@@ -1,0 +1,13 @@
+{
+	"folders": [
+		{
+			"path": "{css,js,includes,pages,admin}"
+		},
+		{
+			"path": "database"
+		},
+		{
+			"path": "includes"
+		}
+	]
+}

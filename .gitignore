@@ -1,0 +1,47 @@
+# Laravel
+/vendor/
+/.env
+.env
+.env.*
+!.env.example
+/storage/logs/*
+/storage/framework/cache/*
+/storage/framework/sessions/*
+/storage/framework/views/*
+
+# Node / React
+/node_modules/
+/frontend/node_modules/
+/customer_portal/node_modules/
+/build/
+/dist/
+
+# Flutter
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+**/build/
+**/.dart_tool/
+**/android/.gradle/
+**/ios/Pods/
+
+# IDE
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Secrets / credentials
+*.pem
+*.key
+credentials.json
+service-account.json

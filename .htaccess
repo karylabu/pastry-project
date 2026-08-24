@@ -1,0 +1,24 @@
+# Rewrite rules for Laravel + API endpoints
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteBase /Capstone--Development/
+
+    # IMPORTANT: These must come FIRST so Laravel rewriting does not override them
+    RewriteRule ^(customer|staff)(/.*)?$ - [L]
+
+    # If the requested file or directory exists, serve it directly
+    RewriteCond %{REQUEST_FILENAME} -f [OR]
+    RewriteCond %{REQUEST_FILENAME} -d
+    RewriteRule .* - [L]
+
+    # Otherwise rewrite to Laravel's front controller
+    RewriteCond %{REQUEST_URI} !^/laravel/public/
+    RewriteRule ^(.*)$ /laravel/public/index.php [L]
+</IfModule>
+
+# Deny direct access to includes and vendor folders for safety
+<IfModule mod_authz_core.c>
+    <FilesMatch "^includes/|^vendor/">
+        Require all denied
+    </FilesMatch>
+</IfModule>

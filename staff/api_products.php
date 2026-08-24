@@ -1,0 +1,250 @@
+<?php
+
+header("Access-Control-Allow-Origin: *");
+header("Access-Control-Allow-Methods: GET, POST, OPTIONS");
+header("Access-Control-Allow-Headers: Content-Type");
+header("Content-Type: application/json");
+
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+    exit;
+}
+
+/* ================= DB ================= */
+
+$host = 'localhost';
+$db   = 'pastry_db';
+$user = 'root';
+$pass = '';
+$charset = 'utf8mb4';
+
+$dsn = "mysql:host=$host;dbname=$db;charset=$charset";
+
+try {
+
+    $pdo = new PDO($dsn, $user, $pass, [
+        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC
+    ]);
+
+} catch (Exception $e) {
+
+    echo json_encode([
+        "success" => false,
+        "error" => "DB connection failed"
+    ]);
+    exit;
+}
+
+/* ================= GET PRODUCTS ================= */
+
+$action = $_GET['action'] ?? 'list';
+
+if ($action === 'list') {
+
+    try {
+
+        $sql = "SELECT * FROM products";
+        $stmt = $pdo->query($sql);
+
+        $products = [];
+
+        while ($row = $stmt->fetch()) {
+            $productId = intval($row['id']);
+
+            $variantStmt = $pdo->prepare(
+                "SELECT id, variant_size, stock_quantity, threshold, price
+                 FROM product_variants
+                 WHERE product_id = ?
+                 ORDER BY FIELD(variant_size, 'slice', 'small', 'big')"
+            );
+            $variantStmt->execute([$productId]);
+            $variants = $variantStmt->fetchAll();
+
+            $products[] = [
+                "id" => $productId,
+                "name" => $row["name"],
+                "category" => $row["category"],
+                "price" => $row["price"],
+                "image" => $row["image"],
+                "stock" => $row["stock"] ?? 0,
+                "available" => $row["available"] ?? 1,
+                "variants" => array_map(function ($variant) {
+                    return [
+                        'id' => intval($variant['id']),
+                        'variant_size' => $variant['variant_size'],
+                        'stock_quantity' => intval($variant['stock_quantity']),
+                        'threshold' => intval($variant['threshold']),
+                        'price' => (float)$variant['price'],
+                        'available' => intval($variant['stock_quantity']) > 0,
+                    ];
+                }, $variants),
+            ];
+        }
+
+        echo json_encode($products);
+        exit;
+
+    } catch (Exception $e) {
+
+        echo json_encode([
+            "success" => false,
+            "error" => "Query failed",
+            "details" => $e->getMessage()
+        ]);
+
+        exit;
+    }
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $action = $_GET['action'] ?? '';
+
+    if ($action === 'create') {
+        $name = trim($_POST['name'] ?? '');
+        $category = trim($_POST['category'] ?? '');
+        $price = floatval($_POST['price'] ?? 0);
+        $stock = intval($_POST['stock'] ?? 0);
+        $description = trim($_POST['description'] ?? '');
+
+        if ($name === '' || $category === '' || $price <= 0) {
+            echo json_encode([
+                "success" => false,
+                "error" => "Missing or invalid product data"
+            ]);
+            exit;
+        }
+
+        $imageName = '🍰';
+        if (!empty($_FILES['image']['name']) && $_FILES['image']['error'] === UPLOAD_ERR_OK) {
+            $uploadDir = __DIR__ . '/../uploads/';
+            if (!is_dir($uploadDir)) {
+                mkdir($uploadDir, 0755, true);
+            }
+
+            $ext = strtolower(pathinfo($_FILES['image']['name'], PATHINFO_EXTENSION));
+            $allowed = ['png', 'jpg', 'jpeg', 'gif'];
+            if (in_array($ext, $allowed, true)) {
+                $baseName = 'p' . rand(100, 999);
+                $finalName = $baseName . '.' . $ext;
+                $tries = 0;
+                while (file_exists($uploadDir . $finalName) && $tries < 10) {
+                    $finalName = $baseName . rand(1, 9) . '.' . $ext;
+                    $tries++;
+                }
+                if (move_uploaded_file($_FILES['image']['tmp_name'], $uploadDir . $finalName)) {
+                    $imageName = $finalName;
+                }
+            }
+        }
+
+        try {
+            $insert = $pdo->prepare(
+                "INSERT INTO products (name, category, price, stock, image, description, available) VALUES (?, ?, ?, ?, ?, ?, 1)"
+            );
+            $insert->execute([$name, $category, $price, $stock, $imageName, $description]);
+            $productId = $pdo->lastInsertId();
+
+            $ingredientIds = $_POST['ingredient_id'] ?? [];
+            $ingredientQtys = $_POST['ingredient_qty'] ?? [];
+            if (is_array($ingredientIds) && is_array($ingredientQtys)) {
+                $recipeInsert = $pdo->prepare(
+                    "INSERT INTO product_recipes (product_id, ingredient_id, qty) VALUES (?, ?, ?)"
+                );
+                foreach ($ingredientIds as $index => $ingredientId) {
+                    $ingredientId = intval($ingredientId);
+                    $qty = floatval($ingredientQtys[$index] ?? 0);
+                    if ($ingredientId > 0 && $qty > 0) {
+                        $recipeInsert->execute([$productId, $ingredientId, $qty]);
+                    }
+                }
+            }
+
+            echo json_encode([
+                "success" => true,
+                "product_id" => $productId
+            ]);
+            exit;
+        } catch (Exception $e) {
+            echo json_encode([
+                "success" => false,
+                "error" => "Failed to create product",
+                "details" => $e->getMessage()
+            ]);
+            exit;
+        }
+    }
+
+    if ($action === 'update') {
+        $id = intval($_POST['id'] ?? 0);
+        $name = trim($_POST['name'] ?? '');
+        $category = trim($_POST['category'] ?? '');
+        $price = floatval($_POST['price'] ?? 0);
+        $stock = intval($_POST['stock'] ?? 0);
+        $description = trim($_POST['description'] ?? '');
+
+        if ($id <= 0) {
+            echo json_encode(["success" => false, "error" => "Missing product id"]);
+            exit;
+        }
+
+        try {
+            // Handle image upload if present
+            $imageName = null;
+            if (!empty($_FILES['image']['name']) && $_FILES['image']['error'] === UPLOAD_ERR_OK) {
+                $uploadDir = __DIR__ . '/../uploads/';
+                if (!is_dir($uploadDir)) mkdir($uploadDir, 0755, true);
+
+                $ext = strtolower(pathinfo($_FILES['image']['name'], PATHINFO_EXTENSION));
+                $allowed = ['png', 'jpg', 'jpeg', 'gif'];
+                if (in_array($ext, $allowed, true)) {
+                    $baseName = 'p' . rand(100, 999);
+                    $finalName = $baseName . '.' . $ext;
+                    $tries = 0;
+                    while (file_exists($uploadDir . $finalName) && $tries < 10) {
+                        $finalName = $baseName . rand(1, 9) . '.' . $ext;
+                        $tries++;
+                    }
+                    if (move_uploaded_file($_FILES['image']['tmp_name'], $uploadDir . $finalName)) {
+                        $imageName = $finalName;
+                    }
+                }
+            }
+
+            // Build update query dynamically
+            $fields = [];
+            $params = [];
+            if ($name !== '') { $fields[] = 'name = ?'; $params[] = $name; }
+            if ($category !== '') { $fields[] = 'category = ?'; $params[] = $category; }
+            if ($price > 0) { $fields[] = 'price = ?'; $params[] = $price; }
+            if (isset($_POST['stock'])) { $fields[] = 'stock = ?'; $params[] = $stock; }
+            if ($description !== '') { $fields[] = 'description = ?'; $params[] = $description; }
+            if ($imageName !== null) { $fields[] = 'image = ?'; $params[] = $imageName; }
+
+            if (count($fields) === 0) {
+                echo json_encode(["success" => false, "error" => "No fields to update"]);
+                exit;
+            }
+
+            $sql = "UPDATE products SET " . implode(', ', $fields) . " WHERE id = ?";
+            $params[] = $id;
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute($params);
+
+            echo json_encode(["success" => true, "updated" => $stmt->rowCount()]);
+            exit;
+
+        } catch (Exception $e) {
+            echo json_encode(["success" => false, "error" => "Update failed", "details" => $e->getMessage()]);
+            exit;
+        }
+    }
+}
+
+/* ================= INVALID ================= */
+
+echo json_encode([
+    "success" => false,
+    "error" => "Invalid action"
+]);
+
+?>

@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Save Address Tester</title>
+    <style>
+        body { font-family: Arial; max-width: 900px; margin: 0 auto; padding: 20px; background: #f5f5f5; }
+        .container { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        h1 { color: #333; border-bottom: 2px solid #d4af37; padding-bottom: 10px; }
+        .section { margin: 20px 0; padding: 15px; background: #f9f9f9; border-left: 4px solid #d4af37; }
+        .section h2 { margin-top: 0; color: #666; }
+        input, textarea { width: 100%; max-width: 400px; padding: 8px; margin: 5px 0; border: 1px solid #ddd; border-radius: 4px; }
+        button { padding: 10px 20px; background: #d4af37; color: white; border: none; border-radius: 4px; cursor: pointer; margin: 5px 5px 5px 0; }
+        button:hover { background: #c99e2c; }
+        .response { margin-top: 15px; padding: 10px; background: #f0f0f0; border-radius: 4px; font-family: monospace; white-space: pre-wrap; max-height: 300px; overflow: auto; }
+        .success { color: green; }
+        .error { color: red; }
+        .warning { color: orange; }
+        .info { color: blue; }
+        label { display: block; margin-top: 10px; font-weight: bold; color: #333; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 Save Address API Tester</h1>
+        <p>Use this tool to diagnose and test the save address functionality.</p>
+
+        <!-- Diagnostics Section -->
+        <div class="section">
+            <h2>1. System Diagnostics</h2>
+            <button onclick="runDiagnostics()">Check System Status</button>
+            <div id="diagnostics" class="response"></div>
+        </div>
+
+        <!-- Database Test -->
+        <div class="section">
+            <h2>2. Database Connection</h2>
+            <button onclick="testDatabase()">Test Database</button>
+            <div id="dbResult" class="response"></div>
+        </div>
+
+        <!-- User Info -->
+        <div class="section">
+            <h2>3. Current User Info</h2>
+            <button onclick="showUserInfo()">Show User Info</button>
+            <div id="userInfo" class="response"></div>
+        </div>
+
+        <!-- API Test Form -->
+        <div class="section">
+            <h2>4. Test Save Address API</h2>
+            <form onsubmit="testSaveAddress(event)">
+                <label>User ID (should auto-fill from localStorage):
+                    <input type="number" id="userId" required>
+                </label>
+                <label>Address Label:
+                    <select id="addressLabel" style="width: 100%; max-width: 400px; padding: 8px;">
+                        <option>Home</option>
+                        <option>Work</option>
+                        <option>School</option>
+                        <option>Other</option>
+                    </select>
+                </label>
+                <label>Recipient Name:
+                    <input type="text" id="recipientName" required>
+                </label>
+                <label>Contact Number:
+                    <input type="tel" id="contactNumber" required placeholder="09123456789">
+                </label>
+                <label>House Number:
+                    <input type="text" id="houseNo">
+                </label>
+                <label>Street:
+                    <input type="text" id="street" required>
+                </label>
+                <label>Barangay:
+                    <input type="text" id="barangay" required>
+                </label>
+                <label>City (must contain "Tanauan"):
+                    <input type="text" id="city" required value="Tanauan">
+                </label>
+                <label>Province (must contain "Batangas"):
+                    <input type="text" id="province" required value="Batangas">
+                </label>
+                <label>ZIP Code:
+                    <input type="text" id="zipCode">
+                </label>
+                <label>Landmark:
+                    <input type="text" id="landmark">
+                </label>
+                <label>Delivery Instructions:
+                    <textarea id="instructions" rows="3"></textarea>
+                </label>
+                <label>
+                    <input type="checkbox" id="isDefault"> Set as Default Address
+                </label>
+                <button type="submit">Test Save Address</button>
+            </form>
+            <div id="saveResult" class="response"></div>
+        </div>
+
+        <!-- Fetch Addresses -->
+        <div class="section">
+            <h2>5. Fetch Saved Addresses</h2>
+            <button onclick="fetchAddresses()">Get All Addresses</button>
+            <div id="addresses" class="response"></div>
+        </div>
+    </div>
+
+    <script>
+        // Auto-load user info on page load
+        window.onload = function() {
+            try {
+                const user = JSON.parse(localStorage.getItem('user') || '{}');
+                if (user.id) {
+                    document.getElementById('userId').value = user.id;
+                }
+            } catch (e) {
+                console.error('Error loading user:', e);
+            }
+        };
+
+        async function runDiagnostics() {
+            const output = document.getElementById('diagnostics');
+            output.innerHTML = 'Running diagnostics...';
+            try {
+                const response = await fetch('/GitHub/Capstone--Development/customer/check_setup.php');
+                const data = await response.json();
+                output.innerHTML = '<span class="info">' + JSON.stringify(data, null, 2) + '</span>';
+            } catch (e) {
+                output.innerHTML = '<span class="error">Error: ' + e.message + '</span>';
+            }
+        }
+
+        async function testDatabase() {
+            const output = document.getElementById('dbResult');
+            output.innerHTML = 'Testing database...';
+            try {
+                const response = await fetch('/GitHub/Capstone--Development/customer/debug_address.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({})
+                });
+                const text = await response.text();
+                output.innerHTML = '<span class="info">' + text.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</span>';
+            } catch (e) {
+                output.innerHTML = '<span class="error">Error: ' + e.message + '</span>';
+            }
+        }
+
+        function showUserInfo() {
+            const output = document.getElementById('userInfo');
+            try {
+                const user = JSON.parse(localStorage.getItem('user') || '{}');
+                if (!user.id) {
+                    output.innerHTML = '<span class="warning">No user logged in. User ID: ' + (user.id || 'NOT SET') + '</span>';
+                } else {
+                    output.innerHTML = '<span class="success">User logged in:\n' + JSON.stringify(user, null, 2) + '</span>';
+                }
+            } catch (e) {
+                output.innerHTML = '<span class="error">Error: ' + e.message + '</span>';
+            }
+        }
+
+        async function testSaveAddress(event) {
+            event.preventDefault();
+            const output = document.getElementById('saveResult');
+            output.innerHTML = 'Saving address...';
+            
+            try {
+                const formData = {
+                    user_id: parseInt(document.getElementById('userId').value),
+                    address_id: 0,
+                    address_label: document.getElementById('addressLabel').value,
+                    recipient_name: document.getElementById('recipientName').value,
+                    contact_number: document.getElementById('contactNumber').value,
+                    house_no: document.getElementById('houseNo').value,
+                    street: document.getElementById('street').value,
+                    barangay: document.getElementById('barangay').value,
+                    city: document.getElementById('city').value,
+                    province: document.getElementById('province').value,
+                    zip_code: document.getElementById('zipCode').value,
+                    landmark: document.getElementById('landmark').value,
+                    delivery_instructions: document.getElementById('instructions').value,
+                    is_default: document.getElementById('isDefault').checked
+                };
+
+                console.log('Sending:', formData);
+
+                const response = await fetch('/GitHub/Capstone--Development/customer/api_addresses.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(formData)
+                });
+
+                const data = await response.json();
+                console.log('Response:', data);
+
+                if (data.status === 'success') {
+                    output.innerHTML = '<span class="success">✓ Success!\n' + JSON.stringify(data, null, 2) + '</span>';
+                } else {
+                    output.innerHTML = '<span class="error">✗ Error: ' + (data.message || 'Unknown error') + '\n' + JSON.stringify(data, null, 2) + '</span>';
+                }
+            } catch (e) {
+                console.error('Error:', e);
+                output.innerHTML = '<span class="error">Error: ' + e.message + '\n\nCheck browser console (F12) for more details.</span>';
+            }
+        }
+
+        async function fetchAddresses() {
+            const output = document.getElementById('addresses');
+            const userId = document.getElementById('userId').value;
+            
+            if (!userId) {
+                output.innerHTML = '<span class="error">Please enter a User ID first</span>';
+                return;
+            }
+
+            output.innerHTML = 'Fetching addresses...';
+            try {
+                const response = await fetch(`/GitHub/Capstone--Development/customer/api_addresses.php?user_id=${userId}`);
+                const data = await response.json();
+                console.log('Addresses:', data);
+
+                if (data.status === 'success') {
+                    if (data.addresses && data.addresses.length > 0) {
+                        output.innerHTML = '<span class="success">✓ Found ' + data.addresses.length + ' address(es):\n' + JSON.stringify(data.addresses, null, 2) + '</span>';
+                    } else {
+                        output.innerHTML = '<span class="info">No addresses saved yet for this user</span>';
+                    }
+                } else {
+                    output.innerHTML = '<span class="error">✗ Error: ' + (data.message || 'Unknown error') + '</span>';
+                }
+            } catch (e) {
+                output.innerHTML = '<span class="error">Error: ' + e.message + '</span>';
+            }
+        }
+    </script>
+</body>
+</html>

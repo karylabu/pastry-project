@@ -1,0 +1,96 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* 1. Global Base Styles - DM Sans as primary font */
+@layer base {
+  html, body {
+    @apply font-['DM_Sans'] text-base leading-relaxed antialiased;
+    font-family: 'DM Sans', 'Segoe UI', sans-serif;
+  }
+
+  /* Standardized font sizes */
+  h1 {
+    @apply text-4xl font-bold;
+  }
+
+  h2 {
+    @apply text-3xl font-bold;
+  }
+
+  h3 {
+    @apply text-2xl font-bold;
+  }
+
+  h4 {
+    @apply text-xl font-bold;
+  }
+
+  p {
+    @apply text-base leading-relaxed;
+  }
+
+  small {
+    @apply text-xs;
+  }
+}
+
+/* 2. Font Family Utilities */
+.font-playfair { 
+  font-family: 'Playfair Display', 'DM Sans', sans-serif; 
+}
+
+.font-dmsans { 
+  font-family: 'DM Sans', sans-serif; 
+}
+
+/* Consistent serif/accent font for headings */
+.font-serif {
+  font-family: 'DM Sans', sans-serif;
+  font-weight: 700;
+}
+
+/* 3. Flying Animation Logic */
+@keyframes flyToCart {
+  0% { 
+    opacity: 1; 
+    transform: scale(1) rotate(0deg); 
+  }
+  100% { 
+    opacity: 0; 
+    left: 90vw; 
+    top: 20px; 
+    transform: scale(0.1) rotate(45deg); 
+  }
+}
+
+.animate-fly-to-cart {
+  position: fixed;
+  z-index: 9999;
+  animation: flyToCart 0.8s cubic-bezier(0.42, 0, 0.58, 1) forwards;
+  pointer-events: none;
+}
+
+/* 4. Cart Modal Overlay & Scrollbar */
+.cart-modal-overlay {
+  background-color: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(8px);
+}
+
+/* Custom Scrollbar para sa listahan ng Cart Items */
+.cart-items-list::-webkit-scrollbar { 
+  width: 6px; 
+}
+
+.cart-items-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.cart-items-list::-webkit-scrollbar-thumb { 
+  background: #e5e7eb; 
+  border-radius: 10px; 
+}
+
+.cart-items-list::-webkit-scrollbar-thumb:hover { 
+  background: #d1d5db; 
+}

@@ -1,0 +1,280 @@
+﻿import React, { useEffect, useMemo, useState } from 'react';
+import { BASE } from '../../services/config';
+import { Heart } from 'lucide-react';
+
+export default function ProductCard({
+  product,
+  onAction,
+  onSelect,
+  favorite,
+  onToggleFavorite,
+}) {
+  const [selectedSizeId, setSelectedSizeId] = useState(null);
+
+  const category = product?.category ? String(product.category).toUpperCase() : '';
+  const isCakeProduct = category === 'CAKES' || category === 'CAKE';
+  const shouldShowVariantSelector = isCakeProduct || category === 'MEALS' || category === 'PASTA' || category === 'RICE MEALS';
+
+  const variantSizes = useMemo(() => {
+    const rawVariants = Array.isArray(product?.variants)
+      ? product.variants
+      : Array.isArray(product?.sizes)
+      ? product.sizes
+      : [];
+
+    if (rawVariants.length === 0) return [];
+
+    const normalizedVariants = rawVariants.map((variant, index) => {
+      const sizeLabel = variant?.variant_size ?? variant?.size ?? variant?.name ?? variant?.label ?? `Option ${index + 1}`;
+      const priceValue = parseFloat(variant?.price ?? variant?.unit_price ?? product?.price ?? 0);
+      const stockValue = Number(variant?.stock_quantity ?? variant?.stock ?? variant?.quantity ?? product?.stock ?? 0);
+      const rawId = variant?.id;
+      const normalizedId = rawId === undefined || rawId === null || rawId === '' || rawId === 0
+        ? `${sizeLabel}-${index}`
+        : String(rawId);
+
+      const displayLabel = String(sizeLabel).toLowerCase();
+      const labelMap = {
+        slice: 'Slice',
+        small: 'Small',
+        big: 'Big',
+        regular: 'Regular',
+        meal: 'Meal',
+        combo: 'Combo',
+        solo: 'Solo',
+        sharing: 'Sharing',
+      };
+
+      return {
+        id: normalizedId,
+        size: labelMap[displayLabel] || String(sizeLabel),
+        price: Number.isFinite(priceValue) ? priceValue : 0,
+        stock_quantity: Number.isFinite(stockValue) ? stockValue : 0,
+        available: variant?.available ?? stockValue > 0,
+      };
+    });
+
+    const shouldAddRegular = shouldShowVariantSelector && (category === 'MEALS' || category === 'PASTA' || category === 'RICE MEALS');
+    if (!shouldAddRegular) return normalizedVariants;
+
+    const hasRegular = normalizedVariants.some((variant) => {
+      const label = String(variant.size).trim().toLowerCase();
+      return label === 'regular' || label === 'default' || label === 'standard';
+    });
+
+    const filteredVariants = normalizedVariants.filter((variant) => {
+      const label = String(variant.size).trim().toLowerCase();
+      return label === 'regular' || label === 'meal' || label === 'combo' || label === 'solo' || label === 'sharing';
+    });
+
+    if (hasRegular) return filteredVariants;
+
+    const basePrice = Number.isFinite(parseFloat(product?.price)) ? parseFloat(product.price) : 0;
+
+    return [
+      {
+        id: 'regular',
+        size: 'Regular',
+        price: basePrice,
+        stock_quantity: Number(product?.stock ?? 0),
+        available: Number(product?.stock ?? 0) > 0,
+      },
+      ...filteredVariants,
+    ];
+  }, [product?.variants, product?.sizes, product?.price, product?.stock, category, shouldShowVariantSelector]);
+
+  const fallbackOptions = category === 'CAKES'
+    ? ['SLICE', 'SMALL', 'BIG']
+    : category === 'PASTA'
+    ? ['REGULAR', 'COMBO']
+    : category === 'STARTER'
+    ? ['SOLO', 'SHARING']
+    : category === 'MEALS' || category === 'RICE MEALS'
+    ? ['REGULAR', 'MEAL', 'COMBO']
+    : ['REGULAR', 'MEAL'];
+
+  const variantButtons = useMemo(() => {
+    if (variantSizes.length > 0) {
+      return variantSizes;
+    }
+
+    if (!shouldShowVariantSelector) {
+      return [];
+    }
+
+    return fallbackOptions.map((label) => ({
+      id: label,
+      size: label,
+      price: parseFloat(product.price) || 0,
+      stock_quantity: Number(product.stock ?? 0),
+      available: Number(product.stock ?? 0) > 0,
+    }));
+  }, [variantSizes, shouldShowVariantSelector, fallbackOptions, product?.price, product?.stock]);
+
+  const currentVariant = useMemo(() => {
+    if (variantButtons.length === 0) {
+      return null;
+    }
+
+    const selected = variantButtons.find((variant) => variant.id === selectedSizeId);
+    return selected || variantButtons[0];
+  }, [selectedSizeId, variantButtons]);
+
+  const normalizedVariantLabel = (currentVariant?.size || product?.variant || product?.defaultSize || '')
+    .toString()
+    .trim()
+    .toLowerCase();
+  const isRegularSelection = normalizedVariantLabel.includes('regular');
+
+  useEffect(() => {
+    if (!variantButtons.length) return;
+
+    const incomingVariant = product?.variant || product?.defaultSize || '';
+    const matchedVariant = variantButtons.find((variant) => {
+      const incoming = String(incomingVariant).trim().toLowerCase();
+      const labels = [variant?.size, variant?.variant_size, variant?.name, variant?.label]
+        .filter(Boolean)
+        .map((value) => String(value).trim().toLowerCase());
+      return labels.includes(incoming) || String(variant?.id).toLowerCase() === incoming;
+    });
+
+    if (matchedVariant && matchedVariant.id !== selectedSizeId) {
+      setSelectedSizeId(matchedVariant.id);
+      return;
+    }
+
+    if (!selectedSizeId) {
+      setSelectedSizeId(variantButtons[0].id);
+    }
+  }, [selectedSizeId, variantButtons, product?.variant, product?.defaultSize]);
+
+  if (!product) return null;
+
+  const currentPrice = currentVariant
+    ? parseFloat(currentVariant.price) || 0
+    : parseFloat(product.price) || 0;
+
+  const overallOutOfStock = variantButtons.length > 0
+    ? variantButtons.every((variant) => variant.stock_quantity <= 0)
+    : Number(product?.stock ?? 0) <= 0;
+  const stockLabel = overallOutOfStock
+    ? 'Out of stock'
+    : currentVariant && currentVariant.stock_quantity > 0 && currentVariant.stock_quantity < 10
+    ? 'Low stock'
+    : '';
+
+  const handleSelection = (variant) => {
+    if (variant.stock_quantity <= 0) return;
+    setSelectedSizeId(variant.id);
+  };
+
+  return (
+    <div
+      onClick={() => {
+        if (!overallOutOfStock) {
+          const label = currentVariant ? currentVariant.size : fallbackOptions[0];
+          onSelect?.(product, label, currentPrice);
+        }
+      }}
+      className={`group w-full rounded-[30px] border border-stone-200/70 bg-white p-5 shadow-[0_10px_35px_rgba(15,23,42,0.05)] transition-all duration-300 flex flex-col items-center text-center ${
+        overallOutOfStock
+          ? 'opacity-50 cursor-not-allowed'
+          : 'cursor-pointer hover:-translate-y-1 hover:shadow-[0_18px_45px_rgba(15,23,42,0.08)]'
+      }`}
+    >
+      <div className="mb-4 h-24 w-24 flex-shrink-0 overflow-hidden rounded-full border border-stone-100 bg-stone-50 shadow-inner md:h-28 md:w-28">
+        <img
+          src={product.image ? `${BASE}/uploads/${product.image}` : 'https://via.placeholder.com/150'}
+          alt={product.name}
+          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+        />
+      </div>
+
+      <div className="flex flex-col flex-grow w-full">
+        <h3 className="text-sm font-semibold text-gray-800 leading-tight mb-2 px-1 line-clamp-2 min-h-[2.5rem]">
+          {product.name}
+        </h3>
+
+        {shouldShowVariantSelector && (
+          <div className="mb-3 flex flex-wrap justify-center gap-1 rounded-full border border-stone-100 bg-stone-50 p-1.5">
+            {variantButtons.map((variant) => {
+              const disabled = variant.stock_quantity <= 0;
+              const selected = currentVariant && currentVariant.id === variant.id;
+
+              return (
+                <button
+                  key={variant.id}
+                  type="button"
+                  disabled={disabled}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleSelection(variant);
+                  }}
+                  className={`rounded-full border px-2 py-0.5 text-[8px] font-semibold uppercase tracking-[0.12em] whitespace-nowrap transition-all ${
+                    disabled
+                      ? 'cursor-not-allowed border-stone-200 bg-stone-100 text-stone-400'
+                      : selected
+                      ? 'border-[#d4af37] bg-[#f7e8b0] text-stone-800 shadow-sm'
+                      : 'border-stone-200 bg-white text-stone-600 hover:border-stone-300 hover:text-stone-800'
+                  }`}
+                >
+                  {variant.size}
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        <p className="text-sm font-semibold text-black mb-4">
+          ₱{currentPrice.toLocaleString()}
+        </p>
+
+        <div className="flex flex-col gap-3 mb-4 text-left">
+          {stockLabel && (
+            <div className="flex flex-wrap items-center gap-2 justify-center">
+              <span className="rounded-full px-3 py-1 text-[10px] font-semibold bg-[#FEF3C7] text-[#92400E]">
+                {stockLabel}
+              </span>
+            </div>
+          )}
+        </div>
+
+        <div className="flex items-center gap-3">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              if (overallOutOfStock) return;
+
+              const label = currentVariant ? currentVariant.size : fallbackOptions[0];
+              onAction?.(product, label, currentPrice);
+            }}
+            disabled={overallOutOfStock}
+            className={`flex-1 rounded-xl py-2.5 text-[10px] font-semibold uppercase tracking-[0.2em] transition-all ${
+              overallOutOfStock
+                ? 'cursor-not-allowed bg-gray-300 text-gray-500'
+                : 'bg-[#111827] text-white hover:bg-[#d4af37] hover:text-black'
+            }`}
+          >
+            Add to Cart
+          </button>
+
+          <button
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onToggleFavorite?.(product);
+            }}
+            className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-stone-200 bg-white/90 transition hover:border-black hover:bg-red-50"
+          >
+            <Heart
+              size={16}
+              className={favorite ? 'text-red-500' : 'text-gray-400'}
+              fill={favorite ? 'currentColor' : 'none'}
+            />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}

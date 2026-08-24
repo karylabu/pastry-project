@@ -1,0 +1,378 @@
+{
+  "Chocolate Ganache Cake": {
+    "Chocolate Cake": [
+      "2 cups all-purpose flour",
+      "2 cups granulated sugar",
+      "3/4 cup unsweetened cocoa powder",
+      "2 teaspoons baking powder",
+      "1 1/2 teaspoons baking soda",
+      "1 teaspoon salt",
+      "2 large eggs",
+      "1 cup milk",
+      "1/2 cup vegetable oil",
+      "2 teaspoons vanilla extract",
+      "1 cup hot coffee or hot water"
+    ],
+    "Chocolate Ganache": [
+      "250 grams dark or semi-sweet chocolate, chopped",
+      "1 cup (240 mL) heavy cream",
+      "1 tablespoon unsalted butter (optional)"
+    ]
+  },
+  "Chocolate S'mores Cake": {
+    "Chocolate Cake": [
+      "2 cups all-purpose flour",
+      "2 cups granulated sugar",
+      "3/4 cup unsweetened cocoa powder",
+      "2 teaspoons baking powder",
+      "1 1/2 teaspoons baking soda",
+      "1 teaspoon salt",
+      "2 large eggs",
+      "1 cup milk",
+      "1/2 cup vegetable oil",
+      "2 teaspoons vanilla extract",
+      "1 cup hot coffee or hot water"
+    ],
+    "Graham Cracker Crust (Optional)": [
+      "1 1/2 cups graham cracker crumbs",
+      "1/4 cup granulated sugar",
+      "6 tablespoons unsalted butter, melted"
+    ],
+    "Chocolate Ganache Filling": [
+      "250 grams dark or semi-sweet chocolate, chopped",
+      "1 cup (240 mL) heavy cream",
+      "1 tablespoon unsalted butter (optional)"
+    ],
+    "Marshmallow Frosting": [
+      "4 large egg whites",
+      "1 cup granulated sugar",
+      "1/4 teaspoon cream of tartar",
+      "1 teaspoon vanilla extract"
+    ]
+  },
+  "Chocolate Caramel Cake": {
+    "Chocolate Cake": [
+      "2 cups all-purpose flour",
+      "2 cups granulated sugar",
+      "3/4 cup unsweetened cocoa powder",
+      "2 teaspoons baking powder",
+      "1 1/2 teaspoons baking soda",
+      "1 teaspoon salt",
+      "2 large eggs",
+      "1 cup milk",
+      "1/2 cup vegetable oil",
+      "2 teaspoons vanilla extract",
+      "1 cup hot coffee or hot water"
+    ],
+    "Caramel Filling": [
+      "1 cup granulated sugar",
+      "6 tablespoons unsalted butter",
+      "1/2 cup (120 mL) heavy cream",
+      "1/2 teaspoon salt (optional, for salted caramel)",
+      "1 teaspoon vanilla extract"
+    ],
+    "Chocolate Ganache": [
+      "250 grams dark or semi-sweet chocolate, chopped",
+      "1 cup (240 mL) heavy cream",
+      "1 tablespoon unsalted butter (optional)"
+    ],
+    "Toppings": [
+      "1/4 cup caramel sauce (for drizzling)",
+      "50 grams chocolate curls or shaved chocolate (optional)",
+      "A pinch flaky sea salt (optional, for salted caramel chocolate cake)"
+    ]
+  },
+  "Chocolate Oreo Cake": {
+    "Chocolate Cake": [
+      "2 cups all-purpose flour",
+      "2 cups granulated sugar",
+      "3/4 cup unsweetened cocoa powder",
+      "2 teaspoons baking powder",
+      "1 1/2 teaspoons baking soda",
+      "1 teaspoon salt",
+      "2 large eggs",
+      "1 cup milk",
+      "1/2 cup vegetable oil",
+      "2 teaspoons vanilla extract",
+      "1 cup hot coffee or hot water"
+    ],
+    "Oreo Buttercream Frosting": [
+      "1 cup (227 g) unsalted butter, softened",
+      "4 cups powdered sugar",
+      "1/2 cup unsweetened cocoa powder",
+      "10–12 Oreo cookies, finely crushed",
+      "2 teaspoons vanilla extract",
+      "2–4 tablespoons milk or heavy cream"
+    ],
+    "Chocolate Ganache (Optional)": [
+      "250 grams dark or semi-sweet chocolate, chopped",
+      "1 cup (240 mL) heavy cream",
+      "1 tablespoon unsalted butter (optional)"
+    ],
+    "Toppings": [
+      "8–10 whole Oreo cookies",
+      "4–6 Oreo cookies, crushed",
+      "50 grams chocolate shavings or curls (optional)"
+    ]
+  },
+  "Tiramisu Cake": {
+    "Vanilla Sponge Cake": [
+      "2 cups all-purpose flour",
+      "1 1/2 cups granulated sugar",
+      "2 teaspoons baking powder",
+      "1/2 teaspoon salt",
+      "1/2 cup (113 g) unsalted butter, softened",
+      "1/2 cup (120 mL) vegetable oil",
+      "4 large eggs",
+      "1 cup (240 mL) whole milk",
+      "2 teaspoons vanilla extract"
+    ],
+    "Coffee Syrup": [
+      "1 cup (240 mL) strong brewed coffee or espresso",
+      "2 tablespoons granulated sugar",
+      "1 tablespoon coffee liqueur (optional)"
+    ],
+    "Mascarpone Cream Frosting": [
+      "250 grams mascarpone cheese",
+      "1 1/2 cups (360 mL) heavy whipping cream",
+      "1/2 cup powdered sugar",
+      "1 teaspoon vanilla extract"
+    ],
+    "Toppings": [
+      "2 tablespoons unsweetened cocoa powder (for dusting)",
+      "30 grams dark chocolate, grated or shaved (optional)"
+    ]
+  },
+  "Red Velvet Cake": {
+    "Red Velvet Cake": [
+      "2 1/2 cups all-purpose flour",
+      "1 1/2 cups granulated sugar",
+      "2 tablespoons unsweetened cocoa powder",
+      "1 teaspoon baking soda",
+      "1 teaspoon salt",
+      "2 large eggs",
+      "1 cup (240 mL) buttermilk",
+      "1 cup (240 mL) vegetable oil",
+      "2 teaspoons vanilla extract",
+      "1 teaspoon white vinegar",
+      "2 tablespoons red food coloring (liquid) or 1–2 teaspoons red gel food coloring"
+    ],
+    "Cream Cheese Frosting": [
+      "227 grams (8 oz) cream cheese, softened",
+      "1/2 cup (113 g) unsalted butter, softened",
+      "4 cups powdered sugar",
+      "1 teaspoon vanilla extract"
+    ],
+    "Toppings (Optional)": [
+      "Red velvet cake crumbs",
+      "White chocolate shavings",
+      "Fresh berries (such as strawberries or raspberries)"
+    ]
+  },
+  "Ube Flan Cake": {
+    "Ube Cake": [
+      "2 1/2 cups all-purpose flour",
+      "1 1/2 cups granulated sugar",
+      "2 teaspoons baking powder",
+      "1/2 teaspoon salt",
+      "3 large eggs",
+      "1 cup (240 mL) whole milk",
+      "1/2 cup (120 mL) vegetable oil",
+      "1 cup (250 g) ube halaya (ube jam)",
+      "1 teaspoon ube extract",
+      "1 teaspoon vanilla extract"
+    ],
+    "Leche Flan": [
+      "10 large egg yolks",
+      "1 can (300 mL) sweetened condensed milk",
+      "1 can (370 mL) evaporated milk",
+      "1 teaspoon vanilla extract"
+    ],
+    "Caramel": [
+      "1 cup granulated sugar",
+      "1/4 cup water"
+    ],
+    "Whipped Cream Frosting (Optional)": [
+      "2 cups (480 mL) heavy whipping cream",
+      "1/4 cup powdered sugar",
+      "1 teaspoon vanilla extract"
+    ],
+    "Toppings (Optional)": [
+      "Ube halaya (for piping or garnish)",
+      "Toasted coconut flakes",
+      "White chocolate shavings"
+    ]
+  },
+  "Strawberry Pistachio Cake": {
+    "Pistachio Cake": [
+      "2 1/2 cups all-purpose flour",
+      "1 1/2 cups granulated sugar",
+      "1 cup finely ground pistachios",
+      "2 teaspoons baking powder",
+      "1/2 teaspoon baking soda",
+      "1/2 teaspoon salt",
+      "3 large eggs",
+      "1 cup (240 mL) whole milk",
+      "1/2 cup (120 mL) vegetable oil",
+      "1 teaspoon vanilla extract",
+      "1/2 teaspoon almond extract (optional)"
+    ],
+    "Strawberry Filling": [
+      "2 cups fresh strawberries, diced",
+      "1/4 cup granulated sugar",
+      "1 tablespoon cornstarch",
+      "1 tablespoon lemon juice"
+    ],
+    "Cream Cheese Frosting": [
+      "227 grams (8 oz) cream cheese, softened",
+      "1/2 cup (113 g) unsalted butter, softened",
+      "4 cups powdered sugar",
+      "1 teaspoon vanilla extract"
+    ],
+    "Toppings": [
+      "1 cup fresh strawberries, halved or sliced",
+      "1/2 cup chopped pistachios",
+      "White chocolate shavings (optional)"
+    ]
+  },
+  "Carrot Cake": {
+    "Carrot Cake": [
+      "2 cups all-purpose flour",
+      "1 1/2 cups granulated sugar",
+      "1 cup brown sugar",
+      "2 teaspoons baking powder",
+      "1 teaspoon baking soda",
+      "1 teaspoon ground cinnamon",
+      "1/2 teaspoon ground nutmeg",
+      "1/2 teaspoon salt",
+      "4 large eggs",
+      "1 cup (240 mL) vegetable oil",
+      "3 cups finely grated carrots",
+      "1 teaspoon vanilla extract",
+      "1/2 cup chopped walnuts or pecans (optional)",
+      "1/2 cup raisins (optional)"
+    ],
+    "Cream Cheese Frosting": [
+      "227 grams (8 oz) cream cheese, softened",
+      "1/2 cup (113 g) unsalted butter, softened",
+      "4 cups powdered sugar",
+      "1 teaspoon vanilla extract"
+    ],
+    "Toppings (Optional)": [
+      "1/4 cup chopped walnuts or pecans",
+      "Carrot cake crumbs",
+      "Shredded carrots for garnish"
+    ]
+  },
+  "Sans Rival": {
+    "Cashew Meringue Layers": [
+      "10 large egg whites",
+      "1 cup granulated sugar",
+      "1 cup powdered sugar",
+      "2 cups (250 g) roasted cashew nuts, finely chopped",
+      "1/4 teaspoon cream of tartar"
+    ],
+    "French Buttercream": [
+      "10 large egg yolks",
+      "1 cup granulated sugar",
+      "1 cup (240 mL) water",
+      "2 cups (454 g) unsalted butter, softened",
+      "1 teaspoon vanilla extract"
+    ],
+    "Toppings": [
+      "1 cup (125 g) roasted cashew nuts, coarsely chopped",
+      "2 tablespoons powdered sugar (optional, for dusting)"
+    ]
+  },
+  "Chocolate Mousse Cake": {
+    "Chocolate Cake Base": [
+      "1 1/2 cups all-purpose flour",
+      "1 1/2 cups granulated sugar",
+      "1/2 cup unsweetened cocoa powder",
+      "1 1/2 teaspoons baking powder",
+      "1 teaspoon baking soda",
+      "1/2 teaspoon salt",
+      "2 large eggs",
+      "3/4 cup (180 mL) milk",
+      "1/3 cup (80 mL) vegetable oil",
+      "1 teaspoon vanilla extract",
+      "3/4 cup (180 mL) hot coffee or hot water"
+    ],
+    "Chocolate Mousse": [
+      "250 grams dark or semi-sweet chocolate, chopped",
+      "2 cups (480 mL) heavy whipping cream, divided",
+      "2 tablespoons granulated sugar",
+      "1 teaspoon vanilla extract",
+      "1 teaspoon unflavored gelatin (optional, for a firmer mousse)",
+      "2 tablespoons water (if using gelatin)"
+    ],
+    "Chocolate Ganache": [
+      "200 grams dark or semi-sweet chocolate, chopped",
+      "3/4 cup (180 mL) heavy cream"
+    ],
+    "Toppings (Optional)": [
+      "Chocolate curls or shavings",
+      "Unsweetened cocoa powder",
+      "Fresh berries",
+      "Whipped cream"
+    ]
+  },
+  "Blueberry Cheesecake": {
+    "Graham Cracker Crust": [
+      "2 cups graham cracker crumbs",
+      "1/4 cup granulated sugar",
+      "1/2 cup (113 g) unsalted butter, melted"
+    ],
+    "Cheesecake Filling": [
+      "680 grams (24 oz) cream cheese, softened",
+      "1 cup (240 mL) granulated sugar",
+      "3 large eggs",
+      "1 cup (240 mL) sour cream",
+      "1 teaspoon vanilla extract",
+      "1 tablespoon all-purpose flour (optional, for added stability)"
+    ],
+    "Blueberry Topping": [
+      "2 cups fresh or frozen blueberries",
+      "1/4 cup granulated sugar",
+      "1 tablespoon cornstarch",
+      "2 tablespoons water",
+      "1 tablespoon lemon juice"
+    ],
+    "Toppings (Optional)": [
+      "Fresh blueberries",
+      "Whipped cream",
+      "Lemon zest"
+    ]
+  },
+  "Choco-Pistachio Dream Cake": {
+    "Chocolate Cake": [
+      "2 cups all-purpose flour",
+      "2 cups granulated sugar",
+      "3/4 cup unsweetened cocoa powder",
+      "2 teaspoons baking powder",
+      "1 1/2 teaspoons baking soda",
+      "1 teaspoon salt",
+      "2 large eggs",
+      "1 cup (240 mL) milk",
+      "1/2 cup (120 mL) vegetable oil",
+      "2 teaspoons vanilla extract",
+      "1 cup (240 mL) hot coffee or hot water"
+    ],
+    "Pistachio Cream Filling": [
+      "1 cup (250 g) pistachio spread or pistachio cream",
+      "1 cup (240 mL) heavy whipping cream",
+      "227 grams (8 oz) cream cheese, softened",
+      "1/4 cup powdered sugar"
+    ],
+    "Chocolate Ganache": [
+      "250 grams dark or semi-sweet chocolate, chopped",
+      "1 cup (240 mL) heavy cream",
+      "1 tablespoon unsalted butter (optional)"
+    ],
+    "Toppings": [
+      "1/2 cup chopped roasted pistachios",
+      "50 grams dark chocolate shavings or curls",
+      "Chocolate drizzle (optional)"
+    ]
+  }
+}

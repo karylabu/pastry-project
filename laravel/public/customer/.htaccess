@@ -1,0 +1,7 @@
+<IfModule mod_headers.c>
+    Header always set Access-Control-Allow-Methods "GET, POST, OPTIONS"
+    Header always set Access-Control-Allow-Headers "Content-Type, X-XSRF-TOKEN, X-CSRF-TOKEN"
+</IfModule>
+
+# Let PHP handle OPTIONS so the customer API can emit Access-Control-Allow-Origin headers.
+# Removing the direct 204 rewrite ensures cors.php runs for preflight requests.
