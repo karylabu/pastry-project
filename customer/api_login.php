@@ -53,8 +53,17 @@ try {
         exit;
     }
 
+    session_regenerate_id(true);
+    $_SESSION['user'] = [
+        'id' => (int) $user['id'],
+        'name' => $user['name'],
+        'email' => $user['email'],
+        'role' => $user['role'],
+    ];
+
     // Generate a simple token for the session
     $token = bin2hex(random_bytes(32));
+    $_SESSION['auth_token'] = $token;
     
     // Store token in database for validation (optional but recommended)
     $token_escaped = mysqli_real_escape_string($conn, $token);

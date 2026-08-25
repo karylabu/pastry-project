@@ -4,6 +4,8 @@ import { AnimatePresence, motion } from "framer-motion";
 import StaffNavbar from "../components/StaffNavbar";
 import { STAFF_BASE } from "../../services/config";
 
+const staffFetch = (url, options = {}) => fetch(url, { credentials: "include", ...options });
+
 export default function OrderHistory({ showNavbar = true }) {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -16,7 +18,7 @@ export default function OrderHistory({ showNavbar = true }) {
   const [selectedOrder, setSelectedOrder] = useState(null);
 
   useEffect(() => {
-    fetch(`${STAFF_BASE}/api_orders.php`)
+    staffFetch(`${STAFF_BASE}/api_orders.php`)
       .then((res) => res.json())
       .then((data) => {
         if (Array.isArray(data)) {

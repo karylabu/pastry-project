@@ -4,7 +4,7 @@ const origin = typeof window !== "undefined" ? window.location.origin : "";
 // Development: XAMPP is running on localhost:80 (Apache)
 // Production: Use the homepage prefix
 const xamppBase = "http://localhost";
-const xamppWithProject = "http://localhost/Capstone--Development%20-%20Copy";
+const xamppWithProject = "http://localhost/pastry-project";
 const xamppCustomerBase = `${xamppWithProject}/customer`;
 const xamppStaffBase = `${xamppWithProject}/staff`;
 const configuredDevBase = process.env.REACT_APP_API_BASE || "";

@@ -1,15 +1,8 @@
 <?php
+require_once __DIR__ . '/../includes/api_auth.php';
+require_once __DIR__ . '/../includes/inventory.php';
 
-header("Content-Type: application/json");
-header("Access-Control-Allow-Origin: *");
-header("Access-Control-Allow-Methods: POST, OPTIONS");
-header("Access-Control-Allow-Headers: Content-Type");
-
-if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-    exit;
-}
-
-session_start();
+requireInventoryWrite();
 
 function getSessionUserId(): int {
     if (session_status() !== PHP_SESSION_ACTIVE) {
@@ -50,6 +43,7 @@ $action = trim($data['action'] ?? "");
 $id     = intval($data['id'] ?? 0);
 $qty    = intval($data['qty'] ?? 0);
 $type   = $data['type'] ?? $action;
+$reason = trim((string) ($data['reason'] ?? $data['note'] ?? 'Manual stock adjustment'));
 $productVariantId = intval($data['product_variant_id'] ?? 0);
 
 if ($action === "produce") {
@@ -61,12 +55,14 @@ if ($action === "produce") {
         exit;
     }
 
-    $stmt = $conn->prepare("SELECT stock, name FROM products WHERE id = ?");
+    $conn->begin_transaction();
+    $stmt = $conn->prepare("SELECT stock, name FROM products WHERE id = ? FOR UPDATE");
     $stmt->bind_param("i", $id);
     $stmt->execute();
     $result = $stmt->get_result();
 
     if ($result->num_rows === 0) {
+        $conn->rollback();
         echo json_encode([
             "status" => "error",
             "message" => "Product not found"
@@ -82,7 +78,8 @@ if ($action === "produce") {
         "SELECT pr.ingredient_id, pr.qty, i.name, i.unit, i.stock
          FROM product_recipes pr
          JOIN ingredients i ON i.id = pr.ingredient_id
-         WHERE pr.product_id = ?"
+         WHERE pr.product_id = ? AND pr.active = 1
+         FOR UPDATE"
     );
     $recipeStmt->bind_param("i", $id);
     $recipeStmt->execute();
@@ -100,6 +97,7 @@ if ($action === "produce") {
     }
 
     if (count($recipeLines) === 0) {
+        $conn->rollback();
         echo json_encode([
             "status" => "error",
             "message" => "No recipe defined for this product"
@@ -117,6 +115,7 @@ if ($action === "produce") {
     }
 
     if ($shortage) {
+        $conn->rollback();
         echo json_encode([
             "status" => "error",
             "message" => "Insufficient {$shortage['name']} for this production quantity"
@@ -124,11 +123,19 @@ if ($action === "produce") {
         exit;
     }
 
-    $currentUserId = getSessionUserId();
-    $conn->begin_transaction();
+    $currentUserId = inventoryUserId();
     $ingredientUpdate = $conn->prepare("UPDATE ingredients SET stock = stock - ?, updated_at = NOW() WHERE id = ?");
-    $movementInsert = $conn->prepare("INSERT INTO ingredient_movements (ingredient_id, action, qty, note, user_id) VALUES (?, 'stock_out', ?, ?, ?)");
     $movementNote = "Produced {$qty} unit(s) of {$productName}";
+
+    $productionStmt = $conn->prepare("INSERT INTO production_transactions (product_id, quantity, user_id) VALUES (?, ?, ?)");
+    $productionStmt->bind_param('iii', $id, $qty, $currentUserId);
+    if (!$productionStmt->execute()) {
+        $conn->rollback();
+        echo json_encode(["status" => "error", "message" => "Failed to record production"]);
+        exit;
+    }
+    $productionId = $productionStmt->insert_id;
+    $productionStmt->close();
 
     foreach ($recipeLines as $line) {
         $required = $line['qty'] * $qty;
@@ -142,8 +149,7 @@ if ($action === "produce") {
             exit;
         }
 
-        $movementInsert->bind_param('idsi', $line['ingredient_id'], $required, $movementNote, $currentUserId);
-        if (!$movementInsert->execute()) {
+        if (!insertIngredientMovement($conn, $line['ingredient_id'], 'stock_out', $required, $movementNote, $currentUserId, 'production', $productionId)) {
             $conn->rollback();
             echo json_encode([
                 "status" => "error",
@@ -161,6 +167,12 @@ if ($action === "produce") {
             "status" => "error",
             "message" => "Failed to update finished goods stock"
         ]);
+        exit;
+    }
+
+    if (!recordProductMovement($conn, $id, 'Production', $qty, $currentProductStock, $currentProductStock + $qty, $movementNote, 'production', $productionId, $currentUserId)) {
+        $conn->rollback();
+        echo json_encode(["status" => "error", "message" => "Failed to record finished-product movement"]);
         exit;
     }
 
@@ -183,12 +195,14 @@ if ($productVariantId > 0) {
         exit;
     }
 
-    $variantStmt = $conn->prepare("SELECT product_id, stock_quantity FROM product_variants WHERE id = ?");
+    $conn->begin_transaction();
+    $variantStmt = $conn->prepare("SELECT product_id, stock_quantity FROM product_variants WHERE id = ? FOR UPDATE");
     $variantStmt->bind_param("i", $productVariantId);
     $variantStmt->execute();
     $variantResult = $variantStmt->get_result();
 
     if ($variantResult->num_rows === 0) {
+        $conn->rollback();
         echo json_encode([
             "status" => "error",
             "message" => "Variant not found"
@@ -204,10 +218,17 @@ if ($productVariantId > 0) {
     $updateVariant->bind_param("ii", $newStock, $productVariantId);
 
     if (!$updateVariant->execute()) {
+        $conn->rollback();
         echo json_encode([
             "status" => "error",
             "message" => "Failed to update variant stock"
         ]);
+        exit;
+    }
+
+    if (!recordProductMovement($conn, (int) $variant['product_id'], 'Stock Adjustment', $type === 'in' ? $qty : -$qty, $current, $newStock, $reason, 'stock_adjustment', null, inventoryUserId(), $productVariantId)) {
+        $conn->rollback();
+        echo json_encode(["status" => "error", "message" => "Failed to record variant stock movement"]);
         exit;
     }
 
@@ -235,6 +256,7 @@ if ($productVariantId > 0) {
     );
     $aggregate->bind_param('ii', $variant['product_id'], $variant['product_id']);
     $aggregate->execute();
+    $conn->commit();
 
     echo json_encode([
         "status" => "success",
@@ -254,12 +276,14 @@ if ($id <= 0 || $qty <= 0 || !in_array($type, ['in','out'])) {
 
 /* ================= GET CURRENT STOCK ================= */
 
-$stmt = $conn->prepare("SELECT stock FROM products WHERE id = ?");
+$conn->begin_transaction();
+$stmt = $conn->prepare("SELECT stock FROM products WHERE id = ? FOR UPDATE");
 $stmt->bind_param("i", $id);
 $stmt->execute();
 $result = $stmt->get_result();
 
 if ($result->num_rows === 0) {
+    $conn->rollback();
     echo json_encode([
         "status" => "error",
         "message" => "Product not found"
@@ -278,7 +302,12 @@ if ($type === "in") {
     $newStock = $current - $qty;
 
     if ($newStock < 0) {
-        $newStock = 0; // prevent negative stock
+        $conn->rollback();
+        echo json_encode([
+            "status" => "error",
+            "message" => "Insufficient product stock"
+        ]);
+        exit;
     }
 }
 
@@ -289,10 +318,19 @@ $update->bind_param("ii", $newStock, $id);
 
 if ($update->execute()) {
     $currentUserId = getSessionUserId();
+    $movementType = $type === 'in' ? 'Stock Adjustment' : 'Stock Adjustment';
+    $movementQuantity = $type === 'in' ? $qty : -$qty;
+    if (!recordProductMovement($conn, $id, $movementType, $movementQuantity, $current, $newStock, $reason, 'stock_adjustment', null, $currentUserId)) {
+        $conn->rollback();
+        echo json_encode(["status" => "error", "message" => "Failed to record stock movement"]);
+        exit;
+    }
     if ($currentUserId > 0) {
         $stockNote = sprintf('Product %s stock %s via api_update_stocks', $type === 'in' ? 'increased' : 'decreased', $type);
         insertAuditLog($conn, $currentUserId, 'stocks', $type === 'in' ? 'stock_in' : 'stock_out', 'product', $id, $stockNote);
     }
+
+    $conn->commit();
 
     echo json_encode([
         "status" => "success",
@@ -301,6 +339,8 @@ if ($update->execute()) {
     ]);
 
 } else {
+
+    $conn->rollback();
 
     echo json_encode([
         "status" => "error",

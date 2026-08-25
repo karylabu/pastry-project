@@ -32,6 +32,7 @@ export default function StaffAdminLogin() {
     try {
       const response = await fetch(`${CUSTOMER_BASE}/api_login.php`, {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
       });
@@ -43,14 +44,14 @@ export default function StaffAdminLogin() {
       }
 
       const normalizedRole = normalizeRole(data.user?.role);
-      const userWithRole = { ...data.user, role: normalizedRole };
+      const userWithRole = { ...data.user, role: normalizedRole, token: data.token || "" };
       localStorage.setItem("user", JSON.stringify(userWithRole));
       setSuccess("Signed in successfully.");
 
       if (["admin", "administrator", "superadmin", "super_admin"].includes(normalizedRole)) {
         navigate("/admin", { replace: true });
       } else if (normalizedRole === "staff") {
-        navigate("/staff", { replace: true });
+        navigate("/staff/dashboard", { replace: true });
       } else {
         navigate("/customer", { replace: true });
       }

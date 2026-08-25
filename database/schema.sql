@@ -34,6 +34,7 @@ CREATE TABLE IF NOT EXISTS products (
     price       DECIMAL(10,2)       NOT NULL,
     production_cost DECIMAL(10,2)   NOT NULL DEFAULT 0.00,
     stock       INT                 NOT NULL DEFAULT 0,
+        minimum_stock INT               NOT NULL DEFAULT 5,
     image       VARCHAR(10)         NOT NULL DEFAULT '🍰',   -- emoji
     description TEXT,
     available   TINYINT(1)          NOT NULL DEFAULT 1,
@@ -67,10 +68,32 @@ CREATE TABLE IF NOT EXISTS ingredient_movements (
     qty             DECIMAL(10,3)       NOT NULL,
     note            TEXT,
     user_id         INT,
+    reference_type  VARCHAR(40),
+    reference_id    INT,
     created_at      TIMESTAMP           DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (ingredient_id) REFERENCES ingredients(id) ON DELETE CASCADE,
     INDEX idx_ingredient (ingredient_id),
     INDEX idx_created_at (created_at)
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS product_inventory_movements (
+    id              INT AUTO_INCREMENT PRIMARY KEY,
+    product_id      INT NOT NULL,
+    product_variant_id INT NULL,
+    movement_type   VARCHAR(40) NOT NULL,
+    quantity        DECIMAL(10,3) NOT NULL,
+    previous_stock  DECIMAL(10,3) NOT NULL,
+    new_stock       DECIMAL(10,3) NOT NULL,
+    reason          VARCHAR(255),
+    reference_type  VARCHAR(40),
+    reference_id    INT,
+    user_id         INT,
+    created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL,
+    UNIQUE KEY uq_product_reference (product_id, product_variant_id, movement_type, reference_type, reference_id),
+    INDEX idx_product_created (product_id, created_at),
+    INDEX idx_reference (reference_type, reference_id)
 ) ENGINE=InnoDB;
 
 CREATE TABLE IF NOT EXISTS audit_log (
@@ -95,6 +118,7 @@ CREATE TABLE IF NOT EXISTS product_recipes (
     product_id     INT                 NOT NULL,
     ingredient_id  INT                 NOT NULL,
     qty            DECIMAL(10,3)       NOT NULL DEFAULT 0,
+    active         TINYINT(1)          NOT NULL DEFAULT 1,
     created_at     TIMESTAMP           DEFAULT CURRENT_TIMESTAMP,
     updated_at     TIMESTAMP           DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     UNIQUE KEY uq_product_ingredient (product_id, ingredient_id),
@@ -121,6 +145,40 @@ CREATE TABLE IF NOT EXISTS variance (
     FOREIGN KEY (recorded_by) REFERENCES users(id) ON DELETE RESTRICT,
     INDEX idx_date (recorded_date),
     INDEX idx_type (variance_type)
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS waste_log (
+    id              INT AUTO_INCREMENT PRIMARY KEY,
+    datetime        DATETIME NOT NULL,
+    item            VARCHAR(150) NOT NULL,
+    qty             DECIMAL(10,3) NOT NULL,
+    unit_cost       DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+    item_type       ENUM('Raw Material','Finished Product') NOT NULL DEFAULT 'Raw Material',
+    reason          VARCHAR(255) NOT NULL,
+    ingredient_id   INT NULL,
+    product_id      INT NULL,
+    user_id         INT NULL,
+    reference_type  VARCHAR(40) NULL,
+    reference_id    INT NULL,
+    idempotency_key VARCHAR(100) NULL,
+    created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (ingredient_id) REFERENCES ingredients(id) ON DELETE SET NULL,
+    FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE SET NULL,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL,
+    INDEX idx_waste_datetime (datetime),
+    INDEX idx_waste_item (item_type, ingredient_id, product_id),
+    UNIQUE KEY uq_waste_idempotency (idempotency_key)
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS production_transactions (
+    id          INT AUTO_INCREMENT PRIMARY KEY,
+    product_id  INT NOT NULL,
+    quantity    INT NOT NULL,
+    user_id     INT,
+    created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE RESTRICT,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL,
+    INDEX idx_production_product (product_id, created_at)
 ) ENGINE=InnoDB;
 
 -- ────────────────────────────────────────────────────────────
@@ -167,10 +225,13 @@ CREATE TABLE IF NOT EXISTS orders (
 CREATE TABLE IF NOT EXISTS order_items (
     id          INT AUTO_INCREMENT PRIMARY KEY,
     order_id    INT             NOT NULL,
+    product_id  INT             NULL,
     product     VARCHAR(150)    NOT NULL,
     qty         INT             NOT NULL DEFAULT 1,
     price       DECIMAL(10,2)   NOT NULL,
     FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE,
+    FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE SET NULL,
+    INDEX idx_order_product (order_id, product_id),
     INDEX idx_order (order_id)
 ) ENGINE=InnoDB;
 

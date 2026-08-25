@@ -1,6 +1,11 @@
 <?php
 header('Content-Type: application/json');
+require_once __DIR__ . '/../includes/api_auth.php';
 require_once __DIR__ . '/../includes/db.php';
+
+// Staff reports contain business revenue data — require an authenticated
+// staff/admin session (or Bearer token) before returning anything.
+requireInventoryRead();
 
 function sendJson(bool $success, array $payload, int $statusCode = 200): never {
     http_response_code($statusCode);

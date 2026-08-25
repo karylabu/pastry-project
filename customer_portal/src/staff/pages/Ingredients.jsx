@@ -2,6 +2,8 @@ import React, { useEffect, useMemo, useState } from "react";
 import StaffNavbar from "../components/StaffNavbar";
 import { STAFF_BASE } from "../../services/config";
 
+const staffFetch = (url, options = {}) => fetch(url, { credentials: "include", ...options });
+
 export default function Ingredients({
   showNavbar = true,
   pageContainerClassName = "lg:pl-[260px] pt-[72px]",
@@ -41,7 +43,7 @@ export default function Ingredients({
 
   const loadIngredients = () => {
     setLoading(true);
-    fetch(`${STAFF_BASE}/api_ingredients.php`)
+    staffFetch(`${STAFF_BASE}/api_ingredients.php`)
       .then((res) => res.json())
       .then((data) => {
         if (data.success) {
@@ -56,7 +58,7 @@ export default function Ingredients({
 
   const syncRecipeIngredients = async () => {
     try {
-      await fetch(`${STAFF_BASE}/api_ingredients.php`, {
+      await staffFetch(`${STAFF_BASE}/api_ingredients.php`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'sync_from_cakes' }),
@@ -116,7 +118,7 @@ export default function Ingredients({
     const action = modalType === 'in' ? 'stock_in' : 'stock_out';
     const payload = { action, ingredient_id: modalIngredient.id, qty, note: modalNote };
     try {
-      const res = await fetch(`${STAFF_BASE}/api_ingredients.php`, {
+      const res = await staffFetch(`${STAFF_BASE}/api_ingredients.php`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
@@ -152,7 +154,7 @@ export default function Ingredients({
       expiry: modalExpiry || null,
     };
     try {
-      const res = await fetch(`${STAFF_BASE}/api_ingredients.php`, {
+      const res = await staffFetch(`${STAFF_BASE}/api_ingredients.php`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
@@ -190,7 +192,7 @@ export default function Ingredients({
       expiry: modalExpiry || null,
     };
     try {
-      const res = await fetch(`${STAFF_BASE}/api_ingredients.php`, {
+      const res = await staffFetch(`${STAFF_BASE}/api_ingredients.php`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
@@ -229,7 +231,7 @@ export default function Ingredients({
     }
     const payload = { action, ingredient_id: modalIngredient.id, qty, note: modalAdjustNote };
     try {
-      const res = await fetch(`${STAFF_BASE}/api_ingredients.php`, {
+      const res = await staffFetch(`${STAFF_BASE}/api_ingredients.php`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
@@ -268,7 +270,7 @@ export default function Ingredients({
   const fetchHistory = async (ingredientId) => {
     setHistoryLoading(true);
     try {
-      const res = await fetch(`${STAFF_BASE}/api_ingredient_history.php?ingredient_id=${encodeURIComponent(ingredientId)}`);
+      const res = await staffFetch(`${STAFF_BASE}/api_ingredient_history.php?ingredient_id=${encodeURIComponent(ingredientId)}`);
       const j = await res.json().catch(() => ({}));
       setHistoryEntries(Array.isArray(j.history) ? j.history : []);
     } catch (e) {

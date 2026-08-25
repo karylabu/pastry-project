@@ -1,9 +1,11 @@
 import React, { useEffect, useMemo, useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useLocation, useNavigate } from "react-router-dom";
-import { Search, Trash2 } from "lucide-react";
+import { Search, Trash2, History, RefreshCw } from "lucide-react";
 import StaffNavbar from "../components/StaffNavbar";
 import { BASE, STAFF_BASE } from "../../services/config";
+
+const staffFetch = (url, options = {}) => fetch(url, { credentials: "include", ...options });
 
 export default function Products({ showNavbar = true }) {
 
@@ -14,7 +16,7 @@ export default function Products({ showNavbar = true }) {
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [qty, setQty] = useState("");
   const [updateError, setUpdateError] = useState(null);
-  const [stockUnit, setStockUnit] = useState("slice");
+  const [feedback, setFeedback] = useState(null);
   // Edit product
   const [editOpen, setEditOpen] = useState(false);
   const [editProduct, setEditProduct] = useState(null);
@@ -25,6 +27,15 @@ export default function Products({ showNavbar = true }) {
   const [bomQty, setBomQty] = useState(1);
   const [bomError, setBomError] = useState(null);
   const [bomLoading, setBomLoading] = useState(false);
+  const [operationLoading, setOperationLoading] = useState(false);
+  const [activeModal, setActiveModal] = useState(null);
+  const [historyEntries, setHistoryEntries] = useState([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyError, setHistoryError] = useState(null);
+  const [adjustReason, setAdjustReason] = useState("Inventory Correction");
+  const [adjustType, setAdjustType] = useState("out");
+  const [adjustNotes, setAdjustNotes] = useState("");
+  const [inventorySummary, setInventorySummary] = useState(null);
 
   const [ingredients, setIngredients] = useState([]);
   const [addProductOpen, setAddProductOpen] = useState(false);
@@ -50,6 +61,10 @@ export default function Products({ showNavbar = true }) {
 
   // ⭐ NEW: CATEGORY FILTER
   const [activeCat, setActiveCat] = useState("All");
+  const currentUser = (() => {
+    try { return JSON.parse(window.localStorage.getItem("user") || "null"); } catch { return null; }
+  })();
+  const canManageCatalog = ["admin", "manager"].includes(String(currentUser?.role || "").toLowerCase());
 
   /* =========================
      FETCH PRODUCTS
@@ -59,7 +74,7 @@ export default function Products({ showNavbar = true }) {
     setLoading(true);
     setFetchError(null);
 
-    fetch(`${STAFF_BASE}/api_products.php?action=list`)
+    staffFetch(`${STAFF_BASE}/api_products.php?action=list`)
       .then(res => res.json())
       .then(data => {
 
@@ -79,9 +94,20 @@ export default function Products({ showNavbar = true }) {
 
   };
 
+  const fetchInventorySummary = () => {
+    staffFetch(`${STAFF_BASE}/api_products.php?action=summary`)
+      .then((res) => res.json().then((data) => ({ res, data })))
+      .then(({ res, data }) => {
+        if (!res.ok || !data?.success) throw new Error(data?.message || "Unable to load inventory summary.");
+        setInventorySummary(data.summary);
+      })
+      .catch(() => setInventorySummary(null));
+  };
+
   useEffect(() => {
     fetchProducts();
     fetchIngredients();
+    fetchInventorySummary();
   }, []);
 
   useEffect(() => {
@@ -90,7 +116,7 @@ export default function Products({ showNavbar = true }) {
   }, [location.search]);
 
   const fetchIngredients = () => {
-    fetch(`${STAFF_BASE}/api_ingredients.php`)
+    staffFetch(`${STAFF_BASE}/api_ingredients.php`)
       .then((res) => res.json())
       .then((data) => {
         if (data?.ingredients) {
@@ -174,7 +200,7 @@ export default function Products({ showNavbar = true }) {
     setProductSaving(true);
 
     try {
-      const res = await fetch(`${STAFF_BASE}/api_products.php?action=create`, {
+      const res = await staffFetch(`${STAFF_BASE}/api_products.php?action=create`, {
         method: "POST",
         body: formData
       });
@@ -203,7 +229,7 @@ export default function Products({ showNavbar = true }) {
     setRecipeLines([]);
     setBomLoading(true);
 
-    fetch(`${STAFF_BASE}/api_product_recipes.php?product_id=${encodeURIComponent(productId)}`)
+    staffFetch(`${STAFF_BASE}/api_product_recipes.php?product_id=${encodeURIComponent(productId)}`)
       .then((res) => res.json())
       .then((data) => {
         if (data?.success) {
@@ -216,6 +242,46 @@ export default function Products({ showNavbar = true }) {
         setBomError("Unable to load product recipe.");
       })
       .finally(() => setBomLoading(false));
+  };
+
+  const loadHistory = async (productId) => {
+    setHistoryLoading(true);
+    setHistoryError(null);
+    try {
+      const res = await staffFetch(`${STAFF_BASE}/api_product_stock_history.php?product_id=${encodeURIComponent(productId)}&per_page=50`);
+      const data = await res.json();
+      if (!res.ok || !data?.success) throw new Error(data?.message || "Unable to load stock history.");
+      setHistoryEntries(Array.isArray(data.history) ? data.history : []);
+    } catch (error) {
+      setHistoryEntries([]);
+      setHistoryError(error.message || "Unable to load stock history.");
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
+
+  const openInventoryModal = (product, action) => {
+    setSelectedProduct(product);
+    setActiveModal(action);
+    setQty("");
+    setBomQty(1);
+    setBomError(null);
+    setUpdateError(null);
+    setAdjustReason("Inventory Correction");
+    setAdjustType("out");
+    setAdjustNotes("");
+    setHistoryEntries([]);
+    if (action === "produce") {
+      setRecipeLines([]);
+      loadProductRecipe(product.id);
+    }
+    if (action === "history") loadHistory(product.id);
+  };
+
+  const closeInventoryModal = () => {
+    setSelectedProduct(null);
+    setActiveModal(null);
+    setHistoryEntries([]);
   };
 
   const produceFinishedGoods = () => {
@@ -241,9 +307,9 @@ export default function Products({ showNavbar = true }) {
     }
 
     setBomError(null);
-    setBomLoading(true);
-
-    fetch(`${STAFF_BASE}/api_update_stocks.php`, {
+    setOperationLoading(true);
+    setOperationLoading(true);
+    staffFetch(`${STAFF_BASE}/api_update_stocks.php`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -255,19 +321,22 @@ export default function Products({ showNavbar = true }) {
       .then((res) => res.json())
       .then((data) => {
         if (data.status === "success") {
+          setFeedback({ type: "success", text: "Production completed successfully." });
           fetchProducts();
-          setSelectedProduct(null);
+          fetchInventorySummary();
+          closeInventoryModal();
           setQty("");
           setBomQty(1);
           setRecipeLines([]);
         } else {
-          setBomError(data.message || "Production failed.");
+          setFeedback({ type: "error", text: data.message || "Unable to update inventory. Please try again." });
+          setBomError(data.message || "Unable to update inventory. Please try again.");
         }
       })
       .catch(() => {
-        setBomError("Server error while producing finished goods.");
+        setBomError("Unable to update inventory. Please try again.");
       })
-      .finally(() => setBomLoading(false));
+        .finally(() => setOperationLoading(false));
   };
 
   /* =========================
@@ -281,19 +350,15 @@ export default function Products({ showNavbar = true }) {
       return;
     }
 
-    // Map units to multipliers (sensible defaults)
-    const multipliers = { slice: 1, small: 6, big: 12 };
-    const multiplier = multipliers[stockUnit] || 1;
-    const computedQty = parsed * multiplier;
-
-    fetch(`${STAFF_BASE}/api_update_stocks.php`, {
+    staffFetch(`${STAFF_BASE}/api_update_stocks.php`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         id: selectedProduct.id,
-        qty: computedQty,
+        qty: parsed,
         type,
-        unit: stockUnit
+        reason: adjustReason,
+        note: adjustNotes
       })
     })
       .then(res => res.json())
@@ -301,36 +366,29 @@ export default function Products({ showNavbar = true }) {
 
         if (data.status === "success") {
           fetchProducts();
-          setSelectedProduct(null);
+          fetchInventorySummary();
+          closeInventoryModal();
           setQty("");
-          setStockUnit("slice");
+          setFeedback({ type: "success", text: "Stock adjustment completed successfully." });
         } else {
-          setUpdateError("Update failed.");
+          setUpdateError(data.message || "Unable to update inventory. Please try again.");
         }
 
       })
-      .catch(() => setUpdateError("Server error"));
+      .catch(() => setUpdateError("Unable to update inventory. Please try again."))
+      .finally(() => setOperationLoading(false));
 
   };
 
   /* =========================
      STOCK COLORS
   ========================= */
-  const getStockColor = (stock) => {
-    if (!stock || stock <= 0) return "text-black bg-black/10";
-    if (stock < 10) return "text-[#B45309] bg-[#FEF3C7]";
-    return "text-black bg-black/5";
-  };
-
-  const renderStockWarning = (stock) => {
-    if (stock > 0 && stock < 10) {
-      return (
-        <span className="ml-2 rounded-full bg-[#FDE68A] px-2 py-0.5 text-[10px] font-semibold text-[#92400E]">
-          ⚠️ Low Stock
-        </span>
-      );
-    }
-    return null;
+  const getStockStatus = (product) => {
+    const stock = Number(product.stock || 0);
+    const minimum = Number(product.minimum_stock ?? 5);
+    if (stock <= 0) return { label: "Out of Stock", icon: "🔴", classes: "bg-[#FEE2E2] text-[#991B1B]" };
+    if (stock <= minimum) return { label: "Low Stock", icon: "🟡", classes: "bg-[#FEF3C7] text-[#92400E]" };
+    return { label: "In Stock", icon: "🟢", classes: "bg-[#DCFCE7] text-[#166534]" };
   };
 
   /* =========================
@@ -369,6 +427,21 @@ export default function Products({ showNavbar = true }) {
           <h1 className="text-[26px] font-bold text-black">
             Products Management
           </h1>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3 mb-6 md:grid-cols-5">
+          {[
+            ["Total Finished Products", inventorySummary?.total_finished_products],
+            ["Low Stock", inventorySummary?.low_stock],
+            ["Out of Stock", inventorySummary?.out_of_stock],
+            ["Today's Production", inventorySummary?.today_production],
+            ["Today's Waste", inventorySummary?.today_waste],
+          ].map(([label, value]) => (
+            <div key={label} className="rounded-xl border border-black/10 bg-white p-4 shadow-sm">
+              <p className="text-[10px] uppercase tracking-[0.14em] text-black/50">{label}</p>
+              <p className="mt-2 text-xl font-semibold text-black">{inventorySummary ? value : "—"}</p>
+            </div>
+          ))}
         </div>
 
         {/* =========================
@@ -444,12 +517,12 @@ export default function Products({ showNavbar = true }) {
               >
                 ☰ Table
               </button>
-              <button
+              {canManageCatalog && <button
                 onClick={openAddProductModal}
                 className="whitespace-nowrap rounded-full bg-black px-4 py-2 text-[11px] font-black uppercase tracking-[0.12em] text-white hover:bg-black/90 transition"
               >
                 ➕ Add New
-              </button>
+              </button>}
             </div>
           </div>
 
@@ -465,6 +538,12 @@ export default function Products({ showNavbar = true }) {
             >
               Retry
             </button>
+          </div>
+        )}
+
+        {feedback && (
+          <div className={`mb-6 rounded-xl border p-3 text-sm ${feedback.type === "success" ? "border-green-200 bg-green-50 text-green-800" : "border-red-200 bg-red-50 text-red-800"}`} role="status">
+            {feedback.type === "success" ? "✓" : "⚠"} {feedback.text}
           </div>
         )}
 
@@ -505,40 +584,22 @@ export default function Products({ showNavbar = true }) {
                   {product.category}
                 </p>
 
-                {/* STOCK BADGE */}
-                <div className="flex flex-wrap items-center gap-2 mb-3">
-                  <div className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${getStockColor(product.stock)}`}>
-                    Stock: {product.stock ?? 0}
+                <div className="mb-3 flex items-center justify-between gap-2">
+                  <div>
+                    <p className="text-[11px] text-black/50">Current stock</p>
+                    <p className="text-lg font-semibold text-black">{product.stock ?? 0}</p>
                   </div>
-                  {renderStockWarning(product.stock)}
+                  <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-semibold ${getStockStatus(product).classes}`}>
+                    {getStockStatus(product).icon} {getStockStatus(product).label}
+                  </span>
                 </div>
+                <p className="mb-3 text-[11px] text-black/50">Minimum stock: {product.minimum_stock ?? 5}</p>
 
                 {/* BUTTON */}
                 <div className="flex gap-2">
-                  <button
-                    onClick={() => {
-                      setSelectedProduct(product);
-                      setQty("");
-                      setBomQty(1);
-                      setBomError(null);
-                      setRecipeLines([]);
-                      loadProductRecipe(product.id);
-                    }}
-                    className="flex-1 bg-black text-white py-2 rounded-lg text-[12px] leading-none hover:bg-black/90 transition font-['DM_Sans']"
-                  >
-                    Manage Stock
-                  </button>
-
-                  <button
-                    onClick={() => {
-                      setEditProduct(product);
-                      setEditImage(null);
-                      setEditOpen(true);
-                    }}
-                    className="flex-1 bg-white border border-black/10 text-black py-2 rounded-lg text-[12px] leading-none hover:bg-black/5 transition"
-                  >
-                    Edit
-                  </button>
+                  <button onClick={() => openInventoryModal(product, "produce")} className="flex-1 bg-black text-white py-2 rounded-lg text-[12px] leading-none hover:bg-black/90 transition">Produce</button>
+                  <button onClick={() => openInventoryModal(product, "adjust")} className="flex-1 bg-white border border-black/10 text-black py-2 rounded-lg text-[12px] leading-none hover:bg-black/5 transition">Adjust Stock</button>
+                  <button onClick={() => openInventoryModal(product, "history")} aria-label={`View ${product.name} history`} className="rounded-lg border border-black/10 bg-white px-2.5 text-black hover:bg-black/5"><History size={15} /></button>
                 </div>
 
               </div>
@@ -575,34 +636,15 @@ export default function Products({ showNavbar = true }) {
                 </div>
                 <div className="px-4 py-4 text-[12px] text-black/70">{product.category}</div>
                 <div className="px-4 py-4">
-                  <div className={`inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-semibold ${getStockColor(product.stock)}`}>
-                    {product.stock ?? 0}
+                  <div>
+                    <div className="text-[12px] font-semibold text-black">{product.stock ?? 0}</div>
+                    <div className={`mt-1 inline-flex rounded-full px-2 py-1 text-[10px] font-semibold ${getStockStatus(product).classes}`}>{getStockStatus(product).icon} {getStockStatus(product).label}</div>
                   </div>
                 </div>
                 <div className="px-4 py-4 flex flex-wrap gap-2">
-                  <button
-                    onClick={() => {
-                      setSelectedProduct(product);
-                      setQty("");
-                      setBomQty(1);
-                      setBomError(null);
-                      setRecipeLines([]);
-                      loadProductRecipe(product.id);
-                    }}
-                    className="rounded-full border border-black/10 bg-white px-3 py-2 text-[11px] text-black hover:bg-black/5"
-                  >
-                    Manage
-                  </button>
-                  <button
-                    onClick={() => {
-                      setEditProduct(product);
-                      setEditImage(null);
-                      setEditOpen(true);
-                    }}
-                    className="rounded-full border border-black/10 bg-white px-3 py-2 text-[11px] text-black hover:bg-black/5"
-                  >
-                    Edit
-                  </button>
+                  <button onClick={() => openInventoryModal(product, "produce")} className="rounded-full bg-black px-3 py-2 text-[11px] text-white hover:bg-black/90">Produce</button>
+                  <button onClick={() => openInventoryModal(product, "adjust")} className="rounded-full border border-black/10 bg-white px-3 py-2 text-[11px] text-black hover:bg-black/5">Adjust</button>
+                  <button onClick={() => openInventoryModal(product, "history")} aria-label={`View ${product.name} history`} className="rounded-full border border-black/10 bg-white px-3 py-2 text-black hover:bg-black/5"><History size={15} /></button>
                 </div>
               </div>
             ))}
@@ -636,7 +678,7 @@ export default function Products({ showNavbar = true }) {
                   Current Stock: {selectedProduct.stock ?? 0}
                 </p>
 
-                <div className="space-y-3 mb-4">
+                {activeModal === "produce" && <div className="space-y-3 mb-4">
                   <label className="block text-[11px] font-semibold text-black/70">Produce finished goods</label>
                   <input
                     type="number"
@@ -671,35 +713,41 @@ export default function Products({ showNavbar = true }) {
                   {bomError && (
                     <p className="text-red-500 text-xs">{bomError}</p>
                   )}
-                </div>
+                  {recipeLines.some((line) => Number(line.stock) < Number(line.qty) * Number(bomQty || 1)) && (
+                    <p className="text-xs font-semibold text-red-600">⚠ Insufficient ingredient stock. Reduce the quantity or replenish ingredients.</p>
+                  )}
+                </div>}
 
-                <div className="flex gap-2 mb-4">
+                {activeModal === "produce" && <div className="flex gap-2 mb-4">
                   <button
                     onClick={produceFinishedGoods}
-                    disabled={bomLoading || recipeLines.length === 0}
+                    disabled={bomLoading || operationLoading || recipeLines.length === 0 || recipeLines.some((line) => Number(line.stock) < Number(line.qty) * Number(bomQty || 1))}
                     className="flex-1 bg-black text-white px-4 py-2 rounded-xl text-xs font-semibold hover:bg-black/90 disabled:cursor-not-allowed disabled:bg-black/40"
                   >
-                    Produce
+                    {operationLoading ? "Producing..." : "Produce"}
                   </button>
-                </div>
+                </div>}
 
-                <div className="border-t border-black/10 pt-4">
+                {activeModal === "adjust" && <div className="space-y-3 border-t border-black/10 pt-4">
                   <label className="block text-[11px] font-semibold text-black/70 mb-2">Manual stock adjust</label>
                   <div className="grid gap-2 sm:grid-cols-2 mb-3">
-                    <select value={stockUnit} onChange={(e) => setStockUnit(e.target.value)} className="rounded-xl border px-2 py-1 text-xs">
-                      <option value="slice">Slice</option>
-                      <option value="small">Small (6 slices)</option>
-                      <option value="big">Big (12 slices)</option>
+                    <select value={adjustType} onChange={(e) => setAdjustType(e.target.value)} className="rounded-xl border px-2 py-2 text-xs">
+                      <option value="in">Stock In</option><option value="out">Stock Out</option>
+                    </select>
+                    <select value={adjustReason} onChange={(e) => setAdjustReason(e.target.value)} className="rounded-xl border px-2 py-2 text-xs">
+                      <option>Damaged</option><option>Expired</option><option>Returned</option><option>Inventory Correction</option><option>Other</option>
                     </select>
                     <input
                       type="number"
                       min="1"
                       value={qty}
                       onChange={(e) => setQty(e.target.value)}
-                      placeholder="Enter quantity"
+                      placeholder="Quantity"
                       className="w-full border border-black/10 rounded-xl px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-[#D4AF37]"
                     />
                   </div>
+                  <textarea value={adjustNotes} onChange={(e) => setAdjustNotes(e.target.value)} placeholder="Optional notes" className="w-full rounded-xl border border-black/10 px-3 py-2 text-xs" />
+                  <p className="text-xs text-black/70">Current Stock: <strong>{selectedProduct.stock ?? 0}</strong> <span className="mx-1">→</span> Adjustment: <strong>{adjustType === "in" ? "+" : "-"}{Number(qty || 0)}</strong> <span className="mx-1">→</span> New Stock: <strong>{Math.max(0, Number(selectedProduct.stock || 0) + (adjustType === "in" ? Number(qty || 0) : -Number(qty || 0)))}</strong></p>
 
                   {updateError && (
                     <p className="text-red-500 text-xs mb-3">
@@ -707,24 +755,13 @@ export default function Products({ showNavbar = true }) {
                     </p>
                   )}
 
-                  <div className="flex gap-2">
+                  <button onClick={() => updateStock(adjustType)} disabled={operationLoading || !qty || Number(qty) <= 0 || (adjustType === "out" && Number(qty) > Number(selectedProduct.stock || 0))} className="w-full bg-black text-white px-4 py-2 rounded-xl text-xs font-semibold hover:bg-black/90 disabled:opacity-50">{operationLoading ? "Updating..." : "Confirm Adjustment"}</button>
+                </div>}
 
-                    <button
-                      onClick={() => updateStock("in")}
-                      className="flex-1 bg-black text-white px-4 py-2 rounded-xl text-xs font-semibold hover:bg-black/90"
-                    >
-                      Stock In
-                    </button>
-
-                    <button
-                      onClick={() => updateStock("out")}
-                      className="flex-1 bg-black text-white px-4 py-2 rounded-xl text-xs font-semibold hover:bg-black/90"
-                    >
-                      Stock Out
-                    </button>
-
-                  </div>
-                </div>
+                {activeModal === "history" && <div className="border-t border-black/10 pt-4">
+                  <div className="mb-3 flex items-center justify-between"><label className="text-[11px] font-semibold text-black/70">Stock history</label><RefreshCw size={14} className={historyLoading ? "animate-spin" : ""} /></div>
+                  {historyLoading ? <p className="text-xs text-black/60">Loading history...</p> : historyError ? <p className="text-xs text-red-600">{historyError}</p> : historyEntries.length === 0 ? <p className="text-xs text-black/60">No movement history.</p> : <div className="max-h-64 overflow-auto rounded-xl border border-black/10"><table className="w-full text-left text-[10px]"><thead className="sticky top-0 bg-black/5"><tr><th className="p-2">Date</th><th className="p-2">Action</th><th className="p-2">Qty</th><th className="p-2">Stock</th><th className="p-2">Staff</th></tr></thead><tbody>{historyEntries.map((entry) => <tr key={entry.movement_id} className="border-t border-black/5"><td className="p-2">{entry.created_at}</td><td className="p-2">{entry.movement_type}</td><td className="p-2">{entry.quantity > 0 ? "+" : ""}{entry.quantity}</td><td className="p-2">{entry.previous_stock} → {entry.new_stock}</td><td className="p-2">{entry.staff}</td></tr>)}</tbody></table></div>}
+                </div>}
 
                 <button
                   onClick={() => setSelectedProduct(null)}
@@ -1045,7 +1082,7 @@ export default function Products({ showNavbar = true }) {
                         formData.append('description', (editProduct.description || '').toString());
                         if (editImage) formData.append('image', editImage);
 
-                        const res = await fetch(`${STAFF_BASE}/api_products.php?action=update`, {
+                        const res = await staffFetch(`${STAFF_BASE}/api_products.php?action=update`, {
                           method: 'POST',
                           body: formData
                         });
