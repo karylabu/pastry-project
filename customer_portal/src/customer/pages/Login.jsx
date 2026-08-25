@@ -7,6 +7,7 @@ import { safeParseJson } from '../../services/api';
 
 // ✅ CORRECT
 const BASE = CUSTOMER_BASE;
+const LOGO_URL = `${BASE}/../uploads/logo.png`;
 const REGISTER_URL = "/customer/register";
 
 // Design tokens
@@ -115,42 +116,35 @@ export default function Login() {
 
       <div className="absolute inset-0 bg-black/70 backdrop-blur-[6px]" />
 
-      <div className="relative z-10 w-full max-w-[380px] shadow-[0_20px_60px_rgba(0,0,0,0.4)] rounded-[20px]">
+      <div className="relative z-10 w-full max-w-[460px] rounded-[24px] shadow-[0_20px_60px_rgba(0,0,0,0.4)]">
 
         {/* Ticket header — stays put across login / forgot-password states */}
-        <div className="relative bg-black rounded-t-[20px] overflow-hidden px-5 pt-5 pb-5">
-          <p className="text-[10px] tracking-[0.2em] text-[#F0B94D] uppercase mb-3 font-semibold text-center">
+        <div className="relative overflow-hidden rounded-t-[24px] bg-[#fbf6ec] px-8 pb-6 pt-7">
+          <p className="mb-3 text-center text-[10px] font-semibold uppercase tracking-[0.2em] text-[#9d7b4b]">
               EST. 2017
           </p>
 
-          <div className="flex items-center justify-center gap-3">
-            <div className="w-12 h-12 rounded-full border-2 border-[#F0B94D]/40 flex items-center justify-center shrink-0 overflow-hidden bg-[#F0B94D] shadow-[inset_0_1px_0_rgba(255,255,255,0.35)]">
-              <img src="/assets/logo.png" alt="Logo" className="w-full h-full object-contain p-1.5" />
+          <div className="flex flex-col items-center justify-center gap-2">
+            <div className="mx-auto flex h-16 w-16 self-center items-center justify-center">
+              <img src={LOGO_URL} alt="Logo" className="mx-auto block h-full w-full object-center object-contain" />
             </div>
             <div className="text-center">
-              <h1 className="text-[22px] sm:text-[24px] font-semibold text-white leading-[1.05] tracking-tight">
+              <h1 className="text-[22px] font-semibold leading-[1.05] tracking-tight text-[#3b2318] sm:text-[24px]">
                 Pastry Project
               </h1>
-              <p className="text-[11px] text-gray-300 mt-1 leading-snug">
+              <p className="mt-1 text-[11px] leading-snug text-[#8c6d54]">
                 Bakeshop & Cafe
               </p>
             </div>
           </div>
 
-          <p className="text-[11px] text-gray-300 mt-3 text-center leading-snug">
+          <p className="mt-5 text-center text-[11px] leading-snug text-[#6b4a3a]">
             Sign in to check today's orders, inventory, and shop status.
           </p>
         </div>
 
-        {/* Perforated tear line, punched through to the backdrop */}
-        <div className="relative h-0">
-          <div className="absolute left-0 right-0 -top-px border-t-2 border-dashed border-[#FBF6EC]/30" />
-          <div className="absolute -left-[10px] -top-[10px] w-5 h-5 rounded-full bg-[#2B1B14]" />
-          <div className="absolute -right-[10px] -top-[10px] w-5 h-5 rounded-full bg-[#2B1B14]" />
-        </div>
-
         {/* Body */}
-        <div className="bg-white rounded-b-[20px] overflow-hidden px-5 pt-4 pb-5">
+        <div className="overflow-hidden rounded-b-[24px] bg-[#fbf6ec] px-8 pb-7 pt-6">
           <AnimatePresence mode="wait">
 
             {showForgot ? (
@@ -173,7 +167,7 @@ export default function Login() {
                 exit={{ opacity: 0, y: -10 }}
                 transition={{ duration: 0.2 }}
               >
-                <p className="text-[10px] tracking-[0.2em] uppercase text-black/70 mb-3 font-semibold">
+                <p className="mb-3 text-[10px] font-semibold uppercase tracking-[0.2em] text-[#6b4a3a]">
                   Enter Details
                 </p>
 
@@ -193,7 +187,7 @@ export default function Login() {
 
                   {/* Email */}
                   <div>
-                    <label className="text-[10px] font-medium text-black mb-1 block">
+                    <label className="mb-1.5 block text-xs font-semibold text-black">
                       Email Address
                     </label>
                     <div className="flex items-center gap-2">
@@ -202,15 +196,16 @@ export default function Login() {
                         type="email"
                         value={email}
                         onChange={e => setEmail(e.target.value)}
+                        placeholder="example@gmail.com"
                         required
-                        className="flex-1 h-[34px] bg-white border border-black/15 rounded-lg px-3 text-[10px] text-black outline-none focus:border-[#F0B94D] focus:ring-2 focus:ring-[#F0B94D]/30 transition-all"
+                        className="h-[46px] flex-1 rounded-xl border border-black/15 bg-white px-4 text-sm text-black outline-none transition-all focus:border-[#F0B94D] focus:ring-2 focus:ring-[#F0B94D]/30"
                       />
                     </div>
                   </div>
 
                   {/* Password */}
                   <div>
-                    <label className="text-[10px] font-medium text-black mb-1 block">
+                    <label className="mb-1.5 block text-xs font-semibold text-black">
                       Password
                     </label>
                     <div className="flex items-center gap-2">
@@ -221,7 +216,7 @@ export default function Login() {
                           value={password}
                           onChange={e => setPassword(e.target.value)}
                           required
-                          className="w-full h-[34px] bg-white border border-black/15 rounded-lg pl-3 pr-10 text-[10px] text-black outline-none focus:border-[#F0B94D] focus:ring-2 focus:ring-[#F0B94D]/30 transition-all"
+                          className="h-[46px] w-full rounded-xl border border-black/15 bg-white pl-4 pr-11 text-sm text-black outline-none transition-all focus:border-[#F0B94D] focus:ring-2 focus:ring-[#F0B94D]/30"
                         />
                         <button
                           type="button"
@@ -249,7 +244,7 @@ export default function Login() {
                   <button
                     type="submit"
                     disabled={loading}
-                    className="w-full h-[38px] bg-[#F0B94D] text-black rounded-full text-[11px] font-bold uppercase tracking-[0.08em] hover:bg-[#e0a934] transition-all active:scale-[0.98] disabled:opacity-40"
+                    className="w-full h-11 bg-[#F0B94D] text-black rounded-full text-[15px] font-bold uppercase tracking-[0.08em] hover:bg-[#e0a934] transition-all active:scale-[0.98] disabled:opacity-40"
                   >
                     {loading ? "Signing In…" : "Sign In"}
                   </button>
@@ -264,7 +259,7 @@ export default function Login() {
                     type="button"
                     onClick={handleGoogleLogin}
                     disabled={googleLoading}
-                    className="w-full h-[38px] border border-black/15 bg-white rounded-full text-[12px] font-medium text-black flex items-center justify-center gap-2 hover:bg-black/5 transition-all disabled:opacity-60"
+                    className="w-full h-11 border border-black/15 bg-white rounded-full text-[15px] font-medium text-black flex items-center justify-center gap-2 hover:bg-black/5 transition-all disabled:opacity-60"
                   >
                     <GoogleIcon />
                     {googleLoading ? "Redirecting…" : "Sign In with Google"}

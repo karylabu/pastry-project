@@ -2,10 +2,11 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { ArrowLeft } from "lucide-react";
-import { CUSTOMER_BASE } from "../../services/config";
+import { CUSTOMER_BASE, LARAVEL_BASE } from "../../services/config";
 import { safeParseJson } from '../../services/api';
 
 const BASE = CUSTOMER_BASE;
+const LOGO_URL = `${BASE}/../uploads/logo.png`;
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const phoneRegex = /^\+?[0-9\s-]{7,15}$/;
 
@@ -52,6 +53,7 @@ export default function Register() {
   const [agreePrivacy, setAgreePrivacy] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const [errors, setErrors] = useState({});
   const [touched, setTouched] = useState({
     name: false,
@@ -158,6 +160,15 @@ export default function Register() {
     }
   };
 
+  const handleGoogleSignup = () => {
+    setError("");
+    setGoogleLoading(true);
+
+    const redirectTarget = new URL(window.location.origin);
+    redirectTarget.pathname = "/customer";
+    window.location.href = `${LARAVEL_BASE}/auth/google?redirect=${encodeURIComponent(redirectTarget.toString())}`;
+  };
+
   return (
     <div
       className="min-h-screen flex items-center justify-center p-6 font-['Inter'] relative overflow-hidden"
@@ -177,47 +188,41 @@ export default function Register() {
         initial={{ opacity: 0, y: 14 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.22 }}
-        className="relative z-10 w-full max-w-[380px] shadow-[0_20px_60px_rgba(0,0,0,0.4)] rounded-[20px]"
+        className="relative z-10 w-full max-w-[520px] rounded-[24px] shadow-[0_20px_60px_rgba(0,0,0,0.4)]"
       >
-        <div className="relative bg-black rounded-t-[20px] overflow-hidden px-5 pt-5 pb-5">
-          <p className="text-[10px] tracking-[0.2em] text-[#F0B94D] uppercase mb-3 font-semibold text-center">
+        <div className="relative overflow-hidden rounded-t-[24px] bg-[#fbf6ec] px-8 pb-6 pt-7">
+          <p className="mb-3 text-center text-[10px] font-semibold uppercase tracking-[0.2em] text-[#9d7b4b]">
             EST. 2017
           </p>
 
-          <div className="flex items-center justify-center gap-3">
-            <div className="w-12 h-12 rounded-full border-2 border-[#F0B94D]/40 flex items-center justify-center shrink-0 overflow-hidden bg-[#F0B94D] shadow-[inset_0_1px_0_rgba(255,255,255,0.35)]">
-              <img src="/assets/logo.png" alt="Logo" className="w-full h-full object-contain p-1.5" />
+          <div className="flex flex-col items-center justify-center gap-2">
+            <div className="flex h-16 w-16 items-center justify-center">
+              <img src={LOGO_URL} alt="Logo" className="mx-auto block h-full w-full object-contain" />
             </div>
             <div className="text-center">
-              <h1 className="text-[22px] sm:text-[24px] font-semibold text-white leading-[1.05] tracking-tight">
+              <h1 className="text-[22px] font-semibold leading-[1.05] tracking-tight text-[#3b2318] sm:text-[24px]">
                 Pastry Project
               </h1>
-              <p className="text-[11px] text-gray-300 mt-1 leading-snug">
+              <p className="mt-1 text-[11px] leading-snug text-[#8c6d54]">
                 Bakeshop & Cafe
               </p>
             </div>
           </div>
 
-          <p className="text-[11px] text-gray-300 mt-3 text-center leading-snug">
+          <p className="mt-5 text-center text-[11px] leading-snug text-[#6b4a3a]">
             Create an account to start ordering your favorites.
           </p>
         </div>
 
-        <div className="relative h-0">
-          <div className="absolute left-0 right-0 -top-px border-t-2 border-dashed border-[#FBF6EC]/30" />
-          <div className="absolute -left-[10px] -top-[10px] w-5 h-5 rounded-full bg-[#2B1B14]" />
-          <div className="absolute -right-[10px] -top-[10px] w-5 h-5 rounded-full bg-[#2B1B14]" />
-        </div>
-
-        <div className="bg-white rounded-b-[20px] overflow-hidden px-5 pt-4 pb-5">
+        <div className="overflow-hidden rounded-b-[24px] bg-[#fbf6ec] px-8 pb-7 pt-6">
           <button
             onClick={() => navigate("/customer/login")}
-            className="flex items-center gap-2 mb-3 text-[10px] text-black/60 hover:text-black transition"
+            className="mb-4 flex items-center gap-2 text-xs text-[#6b4a3a] transition hover:text-black"
           >
             <ArrowLeft size={14} /> Back to Login
           </button>
 
-          <p className="text-[10px] tracking-[0.2em] uppercase text-black/70 mb-3 font-semibold">
+          <p className="mb-3 text-[10px] font-semibold uppercase tracking-[0.2em] text-[#6b4a3a]">
             Create Account
           </p>
 
@@ -229,7 +234,7 @@ export default function Register() {
 
           <form onSubmit={handleSubmit} className="space-y-3">
             <div>
-              <label className="text-[10px] font-medium text-black mb-1 block">Full Name</label>
+              <label className="mb-1.5 block text-xs font-semibold text-black">Full Name</label>
               <input
                 type="text"
                 placeholder="Full Name"
@@ -241,13 +246,13 @@ export default function Register() {
                     setErrors((prev) => ({ ...prev, name: validateName(e.target.value) }));
                   }
                 }}
-                className="w-full h-[34px] bg-white border border-black/15 rounded-lg px-3 text-[10px] text-black outline-none focus:border-[#F0B94D] focus:ring-2 focus:ring-[#F0B94D]/30 transition-all"
+                className="h-[46px] w-full rounded-xl border border-black/15 bg-white px-4 text-sm text-black outline-none transition-all focus:border-[#F0B94D] focus:ring-2 focus:ring-[#F0B94D]/30"
               />
               {touched.name && errors.name && <p className="mt-1 text-[10px] text-[#A8354A]">{errors.name}</p>}
             </div>
 
             <div>
-              <label className="text-[10px] font-medium text-black mb-1 block">Email Address</label>
+              <label className="mb-1.5 block text-xs font-semibold text-black">Email Address</label>
               <input
                 type="email"
                 placeholder="Email Address"
@@ -259,13 +264,13 @@ export default function Register() {
                     setErrors((prev) => ({ ...prev, email: validateEmail(e.target.value) }));
                   }
                 }}
-                className="w-full h-[34px] bg-white border border-black/15 rounded-lg px-3 text-[10px] text-black outline-none focus:border-[#F0B94D] focus:ring-2 focus:ring-[#F0B94D]/30 transition-all"
+                className="h-[46px] w-full rounded-xl border border-black/15 bg-white px-4 text-sm text-black outline-none transition-all focus:border-[#F0B94D] focus:ring-2 focus:ring-[#F0B94D]/30"
               />
               {touched.email && errors.email && <p className="mt-1 text-[10px] text-[#A8354A]">{errors.email}</p>}
             </div>
 
             <div>
-              <label className="text-[10px] font-medium text-black mb-1 block">Phone Number (Optional)</label>
+              <label className="mb-1.5 block text-xs font-semibold text-black">Phone Number (Optional)</label>
               <input
                 type="tel"
                 placeholder="Phone Number"
@@ -277,13 +282,13 @@ export default function Register() {
                     setErrors((prev) => ({ ...prev, phone: validatePhone(e.target.value) }));
                   }
                 }}
-                className="w-full h-[34px] bg-white border border-black/15 rounded-lg px-3 text-[10px] text-black outline-none focus:border-[#F0B94D] focus:ring-2 focus:ring-[#F0B94D]/30 transition-all"
+                className="h-[46px] w-full rounded-xl border border-black/15 bg-white px-4 text-sm text-black outline-none transition-all focus:border-[#F0B94D] focus:ring-2 focus:ring-[#F0B94D]/30"
               />
               {touched.phone && errors.phone && <p className="mt-1 text-[10px] text-[#A8354A]">{errors.phone}</p>}
             </div>
 
             <div>
-              <label className="text-[10px] font-medium text-black mb-1 block">Password</label>
+              <label className="mb-1.5 block text-xs font-semibold text-black">Password</label>
               <input
                 type="password"
                 placeholder="Password"
@@ -295,13 +300,13 @@ export default function Register() {
                     setErrors((prev) => ({ ...prev, password: validatePassword(e.target.value) }));
                   }
                 }}
-                className="w-full h-[34px] bg-white border border-black/15 rounded-lg px-3 text-[10px] text-black outline-none focus:border-[#F0B94D] focus:ring-2 focus:ring-[#F0B94D]/30 transition-all"
+                className="h-[46px] w-full rounded-xl border border-black/15 bg-white px-4 text-sm text-black outline-none transition-all focus:border-[#F0B94D] focus:ring-2 focus:ring-[#F0B94D]/30"
               />
               {touched.password && errors.password && <p className="mt-1 text-[10px] text-[#A8354A]">{errors.password}</p>}
             </div>
 
             <div>
-              <label className="text-[10px] font-medium text-black mb-1 block">Confirm Password</label>
+              <label className="mb-1.5 block text-xs font-semibold text-black">Confirm Password</label>
               <input
                 type="password"
                 placeholder="Confirm Password"
@@ -313,12 +318,12 @@ export default function Register() {
                     setErrors((prev) => ({ ...prev, confirmPassword: validateConfirmPassword(e.target.value, password) }));
                   }
                 }}
-                className="w-full h-[34px] bg-white border border-black/15 rounded-lg px-3 text-[10px] text-black outline-none focus:border-[#F0B94D] focus:ring-2 focus:ring-[#F0B94D]/30 transition-all"
+                className="h-[46px] w-full rounded-xl border border-black/15 bg-white px-4 text-sm text-black outline-none transition-all focus:border-[#F0B94D] focus:ring-2 focus:ring-[#F0B94D]/30"
               />
               {touched.confirmPassword && errors.confirmPassword && <p className="mt-1 text-[10px] text-[#A8354A]">{errors.confirmPassword}</p>}
             </div>
 
-            <div className="flex flex-col gap-2 text-[10px] text-black/70 pt-1">
+            <div className="flex flex-col gap-2 pt-1 text-xs leading-relaxed text-black/70">
               <label className="flex items-center gap-2">
                 <input
                   type="checkbox"
@@ -378,13 +383,40 @@ export default function Register() {
             <button
               type="submit"
               disabled={loading || !isFormValid}
-              className="w-full h-[38px] bg-[#F0B94D] text-black rounded-full text-[11px] font-bold uppercase tracking-[0.08em] hover:bg-[#e0a934] transition-all active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed"
+              className="h-11 w-full rounded-full bg-[#F0B94D] text-[15px] font-bold uppercase tracking-[0.08em] text-black transition-all hover:bg-[#e0a934] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40"
             >
               {loading ? "Creating account…" : "Create account"}
+            </button>
+
+            <div className="flex items-center gap-3 py-1">
+              <div className="h-px flex-1 bg-black/15" />
+              <span className="text-[11px] text-black/60">or</span>
+              <div className="h-px flex-1 bg-black/15" />
+            </div>
+
+            <button
+              type="button"
+              onClick={handleGoogleSignup}
+              disabled={googleLoading}
+              className="flex h-11 w-full items-center justify-center gap-2 rounded-full border border-black/15 bg-white text-[15px] font-medium text-black transition-all hover:bg-black/5 disabled:opacity-60"
+            >
+              <GoogleIcon />
+              {googleLoading ? "Redirecting…" : "Sign Up with Google"}
             </button>
           </form>
         </div>
       </motion.div>
     </div>
+  );
+}
+
+function GoogleIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
+      <path fill="#4285F4" d="M21.35 12.27c0-.72-.06-1.42-.18-2.09H12v3.96h5.24a4.48 4.48 0 01-1.95 2.94v2.45h3.16c1.85-1.7 2.9-4.2 2.9-7.26z" />
+      <path fill="#34A853" d="M12 21.7c2.65 0 4.88-.88 6.5-2.38l-3.16-2.45c-.88.59-2 .94-3.34.94-2.57 0-4.75-1.74-5.53-4.08H3.2v2.53A9.82 9.82 0 0012 21.7z" />
+      <path fill="#FBBC05" d="M6.47 13.73A5.9 5.9 0 016.16 12c0-.6.1-1.18.31-1.73V7.74H3.2A9.83 9.83 0 002.17 12c0 1.58.38 3.07 1.03 4.26l3.27-2.53z" />
+      <path fill="#EA4335" d="M12 6.19c1.45 0 2.75.5 3.77 1.48l2.83-2.83C16.87 3.27 14.65 2.3 12 2.3a9.82 9.82 0 00-8.8 5.44l3.27 2.53C7.25 7.93 9.43 6.19 12 6.19z" />
+    </svg>
   );
 }

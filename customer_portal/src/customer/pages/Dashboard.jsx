@@ -11,30 +11,49 @@ import { safeParseJson } from "../../services/api";
 
 /* =========================
    HERO BANNER SLIDES
-   First slide is a video, the rest are pastry photos.
+  First slide uses the uploaded banner image, followed by pastry photos.
    Swap the src values below for your own assets.
 ========================= */
 const HERO_SLIDES = [
   {
+    type: "image",
+    src: "http://localhost/pastry-project/uploads/banner(1).jpg",
+  },
+  {
     type: "video",
-    src: "/assets/hero/pastry-process.mp4", // replace with your own video file
-    poster: "https://images.unsplash.com/photo-1555507036-ab1f4038808a?q=80&w=2000",
+    src: "http://localhost/pastry-project/uploads/banner%282%29.mp4",
   },
   {
     type: "image",
-    src: "https://images.unsplash.com/photo-1509440159596-0249088772ff?q=80&w=2000",
+    src: "http://localhost/pastry-project/uploads/banner%283%29.jpg",
   },
   {
     type: "image",
-    src: "https://images.unsplash.com/photo-1517433367423-c7e5b0f35086?q=80&w=2000",
+    src: "http://localhost/pastry-project/uploads/banner%284%29.jpg",
   },
   {
     type: "image",
-    src: "https://images.unsplash.com/photo-1505253758473-96b7015fcd40?q=80&w=2000",
+    src: "http://localhost/pastry-project/uploads/banner%285%29.jpg",
+  },
+  {
+    type: "image",
+    src: "http://localhost/pastry-project/uploads/banner%286%29.jpg",
+  },
+  {
+    type: "image",
+    src: "http://localhost/pastry-project/uploads/banner%287%29.jpg",
+  },
+  {
+    type: "image",
+    src: "http://localhost/pastry-project/uploads/banner%288%29.jpg",
+  },
+  {
+    type: "video",
+    src: "http://localhost/pastry-project/uploads/banner%289%29.mp4",
   },
 ];
 
-function Banner({ onOrderClick }) {
+function Banner({ onShopNow, onCustomizeNow }) {
   const [slide, setSlide] = useState(0);
   const total = HERO_SLIDES.length;
 
@@ -51,7 +70,7 @@ function Banner({ onOrderClick }) {
   }, [slide]);
 
   return (
-    <div className="relative w-full h-screen min-h-[720px] bg-[#1a1a1a] flex items-center justify-center overflow-hidden font-['DM_Sans']">
+    <div className="relative mx-auto aspect-[1920/1080] w-full max-w-[1920px] bg-[#1a1a1a] flex items-center justify-center overflow-hidden font-['DM_Sans']">
 
       {/* SLIDES */}
       <AnimatePresence mode="wait">
@@ -65,7 +84,7 @@ function Banner({ onOrderClick }) {
         >
           {HERO_SLIDES[slide].type === "video" ? (
             <video
-              className="absolute inset-0 w-full h-full object-cover opacity-40"
+              className="absolute inset-0 w-full h-full object-contain"
               src={HERO_SLIDES[slide].src}
               poster={HERO_SLIDES[slide].poster}
               autoPlay
@@ -74,41 +93,35 @@ function Banner({ onOrderClick }) {
               playsInline
             />
           ) : (
-            <div
-              className="absolute inset-0 opacity-40 bg-cover bg-center"
-              style={{ backgroundImage: `url('${HERO_SLIDES[slide].src}')` }}
+            <img
+              src={HERO_SLIDES[slide].src}
+              alt="Pastry Project banner"
+              className="absolute inset-0 h-full w-full object-contain"
             />
           )}
         </motion.div>
       </AnimatePresence>
 
-      {/* TEXT CONTENT */}
-      <div className="relative z-10 text-center px-6 max-w-4xl">
-        <motion.p
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          className="text-[#d4af37] text-xs font-black tracking-[0.4em] uppercase mb-4"
+      {slide === 0 && (
+        <button
+          type="button"
+          aria-label="Shop Now"
+          onClick={onShopNow}
+          className="absolute left-[2.5%] top-1/2 z-20 flex h-[8.5%] w-[13.2%] min-h-8 items-center justify-center rounded-full border-2 border-[#3b2318] bg-[#fffaf0] font-serif text-[clamp(10px,1.3vw,22px)] font-semibold text-[#3b2318] shadow-sm transition hover:bg-[#d4af37]"
         >
-          Pastry Project by Chef Lawrence
-        </motion.p>
-        <motion.h1
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
-          className="text-white text-5xl md:text-6xl font-bold mb-8 leading-tight"
+          Shop Now
+        </button>
+      )}
+      {slide === 1 && (
+        <button
+          type="button"
+          aria-label="Customize Now"
+          onClick={onCustomizeNow}
+          className="absolute bottom-[10%] left-[2.5%] z-20 flex h-[8.5%] w-[13.2%] min-h-8 items-center justify-center rounded-full border-2 border-[#3b2318] bg-[#fffaf0] font-serif text-[clamp(10px,1.3vw,22px)] font-semibold text-[#3b2318] shadow-sm transition hover:bg-[#d4af37]"
         >
-          Baked Fresh,
-          <br />
-          <span className="italic text-[#d4af37]">Made with Love.</span>
-        </motion.h1>
-        <motion.button
-          onClick={onOrderClick}
-          whileHover={{ scale: 1.05 }}
-          className="bg-[#d4af37] text-black px-12 py-4 rounded-full font-bold text-sm uppercase tracking-[0.2em] shadow-2xl"
-        >
-          Browse Menu
-        </motion.button>
-      </div>
+          Customize Now
+        </button>
+      )}
 
       {/* PREV / NEXT ARROWS */}
       <button
@@ -143,7 +156,7 @@ function Banner({ onOrderClick }) {
   );
 }
 
-function RecommendationCard({ product, onAddToCart }) {
+function RecommendationCard({ product, onSelect }) {
   const sizeOptions = Array.isArray(product?.sizes) && product.sizes.length > 0
     ? product.sizes
     : [{ size: 'Regular', price: Number(product?.price || 0) }];
@@ -160,16 +173,16 @@ function RecommendationCard({ product, onAddToCart }) {
     ?? Number(product?.price || 0);
 
   return (
-    <div className="rounded-[30px] border border-stone-200 bg-white p-4 shadow-[0_10px_35px_rgba(15,23,42,0.05)]">
-      <div className="mb-4 h-32 w-full overflow-hidden rounded-[22px] bg-stone-100">
+    <div className="flex h-full min-w-0 flex-col rounded-[30px] border border-stone-200 bg-white p-4 shadow-[0_10px_35px_rgba(15,23,42,0.05)]">
+      <div className="mb-4 flex h-32 w-full items-center justify-center overflow-hidden rounded-[22px] bg-stone-100">
         <img
           src={product.image ? `${CUSTOMER_BASE}/uploads/${product.image}` : 'https://via.placeholder.com/300'}
           alt={product.name}
-          className="h-full w-full object-cover"
+          className="h-[120px] w-full object-contain mix-blend-multiply"
         />
       </div>
 
-      <h3 className="text-base font-bold text-gray-800">{product.name}</h3>
+      <h3 className="min-h-[2.5rem] line-clamp-2 text-base font-bold leading-tight text-gray-800">{product.name}</h3>
       <p className="mt-2 text-sm font-semibold text-black">₱{Number(selectedPrice || 0).toLocaleString()}</p>
 
       <div className="mt-3 flex flex-wrap justify-center gap-1.5">
@@ -201,15 +214,8 @@ function RecommendationCard({ product, onAddToCart }) {
       </p>
 
       <button
-        onClick={() => onAddToCart?.({
-          ...product,
-          qty: 1,
-          price: Number(selectedPrice || product.price || 0),
-          variant: selectedSize,
-          size: selectedSize,
-          basePrice: Number(selectedPrice || product.price || 0),
-        })}
-        className="mt-4 w-full rounded-xl bg-[#111827] py-2.5 text-[10px] font-semibold uppercase tracking-[0.2em] text-white hover:bg-[#d4af37] hover:text-black"
+        onClick={() => onSelect?.(product, selectedSize, Number(selectedPrice || product.price || 0))}
+        className="mt-auto h-11 w-full rounded-xl bg-[#111827] py-2.5 text-[10px] font-semibold uppercase tracking-[0.2em] text-white hover:bg-[#d4af37] hover:text-black"
       >
         Add to Cart
       </button>
@@ -763,34 +769,12 @@ export default function Dashboard({ onAddToCart }) {
   return (
     <div className="bg-white min-h-screen font-['DM_Sans'] relative">
 
-      <Banner onOrderClick={() => navigate("/customer/menu")} />
+      <Banner
+        onShopNow={() => navigate("/customer/menu")}
+        onCustomizeNow={() => navigate("/customer/customized-cakes")}
+      />
 
       <div className="max-w-7xl mx-auto px-6 md:px-10 py-10">
-
-        {/* CUSTOM CAKE */}
-        <div className="relative w-full h-[350px] rounded-[50px] overflow-hidden group bg-black shadow-2xl mb-20">
-          <div
-            className="absolute inset-0 bg-cover bg-center opacity-60 group-hover:scale-110 transition-transform duration-1000"
-            style={{ backgroundImage: "url('https://images.unsplash.com/photo-1535141192574-5d4897c12636?q=80&w=2000')" }}
-          />
-          <div className="absolute inset-0 bg-gradient-to-r from-black/80 to-transparent flex items-center px-16">
-            <div className="max-w-md">
-              <h2 className="text-white text-4xl font-bold mb-4">
-                Want to customize <br />
-                <span className="text-[#d4af37]">your cake?</span>
-              </h2>
-              <p className="text-gray-300 text-sm mb-8">
-                Choose flavors, tiers, and design. We'll bake it your way.
-              </p>
-              <button
-                onClick={() => navigate("/customer/customized-cakes")}
-                className="bg-white text-black px-10 py-4 rounded-full font-black text-sm uppercase tracking-widest hover:bg-[#d4af37]"
-              >
-                Customize Now
-              </button>
-            </div>
-          </div>
-        </div>
 
         {recommendedProducts.length > 0 && (
           <section className="mb-20">
@@ -806,7 +790,7 @@ export default function Dashboard({ onAddToCart }) {
                 <RecommendationCard
                   key={product.id}
                   product={product}
-                  onAddToCart={onAddToCart}
+                  onSelect={handleSelectProduct}
                 />
               ))}
             </div>
@@ -824,35 +808,12 @@ export default function Dashboard({ onAddToCart }) {
               View Menu
             </button>
           </div>
-          <div className="grid grid-cols-2 md:grid-cols-6 gap-8">
+          <div className="grid grid-cols-2 gap-8 md:grid-cols-5">
             {bestSellers.map(p => (
-            <ProductCard
+            <RecommendationCard
               key={p.id}
               product={p}
-              onAction={handleAction}
               onSelect={handleSelectProduct}
-              favorite={favoriteIds.includes(Number(p.id))}
-              onToggleFavorite={async (product) => {
-                const id = Number(product.id);
-                const currentlyFavorite = favoriteIds.includes(id);
-                const next = currentlyFavorite
-                  ? favoriteIds.filter(itemId => itemId !== id)
-                  : [...favoriteIds, id];
-                setFavoriteIds(next);
-                if (userId > 0) {
-                  try {
-                    await fetch(`${CUSTOMER_BASE}/api_favorites.php`, {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ user_id: userId, product_id: id, favorite: !currentlyFavorite }),
-                    });
-                  } catch (err) {
-                    console.error('Failed to save favorite to server', err);
-                  }
-                } else {
-                  saveLocalFavorites(next);
-                }
-              }}
             />
           ))}
           </div>
@@ -869,35 +830,12 @@ export default function Dashboard({ onAddToCart }) {
               Explore More
             </button>
           </div>
-          <div className="grid grid-cols-2 md:grid-cols-6 gap-8">
+          <div className="grid grid-cols-2 gap-8 md:grid-cols-5">
             {mustTry.map(p => (
-            <ProductCard
+            <RecommendationCard
               key={p.id}
               product={p}
-              onAction={handleAction}
               onSelect={handleSelectProduct}
-              favorite={favoriteIds.includes(Number(p.id))}
-              onToggleFavorite={async (product) => {
-                const id = Number(product.id);
-                const currentlyFavorite = favoriteIds.includes(id);
-                const next = currentlyFavorite
-                  ? favoriteIds.filter(itemId => itemId !== id)
-                  : [...favoriteIds, id];
-                setFavoriteIds(next);
-                if (userId > 0) {
-                  try {
-                    await fetch(`${CUSTOMER_BASE}/api_favorites.php`, {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ user_id: userId, product_id: id, favorite: !currentlyFavorite }),
-                    });
-                  } catch (err) {
-                    console.error('Failed to save favorite to server', err);
-                  }
-                } else {
-                  saveLocalFavorites(next);
-                }
-              }}
             />
           ))}
           </div>

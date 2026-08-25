@@ -12,7 +12,7 @@ export default function Menu({ onAddToCart }) {
 
   const [products, setProducts] = useState([]);
   const [favoriteIds, setFavoriteIds] = useState([]);
-  const [activeCat, setActiveCat] = useState('All');
+  const [activeCat, setActiveCat] = useState('All Items');
   const [searchTerm, setSearchTerm] = useState(urlSearch);
   const [showOnlyAvailable, setShowOnlyAvailable] = useState(false);
   const [sortBy, setSortBy] = useState('recommended');
@@ -129,7 +129,13 @@ export default function Menu({ onAddToCart }) {
 
   const normalizedSearch = searchTerm.toLowerCase();
   const filtered = products.filter((p) => {
-    const matchesCategory = activeCat === 'All' || p.category?.toLowerCase() === activeCat.toLowerCase();
+    const productCategory = p.category?.toLowerCase() || '';
+    const selectedCategory = activeCat.toLowerCase();
+    const matchesCategory = activeCat === 'All Items' || (
+      activeCat === 'Starters'
+        ? productCategory === 'starter' || productCategory === 'starters'
+        : productCategory === selectedCategory
+    );
     const matchesSearch = !normalizedSearch ||
       p.name?.toLowerCase().includes(normalizedSearch) ||
       p.description?.toLowerCase().includes(normalizedSearch) ||
@@ -158,11 +164,11 @@ export default function Menu({ onAddToCart }) {
   });
 
   const categories = [
-    'All',
+    'All Items',
     'Cakes',
     'Meals',
     'Pasta',
-    'Starter'
+    'Starters'
   ];
 
   return (
@@ -178,7 +184,7 @@ export default function Menu({ onAddToCart }) {
             </p>
 
             <h2 className="text-[26px] sm:text-[28px] lg:text-[30px] font-bold tracking-tight text-slate-900 leading-tight">
-              {activeCat === 'All'
+              {activeCat === 'All Items'
                 ? 'Menu'
                 : activeCat}
             </h2>
@@ -186,22 +192,27 @@ export default function Menu({ onAddToCart }) {
 
           {/* CATEGORY BUTTONS */}
           <div className="flex flex-col items-end gap-3 lg:ml-auto lg:self-end lg:pb-1">
-            <div className="flex bg-gray-50 p-1 rounded-full border border-gray-100 shadow-inner overflow-x-auto no-scrollbar">
+            <div className="rounded-2xl border border-gray-200 bg-white p-2 shadow-[0_8px_24px_rgba(15,23,42,0.06)]">
+              <p className="mb-2 px-2 text-[10px] font-black uppercase tracking-[0.22em] text-gray-400">
+                Browse by category
+              </p>
+              <div className="flex max-w-full flex-wrap justify-end gap-1.5">
               {categories.map((cat) => (
                 <button
                   key={cat}
                   onClick={() =>
                     setActiveCat(cat)
                   }
-                  className={`px-3.5 py-1.5 rounded-full text-[10px] font-black uppercase tracking-[0.16em] whitespace-nowrap transition-all ${
+                  className={`rounded-xl border px-3.5 py-2 text-xs font-black uppercase tracking-[0.1em] whitespace-nowrap transition-all ${
                     activeCat === cat
-                      ? 'bg-black text-white shadow-lg'
-                      : 'text-gray-400 hover:text-black'
+                      ? 'border-black bg-black text-white shadow-sm'
+                      : 'border-transparent bg-gray-50 text-gray-500 hover:border-gray-200 hover:bg-white hover:text-black'
                   }`}
                 >
                   {cat}
                 </button>
               ))}
+              </div>
             </div>
 
             <div className="flex flex-wrap items-center justify-end gap-2">
@@ -259,7 +270,7 @@ export default function Menu({ onAddToCart }) {
                 View Favorites
               </button>
             </div>
-            <div className="mt-6 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6">
+            <div className="mt-6 grid grid-cols-2 items-stretch gap-6 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-5">
               {products
                 .filter((p) => favoriteIds.includes(Number(p.id)))
                 .slice(0, 8)
@@ -278,7 +289,7 @@ export default function Menu({ onAddToCart }) {
         )}
 
         {/* PRODUCTS */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6">
+        <div className="grid grid-cols-2 items-stretch gap-6 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-5">
           {sortedProducts.map((p) => (
             <ProductCard
               key={p.id}
