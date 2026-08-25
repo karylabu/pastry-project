@@ -13,7 +13,7 @@ export default function ProductCard({
 
   const category = product?.category ? String(product.category).toUpperCase() : '';
   const isCakeProduct = category === 'CAKES' || category === 'CAKE';
-  const shouldShowVariantSelector = isCakeProduct || category === 'MEALS' || category === 'PASTA' || category === 'RICE MEALS';
+  const shouldShowVariantSelector = isCakeProduct || category === 'MEALS' || category === 'PASTA' || category === 'RICE MEALS' || category === 'STARTER' || category === 'STARTERS';
 
   const variantSizes = useMemo(() => {
     const rawVariants = Array.isArray(product?.variants)
@@ -53,16 +53,32 @@ export default function ProductCard({
         available: variant?.available ?? stockValue > 0,
       };
     });
+    const uniqueVariants = normalizedVariants.filter((variant, index, variants) =>
+      variants.findIndex((candidate) =>
+        String(candidate.size).trim().toLowerCase() === String(variant.size).trim().toLowerCase()
+      ) === index
+    );
+    const variantsForDisplay = category === 'PASTA' && !uniqueVariants.some((variant) =>
+      String(variant.size).trim().toLowerCase() === 'meal'
+    )
+      ? [...uniqueVariants, {
+          id: 'meal',
+          size: 'Meal',
+          price: parseFloat(product?.meal_price ?? product?.price ?? 0) || 0,
+          stock_quantity: Number(product?.stock ?? 0),
+          available: Number(product?.stock ?? 0) > 0,
+        }]
+      : uniqueVariants;
 
     const shouldAddRegular = shouldShowVariantSelector && (category === 'MEALS' || category === 'PASTA' || category === 'RICE MEALS');
-    if (!shouldAddRegular) return normalizedVariants;
+    if (!shouldAddRegular) return variantsForDisplay;
 
-    const hasRegular = normalizedVariants.some((variant) => {
+    const hasRegular = variantsForDisplay.some((variant) => {
       const label = String(variant.size).trim().toLowerCase();
       return label === 'regular' || label === 'default' || label === 'standard';
     });
 
-    const filteredVariants = normalizedVariants.filter((variant) => {
+    const filteredVariants = variantsForDisplay.filter((variant) => {
       const label = String(variant.size).trim().toLowerCase();
       return label === 'regular' || label === 'meal' || label === 'combo' || label === 'solo' || label === 'sharing';
     });
@@ -86,7 +102,7 @@ export default function ProductCard({
   const fallbackOptions = category === 'CAKES'
     ? ['SLICE', 'SMALL', 'BIG']
     : category === 'PASTA'
-    ? ['REGULAR', 'COMBO']
+    ? ['REGULAR', 'MEAL', 'COMBO']
     : category === 'STARTER'
     ? ['SOLO', 'SHARING']
     : category === 'MEALS' || category === 'RICE MEALS'
@@ -176,17 +192,17 @@ export default function ProductCard({
           onSelect?.(product, label, currentPrice);
         }
       }}
-      className={`group w-full rounded-[30px] border border-stone-200/70 bg-white p-5 shadow-[0_10px_35px_rgba(15,23,42,0.05)] transition-all duration-300 flex flex-col items-center text-center ${
+      className={`group relative flex h-[360px] min-w-0 w-full flex-col items-center rounded-[30px] border border-stone-200/70 bg-white p-4 text-center shadow-[0_10px_35px_rgba(15,23,42,0.05)] transition-all duration-300 ${
         overallOutOfStock
           ? 'opacity-50 cursor-not-allowed'
           : 'cursor-pointer hover:-translate-y-1 hover:shadow-[0_18px_45px_rgba(15,23,42,0.08)]'
       }`}
     >
-      <div className="mb-4 h-24 w-24 flex-shrink-0 overflow-hidden rounded-full border border-stone-100 bg-stone-50 shadow-inner md:h-28 md:w-28">
+      <div className="mb-4 flex h-32 w-full flex-shrink-0 items-center justify-center overflow-hidden rounded-[22px] border border-stone-100 bg-stone-100 shadow-inner">
         <img
           src={product.image ? `${BASE}/uploads/${product.image}` : 'https://via.placeholder.com/150'}
           alt={product.name}
-          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+          className="h-[120px] w-full object-contain mix-blend-multiply transition-transform duration-500 group-hover:scale-110"
         />
       </div>
 
@@ -196,7 +212,7 @@ export default function ProductCard({
         </h3>
 
         {shouldShowVariantSelector && (
-          <div className="mb-3 flex flex-wrap justify-center gap-1 rounded-full border border-stone-100 bg-stone-50 p-1.5">
+          <div className="mb-3 flex min-h-[34px] flex-wrap items-center justify-center gap-1 rounded-full border border-stone-100 bg-stone-50 p-1.5">
             {variantButtons.map((variant) => {
               const disabled = variant.stock_quantity <= 0;
               const selected = currentVariant && currentVariant.id === variant.id;
@@ -210,7 +226,7 @@ export default function ProductCard({
                     e.stopPropagation();
                     handleSelection(variant);
                   }}
-                  className={`rounded-full border px-2 py-0.5 text-[8px] font-semibold uppercase tracking-[0.12em] whitespace-nowrap transition-all ${
+                  className={`rounded-full border px-2 py-1 text-[9px] font-semibold uppercase tracking-[0.12em] whitespace-nowrap transition-all ${
                     disabled
                       ? 'cursor-not-allowed border-stone-200 bg-stone-100 text-stone-400'
                       : selected
@@ -229,17 +245,13 @@ export default function ProductCard({
           ₱{currentPrice.toLocaleString()}
         </p>
 
-        <div className="flex flex-col gap-3 mb-4 text-left">
-          {stockLabel && (
-            <div className="flex flex-wrap items-center gap-2 justify-center">
-              <span className="rounded-full px-3 py-1 text-[10px] font-semibold bg-[#FEF3C7] text-[#92400E]">
-                {stockLabel}
-              </span>
-            </div>
-          )}
-        </div>
+        {stockLabel === 'Low stock' && (
+          <span className="absolute right-0 top-6 rounded-l-full bg-[#FEF3C7] px-3 py-1 text-[10px] font-semibold text-[#92400E] shadow-sm">
+            Low stock
+          </span>
+        )}
 
-        <div className="flex items-center gap-3">
+        <div className="mt-auto flex h-11 w-full -translate-y-2 items-center gap-3">
           <button
             onClick={(e) => {
               e.stopPropagation();
@@ -249,7 +261,7 @@ export default function ProductCard({
               onAction?.(product, label, currentPrice);
             }}
             disabled={overallOutOfStock}
-            className={`flex-1 rounded-xl py-2.5 text-[10px] font-semibold uppercase tracking-[0.2em] transition-all ${
+            className={`h-11 min-w-0 flex-1 rounded-xl py-2.5 text-[10px] font-semibold uppercase tracking-[0.2em] transition-all ${
               overallOutOfStock
                 ? 'cursor-not-allowed bg-gray-300 text-gray-500'
                 : 'bg-[#111827] text-white hover:bg-[#d4af37] hover:text-black'

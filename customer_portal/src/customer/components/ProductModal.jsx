@@ -8,7 +8,7 @@ function AddOnCard({ label, price, selected, onClick }) {
     <button
       type="button"
       onClick={onClick}
-      className={`w-full min-h-[48px] rounded-2xl border px-4 py-3 flex items-center justify-between transition-all duration-200 active:scale-[0.98] ${
+      className={`flex min-h-[48px] w-full min-w-0 items-center justify-between gap-3 rounded-2xl border px-4 py-3 transition-all duration-200 active:scale-[0.98] ${
         selected
           ? 'border-black bg-gray-50 shadow-sm'
           : 'border-gray-100 bg-white hover:border-gray-300 hover:bg-gray-50'
@@ -22,9 +22,9 @@ function AddOnCard({ label, price, selected, onClick }) {
         >
           <Check size={12} />
         </span>
-        <span className="text-[12px] font-semibold text-gray-700">{label}</span>
+        <span className="min-w-0 break-words text-sm font-semibold text-gray-700">{label}</span>
       </div>
-      <span className="text-[11px] font-bold text-[#d4af37]">₱{price}</span>
+      <span className="text-xs font-bold text-[#d4af37]">₱{price}</span>
     </button>
   );
 }
@@ -38,7 +38,7 @@ export default function ProductModal({ isOpen, onClose, product, allCakes, onAdd
 
   const category = (product?.category || '').trim().toLowerCase();
   const isCakeProduct = category === 'cake' || category === 'cakes';
-  const shouldShowVariantSelector = isCakeProduct || category === 'meals' || category === 'pasta' || category === 'rice meals';
+  const shouldShowVariantSelector = isCakeProduct || category === 'meals' || category === 'pasta' || category === 'rice meals' || category === 'starter' || category === 'starters';
 
   // Build variant/size pill options the same way ProductCard does
   const variantSizes = useMemo(() => {
@@ -82,16 +82,32 @@ export default function ProductModal({ isOpen, onClose, product, allCakes, onAdd
         available: variant?.available ?? stockValue > 0,
       };
     });
+    const uniqueVariants = normalizedVariants.filter((variant, index, variants) =>
+      variants.findIndex((candidate) =>
+        String(candidate.size).trim().toLowerCase() === String(variant.size).trim().toLowerCase()
+      ) === index
+    );
+    const variantsForDisplay = category === 'pasta' && !uniqueVariants.some((variant) =>
+      String(variant.size).trim().toLowerCase() === 'meal'
+    )
+      ? [...uniqueVariants, {
+          id: 'meal',
+          size: 'Meal',
+          price: parseFloat(product?.meal_price ?? product?.price ?? 0) || 0,
+          stock_quantity: Number(product?.stock ?? 0),
+          available: Number(product?.stock ?? 0) > 0,
+        }]
+      : uniqueVariants;
 
     const shouldAddRegular = shouldShowVariantSelector && (category === 'meals' || category === 'pasta' || category === 'rice meals');
-    if (!shouldAddRegular) return normalizedVariants;
+    if (!shouldAddRegular) return variantsForDisplay;
 
-    const hasRegular = normalizedVariants.some((variant) => {
+    const hasRegular = variantsForDisplay.some((variant) => {
       const label = String(variant.size).trim().toLowerCase();
       return label === 'regular' || label === 'default' || label === 'standard';
     });
 
-    const filteredVariants = normalizedVariants.filter((variant) => {
+    const filteredVariants = variantsForDisplay.filter((variant) => {
       const label = String(variant.size).trim().toLowerCase();
       return label === 'regular' || label === 'meal' || label === 'combo' || label === 'solo' || label === 'sharing';
     });
@@ -115,7 +131,7 @@ export default function ProductModal({ isOpen, onClose, product, allCakes, onAdd
   const fallbackOptions = category === 'cake' || category === 'cakes'
     ? ['slice', 'small', 'big']
     : category === 'pasta'
-    ? ['regular', 'combo']
+    ? ['regular', 'meal', 'combo']
     : category === 'starter'
     ? ['solo', 'sharing']
     : category === 'meals' || category === 'rice meals'
@@ -230,11 +246,11 @@ export default function ProductModal({ isOpen, onClose, product, allCakes, onAdd
   };
 
   return (
-    <div className="fixed inset-0 z-[30000] bg-black/40 backdrop-blur-sm flex justify-center px-3 pt-1 pb-3 font-['DM_Sans']">
+    <div className="fixed inset-0 z-[60000] flex items-center justify-center overflow-y-auto bg-black/40 px-3 py-4 backdrop-blur-sm font-['DM_Sans']">
       <motion.div
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
-        className="bg-white w-full max-w-[390px] rounded-[28px] shadow-2xl relative flex flex-col max-h-[calc(100vh-12px)] overflow-x-visible overflow-y-visible"
+        className="relative flex w-full max-w-[360px] flex-col overflow-hidden rounded-[24px] bg-white shadow-2xl max-h-[calc(100vh-32px)]"
       >
         {/* Floating Close Button */}
         <button
@@ -245,21 +261,21 @@ export default function ProductModal({ isOpen, onClose, product, allCakes, onAdd
         </button>
 
         {/* 1. Image + Header Section, styled like the menu card */}
-        <div className="pt-8 pb-4 px-8 flex-shrink-0 flex flex-col items-center text-center bg-[#f9f9f9]">
-          <div className="w-28 h-28 mb-4 overflow-hidden rounded-full bg-white shadow-inner border border-gray-50">
+        <div className="flex flex-shrink-0 flex-col items-center bg-[#f9f9f9] px-6 pb-3 pt-6 text-center">
+          <div className="mb-3 h-24 w-40 overflow-hidden rounded-2xl border border-gray-50 bg-white shadow-inner">
             <img
               src={product.image ? `${BASE}/uploads/${product.image}` : 'https://via.placeholder.com/150'}
               alt={product.name}
-              className="w-full h-full object-cover"
+              className="h-full w-full object-contain p-1 mix-blend-multiply"
             />
           </div>
-          <h2 className="text-[22px] font-bold text-gray-900 tracking-tight mb-3 px-2">
+          <h2 className="mb-2 px-2 text-lg font-bold tracking-tight text-gray-900">
             {product.name}
           </h2>
 
           {/* Size / Variant pill selector */}
           {shouldShowVariantSelector && variantButtons.length > 0 && (
-            <div className="flex flex-wrap justify-center gap-1 bg-white p-1 rounded-full border border-gray-100">
+            <div className="grid w-full grid-cols-3 gap-1.5 rounded-2xl border border-gray-100 bg-white p-1.5">
               {variantButtons.map((v) => {
                 const disabled = v.stock_quantity <= 0;
                 const selected = currentVariant && currentVariant.id === v.id;
@@ -269,7 +285,7 @@ export default function ProductModal({ isOpen, onClose, product, allCakes, onAdd
                     type="button"
                     disabled={disabled}
                     onClick={() => handleSelectSize(v)}
-                    className={`px-2.5 py-1 rounded-full text-[8px] font-semibold uppercase tracking-[0.12em] transition-all border whitespace-nowrap ${
+                    className={`min-w-0 rounded-xl border px-2 py-2 text-center text-[10px] font-semibold uppercase tracking-[0.08em] transition-all ${
                       disabled
                         ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
                         : selected
@@ -286,11 +302,11 @@ export default function ProductModal({ isOpen, onClose, product, allCakes, onAdd
         </div>
 
         {/* 2. Scrollable Content Area */}
-        <div className="flex-1 overflow-y-auto overflow-x-hidden px-8 py-5 space-y-7 no-scrollbar">
+        <div className="min-h-0 flex-1 space-y-5 overflow-y-auto overflow-x-hidden px-6 py-4 no-scrollbar">
           {/* Drink Selection */}
           {showDrinks && (
             <div className="space-y-3">
-              <label className="block text-[10px] font-black uppercase tracking-[0.2em] text-gray-300">
+              <label className="block text-xs font-black uppercase tracking-[0.16em] text-gray-400">
                 Select Drink
               </label>
               <div className="grid grid-cols-2 gap-2">
@@ -298,7 +314,7 @@ export default function ProductModal({ isOpen, onClose, product, allCakes, onAdd
                   <button
                     key={drink}
                     onClick={() => setSelectedDrink(drink)}
-                    className={`h-[46px] rounded-xl border transition-all text-[11px] font-bold ${
+                    className={`h-[46px] rounded-xl border transition-all text-sm font-bold ${
                       selectedDrink === drink
                         ? 'bg-black border-black text-white shadow-lg shadow-black/10'
                         : 'bg-white border-gray-100 text-gray-400 hover:border-gray-200'
@@ -314,13 +330,13 @@ export default function ProductModal({ isOpen, onClose, product, allCakes, onAdd
           {/* Cake Selection */}
           {showCake && (
             <div className="space-y-3">
-              <label className="block text-[10px] font-black uppercase tracking-[0.2em] text-gray-300">
+              <label className="block text-xs font-black uppercase tracking-[0.16em] text-gray-400">
                 Free Cake Slice
               </label>
               <select
                 value={selectedCake}
                 onChange={(e) => setSelectedCake(e.target.value)}
-                className="w-full h-[50px] px-5 rounded-xl bg-gray-50 border-none outline-none text-[12px] font-bold appearance-none cursor-pointer"
+                className="w-full h-[50px] px-5 rounded-xl bg-gray-50 border-none outline-none text-sm font-bold appearance-none cursor-pointer"
               >
                 {availableCakes.map((cake) => (
                   <option key={cake.id} value={cake.name}>
@@ -335,10 +351,10 @@ export default function ProductModal({ isOpen, onClose, product, allCakes, onAdd
           <div className="space-y-3 pb-4">
             <div className="flex items-center justify-between gap-4">
               <div>
-                <label className="block text-[10px] font-black uppercase tracking-[0.2em] text-gray-300">
+                <label className="block text-xs font-black uppercase tracking-[0.16em] text-gray-400">
                   Quantity
                 </label>
-                <p className="text-sm font-semibold text-gray-700 mt-1">
+                <p className="text-base font-semibold text-gray-700 mt-1">
                   {qty} item{qty !== 1 ? 's' : ''}
                 </p>
               </div>
@@ -361,18 +377,7 @@ export default function ProductModal({ isOpen, onClose, product, allCakes, onAdd
               </div>
             </div>
 
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-500">Unit price</span>
-              <span className="text-sm font-semibold text-gray-900">
-                ₱{parsedUnitPrice.toLocaleString()}
-              </span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-500">Total</span>
-              <span className="text-lg font-bold text-black">₱{totalPrice.toLocaleString()}</span>
-            </div>
-
-            <label className="block text-[10px] font-black uppercase tracking-[0.2em] text-gray-300">
+            <label className="block text-xs font-black uppercase tracking-[0.16em] text-gray-400">
               Extra Add-ons
             </label>
             <div className="space-y-2">
@@ -402,15 +407,28 @@ export default function ProductModal({ isOpen, onClose, product, allCakes, onAdd
                   );
                 })}
             </div>
+
+            <div className="mt-4 border-t border-gray-100 pt-4">
+              <div className="flex items-center justify-between">
+                <span className="text-base text-gray-500">Unit price</span>
+                <span className="text-base font-semibold text-gray-900">
+                  ₱{parsedUnitPrice.toLocaleString()}
+                </span>
+              </div>
+              <div className="mt-2 flex items-center justify-between">
+                <span className="text-base text-gray-500">Total</span>
+                <span className="text-lg font-bold text-black">₱{totalPrice.toLocaleString()}</span>
+              </div>
+            </div>
           </div>
         </div>
 
         {/* 3. Footer Section (Fixed Bottom) */}
-        <div className="p-8 pt-4 flex-shrink-0 bg-white rounded-b-[40px]">
+        <div className="flex-shrink-0 rounded-b-[24px] bg-white px-6 pb-5 pt-3">
           <button
             onClick={handleConfirm}
             disabled={overallOutOfStock}
-            className={`w-full h-[48px] rounded-[20px] font-black uppercase tracking-[0.2em] text-[9px] flex items-center justify-center gap-2 active:scale-[0.97] shadow-lg shadow-black/10 ${
+            className={`w-full h-[48px] rounded-[20px] font-black uppercase tracking-[0.16em] text-xs flex items-center justify-center gap-2 active:scale-[0.97] shadow-lg shadow-black/10 ${
               overallOutOfStock
                 ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                 : 'bg-black text-white hover:bg-black/90'

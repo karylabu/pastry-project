@@ -234,7 +234,7 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
               <Link
                 key={nav.path}
                 to={nav.path}
-                className={`text-[10px] uppercase tracking-[0.3em] ${
+                className={`text-sm uppercase tracking-[0.3em] ${
                   location.pathname === nav.path
                     ? "text-black font-semibold"
                     : "text-gray-400 hover:text-black"

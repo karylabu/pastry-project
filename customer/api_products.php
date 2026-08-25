@@ -49,11 +49,17 @@ function getProductSizeOptions(PDO $pdo, array $product): array {
 
     if (!empty($rows)) {
         $sizes = [];
+        $seenSizes = [];
         foreach ($rows as $row) {
             $size = trim((string) ($row['size'] ?? ''));
             if ($size === '') {
                 continue;
             }
+            $sizeKey = strtolower($size);
+            if (isset($seenSizes[$sizeKey])) {
+                continue;
+            }
+            $seenSizes[$sizeKey] = true;
             $sizes[] = [
                 'id' => (int) ($row['id'] ?? 0),
                 'size' => $size,
@@ -73,7 +79,7 @@ function getProductSizeOptions(PDO $pdo, array $product): array {
             ['size' => 'small', 'price' => (float) ($product['small_price'] ?? 0)],
             ['size' => 'big', 'price' => (float) ($product['big_price'] ?? 0)],
         ];
-    } elseif ($category === 'meals' || $category === 'pizza') {
+    } elseif ($category === 'meals' || $category === 'pasta' || $category === 'pizza') {
         $sizeChecks = [
             ['size' => 'regular', 'price' => (float) ($product['price'] ?? 0)],
             ['size' => 'meal', 'price' => (float) ($product['meal_price'] ?? 0)],
