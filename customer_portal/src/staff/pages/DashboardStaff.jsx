@@ -7,6 +7,7 @@ import { BASE, CUSTOMER_BASE as CUSTOMER_BASE_CONFIG } from '../../services/conf
 
 const STAFF_BASE = `${BASE}/staff`;
 const CUSTOMER_BASE = CUSTOMER_BASE_CONFIG;
+const staffFetch = (url, options = {}) => fetch(url, { credentials: 'include', ...options });
 
 const STATUS_STYLES = {
   Pending:      "bg-gray-100 text-black border border-black/20",
@@ -87,7 +88,7 @@ function StaffChatInbox({ open, onClose }) {
 
   const fetchInbox = useCallback(async () => {
     try {
-      const res  = await fetch(`${STAFF_BASE}/api_chat_fetch_all.php`);
+      const res  = await staffFetch(`${STAFF_BASE}/api_chat_fetch_all.php`);
       const data = await res.json();
       if (data.success) setConversations(data.conversations);
     } catch (e) { console.error(e); }
@@ -368,7 +369,7 @@ export default function DashboardStaff() {
     setOrdersLoading(true);
     Promise.all([
       fetch(`${CUSTOMER_BASE}/api_orders.php?action=list`).then(res => res.json()).catch(() => []),
-      fetch(`${STAFF_BASE}/api_orders.php`).then(res => res.json()).catch(() => []),
+      staffFetch(`${STAFF_BASE}/api_orders.php`).then(res => res.json()).catch(() => []),
     ])
       .then(([customerOrders, staffOrders]) => {
         const combined = [
@@ -388,7 +389,7 @@ export default function DashboardStaff() {
   useEffect(() => {
     const pollUnread = async () => {
       try {
-        const res  = await fetch(`${STAFF_BASE}/api_chat_fetch_all.php`);
+        const res  = await staffFetch(`${STAFF_BASE}/api_chat_fetch_all.php`);
         const data = await res.json();
         if (data.success) {
           const total = data.conversations.reduce((sum, c) => sum + Number(c.unread_count || 0), 0);
@@ -402,7 +403,7 @@ export default function DashboardStaff() {
   }, []);
 
   const updateOrderStatus = (id, status) => {
-    fetch(`${STAFF_BASE}/api_update_order_status.php`, {
+    staffFetch(`${STAFF_BASE}/api_update_order_status.php`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id, status })

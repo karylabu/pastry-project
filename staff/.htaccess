@@ -1,0 +1,8 @@
+# Pass the Authorization header through to PHP.
+# Under some Apache setups (CGI/FastCGI/proxy) the header is stripped from
+# PHP's $_SERVER, which breaks Bearer-token authentication for API clients.
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteCond %{HTTP:Authorization} ^(.+)$
+  RewriteRule .* - [E=HTTP_AUTHORIZATION:%1]
+</IfModule>

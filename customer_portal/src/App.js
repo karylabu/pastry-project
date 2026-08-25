@@ -19,6 +19,7 @@ import StaffAdminLogin from "./admin/pages/StaffAdminLogin";
 
 /* ADMIN */
 import AdminApp from "./admin/components/AdminApp";
+import ProtectedRoute, { AccessDenied } from "./auth/ProtectedRoute";
 
 function GoogleAuthBootstrap() {
   const navigate = useNavigate();
@@ -89,11 +90,30 @@ function App() {
 
         {/* ================= STAFF ================= */}
         <Route path="staff/login" element={<StaffAdminLogin />} />
-        <Route path="staff/*" element={<StaffApp />} />
+        <Route path="staff/access-denied" element={<AccessDenied />} />
+        <Route
+          path="staff/*"
+          element={
+            <ProtectedRoute>
+              <StaffApp />
+            </ProtectedRoute>
+          }
+        />
 
         {/* ================= ADMIN ================= */}
         <Route path="admin/login" element={<StaffAdminLogin />} />
-        <Route path="admin/*" element={<AdminApp />} />
+        <Route
+          path="admin/*"
+          element={
+            <ProtectedRoute
+              allowedRoles={["admin", "administrator", "superadmin", "super_admin", "manager"]}
+              loginPath="/admin/login"
+              deniedPath="/staff/access-denied"
+            >
+              <AdminApp />
+            </ProtectedRoute>
+          }
+        />
 
         {/* FALLBACK */}
         <Route path="*" element={<div style={{ padding: 20 }}>404 Not Found</div>} />

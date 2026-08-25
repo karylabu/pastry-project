@@ -1,13 +1,7 @@
 <?php
+require_once __DIR__ . '/../includes/api_auth.php';
 
-header("Access-Control-Allow-Origin: *");
-header("Access-Control-Allow-Methods: GET, POST, OPTIONS");
-header("Access-Control-Allow-Headers: Content-Type");
-header("Content-Type: application/json");
-
-if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-    exit;
-}
+requireInventoryRead();
 
 /* ================= DB ================= */
 
@@ -39,26 +33,69 @@ try {
 
 $action = $_GET['action'] ?? 'list';
 
+if ($action === 'summary') {
+    try {
+        $summaryStmt = $pdo->query(
+            "SELECT
+                COUNT(*) AS total_finished_products,
+                SUM(stock > 0 AND stock <= minimum_stock) AS low_stock,
+                SUM(stock = 0) AS out_of_stock
+             FROM products"
+        );
+        $summary = $summaryStmt->fetch() ?: [];
+        $movementStmt = $pdo->query(
+            "SELECT
+                COALESCE(SUM(CASE WHEN movement_type = 'Production' THEN quantity ELSE 0 END), 0) AS today_production,
+                COALESCE(SUM(CASE WHEN movement_type = 'Waste' THEN ABS(quantity) ELSE 0 END), 0) AS today_waste
+             FROM product_inventory_movements
+             WHERE created_at >= CURDATE() AND created_at < CURDATE() + INTERVAL 1 DAY"
+        );
+        $movements = $movementStmt->fetch() ?: [];
+        echo json_encode([
+            'success' => true,
+            'summary' => [
+                'total_finished_products' => (int) ($summary['total_finished_products'] ?? 0),
+                'low_stock' => (int) ($summary['low_stock'] ?? 0),
+                'out_of_stock' => (int) ($summary['out_of_stock'] ?? 0),
+                'today_production' => (float) ($movements['today_production'] ?? 0),
+                'today_waste' => (float) ($movements['today_waste'] ?? 0),
+            ],
+        ]);
+        exit;
+    } catch (Exception $e) {
+        http_response_code(500);
+        echo json_encode(['success' => false, 'message' => 'Unable to load inventory summary']);
+        exit;
+    }
+}
+
 if ($action === 'list') {
 
     try {
 
         $sql = "SELECT * FROM products";
         $stmt = $pdo->query($sql);
+        $hasVariantsTable = (bool) $pdo->query(
+            "SELECT COUNT(*) FROM information_schema.tables
+             WHERE table_schema = DATABASE() AND table_name = 'product_variants'"
+        )->fetchColumn();
 
         $products = [];
 
         while ($row = $stmt->fetch()) {
             $productId = intval($row['id']);
 
-            $variantStmt = $pdo->prepare(
-                "SELECT id, variant_size, stock_quantity, threshold, price
-                 FROM product_variants
-                 WHERE product_id = ?
-                 ORDER BY FIELD(variant_size, 'slice', 'small', 'big')"
-            );
-            $variantStmt->execute([$productId]);
-            $variants = $variantStmt->fetchAll();
+            $variants = [];
+            if ($hasVariantsTable) {
+                $variantStmt = $pdo->prepare(
+                    "SELECT id, variant_size, stock_quantity, threshold, price
+                     FROM product_variants
+                     WHERE product_id = ?
+                     ORDER BY FIELD(variant_size, 'slice', 'small', 'big')"
+                );
+                $variantStmt->execute([$productId]);
+                $variants = $variantStmt->fetchAll();
+            }
 
             $products[] = [
                 "id" => $productId,
@@ -67,6 +104,7 @@ if ($action === 'list') {
                 "price" => $row["price"],
                 "image" => $row["image"],
                 "stock" => $row["stock"] ?? 0,
+                "minimum_stock" => $row["minimum_stock"] ?? 5,
                 "available" => $row["available"] ?? 1,
                 "variants" => array_map(function ($variant) {
                     return [
@@ -100,6 +138,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_GET['action'] ?? '';
 
     if ($action === 'create') {
+        requireInventoryManager();
         $name = trim($_POST['name'] ?? '');
         $category = trim($_POST['category'] ?? '');
         $price = floatval($_POST['price'] ?? 0);
@@ -175,6 +214,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     if ($action === 'update') {
+        requireInventoryManager();
         $id = intval($_POST['id'] ?? 0);
         $name = trim($_POST['name'] ?? '');
         $category = trim($_POST['category'] ?? '');
@@ -184,6 +224,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         if ($id <= 0) {
             echo json_encode(["success" => false, "error" => "Missing product id"]);
+            exit;
+        }
+        if ($stock < 0) {
+            echo json_encode(["success" => false, "error" => "Stock cannot be negative"]);
             exit;
         }
 
@@ -225,15 +269,45 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 exit;
             }
 
+            $previousStock = null;
+            $pdo->beginTransaction();
+            if (isset($_POST['stock'])) {
+                $stockStmt = $pdo->prepare("SELECT stock FROM products WHERE id = ? FOR UPDATE");
+                $stockStmt->execute([$id]);
+                $stockRow = $stockStmt->fetch();
+                if (!$stockRow) {
+                    $pdo->rollBack();
+                    echo json_encode(["success" => false, "error" => "Product not found"]);
+                    exit;
+                }
+                $previousStock = (int) $stockRow['stock'];
+            }
+
             $sql = "UPDATE products SET " . implode(', ', $fields) . " WHERE id = ?";
             $params[] = $id;
             $stmt = $pdo->prepare($sql);
             $stmt->execute($params);
 
+            if ($previousStock !== null && $stock !== $previousStock) {
+                $movementQuantity = $stock - $previousStock;
+                $movementUserId = (int) ($_SESSION['user']['id'] ?? 0);
+                $movementStmt = $pdo->prepare(
+                    "INSERT INTO product_inventory_movements
+                     (product_id, movement_type, quantity, previous_stock, new_stock, reason, reference_type, user_id)
+                     VALUES (?, 'Inventory Correction', ?, ?, ?, 'Product edit stock correction', 'stock_adjustment', ?)"
+                );
+                $movementStmt->execute([$id, $movementQuantity, $previousStock, $stock, $movementUserId ?: null]);
+            }
+
+            $pdo->commit();
+
             echo json_encode(["success" => true, "updated" => $stmt->rowCount()]);
             exit;
 
         } catch (Exception $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
             echo json_encode(["success" => false, "error" => "Update failed", "details" => $e->getMessage()]);
             exit;
         }

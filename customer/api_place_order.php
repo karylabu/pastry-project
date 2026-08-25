@@ -3,6 +3,7 @@ header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: POST, OPTIONS');
 header('Access-Control-Allow-Headers: Content-Type');
 header('Content-Type: application/json');
+require_once __DIR__ . '/../includes/inventory.php';
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     http_response_code(204);
@@ -27,39 +28,6 @@ try {
     if (!$conn) {
         throw new Exception('Database connection failed: ' . mysqli_connect_error());
     }
-
-    // --- AUTO MIGRATION: Ensure all required columns exist ---
-    $required_columns = [
-        'user_id' => "INT DEFAULT NULL",
-        'customer' => "VARCHAR(255) DEFAULT ''",
-        'email' => "VARCHAR(255) DEFAULT ''",
-        'items' => "TEXT",
-        'subtotal' => "DECIMAL(10,2) DEFAULT 0",
-        'delivery_fee' => "DECIMAL(10,2) DEFAULT 0",
-        'total' => "DECIMAL(10,2) DEFAULT 0",
-        'method' => "VARCHAR(50) DEFAULT 'Delivery'",
-        'payment' => "VARCHAR(50) DEFAULT 'Cash'",
-        'address' => "TEXT",
-        'phone' => "VARCHAR(20) DEFAULT ''",
-        'lat' => "DECIMAL(10,8) DEFAULT 0",
-        'lng' => "DECIMAL(11,8) DEFAULT 0",
-        'status' => "VARCHAR(50) DEFAULT 'Pending'",
-        'order_date' => "DATE",
-        'created_at' => "DATETIME DEFAULT CURRENT_TIMESTAMP"
-    ];
-
-    $existing_columns = [];
-    $res = mysqli_query($conn, "SHOW COLUMNS FROM orders");
-    while ($row = mysqli_fetch_assoc($res)) {
-        $existing_columns[] = $row['Field'];
-    }
-
-    foreach ($required_columns as $col => $definition) {
-        if (!in_array($col, $existing_columns)) {
-            mysqli_query($conn, "ALTER TABLE orders ADD COLUMN $col $definition");
-        }
-    }
-    // ---------------------------------------------------------
 
     // Sanitize and extract
     $user_id = intval($data['user_id'] ?? 0);
@@ -125,9 +93,10 @@ try {
     if ($table_check && mysqli_num_rows($table_check) > 0) {
         foreach ($items_data as $item) {
             $p_name = mysqli_real_escape_string($conn, $item['name'] ?? '');
+            $p_id = intval($item['id'] ?? $item['product_id'] ?? 0);
             $p_qty = intval($item['qty'] ?? 1);
             $p_price = floatval($item['price'] ?? 0);
-            mysqli_query($conn, "INSERT INTO order_items (order_id, product, qty, price) VALUES ($order_id, '$p_name', $p_qty, $p_price)");
+            mysqli_query($conn, "INSERT INTO order_items (order_id, product_id, product, qty, price) VALUES ($order_id, " . ($p_id > 0 ? $p_id : 'NULL') . ", '$p_name', $p_qty, $p_price)");
         }
     }
 

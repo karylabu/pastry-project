@@ -2,12 +2,14 @@ import React, { useEffect, useMemo, useState } from "react";
 import StaffNavbar from "../components/StaffNavbar";
 import { STAFF_BASE } from "../../services/config";
 
+const staffFetch = (url, options = {}) => fetch(url, { credentials: "include", ...options });
+
 export default function LowStockAlerts({ showNavbar = true }) {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch(`${STAFF_BASE}/api_products.php?action=list`)
+    staffFetch(`${STAFF_BASE}/api_products.php?action=list`)
       .then((res) => res.json())
       .then((data) => {
         if (Array.isArray(data)) {

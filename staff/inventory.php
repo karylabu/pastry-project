@@ -1,16 +1,11 @@
     <?php
-    session_start();
+    require_once __DIR__ . '/../includes/staff_page_auth.php';
 
     /*
     |--------------------------------------------------------------------------
     | AUTH CHECK
     |--------------------------------------------------------------------------
     */
-    if (!isset($_SESSION['user'])) {
-        header('Location: staff_login.php');
-        exit;
-    }
-
     require_once __DIR__ . '/../includes/db.php';
     /*
     |--------------------------------------------------------------------------
