@@ -41,13 +41,11 @@ if ($sender === 'staff' || $sender === 'customer') {
     $sender = 'admin';
 }
 
-$columnCheck = $conn->query("SHOW COLUMNS FROM messages LIKE 'sender'");
-if ($columnCheck && $columnCheck->num_rows > 0) {
-    $column = $columnCheck->fetch_assoc();
-    if ($column && strpos($column['Type'], 'admin') === false) {
-        $conn->query("ALTER TABLE messages MODIFY sender ENUM('customer','staff','ai','admin') NOT NULL");
-    }
-}
+/*
+| SCHEMA NOTE: The messages.sender ENUM is maintained through versioned
+| migrations in database/migrations/. This API must never run ALTER TABLE
+| statements at request time.
+*/
 
 $stmt = $conn->prepare('INSERT INTO messages (order_id, sender, message, is_read, created_at) VALUES (?, ?, ?, 1, NOW())');
 $stmt->bind_param('iss', $orderId, $sender, $message);
@@ -58,3 +56,4 @@ $conn->close();
 
 echo json_encode(['success' => true, 'message' => 'Saved']);
 exit();
+?>

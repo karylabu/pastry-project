@@ -42,20 +42,12 @@ function insertAuditLog(mysqli $conn, int $userId, string $context, string $acti
     return $ok;
 }
 
-function ensureNotificationsTableCompat(mysqli $conn): void {
-    if (!$conn) return;
-    $tables = $conn->query("SHOW TABLES LIKE 'notifications'");
-    if ($tables && $tables->num_rows > 0) {
-        @mysqli_query($conn, "ALTER TABLE notifications MODIFY COLUMN type VARCHAR(50) NOT NULL DEFAULT 'Info'");
-    }
-}
-
 function insertCustomerNotification(mysqli $conn, int $userId, string $title, string $message, string $type, string $actionUrl = ''): bool {
     if (!$conn || !$userId) return false;
 
     try {
-        ensureNotificationsTableCompat($conn);
-
+        // SCHEMA NOTE: the notifications table is maintained through
+        // versioned migrations; no runtime ALTER TABLE here.
         $tables = $conn->query("SHOW TABLES LIKE 'notifications'");
         if (!$tables || $tables->num_rows === 0) {
             return false;
@@ -77,21 +69,13 @@ function insertCustomerNotification(mysqli $conn, int $userId, string $title, st
 }
 
 /* =========================
-   DATABASE
-========================= */
-function ensureOrdersSchemaCompat(mysqli $conn): void {
-    if (!$conn) {
-        return;
-    }
-
-    @mysqli_query($conn, "ALTER TABLE orders MODIFY COLUMN status ENUM('Pending','Confirmed','Preparing','To Receive','Completed','Cancelled') NOT NULL DEFAULT 'Pending'");
-
-    $phoneCheck = $conn->query("SHOW COLUMNS FROM orders LIKE 'phone'");
-    if (!$phoneCheck || $phoneCheck->num_rows === 0) {
-        @mysqli_query($conn, "ALTER TABLE orders ADD COLUMN phone VARCHAR(30) NULL AFTER email");
-    }
-}
-
+    DATABASE
+ ========================= */
+/*
+| SCHEMA NOTE: The orders/notifications schemas are maintained exclusively
+| through versioned migrations in database/migrations/. This API must never
+| run ALTER TABLE / CREATE TABLE statements at request time.
+*/
 function loadOrderItemsFromJson(string $itemsJson): array {
     $items = json_decode($itemsJson ?: '[]', true);
     if (!is_array($items)) {
@@ -261,13 +245,32 @@ function shouldDeductInventory(string $oldStatus, string $newStatus): bool {
     return $newStatus === 'Confirmed' && $oldStatus !== 'Confirmed';
 }
 
+/**
+ * Count inventory movements recorded for an order for a given movement type.
+ * Used to make deduction idempotent: an order may only be deducted while its
+ * stock has NOT already been deducted (or has been restored by cancellation).
+ */
+function orderMovementCount(mysqli $conn, int $orderId, string $movementType): int {
+    $stmt = $conn->prepare(
+        "SELECT COUNT(*) AS c FROM product_inventory_movements
+         WHERE reference_type = 'order' AND reference_id = ? AND movement_type = ?"
+    );
+    if (!$stmt) {
+        return -1;
+    }
+    $stmt->bind_param('is', $orderId, $movementType);
+    $stmt->execute();
+    $row = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+    return $row ? (int) $row['c'] : -1;
+}
+
 $conn = @new mysqli("localhost", "root", "", "pastry_db");
 
 if ($conn->connect_error) {
-    sendJson(false, "DB connect failed", ["error" => $conn->connect_error]);
+    sendJson(false, "DB connect failed");
 }
 
-ensureOrdersSchemaCompat($conn);
 /* =========================
    INPUT
 ========================= */
@@ -288,8 +291,9 @@ if (empty($data) && !empty($_POST)) {
 $id = isset($data['id']) ? intval($data['id']) : 0;
 $status = isset($data['status']) ? trim($data['status']) : "";
 
-if (!$id || !$status) {
-    sendJson(false, "Invalid input", ["raw" => $raw]);
+$allowedStatuses = ['Pending', 'Confirmed', 'Preparing', 'To Receive', 'Completed', 'Cancelled'];
+if (!$id || !in_array($status, $allowedStatuses, true)) {
+    sendJson(false, "Invalid input");
 }
 
 /* =========================
@@ -317,6 +321,17 @@ try {
     $currentUserId = getSessionUserId();
 
     if (shouldDeductInventory($oldStatus, $status)) {
+        // Idempotency guard: skip deduction when this order's stock is
+        // already deducted (deductions > restorations). Prevents double
+        // deduction on status flip-flops like Confirmed -> Pending -> Confirmed.
+        $deductedCount = orderMovementCount($conn, $id, 'Order');
+        $restoredCount = orderMovementCount($conn, $id, 'Cancellation');
+        if ($deductedCount < 0 || $restoredCount < 0) {
+            $conn->rollback();
+            sendJson(false, "Failed to verify order inventory state");
+        }
+        $alreadyDeducted = $deductedCount > 0 && $deductedCount > $restoredCount;
+
         $orderLines = loadOrderItemsFromJson($itemsJson);
         if (empty($orderLines)) {
             $orderLines = loadLegacyOrderItems($conn, $id);
@@ -329,7 +344,11 @@ try {
         }
 
         $plan = $planResult['plan'];
-        $applyResult = applyInventoryPlan($conn, $id, $status, $plan, $currentUserId);
+        // Skip the deduction entirely when this order's stock is already
+        // deducted (deductions > restorations) - prevents double-deduction.
+        $applyResult = $alreadyDeducted
+            ? ['success' => true]
+            : applyInventoryPlan($conn, $id, $status, $plan, $currentUserId);
         if (!$applyResult['success']) {
             $conn->rollback();
             sendJson(false, $applyResult['message']);
@@ -556,6 +575,6 @@ try {
         $conn->close();
     }
     error_log('api_update_order_status fatal: ' . $e->getMessage());
-    sendJson(false, "Unexpected server error", ["error" => $e->getMessage()]);
+    sendJson(false, "Unexpected server error");
 }
 ?>

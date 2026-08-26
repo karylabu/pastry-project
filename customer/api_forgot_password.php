@@ -59,16 +59,11 @@ try {
         sendJson(false, 'The server is temporarily unavailable. Please try again later.', 503);
     }
 
-    mysqli_query($conn, "
-        CREATE TABLE IF NOT EXISTS password_resets (
-            id         INT AUTO_INCREMENT PRIMARY KEY,
-            email      VARCHAR(255) NOT NULL,
-            token      VARCHAR(6)   NOT NULL,
-            expires_at DATETIME     NOT NULL,
-            used       TINYINT(1)   DEFAULT 0,
-            created_at TIMESTAMP    DEFAULT CURRENT_TIMESTAMP
-        )
-    ");
+    /*
+    | SCHEMA NOTE: The password_resets table is maintained exclusively through
+    | versioned migrations in database/migrations/. This API must never run
+    | CREATE TABLE / ALTER TABLE statements at request time.
+    */
 
     $data  = json_decode(file_get_contents("php://input"), true);
     $email = strtolower(trim((string) ($data['email'] ?? '')));

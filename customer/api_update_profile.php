@@ -30,15 +30,11 @@ try {
         exit;
     }
 
-    $check = mysqli_query($conn, "SHOW COLUMNS FROM users LIKE 'username'");
-    if (mysqli_num_rows($check) === 0) {
-        mysqli_query($conn, "ALTER TABLE users ADD COLUMN username VARCHAR(100) NULL");
-    }
-
-    $checkPic = mysqli_query($conn, "SHOW COLUMNS FROM users LIKE 'profile_image'");
-    if (mysqli_num_rows($checkPic) === 0) {
-        mysqli_query($conn, "ALTER TABLE users ADD COLUMN profile_image TEXT NULL");
-    }
+    /*
+    | SCHEMA NOTE: The users table columns (username, profile_image) are maintained
+    | through versioned migrations in database/migrations/. This API must never run
+    | ALTER TABLE statements at request time.
+    */
 
     $stmt = $conn->prepare("UPDATE users SET name = ?, email = ?, phone = ?, username = ?, profile_image = ? WHERE id = ?");
     $stmt->bind_param('sssssi', $fullName, $email, $phone, $username, $profileImage, $userId);

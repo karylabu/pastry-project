@@ -120,7 +120,7 @@ function requireApiRole(array $allowedRoles): array
 
 function requireInventoryRead(): array
 {
-    return requireApiRole(['staff', 'admin', 'administrator', 'superadmin', 'super_admin', 'manager']);
+    return requireApiRole(['staff', 'admin', 'administrator', 'superadmin', 'super_admin', 'manager', 'owner']);
 }
 
 function requireInventoryWrite(): array
@@ -130,5 +130,5 @@ function requireInventoryWrite(): array
 
 function requireInventoryManager(): array
 {
-    return requireApiRole(['admin', 'administrator', 'superadmin', 'super_admin', 'manager']);
+    return requireApiRole(['admin', 'administrator', 'superadmin', 'super_admin', 'manager', 'owner']);
 }

@@ -42,9 +42,11 @@ if (empty($message)) {
 /* =========================
    SAVE MESSAGE
 ========================= */
-// Force column fixes just in case
-$conn->query("ALTER TABLE messages ADD COLUMN IF NOT EXISTS user_id INT NULL");
-$conn->query("ALTER TABLE messages ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP");
+/*
+| SCHEMA NOTE: The messages table columns (user_id, updated_at) are maintained
+| through versioned migrations in database/migrations/. This API must never run
+| ALTER TABLE statements at request time.
+*/
 
 $query = "INSERT INTO messages (order_id, user_id, sender, message, created_at) VALUES (?, ?, ?, ?, NOW())";
 $stmt = $conn->prepare($query);

@@ -84,6 +84,25 @@ function createLowStockAlert(mysqli $conn, int $ingredientId, string $ingredient
     $userResult->free();
 }
 
+/**
+ * Validates an optional expiry date (YYYY-MM-DD).
+ * Returns null when absent, the normalized date when valid, or false after
+ * sending a 400 response when invalid.
+ */
+function validateExpiryOrNull($value, mysqli $conn) {
+    if (empty($value)) {
+        return null;
+    }
+    $trimmed = trim((string) $value);
+    $date = DateTime::createFromFormat('Y-m-d', $trimmed);
+    if (!$date || $date->format('Y-m-d') !== $trimmed) {
+        echo json_encode(["success" => false, "message" => "Expiry must use YYYY-MM-DD format"]);
+        $conn->close();
+        return false;
+    }
+    return $trimmed;
+}
+
 // Support POST actions: stock_in, stock_out
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $raw = file_get_contents('php://input');
@@ -103,7 +122,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $unit = trim($data['unit'] ?? '');
         $stock = isset($data['stock']) ? floatval($data['stock']) : 0;
         $threshold = isset($data['threshold']) ? intval($data['threshold']) : 0;
-        $expiry = !empty($data['expiry']) ? $conn->real_escape_string($data['expiry']) : null;
+        $expiry = validateExpiryOrNull($data['expiry'] ?? null, $conn);
+        if ($expiry === false) {
+            exit;
+        }
 
         if ($name === '') {
             echo json_encode(["success" => false, "message" => "Name is required"]);
@@ -158,10 +180,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $unit = trim($data['unit'] ?? '');
         $stock = isset($data['stock']) ? floatval($data['stock']) : 0;
         $threshold = isset($data['threshold']) ? intval($data['threshold']) : 0;
-        $expiry = !empty($data['expiry']) ? $conn->real_escape_string($data['expiry']) : null;
+        $expiry = validateExpiryOrNull($data['expiry'] ?? null, $conn);
+        if ($expiry === false) {
+            exit;
+        }
 
         if (!$ingredient_id || $name === '') {
             echo json_encode(["success" => false, "message" => "Missing ingredient or name"]);
+            $conn->close();
+            exit;
+        }
+
+        $statusStmt = $conn->prepare("SELECT expiry, EXISTS (SELECT 1 FROM ingredient_batches b WHERE b.ingredient_id = ingredients.id AND b.quantity_remaining > 0 AND b.expiry_date < CURDATE()) AS expired_batch, EXISTS (SELECT 1 FROM ingredient_batches b WHERE b.ingredient_id = ingredients.id AND b.quantity_remaining <= 0) AS discarded_batch FROM ingredients WHERE id = ?");
+        $statusStmt->bind_param('i', $ingredient_id);
+        $statusStmt->execute();
+        $statusRow = $statusStmt->get_result()->fetch_assoc();
+        $statusStmt->close();
+        $expired = $statusRow && !empty($statusRow['expiry']) && $statusRow['expiry'] !== '0000-00-00' && $statusRow['expiry'] < date('Y-m-d');
+        if (!$statusRow || $expired || (int) $statusRow['expired_batch'] === 1 || (int) $statusRow['discarded_batch'] === 1) {
+            http_response_code(409);
+            echo json_encode(["success" => false, "message" => "Expired or discarded inventory cannot be edited. Use the discard workflow instead."]);
             $conn->close();
             exit;
         }
@@ -176,17 +214,55 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         $previousStockStmt->close();
 
+        // AUDIT TRAIL: direct stock edits are recorded as correction movements
+        // inside a transaction so the history always matches reality.
+        $conn->begin_transaction();
+
+        $lockStmt = $conn->prepare("SELECT stock FROM ingredients WHERE id = ? LIMIT 1 FOR UPDATE");
+        $lockStmt->bind_param('i', $ingredient_id);
+        $lockStmt->execute();
+        $lockedRow = $lockStmt->get_result()->fetch_assoc();
+        $lockStmt->close();
+        if (!$lockedRow) {
+            $conn->rollback();
+            echo json_encode(["success" => false, "message" => "Ingredient not found"]);
+            $conn->close();
+            exit;
+        }
+        $previousStock = (float) $lockedRow['stock'];
+
         $stmt = $conn->prepare("UPDATE ingredients SET name = ?, unit = ?, stock = ?, threshold = ?, expiry = ?, updated_at = NOW() WHERE id = ? LIMIT 1");
         $stmt->bind_param('ssdisi', $name, $unit, $stock, $threshold, $expiry, $ingredient_id);
         $ok = $stmt->execute();
         $stmt->close();
 
-        if ($ok) {
-            createLowStockAlert($conn, $ingredient_id, $name, $previousStock, $stock, $threshold);
-            echo json_encode(["success" => true, "ingredient_id" => $ingredient_id]);
-        } else {
+        if (!$ok) {
+            $conn->rollback();
             echo json_encode(["success" => false, "message" => "Failed to update ingredient"]);
+            $conn->close();
+            exit;
         }
+
+        if ((float) $stock !== $previousStock) {
+            $correctionAction = (float) $stock > $previousStock ? 'stock_in' : 'stock_out';
+            $correctionQty = abs((float) $stock - $previousStock);
+            $movement = $conn->prepare("INSERT INTO ingredient_movements (ingredient_id, action, qty, note, user_id) VALUES (?, ?, ?, ?, ?)");
+            $movementUserId = getSessionUserId();
+            $movementNote = 'Inventory correction via ingredient update';
+            $movement->bind_param('isdsi', $ingredient_id, $correctionAction, $correctionQty, $movementNote, $movementUserId);
+            if (!$movement->execute()) {
+                $movement->close();
+                $conn->rollback();
+                echo json_encode(["success" => false, "message" => "Failed to record stock correction"]);
+                $conn->close();
+                exit;
+            }
+            $movement->close();
+        }
+
+        $conn->commit();
+        createLowStockAlert($conn, $ingredient_id, $name, $previousStock, (float) $stock, $threshold);
+        echo json_encode(["success" => true, "ingredient_id" => $ingredient_id]);
         $conn->close();
         exit;
     }
@@ -348,7 +424,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 
-$sql = "SELECT id, name, unit, stock, threshold, expiry, created_at, updated_at FROM ingredients ORDER BY name ASC";
+$sql = "SELECT id, name, unit, stock, threshold, expiry, created_at, updated_at,
+           (SELECT COUNT(*) FROM ingredient_batches b WHERE b.ingredient_id = ingredients.id) AS batch_count,
+           (SELECT COUNT(*) FROM ingredient_batches b WHERE b.ingredient_id = ingredients.id AND b.quantity_remaining > 0 AND b.expiry_date IS NOT NULL AND b.expiry_date < CURDATE()) AS expired_batch_count,
+           (SELECT COUNT(*) FROM discard_requests d WHERE d.ingredient_id = ingredients.id AND d.status = 'Pending') AS pending_discard_count
+               ,(SELECT COUNT(*) FROM ingredient_batches b WHERE b.ingredient_id = ingredients.id AND b.quantity_remaining <= 0) AS discarded_batch_count
+    FROM ingredients ORDER BY name ASC";
 $result = $conn->query($sql);
 
 $ingredients = [];
@@ -363,6 +444,10 @@ if ($result) {
             "expiry" => $row["expiry"],
             "created_at" => $row["created_at"],
             "updated_at" => $row["updated_at"],
+            "batch_count" => (int) ($row["batch_count"] ?? 0),
+            "expired_batch_count" => (int) ($row["expired_batch_count"] ?? 0),
+            "pending_discard_count" => (int) ($row["pending_discard_count"] ?? 0),
+            "discarded_batch_count" => (int) ($row["discarded_batch_count"] ?? 0),
         ];
     }
 }

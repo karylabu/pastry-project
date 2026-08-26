@@ -70,10 +70,10 @@ export default function Login() {
 
       if (data?.success) {
         // Save user to localStorage
-        localStorage.setItem("user", JSON.stringify(data.user));
+        localStorage.setItem("user", JSON.stringify({ ...data.user, token: data.token || "" }));
 
         // Show styled success modal instead of plain alert
-        setJustLoggedUser(data.user);
+        setJustLoggedUser({ ...data.user, token: data.token || "" });
         setShowLoginSuccess(true);
       } else {
         setError(data.message || "Login failed.");

@@ -45,3 +45,8 @@ Thumbs.db
 *.key
 credentials.json
 service-account.json
+
+# Private database exports and local backups
+database/backups/
+database/*dump*.sql
+database/*backup*.sql

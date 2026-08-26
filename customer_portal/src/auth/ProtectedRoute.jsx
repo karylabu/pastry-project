@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
 import { STAFF_BASE } from "../services/config";
 
-const DEFAULT_ALLOWED_ROLES = ["staff", "admin", "administrator", "superadmin", "super_admin", "manager"];
+const DEFAULT_ALLOWED_ROLES = ["staff", "admin", "administrator", "superadmin", "super_admin", "manager", "owner"];
 
 /**
  * Reusable route guard.
@@ -33,7 +33,16 @@ export default function ProtectedRoute({
         if (response.ok && data.success && data.user) {
           const role = String(data.user.role || "").trim().toLowerCase();
           if (allowedRoles.includes(role)) {
-            localStorage.setItem("user", JSON.stringify(data.user));
+            let storedUser = {};
+            try {
+              storedUser = JSON.parse(localStorage.getItem("user") || "{}");
+            } catch (error) {
+              storedUser = {};
+            }
+            localStorage.setItem("user", JSON.stringify({
+              ...data.user,
+              token: data.user.token || storedUser.token || "",
+            }));
             setState("authorized");
           } else {
             // Authenticated but not allowed for THIS route's role set.

@@ -1,7 +1,7 @@
 # Rewrite rules for Laravel + API endpoints
 <IfModule mod_rewrite.c>
     RewriteEngine On
-    RewriteBase /Capstone--Development/
+    RewriteBase /pastry-project/
 
     # IMPORTANT: These must come FIRST so Laravel rewriting does not override them
     RewriteRule ^(customer|staff)(/.*)?$ - [L]
@@ -12,8 +12,8 @@
     RewriteRule .* - [L]
 
     # Otherwise rewrite to Laravel's front controller
-    RewriteCond %{REQUEST_URI} !^/laravel/public/
-    RewriteRule ^(.*)$ /laravel/public/index.php [L]
+    RewriteCond %{REQUEST_URI} !^/pastry-project/laravel/public/
+    RewriteRule ^(.*)$ laravel/public/index.php [L]
 </IfModule>
 
 # Deny direct access to includes and vendor folders for safety

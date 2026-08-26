@@ -4,19 +4,11 @@ require_once __DIR__ . '/../includes/api_auth.php';
 requireInventoryRead();
 
 /* ================= DATABASE CONNECTION ================= */
-
-function ensureOrdersSchemaCompat(mysqli $conn): void {
-    if (!$conn) {
-        return;
-    }
-
-    @mysqli_query($conn, "ALTER TABLE orders MODIFY COLUMN status ENUM('Pending','Confirmed','Preparing','To Receive','Completed','Cancelled') NOT NULL DEFAULT 'Pending'");
-
-    $phoneCheck = $conn->query("SHOW COLUMNS FROM orders LIKE 'phone'");
-    if (!$phoneCheck || $phoneCheck->num_rows === 0) {
-        @mysqli_query($conn, "ALTER TABLE orders ADD COLUMN phone VARCHAR(30) NULL AFTER email");
-    }
-}
+/*
+| SCHEMA NOTE: The orders table schema is maintained exclusively through
+| versioned migrations in database/migrations/. This API must never run
+| ALTER TABLE / CREATE TABLE statements at request time.
+*/
 
 $conn = new mysqli("localhost", "root", "", "pastry_db");
 
@@ -27,8 +19,6 @@ if ($conn->connect_error) {
     ]);
     exit;
 }
-
-ensureOrdersSchemaCompat($conn);
 
 /* ================= GET ORDERS ================= */
 
@@ -44,7 +34,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     if (!$result) {
         echo json_encode([
             "status" => "error",
-            "message" => $conn->error
+            "message" => "Failed to load orders"
         ]);
         exit;
     }
@@ -87,52 +77,58 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     exit;
 }
 
-/* ================= UPDATE STATUS / TOTAL ================= */
+/* ================= UPDATE TOTAL ================= */
+/*
+| SECURITY: This endpoint previously interpolated client-supplied values
+| directly into SQL (injection risk) and allowed arbitrary status writes
+| that BYPASSED inventory deduction/cancellation logic. Status changes must
+| go through api_update_order_status.php, which handles stock atomically.
+| Only a numeric order-total correction is permitted here, via prepared
+| statements.
+*/
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     $data = json_decode(file_get_contents("php://input"), true);
+    if (!is_array($data)) {
+        $data = $_POST;
+    }
+
+    // Status changes are NOT allowed here — they would bypass stock logic.
+    if (!empty($data['status'])) {
+        http_response_code(400);
+        echo json_encode([
+            "status" => "error",
+            "message" => "Status changes must use api_update_order_status.php"
+        ]);
+        exit;
+    }
 
     $id = intval($data['id'] ?? 0);
-    $status = $conn->real_escape_string($data['status'] ?? '');
-    $total = isset($data['total']) ? floatval($data['total']) : null;
+    $hasTotal = array_key_exists('total', $data) && is_numeric($data['total']);
+    $total = $hasTotal ? floatval($data['total']) : null;
 
-    if (!$id) {
+    if (!$id || !$hasTotal || $total < 0) {
         echo json_encode([
             "status" => "error",
-            "message" => "Missing data"
+            "message" => "Missing or invalid data"
         ]);
         exit;
     }
 
-    $updates = [];
-    if ($status !== '') {
-        $updates[] = "status='$status'";
-    }
-    if ($total !== null) {
-        $updates[] = "total=" . number_format($total, 2, '.', '');
-    }
-
-    if (empty($updates)) {
-        echo json_encode([
-            "status" => "error",
-            "message" => "Nothing to update"
-        ]);
-        exit;
-    }
-
-    $sql = "UPDATE orders SET " . implode(', ', $updates) . " WHERE id=$id";
-
-    if ($conn->query($sql)) {
+    $stmt = $conn->prepare("UPDATE orders SET total = ? WHERE id = ?");
+    $stmt->bind_param("di", $total, $id);
+    if ($stmt->execute()) {
         echo json_encode([
             "status" => "success"
         ]);
     } else {
         echo json_encode([
             "status" => "error",
-            "message" => $conn->error
+            "message" => "Update failed"
         ]);
     }
+    $stmt->close();
 
     exit;
 }

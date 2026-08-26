@@ -2,70 +2,11 @@
 require_once __DIR__ . '/../../customer/cors.php';
 require_once __DIR__ . '/../../includes/db.php';
 
-function ensurePredictiveTables(mysqli $conn): void {
-    if (!$conn) {
-        return;
-    }
-
-    mysqli_query($conn, "
-        CREATE TABLE IF NOT EXISTS analytics_imports (
-            id INT AUTO_INCREMENT PRIMARY KEY,
-            file_name VARCHAR(255) NOT NULL,
-            source_name VARCHAR(100) DEFAULT 'POS Export',
-            uploaded_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            status VARCHAR(20) NOT NULL DEFAULT 'completed',
-            rows_received INT NOT NULL DEFAULT 0,
-            rows_processed INT NOT NULL DEFAULT 0,
-            error_message TEXT NULL
-        ) ENGINE=InnoDB
-    ");
-
-    mysqli_query($conn, "
-        CREATE TABLE IF NOT EXISTS analytics_sales_history (
-            id INT AUTO_INCREMENT PRIMARY KEY,
-            import_id INT DEFAULT NULL,
-            product_name VARCHAR(255) NOT NULL,
-            sale_date DATE NOT NULL,
-            units_sold DECIMAL(10,2) NOT NULL DEFAULT 0,
-            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            INDEX idx_product_date (product_name, sale_date)
-        ) ENGINE=InnoDB
-    ");
-
-    mysqli_query($conn, "
-        CREATE TABLE IF NOT EXISTS analytics_forecasts (
-            id INT AUTO_INCREMENT PRIMARY KEY,
-            product_name VARCHAR(255) NOT NULL,
-            forecast_date DATE NOT NULL,
-            predicted_units DECIMAL(10,2) NOT NULL DEFAULT 0,
-            confidence_score DECIMAL(5,2) NOT NULL DEFAULT 0,
-            generated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            INDEX idx_forecast_product (product_name, forecast_date)
-        ) ENGINE=InnoDB
-    ");
-
-    mysqli_query($conn, "
-        CREATE TABLE IF NOT EXISTS analytics_reorder_logs (
-            id INT AUTO_INCREMENT PRIMARY KEY,
-            product_name VARCHAR(255) NOT NULL,
-            ingredient_name VARCHAR(255) NOT NULL,
-            recommended_qty DECIMAL(10,2) NOT NULL DEFAULT 0,
-            status VARCHAR(30) NOT NULL DEFAULT 'pending',
-            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
-        ) ENGINE=InnoDB
-    ");
-
-    mysqli_query($conn, "
-        CREATE TABLE IF NOT EXISTS analytics_procurement_alerts (
-            id INT AUTO_INCREMENT PRIMARY KEY,
-            product_name VARCHAR(255) NOT NULL,
-            ingredient_name VARCHAR(255) NOT NULL,
-            severity VARCHAR(20) NOT NULL DEFAULT 'warning',
-            message TEXT NOT NULL,
-            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
-        ) ENGINE=InnoDB
-    ");
-}
+/*
+| SCHEMA NOTE: The analytics_* tables are created by the versioned migration
+| database/migrations/2026_08_25_06_analytics_tables.sql. This API must never
+| run CREATE TABLE / ALTER TABLE statements at request time.
+*/
 
 function normalizeProductName(mixed $value): string {
     return trim(preg_replace('/\s+/', ' ', (string) $value));
@@ -427,7 +368,6 @@ function persistForecastData(mysqli $conn, array $history, array $forecastPayloa
     }
 }
 
-ensurePredictiveTables($conn);
 
 $method = $_SERVER['REQUEST_METHOD'];
 $action = '';

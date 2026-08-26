@@ -15,15 +15,11 @@ try {
     $conn = mysqli_connect("localhost", "root", "", "pastry_db");
     if (!$conn) throw new Exception("Database connection failed.");
 
-    // Ensure user_sessions table exists (for storing tokens)
-    mysqli_query($conn, "CREATE TABLE IF NOT EXISTS user_sessions (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        user_id INT NOT NULL,
-        token VARCHAR(255) UNIQUE NOT NULL,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        expires_at DATETIME,
-        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-    )");
+    /*
+    | SCHEMA NOTE: The user_sessions table is created by the versioned migration
+    | database/migrations/2026_08_25_01_user_sessions.sql. This API must never run
+    | CREATE TABLE / ALTER TABLE statements at request time.
+    */
 
     $data     = json_decode(file_get_contents("php://input"), true);
     $email    = trim($data['email']    ?? '');
@@ -35,7 +31,7 @@ try {
     }
 
     $escaped = mysqli_real_escape_string($conn, $email);
-    $result  = mysqli_query($conn, "SELECT * FROM users WHERE email='$escaped' LIMIT 1");
+    $result  = mysqli_query($conn, "SELECT id, name, email, password, role FROM users WHERE email='$escaped' LIMIT 1");
 
     if (!$result || mysqli_num_rows($result) === 0) {
         echo json_encode(["success" => false, "message" => "User not found."]);
@@ -81,11 +77,6 @@ try {
             "name"  => $user['name'],
             "email" => $user['email'],
             "role"  => $user['role'],
-            "phone" => $user['phone'] ?? '',
-            "address" => $user['address'] ?? '',
-            "city" => $user['city'] ?? '',
-            "postal_code" => $user['postal_code'] ?? '',
-            "profile_image" => $user['profile_image'] ?? '',
         ]
     ]);
 

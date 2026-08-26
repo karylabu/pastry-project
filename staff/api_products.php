@@ -126,8 +126,7 @@ if ($action === 'list') {
 
         echo json_encode([
             "success" => false,
-            "error" => "Query failed",
-            "details" => $e->getMessage()
+            "error" => "Query failed"
         ]);
 
         exit;
@@ -206,8 +205,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } catch (Exception $e) {
             echo json_encode([
                 "success" => false,
-                "error" => "Failed to create product",
-                "details" => $e->getMessage()
+                "error" => "Failed to create product"
             ]);
             exit;
         }
@@ -308,7 +306,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($pdo->inTransaction()) {
                 $pdo->rollBack();
             }
-            echo json_encode(["success" => false, "error" => "Update failed", "details" => $e->getMessage()]);
+            echo json_encode(["success" => false, "error" => "Update failed"]);
             exit;
         }
     }
