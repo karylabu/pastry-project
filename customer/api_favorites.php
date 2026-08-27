@@ -10,13 +10,11 @@ try {
         throw new Exception('Database Connection Failed: ' . mysqli_connect_error());
     }
 
-    mysqli_query($conn, "CREATE TABLE IF NOT EXISTS favorites (
-        favorite_id INT AUTO_INCREMENT PRIMARY KEY,
-        customer_id INT NOT NULL,
-        product_id INT NOT NULL,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        UNIQUE KEY unique_favorite (customer_id, product_id)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+    /*
+    | SCHEMA NOTE: The favorites table is maintained exclusively through
+    | versioned migrations in database/migrations/. This API must never run
+    | CREATE TABLE / ALTER TABLE statements at request time.
+    */
 
     $method = $_SERVER['REQUEST_METHOD'];
     $user_id = 0;

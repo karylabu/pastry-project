@@ -57,7 +57,7 @@ function getEntries($conn) {
 
     if ($result === false) {
         http_response_code(500);
-        echo json_encode(["success" => false, "message" => "Query failed: " . $conn->error]);
+        echo json_encode(["success" => false, "message" => "Failed to load waste entries"]);
         return;
     }
 
@@ -131,11 +131,29 @@ function createEntry($conn) {
     $itemTypeInput = strtolower(trim((string) ($body['item_type'] ?? $body['type'] ?? '')));
     $item = trim((string) ($body["item"] ?? ''));
     $qty    = (float) $body["qty"];
-    $reason = $body["reason"];
+    $reason = trim((string) $body["reason"]);
+    if ($reason === '') {
+        http_response_code(400);
+        echo json_encode(["success" => false, "message" => "A non-empty reason is required"]);
+        return;
+    }
+    if (mb_strlen($reason) > 50) {
+        http_response_code(400);
+        echo json_encode(["success" => false, "message" => "Reason must be 50 characters or fewer"]);
+        return;
+    }
     $idempotencyKey = trim((string) ($body['idempotency_key'] ?? ''));
     $datetime = !empty($body["datetime"])
         ? str_replace("T", " ", $body["datetime"]) . (strlen($body["datetime"]) === 16 ? ":00" : "")
         : date("Y-m-d H:i:s");
+
+    // INPUT VALIDATION: reject malformed datetimes instead of storing garbage.
+    $dtCheck = DateTime::createFromFormat("Y-m-d H:i:s", $datetime);
+    if (!$dtCheck || $dtCheck->format("Y-m-d H:i:s") !== $datetime) {
+        http_response_code(400);
+        echo json_encode(["success" => false, "message" => "datetime must use YYYY-MM-DD HH:MM:SS format"]);
+        return;
+    }
 
     if ($qty <= 0 || ($ingredientId <= 0 && $productId <= 0 && $item === '')) {
         http_response_code(400);
@@ -234,6 +252,11 @@ function createEntry($conn) {
     }
     $update->close();
 
+    // FK columns are nullable — a finished-product waste entry must store
+    // NULL for ingredient_id (and vice versa), never 0, or the FK fails.
+    $ingredientId = $ingredientId > 0 ? $ingredientId : null;
+    $productId = $productId > 0 ? $productId : null;
+
     $insert = $conn->prepare(
         "INSERT INTO waste_log (datetime, item, qty, unit_cost, item_type, reason, ingredient_id, product_id, user_id, reference_type, idempotency_key) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'waste', NULLIF(?, ''))"
     );
@@ -243,7 +266,7 @@ function createEntry($conn) {
     if (!$insert->execute()) {
         http_response_code(500);
         $conn->rollback();
-        echo json_encode(["success" => false, "message" => "Insert failed: " . $insert->error]);
+        echo json_encode(["success" => false, "message" => "Failed to save waste entry"]);
         $insert->close();
         return;
     }

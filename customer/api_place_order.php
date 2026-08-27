@@ -47,6 +47,12 @@ try {
     $status = 'Pending';
     $order_date = date('Y-m-d');
 
+    /*
+    | SCHEMA NOTE: All table schemas are maintained exclusively through
+    | versioned migrations in database/migrations/. This API must never run
+    | CREATE TABLE / ALTER TABLE statements at request time.
+    */
+
     $sql = "INSERT INTO orders (
                 user_id, customer, email, items, subtotal, delivery_fee,
                 total, method, payment, address, phone, lat, lng,
@@ -65,18 +71,6 @@ try {
     $order_id = mysqli_insert_id($conn);
 
     // --- Create Notification for the user ---
-    // Ensure table exists first
-    mysqli_query($conn, "CREATE TABLE IF NOT EXISTS notifications (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        user_id INT NOT NULL,
-        title VARCHAR(255) NOT NULL,
-        message TEXT NOT NULL,
-        type VARCHAR(50) DEFAULT 'order',
-        is_read TINYINT(1) DEFAULT 0,
-        action_url VARCHAR(255) DEFAULT '',
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    )");
-
     if ($user_id > 0) {
         $notif_title = "Order Placed";
         $notif_msg = "Your order #$order_id has been successfully placed. We'll notify you once it's confirmed!";

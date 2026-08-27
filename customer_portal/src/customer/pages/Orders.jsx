@@ -264,7 +264,10 @@ export default function Orders() {
     try {
       const res = await fetch(`${CUSTOMER_BASE}/api_cancel_order.php`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(user?.token ? { Authorization: `Bearer ${user.token}` } : {}),
+        },
         body: JSON.stringify({ order_id: cancelTarget.id }),
       });
       const data = await safeParseJson(res);

@@ -10,26 +10,11 @@ try {
         throw new Exception('Database Connection Failed: ' . mysqli_connect_error());
     }
 
-    // Ensure addresses table exists
-    mysqli_query($conn, "CREATE TABLE IF NOT EXISTS addresses (
-        address_id INT AUTO_INCREMENT PRIMARY KEY,
-        customer_id INT NOT NULL,
-        address_label VARCHAR(50) NOT NULL,
-        recipient_name VARCHAR(100) NOT NULL,
-        contact_number VARCHAR(20) NOT NULL,
-        house_no VARCHAR(50),
-        street VARCHAR(100) NOT NULL,
-        barangay VARCHAR(100) NOT NULL,
-        city VARCHAR(100) NOT NULL,
-        province VARCHAR(100) NOT NULL,
-        zip_code VARCHAR(20),
-        landmark VARCHAR(255),
-        delivery_instructions TEXT,
-        is_default BOOLEAN DEFAULT FALSE,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-        FOREIGN KEY (customer_id) REFERENCES users(id) ON DELETE CASCADE
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+    /*
+    | SCHEMA NOTE: The addresses table is maintained exclusively through
+    | versioned migrations in database/migrations/. This API must never run
+    | CREATE TABLE / ALTER TABLE statements at request time.
+    */
 
     // Identify customer_id from request
     $user_id = 0;

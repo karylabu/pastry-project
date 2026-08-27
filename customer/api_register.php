@@ -18,16 +18,11 @@ try {
         exit;
     }
 
-    // 2. Setup (optional but keeps DB healthy)
-    mysqli_query($conn, "CREATE TABLE IF NOT EXISTS users (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        name VARCHAR(255) NOT NULL,
-        email VARCHAR(255) NOT NULL UNIQUE,
-        phone VARCHAR(20) NULL,
-        password VARCHAR(255) NOT NULL,
-        role VARCHAR(50) DEFAULT 'customer',
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    )");
+    /*
+    | SCHEMA NOTE: The users table is maintained exclusively through versioned
+    | migrations in database/migrations/. This API must never run CREATE TABLE /
+    | ALTER TABLE statements at request time.
+    */
 
     // 3. Data
     $input = file_get_contents('php://input');

@@ -71,7 +71,7 @@ if (!$conn) {
 $sqlOrders = "SELECT id, status, items, total, created_at FROM orders WHERE LOWER(status) = 'completed' ORDER BY created_at ASC";
 $ordersResult = $conn->query($sqlOrders);
 if ($ordersResult === false) {
-    sendJson(false, ['message' => 'Orders query failed: ' . $conn->error]);
+    sendJson(false, ['message' => 'Orders query failed.']);
 }
 $orders = [];
 while ($row = $ordersResult->fetch_assoc()) {
@@ -83,7 +83,7 @@ $orders = extractCompletedOrders($orders);
 $sqlProducts = "SELECT id, name, category FROM products WHERE available = 1 ORDER BY name ASC";
 $productsResult = $conn->query($sqlProducts);
 if ($productsResult === false) {
-    sendJson(false, ['message' => 'Products query failed: ' . $conn->error]);
+    sendJson(false, ['message' => 'Products query failed.']);
 }
 $productCategories = [];
 while ($row = $productsResult->fetch_assoc()) {
@@ -93,7 +93,7 @@ while ($row = $productsResult->fetch_assoc()) {
 $sqlIngredients = "SELECT id, name, stock, threshold FROM ingredients ORDER BY name ASC";
 $ingredientsResult = $conn->query($sqlIngredients);
 if ($ingredientsResult === false) {
-    sendJson(false, ['message' => 'Ingredients query failed: ' . $conn->error]);
+    sendJson(false, ['message' => 'Ingredients query failed.']);
 }
 $ingredients = [];
 while ($row = $ingredientsResult->fetch_assoc()) {

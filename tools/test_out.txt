@@ -1,0 +1,59 @@
+PASS | Staff login returns Bearer token
+PASS | Customer login returns Bearer token
+PASS | API unauthenticated -> 401 | HTTP 401
+PASS | API customer role -> 403 | HTTP 403
+PASS | Read API customer role -> 403 | HTTP 403
+PASS | Produce valid qty succeeds | {"status":"success","message":"Finished goods produced successfully","new_stock":8}
+PASS | Produce adds finished stock (+3) | 5 -> 8
+PASS | Produce deducts ingredients (-6) | 100 -> 94
+PASS | Production transaction recorded with user
+PASS | Produce zero -> rejected | {"status":"error","message":"Invalid input data"}
+PASS | Produce negative -> rejected
+PASS | Produce decimal -> rejected (no silent truncation) | {"status":"error","message":"Quantity must be a whole number"}
+PASS | Produce insufficient ingredients -> rejected | {"status":"error","message":"Insufficient TEST Flour for this production quantity"}
+PASS | Rollback: product stock unchanged
+PASS | Rollback: ingredient stock unchanged
+PASS | Rollback: no production row created
+PASS | Rollback: no product movement created
+PASS | Rollback: no ingredient movement created
+PASS | Produce without active recipe -> rejected | {"status":"error","message":"No recipe defined for this product"}
+PASS | Produce nonexistent product -> rejected
+PASS | Duplicate produce replay detected | {"status":"success","duplicate":true,"production_id":16,"message":"Production already recorded"}
+PASS | Duplicate produce added stock ONCE | 8 -> 9
+PASS | Duplicate produce deducted ingredients ONCE
+PASS | Concurrent produces: both succeed atomically | stock=11 ing=88
+PASS | Valid stock-in
+PASS | Valid stock-out
+PASS | Zero qty adjustment -> rejected
+PASS | Negative qty adjustment -> rejected
+PASS | Excessive stock-out -> rejected, stock intact
+PASS | Missing reason -> allowed with default note
+PASS | Adjustment audit trail complete (prev/new/user/reason)
+PASS | Valid waste recorded | {"success":true,"entry":{"id":15,"datetime":"2026-08-25 05:40:43","item":"TEST Cake","qty":2,"unit_cost":20,"cost":40,"type":"Finished Product","reason":"Expired"}}
+PASS | Waste exceeding stock -> 409, unchanged | HTTP 409
+PASS | Zero waste -> 400
+PASS | Negative waste -> 400
+PASS | Invalid datetime -> 400
+PASS | Over-long reason -> 400
+PASS | Duplicate waste replay detected
+PASS | Duplicate waste deducted ONCE | 14 -> 13
+PASS | Unauthorized waste -> 403 | HTTP 403
+PASS | Fixture order starts Pending
+PASS | Confirm order succeeds + deducts stock | {"success":true,"message":"Order updated","id":149,"status":"Confirmed","sms_sent":false,"sms_error":null}
+PASS | Order movement recorded once
+PASS | Confirmed -> Pending allowed
+PASS | Re-confirm does NOT double-deduct | stock=11 resp={"success":true,"message":"Order updated","id":149,"status":"Confirmed","sms_sent":false,"sms_error":null}
+PASS | Cancellation restores stock | stock=13 resp={"success":true,"message":"Order updated","id":149,"status":"Cancelled","sms_sent":false,"sms_error":null}
+PASS | Repeated cancellation does NOT restore twice | stock=13
+PASS | Cancelled -> Confirm re-deducts correctly | stock=11 resp={"success":true,"message":"Order updated","id":149,"status":"Confirmed","sms_sent":false,"sms_error":null}
+PASS | Concurrent confirm deducts EXACTLY once | deducted=1
+PASS | api_orders POST status bypass blocked (400) | HTTP 400
+PASS | Injection attempt changed nothing
+PASS | api_orders POST total-only update works
+PASS | Total updated safely | total=123.45
+PASS | Stock history returns movements w/ audit fields
+PASS | Ingredient history returns movements
+PASS | Analytics accessible to staff
+PASS | Reports denied to customer (403) | HTTP 403
+
+TOTAL: 57 | PASS: 57 | FAIL: 0

@@ -1,0 +1,6 @@
+﻿
+Fatal error: Uncaught mysqli_sql_exception: MySQL server has gone away in C:\xampp\htdocs\pastry-project\tools\e2e_status.php:3
+Stack trace:
+#0 C:\xampp\htdocs\pastry-project\tools\e2e_status.php(3): mysqli->__construct('localhost', 'root', Object(SensitiveParameterValue), 'pastry_db')
+#1 {main}
+  thrown in C:\xampp\htdocs\pastry-project\tools\e2e_status.php on line 3

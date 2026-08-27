@@ -308,7 +308,6 @@ export default function Products({ showNavbar = true }) {
 
     setBomError(null);
     setOperationLoading(true);
-    setOperationLoading(true);
     staffFetch(`${STAFF_BASE}/api_update_stocks.php`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -350,6 +349,9 @@ export default function Products({ showNavbar = true }) {
       return;
     }
 
+    setUpdateError(null);
+    setOperationLoading(true);
+
     staffFetch(`${STAFF_BASE}/api_update_stocks.php`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -385,7 +387,7 @@ export default function Products({ showNavbar = true }) {
   ========================= */
   const getStockStatus = (product) => {
     const stock = Number(product.stock || 0);
-    const minimum = Number(product.minimum_stock ?? 5);
+    const minimum = Number(product.minimum_stock ?? 0);
     if (stock <= 0) return { label: "Out of Stock", icon: "🔴", classes: "bg-[#FEE2E2] text-[#991B1B]" };
     if (stock <= minimum) return { label: "Low Stock", icon: "🟡", classes: "bg-[#FEF3C7] text-[#92400E]" };
     return { label: "In Stock", icon: "🟢", classes: "bg-[#DCFCE7] text-[#166534]" };
@@ -593,7 +595,7 @@ export default function Products({ showNavbar = true }) {
                     {getStockStatus(product).icon} {getStockStatus(product).label}
                   </span>
                 </div>
-                <p className="mb-3 text-[11px] text-black/50">Minimum stock: {product.minimum_stock ?? 5}</p>
+                <p className="mb-3 text-[11px] text-black/50">Minimum stock: {product.minimum_stock ?? "Not set"}</p>
 
                 {/* BUTTON */}
                 <div className="flex gap-2">
@@ -608,9 +610,16 @@ export default function Products({ showNavbar = true }) {
 
           ))}
 
+            {!loading && filteredProducts.length === 0 && (
+              <div className="col-span-full rounded-xl border border-dashed border-black/15 px-6 py-12 text-center">
+                <p className="text-sm font-semibold text-black">No products found</p>
+                <p className="mt-1 text-xs text-black/55">Try a different search or category.</p>
+              </div>
+            )}
+
           </div>
         ) : (
-          <div className="overflow-hidden rounded-3xl border border-black/10 shadow-sm">
+          <div className="overflow-x-auto rounded-3xl border border-black/10 shadow-sm">
             <div className="grid grid-cols-[1.5fr_0.8fr_0.8fr_0.8fr] gap-0 bg-black/5 text-[11px] uppercase tracking-[0.18em] text-black/70">
               <div className="px-4 py-3 font-semibold">Product</div>
               <div className="px-4 py-3 font-semibold">Category</div>
@@ -648,6 +657,9 @@ export default function Products({ showNavbar = true }) {
                 </div>
               </div>
             ))}
+            {!loading && filteredProducts.length === 0 && (
+              <div className="px-6 py-12 text-center text-sm text-black/60">No products found. Try a different search or category.</div>
+            )}
           </div>
         )}
 
@@ -660,17 +672,20 @@ export default function Products({ showNavbar = true }) {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="fixed inset-0 bg-black/40 flex items-center justify-center z-50"
+              className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/40 p-4"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="inventory-modal-title"
             >
 
               <motion.div
                 initial={{ scale: 0.9 }}
                 animate={{ scale: 1 }}
                 exit={{ scale: 0.9 }}
-                className="bg-white w-[360px] rounded-2xl p-6 shadow-xl border border-black/10"
+                className="w-full max-w-[360px] rounded-2xl border border-black/10 bg-white p-6 shadow-xl"
               >
 
-                <h2 className="text-lg font-semibold mb-1">
+                <h2 id="inventory-modal-title" className="text-lg font-semibold mb-1">
                   {selectedProduct.name}
                 </h2>
 

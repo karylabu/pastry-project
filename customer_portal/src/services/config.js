@@ -12,10 +12,9 @@ const devBase = configuredDevBase.includes("/GitHub/") ? xamppWithProject : (con
 const homepage = process.env.PUBLIC_URL || "/GitHub/Capstone--Development/customer";
 const prodBase = `${origin}${homepage}`.replace(/\/$/, "");
 const prodRootBase = `${origin}${homepage.replace(/\/customer$/, "")}`.replace(/\/$/, "");
-const isLocalPreview = typeof window !== "undefined" &&
-  (window.location.hostname === "127.0.0.1" || window.location.hostname === "localhost") &&
-  ["3000", "3001", "3002"].includes(window.location.port);
-const useXampp = process.env.NODE_ENV === "development" || isLocalPreview;
+const isLocalHost = typeof window !== "undefined" &&
+  (window.location.hostname === "127.0.0.1" || window.location.hostname === "localhost");
+const useXampp = process.env.NODE_ENV === "development" || isLocalHost;
 
 export const BASE = useXampp ? devBase : prodBase;
 // Use full XAMPP URLs for API calls

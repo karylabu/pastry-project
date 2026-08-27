@@ -10,7 +10,7 @@ function inventoryUserId(): int
 
 function recordProductMovement(mysqli $conn, int $productId, string $type, float $quantity, float $previous, float $newStock, string $reason, ?string $referenceType, ?int $referenceId, int $userId, ?int $productVariantId = null): bool
 {
-    $stmt = $conn->prepare("INSERT INTO product_inventory_movements (product_id, product_variant_id, movement_type, quantity, previous_stock, new_stock, reason, reference_type, reference_id, user_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+    $stmt = $conn->prepare("INSERT INTO product_inventory_movements (product_id, product_variant_id, movement_type, quantity, previous_stock, new_stock, reason, reference_type, reference_id, user_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
     if (!$stmt) return false;
     $stmt->bind_param('iisdddssii', $productId, $productVariantId, $type, $quantity, $previous, $newStock, $reason, $referenceType, $referenceId, $userId);
     $ok = $stmt->execute();
@@ -29,11 +29,11 @@ function productMovementExists(mysqli $conn, int $productId, string $type, strin
     return $found;
 }
 
-function insertIngredientMovement(mysqli $conn, int $ingredientId, string $action, float $quantity, string $note, int $userId, ?string $referenceType = null, ?int $referenceId = null): bool
+function insertIngredientMovement(mysqli $conn, int $ingredientId, string $action, float $quantity, string $note, int $userId, ?string $referenceType = null, ?int $referenceId = null, ?float $previousStock = null, ?float $newStock = null): bool
 {
-    $stmt = $conn->prepare("INSERT INTO ingredient_movements (ingredient_id, action, qty, note, user_id, reference_type, reference_id) VALUES (?, ?, ?, ?, ?, ?, ?)");
+    $stmt = $conn->prepare("INSERT INTO ingredient_movements (ingredient_id, action, qty, note, user_id, reference_type, reference_id, previous_stock, new_stock) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
     if (!$stmt) return false;
-    $stmt->bind_param('isdsisi', $ingredientId, $action, $quantity, $note, $userId, $referenceType, $referenceId);
+    $stmt->bind_param('isdsisidd', $ingredientId, $action, $quantity, $note, $userId, $referenceType, $referenceId, $previousStock, $newStock);
     $ok = $stmt->execute();
     $stmt->close();
     return $ok;

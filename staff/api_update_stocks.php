@@ -41,10 +41,33 @@ $data = json_decode(file_get_contents("php://input"), true);
 
 $action = trim($data['action'] ?? "");
 $id     = intval($data['id'] ?? 0);
-$qty    = intval($data['qty'] ?? 0);
+
+// INTEGRITY: quantities must be whole numbers — silently truncating a
+// decimal (intval("2.9") === 2) would corrupt stock records.
+$rawQty = $data['qty'] ?? 0;
+if (is_string($rawQty)) {
+    $rawQty = trim($rawQty);
+}
+if (!is_numeric($rawQty) || floor((float) $rawQty) != (float) $rawQty) {
+    echo json_encode(["status" => "error", "message" => "Quantity must be a whole number"]);
+    exit;
+}
+$qty    = intval($rawQty);
+
+// Keep movement reasons within the column limit so inserts cannot fail late
+// inside an open transaction.
+$reason = mb_substr(trim((string) ($data['reason'] ?? $data['note'] ?? 'Manual stock adjustment')), 0, 255);
 $type   = $data['type'] ?? $action;
-$reason = trim((string) ($data['reason'] ?? $data['note'] ?? 'Manual stock adjustment'));
 $productVariantId = intval($data['product_variant_id'] ?? 0);
+
+// DUPLICATE PROTECTION: optional client idempotency key (same pattern as
+// waste logging). Replaying the same key returns the original result
+// instead of producing twice.
+$idempotencyKey = trim((string) ($data['idempotency_key'] ?? ''));
+if (strlen($idempotencyKey) > 100) {
+    echo json_encode(["status" => "error", "message" => "idempotency_key is too long"]);
+    exit;
+}
 
 if ($action === "produce") {
     if ($id <= 0 || $qty <= 0) {
@@ -53,6 +76,23 @@ if ($action === "produce") {
             "message" => "Invalid input data"
         ]);
         exit;
+    }
+
+    if ($idempotencyKey !== '') {
+        $dupStmt = $conn->prepare("SELECT id, quantity FROM production_transactions WHERE idempotency_key = ? LIMIT 1");
+        $dupStmt->bind_param('s', $idempotencyKey);
+        $dupStmt->execute();
+        $existingProduction = $dupStmt->get_result()->fetch_assoc();
+        $dupStmt->close();
+        if ($existingProduction) {
+            echo json_encode([
+                "status" => "success",
+                "duplicate" => true,
+                "production_id" => (int) $existingProduction['id'],
+                "message" => "Production already recorded"
+            ]);
+            exit;
+        }
     }
 
     $conn->begin_transaction();
@@ -127,8 +167,8 @@ if ($action === "produce") {
     $ingredientUpdate = $conn->prepare("UPDATE ingredients SET stock = stock - ?, updated_at = NOW() WHERE id = ?");
     $movementNote = "Produced {$qty} unit(s) of {$productName}";
 
-    $productionStmt = $conn->prepare("INSERT INTO production_transactions (product_id, quantity, user_id) VALUES (?, ?, ?)");
-    $productionStmt->bind_param('iii', $id, $qty, $currentUserId);
+    $productionStmt = $conn->prepare("INSERT INTO production_transactions (product_id, quantity, user_id, idempotency_key) VALUES (?, ?, ?, NULLIF(?, ''))");
+    $productionStmt->bind_param('iiis', $id, $qty, $currentUserId, $idempotencyKey);
     if (!$productionStmt->execute()) {
         $conn->rollback();
         echo json_encode(["status" => "error", "message" => "Failed to record production"]);
@@ -212,7 +252,17 @@ if ($productVariantId > 0) {
 
     $variant = $variantResult->fetch_assoc();
     $current = intval($variant['stock_quantity']);
-    $newStock = $type === 'in' ? $current + $qty : max(0, $current - $qty);
+    if ($type === 'in') {
+        $newStock = $current + $qty;
+    } else {
+        // INTEGRITY: never clamp silently — reject excessive stock-out.
+        if ($current < $qty) {
+            $conn->rollback();
+            echo json_encode(["status" => "error", "message" => "Insufficient variant stock"]);
+            exit;
+        }
+        $newStock = $current - $qty;
+    }
 
     $updateVariant = $conn->prepare("UPDATE product_variants SET stock_quantity = ? WHERE id = ?");
     $updateVariant->bind_param("ii", $newStock, $productVariantId);

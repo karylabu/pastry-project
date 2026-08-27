@@ -1,16 +1,25 @@
 import React, { useEffect, useMemo, useState, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { MessageCircle, X, Send, Bot, User, Headphones, Inbox, ArrowRight, Plus, FileDown } from 'lucide-react';
+import { MessageCircle, X, Send, Bot, User, Headphones, Inbox, ArrowRight, PackagePlus, ShoppingBag, Trash2, SlidersHorizontal, AlertTriangle } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 import StaffNavbar from '../components/StaffNavbar';
-import { BASE, CUSTOMER_BASE as CUSTOMER_BASE_CONFIG } from '../../services/config';
+import { BASE, CUSTOMER_BASE as CUSTOMER_BASE_CONFIG, LARAVEL_BASE } from '../../services/config';
 
 const STAFF_BASE = `${BASE}/staff`;
 const CUSTOMER_BASE = CUSTOMER_BASE_CONFIG;
-const staffFetch = (url, options = {}) => fetch(url, { credentials: 'include', ...options });
+const staffFetch = (url, options = {}) => {
+  const token = localStorage.getItem('user') ? JSON.parse(localStorage.getItem('user')).token : '';
+  return fetch(url, {
+    credentials: 'include',
+    ...options,
+    headers: { ...(options.headers || {}), ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+  });
+};
 
 const STATUS_STYLES = {
   Pending:      "bg-gray-100 text-black border border-black/20",
+  Confirmed:    "bg-gray-100 text-black border border-black/20",
   Preparing:    "bg-gray-50 text-black border border-black/20",
   "To Receive": "bg-gray-100 text-black border border-black/20",
   Completed:    "bg-black text-white border border-black",
@@ -22,34 +31,23 @@ const getNextStatus = (status) => {
   return idx >= 0 && idx < steps.length - 1 ? steps[idx + 1] : null;
 };
 
+const getActionLabel = (status) => ({
+  Pending: "Start preparing",
+  Preparing: "Mark ready",
+  "To Receive": "Complete",
+}[status] || null);
+
 /* =========================
    STATS STRIP — one bordered panel, segmented, reads like a ledger
 ========================= */
 function StatsStrip({ stats }) {
   return (
-    <div className="rounded-2xl border border-black/10 bg-white shadow-sm grid grid-cols-2 md:grid-cols-5 divide-x divide-y md:divide-y-0 divide-black/10">
+    <div className="rounded-2xl border border-black/10 bg-white shadow-sm grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 divide-x divide-y md:divide-y-0 divide-black/10">
       {stats.map(stat => (
         <div key={stat.label} className="px-6 py-5">
           <p className="text-[10px] uppercase tracking-[0.25em] text-black/50 font-semibold mb-2">{stat.label}</p>
           <p className={`text-[28px] font-bold leading-none ${stat.tone || "text-black"}`}>{stat.value}</p>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-/* =========================
-   SALES BAR CHART (dark)
-========================= */
-function SalesBarChart({ data }) {
-  const max = Math.max(...data.map(item => item.total), 1);
-  return (
-    <div className="grid grid-cols-7 gap-3 items-end h-40">
-      {data.map(day => (
-        <div key={day.dateKey} className="flex flex-col items-center gap-2">
-          <div className="w-full rounded-t-md bg-gradient-to-t from-[#D4AF37]/30 to-[#D4AF37] transition-all"
-            style={{ height: `${Math.max(8, (day.total / max) * 100)}%` }} />
-          <span className="text-[10px] text-black/50 uppercase tracking-[0.15em]">{day.label}</span>
+          {stat.secondary && <p className="mt-2 text-[11px] leading-tight text-black/50">{stat.secondary}</p>}
         </div>
       ))}
     </div>
@@ -324,67 +322,111 @@ function StaffChatInbox({ open, onClose }) {
    MAIN DASHBOARD
 ========================= */
 export default function DashboardStaff() {
-  const [products, setProducts]         = useState([]);
-  const [orders, setOrders]             = useState([]);
-  const [productsLoading, setProductsLoading] = useState(true);
-  const [ordersLoading, setOrdersLoading]     = useState(true);
+  const [dashboard, setDashboard]       = useState(null);
+  const [dashboardLoading, setDashboardLoading] = useState(true);
+  const [dashboardError, setDashboardError] = useState(null);
   const [chatOpen, setChatOpen]         = useState(false);
   const [inboxUnread, setInboxUnread]   = useState(0);
+  const audioContextRef = useRef(null);
+  const previousOrderIdsRef = useRef(new Set());
+  const hasOrderBaselineRef = useRef(false);
+  const alertingOrderIdsRef = useRef(new Set());
+  const alertIntervalRef = useRef(null);
 
-  const isToday = dateString => {
-    if (!dateString) return false;
-    const date = new Date(dateString);
-    const today = new Date();
-    return date.toDateString() === today.toDateString();
-  };
+  const unlockAlertSound = useCallback(() => {
+    if (!audioContextRef.current) {
+      const AudioContext = window.AudioContext || window.webkitAudioContext;
+      if (!AudioContext) return;
+      audioContextRef.current = new AudioContext();
+    }
+    if (audioContextRef.current.state === 'suspended') {
+      audioContextRef.current.resume().catch(() => {});
+    }
+  }, []);
 
-  const isThisWeek = dateString => {
-    if (!dateString) return false;
-    const date = new Date(dateString);
-    const today = new Date();
-    const diffDays = Math.floor((today.setHours(0,0,0,0) - date.setHours(0,0,0,0)) / 86400000);
-    return diffDays >= 0 && diffDays < 7;
-  };
+  const playOrderAlert = useCallback(() => {
+    const context = audioContextRef.current;
+    if (!context || context.state !== 'running') return;
 
-  const fetchProducts = () => {
-    fetch(`${CUSTOMER_BASE}/api_products.php?action=list`)
-      .then(res => res.json())
-      .then(data => { if (Array.isArray(data)) setProducts(data); else setProducts([]); })
-      .catch(() => setProducts([]))
-      .finally(() => setProductsLoading(false));
-  };
+    const now = context.currentTime;
+    [880, 1175].forEach((frequency, index) => {
+      const oscillator = context.createOscillator();
+      const gain = context.createGain();
+      oscillator.type = 'sine';
+      oscillator.frequency.value = frequency;
+      gain.gain.setValueAtTime(0.0001, now + index * 0.14);
+      gain.gain.exponentialRampToValueAtTime(0.16, now + index * 0.14 + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + index * 0.14 + 0.28);
+      oscillator.connect(gain);
+      gain.connect(context.destination);
+      oscillator.start(now + index * 0.14);
+      oscillator.stop(now + index * 0.14 + 0.3);
+    });
+  }, []);
 
-  const normalizeOrders = (items = [], source) =>
-    (Array.isArray(items) ? items : []).map(order => ({
-      ...order,
-      source,
-      items: typeof order.items === "string" && order.items.length
-        ? JSON.parse(order.items)
-        : Array.isArray(order.items)
-        ? order.items
-        : [],
-    }));
+  const stopOrderAlert = useCallback(() => {
+    if (alertIntervalRef.current) {
+      window.clearInterval(alertIntervalRef.current);
+      alertIntervalRef.current = null;
+    }
+  }, []);
 
-  const fetchOrders = () => {
-    setOrdersLoading(true);
-    Promise.all([
-      fetch(`${CUSTOMER_BASE}/api_orders.php?action=list`).then(res => res.json()).catch(() => []),
-      staffFetch(`${STAFF_BASE}/api_orders.php`).then(res => res.json()).catch(() => []),
-    ])
-      .then(([customerOrders, staffOrders]) => {
-        const combined = [
-          ...normalizeOrders(customerOrders, "Customer"),
-          ...normalizeOrders(staffOrders, "Staff"),
-        ].sort((a, b) => {
-          const dateA = a.created_at ? new Date(a.created_at).getTime() : Number(a.id);
-          const dateB = b.created_at ? new Date(b.created_at).getTime() : Number(b.id);
-          return dateB - dateA;
+  const startOrderAlert = useCallback(() => {
+    if (alertIntervalRef.current) return;
+    playOrderAlert();
+    alertIntervalRef.current = window.setInterval(playOrderAlert, 4000);
+  }, [playOrderAlert]);
+
+  useEffect(() => {
+    window.addEventListener('pointerdown', unlockAlertSound, { once: true });
+    window.addEventListener('keydown', unlockAlertSound, { once: true });
+    return () => {
+      window.removeEventListener('pointerdown', unlockAlertSound);
+      window.removeEventListener('keydown', unlockAlertSound);
+      audioContextRef.current?.close().catch(() => {});
+    };
+  }, [unlockAlertSound]);
+
+  const fetchDashboard = useCallback(async () => {
+    setDashboardLoading(true);
+    setDashboardError(null);
+    try {
+      const response = await staffFetch(`${LARAVEL_BASE}/api/staff/dashboard`, { credentials: 'omit' });
+      const data = await response.json();
+      if (!response.ok || !data.success) throw new Error(data.message || 'Unable to load dashboard data.');
+      const liveOrders = Array.isArray(data.live_orders) ? data.live_orders : [];
+      const currentOrderIds = new Set(liveOrders.map(order => String(order.id)));
+      const newPendingOrder = liveOrders.some(order =>
+        order.status === 'Pending' &&
+        !previousOrderIdsRef.current.has(String(order.id))
+      );
+      if (hasOrderBaselineRef.current && newPendingOrder) {
+        liveOrders.forEach(order => {
+          if (order.status === 'Pending' && !previousOrderIdsRef.current.has(String(order.id))) {
+            alertingOrderIdsRef.current.add(String(order.id));
+          }
         });
-        setOrders(combined);
-      })
-      .catch(() => setOrders([]))
-      .finally(() => setOrdersLoading(false));
-  };
+      }
+      const pendingOrderIds = new Set(
+        liveOrders
+          .filter(order => order.status === 'Pending')
+          .map(order => String(order.id))
+      );
+      alertingOrderIdsRef.current.forEach(orderId => {
+        if (!pendingOrderIds.has(orderId)) alertingOrderIdsRef.current.delete(orderId);
+      });
+      if (alertingOrderIdsRef.current.size > 0) startOrderAlert();
+      else stopOrderAlert();
+      previousOrderIdsRef.current = currentOrderIds;
+      hasOrderBaselineRef.current = true;
+      setDashboard(data);
+    } catch (error) {
+      setDashboard(null);
+      setDashboardError(error.message || 'Unable to load dashboard data.');
+    } finally {
+      setDashboardLoading(false);
+    }
+  }, [startOrderAlert, stopOrderAlert]);
 
   useEffect(() => {
     const pollUnread = async () => {
@@ -409,22 +451,34 @@ export default function DashboardStaff() {
       body: JSON.stringify({ id, status })
     })
       .then(res => res.json())
-      .then(data => { if (data.success) fetchOrders(); })
+      .then(data => { if (data.success) fetchDashboard(); })
       .catch(err => console.error("Update error:", err));
   };
 
   useEffect(() => {
-    fetchProducts();
-    fetchOrders();
-    const interval = setInterval(fetchOrders, 10000);
-    return () => clearInterval(interval);
-  }, []);
+    fetchDashboard();
+    const interval = setInterval(fetchDashboard, 10000);
+    return () => {
+      clearInterval(interval);
+      stopOrderAlert();
+      alertingOrderIdsRef.current.clear();
+    };
+  }, [fetchDashboard, stopOrderAlert]);
 
-  const todayOrders     = useMemo(() => orders.filter(o => isToday(o.created_at)), [orders]);
-  const pendingOrders   = useMemo(() => orders.filter(o => o.status === 'Pending'), [orders]);
-  const preparingOrders = useMemo(() => orders.filter(o => o.status === 'Preparing'), [orders]);
-  const completedOrders = useMemo(() => orders.filter(o => o.status === 'Completed'), [orders]);
-  const totalSalesToday = useMemo(() => todayOrders.reduce((sum, o) => sum + Number(o.total || 0), 0), [todayOrders]);
+  const summary = dashboard?.summary;
+  const orders = dashboard?.live_orders || [];
+  const nearExpiryItems = dashboard?.inventory?.near_expiry || [];
+  const productionRows = dashboard?.production || [];
+  const productionSummary = dashboard?.production_summary;
+  const wasteReasons = dashboard?.waste?.by_reason || [];
+  const salesTrend = dashboard?.sales_overview?.trend || [];
+  const attention = dashboard?.needs_attention;
+  const inventoryHealth = dashboard?.inventory_health;
+  const salesToday = Number(summary?.sales_today || 0);
+  const salesYesterday = Number(summary?.sales_yesterday || 0);
+  const salesChange = salesYesterday > 0
+    ? `${salesToday >= salesYesterday ? "+" : ""}${Math.round(((salesToday - salesYesterday) / salesYesterday) * 100)}% vs yesterday`
+    : salesToday > 0 ? "No sales recorded yesterday" : "No sales recorded";
 
   // Urgent orders float to the top of the table, oldest first — everything else follows, newest first
   const displayOrders = useMemo(() => {
@@ -435,47 +489,13 @@ export default function DashboardStaff() {
     return [...urgent, ...rest];
   }, [orders]);
 
-  const lowStockProducts  = useMemo(() => products.filter(p => Number(p.stock) > 0 && Number(p.stock) <= 5), [products]);
-  const outOfStockProducts = useMemo(() => products.filter(p => Number(p.stock) === 0), [products]);
-
-  const mostSoldItems = useMemo(() => {
-    const tally = {};
-    orders.forEach(order => {
-      Array.isArray(order.items) && order.items.forEach(item => {
-        const name = item.name || 'Unknown';
-        const qty  = Number(item.qty) || 0;
-        if (!name || qty <= 0) return;
-        tally[name] = (tally[name] || 0) + qty;
-      });
-    });
-    return Object.entries(tally).map(([name, qty]) => ({ name, qty })).sort((a, b) => b.qty - a.qty).slice(0, 5);
-  }, [orders]);
-
-  const salesHistory = useMemo(() => {
-    const today = new Date();
-    const days  = Array.from({ length: 7 }, (_, i) => {
-      const date = new Date(today);
-      date.setDate(today.getDate() - (6 - i));
-      return { label: date.toLocaleDateString('en-US', { weekday: 'short' }), dateKey: date.toISOString().slice(0, 10), total: 0 };
-    });
-    orders.forEach(order => {
-      const key = order.created_at ? new Date(order.created_at).toISOString().slice(0, 10) : null;
-      const day = days.find(d => d.dateKey === key);
-      if (day) day.total += Number(order.total || 0);
-    });
-    return days;
-  }, [orders]);
-
-  const weeklySales = useMemo(() =>
-    orders.filter(o => isThisWeek(o.created_at)).reduce((sum, o) => sum + Number(o.total || 0), 0),
-  [orders]);
-
   const stats = [
-    { label: "Orders Today",   value: todayOrders.length,                     tone: "text-white" },
-    { label: "Pending",        value: pendingOrders.length,                   tone: pendingOrders.length > 0 ? "text-amber-300" : "text-white" },
-    { label: "Preparing",      value: preparingOrders.length,                 tone: "text-sky-300" },
-    { label: "Completed",      value: completedOrders.length,                 tone: "text-emerald-300" },
-    { label: "Sales Today",    value: `₱${totalSalesToday.toLocaleString()}`, tone: "text-[#D4AF37]" },
+    { label: "Orders Today", value: summary ? summary.orders_today : "—", secondary: summary ? `${summary.pending_orders} pending · ${summary.preparing_orders} preparing` : null, tone: "text-black" },
+    { label: "Sales Today", value: summary ? `₱${salesToday.toLocaleString()}` : "—", secondary: summary ? salesChange : null, tone: "text-[#8A6A00]" },
+    { label: "Low Stock", value: summary ? summary.low_stock : "—", secondary: "Below defined threshold", tone: "text-amber-700" },
+    { label: "Out of Stock", value: summary ? summary.out_of_stock : "—", secondary: "Requires restocking", tone: "text-red-700" },
+    { label: "Production Today", value: summary ? summary.production_today : "—", secondary: summary?.production_planned == null ? "Recorded production" : `${summary.production_completed} / ${summary.production_planned} completed`, tone: "text-black" },
+    { label: "Waste Today", value: summary ? summary.waste_today : "—", secondary: summary ? `₱${Number(summary.waste_value_today || 0).toLocaleString()} estimated value` : null, tone: "text-red-700" },
   ];
 
   return (
@@ -492,10 +512,39 @@ export default function DashboardStaff() {
             <p className="text-[13px] text-black/60">Live orders, stock health, and sales at a glance.</p>
           </div>
 
+          {dashboardError && (
+            <div className="mb-8 flex items-center justify-between gap-4 rounded-xl border border-red-200 bg-red-50 px-5 py-4 text-[13px] text-red-800">
+              <span>{dashboardError}</span>
+              <button onClick={fetchDashboard} className="shrink-0 rounded-lg bg-black px-3 py-2 text-[11px] font-semibold text-white">Try again</button>
+            </div>
+          )}
+
           {/* STATS */}
           <div className="mb-8">
             <StatsStrip stats={stats} />
           </div>
+
+          <Panel eyebrow="Priority queue" title="Needs attention" className="mb-8">
+            <div className="grid gap-3 p-4 sm:grid-cols-2 xl:grid-cols-4">
+              {[
+                { label: "Out of stock", count: attention?.out_of_stock, description: "Items need restocking", href: "/staff/low-stock", tone: "border-red-200 bg-red-50 text-red-800" },
+                { label: "Low stock", count: attention?.low_stock, description: "Items below threshold", href: "/staff/low-stock", tone: "border-amber-200 bg-amber-50 text-amber-800" },
+                { label: "Near expiry", count: attention?.near_expiry, description: "Ingredients within 7 days", href: "/staff/ingredients", tone: "border-yellow-200 bg-yellow-50 text-yellow-800" },
+                { label: "Orders waiting", count: attention?.orders_waiting, description: "Pending preparation", href: "/staff/orders", tone: "border-black/10 bg-black/[0.03] text-black" },
+              ].map(alert => (
+                <div key={alert.label} className={`flex min-h-[126px] flex-col justify-between rounded-xl border p-4 ${alert.tone}`}>
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-[11px] font-bold uppercase tracking-[0.15em]">{alert.label}</p>
+                      <p className="mt-1 text-[12px] opacity-70">{alert.description}</p>
+                    </div>
+                    <span className="text-[24px] font-bold leading-none">{alert.count == null ? "—" : alert.count}</span>
+                  </div>
+                  <Link to={alert.href} className="mt-3 text-[10px] font-bold uppercase tracking-[0.14em] underline underline-offset-4">View details</Link>
+                </div>
+              ))}
+            </div>
+          </Panel>
 
           {/* LIVE ORDERS TABLE */}
           <div className="mb-8">
@@ -503,12 +552,12 @@ export default function DashboardStaff() {
               eyebrow="Order Management"
               title="Live orders"
               action={
-                <a
-                  href="/pastry_system/staff/orders"
+                <Link
+                  to="/staff/orders"
                   className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.15em] text-black/60 hover:text-[#D4AF37] transition-colors"
                 >
                   View all <ArrowRight size={13} />
-                </a>
+                </Link>
               }
             >
               <div className="overflow-x-auto">
@@ -525,8 +574,10 @@ export default function DashboardStaff() {
                     </tr>
                   </thead>
                   <tbody>
-                    {ordersLoading ? (
+                    {dashboardLoading ? (
                       <tr><td colSpan={7} className="px-6 py-10 text-center text-black/50 text-[13px]">Loading orders…</td></tr>
+                    ) : dashboardError ? (
+                      <tr><td colSpan={7} className="px-6 py-10 text-center text-black/50 text-[13px]">Dashboard data is unavailable.</td></tr>
                     ) : displayOrders.length === 0 ? (
                       <tr><td colSpan={7} className="px-6 py-10 text-center text-black/50 text-[13px]">No orders yet.</td></tr>
                     ) : displayOrders.slice(0, 8).map(order => {
@@ -540,7 +591,7 @@ export default function DashboardStaff() {
                           <td className="px-6 py-4 text-[13px] font-semibold text-black">#{order.id}</td>
                           <td className="px-4 py-4 text-[13px] text-black/70">{order.customer}</td>
                           <td className="px-4 py-4 text-[12px] text-black/60">
-                            {order.items?.[0]?.name || "—"}
+                            {order.items?.[0]?.name || order.items?.[0]?.product || "—"}
                             {order.items?.length > 1 && ` +${order.items.length - 1} more`}
                           </td>
                           <td className="px-4 py-4 text-[13px] font-semibold text-black">₱{Number(order.total).toLocaleString()}</td>
@@ -550,15 +601,15 @@ export default function DashboardStaff() {
                             </span>
                           </td>
                           <td className="px-4 py-4 text-[12px] text-black/60">
-                            {order.created_at ? new Date(order.created_at).toLocaleDateString([], { month: "short", day: "numeric" }) : "—"}
+                            {order.created_at ? new Date(order.created_at).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "—"}
                           </td>
                           <td className="px-6 py-4 text-right">
-                            {next ? (
+                            {next && getActionLabel(order.status) ? (
                               <button
                                 onClick={() => updateOrderStatus(order.id, next)}
                                 className="text-[11px] font-semibold uppercase tracking-[0.1em] px-3 py-1.5 rounded-lg bg-black text-white hover:bg-black/90 transition-colors"
                               >
-                                → {next}
+                                {getActionLabel(order.status)}
                               </button>
                             ) : (
                               <span className="text-[11px] text-black/70">Done</span>
@@ -573,95 +624,131 @@ export default function DashboardStaff() {
             </Panel>
           </div>
 
-          {/* INVENTORY + SALES */}
-          <div className="grid gap-6 xl:grid-cols-[1.3fr_1fr] mb-8">
-
-            <div className="grid gap-6 sm:grid-cols-2">
-              <Panel eyebrow="Inventory" title="Low stock">
-                <div className="p-4">
-                  {lowStockProducts.length === 0 ? (
-                    <p className="text-[13px] text-black/50 px-2 py-4">No low-stock items.</p>
-                  ) : (
-                    <ul className="space-y-1">
-                      {lowStockProducts.slice(0, 5).map(p => (
-                        <li key={p.id} className="flex items-center justify-between px-3 py-2.5 rounded-lg hover:bg-[#D4AF37]/10">
-                          <span className="text-[13px] text-black/80 truncate">{p.name}</span>
-                          <span className="text-[12px] font-semibold text-black shrink-0 ml-2">{p.stock} left</span>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
+          <Panel eyebrow="Inventory" title="Inventory health" className="mb-8">
+            <div className="grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-4">
+              {[
+                { label: "In stock", value: inventoryHealth?.in_stock, tone: "text-emerald-700", background: "bg-emerald-50 border-emerald-200" },
+                { label: "Low stock", value: inventoryHealth?.low_stock, tone: "text-amber-700", background: "bg-amber-50 border-amber-200" },
+                { label: "Out of stock", value: inventoryHealth?.out_of_stock, tone: "text-red-700", background: "bg-red-50 border-red-200" },
+                { label: "Near expiry", value: inventoryHealth?.near_expiry, tone: "text-yellow-700", background: "bg-yellow-50 border-yellow-200" },
+              ].map(item => (
+                <div key={item.label} className={`rounded-xl border p-4 ${item.background}`}>
+                  <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-black/55">{item.label}</p>
+                  <p className={`mt-2 text-[28px] font-bold leading-none ${item.tone}`}>{item.value == null ? "—" : item.value}</p>
                 </div>
-              </Panel>
-
-              <Panel eyebrow="Inventory" title="Out of stock">
-                <div className="p-4">
-                  {outOfStockProducts.length === 0 ? (
-                    <p className="text-[13px] text-black/50 px-2 py-4">Nothing out of stock.</p>
-                  ) : (
-                    <ul className="space-y-1">
-                      {outOfStockProducts.slice(0, 5).map(p => (
-                        <li key={p.id} className="flex items-center justify-between px-3 py-2.5 rounded-lg hover:bg-[#D4AF37]/10">
-                          <span className="text-[13px] text-black/80 truncate">{p.name}</span>
-                          <span className="text-[12px] font-semibold text-black shrink-0 ml-2">Out</span>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              </Panel>
-
-              <Panel eyebrow="Analytics" title="Most sold items" className="sm:col-span-2">
-                <div className="p-4">
-                  {mostSoldItems.length === 0 ? (
-                    <p className="text-[13px] text-black/50 px-2 py-4">No sales data yet.</p>
-                  ) : (
-                    <ul className="grid sm:grid-cols-2 gap-1">
-                      {mostSoldItems.map((item, i) => (
-                        <li key={item.name} className="flex items-center justify-between px-3 py-2.5 rounded-lg hover:bg-[#D4AF37]/10">
-                          <span className="text-[13px] text-black/80 truncate">
-                            <span className="text-black/50 mr-2">{i + 1}</span>{item.name}
-                          </span>
-                          <span className="text-[12px] font-semibold text-black shrink-0 ml-2">{item.qty} sold</span>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              </Panel>
+              ))}
             </div>
+            <div className="border-t border-black/10 px-6 py-4">
+              <Link to="/staff/products" className="text-[11px] font-semibold uppercase tracking-[0.15em] text-black/60 underline underline-offset-4 hover:text-black">View inventory <ArrowRight size={13} className="ml-1 inline" /></Link>
+            </div>
+          </Panel>
 
-            <Panel eyebrow="Analytics" title="Sales trend — last 7 days">
-              <div className="p-6">
-                <SalesBarChart data={salesHistory} />
-                <div className="mt-6 grid grid-cols-2 gap-3">
-                  <div className="rounded-xl bg-white border border-black/10 p-4">
-                    <p className="text-[10px] uppercase tracking-[0.25em] text-black/50">Today</p>
-                    <p className="mt-2 text-[17px] font-semibold text-black">₱{totalSalesToday.toLocaleString()}</p>
+          <Panel eyebrow="Production" title="Today's production" className="mb-8">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-black/10 px-6 py-4">
+              <p className="text-[13px] text-black/60">{productionSummary?.planning_available ? "Progress against today's plan" : "Recorded output from production transactions"}</p>
+              <p className="text-[13px] font-semibold text-black">{productionSummary?.produced ?? "—"} units produced</p>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left">
+                <thead><tr className="border-b border-black/10 text-[10px] uppercase tracking-[0.2em] text-black/50"><th className="px-6 py-3">Product</th><th className="px-4 py-3">Produced</th><th className="px-4 py-3">Plan</th></tr></thead>
+                <tbody>
+                  {productionRows.length === 0 ? <tr><td colSpan={3} className="px-6 py-8 text-center text-[13px] text-black/50">No production recorded today.</td></tr> : productionRows.map(row => (
+                    <tr key={row.product_id} className="border-b border-black/10 last:border-0"><td className="px-6 py-3 text-[13px] text-black/80">{row.product}</td><td className="px-4 py-3 text-[13px] font-semibold">{row.produced}</td><td className="px-4 py-3 text-[13px] text-black/50">{row.planned == null ? "No plan recorded" : row.planned}</td></tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </Panel>
+
+          <div className="grid gap-6 xl:grid-cols-3 mb-8">
+            <Panel eyebrow="Sales" title="Overview">
+              <div className="grid grid-cols-3 divide-x divide-black/10 p-5">
+                {[
+                  ["Today", summary?.sales_today],
+                  ["This week", summary?.sales_week],
+                  ["This month", summary?.sales_month],
+                ].map(([label, value]) => (
+                  <div key={label} className="px-3 first:pl-0 last:pr-0">
+                    <p className="text-[10px] uppercase tracking-[0.15em] text-black/50">{label}</p>
+                    <p className="mt-2 text-[16px] font-bold text-black">{value == null ? "—" : `₱${Number(value).toLocaleString()}`}</p>
                   </div>
-                  <div className="rounded-xl bg-white border border-black/10 p-4">
-                    <p className="text-[10px] uppercase tracking-[0.25em] text-black/50">This week</p>
-                    <p className="mt-2 text-[17px] font-semibold text-black">₱{weeklySales.toLocaleString()}</p>
-                  </div>
+                ))}
+              </div>
+              <div className="border-t border-black/10 px-5 py-4">
+                <div className="mb-3 flex items-center justify-between">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-black/50">Last 7 days</p>
+                  <Link to="/staff/reports" className="text-[10px] font-semibold uppercase tracking-[0.12em] text-black/60 underline underline-offset-4">View reports</Link>
                 </div>
+                {salesTrend.length === 0 ? (
+                  <p className="text-[13px] text-black/50">No sales trend data available.</p>
+                ) : (
+                  <div className="flex h-20 items-end gap-2">
+                    {salesTrend.map(day => {
+                      const maximum = Math.max(...salesTrend.map(item => Number(item.revenue || 0)), 0);
+                      const height = maximum > 0 ? Math.max(8, (Number(day.revenue || 0) / maximum) * 100) : 0;
+                      return (
+                        <div key={day.date} className="flex min-w-0 flex-1 flex-col items-center justify-end gap-1" title={`${day.date}: ₱${Number(day.revenue || 0).toLocaleString()}`}>
+                          <div className="w-full rounded-t bg-[#D4AF37]" style={{ height: `${height}%` }} />
+                          <span className="text-[9px] text-black/50">{new Date(`${day.date}T00:00:00`).toLocaleDateString([], { weekday: "short" }).slice(0, 3)}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </Panel>
+
+            <Panel eyebrow="Inventory" title="Near expiry">
+              <div className="p-4">
+                {nearExpiryItems.length === 0 ? (
+                  <p className="px-2 py-4 text-[13px] text-black/50">No items expiring within 7 days.</p>
+                ) : nearExpiryItems.slice(0, 5).map(item => (
+                  <div key={item.id} className="flex items-center justify-between border-b border-black/10 px-2 py-3 last:border-0">
+                    <span className="truncate text-[13px] text-black/80">{item.name}</span>
+                    <span className="ml-3 shrink-0 text-[12px] font-semibold text-amber-700">{item.expiry}</span>
+                  </div>
+                ))}
+              </div>
+            </Panel>
+
+            <Panel
+              eyebrow="Waste"
+              title="Today's summary"
+              action={<Link to="/staff/waste-tracking" className="text-[10px] font-semibold uppercase tracking-[0.12em] text-black/60 underline underline-offset-4">View report</Link>}
+            >
+              <div className="grid grid-cols-2 divide-x divide-black/10 border-b border-black/10 p-4">
+                <div className="px-2">
+                  <p className="text-[10px] uppercase tracking-[0.15em] text-black/50">Quantity</p>
+                  <p className="mt-1 text-[20px] font-bold text-red-700">{summary?.waste_today == null ? "—" : summary.waste_today}</p>
+                </div>
+                <div className="px-3">
+                  <p className="text-[10px] uppercase tracking-[0.15em] text-black/50">Estimated value</p>
+                  <p className="mt-1 text-[20px] font-bold text-red-700">{summary?.waste_value_today == null ? "—" : `₱${Number(summary.waste_value_today).toLocaleString()}`}</p>
+                </div>
+              </div>
+              <div className="p-4">
+                {wasteReasons.length === 0 ? (
+                  <p className="px-2 py-4 text-[13px] text-black/50">No waste recorded today.</p>
+                ) : wasteReasons.slice(0, 5).map(row => (
+                  <div key={row.reason} className="flex items-center justify-between border-b border-black/10 px-2 py-3 last:border-0">
+                    <span className="truncate text-[13px] text-black/80">{row.reason}</span>
+                    <span className="ml-3 shrink-0 text-[12px] font-semibold text-red-700">{row.quantity}</span>
+                  </div>
+                ))}
               </div>
             </Panel>
           </div>
 
           {/* QUICK ACTIONS */}
-          <div className="flex flex-wrap gap-3 mb-4">
-            <a href="/pastry_system/staff/products"
-              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-black text-white text-[12px] font-semibold hover:bg-black/90 transition-colors">
-              <Plus size={14} /> Add Product
-            </a>
-            <a href="/pastry_system/staff/orders"
-              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white border border-black/10 text-black/80 text-[12px] font-semibold hover:bg-[#D4AF37]/10 transition-colors">
-              <Inbox size={14} /> Manage Orders
-            </a>
-            <a href="/admin/reports.php"
-              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white border border-black/10 text-black/80 text-[12px] font-semibold hover:bg-[#D4AF37]/10 transition-colors">
-              <FileDown size={14} /> View Reports
-            </a>
+          <div className="mb-4 rounded-2xl border border-black/10 bg-white p-5 shadow-sm">
+            <p className="mb-3 text-[10px] font-bold uppercase tracking-[0.25em] text-[#8A6A00]">Quick actions</p>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+              <Link to="/staff/orders" className="flex items-center justify-center gap-2 rounded-xl bg-black px-3 py-3 text-[12px] font-semibold text-white hover:bg-black/90"><ShoppingBag size={15} /> View Live Orders</Link>
+              <Link to="/staff/products" className="flex items-center justify-center gap-2 rounded-xl border border-black/10 bg-white px-3 py-3 text-[12px] font-semibold text-black hover:bg-black/5"><PackagePlus size={15} /> Production</Link>
+              <Link to="/staff/products" className="flex items-center justify-center gap-2 rounded-xl border border-black/10 bg-white px-3 py-3 text-[12px] font-semibold text-black hover:bg-black/5"><SlidersHorizontal size={15} /> Update Stock</Link>
+              <Link to="/staff/low-stock" className="flex items-center justify-center gap-2 rounded-xl border border-black/10 bg-white px-3 py-3 text-[12px] font-semibold text-black hover:bg-black/5"><AlertTriangle size={15} /> Low Stock Alerts</Link>
+              <Link to="/staff/waste-tracking" className="flex items-center justify-center gap-2 rounded-xl border border-black/10 bg-white px-3 py-3 text-[12px] font-semibold text-black hover:bg-black/5"><Trash2 size={15} /> Record Waste</Link>
+            </div>
           </div>
 
         </div>

@@ -9,8 +9,10 @@ use App\Http\Controllers\Api\StockController;
 use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\SalesImportController;
 use App\Http\Controllers\NewsletterController;
+use App\Http\Controllers\StaffApiController;
 
 Route::get('products', [ProductController::class, 'index']);
+Route::match(['get', 'options'], 'staff/dashboard', [StaffApiController::class, 'getDashboard']);
 Route::post('sales/import-pdf', [SalesImportController::class, 'store']);
 Route::post('newsletter/subscribe', [NewsletterController::class, 'subscribe']);
 
