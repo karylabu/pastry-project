@@ -56,6 +56,8 @@ function getRouterBasename() {
 
   const pathname = window.location.pathname;
   const knownPrefixes = [
+    "/pastry-project/customer",
+    "/pastry-project",
     "/GitHub/pastry-project/customer",
     "/GitHub/pastry-project/customer_portal",
     "/GitHub/pastry-project",
@@ -77,10 +79,10 @@ function App() {
       <GoogleAuthBootstrap />
       <Routes>
 
-        {/* ROOT → redirect to login */}
+        {/* ROOT → guest-friendly dashboard */}
         <Route
           path="/"
-          element={<Navigate to="customer/login" replace />}
+          element={<Navigate to="customer" replace />}
         />
 
         {/* ── AUTH (no navbar) ── */}

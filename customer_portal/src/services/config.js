@@ -2,21 +2,30 @@
 const origin = typeof window !== "undefined" ? window.location.origin : "";
 
 export function resolveProjectBase(baseOrigin = origin, suffix = "") {
-  const projectPath = "/GitHub/pastry-project";
+  const projectPath = "/pastry-project";
   const normalizedBase = (baseOrigin || "http://localhost").replace(/\/$/, "");
   const normalizedSuffix = suffix ? `/${suffix.replace(/^\/+|\/+$/g, "")}` : "";
 
   return `${normalizedBase}${projectPath}${normalizedSuffix}`;
 }
 
+function normalizeLocalProjectBase(baseUrl = "") {
+  if (!baseUrl) return resolveProjectBase("http://localhost");
+
+  const cleaned = baseUrl.replace(/\/$/, "");
+  if (cleaned.includes("/GitHub/pastry-project")) {
+    return cleaned.replace("/GitHub/pastry-project", "/pastry-project");
+  }
+
+  return cleaned;
+}
+
 // Development: XAMPP is running on localhost:80 (Apache) and the project is mounted
-// under C:\xampp\htdocs\GitHub\pastry-project.
+// under C:\xampp\htdocs\pastry-project.
 const xamppWithProject = resolveProjectBase("http://localhost");
 const configuredDevBase = process.env.REACT_APP_API_BASE || "";
-const devBase = configuredDevBase.includes("/GitHub/")
-  ? configuredDevBase.replace(/\/$/, "")
-  : (configuredDevBase || xamppWithProject);
-const homepage = process.env.PUBLIC_URL || "/GitHub/pastry-project/customer";
+const devBase = normalizeLocalProjectBase(configuredDevBase || xamppWithProject);
+const homepage = process.env.PUBLIC_URL || "/pastry-project/customer";
 const prodBase = `${origin}${homepage}`.replace(/\/$/, "");
 const prodRootBase = `${origin}${homepage.replace(/\/customer$/, "")}`.replace(/\/$/, "");
 const isLocalHost = typeof window !== "undefined" &&

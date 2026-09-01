@@ -4,9 +4,10 @@ import { motion } from "framer-motion";
 import { ArrowLeft } from "lucide-react";
 import { CUSTOMER_BASE, LARAVEL_BASE } from "../../services/config";
 import { safeParseJson } from '../../services/api';
+import { signInWithGoogle } from "../../services/firebase";
 
 const BASE = CUSTOMER_BASE;
-const LOGO_URL = `${BASE}/../uploads/logo.png`;
+const LOGO_URL = `${BASE}/../uploads/logo-transparent.png`;
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const phoneRegex = /^\+?[0-9\s-]{7,15}$/;
 
@@ -160,13 +161,53 @@ export default function Register() {
     }
   };
 
-  const handleGoogleSignup = () => {
+  const handleGoogleSignup = async () => {
     setError("");
     setGoogleLoading(true);
 
-    const redirectTarget = new URL(window.location.origin);
-    redirectTarget.pathname = "/customer";
-    window.location.href = `${LARAVEL_BASE}/auth/google?redirect=${encodeURIComponent(redirectTarget.toString())}`;
+    try {
+      const { idToken, user: googleUser, email, name, photoURL } = await signInWithGoogle();
+      const googlePayload = {
+        email: email || googleUser?.email || "",
+        name: name || googleUser?.displayName || "Google User",
+        photoUrl: photoURL || googleUser?.photoURL || "",
+      };
+
+      let data = null;
+      let response = null;
+
+      try {
+        response = await fetch(`${CUSTOMER_BASE}/api_google_login.php`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Accept: "application/json" },
+          body: JSON.stringify(googlePayload),
+        });
+        data = await safeParseJson(response);
+      } catch (directError) {
+        console.warn("Direct Google signup failed, trying Laravel route:", directError);
+      }
+
+      if (!data?.success) {
+        response = await fetch(`${LARAVEL_BASE}/api/google-login`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Accept: "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ id_token: idToken, ...googlePayload }),
+        });
+        data = await safeParseJson(response);
+      }
+
+      if (!response || !response.ok || !data?.success) {
+        throw new Error(data?.message || "Google sign-up failed.");
+      }
+
+      localStorage.setItem("user", JSON.stringify(data.user));
+      navigate("/customer", { replace: true });
+    } catch (error) {
+      setError(error?.code === "auth/popup-closed-by-user" ? "Google sign-up was cancelled." : (error.message || "Google sign-up failed."));
+    } finally {
+      setGoogleLoading(false);
+    }
   };
 
   return (

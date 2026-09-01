@@ -29,6 +29,90 @@ function AddOnCard({ label, price, selected, onClick }) {
   );
 }
 
+const PIZZA_IMAGE_FALLBACKS = {
+  'spinach pizza': 'spinach.png',
+  'four-cheese pizza': 'four_cheese.png',
+  'breakfast pizza': 'breakfast.png',
+  'hawaiian pizza': 'hawaiian.png',
+  'veggie pizza': 'veggie.png',
+  'pepperoni pizza': 'pepperoni.png',
+  'ham and cheese pizza': 'meal7.png',
+  'ham & cheese pizza': 'meal7.png',
+};
+
+const COFFEE_IMAGE_FALLBACKS = {
+  'americano': 'americano.png',
+  'cappuccino': 'cappuccino.png',
+  'latte': 'latte.png',
+  'white chocolate': 'white.png',
+  'caramel': 'caramel.png',
+  'salted caramel': 'salted.png',
+  'mocha': 'mocha.png',
+  'hazelnut': 'hazelnut.png',
+  'vanilla': 'vanilla.png',
+  'pastry project latte': 'pastry.png',
+  'dirty matcha': 'dirty.png',
+  'matcha latte': 'matcha.png',
+  'spanish latte': 'spanish.png',
+};
+
+const DRINK_IMAGE_FALLBACKS = {
+  'caramel': 'caramel.png',
+  'salted caramel': 'salted.png',
+  'white chocolate': 'white.png',
+  'oreo': 'oreo.png',
+  'matcha': 'matcha.png',
+  'vanilla': 'vanilla.png',
+  'chocolate chip cream': 'chocolate.png',
+  'strawberry yogurt smoothie': 'strawberry.png',
+  'mango yogurt smoothie': 'mango.png',
+  'blueberry yogurt smoothie': 'blueberry.png',
+  'raspberry yogurt smoothie': 'raspberry.png',
+  'plain yogurt smoothie': 'plain.png',
+  'blueberry ade': 'blueberry.png',
+  'strawberry ade': 'strawberry.png',
+  'mango ade': 'mango.png',
+  'raspberry ade': 'raspberry.png',
+  'passion fruit fizz': 'passion.png',
+  'blueberry fizz': 'blueberry.png',
+  'mango fizz': 'mango.png',
+  'strawberry fizz': 'strawberry.png',
+  'kiwi fizz': 'kiwi.png',
+  'passion fruit tea': 'passion.png',
+  'blueberry fruit tea': 'blueberry.png',
+  'mango fruit tea': 'mango.png',
+  'strawberry fruit tea': 'strawberry.png',
+  'kiwi fruit tea': 'kiwi.png',
+};
+
+const resolveProductImage = (product) => {
+  if (product?.image) {
+    return `${BASE}/uploads/${product.image}`;
+  }
+
+  const productName = String(product?.name || '').trim().toLowerCase();
+  const category = String(product?.category || '').trim().toLowerCase();
+
+  let fallbackMap = null;
+  if (category.includes('pizza')) fallbackMap = PIZZA_IMAGE_FALLBACKS;
+  else if (category.includes('coffee')) fallbackMap = COFFEE_IMAGE_FALLBACKS;
+  else if (category.includes('drink')) fallbackMap = DRINK_IMAGE_FALLBACKS;
+
+  const fallbackFile = fallbackMap
+    ? Object.entries(fallbackMap).find(([key]) => productName.includes(key))?.[1]
+    : null;
+
+  if (fallbackFile) {
+    return `${BASE}/uploads/${fallbackFile}`;
+  }
+
+  if (category.includes('coffee')) return `${BASE}/uploads/americano.png`;
+  if (category.includes('drink')) return `${BASE}/uploads/caramel.png`;
+  if (category.includes('pizza')) return `${BASE}/uploads/pepperoni.png`;
+
+  return `${BASE}/uploads/pepperoni.png`;
+};
+
 export default function ProductModal({ isOpen, onClose, product, allCakes, onAddToCart }) {
   const [selectedDrink, setSelectedDrink] = useState('Iced Tea');
   const [selectedCake, setSelectedCake] = useState('');
@@ -261,12 +345,15 @@ export default function ProductModal({ isOpen, onClose, product, allCakes, onAdd
         </button>
 
         {/* 1. Image + Header Section, styled like the menu card */}
-        <div className="flex flex-shrink-0 flex-col items-center bg-[#f9f9f9] px-6 pb-3 pt-6 text-center">
-          <div className="mb-3 h-24 w-40 overflow-hidden rounded-2xl border border-gray-50 bg-white shadow-inner">
+        <div className="flex flex-shrink-0 flex-col items-center bg-transparent px-6 pb-3 pt-6 text-center">
+          <div className="mb-3 h-24 w-40 overflow-hidden bg-transparent p-0">
             <img
-              src={product.image ? `${BASE}/uploads/${product.image}` : 'https://via.placeholder.com/150'}
+              src={resolveProductImage(product)}
               alt={product.name}
-              className="h-full w-full object-contain p-1 mix-blend-multiply"
+              onError={(event) => {
+                event.currentTarget.src = `${BASE}/uploads/pepperoni.png`;
+              }}
+              className="h-full w-full object-cover object-center scale-100"
             />
           </div>
           <h2 className="mb-2 px-2 text-lg font-bold tracking-tight text-gray-900">

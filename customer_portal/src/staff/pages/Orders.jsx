@@ -3,9 +3,10 @@ import { motion, AnimatePresence } from "framer-motion";
 
 /* STAFF NAVBAR */
 import StaffNavbar from "../components/StaffNavbar";
-import { STAFF_BASE } from "../../services/config";
+import { STAFF_BASE, LARAVEL_BASE } from "../../services/config";
 
 const staffFetch = (url, options = {}) => fetch(url, { credentials: "include", ...options });
+const laravelStaffFetch = (url, options = {}) => fetch(url, { credentials: "include", ...options });
 
 const POLL_INTERVAL = 15000;
 

@@ -33,6 +33,7 @@ $orderId = (intval($oId) > 0) ? intval($oId) : null;
 
 $message = trim($data['message'] ?? "");
 $sender  = $data['sender'] ?? "customer";
+$supportMode = "staff";
 
 if (empty($message)) {
     echo json_encode(["success" => false, "message" => "Empty message"]);
@@ -45,6 +46,8 @@ if (empty($message)) {
 // Force column fixes just in case
 $conn->query("ALTER TABLE messages ADD COLUMN IF NOT EXISTS user_id INT NULL");
 $conn->query("ALTER TABLE messages ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP");
+$conn->query("ALTER TABLE messages ADD COLUMN IF NOT EXISTS image_path VARCHAR(255) NULL");
+$conn->query("ALTER TABLE messages MODIFY order_id INT NULL");
 
 $query = "INSERT INTO messages (order_id, user_id, sender, message, created_at) VALUES (?, ?, ?, ?, NOW())";
 $stmt = $conn->prepare($query);
@@ -60,6 +63,7 @@ $stmt->bind_param("iiss", $orderId, $userId, $sender, $message);
 if ($stmt->execute()) {
     $stmt->close();
     error_log("SUCCESS: Message saved");
+
     echo json_encode(["success" => true, "message" => "Sent"]);
 } else {
     error_log("DB EXECUTE ERROR: " . $stmt->error);

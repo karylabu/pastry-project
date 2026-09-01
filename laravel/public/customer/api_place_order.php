@@ -28,6 +28,44 @@ try {
         throw new Exception('Database connection failed: ' . mysqli_connect_error());
     }
 
+<<<<<<< HEAD
+    // --- AUTO MIGRATION: Ensure all required columns exist ---
+    $required_columns = [
+        'user_id' => "INT DEFAULT NULL",
+        'customer' => "VARCHAR(255) DEFAULT ''",
+        'email' => "VARCHAR(255) DEFAULT ''",
+        'items' => "TEXT",
+        'subtotal' => "DECIMAL(10,2) DEFAULT 0",
+        'delivery_fee' => "DECIMAL(10,2) DEFAULT 0",
+        'total' => "DECIMAL(10,2) DEFAULT 0",
+        'method' => "VARCHAR(50) DEFAULT 'Delivery'",
+        'payment' => "VARCHAR(50) DEFAULT 'Cash'",
+        'address' => "TEXT",
+        'phone' => "VARCHAR(20) DEFAULT ''",
+        'lat' => "DECIMAL(10,8) DEFAULT 0",
+        'lng' => "DECIMAL(11,8) DEFAULT 0",
+        'voucher_code' => "VARCHAR(50) DEFAULT ''",
+        'voucher_amount' => "DECIMAL(10,2) DEFAULT 0",
+        'status' => "VARCHAR(50) DEFAULT 'Pending'",
+        'order_date' => "DATE",
+        'created_at' => "DATETIME DEFAULT CURRENT_TIMESTAMP"
+    ];
+
+    $existing_columns = [];
+    $res = mysqli_query($conn, "SHOW COLUMNS FROM orders");
+    while ($row = mysqli_fetch_assoc($res)) {
+        $existing_columns[] = $row['Field'];
+    }
+
+    foreach ($required_columns as $col => $definition) {
+        if (!in_array($col, $existing_columns)) {
+            mysqli_query($conn, "ALTER TABLE orders ADD COLUMN $col $definition");
+        }
+    }
+    // ---------------------------------------------------------
+
+=======
+>>>>>>> origin/main
     // Sanitize and extract
     $user_id = intval($data['user_id'] ?? 0);
     $customer = mysqli_real_escape_string($conn, $data['customer'] ?? '');
@@ -43,17 +81,19 @@ try {
     $phone = mysqli_real_escape_string($conn, $data['phone'] ?? '');
     $lat = floatval($data['latitude'] ?? 0);
     $lng = floatval($data['longitude'] ?? 0);
+    $voucher_code = mysqli_real_escape_string($conn, $data['voucher_code'] ?? '');
+    $voucher_amount = max(0, floatval($data['voucher_amount'] ?? 0));
     $status = 'Pending';
     $order_date = date('Y-m-d');
 
     $sql = "INSERT INTO orders (
                 user_id, customer, email, items, subtotal, delivery_fee,
-                total, method, payment, address, phone, lat, lng,
+                total, method, payment, address, phone, lat, lng, voucher_code, voucher_amount,
                 status, order_date, created_at
             ) VALUES (
                 " . ($user_id > 0 ? $user_id : "NULL") . ",
                 '$customer', '$email', '$items_json', $subtotal, $delivery_fee,
-                $total, '$method', '$payment', '$address', '$phone', $lat, $lng,
+                $total, '$method', '$payment', '$address', '$phone', $lat, $lng, '$voucher_code', $voucher_amount,
                 '$status', '$order_date', NOW()
             )";
 

@@ -265,6 +265,40 @@ function orderMovementCount(mysqli $conn, int $orderId, string $movementType): i
     return $row ? (int) $row['c'] : -1;
 }
 
+function awardLoyaltyPoints(mysqli $conn, int $userId, int $orderId, float $total): void {
+    if ($userId <= 0 || $orderId <= 0) {
+        return;
+    }
+
+    $conn->query("CREATE TABLE IF NOT EXISTS loyalty_transactions (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        user_id INT NOT NULL,
+        order_id INT NULL,
+        type ENUM('earn', 'redeem') NOT NULL,
+        points INT NOT NULL,
+        discount_amount DECIMAL(10,2) NOT NULL DEFAULT 0,
+        reward_code VARCHAR(32) NULL,
+        max_discount_amount DECIMAL(10,2) NOT NULL DEFAULT 100,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE KEY uq_loyalty_order (order_id),
+        INDEX idx_loyalty_user (user_id, created_at)
+    ) ENGINE=InnoDB");
+    $conn->query("ALTER TABLE loyalty_transactions ADD COLUMN IF NOT EXISTS discount_percent DECIMAL(5,2) NOT NULL DEFAULT 0");
+    $conn->query("ALTER TABLE loyalty_transactions ADD COLUMN IF NOT EXISTS max_discount_amount DECIMAL(10,2) NOT NULL DEFAULT 100");
+
+    $points = (int) floor(max(0, $total) / 100) * 10;
+    if ($points <= 0) {
+        return;
+    }
+
+    $stmt = $conn->prepare("INSERT IGNORE INTO loyalty_transactions (user_id, order_id, type, points) VALUES (?, ?, 'earn', ?)");
+    if ($stmt) {
+        $stmt->bind_param('iii', $userId, $orderId, $points);
+        $stmt->execute();
+        $stmt->close();
+    }
+}
+
 $conn = @new mysqli("localhost", "root", "", "pastry_db");
 
 if ($conn->connect_error) {
@@ -301,9 +335,14 @@ if (!$id || !in_array($status, $allowedStatuses, true)) {
 ========================= */
 try {
     $conn->begin_transaction();
+<<<<<<< HEAD
+
+    $orderStmt = $conn->prepare("SELECT status, items, total, user_id, email FROM orders WHERE id = ? LIMIT 1 FOR UPDATE");
+=======
     $orderStmt = $conn->prepare("SELECT status, items FROM orders WHERE id = ? LIMIT 1 FOR UPDATE");
+>>>>>>> origin/main
     if (!$orderStmt) {
-        sendJson(false, "Order lookup failed");
+        throw new Exception("Order lookup failed");
     }
 
     $orderStmt->bind_param('i', $id);
@@ -312,13 +351,28 @@ try {
     $orderStmt->close();
 
     if (!$orderRow) {
+<<<<<<< HEAD
+        throw new Exception("Order not found");
+=======
         $conn->rollback();
         sendJson(false, "Order not found");
+>>>>>>> origin/main
     }
 
     $oldStatus = trim((string) ($orderRow['status'] ?? 'Pending'));
     $itemsJson = $orderRow['items'] ?? '[]';
     $currentUserId = getSessionUserId();
+    $loyaltyUserId = intval($orderRow['user_id'] ?? 0);
+    if ($loyaltyUserId <= 0 && !empty($orderRow['email'])) {
+        $userStmt = $conn->prepare("SELECT id FROM users WHERE email = ? LIMIT 1");
+        if ($userStmt) {
+            $userStmt->bind_param('s', $orderRow['email']);
+            $userStmt->execute();
+            $userResult = $userStmt->get_result()->fetch_assoc();
+            $userStmt->close();
+            $loyaltyUserId = intval($userResult['id'] ?? 0);
+        }
+    }
 
     if (shouldDeductInventory($oldStatus, $status)) {
         // Idempotency guard: skip deduction when this order's stock is
@@ -339,6 +393,13 @@ try {
 
         $planResult = collectInventoryPlan($conn, $orderLines);
         if (!$planResult['success']) {
+<<<<<<< HEAD
+            throw new Exception($planResult['message']);
+        }
+
+        $plan = $planResult['plan'];
+        $applyResult = applyInventoryPlan($conn, $id, $status, $plan, $currentUserId);
+=======
             $conn->rollback();
             sendJson(false, $planResult['message']);
         }
@@ -349,11 +410,18 @@ try {
         $applyResult = $alreadyDeducted
             ? ['success' => true]
             : applyInventoryPlan($conn, $id, $status, $plan, $currentUserId);
+>>>>>>> origin/main
         if (!$applyResult['success']) {
-            $conn->rollback();
-            sendJson(false, $applyResult['message']);
+            throw new Exception($applyResult['message']);
         }
+    }
 
+<<<<<<< HEAD
+    $stmt = $conn->prepare("UPDATE orders SET status=? WHERE id=?");
+    if (!$stmt) {
+        throw new Exception("Prepare failed");
+    }
+=======
     } elseif ($status === 'Cancelled' && $oldStatus !== 'Cancelled') {
         $movementStmt = $conn->prepare("SELECT product_id, quantity FROM product_inventory_movements WHERE movement_type = 'Order' AND reference_type = 'order' AND reference_id = ? FOR UPDATE");
         $movementStmt->bind_param('i', $id);
@@ -396,14 +464,20 @@ try {
             $conn->rollback();
             sendJson(false, "Prepare failed");
         }
+>>>>>>> origin/main
 
-        $stmt->bind_param("si", $status, $id);
-        if (!$stmt->execute()) {
-            $stmt->close();
-            $conn->rollback();
-            sendJson(false, "Update failed");
-        }
+    $stmt->bind_param("si", $status, $id);
+    if (!$stmt->execute()) {
         $stmt->close();
+<<<<<<< HEAD
+        throw new Exception("Update failed");
+    }
+    $stmt->close();
+
+    if ($status === 'Completed' && $oldStatus !== 'Completed') {
+        awardLoyaltyPoints($conn, $loyaltyUserId, $id, floatval($orderRow['total'] ?? 0));
+=======
+>>>>>>> origin/main
     }
 
     if (shouldDeductInventory($oldStatus, $status)) {

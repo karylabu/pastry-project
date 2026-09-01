@@ -36,6 +36,10 @@ const TANAUAN_CENTER = {
   lng: 121.0743,
 };
 
+const SHOP_OPEN_MINUTES = 8 * 60;
+const SHOP_CLOSE_MINUTES = 20 * 60;
+const SHOP_HOURS_LABEL = '8:00 AM to 8:00 PM';
+
 const isWithinTanauan = (lat, lng) => {
   return (
     typeof lat === 'number' &&
@@ -56,6 +60,17 @@ export default function CheckoutModal({
 }) {
   const [loading, setLoading] = useState(false);
   const [locationError, setLocationError] = useState('');
+  const [shopOpen, setShopOpen] = useState(true);
+  const [promoCode, setPromoCode] = useState('');
+  const [appliedPromo, setAppliedPromo] = useState(null);
+  const [promoMessage, setPromoMessage] = useState('');
+  const modalScrollRef = useRef(null);
+
+  const refreshShopStatus = () => {
+    const now = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Manila' }));
+    const currentMinutes = now.getHours() * 60 + now.getMinutes();
+    setShopOpen(currentMinutes >= SHOP_OPEN_MINUTES && currentMinutes < SHOP_CLOSE_MINUTES);
+  };
 
   const [checkoutData, setCheckoutData] = useState({
     method: "Deliver",
@@ -100,6 +115,36 @@ export default function CheckoutModal({
       })()
     : {};
   const userId = savedUser.id || 0;
+
+  useEffect(() => {
+    refreshShopStatus();
+    const timer = window.setInterval(refreshShopStatus, 60000);
+    return () => window.clearInterval(timer);
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (isOpen && modalScrollRef.current) {
+      modalScrollRef.current.scrollTop = 0;
+    }
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) return undefined;
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (checkoutData.method === 'Pickup' && appliedPromo?.code === 'WELCOME') {
+      setAppliedPromo(null);
+      setPromoMessage('WELCOME is only available for delivery orders.');
+    }
+  }, [checkoutData.method, appliedPromo?.code]);
 
   const formatSavedAddress = (address) => {
     if (!address) return '';
@@ -517,15 +562,36 @@ export default function CheckoutModal({
 
   const rushFee = checkoutData.orderType === "Urgent" ? 100 : 0;
   const discountAmount = 0;
-  const voucherAmount = 0;
+  const voucherAmount = appliedPromo?.code === 'WELCOME' && checkoutData.method === 'Deliver'
+    ? deliveryFee
+    : 0;
   const taxAmount = 0;
 
   const total = subtotal + deliveryFee + rushFee + taxAmount - discountAmount - voucherAmount;
+
+  const applyPromo = () => {
+    const code = promoCode.trim().toUpperCase();
+    if (code === 'WELCOME' && checkoutData.method !== 'Deliver') {
+      setAppliedPromo(null);
+      setPromoMessage('WELCOME is only available for delivery orders.');
+    } else if (code === 'WELCOME') {
+      setAppliedPromo({ code });
+      setPromoMessage('Free delivery applied.');
+    } else {
+      setAppliedPromo(null);
+      setPromoMessage('Invalid promo code. Try WELCOME.');
+    }
+  };
 
   /* =========================
      PLACE ORDER
   ========================= */
   const handlePlaceOrder = async () => {
+
+    if (!shopOpen) {
+      alert(`The shop is currently closed. Checkout is available from ${SHOP_HOURS_LABEL}.`);
+      return;
+    }
 
     if (!checkoutData.phone) {
       alert("Please enter your phone number.");
@@ -580,6 +646,8 @@ export default function CheckoutModal({
         subtotal,
         delivery_fee: deliveryFee,
         rush_fee: rushFee,
+        voucher_code: appliedPromo?.code || '',
+        voucher_amount: voucherAmount,
         total,
 
         user_id: savedUser.id || 0, // Include user_id for proper order association
@@ -736,14 +804,15 @@ export default function CheckoutModal({
     <AnimatePresence>
 
       <motion.div
-        className="fixed inset-0 z-[9999] bg-black/20 flex items-center justify-center p-2 backdrop-blur-sm"
+        className="fixed inset-0 z-[9999] flex items-start justify-center overflow-hidden bg-black/10 px-4 pb-3 pt-[104px] backdrop-blur-[2px] md:pt-[112px]"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
       >
 
         <motion.div
-          className="relative w-full max-w-[640px] max-h-[75vh] bg-white rounded-[28px] flex flex-col md:flex-row font-['DM_Sans'] overflow-hidden shadow-2xl"
+          ref={modalScrollRef}
+          className="relative my-0 flex max-h-[calc(100vh-8rem)] w-full max-w-[820px] flex-col overflow-y-auto overscroll-contain overflow-x-hidden rounded-[24px] bg-white font-['DM_Sans'] shadow-2xl md:max-h-[calc(100vh-8rem)] md:flex-row"
           initial={{ scale: 0.98 }}
           animate={{ scale: 1 }}
         >
@@ -751,13 +820,13 @@ export default function CheckoutModal({
           {/* CLOSE BUTTON */}
           <button
             onClick={onClose}
-            className="absolute top-4 right-4 text-gray-400 hover:text-black z-50"
+            className="absolute top-4 right-4 z-50 text-gray-400 hover:text-[#a67c00]"
           >
             <X size={18} />
           </button>
 
           {/* LEFT SIDE */}
-          <div className="flex-1 p-6 md:p-8 overflow-y-auto relative z-50 pointer-events-auto">
+          <div className="relative z-50 min-w-0 flex-1 p-6 pb-10 pointer-events-auto md:p-10 md:pb-12">
 
             <h2 className="text-2xl font-semibold text-gray-800 mb-5">
               Delivery Details
@@ -785,7 +854,7 @@ export default function CheckoutModal({
                     className={`flex-1 py-2 rounded-xl border text-sm font-medium transition-colors
                     ${
                       checkoutData.method === m
-                        ? "bg-black text-white"
+                        ? "border-[#d4af37] bg-[#fff4c7] text-slate-900"
                         : "bg-white text-gray-600"
                     }`}
                   >
@@ -818,7 +887,7 @@ export default function CheckoutModal({
                     className={`flex-1 py-2 rounded-xl border text-sm font-medium transition-colors
                     ${
                       checkoutData.payment === paymentOption
-                        ? "bg-black text-white"
+                        ? "border-[#d4af37] bg-[#fff4c7] text-slate-900"
                         : "bg-white text-gray-600"
                     }`}
                   >
@@ -851,12 +920,12 @@ export default function CheckoutModal({
                     }
                     className={`rounded-2xl border px-4 py-3 text-left transition ${
                       checkoutData.orderType === option.value
-                        ? "border-black bg-black text-white"
-                        : "border-gray-200 bg-white text-gray-700 hover:border-black"
+                        ? "border-[#d4af37] bg-[#fff4c7] text-slate-900"
+                        : "border-gray-200 bg-white text-gray-700 hover:border-[#2f2f2f]"
                     }`}
                   >
                     <div className="text-sm font-semibold">{option.label}</div>
-                    <div className={`mt-1 text-xs ${checkoutData.orderType === option.value ? "text-white/75" : "text-gray-500"}`}>
+                    <div className={`mt-1 text-xs ${checkoutData.orderType === option.value ? "text-slate-600" : "text-gray-500"}`}>
                       {option.note}
                     </div>
                   </button>
@@ -900,8 +969,8 @@ export default function CheckoutModal({
                             onClick={() => handleSelectSavedAddress(address)}
                             className={`w-full text-left rounded-2xl border px-4 py-3 transition ${
                               selectedAddressId === address.address_id
-                                ? 'border-black bg-black text-white'
-                                : 'border-gray-200 bg-white text-gray-800 hover:border-black'
+                                ? 'border-[#d4af37] bg-[#fff4c7] text-slate-900'
+                                : 'border-gray-200 bg-white text-gray-800 hover:border-[#2f2f2f]'
                             }`}
                           >
                             <div className="flex items-center justify-between gap-2">
@@ -910,7 +979,7 @@ export default function CheckoutModal({
                                 <p className="text-sm text-gray-500 mt-1">{address.recipient_name} • {address.contact_number}</p>
                               </div>
                               {address.is_default && (
-                                <span className="rounded-full bg-gray-900 px-3 py-1 text-[10px] uppercase tracking-[0.2em] text-white">
+                                <span className="rounded-full bg-[#f7e8b0] px-3 py-1 text-[10px] uppercase tracking-[0.2em] text-[#8a6500]">
                                   Default
                                 </span>
                               )}
@@ -923,7 +992,7 @@ export default function CheckoutModal({
                         <button
                           type="button"
                           onClick={() => handleSelectSavedAddress(null)}
-                          className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm font-semibold text-gray-700 hover:border-black hover:text-black transition"
+                          className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm font-semibold text-gray-700 transition hover:border-[#d4af37] hover:text-[#8a6500]"
                         >
                           Use a different address
                         </button>
@@ -990,7 +1059,7 @@ export default function CheckoutModal({
                     ? "GCash Number (09XXXXXXXXX)"
                     : "Phone Number"
                 }
-                className="w-full p-3 bg-gray-50 rounded-xl text-sm outline-none relative z-[9999] pointer-events-auto"
+                className="box-border w-full p-3 bg-gray-50 rounded-xl text-sm outline-none relative z-[9999] pointer-events-auto"
                 value={checkoutData.phone}
                 onClick={(e) => e.currentTarget.focus()}
                 onChange={(e) =>
@@ -1012,7 +1081,7 @@ export default function CheckoutModal({
           </div>
 
           {/* RIGHT SIDE */}
-          <div className="w-full md:w-[280px] bg-gray-50 p-6 md:p-8 border-t border-gray-200 md:border-t-0 md:border-l flex flex-col">
+          <div className="flex w-full shrink-0 flex-col border-t border-gray-200 bg-[#fafafa] p-6 md:w-[340px] md:border-l md:border-t-0 md:p-8">
 
             <p className="text-xs text-gray-500 uppercase tracking-[0.2em] mb-6">
               Summary
@@ -1084,6 +1153,11 @@ export default function CheckoutModal({
             {/* TOTALS */}
             <div className="mt-6 pt-6 border-t border-gray-200 space-y-2">
 
+              <div className={`rounded-2xl border px-4 py-3 text-sm ${shopOpen ? 'border-green-200 bg-green-50 text-green-700' : 'border-amber-200 bg-amber-50 text-amber-800'}`}>
+                <span className="font-semibold">{shopOpen ? 'Shop is open' : 'Shop is closed'}</span>
+                <span className="ml-2">{shopOpen ? 'You can place your order now.' : `Checkout is available daily from ${SHOP_HOURS_LABEL}.`}</span>
+              </div>
+
               <div className="flex justify-between text-sm text-gray-500">
                 <span>Subtotal</span>
                 <span>₱{subtotal}</span>
@@ -1101,15 +1175,33 @@ export default function CheckoutModal({
                 </div>
               )}
 
+              {checkoutData.method === 'Deliver' && <div className="rounded-2xl border border-[#ead9a1] bg-[#fffaf0] p-4">
+                <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#a67c00]">Promo / Voucher</p>
+                <div className="mt-2 flex gap-2">
+                  <input
+                    value={promoCode}
+                    onChange={(event) => setPromoCode(event.target.value)}
+                    onKeyDown={(event) => { if (event.key === 'Enter') applyPromo(); }}
+                    placeholder="Enter promo code"
+                    className="min-w-0 flex-1 rounded-xl border border-[#ead9a1] bg-white px-3 py-2 text-sm uppercase outline-none focus:border-[#2f2f2f]"
+                  />
+                  <button type="button" onClick={applyPromo} className="rounded-xl bg-[#d4af37] px-4 py-2 text-xs font-bold uppercase tracking-[0.12em] text-slate-900 hover:bg-[#c49c20]">Apply</button>
+                </div>
+                <p className="mt-2 text-[11px] text-gray-500">
+                  Try WELCOME for free delivery.
+                </p>
+                {promoMessage && <p className={`mt-2 text-xs font-semibold ${appliedPromo ? 'text-green-700' : 'text-red-600'}`}>{promoMessage}</p>}
+              </div>}
+
               <div className="flex justify-between text-sm text-gray-500">
                 <span>Discount</span>
                 <span>-₱{discountAmount}</span>
               </div>
 
-              <div className="flex justify-between text-sm text-gray-500">
+              {checkoutData.method === 'Deliver' && voucherAmount > 0 && <div className="flex justify-between text-sm text-gray-500">
                 <span>Voucher</span>
                 <span>-₱{voucherAmount}</span>
-              </div>
+              </div>}
 
               <div className="flex justify-between text-sm text-gray-500">
                 <span>Tax</span>
@@ -1123,14 +1215,14 @@ export default function CheckoutModal({
 
               <button
                 onClick={handlePlaceOrder}
-                disabled={loading}
-                className="w-full py-4 bg-black text-white text-sm rounded-2xl mt-4 tracking-[0.18em] uppercase transition active:scale-95 disabled:bg-gray-300"
+                disabled={loading || !shopOpen}
+                className="w-full py-4 rounded-2xl mt-4 bg-[#d4af37] text-sm font-bold tracking-[0.18em] uppercase text-slate-900 transition active:scale-95 hover:bg-[#c49c20] disabled:bg-gray-300"
               >
                 {loading
                   ? checkoutData.payment === "GCash"
                     ? "REDIRECTING..."
                     : "SAVING..."
-                  : "PLACE ORDER"}
+                  : shopOpen ? "PLACE ORDER" : "SHOP CLOSED"}
               </button>
 
             </div>

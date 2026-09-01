@@ -9,11 +9,19 @@ import { BASE, CUSTOMER_BASE as CUSTOMER_BASE_CONFIG, LARAVEL_BASE } from '../..
 const STAFF_BASE = `${BASE}/staff`;
 const CUSTOMER_BASE = CUSTOMER_BASE_CONFIG;
 const staffFetch = (url, options = {}) => {
-  const token = localStorage.getItem('user') ? JSON.parse(localStorage.getItem('user')).token : '';
+  const rawUser = localStorage.getItem('user');
+  const token = rawUser ? (() => { try { return JSON.parse(rawUser).token || ''; } catch { return ''; } })() : '';
+
   return fetch(url, {
     credentials: 'include',
     ...options,
     headers: { ...(options.headers || {}), ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+  }).catch((error) => {
+    console.warn('Staff fetch failed:', url, error);
+    return new Response(JSON.stringify({ success: false, error: 'Network request failed' }), {
+      status: 503,
+      headers: { 'Content-Type': 'application/json' },
+    });
   });
 };
 

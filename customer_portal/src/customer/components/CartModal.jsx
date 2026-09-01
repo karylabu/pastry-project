@@ -1,5 +1,5 @@
 
-import React, { useMemo } from "react";
+import React, { useEffect, useMemo } from "react";
 import { BASE } from '../../services/config';
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Trash2, Plus, Minus } from "lucide-react";
@@ -24,6 +24,17 @@ export default function CartModal({ isOpen, onClose, items = [], setItems, onChe
   }, [items]);
 
   const total = groupedItems.reduce((sum, item) => sum + item.price * item.qty, 0);
+
+  useEffect(() => {
+    if (!isOpen) return undefined;
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [isOpen]);
 
   // Increase: insert a duplicate right after the first occurrence
   const handleIncrease = (firstIndex, item) => {
@@ -61,13 +72,13 @@ export default function CartModal({ isOpen, onClose, items = [], setItems, onChe
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 z-[9999] bg-black/40 backdrop-blur-sm flex items-center justify-center p-4"
+        className="fixed inset-0 z-[9999] overflow-hidden bg-black/40 backdrop-blur-sm flex items-center justify-center p-4"
       >
         <motion.div
           initial={{ scale: 0.95, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           exit={{ scale: 0.95, opacity: 0 }}
-          className="relative w-full max-w-[640px] max-h-[75vh] min-h-[420px] bg-white rounded-[28px] flex overflow-hidden shadow-xl font-['DM_Sans']"
+          className="relative w-full max-w-[640px] max-h-[75vh] min-h-[420px] overscroll-contain bg-white rounded-[28px] flex overflow-hidden shadow-xl font-['DM_Sans']"
         >
           <button
             onClick={onClose}
@@ -76,7 +87,7 @@ export default function CartModal({ isOpen, onClose, items = [], setItems, onChe
             <X size={18} />
           </button>
           {/* ── Left Basket ── */}
-          <div className="flex-[1.2] p-8 overflow-y-auto custom-scrollbar font-['DM_Sans']">
+          <div className="flex-[1.2] p-8 overflow-y-auto overscroll-contain custom-scrollbar font-['DM_Sans']">
             <h2 className="text-2xl font-semibold text-gray-900 mb-6">Your Basket</h2>
             <div className="space-y-4">
               {groupedItems.map((item) => (
