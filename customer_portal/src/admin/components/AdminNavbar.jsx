@@ -20,6 +20,7 @@ import {
   Lock,
   UserCog,
   Megaphone,
+  Settings,
 } from "lucide-react";
 import { BASE, LARAVEL_BASE } from "../../services/config";
 
@@ -86,6 +87,12 @@ const NAV_GROUPS = [
     label: "User Management",
     items: [
       { name: "User Management", path: "/admin/users", icon: UserCog },
+    ],
+  },
+  {
+    label: "System",
+    items: [
+      { name: "Settings", path: "/admin/settings", icon: Settings },
     ],
   },
 ];
@@ -453,6 +460,7 @@ export default function AdminNavbar() {
                 <div className="p-2">
                   <button onClick={() => { navigate('/admin/dashboard'); setOpenAccount(false); }} className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 text-[13px] text-gray-700 hover:text-gray-900 rounded-lg"><LayoutDashboard size={15} /> Dashboard</button>
                   <button onClick={() => { navigate('/admin/reports'); setOpenAccount(false); }} className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 text-[13px] text-gray-700 hover:text-gray-900 rounded-lg"><BarChart2 size={15} /> Reports</button>
+                  <button onClick={() => { navigate('/admin/settings'); setOpenAccount(false); }} className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 text-[13px] text-gray-700 hover:text-gray-900 rounded-lg"><Settings size={15} /> Settings</button>
                   <button onClick={handleLogout} className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-gray-100 text-black/80 hover:text-black text-[13px] rounded-lg"><LogOut size={15} /> Logout</button>
                 </div>
               </div>

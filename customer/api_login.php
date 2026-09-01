@@ -31,7 +31,7 @@ try {
     }
 
     $escaped = mysqli_real_escape_string($conn, $email);
-    $result  = mysqli_query($conn, "SELECT id, name, email, password, role FROM users WHERE email='$escaped' LIMIT 1");
+    $result  = mysqli_query($conn, "SELECT id, name, email, password, role, status FROM users WHERE email='$escaped' LIMIT 1");
 
     if (!$result || mysqli_num_rows($result) === 0) {
         echo json_encode(["success" => false, "message" => "User not found."]);
@@ -49,12 +49,18 @@ try {
         exit;
     }
 
+    if (strtolower(trim((string) ($user['status'] ?? 'active'))) !== 'active') {
+        echo json_encode(["success" => false, "message" => "This account is deactivated."]);
+        exit;
+    }
+
     session_regenerate_id(true);
     $_SESSION['user'] = [
         'id' => (int) $user['id'],
         'name' => $user['name'],
         'email' => $user['email'],
         'role' => $user['role'],
+        'status' => $user['status'],
     ];
 
     // Generate a simple token for the session
@@ -77,6 +83,7 @@ try {
             "name"  => $user['name'],
             "email" => $user['email'],
             "role"  => $user['role'],
+            "status" => $user['status'],
         ]
     ]);
 

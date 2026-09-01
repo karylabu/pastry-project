@@ -14,6 +14,7 @@ import WasteTracking from "../pages/WasteTracking";
 import PredictiveAnalytics from "../pages/PredictiveAnalytics";
 import Promotions from "../pages/Promotions";
 import UserManagement from "../pages/UserManagement";
+import SettingsPage from "../pages/Settings";
 
 const renderWithLayout = (element) => <AdminLayout>{element}</AdminLayout>;
 
@@ -34,6 +35,7 @@ export default function AdminApp() {
       <Route path="predictive-demand" element={renderWithLayout(<PredictiveAnalytics />)} />
       <Route path="promotions" element={renderWithLayout(<Promotions />)} />
       <Route path="users" element={renderWithLayout(<UserManagement />)} />
+      <Route path="settings" element={renderWithLayout(<SettingsPage />)} />
     </Routes>
   );
 }
