@@ -75,7 +75,7 @@ function StatCard({ title, value, sub, icon: Icon, color, soft, trend, isMock })
   return (
     <motion.div
       whileHover={{ y: -3 }}
-      className="bg-white rounded-2xl border p-5 flex flex-col gap-4 relative"
+      className="bg-white rounded-2xl border p-4 flex flex-col gap-3 relative"
       style={{ borderColor: C.border, boxShadow: '0 1px 2px rgba(17,24,39,0.04)' }}
     >
       {isMock && (
@@ -249,6 +249,7 @@ export default function Reports({ showNavbar = true }) {
   const [dateFilterEnd,   setDateFilterEnd]   = useState('');
   const [leaderTab,     setLeaderTab]     = useState('top');
   const [expandedRow,   setExpandedRow]   = useState(null);
+  const [productPerformanceExpanded, setProductPerformanceExpanded] = useState(false);
   const [checked,       setChecked]       = useState({});
   const [analytics, setAnalytics] = useState(null);
   const [analyticsError, setAnalyticsError] = useState('');
@@ -473,7 +474,7 @@ export default function Reports({ showNavbar = true }) {
       </tr>`
     )).join('');
 
-    const orderRows = visibleOrders.map(o => {
+    const orderRows = completedOrds.map(o => {
       const itemsText = Array.isArray(o.items) && o.items.length
         ? esc(o.items.map(it => `${Number(it.qty||0)}x ${it.name||'Item'}`).join('; '))
         : '—';
@@ -498,8 +499,9 @@ export default function Reports({ showNavbar = true }) {
         <meta charset="utf-8" />
         <title>${esc(title)}</title>
         <style>
-          body { font-family: 'Georgia', 'Times New Roman', serif; color: #111827; margin: 32px; }
+          body { font-family: Arial, Helvetica, sans-serif; color: #111827; margin: 32px; }
           .header { text-align: center; margin-bottom: 20px; }
+          .logo { display:block; width:42px; height:42px; object-fit:contain; margin:0 auto 6px; }
           .title { font-size: 22px; font-weight:700; }
           .subtitle { font-size: 13px; color: #6b7280; margin-bottom: 14px }
           .meta { font-size: 12px; color:#6b7280; margin-bottom: 24px }
@@ -515,6 +517,7 @@ export default function Reports({ showNavbar = true }) {
       </head>
       <body>
         <div class="header">
+          <img class="logo" src="${esc(`${BASE}/uploads/logo.jpg`)}" alt="Pastry Project logo" />
           <div class="title">Pastry Project</div>
           <div class="subtitle">Business Analytics Report</div>
           <div class="meta">Period: ${esc(period)} · Generated: ${esc(printedAt)}</div>
@@ -600,7 +603,7 @@ export default function Reports({ showNavbar = true }) {
       {showNavbar && <StaffNavbar />}
 
       <div className="lg:pl-[260px] pt-[72px]">
-        <div className="max-w-[1400px] mx-auto px-6 md:px-10 py-8">
+        <div className="max-w-[1400px] mx-auto px-6 md:px-10 py-6">
 
           {/* HEADER */}
           <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between mb-6">
@@ -622,15 +625,15 @@ export default function Reports({ showNavbar = true }) {
               between "Date range" and "Quick timeframe". Now it's a single
               flat 3-column grid so all three cards share the row evenly
               with no leftover gap. */}
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 items-stretch mb-8">
-            <div className="rounded-2xl bg-white border border-black/10 p-4">
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-[0.8fr_1.05fr_1.15fr] items-start mb-4">
+            <div className="rounded-2xl bg-white border border-black/10 p-3">
               <p className="text-[10px] uppercase tracking-[0.25em] text-black/50 font-semibold">Interval</p>
-              <div className="mt-3 flex items-center gap-2">
+              <div className="mt-2.5 flex items-center gap-1.5">
                 {['daily', 'weekly', 'monthly'].map((key) => (
                   <button
                     key={key}
                     onClick={() => setInterval(key)}
-                    className="rounded-full px-3 py-2 text-xs font-semibold transition"
+                    className="rounded-full px-3 py-1.5 text-xs font-semibold transition"
                     style={{
                       background: interval === key ? C.ink : '#f8fafc',
                       color: interval === key ? '#fff' : C.ink,
@@ -641,26 +644,28 @@ export default function Reports({ showNavbar = true }) {
                 ))}
               </div>
             </div>
-            <div className="rounded-2xl bg-white border border-black/10 p-4">
+            <div className="rounded-2xl bg-white border border-black/10 p-3">
               <p className="text-[10px] uppercase tracking-[0.25em] text-black/50 font-semibold">Date range</p>
-              <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                <label className="text-[11px] text-black/70">From</label>
-                <label className="text-[11px] text-black/70">To</label>
+              <div className="mt-2.5 grid gap-2 sm:grid-cols-2">
+                <label className="block text-[11px] text-black/70">From
                 <input
                   type="date"
                   value={dateFilterStart}
                   onChange={(e) => setDateFilterStart(e.target.value)}
-                  className="rounded-xl border border-black/10 px-3 py-2 text-sm text-black outline-none"
+                  className="mt-1 w-full rounded-xl border border-black/10 px-3 py-2 text-sm text-black outline-none"
                 />
-                <input
+                </label>
+                <label className="block text-[11px] text-black/70">To
+                  <input
                   type="date"
                   value={dateFilterEnd}
                   onChange={(e) => setDateFilterEnd(e.target.value)}
-                  className="rounded-xl border border-black/10 px-3 py-2 text-sm text-black outline-none"
-                />
+                  className="mt-1 w-full rounded-xl border border-black/10 px-3 py-2 text-sm text-black outline-none"
+                  />
+                </label>
               </div>
             </div>
-            <div className="rounded-2xl bg-white border border-black/10 p-4 flex flex-col gap-3">
+            <div className="rounded-2xl bg-white border border-black/10 p-3 flex flex-col gap-2">
               <p className="text-[10px] uppercase tracking-[0.25em] text-black/50 font-semibold">Quick timeframe</p>
               <div className="flex flex-wrap gap-2">
                 {[['today', 'Today'], ['week', 'This Week'], ['month', 'This Month'], ['all', 'All']].map(([val, label]) => (
@@ -671,7 +676,7 @@ export default function Reports({ showNavbar = true }) {
                       setDateFilterStart('');
                       setDateFilterEnd('');
                     }}
-                    className="rounded-full px-4 py-2 text-xs font-bold transition"
+                    className="rounded-full px-3.5 py-1.5 text-xs font-bold transition"
                     style={{
                       background: range === val && !dateFilterStart && !dateFilterEnd ? C.ink : '#f8fafc',
                       color: range === val && !dateFilterStart && !dateFilterEnd ? '#fff' : C.ink,
@@ -681,11 +686,10 @@ export default function Reports({ showNavbar = true }) {
                   </button>
                 ))}
               </div>
-              <p className="text-xs text-black/50">Use the custom dates to pin down holiday ranges or campaign periods. Interval controls affect aggregation and leaderboard snapshots.</p>
             </div>
           </div>
 
-          <div className="mb-8 grid gap-3 rounded-2xl border border-black/10 bg-white p-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="mb-4 grid gap-2 rounded-2xl border border-black/10 bg-white p-2.5 sm:grid-cols-2 lg:grid-cols-4">
             <select value={analyticsProductId} onChange={(e) => setAnalyticsProductId(e.target.value)} className="rounded-xl border border-black/10 px-3 py-2 text-sm">
               <option value="">All products</option>
               {products.map((product) => <option key={product.id} value={product.id}>{product.name}</option>)}
@@ -714,7 +718,7 @@ export default function Reports({ showNavbar = true }) {
           ) : (
             <>
               {/* ── CORE METRICS (BA-01, BA-02, BA-03) ── */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5 mb-8">
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-2.5 mb-4">
                 <StatCard
                   title="Total Revenue" icon={DollarSign} color={C.emerald} soft={C.emeraldSoft}
                   value={analytics ? peso(analytics.summary.revenue) : '—'}
@@ -739,28 +743,42 @@ export default function Reports({ showNavbar = true }) {
 
               {analyticsError && <div className="mb-6 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">Unable to load analytics: {analyticsError}</div>}
 
-              <div className="mb-8 grid gap-6 xl:grid-cols-2">
-                <div className="rounded-2xl border bg-white p-6" style={{ borderColor: C.border }}>
+              <div className="mb-4 grid gap-3 xl:grid-cols-2">
+                <div className="rounded-2xl border bg-white p-4" style={{ borderColor: C.border }}>
                   <h3 className="mb-4 text-base font-bold" style={{ color: C.ink }}>Revenue by Day</h3>
                   {!analytics?.has_data?.sales ? <p className="text-sm text-gray-400">No sales recorded for this period.</p> : <div className="space-y-2">{analytics.sales.daily.map((row) => <div key={row.date} className="flex justify-between border-b border-black/5 py-2 text-sm"><span>{row.date}</span><strong>{peso(row.revenue)} · {row.orders} orders</strong></div>)}</div>}
                 </div>
-                <div className="rounded-2xl border bg-white p-6" style={{ borderColor: C.border }}>
+                <div className="rounded-2xl border bg-white p-4" style={{ borderColor: C.border }}>
                   <h3 className="mb-4 text-base font-bold" style={{ color: C.ink }}>Production by Product</h3>
                   {!analytics?.has_data?.production ? <p className="text-sm text-gray-400">No production records found.</p> : <div className="space-y-2">{analytics.production.by_product.slice(0, 8).map((row) => <div key={row.product_id} className="flex justify-between border-b border-black/5 py-2 text-sm"><span>{row.product}</span><strong>{fmt(row.quantity)}</strong></div>)}</div>}
                 </div>
-                <div className="rounded-2xl border bg-white p-6" style={{ borderColor: C.border }}>
+                <div className="rounded-2xl border bg-white p-4" style={{ borderColor: C.border }}>
                   <h3 className="mb-4 text-base font-bold" style={{ color: C.ink }}>Ingredient Consumption</h3>
                   {!analytics?.has_data?.ingredient_consumption ? <p className="text-sm text-gray-400">No ingredient consumption recorded for this period.</p> : <div className="space-y-2">{analytics.ingredient_consumption.slice(0, 8).map((row) => <div key={row.ingredient_id} className="flex justify-between border-b border-black/5 py-2 text-sm"><span>{row.ingredient}</span><strong>{Number(row.quantity_consumed).toLocaleString()} {row.unit}</strong></div>)}</div>}
                 </div>
-                <div className="rounded-2xl border bg-white p-6" style={{ borderColor: C.border }}>
+                <div className="rounded-2xl border bg-white p-4" style={{ borderColor: C.border }}>
                   <h3 className="mb-4 text-base font-bold" style={{ color: C.ink }}>Waste Analytics</h3>
-                  {!analytics?.has_data?.waste ? <p className="text-sm text-gray-400">No waste recorded for this period.</p> : <><div className="mb-3 grid grid-cols-3 gap-2 text-sm"><span>Qty <strong>{fmt(analytics.summary.waste_quantity)}</strong></span><span>Cost <strong>{peso(analytics.summary.waste_cost)}</strong></span><span>Rate <strong>{analytics.summary.waste_rate == null ? "Not available" : `${analytics.summary.waste_rate.toFixed(2)}%`}</strong></span></div><div className="space-y-2">{analytics.waste.by_reason.map((row) => <div key={row.reason} className="flex justify-between border-b border-black/5 py-2 text-sm"><span>{row.reason}</span><strong>{peso(row.cost)}</strong></div>)}</div></>}
+                  {!analytics?.has_data?.waste ? <p className="text-sm text-gray-400">No waste recorded for this period.</p> : <><div className="mb-3 grid grid-cols-3 gap-2 text-sm"><span>Qty <strong>{fmt(analytics.summary.waste_quantity)}</strong></span><span>Cost <strong>{peso(analytics.summary.waste_cost)}</strong></span><span>Cost Rate <strong>{analytics.summary.waste_rate == null ? "Not available" : `${analytics.summary.waste_rate.toFixed(2)}%`}</strong></span></div><div className="space-y-2">{analytics.waste.by_reason.map((row) => <div key={row.reason} className="flex justify-between border-b border-black/5 py-2 text-sm"><span>{row.reason}</span><strong>{peso(row.cost)}</strong></div>)}</div></>}
                 </div>
               </div>
 
               <div className="mb-8 overflow-x-auto rounded-2xl border bg-white" style={{ borderColor: C.border }}>
-                <div className="border-b p-6"><h3 className="text-base font-bold" style={{ color: C.ink }}>Product Performance</h3><p className="mt-1 text-xs text-gray-400">Sales, production, waste, and current stock from transaction records.</p></div>
-                <table className="w-full min-w-[680px] text-left text-sm"><thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-500"><tr><th className="px-6 py-3">Product</th><th className="px-4 py-3">Sold</th><th className="px-4 py-3">Produced</th><th className="px-4 py-3">Waste</th><th className="px-4 py-3">Current Stock</th></tr></thead><tbody>{analytics?.product_performance?.length ? analytics.product_performance.map((row) => <tr key={row.product_id} className="border-t border-black/5"><td className="px-6 py-3 font-semibold">{row.product}</td><td className="px-4 py-3">{fmt(row.sold)}</td><td className="px-4 py-3">{fmt(row.produced)}</td><td className="px-4 py-3">{fmt(row.waste)}</td><td className="px-4 py-3">{fmt(row.current_stock)}</td></tr>) : <tr><td colSpan={5} className="px-6 py-8 text-center text-gray-400">No product performance data for this period.</td></tr>}</tbody></table>
+                <div className="flex items-center justify-between border-b p-6">
+                  <div>
+                    <h3 className="text-base font-bold" style={{ color: C.ink }}>Product Performance</h3>
+                    <p className="mt-1 text-xs text-gray-400">Sales, production, waste, and current stock from transaction records.</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setProductPerformanceExpanded((expanded) => !expanded)}
+                    className="rounded-lg p-2 text-gray-500 transition hover:bg-gray-100 hover:text-gray-900"
+                    aria-label={productPerformanceExpanded ? 'Collapse product performance' : 'Expand product performance'}
+                    title={productPerformanceExpanded ? 'Collapse' : 'Show all products'}
+                  >
+                    {productPerformanceExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+                  </button>
+                </div>
+                <table className="w-full min-w-[680px] text-left text-sm"><thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-500"><tr><th className="px-6 py-3">Product</th><th className="px-4 py-3">Sold</th><th className="px-4 py-3">Produced</th><th className="px-4 py-3">Waste</th><th className="px-4 py-3">Current Stock</th></tr></thead><tbody>{analytics?.product_performance?.length ? (productPerformanceExpanded ? analytics.product_performance : analytics.product_performance.slice(0, 5)).map((row) => <tr key={row.product_id} className="border-t border-black/5"><td className="px-6 py-3 font-semibold">{row.product}</td><td className="px-4 py-3">{fmt(row.sold)}</td><td className="px-4 py-3">{fmt(row.produced)}</td><td className="px-4 py-3">{fmt(row.waste)}</td><td className="px-4 py-3">{fmt(row.current_stock)}</td></tr>) : <tr><td colSpan={5} className="px-6 py-8 text-center text-gray-400">No product performance data for this period.</td></tr>}</tbody></table>
               </div>
 
               {/* ── WIDGET A: HEATMAP + ORDER TYPE ── */}
@@ -836,7 +854,7 @@ export default function Reports({ showNavbar = true }) {
                     <h3 className="text-base font-bold" style={{ color: C.ink }}>Sales Transactions</h3>
                     <p className="text-xs text-gray-500 mt-1">Detailed sales records for the selected period or custom date range.</p>
                   </div>
-                  <span className="text-[11px] text-gray-500">{visibleOrders.length} transactions shown</span>
+                  <span className="text-[11px] text-gray-500">{completedOrds.length} completed transactions shown</span>
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm border-separate border-spacing-y-1">
@@ -851,9 +869,9 @@ export default function Reports({ showNavbar = true }) {
                       </tr>
                     </thead>
                     <tbody>
-                      {visibleOrders.length === 0 ? (
-                        <tr><td colSpan={6} className="px-4 py-10 text-center text-gray-400">No orders match the selected filters.</td></tr>
-                      ) : visibleOrders.map((o) => {
+                      {completedOrds.length === 0 ? (
+                        <tr><td colSpan={6} className="px-4 py-10 text-center text-gray-400">No completed orders match the selected filters.</td></tr>
+                      ) : completedOrds.map((o) => {
                         const itemsText = Array.isArray(o.items) && o.items.length
                           ? o.items.map(item => `${Number(item.qty || 0)}x ${item.name || 'Item'}`).join(', ')
                           : '—';

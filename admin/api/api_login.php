@@ -48,6 +48,11 @@ try {
         exit;
     }
 
+        if (strtolower(trim((string) ($user['status'] ?? 'active'))) !== 'active') {
+            echo json_encode(["success" => false, "message" => "This account is deactivated."]);
+            exit;
+        }
+
     echo json_encode([
         "success" => true,
         "user" => [

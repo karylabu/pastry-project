@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState, useRef } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Search, Trash2, History, RefreshCw } from "lucide-react";
@@ -7,7 +7,7 @@ import { BASE, STAFF_BASE } from "../../services/config";
 
 const staffFetch = (url, options = {}) => fetch(url, { credentials: "include", ...options });
 
-export default function Products({ showNavbar = true }) {
+export default function Products({ showNavbar = true, allowCatalogManagement = false }) {
 
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -61,10 +61,22 @@ export default function Products({ showNavbar = true }) {
 
   // ⭐ NEW: CATEGORY FILTER
   const [activeCat, setActiveCat] = useState("All");
-  const currentUser = (() => {
-    try { return JSON.parse(window.localStorage.getItem("user") || "null"); } catch { return null; }
-  })();
-  const canManageCatalog = ["admin", "manager"].includes(String(currentUser?.role || "").toLowerCase());
+  const canManageCatalog = Boolean(allowCatalogManagement);
+  const canEditCatalog = Boolean(allowCatalogManagement);
+
+  const openEditProductModal = (product) => {
+    setEditProduct({
+      ...product,
+      name: product.name || "",
+      category: product.category || "",
+      price: product.price ?? "",
+      stock: product.stock ?? "",
+      description: product.description || "",
+      image: product.image || "",
+    });
+    setEditImage(null);
+    setEditOpen(true);
+  };
 
   /* =========================
      FETCH PRODUCTS
@@ -601,6 +613,15 @@ export default function Products({ showNavbar = true }) {
                 <div className="flex gap-2">
                   <button onClick={() => openInventoryModal(product, "produce")} className="flex-1 bg-black text-white py-2 rounded-lg text-[12px] leading-none hover:bg-black/90 transition">Produce</button>
                   <button onClick={() => openInventoryModal(product, "adjust")} className="flex-1 bg-white border border-black/10 text-black py-2 rounded-lg text-[12px] leading-none hover:bg-black/5 transition">Adjust Stock</button>
+                  {canEditCatalog && (
+                    <button
+                      type="button"
+                      onClick={() => openEditProductModal(product)}
+                      className="rounded-lg border border-black/10 bg-white px-2.5 py-2 text-[12px] leading-none text-black hover:bg-black/5 transition"
+                    >
+                      Edit
+                    </button>
+                  )}
                   <button onClick={() => openInventoryModal(product, "history")} aria-label={`View ${product.name} history`} className="rounded-lg border border-black/10 bg-white px-2.5 text-black hover:bg-black/5"><History size={15} /></button>
                 </div>
 
@@ -653,6 +674,15 @@ export default function Products({ showNavbar = true }) {
                 <div className="px-4 py-4 flex flex-wrap gap-2">
                   <button onClick={() => openInventoryModal(product, "produce")} className="rounded-full bg-black px-3 py-2 text-[11px] text-white hover:bg-black/90">Produce</button>
                   <button onClick={() => openInventoryModal(product, "adjust")} className="rounded-full border border-black/10 bg-white px-3 py-2 text-[11px] text-black hover:bg-black/5">Adjust</button>
+                  {canEditCatalog && (
+                    <button
+                      type="button"
+                      onClick={() => openEditProductModal(product)}
+                      className="rounded-full border border-black/10 bg-white px-3 py-2 text-[11px] leading-none text-black hover:bg-black/5 transition"
+                    >
+                      Edit
+                    </button>
+                  )}
                   <button onClick={() => openInventoryModal(product, "history")} aria-label={`View ${product.name} history`} className="rounded-full border border-black/10 bg-white px-3 py-2 text-black hover:bg-black/5"><History size={15} /></button>
                 </div>
               </div>
