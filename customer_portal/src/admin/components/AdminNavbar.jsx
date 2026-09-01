@@ -19,6 +19,7 @@ import {
   TrendingUp,
   Lock,
   UserCog,
+  Megaphone,
 } from "lucide-react";
 import { BASE, LARAVEL_BASE } from "../../services/config";
 
@@ -75,6 +76,12 @@ const NAV_GROUPS = [
     ],
   },
   // Supplier Management removed per request
+  {
+    label: "Marketing",
+    items: [
+      { name: "Promotions", path: "/admin/promotions", icon: Megaphone },
+    ],
+  },
   {
     label: "User Management",
     items: [

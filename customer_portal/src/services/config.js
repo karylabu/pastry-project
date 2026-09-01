@@ -1,15 +1,22 @@
 // Centralized backend base URLs for local environment
 const origin = typeof window !== "undefined" ? window.location.origin : "";
 
-// Development: XAMPP is running on localhost:80 (Apache)
-// Production: Use the homepage prefix
-const xamppBase = "http://localhost";
-const xamppWithProject = "http://localhost/pastry-project";
-const xamppCustomerBase = `${xamppWithProject}/customer`;
-const xamppStaffBase = `${xamppWithProject}/staff`;
+export function resolveProjectBase(baseOrigin = origin, suffix = "") {
+  const projectPath = "/GitHub/pastry-project";
+  const normalizedBase = (baseOrigin || "http://localhost").replace(/\/$/, "");
+  const normalizedSuffix = suffix ? `/${suffix.replace(/^\/+|\/+$/g, "")}` : "";
+
+  return `${normalizedBase}${projectPath}${normalizedSuffix}`;
+}
+
+// Development: XAMPP is running on localhost:80 (Apache) and the project is mounted
+// under C:\xampp\htdocs\GitHub\pastry-project.
+const xamppWithProject = resolveProjectBase("http://localhost");
 const configuredDevBase = process.env.REACT_APP_API_BASE || "";
-const devBase = configuredDevBase.includes("/GitHub/") ? xamppWithProject : (configuredDevBase || xamppWithProject);
-const homepage = process.env.PUBLIC_URL || "/GitHub/Capstone--Development/customer";
+const devBase = configuredDevBase.includes("/GitHub/")
+  ? configuredDevBase.replace(/\/$/, "")
+  : (configuredDevBase || xamppWithProject);
+const homepage = process.env.PUBLIC_URL || "/GitHub/pastry-project/customer";
 const prodBase = `${origin}${homepage}`.replace(/\/$/, "");
 const prodRootBase = `${origin}${homepage.replace(/\/customer$/, "")}`.replace(/\/$/, "");
 const isLocalHost = typeof window !== "undefined" &&

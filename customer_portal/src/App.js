@@ -56,6 +56,9 @@ function getRouterBasename() {
 
   const pathname = window.location.pathname;
   const knownPrefixes = [
+    "/GitHub/pastry-project/customer",
+    "/GitHub/pastry-project/customer_portal",
+    "/GitHub/pastry-project",
     "/GitHub/Capstone--Development/customer",
     "/GitHub/Capstone--Development - Copy/customer_portal",
     "/GitHub/Capstone--Development",

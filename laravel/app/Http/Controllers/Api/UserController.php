@@ -26,6 +26,10 @@ class UserController extends Controller
             $payload = [];
         }
 
+        if (array_key_exists('email', $payload)) {
+            $payload['email'] = strtolower(trim((string) $payload['email']));
+        }
+
         if (array_key_exists('phone_number', $payload) && !array_key_exists('phone', $payload)) {
             $payload['phone'] = $payload['phone_number'];
         }

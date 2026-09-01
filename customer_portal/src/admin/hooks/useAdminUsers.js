@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { ROOT_BASE } from "../../services/config";
 
 const buildUsersUrl = ({ search = "", role = "all", page = 1, perPage = 10 }) => {
-  const url = new URL(`${ROOT_BASE}/laravel/public/api_users.php`);
+  const url = new URL(`${ROOT_BASE}/laravel/public/api/users`);
 
   if (search?.trim()) {
     url.searchParams.set("search", search.trim());
