@@ -3,7 +3,10 @@ import { motion, AnimatePresence } from "framer-motion";
 
 /* STAFF NAVBAR */
 import StaffNavbar from "../components/StaffNavbar";
-import { STAFF_BASE } from "../../services/config";
+import { STAFF_BASE, LARAVEL_BASE } from "../../services/config";
+
+const staffFetch = (url, options = {}) => fetch(url, { credentials: "include", ...options });
+const laravelStaffFetch = (url, options = {}) => fetch(url, { credentials: "include", ...options });
 
 const POLL_INTERVAL = 15000;
 
@@ -130,7 +133,7 @@ export default function Orders({ showNavbar = true }) {
     }));
 
   const fetchIngredients = () => {
-    fetch(`${STAFF_BASE}/api_ingredients.php`)
+    laravelStaffFetch(`${LARAVEL_BASE}/api/staff/inventory/ingredients`)
       .then((res) => res.json())
       .then((data) => {
         const list = Array.isArray(data?.ingredients) ? data.ingredients : [];
@@ -143,8 +146,8 @@ export default function Orders({ showNavbar = true }) {
     if (!silent) setLoading(true);
 
     Promise.all([
-      fetch(`${STAFF_BASE}/api_orders.php?custom=1`).then((res) => res.json()).catch(() => []),
-      fetch(`${STAFF_BASE}/api_orders.php`).then((res) => res.json()).catch(() => []),
+      staffFetch(`${STAFF_BASE}/api_orders.php?custom=1`).then((res) => res.json()).catch(() => []),
+      staffFetch(`${STAFF_BASE}/api_orders.php`).then((res) => res.json()).catch(() => []),
     ])
       .then(([customOrders, regularOrders]) => {
         const combined = [
@@ -215,7 +218,7 @@ export default function Orders({ showNavbar = true }) {
 
   const updateStatus = (id, status) => {
     setUpdatingId(id);
-    fetch(`${STAFF_BASE}/api_update_order_status.php`, {
+    staffFetch(`${STAFF_BASE}/api_update_order_status.php`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id, status }),
@@ -267,7 +270,7 @@ export default function Orders({ showNavbar = true }) {
     }
 
     setWasteSubmitting(true);
-    fetch(`${STAFF_BASE}/api_waste_log.php`, {
+    staffFetch(`${STAFF_BASE}/api_waste_log.php`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ item, qty, reason }),

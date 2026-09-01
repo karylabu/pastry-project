@@ -1,10 +1,7 @@
 <?php
-header("Content-Type: application/json");
-header("Access-Control-Allow-Origin: *");
-header("Access-Control-Allow-Methods: GET, OPTIONS");
-header("Access-Control-Allow-Headers: Content-Type");
+require_once __DIR__ . '/../includes/api_auth.php';
 
-if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') exit;
+requireInventoryRead();
 
 $conn = new mysqli("localhost", "root", "", "pastry_db");
 if ($conn->connect_error) {
@@ -19,7 +16,7 @@ if (!$ingredient_id) {
     exit;
 }
 
-$sql = "SELECT id, ingredient_id, action, qty, note, user_id, created_at FROM ingredient_movements WHERE ingredient_id = ? ORDER BY created_at DESC";
+$sql = "SELECT id, ingredient_id, action, qty, note, user_id, reference_type, reference_id, previous_stock, new_stock, created_at FROM ingredient_movements WHERE ingredient_id = ? ORDER BY created_at DESC";
 $stmt = $conn->prepare($sql);
 $stmt->bind_param('i', $ingredient_id);
 $stmt->execute();
@@ -33,6 +30,10 @@ while ($r = $res->fetch_assoc()) {
         'qty' => (float)$r['qty'],
         'note' => $r['note'],
         'user' => $r['user_id'],
+        'reference_type' => $r['reference_type'],
+        'reference_id' => $r['reference_id'],
+        'previous_stock' => $r['previous_stock'] !== null ? (float) $r['previous_stock'] : null,
+        'new_stock' => $r['new_stock'] !== null ? (float) $r['new_stock'] : null,
         'created_at' => $r['created_at'],
     ];
 }

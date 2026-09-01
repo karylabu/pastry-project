@@ -11,7 +11,9 @@ class StaffController extends Controller
 {
     protected function requireLogin()
     {
-        if (!session()->has('user')) {
+        $user = session('user');
+        $role = is_array($user) ? strtolower((string) ($user['role'] ?? '')) : '';
+        if (!$user || !in_array($role, ['staff', 'manager', 'admin'], true)) {
             return redirect('/staff_login.php');
         }
 
@@ -30,7 +32,8 @@ class StaffController extends Controller
             } else {
                 $user = DB::table('users')->where('email', $email)->first();
 
-                if ($user && (Hash::check($password, $user->password) || $user->password === $password)) {
+                if ($user && in_array(strtolower((string) ($user->role ?? '')), ['staff', 'manager', 'admin'], true)
+                    && (Hash::check($password, $user->password) || $user->password === $password)) {
                     $role = property_exists($user, 'role') && $user->role ? $user->role : 'staff';
                     session(['user' => [
                         'id' => $user->id,
@@ -48,7 +51,7 @@ class StaffController extends Controller
             return view('staff.login', compact('error'));
         }
 
-        if (session()->has('user')) {
+        if (session('user') && in_array(strtolower((string) (session('user.role') ?? '')), ['staff', 'manager', 'admin'], true)) {
             return redirect('/staff/dashboard.php');
         }
 

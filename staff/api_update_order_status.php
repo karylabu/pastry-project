@@ -1,21 +1,13 @@
 <?php
 ini_set('display_errors', 0);
 error_reporting(0);
-session_start();
+require_once __DIR__ . '/../includes/api_auth.php';
+require_once __DIR__ . '/../includes/inventory.php';
+
+requireInventoryWrite();
 
 while (ob_get_level()) {
     ob_end_clean();
-}
-
-header("Content-Type: application/json");
-header("Access-Control-Allow-Origin: *");
-header("Access-Control-Allow-Methods: POST, OPTIONS");
-header("Access-Control-Allow-Headers: Content-Type");
-
-if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-    http_response_code(200);
-    echo json_encode(["success" => true]);
-    exit();
 }
 
 mysqli_report(MYSQLI_REPORT_OFF);
@@ -50,20 +42,12 @@ function insertAuditLog(mysqli $conn, int $userId, string $context, string $acti
     return $ok;
 }
 
-function ensureNotificationsTableCompat(mysqli $conn): void {
-    if (!$conn) return;
-    $tables = $conn->query("SHOW TABLES LIKE 'notifications'");
-    if ($tables && $tables->num_rows > 0) {
-        @mysqli_query($conn, "ALTER TABLE notifications MODIFY COLUMN type VARCHAR(50) NOT NULL DEFAULT 'Info'");
-    }
-}
-
 function insertCustomerNotification(mysqli $conn, int $userId, string $title, string $message, string $type, string $actionUrl = ''): bool {
     if (!$conn || !$userId) return false;
 
     try {
-        ensureNotificationsTableCompat($conn);
-
+        // SCHEMA NOTE: the notifications table is maintained through
+        // versioned migrations; no runtime ALTER TABLE here.
         $tables = $conn->query("SHOW TABLES LIKE 'notifications'");
         if (!$tables || $tables->num_rows === 0) {
             return false;
@@ -85,21 +69,13 @@ function insertCustomerNotification(mysqli $conn, int $userId, string $title, st
 }
 
 /* =========================
-   DATABASE
-========================= */
-function ensureOrdersSchemaCompat(mysqli $conn): void {
-    if (!$conn) {
-        return;
-    }
-
-    @mysqli_query($conn, "ALTER TABLE orders MODIFY COLUMN status ENUM('Pending','Confirmed','Preparing','To Receive','Completed','Cancelled') NOT NULL DEFAULT 'Pending'");
-
-    $phoneCheck = $conn->query("SHOW COLUMNS FROM orders LIKE 'phone'");
-    if (!$phoneCheck || $phoneCheck->num_rows === 0) {
-        @mysqli_query($conn, "ALTER TABLE orders ADD COLUMN phone VARCHAR(30) NULL AFTER email");
-    }
-}
-
+    DATABASE
+ ========================= */
+/*
+| SCHEMA NOTE: The orders/notifications schemas are maintained exclusively
+| through versioned migrations in database/migrations/. This API must never
+| run ALTER TABLE / CREATE TABLE statements at request time.
+*/
 function loadOrderItemsFromJson(string $itemsJson): array {
     $items = json_decode($itemsJson ?: '[]', true);
     if (!is_array($items)) {
@@ -137,19 +113,20 @@ function loadOrderItemsFromJson(string $itemsJson): array {
 function loadLegacyOrderItems(mysqli $conn, int $orderId): array {
     $items = [];
     $orderId = intval($orderId);
-    $result = $conn->query("SELECT product, qty FROM order_items WHERE order_id = {$orderId}");
+    $result = $conn->query("SELECT product_id, product, qty FROM order_items WHERE order_id = {$orderId}");
     if ($result) {
         while ($row = $result->fetch_assoc()) {
             $productName = trim((string) ($row['product'] ?? ''));
+            $productId = (int) ($row['product_id'] ?? 0);
             $qty = max(1, intval($row['qty'] ?? 1));
             if ($productName === '') {
                 continue;
             }
 
-            $key = 'name:' . mb_strtolower($productName);
+            $key = $productId > 0 ? "pid:{$productId}" : 'name:' . mb_strtolower($productName);
             if (!isset($items[$key])) {
                 $items[$key] = [
-                    'product_id' => 0,
+                    'product_id' => $productId,
                     'product_name' => $productName,
                     'qty' => 0,
                 ];
@@ -164,7 +141,7 @@ function loadLegacyOrderItems(mysqli $conn, int $orderId): array {
 
 function resolveProduct(mysqli $conn, int $productId, string $productName): ?array {
     if ($productId > 0) {
-        $stmt = $conn->prepare("SELECT id, name, stock FROM products WHERE id = ? LIMIT 1");
+        $stmt = $conn->prepare("SELECT id, name, stock FROM products WHERE id = ? LIMIT 1 FOR UPDATE");
         if ($stmt) {
             $stmt->bind_param('i', $productId);
             $stmt->execute();
@@ -179,7 +156,7 @@ function resolveProduct(mysqli $conn, int $productId, string $productName): ?arr
 
     if ($productName !== '') {
         $lowerName = mb_strtolower($productName);
-        $stmt = $conn->prepare("SELECT id, name, stock FROM products WHERE LOWER(name) = ? LIMIT 1");
+        $stmt = $conn->prepare("SELECT id, name, stock FROM products WHERE LOWER(name) = ? LIMIT 1 FOR UPDATE");
         if ($stmt) {
             $stmt->bind_param('s', $lowerName);
             $stmt->execute();
@@ -196,10 +173,7 @@ function resolveProduct(mysqli $conn, int $productId, string $productName): ?arr
 }
 
 function collectInventoryPlan(mysqli $conn, array $orderLines): array {
-    $plan = [
-        'products' => [],
-        'ingredients' => [],
-    ];
+    $plan = ['products' => []];
 
     foreach ($orderLines as $line) {
         $qty = max(1, intval($line['qty'] ?? 0));
@@ -209,70 +183,20 @@ function collectInventoryPlan(mysqli $conn, array $orderLines): array {
 
         $product = resolveProduct($conn, intval($line['product_id'] ?? 0), trim((string) ($line['product_name'] ?? '')));
         if (!$product) {
-            continue;
+            return [
+                'success' => false,
+                'message' => 'Order contains an unknown product',
+            ];
         }
 
         $productId = intval($product['id']);
         $productName = trim((string) ($product['name'] ?? ''));
-        $productStock = intval($product['stock'] ?? 0);
-
-        $recipeStmt = $conn->prepare(
-            "SELECT pr.ingredient_id, pr.qty AS recipe_qty, i.stock AS ingredient_stock, i.name AS ingredient_name
-             FROM product_recipes pr
-             JOIN ingredients i ON i.id = pr.ingredient_id
-             WHERE pr.product_id = ?"
-        );
-        if (!$recipeStmt) {
-            return [
-                'success' => false,
-                'message' => 'Failed to read product recipe for ' . $productName,
-            ];
-        }
-
-        $recipeStmt->bind_param('i', $productId);
-        $recipeStmt->execute();
-        $recipeResult = $recipeStmt->get_result();
-
-        $recipeRows = [];
-        while ($recipeRow = $recipeResult->fetch_assoc()) {
-            $recipeRows[] = $recipeRow;
-        }
-        $recipeStmt->close();
-
-        if ($productStock < $qty) {
-            return [
-                'success' => false,
-                'message' => "Insufficient finished goods stock for {$productName}.",
-            ];
-        }
-
         $plan['products'][$productId] = [
             'product_id' => $productId,
             'name' => $productName,
             'qty' => ($plan['products'][$productId]['qty'] ?? 0) + $qty,
         ];
 
-        if (count($recipeRows) === 0) {
-            continue;
-        }
-
-        foreach ($recipeRows as $recipeRow) {
-            $ingredientId = intval($recipeRow['ingredient_id']);
-            $requiredQty = floatval($recipeRow['recipe_qty']) * $qty;
-            $currentStock = floatval($recipeRow['ingredient_stock']);
-            $ingredientName = trim((string) ($recipeRow['ingredient_name'] ?? 'Ingredient'));
-
-            if ($currentStock < $requiredQty) {
-                return [
-                    'success' => false,
-                    'message' => "Insufficient {$ingredientName} for {$productName} (requires {$requiredQty}).",
-                ];
-            }
-
-            $existing = $plan['ingredients'][$ingredientId] ?? ['ingredient_id' => $ingredientId, 'qty' => 0, 'name' => $ingredientName];
-            $existing['qty'] += $requiredQty;
-            $plan['ingredients'][$ingredientId] = $existing;
-        }
     }
 
     return [
@@ -284,51 +208,32 @@ function collectInventoryPlan(mysqli $conn, array $orderLines): array {
 function applyInventoryPlan(mysqli $conn, int $orderId, string $status, array $plan, int $userId): array {
     $note = "Order #{$orderId} inventory deduction on {$status}";
 
-    foreach ($plan['ingredients'] as $ingredientEntry) {
-        $ingredientId = intval($ingredientEntry['ingredient_id']);
-        $qty = floatval($ingredientEntry['qty']);
-
-        $stmt = $conn->prepare("UPDATE ingredients SET stock = stock - ?, updated_at = NOW() WHERE id = ? AND stock >= ?");
-        if (!$stmt) {
-            return ['success' => false, 'message' => 'Failed to prepare ingredient update'];
-        }
-        $stmt->bind_param('did', $qty, $ingredientId, $qty);
-        $stmt->execute();
-        $affected = $stmt->affected_rows;
-        $stmt->close();
-
-        if ($affected === 0) {
-            return ['success' => false, 'message' => 'Insufficient ingredient stock'];
-        }
-
-        $ins = $conn->prepare("INSERT INTO ingredient_movements (ingredient_id, action, qty, note, user_id) VALUES (?, 'stock_out', ?, ?, ?)");
-        if (!$ins) {
-            return ['success' => false, 'message' => 'Failed to log ingredient movement'];
-        }
-        $ins->bind_param('idsi', $ingredientId, $qty, $note, $userId);
-        if (!$ins->execute()) {
-            $ins->close();
-            return ['success' => false, 'message' => 'Failed to log ingredient movement'];
-        }
-        $ins->close();
-    }
-
     foreach ($plan['products'] as $productEntry) {
         $productId = intval($productEntry['product_id']);
         $qty = intval($productEntry['qty']);
 
-        $stmt = $conn->prepare("UPDATE products SET stock = stock - ? WHERE id = ? AND stock >= ?");
+        $stmt = $conn->prepare("SELECT stock FROM products WHERE id = ? FOR UPDATE");
         if (!$stmt) {
             return ['success' => false, 'message' => 'Failed to prepare product stock update'];
         }
-        $stmt->bind_param('iii', $qty, $productId, $qty);
+        $stmt->bind_param('i', $productId);
         $stmt->execute();
-        $affected = $stmt->affected_rows;
+        $row = $stmt->get_result()->fetch_assoc();
         $stmt->close();
 
-        if ($affected === 0) {
+        $previous = $row ? (float) $row['stock'] : -1;
+        if ($previous < $qty) {
             return ['success' => false, 'message' => 'Insufficient product stock'];
         }
+
+        $newStock = $previous - $qty;
+        $stmt = $conn->prepare("UPDATE products SET stock = ? WHERE id = ?");
+        $stmt->bind_param('di', $newStock, $productId);
+        if (!$stmt->execute() || !recordProductMovement($conn, $productId, 'Order', -$qty, $previous, $newStock, $note, 'order', $orderId, $userId)) {
+            $stmt->close();
+            return ['success' => false, 'message' => 'Failed to record order inventory movement'];
+        }
+        $stmt->close();
     }
 
     return ['success' => true];
@@ -337,11 +242,27 @@ function applyInventoryPlan(mysqli $conn, int $orderId, string $status, array $p
 function shouldDeductInventory(string $oldStatus, string $newStatus): bool {
     $newStatus = trim($newStatus);
     $oldStatus = trim($oldStatus);
-    $inventoryStatuses = ['Confirmed', 'Completed'];
-    $alreadyDeductedStatuses = ['Confirmed', 'Preparing', 'To Receive', 'Completed'];
+    return $newStatus === 'Confirmed' && $oldStatus !== 'Confirmed';
+}
 
-    return in_array($newStatus, $inventoryStatuses, true)
-        && !in_array($oldStatus, $alreadyDeductedStatuses, true);
+/**
+ * Count inventory movements recorded for an order for a given movement type.
+ * Used to make deduction idempotent: an order may only be deducted while its
+ * stock has NOT already been deducted (or has been restored by cancellation).
+ */
+function orderMovementCount(mysqli $conn, int $orderId, string $movementType): int {
+    $stmt = $conn->prepare(
+        "SELECT COUNT(*) AS c FROM product_inventory_movements
+         WHERE reference_type = 'order' AND reference_id = ? AND movement_type = ?"
+    );
+    if (!$stmt) {
+        return -1;
+    }
+    $stmt->bind_param('is', $orderId, $movementType);
+    $stmt->execute();
+    $row = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+    return $row ? (int) $row['c'] : -1;
 }
 
 function awardLoyaltyPoints(mysqli $conn, int $userId, int $orderId, float $total): void {
@@ -381,10 +302,8 @@ function awardLoyaltyPoints(mysqli $conn, int $userId, int $orderId, float $tota
 $conn = @new mysqli("localhost", "root", "", "pastry_db");
 
 if ($conn->connect_error) {
-    sendJson(false, "DB connect failed", ["error" => $conn->connect_error]);
+    sendJson(false, "DB connect failed");
 }
-
-ensureOrdersSchemaCompat($conn);
 
 /* =========================
    INPUT
@@ -406,8 +325,9 @@ if (empty($data) && !empty($_POST)) {
 $id = isset($data['id']) ? intval($data['id']) : 0;
 $status = isset($data['status']) ? trim($data['status']) : "";
 
-if (!$id || !$status) {
-    sendJson(false, "Invalid input", ["raw" => $raw]);
+$allowedStatuses = ['Pending', 'Confirmed', 'Preparing', 'To Receive', 'Completed', 'Cancelled'];
+if (!$id || !in_array($status, $allowedStatuses, true)) {
+    sendJson(false, "Invalid input");
 }
 
 /* =========================
@@ -415,8 +335,12 @@ if (!$id || !$status) {
 ========================= */
 try {
     $conn->begin_transaction();
+<<<<<<< HEAD
 
     $orderStmt = $conn->prepare("SELECT status, items, total, user_id, email FROM orders WHERE id = ? LIMIT 1 FOR UPDATE");
+=======
+    $orderStmt = $conn->prepare("SELECT status, items FROM orders WHERE id = ? LIMIT 1 FOR UPDATE");
+>>>>>>> origin/main
     if (!$orderStmt) {
         throw new Exception("Order lookup failed");
     }
@@ -427,7 +351,12 @@ try {
     $orderStmt->close();
 
     if (!$orderRow) {
+<<<<<<< HEAD
         throw new Exception("Order not found");
+=======
+        $conn->rollback();
+        sendJson(false, "Order not found");
+>>>>>>> origin/main
     }
 
     $oldStatus = trim((string) ($orderRow['status'] ?? 'Pending'));
@@ -446,6 +375,17 @@ try {
     }
 
     if (shouldDeductInventory($oldStatus, $status)) {
+        // Idempotency guard: skip deduction when this order's stock is
+        // already deducted (deductions > restorations). Prevents double
+        // deduction on status flip-flops like Confirmed -> Pending -> Confirmed.
+        $deductedCount = orderMovementCount($conn, $id, 'Order');
+        $restoredCount = orderMovementCount($conn, $id, 'Cancellation');
+        if ($deductedCount < 0 || $restoredCount < 0) {
+            $conn->rollback();
+            sendJson(false, "Failed to verify order inventory state");
+        }
+        $alreadyDeducted = $deductedCount > 0 && $deductedCount > $restoredCount;
+
         $orderLines = loadOrderItemsFromJson($itemsJson);
         if (empty($orderLines)) {
             $orderLines = loadLegacyOrderItems($conn, $id);
@@ -453,31 +393,114 @@ try {
 
         $planResult = collectInventoryPlan($conn, $orderLines);
         if (!$planResult['success']) {
+<<<<<<< HEAD
             throw new Exception($planResult['message']);
         }
 
         $plan = $planResult['plan'];
         $applyResult = applyInventoryPlan($conn, $id, $status, $plan, $currentUserId);
+=======
+            $conn->rollback();
+            sendJson(false, $planResult['message']);
+        }
+
+        $plan = $planResult['plan'];
+        // Skip the deduction entirely when this order's stock is already
+        // deducted (deductions > restorations) - prevents double-deduction.
+        $applyResult = $alreadyDeducted
+            ? ['success' => true]
+            : applyInventoryPlan($conn, $id, $status, $plan, $currentUserId);
+>>>>>>> origin/main
         if (!$applyResult['success']) {
             throw new Exception($applyResult['message']);
         }
     }
 
+<<<<<<< HEAD
     $stmt = $conn->prepare("UPDATE orders SET status=? WHERE id=?");
     if (!$stmt) {
         throw new Exception("Prepare failed");
     }
+=======
+    } elseif ($status === 'Cancelled' && $oldStatus !== 'Cancelled') {
+        $movementStmt = $conn->prepare("SELECT product_id, quantity FROM product_inventory_movements WHERE movement_type = 'Order' AND reference_type = 'order' AND reference_id = ? FOR UPDATE");
+        $movementStmt->bind_param('i', $id);
+        $movementStmt->execute();
+        $movementResult = $movementStmt->get_result();
+        while ($movement = $movementResult->fetch_assoc()) {
+            $productId = (int) $movement['product_id'];
+            $restoreQty = abs((float) $movement['quantity']);
+            if ($restoreQty <= 0 || productMovementExists($conn, $productId, 'Cancellation', 'order', $id)) {
+                continue;
+            }
+
+            $productStmt = $conn->prepare("SELECT stock FROM products WHERE id = ? FOR UPDATE");
+            $productStmt->bind_param('i', $productId);
+            $productStmt->execute();
+            $productRow = $productStmt->get_result()->fetch_assoc();
+            $productStmt->close();
+            if (!$productRow) {
+                $conn->rollback();
+                sendJson(false, 'Product not found while restoring cancelled order');
+            }
+
+            $previous = (float) $productRow['stock'];
+            $newStock = $previous + $restoreQty;
+            $productStmt = $conn->prepare("UPDATE products SET stock = ? WHERE id = ?");
+            $productStmt->bind_param('di', $newStock, $productId);
+            if (!$productStmt->execute() || !recordProductMovement($conn, $productId, 'Cancellation', $restoreQty, $previous, $newStock, "Order #{$id} cancelled", 'order', $id, $currentUserId)) {
+                $productStmt->close();
+                $conn->rollback();
+                sendJson(false, 'Failed to restore cancelled order stock');
+            }
+            $productStmt->close();
+        }
+        $movementStmt->close();
+    }
+
+    if (!shouldDeductInventory($oldStatus, $status) && !($status === 'Cancelled' && $oldStatus !== 'Cancelled')) {
+        $stmt = $conn->prepare("UPDATE orders SET status=? WHERE id=?");
+        if (!$stmt) {
+            $conn->rollback();
+            sendJson(false, "Prepare failed");
+        }
+>>>>>>> origin/main
 
     $stmt->bind_param("si", $status, $id);
     if (!$stmt->execute()) {
         $stmt->close();
+<<<<<<< HEAD
         throw new Exception("Update failed");
     }
     $stmt->close();
 
     if ($status === 'Completed' && $oldStatus !== 'Completed') {
         awardLoyaltyPoints($conn, $loyaltyUserId, $id, floatval($orderRow['total'] ?? 0));
+=======
+>>>>>>> origin/main
     }
+
+    if (shouldDeductInventory($oldStatus, $status)) {
+        $stmt = $conn->prepare("UPDATE orders SET status=? WHERE id=?");
+        $stmt->bind_param("si", $status, $id);
+        if (!$stmt->execute()) {
+            $stmt->close();
+            $conn->rollback();
+            sendJson(false, "Update failed");
+        }
+        $stmt->close();
+    } elseif ($status === 'Cancelled' && $oldStatus !== 'Cancelled') {
+        $stmt = $conn->prepare("UPDATE orders SET status=? WHERE id=?");
+        $stmt->bind_param("si", $status, $id);
+        if (!$stmt->execute()) {
+            $stmt->close();
+            $conn->rollback();
+            sendJson(false, "Update failed");
+        }
+        $stmt->close();
+    }
+
+    $conn->commit();
 
     if ($currentUserId > 0) {
         $statusNote = "Order #{$id} status changed from {$oldStatus} to {$status}";
@@ -626,6 +649,6 @@ try {
         $conn->close();
     }
     error_log('api_update_order_status fatal: ' . $e->getMessage());
-    sendJson(false, "Unexpected server error", ["error" => $e->getMessage()]);
+    sendJson(false, "Unexpected server error");
 }
 ?>

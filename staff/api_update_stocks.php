@@ -1,15 +1,8 @@
 <?php
+require_once __DIR__ . '/../includes/api_auth.php';
+require_once __DIR__ . '/../includes/inventory.php';
 
-header("Content-Type: application/json");
-header("Access-Control-Allow-Origin: *");
-header("Access-Control-Allow-Methods: POST, OPTIONS");
-header("Access-Control-Allow-Headers: Content-Type");
-
-if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-    exit;
-}
-
-session_start();
+requireInventoryWrite();
 
 function getSessionUserId(): int {
     if (session_status() !== PHP_SESSION_ACTIVE) {
@@ -48,9 +41,33 @@ $data = json_decode(file_get_contents("php://input"), true);
 
 $action = trim($data['action'] ?? "");
 $id     = intval($data['id'] ?? 0);
-$qty    = intval($data['qty'] ?? 0);
+
+// INTEGRITY: quantities must be whole numbers — silently truncating a
+// decimal (intval("2.9") === 2) would corrupt stock records.
+$rawQty = $data['qty'] ?? 0;
+if (is_string($rawQty)) {
+    $rawQty = trim($rawQty);
+}
+if (!is_numeric($rawQty) || floor((float) $rawQty) != (float) $rawQty) {
+    echo json_encode(["status" => "error", "message" => "Quantity must be a whole number"]);
+    exit;
+}
+$qty    = intval($rawQty);
+
+// Keep movement reasons within the column limit so inserts cannot fail late
+// inside an open transaction.
+$reason = mb_substr(trim((string) ($data['reason'] ?? $data['note'] ?? 'Manual stock adjustment')), 0, 255);
 $type   = $data['type'] ?? $action;
 $productVariantId = intval($data['product_variant_id'] ?? 0);
+
+// DUPLICATE PROTECTION: optional client idempotency key (same pattern as
+// waste logging). Replaying the same key returns the original result
+// instead of producing twice.
+$idempotencyKey = trim((string) ($data['idempotency_key'] ?? ''));
+if (strlen($idempotencyKey) > 100) {
+    echo json_encode(["status" => "error", "message" => "idempotency_key is too long"]);
+    exit;
+}
 
 if ($action === "produce") {
     if ($id <= 0 || $qty <= 0) {
@@ -61,12 +78,38 @@ if ($action === "produce") {
         exit;
     }
 
-    $stmt = $conn->prepare("SELECT stock, name FROM products WHERE id = ?");
-    $stmt->bind_param("i", $id);
-    $stmt->execute();
-    $result = $stmt->get_result();
+    if (trim((string) $idempotencyKey) === '') {
+        echo json_encode([
+            "status" => "error",
+            "message" => "idempotency_key is required for production requests"
+        ]);
+        exit;
+    }
 
-    if ($result->num_rows === 0) {
+    $dupStmt = $conn->prepare("SELECT id, quantity FROM production_transactions WHERE idempotency_key = ? LIMIT 1");
+    $dupStmt->bind_param('s', $idempotencyKey);
+    $dupStmt->execute();
+    $existingProduction = $dupStmt->get_result()->fetch_assoc();
+    $dupStmt->close();
+    if ($existingProduction) {
+        echo json_encode([
+            "status" => "success",
+            "duplicate" => true,
+            "production_id" => (int) $existingProduction['id'],
+            "message" => "Production already recorded"
+        ]);
+        exit;
+    }
+
+    $conn->begin_transaction();
+
+    $productStmt = $conn->prepare("SELECT stock, name FROM products WHERE id = ? FOR UPDATE");
+    $productStmt->bind_param("i", $id);
+    $productStmt->execute();
+    $productResult = $productStmt->get_result();
+
+    if ($productResult->num_rows === 0) {
+        $conn->rollback();
         echo json_encode([
             "status" => "error",
             "message" => "Product not found"
@@ -74,15 +117,17 @@ if ($action === "produce") {
         exit;
     }
 
-    $row = $result->fetch_assoc();
-    $currentProductStock = intval($row['stock'] ?? 0);
-    $productName = $row['name'];
+    $productRow = $productResult->fetch_assoc();
+    $currentProductStock = intval($productRow['stock'] ?? 0);
+    $productName = $productRow['name'];
+    $productStmt->close();
 
     $recipeStmt = $conn->prepare(
-        "SELECT pr.ingredient_id, pr.qty, i.name, i.unit, i.stock
+        "SELECT pr.ingredient_id, pr.qty, i.name, i.unit
          FROM product_recipes pr
          JOIN ingredients i ON i.id = pr.ingredient_id
-         WHERE pr.product_id = ?"
+         WHERE pr.product_id = ? AND pr.active = 1
+         ORDER BY pr.id ASC"
     );
     $recipeStmt->bind_param("i", $id);
     $recipeStmt->execute();
@@ -94,56 +139,180 @@ if ($action === "produce") {
             'ingredient_id' => intval($line['ingredient_id']),
             'qty' => floatval($line['qty']),
             'name' => $line['name'],
-            'unit' => $line['unit'],
-            'stock' => floatval($line['stock'])
+            'unit' => $line['unit']
         ];
     }
+    $recipeStmt->close();
 
     if (count($recipeLines) === 0) {
+        $conn->rollback();
         echo json_encode([
             "status" => "error",
-            "message" => "No recipe defined for this product"
+            "message" => "No active recipe defined for this product"
         ]);
         exit;
     }
 
-    $shortage = null;
+    $ingredientUsableStock = [];
+    $allocations = [];
+    $productionIngredientBeforeStock = [];
+
     foreach ($recipeLines as $line) {
-        $required = $line['qty'] * $qty;
-        if (floatval($line['stock']) < $required) {
-            $shortage = $line;
-            break;
+        $ingredientId = (int) $line['ingredient_id'];
+        $required = (float) $line['qty'] * (float) $qty;
+
+        $batchStmt = $conn->prepare(
+            "SELECT id, ingredient_id, batch_number, quantity_remaining, expiry_date, created_at
+             FROM ingredient_batches
+             WHERE ingredient_id = ?
+               AND quantity_remaining > 0
+               AND (expiry_date IS NULL OR expiry_date >= CURDATE())
+               AND NOT EXISTS (
+                   SELECT 1
+                   FROM discard_requests dr
+                   WHERE dr.ingredient_batch_id = ingredient_batches.id
+                     AND dr.status = 'Pending'
+               )
+             ORDER BY expiry_date IS NULL, expiry_date ASC, id ASC
+             FOR UPDATE"
+        );
+        $batchStmt->bind_param('i', $ingredientId);
+        $batchStmt->execute();
+        $batchResult = $batchStmt->get_result();
+
+        $usableBatches = [];
+        $totalUsable = 0.0;
+        while ($batch = $batchResult->fetch_assoc()) {
+            $usableBatches[] = [
+                'id' => (int) $batch['id'],
+                'batch_number' => $batch['batch_number'],
+                'quantity_remaining' => (float) $batch['quantity_remaining'],
+                'expiry_date' => $batch['expiry_date']
+            ];
+            $totalUsable += (float) $batch['quantity_remaining'];
         }
-    }
+        $batchStmt->close();
 
-    if ($shortage) {
-        echo json_encode([
-            "status" => "error",
-            "message" => "Insufficient {$shortage['name']} for this production quantity"
-        ]);
-        exit;
-    }
+        $ingredientUsableStock[$ingredientId] = $totalUsable;
+        $productionIngredientBeforeStock[$ingredientId] = $totalUsable;
 
-    $currentUserId = getSessionUserId();
-    $conn->begin_transaction();
-    $ingredientUpdate = $conn->prepare("UPDATE ingredients SET stock = stock - ?, updated_at = NOW() WHERE id = ?");
-    $movementInsert = $conn->prepare("INSERT INTO ingredient_movements (ingredient_id, action, qty, note, user_id) VALUES (?, 'stock_out', ?, ?, ?)");
-    $movementNote = "Produced {$qty} unit(s) of {$productName}";
-
-    foreach ($recipeLines as $line) {
-        $required = $line['qty'] * $qty;
-        $ingredientUpdate->bind_param('di', $required, $line['ingredient_id']);
-        if (!$ingredientUpdate->execute()) {
+        if ($totalUsable < $required) {
             $conn->rollback();
             echo json_encode([
                 "status" => "error",
-                "message" => "Failed to deduct ingredients"
+                "message" => "Insufficient {$line['name']}. Required: {$required} {$line['unit']}. Available: {$totalUsable} {$line['unit']}."
             ]);
             exit;
         }
 
-        $movementInsert->bind_param('idsi', $line['ingredient_id'], $required, $movementNote, $currentUserId);
-        if (!$movementInsert->execute()) {
+        $remaining = $required;
+        foreach ($usableBatches as $batch) {
+            if ($remaining <= 0.000001) {
+                break;
+            }
+
+            $consumed = min((float) $batch['quantity_remaining'], $remaining);
+            if ($consumed <= 0.000001) {
+                continue;
+            }
+
+            $allocations[] = [
+                'ingredient_id' => $ingredientId,
+                'batch_id' => (int) $batch['id'],
+                'quantity_consumed' => $consumed,
+                'batch_number' => $batch['batch_number'],
+                'ingredient_name' => $line['name'],
+                'ingredient_unit' => $line['unit']
+            ];
+            $remaining -= $consumed;
+        }
+
+        if ($remaining > 0.000001) {
+            $conn->rollback();
+            echo json_encode([
+                "status" => "error",
+                "message" => "Insufficient {$line['name']} for this production quantity"
+            ]);
+            exit;
+        }
+    }
+
+    $currentUserId = inventoryUserId();
+    $movementNote = "Produced {$qty} unit(s) of {$productName}";
+
+    $productionStmt = $conn->prepare("INSERT INTO production_transactions (product_id, quantity, user_id, idempotency_key) VALUES (?, ?, ?, NULLIF(?, ''))");
+    $productionStmt->bind_param('iiis', $id, $qty, $currentUserId, $idempotencyKey);
+    if (!$productionStmt->execute()) {
+        if ($conn->errno === 1062) {
+            $productionStmt->close();
+            $dupStmt = $conn->prepare("SELECT id, quantity FROM production_transactions WHERE idempotency_key = ? LIMIT 1");
+            $dupStmt->bind_param('s', $idempotencyKey);
+            $dupStmt->execute();
+            $duplicateProduction = $dupStmt->get_result()->fetch_assoc();
+            $dupStmt->close();
+            $conn->rollback();
+            echo json_encode([
+                "status" => "success",
+                "duplicate" => true,
+                "production_id" => $duplicateProduction ? (int) $duplicateProduction['id'] : 0,
+                "message" => "Production already recorded"
+            ]);
+            exit;
+        }
+        $conn->rollback();
+        echo json_encode(["status" => "error", "message" => "Failed to record production"]);
+        exit;
+    }
+    $productionId = $productionStmt->insert_id;
+    $productionStmt->close();
+
+    $batchUpdateStmt = $conn->prepare("UPDATE ingredient_batches SET quantity_remaining = quantity_remaining - ?, updated_at = NOW() WHERE id = ? AND quantity_remaining >= ?");
+    $allocInsertStmt = $conn->prepare("INSERT INTO production_batch_allocations (production_transaction_id, ingredient_id, ingredient_batch_id, quantity_consumed) VALUES (?, ?, ?, ?)");
+    $ingredientMovementStmt = $conn->prepare(
+        "INSERT INTO ingredient_movements (ingredient_id, batch_id, action, qty, note, user_id, reference_type, reference_id, previous_stock, new_stock)
+         VALUES (?, ?, 'stock_out', ?, ?, ?, 'production', ?, ?, ?)"
+    );
+
+    foreach ($allocations as $allocation) {
+        $ingredientId = (int) $allocation['ingredient_id'];
+        $batchId = (int) $allocation['batch_id'];
+        $consumed = (float) $allocation['quantity_consumed'];
+
+        $batchUpdateStmt->bind_param('ddi', $consumed, $batchId, $consumed);
+        if (!$batchUpdateStmt->execute() || $batchUpdateStmt->affected_rows !== 1) {
+            $allocInsertStmt->close();
+            $ingredientMovementStmt->close();
+            $conn->rollback();
+            echo json_encode([
+                "status" => "error",
+                "message" => "Failed to deduct batch quantity for {$allocation['ingredient_name']}"
+            ]);
+            exit;
+        }
+
+        $allocInsertStmt->bind_param('iiid', $productionId, $ingredientId, $batchId, $consumed);
+        if (!$allocInsertStmt->execute()) {
+            $allocInsertStmt->close();
+            $ingredientMovementStmt->close();
+            $conn->rollback();
+            echo json_encode([
+                "status" => "error",
+                "message" => "Failed to record production batch allocation"
+            ]);
+            exit;
+        }
+
+        $aggregateStmt = $conn->prepare("SELECT COALESCE(SUM(quantity_remaining), 0) AS total FROM ingredient_batches WHERE ingredient_id = ?");
+        $aggregateStmt->bind_param('i', $ingredientId);
+        $aggregateStmt->execute();
+        $aggregateResult = $aggregateStmt->get_result()->fetch_assoc();
+        $aggregateStmt->close();
+        $aggregateBefore = (float) ($productionIngredientBeforeStock[$ingredientId] ?? 0);
+        $aggregateAfter = (float) ($aggregateResult['total'] ?? 0);
+
+        $ingredientMovementStmt->bind_param('iidsiidd', $ingredientId, $batchId, $consumed, $movementNote, $currentUserId, $productionId, $aggregateBefore, $aggregateAfter);
+        if (!$ingredientMovementStmt->execute()) {
+            $ingredientMovementStmt->close();
             $conn->rollback();
             echo json_encode([
                 "status" => "error",
@@ -151,7 +320,24 @@ if ($action === "produce") {
             ]);
             exit;
         }
+
+        $ingredientMasterUpdate = $conn->prepare("UPDATE ingredients SET stock = ?, updated_at = NOW() WHERE id = ?");
+        $ingredientMasterUpdate->bind_param('di', $aggregateAfter, $ingredientId);
+        if (!$ingredientMasterUpdate->execute()) {
+            $ingredientMasterUpdate->close();
+            $conn->rollback();
+            echo json_encode([
+                "status" => "error",
+                "message" => "Failed to synchronize ingredient stock"
+            ]);
+            exit;
+        }
+        $ingredientMasterUpdate->close();
     }
+
+    $batchUpdateStmt->close();
+    $allocInsertStmt->close();
+    $ingredientMovementStmt->close();
 
     $productUpdate = $conn->prepare("UPDATE products SET stock = stock + ? WHERE id = ?");
     $productUpdate->bind_param('ii', $qty, $id);
@@ -161,6 +347,12 @@ if ($action === "produce") {
             "status" => "error",
             "message" => "Failed to update finished goods stock"
         ]);
+        exit;
+    }
+
+    if (!recordProductMovement($conn, $id, 'Production', $qty, $currentProductStock, $currentProductStock + $qty, $movementNote, 'production', $productionId, $currentUserId)) {
+        $conn->rollback();
+        echo json_encode(["status" => "error", "message" => "Failed to record finished-product movement"]);
         exit;
     }
 
@@ -183,12 +375,14 @@ if ($productVariantId > 0) {
         exit;
     }
 
-    $variantStmt = $conn->prepare("SELECT product_id, stock_quantity FROM product_variants WHERE id = ?");
+    $conn->begin_transaction();
+    $variantStmt = $conn->prepare("SELECT product_id, stock_quantity FROM product_variants WHERE id = ? FOR UPDATE");
     $variantStmt->bind_param("i", $productVariantId);
     $variantStmt->execute();
     $variantResult = $variantStmt->get_result();
 
     if ($variantResult->num_rows === 0) {
+        $conn->rollback();
         echo json_encode([
             "status" => "error",
             "message" => "Variant not found"
@@ -198,16 +392,33 @@ if ($productVariantId > 0) {
 
     $variant = $variantResult->fetch_assoc();
     $current = intval($variant['stock_quantity']);
-    $newStock = $type === 'in' ? $current + $qty : max(0, $current - $qty);
+    if ($type === 'in') {
+        $newStock = $current + $qty;
+    } else {
+        // INTEGRITY: never clamp silently — reject excessive stock-out.
+        if ($current < $qty) {
+            $conn->rollback();
+            echo json_encode(["status" => "error", "message" => "Insufficient variant stock"]);
+            exit;
+        }
+        $newStock = $current - $qty;
+    }
 
     $updateVariant = $conn->prepare("UPDATE product_variants SET stock_quantity = ? WHERE id = ?");
     $updateVariant->bind_param("ii", $newStock, $productVariantId);
 
     if (!$updateVariant->execute()) {
+        $conn->rollback();
         echo json_encode([
             "status" => "error",
             "message" => "Failed to update variant stock"
         ]);
+        exit;
+    }
+
+    if (!recordProductMovement($conn, (int) $variant['product_id'], 'Stock Adjustment', $type === 'in' ? $qty : -$qty, $current, $newStock, $reason, 'stock_adjustment', null, inventoryUserId(), $productVariantId)) {
+        $conn->rollback();
+        echo json_encode(["status" => "error", "message" => "Failed to record variant stock movement"]);
         exit;
     }
 
@@ -235,6 +446,7 @@ if ($productVariantId > 0) {
     );
     $aggregate->bind_param('ii', $variant['product_id'], $variant['product_id']);
     $aggregate->execute();
+    $conn->commit();
 
     echo json_encode([
         "status" => "success",
@@ -254,12 +466,14 @@ if ($id <= 0 || $qty <= 0 || !in_array($type, ['in','out'])) {
 
 /* ================= GET CURRENT STOCK ================= */
 
-$stmt = $conn->prepare("SELECT stock FROM products WHERE id = ?");
+$conn->begin_transaction();
+$stmt = $conn->prepare("SELECT stock FROM products WHERE id = ? FOR UPDATE");
 $stmt->bind_param("i", $id);
 $stmt->execute();
 $result = $stmt->get_result();
 
 if ($result->num_rows === 0) {
+    $conn->rollback();
     echo json_encode([
         "status" => "error",
         "message" => "Product not found"
@@ -278,7 +492,12 @@ if ($type === "in") {
     $newStock = $current - $qty;
 
     if ($newStock < 0) {
-        $newStock = 0; // prevent negative stock
+        $conn->rollback();
+        echo json_encode([
+            "status" => "error",
+            "message" => "Insufficient product stock"
+        ]);
+        exit;
     }
 }
 
@@ -289,10 +508,19 @@ $update->bind_param("ii", $newStock, $id);
 
 if ($update->execute()) {
     $currentUserId = getSessionUserId();
+    $movementType = $type === 'in' ? 'Stock Adjustment' : 'Stock Adjustment';
+    $movementQuantity = $type === 'in' ? $qty : -$qty;
+    if (!recordProductMovement($conn, $id, $movementType, $movementQuantity, $current, $newStock, $reason, 'stock_adjustment', null, $currentUserId)) {
+        $conn->rollback();
+        echo json_encode(["status" => "error", "message" => "Failed to record stock movement"]);
+        exit;
+    }
     if ($currentUserId > 0) {
         $stockNote = sprintf('Product %s stock %s via api_update_stocks', $type === 'in' ? 'increased' : 'decreased', $type);
         insertAuditLog($conn, $currentUserId, 'stocks', $type === 'in' ? 'stock_in' : 'stock_out', 'product', $id, $stockNote);
     }
+
+    $conn->commit();
 
     echo json_encode([
         "status" => "success",
@@ -301,6 +529,8 @@ if ($update->execute()) {
     ]);
 
 } else {
+
+    $conn->rollback();
 
     echo json_encode([
         "status" => "error",

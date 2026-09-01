@@ -14,9 +14,7 @@ class Ingredient extends Model
     protected $fillable = [
         'name',
         'unit',
-        'stock',
         'threshold',
-        'expiry',
     ];
 
     protected $casts = [
@@ -24,4 +22,24 @@ class Ingredient extends Model
         'threshold' => 'float',
         'expiry' => 'date',
     ];
+
+    public function batches()
+    {
+        return $this->hasMany(IngredientBatch::class);
+    }
+
+    public function ingredientBatches()
+    {
+        return $this->batches();
+    }
+
+    public function movements()
+    {
+        return $this->hasMany(IngredientMovement::class);
+    }
+
+    public function recipes()
+    {
+        return $this->hasMany(ProductRecipe::class);
+    }
 }

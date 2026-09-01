@@ -13,6 +13,8 @@ import ForgotPassword from "../pages/ForgotPassword"; // ← your ForgotPassword
 
 /* STAFF */
 import StaffApp from "../../staff/components/StaffApp";
+import ProtectedRoute, { AccessDenied } from "../../auth/ProtectedRoute";
+import StaffAdminLogin from "../../admin/pages/StaffAdminLogin";
 
 function getRouterBasename() {
   if (typeof window === "undefined") return "/";
@@ -50,7 +52,10 @@ function App() {
         <Route path="customer/*" element={<CustomerApp />} />
 
         {/* ================= STAFF ================= */}
-        <Route path="staff/*" element={<StaffApp />} />
+        <Route path="staff/login" element={<StaffAdminLogin />} />
+        <Route path="staff" element={<Navigate to="staff/login" replace />} />
+        <Route path="staff/access-denied" element={<AccessDenied />} />
+        <Route path="staff/*" element={<ProtectedRoute><StaffApp /></ProtectedRoute>} />
 
         {/* FALLBACK */}
         <Route path="*" element={<div style={{ padding: 20 }}>404 Not Found</div>} />

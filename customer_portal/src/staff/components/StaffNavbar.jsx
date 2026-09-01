@@ -71,8 +71,8 @@ export default function StaffNavbar() {
 
   useEffect(() => {
     const fetchNotifications = () => {
-      fetch(`${STAFF_BASE}/api_orders.php?custom=1`)
-        .then(res => res.json())
+      fetch(`${STAFF_BASE}/api_orders.php?custom=1`, { credentials: "include" })
+        .then(res => (res.ok ? res.json() : []))
         .then(data => {
           if (Array.isArray(data)) {
             const mapped = data
@@ -114,8 +114,17 @@ export default function StaffNavbar() {
   };
 
   const handleLogout = () => {
-    localStorage.removeItem("user");
-    navigate("/staff/login", { replace: true });
+    // Invalidate the server-side session/token first, then clear local state.
+    fetch(`${STAFF_BASE}/logout.php`, {
+      method: "POST",
+      credentials: "include",
+      headers: { Accept: "application/json" },
+    })
+      .catch(() => {})
+      .finally(() => {
+        localStorage.removeItem("user");
+        navigate("/staff/login", { replace: true });
+      });
   };
 
   const handleSearchSubmit = (e) => {

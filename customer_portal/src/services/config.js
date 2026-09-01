@@ -1,21 +1,36 @@
 // Centralized backend base URLs for local environment
 const origin = typeof window !== "undefined" ? window.location.origin : "";
 
-// Development: XAMPP is running on localhost:80 (Apache)
-// Production: Use the homepage prefix
-const xamppBase = "http://localhost";
-const xamppWithProject = "http://localhost/pastry-project";
-const xamppCustomerBase = `${xamppWithProject}/customer`;
-const xamppStaffBase = `${xamppWithProject}/staff`;
+export function resolveProjectBase(baseOrigin = origin, suffix = "") {
+  const projectPath = "/pastry-project";
+  const normalizedBase = (baseOrigin || "http://localhost").replace(/\/$/, "");
+  const normalizedSuffix = suffix ? `/${suffix.replace(/^\/+|\/+$/g, "")}` : "";
+
+  return `${normalizedBase}${projectPath}${normalizedSuffix}`;
+}
+
+function normalizeLocalProjectBase(baseUrl = "") {
+  if (!baseUrl) return resolveProjectBase("http://localhost");
+
+  const cleaned = baseUrl.replace(/\/$/, "");
+  if (cleaned.includes("/GitHub/pastry-project")) {
+    return cleaned.replace("/GitHub/pastry-project", "/pastry-project");
+  }
+
+  return cleaned;
+}
+
+// Development: XAMPP is running on localhost:80 (Apache) and the project is mounted
+// under C:\xampp\htdocs\pastry-project.
+const xamppWithProject = resolveProjectBase("http://localhost");
 const configuredDevBase = process.env.REACT_APP_API_BASE || "";
-const devBase = configuredDevBase.includes("/GitHub/") ? xamppWithProject : (configuredDevBase || xamppWithProject);
-const homepage = process.env.PUBLIC_URL || "/GitHub/Capstone--Development/customer";
+const devBase = normalizeLocalProjectBase(configuredDevBase || xamppWithProject);
+const homepage = process.env.PUBLIC_URL || "/pastry-project/customer";
 const prodBase = `${origin}${homepage}`.replace(/\/$/, "");
 const prodRootBase = `${origin}${homepage.replace(/\/customer$/, "")}`.replace(/\/$/, "");
-const isLocalPreview = typeof window !== "undefined" &&
-  (window.location.hostname === "127.0.0.1" || window.location.hostname === "localhost") &&
-  ["3000", "3001", "3002"].includes(window.location.port);
-const useXampp = process.env.NODE_ENV === "development" || isLocalPreview;
+const isLocalHost = typeof window !== "undefined" &&
+  (window.location.hostname === "127.0.0.1" || window.location.hostname === "localhost");
+const useXampp = process.env.NODE_ENV === "development" || isLocalHost;
 
 export const BASE = useXampp ? devBase : prodBase;
 // Use full XAMPP URLs for API calls

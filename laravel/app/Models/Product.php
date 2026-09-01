@@ -35,4 +35,14 @@ class Product extends Model
         'available' => 'boolean',
         'is_custom' => 'boolean',
     ];
+
+    public function recipes()
+    {
+        return $this->hasMany(ProductRecipe::class);
+    }
+
+    public function productionTransactions()
+    {
+        return $this->hasMany(ProductionTransaction::class);
+    }
 }

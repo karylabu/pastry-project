@@ -12,6 +12,7 @@ import OrderHistory from "../pages/OrderHistory";
 import LowStockAlerts from "../pages/LowStockAlerts";
 import WasteTracking from "../pages/WasteTracking";
 import PredictiveAnalytics from "../pages/PredictiveAnalytics";
+import Promotions from "../pages/Promotions";
 import UserManagement from "../pages/UserManagement";
 
 const renderWithLayout = (element) => <AdminLayout>{element}</AdminLayout>;
@@ -31,6 +32,7 @@ export default function AdminApp() {
       <Route path="low-stock" element={renderWithLayout(<LowStockAlerts />)} />
       <Route path="waste-tracking" element={renderWithLayout(<WasteTracking />)} />
       <Route path="predictive-demand" element={renderWithLayout(<PredictiveAnalytics />)} />
+      <Route path="promotions" element={renderWithLayout(<Promotions />)} />
       <Route path="users" element={renderWithLayout(<UserManagement />)} />
     </Routes>
   );

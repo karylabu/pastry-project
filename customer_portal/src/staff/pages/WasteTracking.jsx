@@ -21,7 +21,18 @@ import {
   Cell,
 } from "recharts";
 import StaffNavbar from "../components/StaffNavbar";
-import { STAFF_BASE } from "../../services/config";
+import { LARAVEL_BASE, STAFF_BASE } from "../../services/config";
+
+const staffFetch = (url, options = {}) => fetch(url, { credentials: "include", ...options });
+const laravelStaffFetch = (url, options = {}) => {
+  let token = '';
+  try { token = JSON.parse(localStorage.getItem('user') || 'null')?.token || ''; } catch (_) { /* no-op */ }
+  return fetch(url, {
+    credentials: 'include',
+    ...options,
+    headers: { ...(options.headers || {}), ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+  });
+};
 
 const C = {
   emerald: '#10b981', emeraldSoft: '#e6f7f0',
@@ -49,21 +60,7 @@ const REASON_CODES = [
 
 const reasonMeta = (key) => REASON_CODES.find((r) => r.key === key) || REASON_CODES[0];
 
-// Seed log entries so the page renders meaningfully before real data loads
-const SEED_ENTRIES = [
-  { id: 1, datetime: "2026-07-06T07:15", item: "Fresh Cream", qty: 3.4, reason: "expired" },
-  { id: 2, datetime: "2026-07-06T09:40", item: "Chocolate Croissant", qty: 12, reason: "unsold" },
-  { id: 3, datetime: "2026-07-05T08:05", item: "Butter", qty: 1.2, reason: "expired" },
-  { id: 4, datetime: "2026-07-05T14:20", item: "Sourdough Loaf", qty: 6, reason: "unsold" },
-  { id: 5, datetime: "2026-07-04T10:10", item: "Butter Croissant", qty: 8, reason: "production" },
-  { id: 6, datetime: "2026-07-03T07:50", item: "Fresh Cream", qty: 2.1, reason: "expired" },
-  { id: 7, datetime: "2026-07-03T16:30", item: "Blueberry Muffin", qty: 5, reason: "damaged" },
-  { id: 8, datetime: "2026-07-02T11:00", item: "Chocolate", qty: 0.4, reason: "expired" },
-  { id: 9, datetime: "2026-07-01T09:15", item: "Fresh Cream", qty: 1.8, reason: "expired" },
-  { id: 10, datetime: "2026-06-30T13:45", item: "Chocolate Croissant", qty: 9, reason: "unsold" },
-];
-
-// Historical weekly trend for the seasonal chart (mocked — swap for API data)
+// Historical weekly trend for the seasonal chart.
 const SEASONAL_TREND = [
   { week: "Wk 1", thisYear: 18, lastYear: 14 },
   { week: "Wk 2", thisYear: 22, lastYear: 17 },
@@ -81,10 +78,7 @@ function formatPeso(value) {
   return `₱${Number(value || 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
 }
 
-// Enriches a log entry for display. If the entry already carries cost/type
-// (real API responses do, since the backend snapshots them at insert time),
-// those are used as-is. Otherwise (seed/demo data) they're derived from the
-// catalogue by item name.
+// Enriches an API log entry with catalogue display metadata.
 function enrich(entry, catalogue) {
   const meta = catalogue.find((c) => c.name === entry.item) || { unit: "kg", unitCost: 0, type: "Raw Material" };
   const unitCost = entry.unit_cost ?? meta.unitCost;
@@ -109,13 +103,23 @@ export default function WasteTracking({ showNavbar = true }) {
     datetime: "",
   });
 
-  // Pull the real ingredient list so the "Log New Waste Entry" dropdown and unit labels reflect actual inventory.
+  // Pull the real inventory catalogue for the entry form.
   useEffect(() => {
-    fetch(`${STAFF_BASE}/api_ingredients.php`)
+    laravelStaffFetch(`${LARAVEL_BASE}/api/staff/inventory/waste/catalogue`)
       .then((res) => res.json())
       .then((data) => {
-        if (data?.success && Array.isArray(data.ingredients)) {
-          setCatalogue(data.ingredients.map((i) => ({ name: i.name, unit: i.unit, unitCost: 0, type: "Raw Material" })));
+        if (data?.success && Array.isArray(data.items)) {
+          setCatalogue(data.items.map((i) => ({
+            id: i.id,
+            batchId: i.batch_id,
+            batchNumber: i.batch_number,
+            key: `${i.id}:${i.batch_id}`,
+            name: i.name,
+            unit: i.unit,
+            unitCost: i.unit_cost,
+            type: i.type,
+            status: i.status,
+          })).filter((item) => item.status === 'Usable' || item.status === 'Expired'));
         }
       })
       .catch(() => {
@@ -123,9 +127,9 @@ export default function WasteTracking({ showNavbar = true }) {
       });
   }, []);
 
-  // Pull real waste log entries; fall back to seed data only if the backend is unreachable.
+  // Pull real waste log entries.
   useEffect(() => {
-    fetch(`${STAFF_BASE}/api_waste_log.php`)
+    laravelStaffFetch(`${LARAVEL_BASE}/api/staff/inventory/waste`)
       .then((res) => res.json())
       .then((data) => {
         if (data?.success && Array.isArray(data.entries)) {
@@ -135,7 +139,7 @@ export default function WasteTracking({ showNavbar = true }) {
         }
       })
       .catch(() => {
-        setEntries(SEED_ENTRIES);
+        setEntries([]);
       });
   }, []);
 
@@ -209,26 +213,36 @@ export default function WasteTracking({ showNavbar = true }) {
     setShowModal(true);
   };
 
-  const submitEntry = (e) => {
+  const submitEntry = async (e) => {
     e.preventDefault();
     if (!form.item || !form.qty) return;
+    const selectedItem = catalogue.find((c) => c.key === form.item);
+    if (!selectedItem) return;
     const newEntry = {
-      id: Date.now(),
       datetime: form.datetime || new Date().toISOString().slice(0, 16),
-      item: form.item,
+      item: selectedItem.name,
       qty: Number(form.qty),
       reason: form.reason,
+      idempotency_key: window.crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`,
+      ingredient_id: selectedItem.id,
+      ingredient_batch_id: selectedItem.batchId,
+      item_type: "Raw Material",
     };
-    setEntries((prev) => [newEntry, ...prev]);
-
-    // Best-effort sync to backend; safe to ignore failures for now
-    fetch(`${STAFF_BASE}/api_waste_log.php`, {
+    try {
+      const response = await laravelStaffFetch(`${LARAVEL_BASE}/api/staff/inventory/waste`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(newEntry),
-    }).catch(() => {});
+      });
+      const data = await response.json();
+      if (!response.ok || !data?.success) throw new Error(data?.message || "Waste log failed.");
+      setEntries((prev) => [data.entry, ...prev]);
+      setShowModal(false);
+    } catch (error) {
+      window.alert(error.message || "Waste log failed.");
+      return;
+    }
 
-    setShowModal(false);
   };
 
   return (
@@ -505,13 +519,13 @@ export default function WasteTracking({ showNavbar = true }) {
                 >
                   <option value="" disabled>{catalogue.length ? "Select an item" : "Loading items..."}</option>
                   {catalogue.map((c) => (
-                    <option key={c.name} value={c.name}>{c.name}</option>
+                    <option key={c.key} value={c.key}>{c.name} · {c.batchNumber}</option>
                   ))}
                 </select>
               </div>
               <div>
                 <label className="block text-[12px] font-semibold mb-1.5" style={{ color: C.sub }}>
-                  Quantity {form.item ? `(${catalogue.find((c) => c.name === form.item)?.unit || ""})` : ""}
+                  Quantity {form.item ? `(${catalogue.find((c) => c.key === form.item)?.unit || ""})` : ""}
                 </label>
                 <input
                   type="number"

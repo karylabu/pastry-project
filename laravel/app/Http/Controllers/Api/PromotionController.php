@@ -11,6 +11,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Str;
 
 class PromotionController extends Controller
 {
@@ -75,6 +76,7 @@ class PromotionController extends Controller
             'message' => ['required', 'string'],
             'coupon_code' => ['nullable', 'string', 'max:50'],
             'image_url' => ['nullable', 'string', 'max:255'],
+            'image' => ['nullable', 'file', 'image', 'mimes:jpg,jpeg,png,gif,webp', 'max:5120'],
             'starts_at' => ['required', 'date'],
             'ends_at' => ['required', 'date', 'after_or_equal:starts_at'],
         ]);
@@ -88,12 +90,26 @@ class PromotionController extends Controller
         }
 
         $validated = $validator->validated();
+        $imageUrl = $validated['image_url'] ?? null;
+
+        if ($request->hasFile('image')) {
+            $image = $request->file('image');
+            $directory = public_path('uploads/promotions');
+
+            if (! is_dir($directory)) {
+                mkdir($directory, 0775, true);
+            }
+
+            $filename = Str::uuid() . '.' . $image->extension();
+            $image->move($directory, $filename);
+            $imageUrl = url('uploads/promotions/' . $filename);
+        }
 
         $promotion = Promotion::create([
             'title' => $validated['title'],
             'description' => $validated['message'],
             'coupon_code' => $validated['coupon_code'] ?? null,
-            'image_url' => $validated['image_url'] ?? null,
+            'image_url' => $imageUrl,
             'starts_at' => $validated['starts_at'],
             'ends_at' => $validated['ends_at'],
             'status' => 'draft',

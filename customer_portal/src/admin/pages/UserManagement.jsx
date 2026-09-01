@@ -91,6 +91,8 @@ export default function UserManagement() {
   useEffect(() => {
     if (error) {
       setNotice({ type: "error", message: error });
+    } else {
+      setNotice((current) => (current.type === "error" ? { type: "", message: "" } : current));
     }
   }, [error]);
 
@@ -115,6 +117,8 @@ export default function UserManagement() {
       nextErrors.email = "Email is required.";
     } else if (!/^\S+@\S+\.\S+$/.test(trimmedEmail)) {
       nextErrors.email = "Please enter a valid email address.";
+    } else if (users.some((user) => user.id !== selectedUser?.id && String(user.email || "").trim().toLowerCase() === trimmedEmail.toLowerCase())) {
+      nextErrors.email = "This email is already registered.";
     }
 
     if (trimmedPhone && !/^[0-9+()\-\s]{7,20}$/.test(trimmedPhone)) {
@@ -187,11 +191,11 @@ export default function UserManagement() {
     setFormErrors({});
 
     try {
-      const url = `${ROOT_BASE}/laravel/public/api_users.php`;
-      const method = "POST";
-      const bodyPayload = selectedUser
-        ? { action: "update", user_id: selectedUser.id, ...payload }
-        : { action: "create", ...payload };
+      const url = selectedUser
+        ? `${ROOT_BASE}/laravel/public/api/users/${selectedUser.id}`
+        : `${ROOT_BASE}/laravel/public/api/users`;
+      const method = selectedUser ? "PUT" : "POST";
+      const bodyPayload = payload;
 
       const response = await fetch(url, {
         method,

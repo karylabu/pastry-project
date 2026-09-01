@@ -28,6 +28,7 @@ try {
         throw new Exception('Database connection failed: ' . mysqli_connect_error());
     }
 
+<<<<<<< HEAD
     // --- AUTO MIGRATION: Ensure all required columns exist ---
     $required_columns = [
         'user_id' => "INT DEFAULT NULL",
@@ -63,6 +64,8 @@ try {
     }
     // ---------------------------------------------------------
 
+=======
+>>>>>>> origin/main
     // Sanitize and extract
     $user_id = intval($data['user_id'] ?? 0);
     $customer = mysqli_real_escape_string($conn, $data['customer'] ?? '');
@@ -129,9 +132,10 @@ try {
     if ($table_check && mysqli_num_rows($table_check) > 0) {
         foreach ($items_data as $item) {
             $p_name = mysqli_real_escape_string($conn, $item['name'] ?? '');
+            $p_id = intval($item['id'] ?? $item['product_id'] ?? 0);
             $p_qty = intval($item['qty'] ?? 1);
             $p_price = floatval($item['price'] ?? 0);
-            mysqli_query($conn, "INSERT INTO order_items (order_id, product, qty, price) VALUES ($order_id, '$p_name', $p_qty, $p_price)");
+            mysqli_query($conn, "INSERT INTO order_items (order_id, product_id, product, qty, price) VALUES ($order_id, " . ($p_id > 0 ? $p_id : 'NULL') . ", '$p_name', $p_qty, $p_price)");
         }
     }
 

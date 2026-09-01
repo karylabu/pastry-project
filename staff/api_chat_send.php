@@ -9,6 +9,8 @@ header('Access-Control-Allow-Methods: POST, OPTIONS');
 header('Access-Control-Allow-Headers: Content-Type');
 
 require_once __DIR__ . '/../includes/db.php';
+require_once __DIR__ . '/../includes/api_auth.php';
+requireInventoryWrite();
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     http_response_code(200);
@@ -71,13 +73,11 @@ if ($sender === 'staff' || $sender === 'customer') {
     $sender = 'admin';
 }
 
-$columnCheck = $conn->query("SHOW COLUMNS FROM messages LIKE 'sender'");
-if ($columnCheck && $columnCheck->num_rows > 0) {
-    $column = $columnCheck->fetch_assoc();
-    if ($column && strpos($column['Type'], 'admin') === false) {
-        $conn->query("ALTER TABLE messages MODIFY sender ENUM('customer','staff','ai','admin') NOT NULL");
-    }
-}
+/*
+| SCHEMA NOTE: The messages.sender ENUM is maintained through versioned
+| migrations in database/migrations/. This API must never run ALTER TABLE
+| statements at request time.
+*/
 
 $stmt = $conn->prepare('INSERT INTO messages (order_id, sender, message, image_path, is_read, created_at) VALUES (?, ?, ?, ?, 1, NOW())');
 $stmt->bind_param('isss', $orderId, $sender, $message, $imagePath);
@@ -88,3 +88,4 @@ $conn->close();
 
 echo json_encode(['success' => true, 'message' => 'Saved']);
 exit();
+?>

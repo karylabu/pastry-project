@@ -1,5 +1,5 @@
 import React from "react";
-import { Routes, Route } from "react-router-dom";
+import { Navigate, Routes, Route } from "react-router-dom";
 
 /* STAFF PAGES */
 import DashboardStaff from "../pages/DashboardStaff";
@@ -7,7 +7,6 @@ import Orders from "../pages/Orders";
 import CustomCakes from "../pages/CustomCakes";
 import Products from "../pages/Products";
 import Ingredients from "../pages/Ingredients";
-import FinishedPastries from "../pages/FinishedPastries";
 import LowStockAlerts from "../pages/LowStockAlerts";
 import WasteTracking from "../pages/WasteTracking";
 import OrderHistory from "../pages/OrderHistory";
@@ -23,7 +22,7 @@ export default function StaffApp() {
       <Route path="custom-cakes" element={<CustomCakes />} />
       <Route path="products"  element={<Products />} />
       <Route path="ingredients" element={<Ingredients />} />
-      <Route path="finished-pastries" element={<FinishedPastries />} />
+      <Route path="finished-pastries" element={<Navigate to="/staff/products" replace />} />
       <Route path="low-stock" element={<LowStockAlerts />} />
       <Route path="waste-tracking" element={<WasteTracking />} />
       <Route path="reports"   element={<Reports />} />

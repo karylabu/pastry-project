@@ -6,6 +6,8 @@ import { jsPDF } from "jspdf";
 import StaffNavbar from "../components/StaffNavbar";
 import { STAFF_BASE } from "../../services/config";
 
+const staffFetch = (url, options = {}) => fetch(url, { credentials: "include", ...options });
+
 const POLL_INTERVAL = 15000;
 
 function Toast({ toasts }) {
@@ -143,7 +145,7 @@ export default function CustomCakes({ showNavbar = true }) {
   const fetchOrders = (silent = false) => {
     if (!silent) setLoading(true);
 
-    fetch(`${STAFF_BASE}/api_orders.php?custom=1`)
+    staffFetch(`${STAFF_BASE}/api_orders.php?custom=1`)
       .then(res => res.json())
       .then(data => {
         setOrders(normalizeOrders(data));
@@ -242,7 +244,7 @@ export default function CustomCakes({ showNavbar = true }) {
 
   const updateStatus = (id, status) => {
     setUpdatingId(id);
-    fetch(`${STAFF_BASE}/api_update_order_status.php`, {
+    staffFetch(`${STAFF_BASE}/api_update_order_status.php`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id, status }),

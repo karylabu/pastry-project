@@ -54,67 +54,22 @@ try {
     $email     = mysqli_real_escape_string($conn, $data['email'] ?? '');
     $user_id   = intval($data['user_id'] ?? 0); // Capture user_id from frontend
 
-    $hasCustomer = false;
-    $hasEmail = false;
-    $hasUserId = false;
-    $columnsRes = mysqli_query($conn, "SHOW COLUMNS FROM orders");
-    if ($columnsRes) {
-        while ($col = mysqli_fetch_assoc($columnsRes)) {
-            if ($col['Field'] === 'customer') {
-                $hasCustomer = true;
-            }
-            if ($col['Field'] === 'email') {
-                $hasEmail = true;
-            }
-            if ($col['Field'] === 'user_id') {
-                $hasUserId = true;
-            }
-        }
-    }
-
-    // Add missing customer/email/user_id fields if the table is still using the older schema.
-    $alterStatements = [];
-    if (!$hasCustomer) {
-        $alterStatements[] = "ADD COLUMN customer VARCHAR(150) NOT NULL DEFAULT ''";
-    }
-    if (!$hasEmail) {
-        $alterStatements[] = "ADD COLUMN email VARCHAR(150) NOT NULL DEFAULT ''";
-    }
-    if (!$hasUserId) {
-        $alterStatements[] = "ADD COLUMN user_id INT DEFAULT NULL AFTER email";
-    }
-    if (count($alterStatements) > 0) {
-        mysqli_query($conn, "ALTER TABLE orders " . implode(', ', $alterStatements));
-        $hasCustomer = true;
-        $hasEmail = true;
-        $hasUserId = true;
-    }
-
-    // Build insert fields dynamically so this API still works if the orders table lacks customer/email/user_id columns.
+    /*
+    | SCHEMA NOTE: The orders table schema is maintained exclusively through
+    | versioned migrations in database/migrations/. This API must never run
+    | ALTER TABLE / CREATE TABLE statements at request time.
+    */
     $fields = ['items', 'subtotal', 'delivery_fee', 'total', 'method', 'payment', 'address', 'phone', 'lat', 'lng'];
     $values = ["'$items'", "'$subtotal'", "'$delivery'", "'$total'", "'$method'", "'$payment'", "'$address'", "'$phone'", "'$latitude'", "'$longitude'"];
 
-    if ($hasCustomer) {
-        $fields[] = 'customer';
-        $values[] = "'$customer'";
-    }
+    $fields[] = 'customer';
+    $values[] = "'$customer'";
 
-    if ($hasEmail) {
-        $fields[] = 'email';
-        $values[] = "'$email'";
-    }
+    $fields[] = 'email';
+    $values[] = "'$email'";
 
-    // Check if user_id column exists and add if provided
-    $hasUserId = false;
-    $userIdCheckRes = mysqli_query($conn, "SHOW COLUMNS FROM orders LIKE 'user_id'");
-    if ($userIdCheckRes && mysqli_num_rows($userIdCheckRes) > 0) {
-        $hasUserId = true;
-    }
-    
-    if ($hasUserId) {
-        $fields[] = 'user_id';
-        $values[] = ($user_id > 0 ? $user_id : 'NULL');
-    }
+    $fields[] = 'user_id';
+    $values[] = ($user_id > 0 ? $user_id : 'NULL');
 
     $sql = sprintf(
         "INSERT INTO orders (%s) VALUES (%s)",

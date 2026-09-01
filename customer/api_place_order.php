@@ -3,6 +3,7 @@ header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: POST, OPTIONS');
 header('Access-Control-Allow-Headers: Content-Type');
 header('Content-Type: application/json');
+require_once __DIR__ . '/../includes/inventory.php';
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     http_response_code(204);
@@ -39,6 +40,7 @@ try {
         throw new Exception('Database connection failed: ' . mysqli_connect_error());
     }
 
+<<<<<<< HEAD
     // --- AUTO MIGRATION: Ensure all required columns exist ---
     $required_columns = [
         'user_id' => "INT DEFAULT NULL",
@@ -74,6 +76,8 @@ try {
     }
     // ---------------------------------------------------------
 
+=======
+>>>>>>> origin/main
     // Sanitize and extract
     $user_id = intval($data['user_id'] ?? 0);
     $customer = mysqli_real_escape_string($conn, $data['customer'] ?? '');
@@ -114,6 +118,12 @@ try {
     $status = 'Pending';
     $order_date = date('Y-m-d');
 
+    /*
+    | SCHEMA NOTE: All table schemas are maintained exclusively through
+    | versioned migrations in database/migrations/. This API must never run
+    | CREATE TABLE / ALTER TABLE statements at request time.
+    */
+
     $sql = "INSERT INTO orders (
                 user_id, customer, email, items, subtotal, delivery_fee,
                 total, method, payment, address, phone, lat, lng, voucher_code, voucher_amount,
@@ -136,18 +146,6 @@ try {
     }
 
     // --- Create Notification for the user ---
-    // Ensure table exists first
-    mysqli_query($conn, "CREATE TABLE IF NOT EXISTS notifications (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        user_id INT NOT NULL,
-        title VARCHAR(255) NOT NULL,
-        message TEXT NOT NULL,
-        type VARCHAR(50) DEFAULT 'order',
-        is_read TINYINT(1) DEFAULT 0,
-        action_url VARCHAR(255) DEFAULT '',
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    )");
-
     if ($user_id > 0) {
         $notif_title = "Order Placed";
         $notif_msg = "Your order #$order_id has been successfully placed. We'll notify you once it's confirmed!";
@@ -164,9 +162,10 @@ try {
     if ($table_check && mysqli_num_rows($table_check) > 0) {
         foreach ($items_data as $item) {
             $p_name = mysqli_real_escape_string($conn, $item['name'] ?? '');
+            $p_id = intval($item['id'] ?? $item['product_id'] ?? 0);
             $p_qty = intval($item['qty'] ?? 1);
             $p_price = floatval($item['price'] ?? 0);
-            mysqli_query($conn, "INSERT INTO order_items (order_id, product, qty, price) VALUES ($order_id, '$p_name', $p_qty, $p_price)");
+            mysqli_query($conn, "INSERT INTO order_items (order_id, product_id, product, qty, price) VALUES ($order_id, " . ($p_id > 0 ? $p_id : 'NULL') . ", '$p_name', $p_qty, $p_price)");
         }
     }
 

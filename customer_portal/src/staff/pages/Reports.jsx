@@ -7,42 +7,34 @@ import {
 } from 'lucide-react';
 import StaffNavbar from '../components/StaffNavbar';
 import { BASE, STAFF_BASE, LARAVEL_BASE } from '../../services/config';
-import { parseCsvSalesFile, downloadCsvTemplate, formatCurrency } from '../utils/salesImport';
 
-const CUSTOMER_BASE = BASE;
+const staffFetch = (url, options = {}) => {
+  let token = '';
+  try {
+    token = JSON.parse(localStorage.getItem('user') || '{}')?.token || '';
+  } catch {
+    token = '';
+  }
 
-/* ─────────────────────────────────────────
-   NOTE ON DATA SOURCES
-   ─────────────────────────────────────────
-   Real, computed from live API data (orders + products + ingredients):
-     - Total Revenue, AOV, Peak Traffic Heatmap, Order Cancellation Rate,
-       Best/Worst selling pastries.
-     - Ingredient Alerts, and the Ingredient Consumption & Procurement
-       Matrix's stock / threshold / expiry / priority-status columns now
-       come straight from `api_ingredients.php`.
+  const headers = new Headers(options.headers || {});
+  if (token) headers.set('Authorization', `Bearer ${token}`);
 
-   Still illustrative (no backend source exists yet):
-     - Weekly Consumption Rate and Waste Quantity / Financial Loss per
-       ingredient — `ingredients` table has no usage or spoilage log, so
-       there's nothing real to show for those two columns yet. They're
-       rendered as "Not tracked" rather than invented per-row.
-     - Total Waste Cost KPI card — kept as a labeled sample estimate
-       (MOCK_WASTE_SAMPLE below) until a waste/spoilage log exists.
-     - Standard vs. Rush order ratio — orders don't carry an `order_type`
-       field yet; the doughnut falls back to counting everything as
-       Standard, with a note in the UI.
+  return fetch(url, { ...options, credentials: 'include', headers });
+};
 
-   Missing Core Analytics Hooks:
-     - Low-Stock Frequency & Alerts UI Integration: While you have a
-       dedicated "Low Stock Alerts" page in the sidebar, it would elevate
-       your dashboard UI if items currently below their threshold (like
-       Blueberries, which has a stock of `1` but a threshold of `0`—or if
-       an item hits its threshold) were visually highlighted with a soft
-       amber/red row background or an alert badge.
-     - Ingredient Consumption Insights: There is no quick indicator of the
-       *Ingredient Consumption Rate* (e.g., how fast you are burning through
-       that 25kg of All-purpose Flour per week).
-───────────────────────────────────────── */
+const laravelStaffFetch = (url, options = {}) => {
+  let token = '';
+  try {
+    token = JSON.parse(localStorage.getItem('user') || '{}')?.token || '';
+  } catch {
+    token = '';
+  }
+
+  const headers = new Headers(options.headers || {});
+  if (token) headers.set('Authorization', `Bearer ${token}`);
+
+  return fetch(url, { ...options, credentials: 'include', headers });
+};
 
 const C = {
   emerald: '#10b981', emeraldSoft: '#e6f7f0',
@@ -62,14 +54,6 @@ function peso(n) { return `₱${Number(n || 0).toLocaleString(undefined, { maxim
 /* Used only for the "Total Waste Cost" KPI card estimate — there's no
    real spoilage log yet, so this is a rough sample, not tied to the
    actual ingredients table. */
-const MOCK_WASTE_SAMPLE = [
-  { name: 'All-Purpose Flour', wasteQty: 2.5, unitCost: 70 },
-  { name: 'Unsalted Butter',   wasteQty: 1.2, unitCost: 380 },
-  { name: 'Fresh Eggs',        wasteQty: 1.8, unitCost: 210 },
-  { name: 'Whole Milk',        wasteQty: 3.4, unitCost: 90 },
-  { name: 'Heavy Cream',       wasteQty: 2.1, unitCost: 210 },
-];
-
 function daysUntil(dateStr) {
   if (!dateStr) return null;
   const diff = new Date(dateStr) - new Date();
@@ -280,17 +264,18 @@ export default function Reports({ showNavbar = true }) {
   const [leaderTab,     setLeaderTab]     = useState('top');
   const [expandedRow,   setExpandedRow]   = useState(null);
   const [checked,       setChecked]       = useState({});
-  const [importing,     setImporting]     = useState(false);
-  const [importSummary, setImportSummary] = useState(null);
-  const [importError,   setImportError]   = useState('');
-  const [importWarnings, setImportWarnings]= useState([]);
-  const [importedTransactions, setImportedTransactions] = useState([]);
+  const [analytics, setAnalytics] = useState(null);
+  const [analyticsError, setAnalyticsError] = useState('');
+  const [analyticsProductId, setAnalyticsProductId] = useState('');
+  const [analyticsCategory, setAnalyticsCategory] = useState('');
+  const [analyticsIngredientId, setAnalyticsIngredientId] = useState('');
+  const [analyticsMovementType, setAnalyticsMovementType] = useState('');
 
   useEffect(() => {
     Promise.all([
-      fetch(`${STAFF_BASE}/api_orders.php`).then(r => r.json()).catch(() => []),
-      fetch(`${CUSTOMER_BASE}/api_products.php?action=list`).then(r => r.json()).catch(() => []),
-      fetch(`${STAFF_BASE}/api_ingredients.php`).then(r => r.json()).catch(() => ({ ingredients: [] })),
+      staffFetch(`${STAFF_BASE}/api_orders.php`).then(r => r.json()).catch(() => []),
+      laravelStaffFetch(`${LARAVEL_BASE}/api/staff/products?action=list`).then(r => r.json()).catch(() => []),
+      laravelStaffFetch(`${LARAVEL_BASE}/api/staff/inventory/ingredients`).then(r => r.json()).catch(() => ({ ingredients: [] })),
     ]).then(([ord, prod, ingRes]) => {
       const parsed = Array.isArray(ord)
         ? ord.map(o => ({
@@ -305,9 +290,47 @@ export default function Reports({ showNavbar = true }) {
     });
   }, []);
 
+  useEffect(() => {
+    const params = new URLSearchParams();
+    if (dateFilterStart && dateFilterEnd) {
+      params.set('start_date', dateFilterStart);
+      params.set('end_date', dateFilterEnd);
+    } else {
+      const start = new Date();
+      if (range === 'today') {
+        // keep today's date
+      } else if (range === 'week') {
+        start.setDate(start.getDate() - ((start.getDay() + 6) % 7));
+      } else if (range === 'month') {
+        start.setDate(1);
+      } else if (range !== 'all') {
+        start.setDate(start.getDate() - Math.max(1, Number(range)) + 1);
+      } else {
+        start.setDate(start.getDate() - 3650);
+      }
+      params.set('start_date', start.toISOString().slice(0, 10));
+      params.set('end_date', new Date().toISOString().slice(0, 10));
+    }
+    if (analyticsProductId) params.set('product_id', analyticsProductId);
+    if (analyticsCategory) params.set('category', analyticsCategory);
+    if (analyticsIngredientId) params.set('ingredient_id', analyticsIngredientId);
+    if (analyticsMovementType) params.set('movement_type', analyticsMovementType);
+    setAnalyticsError('');
+    staffFetch(`${STAFF_BASE}/api_business_analytics.php?${params.toString()}`)
+      .then(async (res) => {
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data.success) throw new Error(data.message || 'Unable to load business analytics.');
+        setAnalytics(data);
+      })
+      .catch((error) => {
+        setAnalytics(null);
+        setAnalyticsError(error.message || 'Unable to load business analytics.');
+      });
+  }, [range, dateFilterStart, dateFilterEnd, analyticsProductId, analyticsCategory, analyticsIngredientId, analyticsMovementType]);
+
   const normalizeStatus = status => String(status || '').trim().toLowerCase();
 
-  const combinedOrders = useMemo(() => [...orders, ...importedTransactions], [orders, importedTransactions]);
+  const combinedOrders = orders;
 
   const visibleOrders = useMemo(() => {
     if (dateFilterStart && dateFilterEnd) {
@@ -319,7 +342,10 @@ export default function Reports({ showNavbar = true }) {
     }
     if (range === 'all') return combinedOrders;
     const cutoff = new Date();
-    cutoff.setDate(cutoff.getDate() - Number(range));
+    if (range === 'today') cutoff.setHours(0, 0, 0, 0);
+    else if (range === 'week') cutoff.setDate(cutoff.getDate() - ((cutoff.getDay() + 6) % 7));
+    else if (range === 'month') cutoff.setDate(1);
+    else cutoff.setDate(cutoff.getDate() - Number(range));
     return combinedOrders.filter(o => o.created_at && new Date(o.created_at) >= cutoff);
   }, [combinedOrders, range, dateFilterStart, dateFilterEnd]);
 
@@ -360,12 +386,6 @@ export default function Reports({ showNavbar = true }) {
   const lowStockCount = useMemo(
     () => ingredients.filter(i => i.status === 'Critical Reorder').length,
     [ingredients]
-  );
-
-  /* ── BA-03: Waste cost (sample estimate — see note at top of file) ── */
-  const totalWasteCost = useMemo(
-    () => MOCK_WASTE_SAMPLE.reduce((s, i) => s + i.wasteQty * i.unitCost, 0),
-    []
   );
 
   /* ── BA-04: Peak traffic heatmap (day x hour) ── */
@@ -419,8 +439,12 @@ export default function Reports({ showNavbar = true }) {
     }));
   }, [products, salesTally]);
 
-  const topSellers = useMemo(() => [...allProductSales].sort((a, b) => b.qty - a.qty).slice(0, 5), [allProductSales]);
-  const bottomSellers = useMemo(() => [...allProductSales].sort((a, b) => a.qty - b.qty).slice(0, 5), [allProductSales]);
+  const topSellers = useMemo(() => analytics
+    ? (analytics.sales?.best_selling_products || []).map((item) => ({ name: item.product, qty: Number(item.sold), revenue: Number(item.revenue) })).slice(0, 5)
+    : [], [analytics]);
+  const bottomSellers = useMemo(() => analytics
+    ? [...(analytics.product_performance || [])].sort((a, b) => Number(a.sold) - Number(b.sold)).slice(0, 5).map((item) => ({ name: item.product, qty: Number(item.sold), revenue: 0 }))
+    : [], [analytics]);
   const leaderList = leaderTab === 'top' ? topSellers : bottomSellers;
   const leaderMax = Math.max(...topSellers.map(p => p.qty), 1);
 
@@ -444,94 +468,6 @@ export default function Reports({ showNavbar = true }) {
     });
     return buckets;
   }, [visibleOrders, interval]);
-
-  const handleImportFile = async (event) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    event.target.value = '';
-
-    setImportError('');
-    setImportWarnings([]);
-    setImportSummary(null);
-    setImporting(true);
-
-    try {
-      const fileName = file.name.toLowerCase();
-
-      if (fileName.endsWith('.csv')) {
-        const parsed = await parseCsvSalesFile(file);
-        if (parsed.items.length === 0) {
-          throw new Error(parsed.warnings[0] || 'No valid rows were found in that CSV file.');
-        }
-
-        const transaction = {
-          id: `import-${Date.now()}`,
-          created_at: new Date().toISOString(),
-          status: 'completed',
-          total: Number(parsed.totalRevenue || 0),
-          order_type: 'imported',
-          items: parsed.items.map(item => ({
-            name: item.name,
-            qty: item.quantity,
-            price: item.price || (item.totalAmount / item.quantity) || 0,
-          })),
-        };
-
-        setImportedTransactions(prev => [transaction, ...prev]);
-        setImportSummary({
-          source: 'CSV',
-          itemsSold: parsed.totalQuantity,
-          revenue: parsed.totalRevenue,
-          rows: parsed.items,
-        });
-        setImportWarnings(parsed.warnings || []);
-        return;
-      }
-
-      if (!fileName.endsWith('.pdf')) {
-        throw new Error('Please upload a CSV or PDF sales report.');
-      }
-
-      const formData = new FormData();
-      formData.append('file', file);
-
-      const response = await fetch(`${LARAVEL_BASE}/api/sales/import-pdf`, {
-        method: 'POST',
-        body: formData,
-      });
-
-      const payload = await response.json().catch(() => null);
-      if (!response.ok || !payload?.success) {
-        throw new Error(payload?.message || 'The PDF import failed.');
-      }
-
-      const transaction = {
-        id: `import-${Date.now()}`,
-        created_at: new Date().toISOString(),
-        status: 'completed',
-        total: Number(payload.revenue || 0),
-        order_type: 'imported',
-        items: (payload.rows || []).map(row => ({
-          name: row.name,
-          qty: row.quantity,
-          price: row.total && row.quantity ? Number(row.total / row.quantity) : 0,
-        })),
-      };
-
-      setImportedTransactions(prev => [transaction, ...prev]);
-      setImportSummary({
-        source: 'PDF',
-        itemsSold: Number(payload.items_sold || 0),
-        revenue: Number(payload.revenue || 0),
-        rows: payload.rows || [],
-      });
-      setImportWarnings(payload.warnings || []);
-    } catch (error) {
-      setImportError(error.message || 'Import failed.');
-    } finally {
-      setImporting(false);
-    }
-  };
 
   const exportReport = () => {
     const title = 'Pastry Project - Business Analytics Report';
@@ -695,56 +631,6 @@ export default function Reports({ showNavbar = true }) {
             </button>
           </div>
 
-          <div className="rounded-2xl bg-white border border-black/10 p-5 mb-8">
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-              <div>
-                <p className="text-[10px] uppercase tracking-[0.25em] text-black/50 font-semibold">Sales data import</p>
-                <h3 className="text-base font-bold mt-1" style={{ color: C.ink }}>Import CSV or PDF sales reports</h3>
-                <p className="text-sm mt-1 text-black/70">Upload a CSV from your POS or a text-based PDF receipt and the dashboard totals will update immediately.</p>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <label className="inline-flex cursor-pointer items-center gap-2 rounded-2xl bg-black px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#111827] transition">
-                  <input type="file" accept=".csv,.pdf" className="hidden" onChange={handleImportFile} />
-                  <UploadCloud size={16} />
-                  {importing ? 'Importing…' : 'Import sales file'}
-                </label>
-                <button
-                  type="button"
-                  onClick={downloadCsvTemplate}
-                  className="inline-flex items-center gap-2 rounded-2xl border border-black/10 bg-white px-4 py-2.5 text-sm font-semibold text-black transition hover:bg-gray-50"
-                >
-                  <FileSpreadsheet size={16} />
-                  CSV template
-                </button>
-              </div>
-            </div>
-
-            {importSummary && (
-              <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
-                <div className="flex items-center gap-2 font-semibold">
-                  <CheckCircle2 size={16} />
-                  {importSummary.source} import applied — {importSummary.itemsSold} items • {formatCurrency(importSummary.revenue)}
-                </div>
-              </div>
-            )}
-            {importError && (
-              <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 flex items-start gap-2">
-                <AlertCircle size={16} className="mt-0.5" />
-                <span>{importError}</span>
-              </div>
-            )}
-            {importWarnings.length > 0 && (
-              <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-                <p className="font-semibold">Import notes</p>
-                <ul className="mt-2 ml-5 list-disc space-y-1">
-                  {importWarnings.slice(0, 4).map((warning, index) => (
-                    <li key={`${warning}-${index}`}>{warning}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </div>
-
           {/* FILTER ROW — was lg:grid-cols-[1.2fr_0.8fr] wrapping a 2-card
               sm:grid-cols-3 inner grid, which left a dead empty column
               between "Date range" and "Quick timeframe". Now it's a single
@@ -791,7 +677,7 @@ export default function Reports({ showNavbar = true }) {
             <div className="rounded-2xl bg-white border border-black/10 p-4 flex flex-col gap-3">
               <p className="text-[10px] uppercase tracking-[0.25em] text-black/50 font-semibold">Quick timeframe</p>
               <div className="flex flex-wrap gap-2">
-                {[['7', '7d'], ['30', '30d'], ['all', 'All']].map(([val, label]) => (
+                {[['today', 'Today'], ['week', 'This Week'], ['month', 'This Month'], ['all', 'All']].map(([val, label]) => (
                   <button
                     key={val}
                     onClick={() => {
@@ -813,6 +699,25 @@ export default function Reports({ showNavbar = true }) {
             </div>
           </div>
 
+          <div className="mb-8 grid gap-3 rounded-2xl border border-black/10 bg-white p-4 sm:grid-cols-2 lg:grid-cols-4">
+            <select value={analyticsProductId} onChange={(e) => setAnalyticsProductId(e.target.value)} className="rounded-xl border border-black/10 px-3 py-2 text-sm">
+              <option value="">All products</option>
+              {products.map((product) => <option key={product.id} value={product.id}>{product.name}</option>)}
+            </select>
+            <select value={analyticsCategory} onChange={(e) => setAnalyticsCategory(e.target.value)} className="rounded-xl border border-black/10 px-3 py-2 text-sm">
+              <option value="">All categories</option>
+              {[...new Set(products.map((product) => product.category).filter(Boolean))].map((category) => <option key={category} value={category}>{category}</option>)}
+            </select>
+            <select value={analyticsIngredientId} onChange={(e) => setAnalyticsIngredientId(e.target.value)} className="rounded-xl border border-black/10 px-3 py-2 text-sm">
+              <option value="">All ingredients</option>
+              {ingredientsRaw.map((ingredient) => <option key={ingredient.id} value={ingredient.id}>{ingredient.name}</option>)}
+            </select>
+            <select value={analyticsMovementType} onChange={(e) => setAnalyticsMovementType(e.target.value)} className="rounded-xl border border-black/10 px-3 py-2 text-sm">
+              <option value="">All movement types</option>
+              {['Production', 'Order', 'Cancellation', 'Waste', 'Return', 'Stock Adjustment', 'Inventory Correction'].map((type) => <option key={type} value={type}>{type}</option>)}
+            </select>
+          </div>
+
           {loading ? (
             <div className="flex items-center justify-center h-64" style={{ color: C.sub }}>
               <div className="text-center">
@@ -826,25 +731,50 @@ export default function Reports({ showNavbar = true }) {
               <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5 mb-8">
                 <StatCard
                   title="Total Revenue" icon={DollarSign} color={C.emerald} soft={C.emeraldSoft}
-                  value={peso(totalRevenue)}
-                  sub={range === 'all' ? 'All time' : `vs previous ${range}d`}
-                  trend={range === 'all' ? undefined : revenueTrend}
+                  value={analytics ? peso(analytics.summary.revenue) : '—'}
+                  sub={analytics ? `${analytics.filters.start_date} to ${analytics.filters.end_date}` : 'Analytics unavailable'}
                 />
                 <StatCard
                   title="Orders Processed" icon={Package} color={C.sky} soft={C.skySoft}
-                  value={fmt(totalOrdersProcessed)}
-                  sub="completed transactions"
+                  value={analytics ? fmt(analytics.summary.orders) : '—'}
+                  sub={analytics ? 'completed transactions' : 'Analytics unavailable'}
                 />
                 <StatCard
                   title="Avg. Order Value" icon={Wallet} color={C.violet} soft={C.violetSoft}
-                  value={peso(avgOrderValue)}
-                  sub="Total revenue ÷ orders"
+                  value={analytics?.summary?.average_order_value == null ? '—' : peso(analytics.summary.average_order_value)}
+                  sub={analytics ? 'Total revenue ÷ completed orders' : 'Analytics unavailable'}
                 />
                 <StatCard
                   title="Order Fulfillment" icon={AlertTriangle} color={C.amber} soft={C.amberSoft}
                   value={`${fmt(totalOrdersProcessed)} / ${fmt(cancelledOrds.length)}`}
                   sub={orderFulfillmentText}
                 />
+              </div>
+
+              {analyticsError && <div className="mb-6 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">Unable to load analytics: {analyticsError}</div>}
+
+              <div className="mb-8 grid gap-6 xl:grid-cols-2">
+                <div className="rounded-2xl border bg-white p-6" style={{ borderColor: C.border }}>
+                  <h3 className="mb-4 text-base font-bold" style={{ color: C.ink }}>Revenue by Day</h3>
+                  {!analytics?.has_data?.sales ? <p className="text-sm text-gray-400">No sales recorded for this period.</p> : <div className="space-y-2">{analytics.sales.daily.map((row) => <div key={row.date} className="flex justify-between border-b border-black/5 py-2 text-sm"><span>{row.date}</span><strong>{peso(row.revenue)} · {row.orders} orders</strong></div>)}</div>}
+                </div>
+                <div className="rounded-2xl border bg-white p-6" style={{ borderColor: C.border }}>
+                  <h3 className="mb-4 text-base font-bold" style={{ color: C.ink }}>Production by Product</h3>
+                  {!analytics?.has_data?.production ? <p className="text-sm text-gray-400">No production records found.</p> : <div className="space-y-2">{analytics.production.by_product.slice(0, 8).map((row) => <div key={row.product_id} className="flex justify-between border-b border-black/5 py-2 text-sm"><span>{row.product}</span><strong>{fmt(row.quantity)}</strong></div>)}</div>}
+                </div>
+                <div className="rounded-2xl border bg-white p-6" style={{ borderColor: C.border }}>
+                  <h3 className="mb-4 text-base font-bold" style={{ color: C.ink }}>Ingredient Consumption</h3>
+                  {!analytics?.has_data?.ingredient_consumption ? <p className="text-sm text-gray-400">No ingredient consumption recorded for this period.</p> : <div className="space-y-2">{analytics.ingredient_consumption.slice(0, 8).map((row) => <div key={row.ingredient_id} className="flex justify-between border-b border-black/5 py-2 text-sm"><span>{row.ingredient}</span><strong>{Number(row.quantity_consumed).toLocaleString()} {row.unit}</strong></div>)}</div>}
+                </div>
+                <div className="rounded-2xl border bg-white p-6" style={{ borderColor: C.border }}>
+                  <h3 className="mb-4 text-base font-bold" style={{ color: C.ink }}>Waste Analytics</h3>
+                  {!analytics?.has_data?.waste ? <p className="text-sm text-gray-400">No waste recorded for this period.</p> : <><div className="mb-3 grid grid-cols-3 gap-2 text-sm"><span>Qty <strong>{fmt(analytics.summary.waste_quantity)}</strong></span><span>Cost <strong>{peso(analytics.summary.waste_cost)}</strong></span><span>Rate <strong>{analytics.summary.waste_rate == null ? "Not available" : `${analytics.summary.waste_rate.toFixed(2)}%`}</strong></span></div><div className="space-y-2">{analytics.waste.by_reason.map((row) => <div key={row.reason} className="flex justify-between border-b border-black/5 py-2 text-sm"><span>{row.reason}</span><strong>{peso(row.cost)}</strong></div>)}</div></>}
+                </div>
+              </div>
+
+              <div className="mb-8 overflow-x-auto rounded-2xl border bg-white" style={{ borderColor: C.border }}>
+                <div className="border-b p-6"><h3 className="text-base font-bold" style={{ color: C.ink }}>Product Performance</h3><p className="mt-1 text-xs text-gray-400">Sales, production, waste, and current stock from transaction records.</p></div>
+                <table className="w-full min-w-[680px] text-left text-sm"><thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-500"><tr><th className="px-6 py-3">Product</th><th className="px-4 py-3">Sold</th><th className="px-4 py-3">Produced</th><th className="px-4 py-3">Waste</th><th className="px-4 py-3">Current Stock</th></tr></thead><tbody>{analytics?.product_performance?.length ? analytics.product_performance.map((row) => <tr key={row.product_id} className="border-t border-black/5"><td className="px-6 py-3 font-semibold">{row.product}</td><td className="px-4 py-3">{fmt(row.sold)}</td><td className="px-4 py-3">{fmt(row.produced)}</td><td className="px-4 py-3">{fmt(row.waste)}</td><td className="px-4 py-3">{fmt(row.current_stock)}</td></tr>) : <tr><td colSpan={5} className="px-6 py-8 text-center text-gray-400">No product performance data for this period.</td></tr>}</tbody></table>
               </div>
 
               {/* ── WIDGET A: HEATMAP + ORDER TYPE ── */}

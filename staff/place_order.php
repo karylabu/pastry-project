@@ -1,5 +1,5 @@
 <?php
-session_start();
+require_once __DIR__ . '/../includes/staff_page_auth.php';
 require 'includes/data.php';
 $db = &getDB();
 $role = $_SESSION['user']['role'] ?? 'customer';
