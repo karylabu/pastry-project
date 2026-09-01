@@ -319,11 +319,11 @@ export default function UserManagement() {
   };
 
   return (
-    <div className="min-h-screen bg-[#f7f2e8]">
+    <div className="min-h-screen bg-white">
       <div className="pt-[72px] lg:pl-[260px]">
         <div className="mx-auto max-w-[1400px] px-6 py-6 md:px-10">
-          <section className="mb-6 rounded-[24px] border border-black/10 bg-white p-5 shadow-[0_18px_60px_rgba(0,0,0,0.06)] sm:p-6">
-            <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
+          <section className="mb-5 rounded-[20px] border border-black/10 bg-white p-5 shadow-sm sm:p-6">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
               <div className="max-w-2xl">
                 <p className="text-[9px] font-bold uppercase tracking-[0.32em] text-[#D4AF37]">Admin Workspace</p>
                 <h1 className="mt-2 text-[22px] font-semibold tracking-tight text-black sm:text-[24px]">User Management</h1>
@@ -345,16 +345,16 @@ export default function UserManagement() {
               </button>
             </div>
 
-            <div className="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <div className="mt-6 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
               {metrics.map((item) => (
                 <MetricCard key={item.label} label={item.label} value={item.value} tone={item.tone} />
               ))}
             </div>
           </section>
 
-          <section className="mb-6 rounded-[20px] border border-black/10 bg-white/85 p-3.5 shadow-[0_10px_30px_rgba(0,0,0,0.04)] backdrop-blur">
+          <section className="mb-5 rounded-[18px] border border-black/10 bg-white p-3 shadow-sm">
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-              <div className="flex flex-1 items-center gap-2 rounded-full border border-black/10 bg-[#fcfbf7] px-3 py-2.5">
+              <div className="flex flex-1 items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-2.5 focus-within:border-slate-400 focus-within:ring-2 focus-within:ring-slate-100">
                 <Search size={16} className="text-black/45" />
                 <input
                   value={search}
@@ -363,7 +363,7 @@ export default function UserManagement() {
                   className="w-full bg-transparent text-[13px] text-black outline-none placeholder:text-black/40"
                 />
               </div>
-              <div className="flex flex-col gap-3 sm:flex-row">
+              <div className="flex flex-col gap-2 sm:flex-row">
                 <select
                   value={roleFilter}
                   onChange={(event) => setRoleFilter(event.target.value)}
@@ -375,17 +375,6 @@ export default function UserManagement() {
                   <option value="staff">Staff</option>
                   <option value="customer">Customer</option>
                 </select>
-                <button
-                  type="button"
-                  onClick={() => {
-                    resetForm();
-                    setSelectedUser(null);
-                    setIsModalOpen(true);
-                  }}
-                  className="rounded-full bg-black px-3.5 py-2 text-[12px] font-semibold text-white transition hover:bg-black/90"
-                >
-                  + Add New User
-                </button>
               </div>
             </div>
           </section>
@@ -402,12 +391,12 @@ export default function UserManagement() {
               </div>
             ) : null}
 
-            <div className="flex flex-col gap-3 border-b border-black/10 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-col gap-3 border-b border-black/10 px-5 py-3.5 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <h2 className="text-[15px] font-semibold text-black">Account Directory</h2>
                 <p className="text-[12px] text-black/60">{users.length} records found</p>
               </div>
-              <div className="inline-flex items-center gap-2 rounded-full bg-[#f8f0da] px-3 py-1.5 text-[12px] text-[#8a6b16]">
+              <div className="inline-flex items-center gap-2 rounded-full bg-slate-50 px-3 py-1.5 text-[12px] text-slate-600">
                 <ShieldCheck size={16} />
                 Secure access control
               </div>
@@ -416,7 +405,7 @@ export default function UserManagement() {
             <div className="overflow-x-auto">
               <table className="min-w-full text-left text-[13px]">
                 <thead>
-                  <tr className="border-b border-black/10 bg-[#fcfbf7] text-[11px] uppercase tracking-[0.24em] text-black/50">
+                  <tr className="border-b border-black/10 bg-slate-50 text-[11px] uppercase tracking-[0.24em] text-black/50">
                     <th className="px-5 py-3 font-semibold">User</th>
                     <th className="px-5 py-3 font-semibold">Role</th>
                     <th className="px-5 py-3 font-semibold">Status</th>

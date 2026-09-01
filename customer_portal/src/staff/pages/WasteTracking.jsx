@@ -4,6 +4,7 @@ import {
   DollarSign,
   TrendingUp,
   AlertTriangle,
+  Package,
   Plus,
   X,
   ChevronDown,
@@ -60,18 +61,6 @@ const REASON_CODES = [
 
 const reasonMeta = (key) => REASON_CODES.find((r) => r.key === key) || REASON_CODES[0];
 
-// Historical weekly trend for the seasonal chart.
-const SEASONAL_TREND = [
-  { week: "Wk 1", thisYear: 18, lastYear: 14 },
-  { week: "Wk 2", thisYear: 22, lastYear: 17 },
-  { week: "Wk 3", thisYear: 19, lastYear: 20 },
-  { week: "Wk 4", thisYear: 27, lastYear: 19 },
-  { week: "Wk 5", thisYear: 24, lastYear: 22 },
-  { week: "Wk 6", thisYear: 31, lastYear: 21 },
-  { week: "Wk 7", thisYear: 26, lastYear: 25 },
-  { week: "Wk 8", thisYear: 29, lastYear: 23 },
-];
-
 const SPOILAGE_ALERT_THRESHOLD = 3; // times an item must appear to trigger a flag
 
 function formatPeso(value) {
@@ -94,6 +83,7 @@ function enrich(entry, catalogue) {
 export default function WasteTracking({ showNavbar = true }) {
   const [entries, setEntries] = useState([]);
   const [catalogue, setCatalogue] = useState([]);
+  const [completedOrders, setCompletedOrders] = useState([]);
   const [range, setRange] = useState("weekly"); // daily | weekly | monthly
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState({
@@ -143,40 +133,114 @@ export default function WasteTracking({ showNavbar = true }) {
       });
   }, []);
 
+  useEffect(() => {
+    staffFetch(`${STAFF_BASE}/api_orders.php`)
+      .then((res) => res.json())
+      .then((data) => {
+        const orders = Array.isArray(data) ? data : [];
+        setCompletedOrders(orders.filter((order) => String(order.status || '').trim().toLowerCase() === 'completed'));
+      })
+      .catch(() => setCompletedOrders([]));
+  }, []);
+
   const enrichedEntries = useMemo(
     () => entries.map((e) => enrich(e, catalogue)).sort((a, b) => new Date(b.datetime) - new Date(a.datetime)),
     [entries, catalogue]
   );
 
+  const periodStart = useMemo(() => {
+    const start = new Date();
+    start.setHours(0, 0, 0, 0);
+    if (range === 'weekly') {
+      start.setDate(start.getDate() - ((start.getDay() + 6) % 7));
+    } else if (range === 'monthly') {
+      start.setDate(1);
+    }
+    return start;
+  }, [range]);
+
+  const periodLabel = range === 'daily' ? 'today' : range === 'weekly' ? 'this week' : 'this month';
+
+  const periodEntries = useMemo(
+    () => enrichedEntries.filter((entry) => {
+      const date = new Date(entry.datetime);
+      return !Number.isNaN(date.getTime()) && date >= periodStart;
+    }),
+    [enrichedEntries, periodStart]
+  );
+
+  const periodCompletedOrderCount = useMemo(
+    () => completedOrders.filter((order) => {
+      const date = new Date(order.created_at);
+      return !Number.isNaN(date.getTime()) && date >= periodStart;
+    }).length,
+    [completedOrders, periodStart]
+  );
+
   /* ---------------- Overview card figures ---------------- */
 
-  const totalWasteQty = useMemo(
-    () => enrichedEntries.reduce((sum, e) => sum + e.qty, 0),
-    [enrichedEntries]
-  );
+  const wasteByType = useMemo(() => periodEntries.reduce((totals, entry) => {
+    const type = entry.type === 'Finished Product' ? 'Finished Product' : 'Raw Material';
+    totals[type] = (totals[type] || 0) + entry.qty;
+    return totals;
+  }, { 'Raw Material': 0, 'Finished Product': 0 }), [periodEntries]);
 
   const totalFinancialLoss = useMemo(
-    () => enrichedEntries.reduce((sum, e) => sum + e.cost, 0),
-    [enrichedEntries]
+    () => periodEntries.reduce((sum, e) => sum + e.cost, 0),
+    [periodEntries]
   );
+
+  const averageWasteCost = periodCompletedOrderCount > 0 ? totalFinancialLoss / periodCompletedOrderCount : null;
+
+  const topWastedItems = useMemo(() => {
+    const byItem = {};
+    periodEntries.forEach((entry) => {
+      const current = byItem[entry.item] || { item: entry.item, qty: 0, cost: 0, unit: entry.unit };
+      current.qty += entry.qty;
+      current.cost += entry.cost;
+      byItem[entry.item] = current;
+    });
+    return Object.values(byItem).sort((a, b) => b.cost - a.cost || b.qty - a.qty).slice(0, 5);
+  }, [periodEntries]);
+
+  const wasteTrend = useMemo(() => {
+    const totals = {};
+    periodEntries.forEach((entry) => {
+      const date = new Date(entry.datetime);
+      if (Number.isNaN(date.getTime())) return;
+      let key = date.toISOString().slice(0, 10);
+      if (range === 'weekly') {
+        const weekStart = new Date(date);
+        weekStart.setDate(date.getDate() - ((date.getDay() + 6) % 7));
+        key = weekStart.toISOString().slice(0, 10);
+      } else if (range === 'monthly') {
+        key = date.toISOString().slice(0, 7);
+      }
+      totals[key] = (totals[key] || 0) + entry.cost;
+    });
+    return Object.entries(totals).sort(([first], [second]) => first.localeCompare(second)).map(([date, cost]) => ({
+      date: range === 'daily' ? date.slice(5) : range === 'weekly' ? `Week of ${date.slice(5)}` : date,
+      cost: Number(cost.toFixed(2)),
+    }));
+  }, [periodEntries, range]);
 
   const highestContributor = useMemo(() => {
     const byItem = {};
-    enrichedEntries.forEach((e) => {
+    periodEntries.forEach((e) => {
       byItem[e.item] = (byItem[e.item] || 0) + e.cost;
     });
     const top = Object.entries(byItem).sort((a, b) => b[1] - a[1])[0];
     if (!top) return null;
-    const matches = enrichedEntries.filter((e) => e.item === top[0]);
+    const matches = periodEntries.filter((e) => e.item === top[0]);
     const totalQty = matches.reduce((s, e) => s + e.qty, 0);
     return { name: top[0], cost: top[1], qty: totalQty, unit: matches[0]?.unit || "" };
-  }, [enrichedEntries]);
+  }, [periodEntries]);
 
   /* ---------------- Reason code donut data ---------------- */
 
   const reasonBreakdown = useMemo(() => {
     const totals = {};
-    enrichedEntries.forEach((e) => {
+    periodEntries.forEach((e) => {
       totals[e.reason] = (totals[e.reason] || 0) + e.cost;
     });
     return REASON_CODES.map((r) => ({
@@ -184,20 +248,20 @@ export default function WasteTracking({ showNavbar = true }) {
       value: Number((totals[r.key] || 0).toFixed(2)),
       color: r.color,
     })).filter((r) => r.value > 0);
-  }, [enrichedEntries]);
+  }, [periodEntries]);
 
   /* ---------------- Spoilage risk flags ---------------- */
 
   const spoilageFlags = useMemo(() => {
     const counts = {};
-    enrichedEntries.forEach((e) => {
+    periodEntries.forEach((e) => {
       counts[e.item] = (counts[e.item] || 0) + 1;
     });
     return Object.entries(counts)
       .filter(([, count]) => count >= SPOILAGE_ALERT_THRESHOLD)
       .map(([item, count]) => ({ item, count }))
       .sort((a, b) => b.count - a.count);
-  }, [enrichedEntries]);
+  }, [periodEntries]);
 
   const flaggedItems = useMemo(() => new Set(spoilageFlags.map((f) => f.item)), [spoilageFlags]);
 
@@ -299,9 +363,9 @@ export default function WasteTracking({ showNavbar = true }) {
                 </div>
               </div>
               <div className="text-[28px] leading-none font-bold" style={{ color: C.ink }}>
-                {totalWasteQty.toFixed(1)} <span className="text-sm font-medium" style={{ color: C.sub }}>kg / units</span>
+                {wasteByType['Raw Material'].toFixed(1)} <span className="text-sm font-medium" style={{ color: C.sub }}>raw material</span>
               </div>
-              <p className="mt-2 text-[13px]" style={{ color: C.sub }}>Logged spoilage, damage, and production waste this {range.replace("ly", "")}.</p>
+              <p className="mt-2 text-[13px]" style={{ color: C.sub }}>{wasteByType['Finished Product'].toFixed(1)} finished product units logged {periodLabel}.</p>
             </div>
 
             <div className="rounded-2xl border bg-white p-5" style={{ borderColor: C.border, boxShadow: '0 1px 2px rgba(17,24,39,0.04)' }}>
@@ -316,7 +380,7 @@ export default function WasteTracking({ showNavbar = true }) {
               <div className="text-[28px] leading-none font-bold" style={{ color: C.ink }}>
                 {formatPeso(totalFinancialLoss)}
               </div>
-              <p className="mt-2 text-[13px]" style={{ color: C.sub }}>Quantity lost × unit cost, across all logged entries.</p>
+              <p className="mt-2 text-[13px]" style={{ color: C.sub }}>Quantity lost × unit cost, logged {periodLabel}.</p>
             </div>
 
             <div className="rounded-2xl border bg-white p-5" style={{ borderColor: C.border, boxShadow: '0 1px 2px rgba(17,24,39,0.04)' }}>
@@ -341,6 +405,57 @@ export default function WasteTracking({ showNavbar = true }) {
                 <p className="text-sm" style={{ color: C.sub }}>No waste logged yet.</p>
               )}
             </div>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2 mb-6">
+            <div className="rounded-2xl border bg-white p-5" style={{ borderColor: C.border }}>
+              <div className="flex items-center gap-2 mb-4">
+                <Package size={17} style={{ color: C.sky }} />
+                <h3 className="text-[15px] font-semibold" style={{ color: C.ink }}>Waste by Item Type</h3>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                {Object.entries(wasteByType).map(([type, quantity]) => (
+                  <div key={type} className="rounded-xl bg-gray-50 px-4 py-3">
+                    <p className="text-[11px] text-gray-500">{type}</p>
+                    <p className="mt-1 text-lg font-bold" style={{ color: C.ink }}>{quantity.toFixed(1)}</p>
+                    <p className="text-[11px] text-gray-400">recorded quantity</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="rounded-2xl border bg-white p-5" style={{ borderColor: C.border }}>
+              <div className="flex items-center gap-2 mb-4">
+                <DollarSign size={17} style={{ color: C.red }} />
+                <h3 className="text-[15px] font-semibold" style={{ color: C.ink }}>Average Waste Cost</h3>
+              </div>
+              <p className="text-[28px] leading-none font-bold" style={{ color: C.ink }}>
+                {averageWasteCost === null ? 'Not available' : formatPeso(averageWasteCost)}
+              </p>
+              <p className="mt-2 text-[13px]" style={{ color: C.sub }}>
+                Per completed order · {periodCompletedOrderCount} completed orders this period
+              </p>
+            </div>
+          </div>
+
+          <div className="rounded-2xl border bg-white p-5 mb-6" style={{ borderColor: C.border }}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-[15px] font-semibold" style={{ color: C.ink }}>Top Wasted Items</h3>
+              <span className="text-[11px] text-gray-400">ranked by financial loss</span>
+            </div>
+            {topWastedItems.length === 0 ? (
+              <p className="text-sm text-gray-400">No waste logged yet.</p>
+            ) : (
+              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
+                {topWastedItems.map((item) => (
+                  <div key={item.item} className="rounded-xl border px-3 py-3" style={{ borderColor: C.border }}>
+                    <p className="truncate text-sm font-semibold" style={{ color: C.ink }} title={item.item}>{item.item}</p>
+                    <p className="mt-1 text-xs text-gray-500">{item.qty.toFixed(1)} {item.unit}</p>
+                    <p className="mt-1 text-sm font-bold" style={{ color: C.red }}>{formatPeso(item.cost)}</p>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* ---------- Procurement risk banner ---------- */}
@@ -368,24 +483,22 @@ export default function WasteTracking({ showNavbar = true }) {
           <div className="grid gap-6 lg:grid-cols-3 mb-8">
             <div className="lg:col-span-2 rounded-2xl border bg-white p-5" style={{ borderColor: C.border, boxShadow: '0 1px 2px rgba(17,24,39,0.04)' }}>
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-[15px] font-semibold" style={{ color: C.ink }}>Seasonal Waste Trends</h3>
+                  <h3 className="text-[15px] font-semibold" style={{ color: C.ink }}>Waste Cost Trend</h3>
                 <div className="flex items-center gap-4 text-[11px]" style={{ color: C.sub }}>
-                  <span className="inline-flex items-center gap-1.5"><span className="h-2 w-2 rounded-full" style={{ background: C.gold }} />This year</span>
-                  <span className="inline-flex items-center gap-1.5"><span className="h-2 w-2 rounded-full" style={{ background: '#cbd5e1' }} />Last year</span>
+                  <span className="inline-flex items-center gap-1.5"><span className="h-2 w-2 rounded-full" style={{ background: C.gold }} />Logged waste</span>
                 </div>
               </div>
               <div className="h-[260px]">
                 <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={SEASONAL_TREND} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
+                  <LineChart data={wasteTrend} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#00000008" vertical={false} />
-                    <XAxis dataKey="week" tick={{ fontSize: 12, fill: "#94a3b8" }} axisLine={false} tickLine={false} />
+                    <XAxis dataKey="date" tick={{ fontSize: 12, fill: "#94a3b8" }} axisLine={false} tickLine={false} />
                     <YAxis tick={{ fontSize: 12, fill: "#94a3b8" }} axisLine={false} tickLine={false} />
                     <Tooltip
-                      formatter={(value, name) => [`${value} kg`, name === "thisYear" ? "This year" : "Last year"]}
+                      formatter={(value) => [formatPeso(value), "Waste cost"]}
                       contentStyle={{ borderRadius: 12, border: "1px solid #00000010", fontSize: 12 }}
                     />
-                    <Line type="monotone" dataKey="lastYear" stroke="#CBD5E1" strokeWidth={2} dot={false} />
-                    <Line type="monotone" dataKey="thisYear" stroke={C.gold} strokeWidth={2.5} dot={{ r: 3 }} />
+                    <Line type="monotone" dataKey="cost" stroke={C.gold} strokeWidth={2.5} dot={{ r: 3 }} />
                   </LineChart>
                 </ResponsiveContainer>
               </div>
