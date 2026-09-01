@@ -248,8 +248,8 @@ export default function Reports({ showNavbar = true }) {
   useEffect(() => {
     Promise.all([
       staffFetch(`${STAFF_BASE}/api_orders.php`).then(r => r.json()).catch(() => []),
-      staffFetch(`${STAFF_BASE}/api_products.php?action=list`).then(r => r.json()).catch(() => []),
-      staffFetch(`${STAFF_BASE}/api_ingredients.php`).then(r => r.json()).catch(() => ({ ingredients: [] })),
+      laravelStaffFetch(`${LARAVEL_BASE}/api/staff/products?action=list`).then(r => r.json()).catch(() => []),
+      laravelStaffFetch(`${LARAVEL_BASE}/api/staff/inventory/ingredients`).then(r => r.json()).catch(() => ({ ingredients: [] })),
     ]).then(([ord, prod, ingRes]) => {
       const parsed = Array.isArray(ord)
         ? ord.map(o => ({

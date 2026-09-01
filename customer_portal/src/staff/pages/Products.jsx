@@ -3,9 +3,18 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Search, Trash2, History, RefreshCw } from "lucide-react";
 import StaffNavbar from "../components/StaffNavbar";
-import { BASE, STAFF_BASE } from "../../services/config";
+import { BASE, LARAVEL_BASE, STAFF_BASE } from "../../services/config";
 
 const staffFetch = (url, options = {}) => fetch(url, { credentials: "include", ...options });
+const laravelStaffFetch = (url, options = {}) => {
+  let token = '';
+  try { token = JSON.parse(localStorage.getItem('user') || 'null')?.token || ''; } catch (_) { /* no-op */ }
+  return fetch(url, {
+    credentials: 'include',
+    ...options,
+    headers: { ...(options.headers || {}), ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+  });
+};
 
 export default function Products({ showNavbar = true }) {
 
@@ -36,6 +45,7 @@ export default function Products({ showNavbar = true }) {
   const [adjustType, setAdjustType] = useState("out");
   const [adjustNotes, setAdjustNotes] = useState("");
   const [inventorySummary, setInventorySummary] = useState(null);
+  const [productionAvailability, setProductionAvailability] = useState({ is_producible: false, reason: null });
 
   const [ingredients, setIngredients] = useState([]);
   const [addProductOpen, setAddProductOpen] = useState(false);
@@ -74,7 +84,7 @@ export default function Products({ showNavbar = true }) {
     setLoading(true);
     setFetchError(null);
 
-    staffFetch(`${STAFF_BASE}/api_products.php?action=list`)
+    laravelStaffFetch(`${LARAVEL_BASE}/api/staff/products?action=list`)
       .then(res => res.json())
       .then(data => {
 
@@ -116,7 +126,7 @@ export default function Products({ showNavbar = true }) {
   }, [location.search]);
 
   const fetchIngredients = () => {
-    staffFetch(`${STAFF_BASE}/api_ingredients.php`)
+    laravelStaffFetch(`${LARAVEL_BASE}/api/staff/inventory/ingredients`)
       .then((res) => res.json())
       .then((data) => {
         if (data?.ingredients) {
@@ -229,7 +239,7 @@ export default function Products({ showNavbar = true }) {
     setRecipeLines([]);
     setBomLoading(true);
 
-    staffFetch(`${STAFF_BASE}/api_product_recipes.php?product_id=${encodeURIComponent(productId)}`)
+    laravelStaffFetch(`${LARAVEL_BASE}/api/staff/products/${encodeURIComponent(productId)}/recipe`)
       .then((res) => res.json())
       .then((data) => {
         if (data?.success) {
@@ -242,6 +252,16 @@ export default function Products({ showNavbar = true }) {
         setBomError("Unable to load product recipe.");
       })
       .finally(() => setBomLoading(false));
+  };
+
+  const loadProductionAvailability = async (productId) => {
+    try {
+      const res = await laravelStaffFetch(`${LARAVEL_BASE}/api/staff/production/availability/${encodeURIComponent(productId)}`);
+      const data = await res.json();
+      setProductionAvailability({ is_producible: data?.is_producible === true, reason: data?.availability_reason || null });
+    } catch (_) {
+      setProductionAvailability({ is_producible: false, reason: 'Unable to check production availability.' });
+    }
   };
 
   const loadHistory = async (productId) => {
@@ -274,6 +294,9 @@ export default function Products({ showNavbar = true }) {
     if (action === "produce") {
       setRecipeLines([]);
       loadProductRecipe(product.id);
+      // Load production availability
+      setProductionAvailability({ is_producible: product.is_producible ?? false, reason: product.availability_reason ?? null });
+      loadProductionAvailability(product.id);
     }
     if (action === "history") loadHistory(product.id);
   };
@@ -298,7 +321,7 @@ export default function Products({ showNavbar = true }) {
 
     const shortage = recipeLines.find((line) => {
       const required = Number(line.qty) * parsedQty;
-      return Number(line.stock) < required;
+      return Number(line.usable_stock) < required;
     });
 
     if (shortage) {
@@ -308,13 +331,13 @@ export default function Products({ showNavbar = true }) {
 
     setBomError(null);
     setOperationLoading(true);
-    staffFetch(`${STAFF_BASE}/api_update_stocks.php`, {
+    laravelStaffFetch(`${LARAVEL_BASE}/api/staff/production`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        action: "produce",
-        id: selectedProduct.id,
-        qty: parsedQty
+        product_id: selectedProduct.id,
+        quantity: parsedQty,
+        idempotency_key: window.crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`
       })
     })
       .then((res) => res.json())
@@ -330,10 +353,17 @@ export default function Products({ showNavbar = true }) {
         } else {
           setFeedback({ type: "error", text: data.message || "Unable to update inventory. Please try again." });
           setBomError(data.message || "Unable to update inventory. Please try again.");
+          // Refresh availability after failed production
+          fetchProducts();
+          if (selectedProduct) {
+            setProductionAvailability({ is_producible: false, reason: data.message || "Production failed" });
+          }
         }
       })
       .catch(() => {
         setBomError("Unable to update inventory. Please try again.");
+        // Refresh availability after error
+        fetchProducts();
       })
         .finally(() => setOperationLoading(false));
   };
@@ -597,6 +627,16 @@ export default function Products({ showNavbar = true }) {
                 </div>
                 <p className="mb-3 text-[11px] text-black/50">Minimum stock: {product.minimum_stock ?? "Not set"}</p>
 
+                {/* PRODUCTION AVAILABILITY */}
+                <div className="mb-3">
+                  <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-semibold ${product.is_producible ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                    {product.is_producible ? '✓ Can Produce' : '✗ Cannot Produce'}
+                  </span>
+                  {!product.is_producible && product.availability_reason && (
+                    <p className="text-[9px] text-red-700 mt-1">{product.availability_reason}</p>
+                  )}
+                </div>
+
                 {/* BUTTON */}
                 <div className="flex gap-2">
                   <button onClick={() => openInventoryModal(product, "produce")} className="flex-1 bg-black text-white py-2 rounded-lg text-[12px] leading-none hover:bg-black/90 transition">Produce</button>
@@ -620,14 +660,15 @@ export default function Products({ showNavbar = true }) {
           </div>
         ) : (
           <div className="overflow-x-auto rounded-3xl border border-black/10 shadow-sm">
-            <div className="grid grid-cols-[1.5fr_0.8fr_0.8fr_0.8fr] gap-0 bg-black/5 text-[11px] uppercase tracking-[0.18em] text-black/70">
+            <div className="grid grid-cols-[1.5fr_0.8fr_0.8fr_0.8fr_0.8fr] gap-0 bg-black/5 text-[11px] uppercase tracking-[0.18em] text-black/70">
               <div className="px-4 py-3 font-semibold">Product</div>
               <div className="px-4 py-3 font-semibold">Category</div>
               <div className="px-4 py-3 font-semibold">Stock</div>
+              <div className="px-4 py-3 font-semibold">Production</div>
               <div className="px-4 py-3 font-semibold">Actions</div>
             </div>
             {filteredProducts.map((product) => (
-              <div key={product.id} className="grid grid-cols-[1.5fr_0.8fr_0.8fr_0.8fr] gap-0 border-t border-black/10 bg-white">
+              <div key={product.id} className="grid grid-cols-[1.5fr_0.8fr_0.8fr_0.8fr_0.8fr] gap-0 border-t border-black/10 bg-white">
                 <div className="px-4 py-4">
                   <div className="flex items-center gap-3">
                     <div className="h-14 w-14 overflow-hidden rounded-2xl bg-black/5 border border-black/10">
@@ -649,6 +690,14 @@ export default function Products({ showNavbar = true }) {
                     <div className="text-[12px] font-semibold text-black">{product.stock ?? 0}</div>
                     <div className={`mt-1 inline-flex rounded-full px-2 py-1 text-[10px] font-semibold ${getStockStatus(product).classes}`}>{getStockStatus(product).icon} {getStockStatus(product).label}</div>
                   </div>
+                </div>
+                <div className="px-4 py-4">
+                  <div className={`inline-flex rounded-full px-2 py-1 text-[10px] font-semibold ${product.is_producible ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                    {product.is_producible ? '✓ Available' : '✗ Unavailable'}
+                  </div>
+                  {!product.is_producible && product.availability_reason && (
+                    <p className="text-[9px] text-red-700 mt-1">{product.availability_reason}</p>
+                  )}
                 </div>
                 <div className="px-4 py-4 flex flex-wrap gap-2">
                   <button onClick={() => openInventoryModal(product, "produce")} className="rounded-full bg-black px-3 py-2 text-[11px] text-white hover:bg-black/90">Produce</button>
@@ -694,6 +743,17 @@ export default function Products({ showNavbar = true }) {
                 </p>
 
                 {activeModal === "produce" && <div className="space-y-3 mb-4">
+                  
+                  {/* AVAILABILITY STATUS */}
+                  <div className={`rounded-xl p-3 ${productionAvailability.is_producible ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
+                    <p className={`text-[11px] font-semibold ${productionAvailability.is_producible ? 'text-green-800' : 'text-red-800'}`}>
+                      Production: {productionAvailability.is_producible ? '✓ Available' : '✗ Unavailable'}
+                    </p>
+                    {!productionAvailability.is_producible && productionAvailability.reason && (
+                      <p className="text-[10px] text-red-700 mt-1">{productionAvailability.reason}</p>
+                    )}
+                  </div>
+
                   <label className="block text-[11px] font-semibold text-black/70">Produce finished goods</label>
                   <input
                     type="number"
@@ -715,7 +775,7 @@ export default function Products({ showNavbar = true }) {
                           <div key={line.ingredient_id} className="flex justify-between gap-2">
                             <span className="font-medium text-black/80 text-xs">{line.name}</span>
                             <span className={`text-right text-xs ${enough ? "text-black/70" : "text-red-500"}`}>
-                              {required.toFixed(2)} {line.unit} / {line.stock.toFixed(2)} available
+                              {required.toFixed(2)} {line.unit} / {Number(line.usable_stock || 0).toFixed(2)} available
                             </span>
                           </div>
                         );
@@ -728,7 +788,7 @@ export default function Products({ showNavbar = true }) {
                   {bomError && (
                     <p className="text-red-500 text-xs">{bomError}</p>
                   )}
-                  {recipeLines.some((line) => Number(line.stock) < Number(line.qty) * Number(bomQty || 1)) && (
+                  {recipeLines.some((line) => Number(line.usable_stock) < Number(line.qty) * Number(bomQty || 1)) && (
                     <p className="text-xs font-semibold text-red-600">⚠ Insufficient ingredient stock. Reduce the quantity or replenish ingredients.</p>
                   )}
                 </div>}
@@ -736,7 +796,7 @@ export default function Products({ showNavbar = true }) {
                 {activeModal === "produce" && <div className="flex gap-2 mb-4">
                   <button
                     onClick={produceFinishedGoods}
-                    disabled={bomLoading || operationLoading || recipeLines.length === 0 || recipeLines.some((line) => Number(line.stock) < Number(line.qty) * Number(bomQty || 1))}
+                    disabled={bomLoading || operationLoading || recipeLines.length === 0 || recipeLines.some((line) => Number(line.usable_stock) < Number(line.qty) * Number(bomQty || 1)) || !productionAvailability.is_producible}
                     className="flex-1 bg-black text-white px-4 py-2 rounded-xl text-xs font-semibold hover:bg-black/90 disabled:cursor-not-allowed disabled:bg-black/40"
                   >
                     {operationLoading ? "Producing..." : "Produce"}
@@ -1103,6 +1163,18 @@ export default function Products({ showNavbar = true }) {
                         });
                         const data = await res.json();
                         if (data.success) {
+                          const recipePayload = recipeRows
+                            .filter((row) => row.ingredient_id && Number(row.qty) > 0)
+                            .map((row) => ({ ingredient_id: Number(row.ingredient_id), qty: Number(row.qty) }));
+                          if (recipePayload.length > 0) {
+                            const recipeRes = await laravelStaffFetch(`${LARAVEL_BASE}/api/staff/products/${data.product_id}/recipe`, {
+                              method: 'PUT',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ recipes: recipePayload }),
+                            });
+                            const recipeData = await recipeRes.json().catch(() => ({}));
+                            if (!recipeRes.ok || !recipeData.success) throw new Error(recipeData.message || 'Failed to save product recipe.');
+                          }
                           await fetchProducts();
                           setEditOpen(false);
                         } else {
