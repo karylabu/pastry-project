@@ -8,7 +8,19 @@ import {
 import StaffNavbar from '../components/StaffNavbar';
 import { BASE, STAFF_BASE } from '../../services/config';
 
-const staffFetch = (url, options = {}) => fetch(url, { credentials: 'include', ...options });
+const staffFetch = (url, options = {}) => {
+  let token = '';
+  try {
+    token = JSON.parse(localStorage.getItem('user') || '{}')?.token || '';
+  } catch {
+    token = '';
+  }
+
+  const headers = new Headers(options.headers || {});
+  if (token) headers.set('Authorization', `Bearer ${token}`);
+
+  return fetch(url, { ...options, credentials: 'include', headers });
+};
 
 const C = {
   emerald: '#10b981', emeraldSoft: '#e6f7f0',
