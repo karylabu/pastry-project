@@ -52,9 +52,9 @@ export default function Footer() {
   };
 
   return (
-    <footer className="bg-[#1a1a1a] font-['DM_Sans'] pt-20 pb-10">
+    <footer className="bg-[#1a1a1a] font-['DM_Sans'] pt-12 pb-0">
       <div className="max-w-7xl mx-auto px-10">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-12 mb-16">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
 
           {/* LOGO */}
           <div className="flex flex-col items-start">
@@ -78,6 +78,11 @@ export default function Footer() {
               Information
             </p>
             <ul className="space-y-3 text-sm text-gray-300">
+              <li>
+                <Link to="/customer/about-us" onClick={() => window.scrollTo(0, 0)} className="hover:text-white transition">
+                  About Us
+                </Link>
+              </li>
               <li>
                 <Link to="/customer/careers" onClick={() => window.scrollTo(0, 0)} className="hover:text-white transition">
                   Careers
@@ -166,7 +171,7 @@ export default function Footer() {
         </div>
 
         {/* BOTTOM BAR */}
-        <div className="border-t border-white/10 pt-6 flex flex-col md:flex-row items-center justify-between gap-3">
+        <div className="border-t border-white/10 pt-4 pb-6 flex flex-col md:flex-row items-center justify-between gap-3">
           <p className="text-gray-500 text-xs tracking-wide">
             © {new Date().getFullYear()} Pastry Project Bakeshop &amp; Café. All rights reserved.
           </p>

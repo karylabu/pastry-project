@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { MessageCircle, X, Send, Bot, User, Headphones, Inbox } from 'lucide-react';
+import { MessageCircle, X, Send, Bot, User, Headphones, Inbox, Paperclip } from 'lucide-react';
 import { STAFF_BASE, CUSTOMER_BASE } from '../../services/config';
 import { safeParseJson } from '../../services/api';
 
@@ -147,8 +147,10 @@ function StaffChatInbox({ open, onClose }) {
   const [messages, setMessages]           = useState([]);
   const [input, setInput]                 = useState("");
   const [sending, setSending]             = useState(false);
+  const [selectedImage, setSelectedImage] = useState(null);
   const bottomRef                         = useRef(null);
   const pollRef                           = useRef(null);
+  const imageInputRef                     = useRef(null);
 
   const totalUnread = conversations.reduce((sum, c) => sum + Number(c.unread_count || 0), 0);
 
@@ -189,20 +191,29 @@ function StaffChatInbox({ open, onClose }) {
 
   const sendMessage = async () => {
     const msg = input.trim();
-    if (!msg || !activeOrderId) return;
+    if ((!msg && !selectedImage) || !activeOrderId) return;
     setSending(true);
     setInput("");
+    const image = selectedImage;
+    setSelectedImage(null);
 
     // Optimistic
     setMessages(prev => [...prev, {
-      id: Date.now(), sender: "staff", message: msg, created_at: new Date().toISOString()
+      id: Date.now(), sender: "staff", message: msg,
+      image_url: image ? URL.createObjectURL(image) : null,
+      created_at: new Date().toISOString()
     }]);
 
     try {
+      const formData = new FormData();
+      formData.append("order_id", activeOrderId);
+      formData.append("message", msg);
+      formData.append("sender", "staff");
+      if (image) formData.append("image", image);
+
       await fetch(`${CUSTOMER_BASE}/api_chat_send.php`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ order_id: activeOrderId, message: msg, sender: "staff" })
+        body: formData
       });
       fetchMessages(activeOrderId);
       fetchInbox();
@@ -223,6 +234,9 @@ function StaffChatInbox({ open, onClose }) {
   };
 
   const activeConvo = conversations.find(c => Number(c.order_id) === Number(activeOrderId));
+  const getImageUrl = (message) => message.image_url || (
+    message.image_path ? `${CUSTOMER_BASE}/${message.image_path}` : null
+  );
 
   const statusColors = {
     Pending: "bg-yellow-100 text-yellow-700",
@@ -354,7 +368,14 @@ function StaffChatInbox({ open, onClose }) {
                               ? "bg-[#fdf8ec] text-gray-800 border border-[#f0e4b8] rounded-tl-sm"
                               : "bg-white text-gray-800 border border-gray-200 rounded-tl-sm shadow-sm"
                             }`}>
-                            {msg.message}
+                            {getImageUrl(msg) && (
+                              <img
+                                src={getImageUrl(msg)}
+                                alt="Chat attachment"
+                                className="max-w-full max-h-56 rounded-lg object-contain mb-1"
+                              />
+                            )}
+                            {msg.message && <p>{msg.message}</p>}
                           </div>
                         </div>
                       </div>
@@ -365,6 +386,22 @@ function StaffChatInbox({ open, onClose }) {
 
                 {/* Input */}
                 <div className="bg-white px-6 py-4 border-t border-gray-100 flex gap-3 items-end">
+                  <input
+                    ref={imageInputRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/gif,image/webp"
+                    className="hidden"
+                    onChange={e => setSelectedImage(e.target.files?.[0] || null)}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => imageInputRef.current?.click()}
+                    disabled={sending}
+                    title="Attach picture"
+                    className="w-10 h-10 rounded-full border border-gray-200 text-gray-600 flex items-center justify-center flex-shrink-0 disabled:opacity-40 hover:border-black hover:text-black"
+                  >
+                    <Paperclip size={15} />
+                  </button>
                   <textarea
                     value={input}
                     onChange={e => setInput(e.target.value)}
@@ -375,12 +412,17 @@ function StaffChatInbox({ open, onClose }) {
                   />
                   <button
                     onClick={sendMessage}
-                    disabled={!input.trim() || sending}
+                    disabled={(!input.trim() && !selectedImage) || sending}
                     className="w-10 h-10 rounded-full bg-black text-white flex items-center justify-center flex-shrink-0 disabled:opacity-40 hover:bg-[#d4af37] transition-colors"
                   >
                     <Send size={15} />
                   </button>
                 </div>
+                {selectedImage && (
+                  <p className="px-6 pb-3 text-[11px] text-gray-500 bg-white truncate">
+                    {selectedImage.name}
+                  </p>
+                )}
               </>
             ) : (
               <div className="flex-1 flex flex-col items-center justify-center gap-4 text-gray-400">

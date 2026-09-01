@@ -25,8 +25,40 @@ $data = json_decode(file_get_contents('php://input'), true);
 $orderId = intval($data['order_id'] ?? 0);
 $message = trim($data['message'] ?? '');
 $sender = $data['sender'] ?? 'admin';
+$imagePath = null;
 
-if ($orderId <= 0 || $message === '') {
+if (isset($_FILES['image']) && $_FILES['image']['error'] === UPLOAD_ERR_OK) {
+    if ($_FILES['image']['size'] > 5 * 1024 * 1024) {
+        echo json_encode(['success' => false, 'message' => 'Image must be 5MB or smaller']);
+        exit();
+    }
+
+    $finfo = new finfo(FILEINFO_MIME_TYPE);
+    $mime = $finfo->file($_FILES['image']['tmp_name']);
+    $extensions = [
+        'image/jpeg' => 'jpg',
+        'image/png' => 'png',
+        'image/gif' => 'gif',
+        'image/webp' => 'webp',
+    ];
+    if (!isset($extensions[$mime])) {
+        echo json_encode(['success' => false, 'message' => 'Only JPG, PNG, GIF, and WEBP images are allowed']);
+        exit();
+    }
+
+    $uploadDir = __DIR__ . '/../customer/uploads/chat';
+    if (!is_dir($uploadDir)) {
+        mkdir($uploadDir, 0755, true);
+    }
+    $filename = bin2hex(random_bytes(16)) . '.' . $extensions[$mime];
+    if (!move_uploaded_file($_FILES['image']['tmp_name'], $uploadDir . '/' . $filename)) {
+        echo json_encode(['success' => false, 'message' => 'Could not save image']);
+        exit();
+    }
+    $imagePath = 'uploads/chat/' . $filename;
+}
+
+if ($orderId <= 0 || ($message === '' && $imagePath === null)) {
     echo json_encode(['success' => false, 'message' => 'Invalid request']);
     exit();
 }
@@ -47,8 +79,8 @@ if ($columnCheck && $columnCheck->num_rows > 0) {
     }
 }
 
-$stmt = $conn->prepare('INSERT INTO messages (order_id, sender, message, is_read, created_at) VALUES (?, ?, ?, 1, NOW())');
-$stmt->bind_param('iss', $orderId, $sender, $message);
+$stmt = $conn->prepare('INSERT INTO messages (order_id, sender, message, image_path, is_read, created_at) VALUES (?, ?, ?, ?, 1, NOW())');
+$stmt->bind_param('isss', $orderId, $sender, $message, $imagePath);
 $stmt->execute();
 $stmt->close();
 

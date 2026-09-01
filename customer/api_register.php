@@ -64,6 +64,25 @@ try {
 
     if (mysqli_stmt_execute($ins)) {
         $newId = mysqli_insert_id($conn);
+        mysqli_query($conn, "CREATE TABLE IF NOT EXISTS customer_vouchers (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            user_id INT NOT NULL,
+            code VARCHAR(50) NOT NULL,
+            discount_type ENUM('free_delivery', 'percent') NOT NULL DEFAULT 'free_delivery',
+            discount_value DECIMAL(10,2) NOT NULL DEFAULT 0,
+            status ENUM('unused', 'used', 'expired') NOT NULL DEFAULT 'unused',
+            used_order_id INT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            used_at TIMESTAMP NULL,
+            UNIQUE KEY uq_customer_voucher (user_id, code),
+            INDEX idx_voucher_code (code, status)
+        ) ENGINE=InnoDB");
+        $voucher = mysqli_prepare($conn, "INSERT IGNORE INTO customer_vouchers (user_id, code, discount_type, discount_value) VALUES (?, 'WELCOME', 'free_delivery', 0)");
+        if ($voucher) {
+            mysqli_stmt_bind_param($voucher, "i", $newId);
+            mysqli_stmt_execute($voucher);
+            mysqli_stmt_close($voucher);
+        }
         echo json_encode([
             "success" => true,
             "message" => "Account created successfully.",

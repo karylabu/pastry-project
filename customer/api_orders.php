@@ -27,6 +27,17 @@ try {
         throw new Exception("No data received");
     }
 
+    $shopNow = new DateTime('now', new DateTimeZone('Asia/Manila'));
+    $shopMinutes = ((int)$shopNow->format('G') * 60) + (int)$shopNow->format('i');
+    if ($shopMinutes < 480 || $shopMinutes >= 1200) {
+        http_response_code(403);
+        echo json_encode([
+            'status' => 'error',
+            'message' => 'The shop is closed. Checkout is available from 8:00 AM to 8:00 PM.',
+        ]);
+        exit;
+    }
+
     // Sanitize and extract
     $itemsData = is_array($data['items'] ?? null) ? $data['items'] : [];
     $items     = mysqli_real_escape_string($conn, json_encode($itemsData));

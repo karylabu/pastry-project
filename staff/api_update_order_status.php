@@ -344,6 +344,40 @@ function shouldDeductInventory(string $oldStatus, string $newStatus): bool {
         && !in_array($oldStatus, $alreadyDeductedStatuses, true);
 }
 
+function awardLoyaltyPoints(mysqli $conn, int $userId, int $orderId, float $total): void {
+    if ($userId <= 0 || $orderId <= 0) {
+        return;
+    }
+
+    $conn->query("CREATE TABLE IF NOT EXISTS loyalty_transactions (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        user_id INT NOT NULL,
+        order_id INT NULL,
+        type ENUM('earn', 'redeem') NOT NULL,
+        points INT NOT NULL,
+        discount_amount DECIMAL(10,2) NOT NULL DEFAULT 0,
+        reward_code VARCHAR(32) NULL,
+        max_discount_amount DECIMAL(10,2) NOT NULL DEFAULT 100,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE KEY uq_loyalty_order (order_id),
+        INDEX idx_loyalty_user (user_id, created_at)
+    ) ENGINE=InnoDB");
+    $conn->query("ALTER TABLE loyalty_transactions ADD COLUMN IF NOT EXISTS discount_percent DECIMAL(5,2) NOT NULL DEFAULT 0");
+    $conn->query("ALTER TABLE loyalty_transactions ADD COLUMN IF NOT EXISTS max_discount_amount DECIMAL(10,2) NOT NULL DEFAULT 100");
+
+    $points = (int) floor(max(0, $total) / 100) * 10;
+    if ($points <= 0) {
+        return;
+    }
+
+    $stmt = $conn->prepare("INSERT IGNORE INTO loyalty_transactions (user_id, order_id, type, points) VALUES (?, ?, 'earn', ?)");
+    if ($stmt) {
+        $stmt->bind_param('iii', $userId, $orderId, $points);
+        $stmt->execute();
+        $stmt->close();
+    }
+}
+
 $conn = @new mysqli("localhost", "root", "", "pastry_db");
 
 if ($conn->connect_error) {
@@ -380,9 +414,11 @@ if (!$id || !$status) {
    UPDATE ORDER
 ========================= */
 try {
-    $orderStmt = $conn->prepare("SELECT status, items FROM orders WHERE id = ? LIMIT 1");
+    $conn->begin_transaction();
+
+    $orderStmt = $conn->prepare("SELECT status, items, total, user_id, email FROM orders WHERE id = ? LIMIT 1 FOR UPDATE");
     if (!$orderStmt) {
-        sendJson(false, "Order lookup failed");
+        throw new Exception("Order lookup failed");
     }
 
     $orderStmt->bind_param('i', $id);
@@ -391,12 +427,23 @@ try {
     $orderStmt->close();
 
     if (!$orderRow) {
-        sendJson(false, "Order not found");
+        throw new Exception("Order not found");
     }
 
     $oldStatus = trim((string) ($orderRow['status'] ?? 'Pending'));
     $itemsJson = $orderRow['items'] ?? '[]';
     $currentUserId = getSessionUserId();
+    $loyaltyUserId = intval($orderRow['user_id'] ?? 0);
+    if ($loyaltyUserId <= 0 && !empty($orderRow['email'])) {
+        $userStmt = $conn->prepare("SELECT id FROM users WHERE email = ? LIMIT 1");
+        if ($userStmt) {
+            $userStmt->bind_param('s', $orderRow['email']);
+            $userStmt->execute();
+            $userResult = $userStmt->get_result()->fetch_assoc();
+            $userStmt->close();
+            $loyaltyUserId = intval($userResult['id'] ?? 0);
+        }
+    }
 
     if (shouldDeductInventory($oldStatus, $status)) {
         $orderLines = loadOrderItemsFromJson($itemsJson);
@@ -406,44 +453,30 @@ try {
 
         $planResult = collectInventoryPlan($conn, $orderLines);
         if (!$planResult['success']) {
-            sendJson(false, $planResult['message']);
+            throw new Exception($planResult['message']);
         }
 
         $plan = $planResult['plan'];
-
-        $conn->begin_transaction();
         $applyResult = applyInventoryPlan($conn, $id, $status, $plan, $currentUserId);
         if (!$applyResult['success']) {
-            $conn->rollback();
-            sendJson(false, $applyResult['message']);
+            throw new Exception($applyResult['message']);
         }
+    }
 
-        $stmt = $conn->prepare("UPDATE orders SET status=? WHERE id=?");
-        if (!$stmt) {
-            $conn->rollback();
-            sendJson(false, "Prepare failed");
-        }
+    $stmt = $conn->prepare("UPDATE orders SET status=? WHERE id=?");
+    if (!$stmt) {
+        throw new Exception("Prepare failed");
+    }
 
-        $stmt->bind_param("si", $status, $id);
-        if (!$stmt->execute()) {
-            $stmt->close();
-            $conn->rollback();
-            sendJson(false, "Update failed");
-        }
+    $stmt->bind_param("si", $status, $id);
+    if (!$stmt->execute()) {
         $stmt->close();
-        $conn->commit();
-    } else {
-        $stmt = $conn->prepare("UPDATE orders SET status=? WHERE id=?");
-        if (!$stmt) {
-            sendJson(false, "Prepare failed");
-        }
+        throw new Exception("Update failed");
+    }
+    $stmt->close();
 
-        $stmt->bind_param("si", $status, $id);
-        if (!$stmt->execute()) {
-            $stmt->close();
-            sendJson(false, "Update failed");
-        }
-        $stmt->close();
+    if ($status === 'Completed' && $oldStatus !== 'Completed') {
+        awardLoyaltyPoints($conn, $loyaltyUserId, $id, floatval($orderRow['total'] ?? 0));
     }
 
     if ($currentUserId > 0) {

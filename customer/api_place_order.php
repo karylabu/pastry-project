@@ -15,6 +15,17 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     exit;
 }
 
+$shopNow = new DateTime('now', new DateTimeZone('Asia/Manila'));
+$shopMinutes = ((int) $shopNow->format('G') * 60) + (int) $shopNow->format('i');
+if ($shopMinutes < 480 || $shopMinutes >= 1200) {
+    http_response_code(403);
+    echo json_encode([
+        'status' => 'error',
+        'message' => 'The shop is closed. Checkout is available from 8:00 AM to 8:00 PM.',
+    ]);
+    exit;
+}
+
 try {
     $raw = file_get_contents('php://input');
     $data = json_decode($raw, true);
@@ -43,6 +54,8 @@ try {
         'phone' => "VARCHAR(20) DEFAULT ''",
         'lat' => "DECIMAL(10,8) DEFAULT 0",
         'lng' => "DECIMAL(11,8) DEFAULT 0",
+        'voucher_code' => "VARCHAR(50) DEFAULT ''",
+        'voucher_amount' => "DECIMAL(10,2) DEFAULT 0",
         'status' => "VARCHAR(50) DEFAULT 'Pending'",
         'order_date' => "DATE",
         'created_at' => "DATETIME DEFAULT CURRENT_TIMESTAMP"
@@ -76,17 +89,39 @@ try {
     $phone = mysqli_real_escape_string($conn, $data['phone'] ?? '');
     $lat = floatval($data['latitude'] ?? 0);
     $lng = floatval($data['longitude'] ?? 0);
+    $voucher_code = mysqli_real_escape_string($conn, $data['voucher_code'] ?? '');
+    $voucher_amount = max(0, floatval($data['voucher_amount'] ?? 0));
+
+    if ($voucher_code !== '') {
+        mysqli_query($conn, "CREATE TABLE IF NOT EXISTS customer_vouchers (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            user_id INT NOT NULL,
+            code VARCHAR(50) NOT NULL,
+            discount_type ENUM('free_delivery', 'percent') NOT NULL DEFAULT 'free_delivery',
+            discount_value DECIMAL(10,2) NOT NULL DEFAULT 0,
+            status ENUM('unused', 'used', 'expired') NOT NULL DEFAULT 'unused',
+            used_order_id INT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            used_at TIMESTAMP NULL,
+            UNIQUE KEY uq_customer_voucher (user_id, code),
+            INDEX idx_voucher_code (code, status)
+        ) ENGINE=InnoDB");
+        $voucherCheck = mysqli_query($conn, "SELECT id FROM customer_vouchers WHERE user_id = {$user_id} AND code = '{$voucher_code}' AND status = 'unused' LIMIT 1");
+        if ($user_id <= 0 || $method !== 'Deliver' || !$voucherCheck || mysqli_num_rows($voucherCheck) === 0) {
+            throw new Exception('This voucher is unavailable, already used, or only valid for delivery orders.');
+        }
+    }
     $status = 'Pending';
     $order_date = date('Y-m-d');
 
     $sql = "INSERT INTO orders (
                 user_id, customer, email, items, subtotal, delivery_fee,
-                total, method, payment, address, phone, lat, lng,
+                total, method, payment, address, phone, lat, lng, voucher_code, voucher_amount,
                 status, order_date, created_at
             ) VALUES (
                 " . ($user_id > 0 ? $user_id : "NULL") . ",
                 '$customer', '$email', '$items_json', $subtotal, $delivery_fee,
-                $total, '$method', '$payment', '$address', '$phone', $lat, $lng,
+                $total, '$method', '$payment', '$address', '$phone', $lat, $lng, '$voucher_code', $voucher_amount,
                 '$status', '$order_date', NOW()
             )";
 
@@ -95,6 +130,10 @@ try {
     }
 
     $order_id = mysqli_insert_id($conn);
+
+    if ($voucher_code !== '') {
+        mysqli_query($conn, "UPDATE customer_vouchers SET status = 'used', used_order_id = {$order_id}, used_at = NOW() WHERE user_id = {$user_id} AND code = '{$voucher_code}' AND status = 'unused'");
+    }
 
     // --- Create Notification for the user ---
     // Ensure table exists first

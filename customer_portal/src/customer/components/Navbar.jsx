@@ -16,7 +16,6 @@ import {
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { BASE, CUSTOMER_BASE } from '../../services/config';
 import { safeParseJson } from '../../services/api';
-import AboutModal from './AboutModal';
 
 export default function Navbar({ cartCount = 0, onCartClick }) {
 
@@ -29,7 +28,6 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
   const [searchQuery, setSearchQuery] = useState("");
 
   const [openAccount, setOpenAccount] = useState(false);
-  const [openAbout, setOpenAbout] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [user, setUser] = useState(null);
   const [notifFilter, setNotifFilter] = useState("All");
@@ -211,13 +209,13 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
             className="flex items-center gap-4"
           >
             <img
-              src={`${BASE}/uploads/logo.jpg`}
+              src={`${BASE}/uploads/logo-transparent.png`}
               alt="Logo"
-              className="h-14 w-auto object-contain"
+              className="h-14 w-14 object-contain"
             />
 
             <div>
-              <h1 className="text-[28px] font-bold italic">
+              <h1 className="font-playfair text-[28px] font-bold italic leading-none">
                 Pastry <span className="text-[#d4af37]">Project</span>
               </h1>
               <p className="text-[8px] uppercase tracking-[0.35em] text-gray-400 mt-1">
@@ -469,12 +467,38 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
                   <h3 className="text-[16px] text-black mt-1 font-semibold">{user?.name || 'Welcome Back'}</h3>
                 </div>
                 <div className="flex flex-col p-2 gap-1">
+                  {!user && (
+                    <>
+                      <Link
+                        to="/customer/login"
+                        onClick={() => setOpenAccount(false)}
+                        className="block rounded-2xl bg-black px-4 py-3 text-sm font-semibold text-white transition hover:bg-gray-800"
+                      >
+                        Login
+                      </Link>
+                      <Link
+                        to="/customer/register"
+                        onClick={() => setOpenAccount(false)}
+                        className="block rounded-2xl px-4 py-3 text-sm font-semibold text-[#a67c00] hover:bg-[#fff8df] transition"
+                      >
+                        Create an account
+                      </Link>
+                    </>
+                  )}
                   <Link
                     to="/customer/profile"
                     onClick={() => setOpenAccount(false)}
                     className="block rounded-2xl px-4 py-3 text-sm text-gray-700 hover:bg-gray-100 transition"
                   >
                     My Profile
+                  </Link>
+                  <Link
+                    to="/customer/rewards"
+                    onClick={() => setOpenAccount(false)}
+                    className="flex items-center gap-2 rounded-2xl px-4 py-3 text-sm font-semibold text-[#a67c00] hover:bg-[#fff8df] transition"
+                  >
+                    <Gift size={16} />
+                    My Rewards
                   </Link>
                   <Link
                     to="/customer/orders"
@@ -511,23 +535,13 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
                   >
                     Account Settings
                   </Link>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setOpenAccount(false);
-                      setOpenAbout(true);
-                    }}
-                    className="w-full text-left rounded-2xl px-4 py-3 text-sm text-gray-700 hover:bg-gray-100 transition"
-                  >
-                    About
-                  </button>
-                  <button
+                  {user && <button
                     type="button"
                     onClick={handleLogout}
                     className="w-full text-left rounded-2xl px-4 py-3 text-sm text-gray-700 hover:bg-gray-100 transition"
                   >
                     Logout
-                  </button>
+                  </button>}
                 </div>
               </div>
             )}
@@ -566,7 +580,6 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
       </div>
     )}
 
-    <AboutModal isOpen={openAbout} onClose={() => setOpenAbout(false)} />
     </>
   );
 }

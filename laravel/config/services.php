@@ -41,4 +41,9 @@ return [
         'redirect' => env('GOOGLE_REDIRECT_URI'),
     ],
 
+    'firebase' => [
+        'project_id' => env('FIREBASE_PROJECT_ID', 'capstone--development'),
+        'api_key' => env('FIREBASE_API_KEY') ?: 'AIzaSyBDD0ypZvw3xPgRUTxEB49sz3tR_L8InII',
+    ],
+
 ];

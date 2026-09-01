@@ -168,14 +168,17 @@ export default function Menu({ onAddToCart }) {
     'Cakes',
     'Meals',
     'Pasta',
-    'Starters'
+    'Starters',
+    'Pizza',
+    'Coffee',
+    'Drinks'
   ];
 
   return (
-    <PageShell>
+    <PageShell padding="px-6 md:px-10 pt-4 pb-10">
 
         {/* HEADER */}
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6 mb-14">
+        <div className="mb-6 flex flex-col gap-5">
 
           {/* LEFT SIDE TITLE */}
           <div>
@@ -190,77 +193,13 @@ export default function Menu({ onAddToCart }) {
             </h2>
           </div>
 
-          {/* CATEGORY BUTTONS */}
-          <div className="flex flex-col items-end gap-3 lg:ml-auto lg:self-end lg:pb-1">
-            <div className="rounded-2xl border border-gray-200 bg-white p-2 shadow-[0_8px_24px_rgba(15,23,42,0.06)]">
-              <p className="mb-2 px-2 text-[10px] font-black uppercase tracking-[0.22em] text-gray-400">
-                Browse by category
-              </p>
-              <div className="flex max-w-full flex-wrap justify-end gap-1.5">
-              {categories.map((cat) => (
-                <button
-                  key={cat}
-                  onClick={() =>
-                    setActiveCat(cat)
-                  }
-                  className={`rounded-xl border px-3.5 py-2 text-xs font-black uppercase tracking-[0.1em] whitespace-nowrap transition-all ${
-                    activeCat === cat
-                      ? 'border-black bg-black text-white shadow-sm'
-                      : 'border-transparent bg-gray-50 text-gray-500 hover:border-gray-200 hover:bg-white hover:text-black'
-                  }`}
-                >
-                  {cat}
-                </button>
-              ))}
-              </div>
-            </div>
-
-            <div className="flex flex-wrap items-center justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setShowOnlyAvailable(false)}
-                className={`rounded-full border px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.16em] transition ${
-                  !showOnlyAvailable
-                    ? 'border-black bg-black text-white'
-                    : 'border-gray-200 bg-white text-gray-500 hover:border-black hover:text-black'
-                }`}
-              >
-                All items
-              </button>
-              <button
-                type="button"
-                onClick={() => setShowOnlyAvailable(true)}
-                className={`rounded-full border px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.16em] transition ${
-                  showOnlyAvailable
-                    ? 'border-black bg-black text-white'
-                    : 'border-gray-200 bg-white text-gray-500 hover:border-black hover:text-black'
-                }`}
-              >
-                Available now
-              </button>
-              <label className="flex items-center gap-2 rounded-full border border-gray-200 bg-white px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.16em] text-gray-500">
-                <span>Sort</span>
-                <select
-                  value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value)}
-                  className="bg-transparent font-semibold uppercase outline-none text-slate-700"
-                >
-                  <option value="recommended">Recommended</option>
-                  <option value="price-asc">Price ↑</option>
-                  <option value="price-desc">Price ↓</option>
-                  <option value="name-asc">Name A–Z</option>
-                </select>
-              </label>
-            </div>
-          </div>
         </div>
 
         {favoriteIds.length > 0 && (
           <section className="mb-14">
             <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
               <div>
-                <p className="text-[11px] uppercase tracking-[0.35em] text-gray-400">Saved Products</p>
-                <h2 className="text-[18px] sm:text-[20px] font-semibold text-slate-900">Frequently Ordered Items</h2>
+                <p className="text-[13px] font-black uppercase tracking-[0.3em] text-[#d4af37]">Saved Products</p>
               </div>
               <button
                 type="button"
@@ -287,6 +226,63 @@ export default function Menu({ onAddToCart }) {
             </div>
           </section>
         )}
+
+        {/* CATEGORY AND FILTER CONTROLS */}
+        <div className="mb-14 flex w-full flex-col items-start gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div className="order-2 self-center rounded-2xl border border-gray-200 bg-white p-2 shadow-[0_8px_24px_rgba(15,23,42,0.06)] lg:order-2 lg:self-auto">
+            <div className="flex flex-col items-center gap-2">
+              <p className="mb-0 px-2 text-[10px] font-black uppercase tracking-[0.22em] text-gray-400">Browse by category</p>
+              <div className="flex max-w-full flex-wrap justify-center gap-1.5">
+                {categories.map((cat) => (
+                  <button
+                    key={cat}
+                    onClick={() => setActiveCat(cat)}
+                    className={`rounded-xl border px-3.5 py-2 text-xs font-black uppercase tracking-[0.1em] whitespace-nowrap transition-all ${
+                      activeCat === cat
+                        ? 'border-black bg-black text-white shadow-sm'
+                        : 'border-transparent bg-gray-50 text-gray-500 hover:border-gray-200 hover:bg-white hover:text-black'
+                    }`}
+                  >
+                    {cat}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div className="order-1 rounded-2xl border border-gray-200 bg-white p-2 shadow-[0_8px_24px_rgba(15,23,42,0.06)] lg:order-1">
+            <p className="mb-2 px-2 text-[10px] font-black uppercase tracking-[0.22em] text-gray-400">Menu filters</p>
+            <div className="flex flex-wrap items-center justify-start gap-2">
+              <button
+                type="button"
+                onClick={() => setShowOnlyAvailable(false)}
+                className={`rounded-full border px-4 py-2 text-[11px] font-black uppercase tracking-[0.16em] transition ${
+                  !showOnlyAvailable ? 'border-black bg-black text-white' : 'border-gray-200 bg-white text-gray-500 hover:border-black hover:text-black'
+                }`}
+              >
+                All items
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowOnlyAvailable(true)}
+                className={`rounded-full border px-4 py-2 text-[11px] font-black uppercase tracking-[0.16em] transition ${
+                  showOnlyAvailable ? 'border-black bg-black text-white' : 'border-gray-200 bg-white text-gray-500 hover:border-black hover:text-black'
+                }`}
+              >
+                Available now
+              </button>
+              <label className="flex items-center gap-2 rounded-full border border-gray-200 bg-white px-4 py-2 text-[11px] font-black uppercase tracking-[0.16em] text-gray-500">
+                <span>Sort</span>
+                <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className="bg-transparent font-semibold uppercase outline-none text-slate-700">
+                  <option value="recommended">Recommended</option>
+                  <option value="price-asc">Price ↑</option>
+                  <option value="price-desc">Price ↓</option>
+                  <option value="name-asc">Name A–Z</option>
+                </select>
+              </label>
+            </div>
+          </div>
+        </div>
 
         {/* PRODUCTS */}
         <div className="grid grid-cols-2 items-stretch gap-6 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-5">

@@ -64,6 +64,87 @@ class AuthController extends Controller
         return back()->withInput()->with('error', $error);
     }
 
+    public function googleLogin(Request $request)
+    {
+        if ($request->isMethod('options')) {
+            return $this->googleCorsResponse(['success' => true]);
+        }
+
+        $idToken = $request->input('id_token');
+
+        if (!$idToken || !is_string($idToken)) {
+            return $this->googleCorsResponse(['success' => false, 'message' => 'Firebase ID token is required.'], 422);
+        }
+
+        $firebaseResponse = Http::asJson()->post(
+            'https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=' . config('services.firebase.api_key'),
+            ['idToken' => $idToken]
+        );
+
+        if (!$firebaseResponse->successful()) {
+            return $this->googleCorsResponse(['success' => false, 'message' => 'Firebase Google sign-in token is invalid.'], 401);
+        }
+
+        $firebaseUser = $firebaseResponse->json('users.0');
+        $email = strtolower(trim($firebaseUser['email'] ?? ''));
+        $name = trim($firebaseUser['displayName'] ?? '') ?: 'Google User';
+        $profilePicture = trim($firebaseUser['photoUrl'] ?? '');
+
+        if (!$email || empty($firebaseUser['emailVerified'])) {
+            return $this->googleCorsResponse(['success' => false, 'message' => 'A verified Google email is required.'], 422);
+        }
+
+        $user = DB::table('users')->where('email', $email)->first();
+
+        if (!$user) {
+            DB::table('users')->insert([
+                'name' => $name,
+                'email' => $email,
+                'password' => Hash::make(bin2hex(random_bytes(16))),
+                'role' => 'customer',
+                'profile_picture' => $profilePicture ?: null,
+                'created_at' => now(),
+            ]);
+
+            $user = DB::table('users')->where('email', $email)->first();
+        } elseif (!$user->profile_picture && $profilePicture) {
+            DB::table('users')->where('id', $user->id)->update(['profile_picture' => $profilePicture]);
+            $user->profile_picture = $profilePicture;
+        }
+
+        $userData = [
+            'id' => $user->id,
+            'name' => $user->name,
+            'email' => $user->email,
+            'role' => $user->role ?? 'customer',
+            'profile_picture' => $user->profile_picture ?? '',
+            'avatar' => $user->profile_picture ?? '',
+        ];
+
+        $_SESSION['user'] = $userData;
+        session(['user' => $userData]);
+
+        return $this->googleCorsResponse(['success' => true, 'user' => $userData]);
+    }
+
+    private function googleCorsResponse(array $payload, int $status = 200)
+    {
+        $origin = request()->headers->get('Origin', '');
+        $allowed = preg_match('/^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(?::\d+)?$/', $origin) === 1;
+
+        $response = response()->json($payload, $status)
+            ->header('Access-Control-Allow-Methods', 'POST, OPTIONS')
+            ->header('Access-Control-Allow-Headers', 'Content-Type, Accept, X-Requested-With')
+            ->header('Vary', 'Origin');
+
+        if ($allowed) {
+            $response->header('Access-Control-Allow-Origin', $origin)
+                ->header('Access-Control-Allow-Credentials', 'true');
+        }
+
+        return $response;
+    }
+
     private function buildFrontendAuthRedirect(Request $request, array $userData)
     {
         $redirect = $request->query('redirect');

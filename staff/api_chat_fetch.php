@@ -27,12 +27,14 @@ if ($orderId <= 0) {
     exit();
 }
 
+$conn->query("ALTER TABLE messages ADD COLUMN IF NOT EXISTS image_path VARCHAR(255) NULL");
+
 $mark = $conn->prepare("UPDATE messages SET is_read = 1 WHERE order_id = ? AND sender = 'customer'");
 $mark->bind_param('i', $orderId);
 $mark->execute();
 $mark->close();
 
-$stmt = $conn->prepare('SELECT id, sender, message, is_read, created_at FROM messages WHERE order_id = ? ORDER BY created_at ASC');
+$stmt = $conn->prepare('SELECT id, sender, message, image_path, is_read, created_at FROM messages WHERE order_id = ? ORDER BY created_at ASC');
 $stmt->bind_param('i', $orderId);
 $stmt->execute();
 $result = $stmt->get_result();

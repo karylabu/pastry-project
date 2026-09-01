@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, AlertTriangle, PackageCheck, Filter, ChevronDown, Eye, Search, Download, Cookie, Printer } from "lucide-react";
+import { X, AlertTriangle, PackageCheck, Filter, ChevronDown, Eye, Search, Download, Cookie, Printer, Star } from "lucide-react";
 import PageShell from '../components/PageShell';
 import { safeParseJson } from '../../services/api';
 import { CUSTOMER_BASE } from "../../services/config";
@@ -99,6 +99,73 @@ function ReceivedDialog({ order, onConfirm, onDismiss, isLoading }) {
   );
 }
 
+function FeedbackDialog({ order, onSubmit, onDismiss, isLoading }) {
+  const [rating, setRating] = useState(0);
+  const [comment, setComment] = useState('');
+
+  if (!order) return null;
+
+  const handleSubmit = (event) => {
+    event.preventDefault();
+    if (rating) onSubmit({ rating, comment });
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 p-6 backdrop-blur-sm"
+      onClick={onDismiss}
+    >
+      <motion.form
+        initial={{ scale: 0.92, opacity: 0, y: 16 }}
+        animate={{ scale: 1, opacity: 1, y: 0 }}
+        exit={{ scale: 0.92, opacity: 0, y: 16 }}
+        transition={{ type: 'spring', damping: 24, stiffness: 260 }}
+        onSubmit={handleSubmit}
+        onClick={(event) => event.stopPropagation()}
+        className="w-full max-w-sm rounded-[32px] bg-white p-8 font-['DM_Sans'] shadow-2xl"
+      >
+        <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-full bg-[#fff4c7] text-[#a67c00]">
+          <Star size={26} fill="currentColor" strokeWidth={1.8} />
+        </div>
+        <h3 className="mb-2 text-center text-[20px] font-black leading-tight text-gray-900">How was your order?</h3>
+        <p className="mb-6 text-center text-[12px] leading-relaxed text-gray-400">Order #{order.id} is completed. Share your rating and comment.</p>
+        <div className="mb-5 flex justify-center gap-2" aria-label="Order rating">
+          {[1, 2, 3, 4, 5].map((value) => (
+            <button
+              key={value}
+              type="button"
+              onClick={() => setRating(value)}
+              aria-label={`${value} star${value === 1 ? '' : 's'}`}
+              className={`transition-transform hover:scale-110 ${value <= rating ? 'text-[#d4af37]' : 'text-gray-300'}`}
+            >
+              <Star size={28} fill="currentColor" strokeWidth={1.5} />
+            </button>
+          ))}
+        </div>
+        <textarea
+          value={comment}
+          onChange={(event) => setComment(event.target.value)}
+          rows={4}
+          maxLength={1000}
+          placeholder="Write a comment (optional)"
+          className="mb-5 w-full resize-none rounded-2xl border border-gray-200 px-4 py-3 text-sm text-gray-700 outline-none transition focus:border-black"
+        />
+        <div className="flex gap-3">
+          <button type="button" onClick={onDismiss} className="flex-1 rounded-[20px] border border-gray-200 py-4 text-[11px] font-black uppercase tracking-[0.2em] text-gray-500 transition hover:bg-gray-50">
+            Later
+          </button>
+          <button type="submit" disabled={!rating || isLoading} className="flex-1 rounded-[20px] bg-slate-900 py-4 text-[11px] font-black uppercase tracking-[0.2em] text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-40">
+            {isLoading ? 'Saving...' : 'Submit'}
+          </button>
+        </div>
+      </motion.form>
+    </motion.div>
+  );
+}
+
 // ── Main Component ────────────────────────────────────────────────────────────
 export default function Orders() {
   const [orders, setOrders]           = useState([]);
@@ -113,6 +180,8 @@ export default function Orders() {
   const [processingId, setProcessingId]   = useState(null);
   const [actionError, setActionError]     = useState(null);
   const [catalogProducts, setCatalogProducts] = useState([]);
+  const [feedbackTarget, setFeedbackTarget] = useState(null);
+  const [feedbackSubmitting, setFeedbackSubmitting] = useState(false);
 
   const userEmail = user?.email?.toLowerCase?.();
   const userName  = user?.name?.toLowerCase?.();
@@ -195,12 +264,12 @@ export default function Orders() {
         setOrders(userOrders);
         localStorage.setItem(storageKey, JSON.stringify(userOrders));
       } else {
-        const savedOrders = JSON.parse(localStorage.getItem(storageKey)) || [];
-        setOrders(filterUserOrders(savedOrders));
+        setOrders([]);
+        localStorage.setItem(storageKey, JSON.stringify([]));
       }
     } catch {
-      const savedOrders = JSON.parse(localStorage.getItem(storageKey)) || [];
-      setOrders(filterUserOrders(savedOrders));
+      setOrders([]);
+      localStorage.setItem(storageKey, JSON.stringify([]));
     }
   }, [userEmail, user?.id, storageKey]);
 
@@ -209,6 +278,16 @@ export default function Orders() {
     window.addEventListener("ordersUpdated", loadOrders);
     return () => window.removeEventListener("ordersUpdated", loadOrders);
   }, [loadOrders]);
+
+  useEffect(() => {
+    if (feedbackTarget) return;
+    const completedOrder = orders.find((order) => (
+      String(order.status || '').toLowerCase() === 'completed' &&
+      !localStorage.getItem(`order_feedback_submitted_${order.id}`) &&
+      !localStorage.getItem(`order_feedback_dismissed_${order.id}`)
+    ));
+    if (completedOrder) setFeedbackTarget(completedOrder);
+  }, [orders, feedbackTarget]);
 
   useEffect(() => {
     const loadCatalogProducts = async () => {
@@ -304,6 +383,38 @@ export default function Orders() {
       setProcessingId(null);
       setReceivedTarget(null);
     }
+  };
+
+  const handleFeedbackSubmit = async ({ rating, comment }) => {
+    if (!feedbackTarget) return;
+    setFeedbackSubmitting(true);
+    setActionError(null);
+    try {
+      const res = await fetch(`${CUSTOMER_BASE}/api_order_feedback.php`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          order_id: feedbackTarget.id,
+          user_id: user?.id || feedbackTarget.user_id || 0,
+          rating,
+          comment,
+        }),
+      });
+      const data = await safeParseJson(res);
+      if (!data.success) throw new Error(data.message || 'Failed to save feedback.');
+      localStorage.setItem(`order_feedback_submitted_${feedbackTarget.id}`, '1');
+      setFeedbackTarget(null);
+    } catch (error) {
+      setActionError(error.message || 'Unable to save your feedback. Please try again.');
+    } finally {
+      setFeedbackSubmitting(false);
+    }
+  };
+
+  const dismissFeedback = () => {
+    if (!feedbackTarget) return;
+    localStorage.setItem(`order_feedback_dismissed_${feedbackTarget.id}`, '1');
+    setFeedbackTarget(null);
   };
 
   const updateLocalStatus = (id, newStatus) => {
@@ -974,6 +1085,17 @@ export default function Orders() {
       <AnimatePresence>
         {selectedOrder && (
           <OrderDetailsDialog order={selectedOrder} onDismiss={() => setSelectedOrder(null)} />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {feedbackTarget && (
+          <FeedbackDialog
+            order={feedbackTarget}
+            onSubmit={handleFeedbackSubmit}
+            onDismiss={dismissFeedback}
+            isLoading={feedbackSubmitting}
+          />
         )}
       </AnimatePresence>
       </PageShell>

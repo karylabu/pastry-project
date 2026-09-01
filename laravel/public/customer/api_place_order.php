@@ -43,6 +43,8 @@ try {
         'phone' => "VARCHAR(20) DEFAULT ''",
         'lat' => "DECIMAL(10,8) DEFAULT 0",
         'lng' => "DECIMAL(11,8) DEFAULT 0",
+        'voucher_code' => "VARCHAR(50) DEFAULT ''",
+        'voucher_amount' => "DECIMAL(10,2) DEFAULT 0",
         'status' => "VARCHAR(50) DEFAULT 'Pending'",
         'order_date' => "DATE",
         'created_at' => "DATETIME DEFAULT CURRENT_TIMESTAMP"
@@ -76,17 +78,19 @@ try {
     $phone = mysqli_real_escape_string($conn, $data['phone'] ?? '');
     $lat = floatval($data['latitude'] ?? 0);
     $lng = floatval($data['longitude'] ?? 0);
+    $voucher_code = mysqli_real_escape_string($conn, $data['voucher_code'] ?? '');
+    $voucher_amount = max(0, floatval($data['voucher_amount'] ?? 0));
     $status = 'Pending';
     $order_date = date('Y-m-d');
 
     $sql = "INSERT INTO orders (
                 user_id, customer, email, items, subtotal, delivery_fee,
-                total, method, payment, address, phone, lat, lng,
+                total, method, payment, address, phone, lat, lng, voucher_code, voucher_amount,
                 status, order_date, created_at
             ) VALUES (
                 " . ($user_id > 0 ? $user_id : "NULL") . ",
                 '$customer', '$email', '$items_json', $subtotal, $delivery_fee,
-                $total, '$method', '$payment', '$address', '$phone', $lat, $lng,
+                $total, '$method', '$payment', '$address', '$phone', $lat, $lng, '$voucher_code', $voucher_amount,
                 '$status', '$order_date', NOW()
             )";
 

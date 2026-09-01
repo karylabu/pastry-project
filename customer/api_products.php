@@ -159,6 +159,75 @@ if ($action === 'list') {
 }
 
 /* =========================================================
+   1B. BEST SELLERS
+========================================================= */
+
+if ($action === 'bestsellers') {
+    $salesStmt = $pdo->query("SELECT o.items, oi.product, oi.qty
+        FROM orders o
+        LEFT JOIN order_items oi ON oi.order_id = o.id
+        WHERE LOWER(o.status) = 'completed'");
+    $salesByProduct = [];
+    foreach ($salesStmt->fetchAll() as $sale) {
+        $savedItems = json_decode((string) ($sale['items'] ?? ''), true);
+        if (is_array($savedItems)) {
+            foreach ($savedItems as $savedItem) {
+                $name = strtolower(trim((string) ($savedItem['product'] ?? $savedItem['name'] ?? '')));
+                if ($name !== '') {
+                    $salesByProduct[$name] = ($salesByProduct[$name] ?? 0) + max(1, (int) ($savedItem['qty'] ?? 1));
+                }
+            }
+        }
+
+        $name = strtolower(trim((string) ($sale['product'] ?? '')));
+        if ($name !== '' && !is_array($savedItems)) {
+            $salesByProduct[$name] = ($salesByProduct[$name] ?? 0) + max(1, (int) ($sale['qty'] ?? 1));
+        }
+    }
+
+    $productsStmt = $pdo->query("SELECT * FROM products WHERE available = 1 AND stock > 0");
+    $bestSellers = [];
+    foreach ($productsStmt->fetchAll() as $product) {
+        $name = strtolower(trim((string) ($product['name'] ?? '')));
+        if ($name === '' || !isset($salesByProduct[$name])) {
+            continue;
+        }
+        $product['total_sold'] = $salesByProduct[$name];
+        $bestSellers[] = $product;
+    }
+    usort($bestSellers, fn ($a, $b) => $b['total_sold'] <=> $a['total_sold'] ?: strcasecmp($a['name'], $b['name']));
+    $bestSellers = array_slice($bestSellers, 0, 6);
+
+    foreach ($bestSellers as &$product) {
+        $product['sizes'] = getProductSizeOptions($pdo, $product);
+        $product['price'] = (float) ($product['price'] ?? 0);
+        if (empty($product['sizes'])) {
+            $product['price'] = max(
+                (float) ($product['price'] ?? 0),
+                (float) ($product['slice_price'] ?? 0),
+                (float) ($product['small_price'] ?? 0),
+                (float) ($product['big_price'] ?? 0),
+                (float) ($product['meal_price'] ?? 0),
+                (float) ($product['combo_price'] ?? 0),
+                (float) ($product['solo_price'] ?? 0),
+                (float) ($product['sharing_price'] ?? 0)
+            );
+            $product['sizes'] = [[
+                'id' => 0,
+                'size' => 'Regular',
+                'price' => $product['price'],
+                'available' => (int) ($product['available'] ?? 1),
+            ]];
+        }
+        $product['total_sold'] = (int) ($product['total_sold'] ?? 0);
+    }
+    unset($product);
+
+    echo json_encode($bestSellers);
+    exit;
+}
+
+/* =========================================================
    2. CUSTOM CAKE ORDER
 ========================================================= */
 
@@ -454,19 +523,19 @@ if ($action === 'recommendations') {
     $columnCheck = $pdo->query("SHOW COLUMNS FROM orders LIKE 'user_id'");
     $hasUserIdColumn = $columnCheck && $columnCheck->rowCount() > 0;
 
-    $orderHistorySql = $hasUserIdColumn
-        ? "SELECT oi.product, SUM(oi.qty) AS total_qty
+        $orderHistorySql = $hasUserIdColumn
+                ? "SELECT o.items, oi.product
            FROM orders o
            LEFT JOIN order_items oi ON oi.order_id = o.id
-           WHERE (o.user_id = ? OR LOWER(o.email) = LOWER(?))
-           GROUP BY oi.product
-           ORDER BY total_qty DESC"
-        : "SELECT oi.product, SUM(oi.qty) AS total_qty
+                     WHERE (o.user_id = ? OR LOWER(o.email) = LOWER(?))
+                         AND LOWER(o.status) = 'completed'
+                     ORDER BY o.created_at DESC, o.id DESC"
+                : "SELECT o.items, oi.product
            FROM orders o
            LEFT JOIN order_items oi ON oi.order_id = o.id
-           WHERE LOWER(o.email) = LOWER(?)
-           GROUP BY oi.product
-           ORDER BY total_qty DESC";
+                     WHERE LOWER(o.email) = LOWER(?)
+                         AND LOWER(o.status) = 'completed'
+                     ORDER BY o.created_at DESC, o.id DESC";
 
     $historyStmt = $pdo->prepare($orderHistorySql);
     if ($hasUserIdColumn) {
@@ -479,8 +548,19 @@ if ($action === 'recommendations') {
     $previousProducts = [];
     foreach ($historyRows as $row) {
         $productName = trim((string) ($row['product'] ?? ''));
-        if ($productName !== '') {
+        if ($productName !== '' && !in_array(strtolower($productName), $previousProducts, true)) {
             $previousProducts[] = strtolower($productName);
+        }
+
+        $savedItems = json_decode((string) ($row['items'] ?? ''), true);
+        if (is_array($savedItems)) {
+            foreach ($savedItems as $savedItem) {
+                $savedProductName = trim((string) ($savedItem['product'] ?? $savedItem['name'] ?? ''));
+                $savedProductKey = strtolower($savedProductName);
+                if ($savedProductKey !== '' && !in_array($savedProductKey, $previousProducts, true)) {
+                    $previousProducts[] = $savedProductKey;
+                }
+            }
         }
     }
 
@@ -506,7 +586,16 @@ if ($action === 'recommendations') {
                SELECT DISTINCT oi.product
                FROM orders o
                JOIN order_items oi ON oi.order_id = o.id
-               WHERE o.user_id = ?
+                             WHERE o.user_id = ?
+                                 AND LOWER(o.status) = 'completed'
+                                 AND o.id = (
+                                         SELECT latest.id
+                                         FROM orders latest
+                                         WHERE latest.user_id = ?
+                                             AND LOWER(latest.status) = 'completed'
+                                         ORDER BY latest.created_at DESC, latest.id DESC
+                                         LIMIT 1
+                                 )
            )
            GROUP BY oi2.product
            ORDER BY co_purchase_count DESC"
@@ -517,16 +606,25 @@ if ($action === 'recommendations') {
                SELECT DISTINCT oi.product
                FROM orders o
                JOIN order_items oi ON oi.order_id = o.id
-               WHERE LOWER(o.email) = LOWER(?)
+                             WHERE LOWER(o.email) = LOWER(?)
+                                 AND LOWER(o.status) = 'completed'
+                                 AND o.id = (
+                                         SELECT latest.id
+                                         FROM orders latest
+                                         WHERE LOWER(latest.email) = LOWER(?)
+                                             AND LOWER(latest.status) = 'completed'
+                                         ORDER BY latest.created_at DESC, latest.id DESC
+                                         LIMIT 1
+                                 )
            )
            GROUP BY oi2.product
            ORDER BY co_purchase_count DESC";
 
     $coPurchaseStmt = $pdo->prepare($coPurchaseSql);
     if ($hasUserIdColumn) {
-        $coPurchaseStmt->execute([$userId]);
+        $coPurchaseStmt->execute([$userId, $userId]);
     } else {
-        $coPurchaseStmt->execute([$userEmail]);
+        $coPurchaseStmt->execute([$userEmail, $userEmail]);
     }
     $coPurchaseRows = $coPurchaseStmt->fetchAll();
 
@@ -554,7 +652,7 @@ if ($action === 'recommendations') {
             continue;
         }
 
-        if (isset($previousSet[$productName])) {
+        if (!isset($previousSet[$productName])) {
             continue;
         }
 
@@ -646,7 +744,7 @@ if ($action === 'recommendations') {
 
     echo json_encode([
         'success' => true,
-        'items' => array_slice($results, 0, 5)
+        'items' => array_slice($results, 0, 6)
     ]);
     exit;
 }

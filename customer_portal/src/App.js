@@ -73,10 +73,10 @@ function App() {
       <GoogleAuthBootstrap />
       <Routes>
 
-        {/* ROOT → redirect to login */}
+        {/* ROOT → guest-friendly dashboard */}
         <Route
           path="/"
-          element={<Navigate to="customer/login" replace />}
+          element={<Navigate to="customer" replace />}
         />
 
         {/* ── AUTH (no navbar) ── */}
