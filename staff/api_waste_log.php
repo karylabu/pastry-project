@@ -117,6 +117,73 @@ function getItemCatalogue($conn) {
     echo json_encode(["success" => true, "items" => $items]);
 }
 
+function synchronizeIngredientStock(mysqli $conn, int $ingredientId): float {
+    $stmt = $conn->prepare('SELECT COALESCE(SUM(quantity_remaining), 0) AS total FROM ingredient_batches WHERE ingredient_id = ?');
+    $stmt->bind_param('i', $ingredientId); $stmt->execute();
+    $total = (float) ($stmt->get_result()->fetch_assoc()['total'] ?? 0); $stmt->close();
+    $update = $conn->prepare('UPDATE ingredients SET stock = ?, updated_at = NOW() WHERE id = ?');
+    $update->bind_param('di', $total, $ingredientId);
+    if (!$update->execute()) { $update->close(); throw new RuntimeException('Failed to synchronize ingredient stock'); }
+    $update->close(); return $total;
+}
+
+function createIngredientWasteEntry(mysqli $conn, array $body, int $ingredientId, string $item, float $qty, string $reason, string $datetime, string $idempotencyKey): void {
+    $conn->begin_transaction();
+    try {
+        $ingredientStmt = $conn->prepare('SELECT id, name, unit_cost FROM ingredients WHERE ' . ($ingredientId > 0 ? 'id = ?' : 'name = ?') . ' LIMIT 1 FOR UPDATE');
+        if ($ingredientId > 0) $ingredientStmt->bind_param('i', $ingredientId); else $ingredientStmt->bind_param('s', $item);
+        $ingredientStmt->execute(); $ingredient = $ingredientStmt->get_result()->fetch_assoc(); $ingredientStmt->close();
+        if (!$ingredient) throw new RuntimeException('Inventory item not found');
+        $ingredientId = (int) $ingredient['id']; $item = $ingredient['name']; $unitCost = (float) $ingredient['unit_cost'];
+
+        $requestedBatchId = max(0, (int) ($body['ingredient_batch_id'] ?? $body['batch_id'] ?? 0));
+        if ($requestedBatchId > 0) {
+            $batchStmt = $conn->prepare('SELECT id, batch_number, quantity_remaining FROM ingredient_batches WHERE id = ? AND ingredient_id = ? AND quantity_remaining > 0 FOR UPDATE');
+            $batchStmt->bind_param('ii', $requestedBatchId, $ingredientId);
+        } else {
+            $batchStmt = $conn->prepare("SELECT id, batch_number, quantity_remaining FROM ingredient_batches WHERE ingredient_id = ? AND quantity_remaining > 0 AND (expiry_date IS NULL OR expiry_date >= CURDATE()) AND NOT EXISTS (SELECT 1 FROM discard_requests d WHERE d.ingredient_batch_id = ingredient_batches.id AND d.status = 'Pending') ORDER BY expiry_date IS NULL, expiry_date ASC, id ASC FOR UPDATE");
+            $batchStmt->bind_param('i', $ingredientId);
+        }
+        $batchStmt->execute(); $result = $batchStmt->get_result(); $batches = [];
+        while ($batch = $result->fetch_assoc()) $batches[] = ['id' => (int) $batch['id'], 'batch_number' => $batch['batch_number'], 'quantity_remaining' => (float) $batch['quantity_remaining']];
+        $batchStmt->close();
+        $remaining = $qty; $allocations = [];
+        foreach ($batches as $batch) {
+            if ($remaining <= 0.000001) break;
+            $consumed = min($remaining, $batch['quantity_remaining']);
+            $allocations[] = ['id' => $batch['id'], 'batch_number' => $batch['batch_number'], 'quantity' => $consumed];
+            $remaining -= $consumed;
+            if ($requestedBatchId > 0) break;
+        }
+        if ($remaining > 0.000001) throw new RuntimeException('Insufficient batch stock for waste entry');
+
+        $insert = $conn->prepare("INSERT INTO waste_log (datetime, item, qty, unit_cost, item_type, reason, ingredient_id, user_id, reference_type, idempotency_key) VALUES (?, ?, ?, ?, 'Raw Material', ?, ?, ?, 'waste', NULLIF(?, ''))");
+        $userId = inventoryUserId(); $insert->bind_param('ssddsiis', $datetime, $item, $qty, $unitCost, $reason, $ingredientId, $userId, $idempotencyKey);
+        if (!$insert->execute()) throw new RuntimeException('Failed to save waste entry');
+        $newId = $insert->insert_id; $insert->close();
+
+        $beforeStmt = $conn->prepare('SELECT COALESCE(SUM(quantity_remaining), 0) AS total FROM ingredient_batches WHERE ingredient_id = ?');
+        $beforeStmt->bind_param('i', $ingredientId); $beforeStmt->execute(); $before = (float) ($beforeStmt->get_result()->fetch_assoc()['total'] ?? 0); $beforeStmt->close();
+        foreach ($allocations as $allocation) {
+            $update = $conn->prepare('UPDATE ingredient_batches SET quantity_remaining = quantity_remaining - ?, updated_at = NOW() WHERE id = ? AND quantity_remaining >= ?');
+            $update->bind_param('did', $allocation['quantity'], $allocation['id'], $allocation['quantity']);
+            if (!$update->execute() || $update->affected_rows !== 1) { $update->close(); throw new RuntimeException('Failed to deduct waste batch'); }
+            $update->close();
+            $afterStmt = $conn->prepare('SELECT COALESCE(SUM(quantity_remaining), 0) AS total FROM ingredient_batches WHERE ingredient_id = ?');
+            $afterStmt->bind_param('i', $ingredientId); $afterStmt->execute(); $after = (float) ($afterStmt->get_result()->fetch_assoc()['total'] ?? 0); $afterStmt->close();
+            $movement = $conn->prepare("INSERT INTO ingredient_movements (ingredient_id, batch_id, action, qty, note, user_id, reference_type, reference_id, previous_stock, new_stock) VALUES (?, ?, 'stock_out', ?, ?, ?, 'waste', ?, ?, ?)");
+            $note = "Waste: {$reason} batch {$allocation['batch_number']}"; $movement->bind_param('iidsiidd', $ingredientId, $allocation['id'], $allocation['quantity'], $note, $userId, $newId, $before, $after);
+            if (!$movement->execute()) { $movement->close(); throw new RuntimeException('Failed to record waste movement'); }
+            $movement->close(); $before = $after;
+        }
+        $newStock = synchronizeIngredientStock($conn, $ingredientId);
+        $conn->commit();
+        echo json_encode(['success' => true, 'entry' => ['id' => $newId, 'datetime' => $datetime, 'item' => $item, 'qty' => $qty, 'unit_cost' => $unitCost, 'cost' => round($qty * $unitCost, 2), 'type' => 'Raw Material', 'reason' => $reason], 'new_stock' => $newStock]);
+    } catch (Throwable $error) {
+        $conn->rollback(); http_response_code(409); echo json_encode(['success' => false, 'message' => $error->getMessage()]);
+    }
+}
+
 function createEntry($conn) {
     $body = json_decode(file_get_contents("php://input"), true);
 
@@ -184,6 +251,11 @@ function createEntry($conn) {
         }
     }
 
+    if ($productId <= 0 && $itemTypeInput !== 'finished product') {
+        createIngredientWasteEntry($conn, $body, $ingredientId, $item, $qty, $reason, $datetime, $idempotencyKey);
+        return;
+    }
+
     $conn->begin_transaction();
     $unitCost = 0.0;
     $itemType = "Raw Material";
@@ -198,13 +270,10 @@ function createEntry($conn) {
         }
         $itemType = "Finished Product";
     } else {
-        $stmt = $conn->prepare("SELECT id, name, unit_cost, stock FROM ingredients WHERE id = ? FOR UPDATE");
-        if ($ingredientId <= 0) {
-            $stmt = $conn->prepare("SELECT id, name, unit_cost, stock FROM ingredients WHERE name = ? LIMIT 1 FOR UPDATE");
-            $stmt->bind_param("s", $item);
-        } else {
-            $stmt->bind_param("i", $ingredientId);
-        }
+        $conn->rollback();
+        http_response_code(409);
+        echo json_encode(["success" => false, "message" => "Ingredient waste must identify a batch"]);
+        return;
     }
     $stmt->execute();
     $res = $stmt->get_result();
@@ -237,13 +306,8 @@ function createEntry($conn) {
     }
 
     $newStock = $previous - $qty;
-    if ($productId > 0) {
-        $update = $conn->prepare("UPDATE products SET stock = ? WHERE id = ?");
-        $update->bind_param('di', $newStock, $productId);
-    } else {
-        $update = $conn->prepare("UPDATE ingredients SET stock = ?, updated_at = NOW() WHERE id = ?");
-        $update->bind_param('di', $newStock, $ingredientId);
-    }
+    $update = $conn->prepare("UPDATE products SET stock = ? WHERE id = ?");
+    $update->bind_param('di', $newStock, $productId);
     if (!$update->execute()) {
         $update->close();
         $conn->rollback();

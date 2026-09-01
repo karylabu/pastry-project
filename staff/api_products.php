@@ -29,6 +29,73 @@ try {
     exit;
 }
 
+/* ================= HELPER: CHECK PRODUCTION AVAILABILITY ================= */
+function checkProductionAvailability($pdo, $productId) {
+    try {
+        // Get active recipe
+        $recipeStmt = $pdo->prepare("
+            SELECT pr.ingredient_id, pr.qty, i.name
+            FROM product_recipes pr
+            JOIN ingredients i ON i.id = pr.ingredient_id
+            WHERE pr.product_id = ? AND pr.active = 1
+            ORDER BY pr.id ASC
+        ");
+        $recipeStmt->execute([$productId]);
+        $recipe = $recipeStmt->fetchAll();
+
+        // No active recipe
+        if (count($recipe) === 0) {
+            return [
+                'is_producible' => false,
+                'reason' => 'No active recipe'
+            ];
+        }
+
+        // Check each ingredient
+        foreach ($recipe as $ingredient) {
+            $ing_id = (int)$ingredient['ingredient_id'];
+            $required = (float)$ingredient['qty'];
+            $ing_name = $ingredient['name'];
+
+            // Get usable batch stock
+            $batchStmt = $pdo->prepare("
+                SELECT COALESCE(SUM(quantity_remaining), 0) as total
+                FROM ingredient_batches
+                WHERE ingredient_id = ?
+                  AND quantity_remaining > 0
+                  AND (expiry_date IS NULL OR expiry_date >= CURDATE())
+                  AND NOT EXISTS (
+                    SELECT 1 FROM discard_requests dr 
+                    WHERE dr.ingredient_batch_id = ingredient_batches.id 
+                    AND dr.status = 'Pending'
+                  )
+            ");
+            $batchStmt->execute([$ing_id]);
+            $batchRow = $batchStmt->fetch();
+            $usable = (float)($batchRow['total'] ?? 0);
+
+            // Insufficient stock
+            if ($usable < $required) {
+                return [
+                    'is_producible' => false,
+                    'reason' => 'Insufficient ' . $ing_name
+                ];
+            }
+        }
+
+        return [
+            'is_producible' => true,
+            'reason' => null
+        ];
+
+    } catch (Exception $e) {
+        return [
+            'is_producible' => false,
+            'reason' => 'Unable to check availability'
+        ];
+    }
+}
+
 /* ================= GET PRODUCTS ================= */
 
 $action = $_GET['action'] ?? 'list';
@@ -97,6 +164,8 @@ if ($action === 'list') {
                 $variants = $variantStmt->fetchAll();
             }
 
+            $availability = checkProductionAvailability($pdo, $productId);
+            
             $products[] = [
                 "id" => $productId,
                 "name" => $row["name"],
@@ -106,6 +175,8 @@ if ($action === 'list') {
                 "stock" => $row["stock"] ?? 0,
                 "minimum_stock" => $row["minimum_stock"] ?? 5,
                 "available" => $row["available"] ?? 1,
+                "is_producible" => $availability['is_producible'],
+                "availability_reason" => $availability['reason'],
                 "variants" => array_map(function ($variant) {
                     return [
                         'id' => intval($variant['id']),

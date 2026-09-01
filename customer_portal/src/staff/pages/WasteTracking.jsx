@@ -21,9 +21,18 @@ import {
   Cell,
 } from "recharts";
 import StaffNavbar from "../components/StaffNavbar";
-import { STAFF_BASE } from "../../services/config";
+import { LARAVEL_BASE, STAFF_BASE } from "../../services/config";
 
 const staffFetch = (url, options = {}) => fetch(url, { credentials: "include", ...options });
+const laravelStaffFetch = (url, options = {}) => {
+  let token = '';
+  try { token = JSON.parse(localStorage.getItem('user') || 'null')?.token || ''; } catch (_) { /* no-op */ }
+  return fetch(url, {
+    credentials: 'include',
+    ...options,
+    headers: { ...(options.headers || {}), ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+  });
+};
 
 const C = {
   emerald: '#10b981', emeraldSoft: '#e6f7f0',
@@ -96,11 +105,21 @@ export default function WasteTracking({ showNavbar = true }) {
 
   // Pull the real inventory catalogue for the entry form.
   useEffect(() => {
-    staffFetch(`${STAFF_BASE}/api_waste_log.php?action=items`)
+    laravelStaffFetch(`${LARAVEL_BASE}/api/staff/inventory/waste/catalogue`)
       .then((res) => res.json())
       .then((data) => {
         if (data?.success && Array.isArray(data.items)) {
-          setCatalogue(data.items.map((i) => ({ id: i.id, name: i.name, unit: i.unit, unitCost: i.unit_cost, type: i.type })));
+          setCatalogue(data.items.map((i) => ({
+            id: i.id,
+            batchId: i.batch_id,
+            batchNumber: i.batch_number,
+            key: `${i.id}:${i.batch_id}`,
+            name: i.name,
+            unit: i.unit,
+            unitCost: i.unit_cost,
+            type: i.type,
+            status: i.status,
+          })).filter((item) => item.status === 'Usable' || item.status === 'Expired'));
         }
       })
       .catch(() => {
@@ -110,7 +129,7 @@ export default function WasteTracking({ showNavbar = true }) {
 
   // Pull real waste log entries.
   useEffect(() => {
-    staffFetch(`${STAFF_BASE}/api_waste_log.php`)
+    laravelStaffFetch(`${LARAVEL_BASE}/api/staff/inventory/waste`)
       .then((res) => res.json())
       .then((data) => {
         if (data?.success && Array.isArray(data.entries)) {
@@ -197,18 +216,20 @@ export default function WasteTracking({ showNavbar = true }) {
   const submitEntry = async (e) => {
     e.preventDefault();
     if (!form.item || !form.qty) return;
-    const selectedItem = catalogue.find((c) => c.name === form.item);
+    const selectedItem = catalogue.find((c) => c.key === form.item);
     if (!selectedItem) return;
     const newEntry = {
       datetime: form.datetime || new Date().toISOString().slice(0, 16),
-      item: form.item,
+      item: selectedItem.name,
       qty: Number(form.qty),
       reason: form.reason,
       idempotency_key: window.crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`,
-      ...(selectedItem.type === "Finished Product" ? { product_id: selectedItem.id, item_type: "Finished Product" } : { ingredient_id: selectedItem.id, item_type: "Raw Material" }),
+      ingredient_id: selectedItem.id,
+      ingredient_batch_id: selectedItem.batchId,
+      item_type: "Raw Material",
     };
     try {
-      const response = await staffFetch(`${STAFF_BASE}/api_waste_log.php`, {
+      const response = await laravelStaffFetch(`${LARAVEL_BASE}/api/staff/inventory/waste`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(newEntry),
@@ -498,13 +519,13 @@ export default function WasteTracking({ showNavbar = true }) {
                 >
                   <option value="" disabled>{catalogue.length ? "Select an item" : "Loading items..."}</option>
                   {catalogue.map((c) => (
-                    <option key={c.name} value={c.name}>{c.name}</option>
+                    <option key={c.key} value={c.key}>{c.name} · {c.batchNumber}</option>
                   ))}
                 </select>
               </div>
               <div>
                 <label className="block text-[12px] font-semibold mb-1.5" style={{ color: C.sub }}>
-                  Quantity {form.item ? `(${catalogue.find((c) => c.name === form.item)?.unit || ""})` : ""}
+                  Quantity {form.item ? `(${catalogue.find((c) => c.key === form.item)?.unit || ""})` : ""}
                 </label>
                 <input
                   type="number"

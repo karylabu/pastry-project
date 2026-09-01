@@ -132,7 +132,7 @@ export default function Orders({ showNavbar = true }) {
     }));
 
   const fetchIngredients = () => {
-    staffFetch(`${STAFF_BASE}/api_ingredients.php`)
+    laravelStaffFetch(`${LARAVEL_BASE}/api/staff/inventory/ingredients`)
       .then((res) => res.json())
       .then((data) => {
         const list = Array.isArray(data?.ingredients) ? data.ingredients : [];

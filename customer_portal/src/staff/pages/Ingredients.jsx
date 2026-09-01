@@ -1,8 +1,17 @@
 import React, { useEffect, useMemo, useState } from "react";
 import StaffNavbar from "../components/StaffNavbar";
-import { STAFF_BASE } from "../../services/config";
+import { LARAVEL_BASE, STAFF_BASE } from "../../services/config";
 
 const staffFetch = (url, options = {}) => fetch(url, { credentials: "include", ...options });
+const laravelStaffFetch = (url, options = {}) => {
+  let token = '';
+  try { token = JSON.parse(localStorage.getItem('user') || 'null')?.token || ''; } catch (_) { /* no-op */ }
+  return fetch(url, {
+    credentials: 'include',
+    ...options,
+    headers: { ...(options.headers || {}), ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+  });
+};
 
 export default function Ingredients({
   showNavbar = true,
@@ -53,7 +62,7 @@ export default function Ingredients({
 
   const loadPendingRequests = async () => {
     try {
-      const res = await staffFetch(`${STAFF_BASE}/api_discard_requests.php?status=Pending`);
+      const res = await laravelStaffFetch(`${LARAVEL_BASE}/api/staff/inventory/discards?status=Pending`);
       const data = await res.json();
       setPendingRequests(res.ok && data?.success ? data.requests || [] : []);
     } catch (e) { setPendingRequests([]); }
@@ -62,7 +71,8 @@ export default function Ingredients({
   const processDiscardRequest = async (requestId, action) => {
     setBatchSubmitting(true);
     try {
-      const res = await staffFetch(`${STAFF_BASE}/api_discard_requests.php`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action, request_id: requestId }) });
+      const endpoint = action === 'approve' ? 'approve' : 'reject';
+      const res = await laravelStaffFetch(`${LARAVEL_BASE}/api/staff/inventory/discards/${encodeURIComponent(requestId)}/${endpoint}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(action === 'reject' ? { rejection_note: '' } : {}) });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.success) throw new Error(data.message || 'Unable to process discard request.');
       await loadPendingRequests(); await loadIngredients();
@@ -72,7 +82,7 @@ export default function Ingredients({
 
   const loadIngredients = () => {
     setLoading(true);
-    staffFetch(`${STAFF_BASE}/api_ingredients.php`)
+    laravelStaffFetch(`${LARAVEL_BASE}/api/staff/inventory/ingredients`)
       .then((res) => res.json())
       .then((data) => {
         if (data.success) {
@@ -87,10 +97,10 @@ export default function Ingredients({
 
   const syncRecipeIngredients = async () => {
     try {
-      await staffFetch(`${STAFF_BASE}/api_ingredients.php`, {
+      await laravelStaffFetch(`${LARAVEL_BASE}/api/staff/ingredients/sync-recipes`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'sync_from_cakes' }),
+        body: JSON.stringify({}),
       });
     } catch (e) {
       // network errors are ignored — caller will still load ingredients
@@ -130,7 +140,7 @@ export default function Ingredients({
   const fetchBatches = async (ingredientId) => {
     setBatchLoading(true);
     try {
-      const res = await staffFetch(`${STAFF_BASE}/api_ingredient_batches.php?ingredient_id=${encodeURIComponent(ingredientId)}`);
+      const res = await laravelStaffFetch(`${LARAVEL_BASE}/api/staff/inventory/ingredients/${encodeURIComponent(ingredientId)}/batches`);
       const data = await res.json();
       setBatches(res.ok && data?.success ? data.batches || [] : []);
     } catch (e) { setBatches([]); }
@@ -142,7 +152,7 @@ export default function Ingredients({
     if (!batchForm.ingredient_id || quantity <= 0 || !batchForm.batch_number.trim()) { alert('Ingredient, batch number, and a positive quantity are required.'); return; }
     setBatchSubmitting(true);
     try {
-      const res = await staffFetch(`${STAFF_BASE}/api_ingredient_batches.php`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'add_stock', ...batchForm, quantity }) });
+      const res = await laravelStaffFetch(`${LARAVEL_BASE}/api/staff/inventory/batches`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...batchForm, quantity_received: quantity }) });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.success) throw new Error(data.message || 'Unable to add stock. Please try again.');
       await loadIngredients(); closeModal();
@@ -155,7 +165,7 @@ export default function Ingredients({
     if (!discardForm.batch_id || quantity <= 0) { alert('Select a batch and enter a positive quantity.'); return; }
     setBatchSubmitting(true);
     try {
-      const res = await staffFetch(`${STAFF_BASE}/api_discard_requests.php`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'request', ingredient_batch_id: Number(discardForm.batch_id), quantity, reason: discardForm.reason, notes: discardForm.notes }) });
+      const res = await laravelStaffFetch(`${LARAVEL_BASE}/api/staff/inventory/discards`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ingredient_id: Number(modalIngredient?.id), ingredient_batch_id: Number(discardForm.batch_id), quantity, reason: discardForm.reason, notes: discardForm.notes }) });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.success) throw new Error(data.message || 'Unable to submit discard request.');
       alert('Discard request submitted for owner approval.'); closeModal(); await loadIngredients();
@@ -186,9 +196,9 @@ export default function Ingredients({
       return;
     }
     const action = modalType === 'in' ? 'stock_in' : 'stock_out';
-    const payload = { action, ingredient_id: modalIngredient.id, qty, note: modalNote };
+    const payload = { action, qty, note: modalNote };
     try {
-      const res = await staffFetch(`${STAFF_BASE}/api_ingredients.php`, {
+      const res = await laravelStaffFetch(`${LARAVEL_BASE}/api/staff/ingredients/${encodeURIComponent(modalIngredient.id)}/adjust-stock`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
@@ -205,26 +215,18 @@ export default function Ingredients({
   };
 
   const submitCreateIngredient = async () => {
-    const stockValue = Number(modalStock || 0);
     const thresholdValue = Number(modalThreshold || 0);
-    if (stockValue < 0) {
-      alert('Stock cannot be negative.');
-      return;
-    }
     if (thresholdValue <= 0) {
       alert('Threshold must be greater than zero.');
       return;
     }
     const payload = {
-      action: 'create',
       name: modalName,
       unit: modalUnit,
-      stock: stockValue,
       threshold: thresholdValue,
-      expiry: modalExpiry || null,
     };
     try {
-      const res = await staffFetch(`${STAFF_BASE}/api_ingredients.php`, {
+      const res = await laravelStaffFetch(`${LARAVEL_BASE}/api/staff/ingredients`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
@@ -242,28 +244,19 @@ export default function Ingredients({
 
   const submitEditIngredient = async () => {
     if (!modalIngredient) return;
-    const stockValue = Number(modalStock || 0);
     const thresholdValue = Number(modalThreshold || 0);
-    if (stockValue < 0) {
-      alert('Stock cannot be negative.');
-      return;
-    }
     if (thresholdValue <= 0) {
       alert('Threshold must be greater than zero.');
       return;
     }
     const payload = {
-      action: 'update',
-      ingredient_id: modalIngredient.id,
       name: modalName,
       unit: modalUnit,
-      stock: stockValue,
       threshold: thresholdValue,
-      expiry: modalExpiry || null,
     };
     try {
-      const res = await staffFetch(`${STAFF_BASE}/api_ingredients.php`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
+      const res = await laravelStaffFetch(`${LARAVEL_BASE}/api/staff/ingredients/${encodeURIComponent(modalIngredient.id)}`, {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
       const j = await res.json().catch(() => ({}));
@@ -299,9 +292,9 @@ export default function Ingredients({
       alert('Cannot stock out more than current balance.');
       return;
     }
-    const payload = { action, ingredient_id: modalIngredient.id, qty, note: modalAdjustNote };
+    const payload = { action, qty, note: modalAdjustNote };
     try {
-      const res = await staffFetch(`${STAFF_BASE}/api_ingredients.php`, {
+      const res = await laravelStaffFetch(`${LARAVEL_BASE}/api/staff/ingredients/${encodeURIComponent(modalIngredient.id)}/adjust-stock`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
@@ -321,9 +314,8 @@ export default function Ingredients({
   const deleteIngredient = async (id) => {
     if (!window.confirm('Delete this ingredient? This cannot be undone.')) return false;
     try {
-      const res = await fetch(`${STAFF_BASE}/api_ingredients.php`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'delete', ingredient_id: id }),
+      const res = await laravelStaffFetch(`${LARAVEL_BASE}/api/staff/ingredients/${encodeURIComponent(id)}`, {
+        method: 'DELETE', headers: { 'Content-Type': 'application/json' },
       });
       const j = await res.json().catch(() => ({}));
       if (j.success || res.ok) {
@@ -363,14 +355,13 @@ export default function Ingredients({
       res = res.filter(i => i.unit === unitFilter);
     }
     if (showLowOnly) {
-      res = res.filter(i => Number(i.stock) <= Number(i.threshold || 0));
+      res = res.filter(i => Number(i.usable_stock) <= Number(i.threshold || 0));
     }
     if (showExpiredOnly) {
-      const now = new Date();
-      res = res.filter(i => i.expiry && new Date(i.expiry) < now);
+      res = res.filter(i => i.has_expired_batches);
     }
-    if (sortBy === 'stock_asc') res.sort((a,b) => Number(a.stock) - Number(b.stock));
-    else if (sortBy === 'stock_desc') res.sort((a,b) => Number(b.stock) - Number(a.stock));
+    if (sortBy === 'stock_asc') res.sort((a,b) => Number(a.usable_stock) - Number(b.usable_stock));
+    else if (sortBy === 'stock_desc') res.sort((a,b) => Number(b.usable_stock) - Number(a.usable_stock));
     else if (sortBy === 'threshold') res.sort((a,b) => Number(b.threshold || 0) - Number(a.threshold || 0));
     else res.sort((a,b) => String(a.name || '').localeCompare(String(b.name || '')));
     return res;
@@ -452,11 +443,9 @@ export default function Ingredients({
                 </thead>
                 <tbody>
                   {filteredIngredients.map((item) => {
-                    const now = new Date();
-                    const expiryDate = item.expiry ? new Date(item.expiry) : null;
-                    const isExpired = expiryDate ? expiryDate < now : false;
+                    const isExpired = Boolean(item.has_expired_batches);
                     const thresholdInvalid = Number(item.threshold) <= 0;
-                    const low = !thresholdInvalid && Number(item.stock) <= Number(item.threshold || 0);
+                    const low = !thresholdInvalid && Number(item.usable_stock) <= Number(item.threshold || 0);
                     const rowClass = isExpired
                       ? 'bg-red-50'
                       : low
@@ -488,13 +477,13 @@ export default function Ingredients({
                           </div>
                         </td>
                         <td className="px-4 py-4 text-[13px] text-black/70">{item.unit}</td>
-                        <td className={`px-4 py-4 text-[13px] font-semibold ${low || isExpired ? 'text-red-600' : 'text-black'}`}>{item.stock}</td>
+                        <td className={`px-4 py-4 text-[13px] font-semibold ${low || isExpired ? 'text-red-600' : 'text-black'}`}>{item.usable_stock ?? 0}</td>
                         <td className="px-4 py-4 text-[12px] text-black/60">{item.threshold}</td>
                         <td className="px-6 py-4 text-[12px] text-black/60">
                           {isExpired ? (
                             <span className="inline-flex items-center rounded-full bg-red-100 text-red-700 px-2 py-1 text-[11px] font-semibold">Expired</span>
                           ) : (
-                            item.expiry || '—'
+                            item.has_expired_batches ? `${item.expired_batch_count} expired batch${Number(item.expired_batch_count) === 1 ? '' : 'es'}` : '—'
                           )}
                         </td>
                         <td className="px-6 py-4">
