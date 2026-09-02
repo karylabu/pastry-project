@@ -30,66 +30,100 @@ function AddOnCard({ label, price, selected, onClick }) {
 }
 
 const PIZZA_IMAGE_FALLBACKS = {
-  'spinach pizza': 'spinach.png',
+  'spinach pizza': 'Spinach.png',
   'four-cheese pizza': 'four_cheese.png',
-  'breakfast pizza': 'breakfast.png',
-  'hawaiian pizza': 'hawaiian.png',
-  'veggie pizza': 'veggie.png',
-  'pepperoni pizza': 'pepperoni.png',
+  'breakfast pizza': 'Breakfast.png',
+  'hawaiian pizza': 'Hawaiian.png',
+  'veggie pizza': 'Veggie.png',
+  'pepperoni pizza': 'Pepperoni.png',
   'ham and cheese pizza': 'meal7.png',
   'ham & cheese pizza': 'meal7.png',
 };
 
 const COFFEE_IMAGE_FALLBACKS = {
   'americano': 'americano.png',
-  'cappuccino': 'cappuccino.png',
-  'latte': 'latte.png',
-  'white chocolate': 'white.png',
-  'caramel': 'caramel.png',
-  'salted caramel': 'salted.png',
-  'mocha': 'mocha.png',
-  'hazelnut': 'hazelnut.png',
-  'vanilla': 'vanilla.png',
-  'pastry project latte': 'pastry.png',
-  'dirty matcha': 'dirty.png',
-  'matcha latte': 'matcha.png',
-  'spanish latte': 'spanish.png',
+  'cappuccino': 'Capuccino.png',
+  'capuccino': 'Capuccino.png',
+  'pastry project latte': 'Pastryprojlatte.png',
+  'matcha cream latte': 'matcha.png',
+  'matcha latte': 'Matchalatte.png',
+  'latte': 'Pastryprojlatte.png',
+  'white chocolate': 'Whitechocolate(1).png',
+  'caramel': 'Caramel2.png',
+  'salted caramel': 'Saltedcaramel.png',
+  'mocha': 'Mocha.png',
+  'hazelnut': 'Hazelnut.png',
+  'vanilla': 'Vanilla.png',
+  'dirty matcha': 'Dirtymatcha.png',
 };
 
 const DRINK_IMAGE_FALLBACKS = {
-  'caramel': 'caramel.png',
-  'salted caramel': 'salted.png',
-  'white chocolate': 'white.png',
-  'oreo': 'oreo.png',
-  'matcha': 'matcha.png',
-  'vanilla': 'vanilla.png',
-  'chocolate chip cream': 'chocolate.png',
-  'strawberry yogurt smoothie': 'strawberry.png',
-  'mango yogurt smoothie': 'mango.png',
-  'blueberry yogurt smoothie': 'blueberry.png',
-  'raspberry yogurt smoothie': 'raspberry.png',
-  'plain yogurt smoothie': 'plain.png',
-  'blueberry ade': 'blueberry.png',
-  'strawberry ade': 'strawberry.png',
-  'mango ade': 'mango.png',
-  'raspberry ade': 'raspberry.png',
-  'passion fruit fizz': 'passion.png',
-  'blueberry fizz': 'blueberry.png',
-  'mango fizz': 'mango.png',
-  'strawberry fizz': 'strawberry.png',
-  'kiwi fizz': 'kiwi.png',
-  'passion fruit tea': 'passion.png',
-  'blueberry fruit tea': 'blueberry.png',
-  'mango fruit tea': 'mango.png',
-  'strawberry fruit tea': 'strawberry.png',
-  'kiwi fruit tea': 'kiwi.png',
+  'caramel': 'Caramel.png',
+  'salted caramel': 'Saltedcaramel (1).png',
+  'white chocolate': 'Whitechocolate(1).png',
+  'oreo': 'Oreo.png',
+  'matcha': 'Matcha.png',
+  'vanilla': 'Vanilla.png',
+  'chocolate chip cream': 'Chocolate.png',
+  'strawberry yogurt smoothie': 'Strawberryyogurtsmoothie.png',
+  'mango yogurt smoothie': 'Mangoyogurtsmoothie.png',
+  'blueberry yogurt smoothie': 'Blueberryyogurtsmoothie.png',
+  'raspberry yogurt smoothie': 'Rasberryyogurtsmoothie.png',
+  'plain yogurt smoothie': 'Plainyogurtsmoothie.png',
+  'chocolate': 'Chocolate.png',
+  'blueberry ade': 'Blueberryade.png',
+  'strawberry ade': 'Strawberryade.png',
+  'mango ade': 'Mangoade.png',
+  'passion fruit fizz': 'Passionfruitfizz.png',
+  'blueberry fizz': 'Blueberryfizz.png',
+  'mango fizz': 'Mangofizz.png',
+  'strawberry fizz': 'Strawberryfizz.png',
+  'kiwi fizz': 'Kiwifizz.png',
+  'passion fruit tea': 'Passionfruittea.png',
+  'blueberry fruit tea': 'Blueberryfruittea.png',
+  'mango fruit tea': 'Mangofruittea.png',
+  'strawberry fruit tea': 'Strawberryfruittea.png',
+  'kiwi fruit tea': 'Kiwifruittea.png',
+};
+
+const STARTER_IMAGE_FALLBACKS = {
+  'cheesy bacon fries': 'cheesy.png',
+  'chicken nuggets': 'chicken.png',
+  'french fries': 'french.png',
+  'mojos hot': 'mojos_hot.png',
+  'mojos': 'mojos.png',
+  'mozzarella sticks': 'mozarella.png',
+  'potato wedges': 'potato.png',
+};
+
+const productImageUrl = (filename) => `${BASE}/uploads/${filename}?v=transparent-v25`;
+
+const DRINK_VISUAL_SCALES = {
+  'blueberry ade': 1.12,
+  'strawberry ade': 1.1,
+  'mango ade': 1.12,
+  'passion fruit fizz': 1.0,
+  'blueberry fizz': 1.0,
+  'mango fizz': 1.0,
+  'strawberry fizz': 1.03,
+  'kiwi fizz': 1.0,
+  'passion fruit tea': 1.0,
+  'blueberry fruit tea': 1.05,
+  'mango fruit tea': 1.0,
+  'strawberry fruit tea': 1.05,
+  'kiwi fruit tea': 1.0,
+  'matcha': 1.0,
+  'matcha latte': 1.15,
+  'vanilla': 1.15,
+  'white chocolate': 1.15,
+  'strawberry yogurt smoothie': 1,
+  'mango yogurt smoothie': 1.05,
+  'blueberry yogurt smoothie': 1.15,
+  'raspberry yogurt smoothie': 1.05,
+  'plain yogurt smoothie': 1.05,
 };
 
 const resolveProductImage = (product) => {
-  if (product?.image) {
-    return `${BASE}/uploads/${product.image}`;
-  }
-
   const productName = String(product?.name || '').trim().toLowerCase();
   const category = String(product?.category || '').trim().toLowerCase();
 
@@ -97,20 +131,25 @@ const resolveProductImage = (product) => {
   if (category.includes('pizza')) fallbackMap = PIZZA_IMAGE_FALLBACKS;
   else if (category.includes('coffee')) fallbackMap = COFFEE_IMAGE_FALLBACKS;
   else if (category.includes('drink')) fallbackMap = DRINK_IMAGE_FALLBACKS;
+  else if (category.includes('starter')) fallbackMap = STARTER_IMAGE_FALLBACKS;
 
   const fallbackFile = fallbackMap
     ? Object.entries(fallbackMap).find(([key]) => productName.includes(key))?.[1]
     : null;
 
   if (fallbackFile) {
-    return `${BASE}/uploads/${fallbackFile}`;
+    return productImageUrl(fallbackFile);
   }
 
   if (category.includes('coffee')) return `${BASE}/uploads/americano.png`;
   if (category.includes('drink')) return `${BASE}/uploads/caramel.png`;
   if (category.includes('pizza')) return `${BASE}/uploads/pepperoni.png`;
 
-  return `${BASE}/uploads/pepperoni.png`;
+  if (product?.image) {
+    return productImageUrl(product.image);
+  }
+
+  return `${BASE}/uploads/americano.png`;
 };
 
 export default function ProductModal({ isOpen, onClose, product, allCakes, onAddToCart }) {
@@ -122,6 +161,10 @@ export default function ProductModal({ isOpen, onClose, product, allCakes, onAdd
 
   const category = (product?.category || '').trim().toLowerCase();
   const isCakeProduct = category === 'cake' || category === 'cakes';
+  const isDrinkProduct = category.includes('drink');
+  const normalizedProductName = String(product?.name || '').trim().toLowerCase();
+  const drinkVisualScale = DRINK_VISUAL_SCALES[normalizedProductName] || 1;
+  const isSmallCoffeeProduct = category.includes('coffee') && ['vanilla', 'matcha latte', 'white chocolate'].includes(normalizedProductName);
   const shouldShowVariantSelector = isCakeProduct || category === 'meals' || category === 'pasta' || category === 'rice meals' || category === 'starter' || category === 'starters';
 
   // Build variant/size pill options the same way ProductCard does
@@ -346,14 +389,26 @@ export default function ProductModal({ isOpen, onClose, product, allCakes, onAdd
 
         {/* 1. Image + Header Section, styled like the menu card */}
         <div className="flex flex-shrink-0 flex-col items-center bg-transparent px-6 pb-3 pt-6 text-center">
-          <div className="mb-3 h-24 w-40 overflow-hidden bg-transparent p-0">
+          <div className="mb-3 flex h-[174px] w-full max-w-[174px] items-center justify-center overflow-hidden bg-transparent p-0">
             <img
               src={resolveProductImage(product)}
               alt={product.name}
               onError={(event) => {
-                event.currentTarget.src = `${BASE}/uploads/pepperoni.png`;
+                const fallback = category.includes('coffee')
+                  ? 'americano.png'
+                  : category.includes('drink')
+                  ? 'caramel.png'
+                  : category.includes('pizza')
+                  ? 'pepperoni.png'
+                  : 'americano.png';
+                event.currentTarget.src = `${BASE}/uploads/${fallback}`;
               }}
-              className="h-full w-full object-cover object-center scale-100"
+              style={isDrinkProduct || isSmallCoffeeProduct ? { transform: `scale(${drinkVisualScale})` } : undefined}
+              className={
+                isDrinkProduct || isSmallCoffeeProduct
+                  ? 'h-[145px] w-auto max-w-[85%] max-h-[145px] object-contain object-center scale-100'
+                  : 'h-[118px] w-auto max-w-[78%] max-h-[118px] object-contain object-center scale-100'
+              }
             />
           </div>
           <h2 className="mb-2 px-2 text-lg font-bold tracking-tight text-gray-900">

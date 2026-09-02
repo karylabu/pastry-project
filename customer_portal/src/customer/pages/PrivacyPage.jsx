@@ -53,7 +53,7 @@ export default function PrivacyPage() {
       <header className="border-b border-[#f0e7cb] bg-white/90 backdrop-blur-sm">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-5 py-4 sm:px-6 lg:px-10">
           <div className="flex items-center gap-3">
-            <img src="/assets/logo-transparent.png" alt="Pastry Project logo" className="h-11 w-11 rounded-none bg-transparent object-contain" />
+            <img src="http://localhost/pastry-project/uploads/logo.png?v=logo-v2" alt="Pastry Project logo" className="h-11 w-11 rounded-none bg-transparent object-contain" />
             <div>
               <p className="text-xl font-black tracking-tight text-[#171717]">Pastry Project</p>
             </div>

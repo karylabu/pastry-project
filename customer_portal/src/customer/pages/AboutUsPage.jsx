@@ -32,7 +32,7 @@ export default function AboutUsPage() {
         <div className="relative mx-auto grid max-w-7xl gap-10 px-5 py-12 sm:px-6 lg:grid-cols-[1.1fr_0.9fr] lg:px-10 lg:py-14">
           <div className="flex flex-col justify-center">
             <div className="mb-4 flex items-center gap-3">
-              <img src="/assets/logo-transparent.png" alt="Pastry Project logo" className="h-12 w-12 rounded-none bg-transparent object-contain" />
+              <img src="http://localhost/pastry-project/uploads/logo.png?v=logo-v2" alt="Pastry Project logo" className="h-12 w-12 rounded-none bg-transparent object-contain" />
               <p className="text-2xl font-black tracking-tight text-[#171717]">Pastry Project</p>
             </div>
 

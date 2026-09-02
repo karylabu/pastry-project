@@ -8,7 +8,7 @@ import { signInWithGoogle } from "../../services/firebase";
 
 // ✅ CORRECT
 const BASE = CUSTOMER_BASE;
-const LOGO_URL = "/assets/logo-transparent.png";
+const LOGO_URL = "http://localhost/pastry-project/uploads/logo.png?v=logo-v2";
 const REGISTER_URL = "/customer/register";
 const isCustomerRole = (role) => {
   const normalizedRole = String(role || '').trim().toLowerCase();
@@ -231,7 +231,7 @@ export default function Login() {
       <div className="blob-black-left" />
       <div className="blob-yellow-bottom" />
       <img className="login-banner" src="http://localhost/pastry-project/uploads/login.jpg" alt="" aria-hidden="true" />
-      <img className="brand-icon-overlay" src="http://localhost/pastry-project/uploads/logo-transparent.png" alt="Pastry Project logo" />
+      <img className="brand-icon-overlay" src="http://localhost/pastry-project/uploads/logo.png?v=logo-v2" alt="Pastry Project logo" />
 
       <div className="bg-icon icon-croissant">🥐</div>
       <div className="bg-icon icon-whisk">🍳</div>

@@ -6,6 +6,68 @@ import ProductModal from '../components/ProductModal';
 import { CUSTOMER_BASE } from '../../services/config';
 import { safeParseJson } from '../../services/api';
 
+const MISSING_PRODUCT_IMAGES = new Set([
+  'affogato.png',
+  'matchagato.png',
+  'spanish.png',
+  'tiramisu.png',
+  'ube.png',
+  'vietnamese.png',
+  'raspberry.png',
+  'cappuccino.png',
+  'white.png',
+]);
+
+const hasMenuImage = (product) => {
+  const imageName = String(product?.image || '').trim().toLowerCase();
+  return imageName !== '' && !MISSING_PRODUCT_IMAGES.has(imageName);
+};
+
+const COFFEE_DISPLAY_ORDER = [
+  'americano',
+  'cappuccino',
+  'latte',
+  'white chocolate',
+  'caramel',
+  'salted caramel',
+  'mocha',
+  'hazelnut',
+  'vanilla',
+  'pastry project latte',
+  'dirty matcha',
+  'matcha latte',
+];
+
+const DRINK_DISPLAY_ORDER = [
+  'caramel',
+  'salted caramel',
+  'chocolate',
+  'white chocolate',
+  'oreo',
+  'matcha',
+  'vanilla',
+  'chocolate chip cream',
+  'strawberry yogurt smoothie',
+  'mango yogurt smoothie',
+  'blueberry yogurt smoothie',
+  'raspberry yogurt smoothie',
+  'plain yogurt smoothie',
+  'blueberry ade',
+  'strawberry ade',
+  'mango ade',
+  'raspberry ade',
+  'passion fruit fizz',
+  'blueberry fizz',
+  'mango fizz',
+  'strawberry fizz',
+  'kiwi fizz',
+  'passion fruit tea',
+  'blueberry fruit tea',
+  'mango fruit tea',
+  'strawberry fruit tea',
+  'kiwi fruit tea',
+];
+
 export default function Menu({ onAddToCart }) {
   const location = useLocation();
   const urlSearch = new URLSearchParams(location.search).get('search')?.trim() || '';
@@ -70,8 +132,9 @@ export default function Menu({ onAddToCart }) {
       .then(res => safeParseJson(res))
       .then(data => {
         if (Array.isArray(data)) {
-          // Filter out items with name "Cake Customization"
-          const filtered = data.filter(p => p.name.toLowerCase() !== 'cake customization');
+          const filtered = data.filter((product) =>
+            product.name?.toLowerCase() !== 'cake customization' && hasMenuImage(product)
+          );
           setProducts(filtered);
         }
       });
@@ -131,6 +194,10 @@ export default function Menu({ onAddToCart }) {
   const filtered = products.filter((p) => {
     const productCategory = p.category?.toLowerCase() || '';
     const selectedCategory = activeCat.toLowerCase();
+    const normalizedProductName = String(p.name || '').trim().toLowerCase();
+    const isReferenceCoffee = activeCat === 'Coffee'
+      ? COFFEE_DISPLAY_ORDER.includes(normalizedProductName)
+      : true;
     const matchesCategory = activeCat === 'All Items' || (
       activeCat === 'Starters'
         ? productCategory === 'starter' || productCategory === 'starters'
@@ -142,10 +209,20 @@ export default function Menu({ onAddToCart }) {
       p.category?.toLowerCase().includes(normalizedSearch);
     const matchesAvailability = !showOnlyAvailable || Number(p.stock || 0) > 0;
 
-    return matchesCategory && matchesSearch && matchesAvailability;
+    return isReferenceCoffee && matchesCategory && matchesSearch && matchesAvailability;
   });
 
   const sortedProducts = filtered.slice().sort((a, b) => {
+    if (activeCat === 'Coffee' && sortBy === 'recommended') {
+      return COFFEE_DISPLAY_ORDER.indexOf(String(a.name || '').trim().toLowerCase())
+        - COFFEE_DISPLAY_ORDER.indexOf(String(b.name || '').trim().toLowerCase());
+    }
+
+    if (activeCat === 'Drinks' && sortBy === 'recommended') {
+      return DRINK_DISPLAY_ORDER.indexOf(String(a.name || '').trim().toLowerCase())
+        - DRINK_DISPLAY_ORDER.indexOf(String(b.name || '').trim().toLowerCase());
+    }
+
     const aOut = Number(a.stock || 0) <= 0;
     const bOut = Number(b.stock || 0) <= 0;
     if (aOut !== bOut) return aOut ? 1 : -1;
@@ -219,6 +296,7 @@ export default function Menu({ onAddToCart }) {
                     product={p}
                     onAction={handleAction}
                     onSelect={handleSelectProduct}
+                    onAddToCart={onAddToCart}
                     favorite={favoriteIds.includes(Number(p.id))}
                     onToggleFavorite={toggleFavorite}
                   />
@@ -285,13 +363,14 @@ export default function Menu({ onAddToCart }) {
         </div>
 
         {/* PRODUCTS */}
-        <div className="grid grid-cols-2 items-stretch gap-6 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-5">
+        <div className="grid auto-rows-fr grid-cols-2 items-stretch gap-6 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-5">
           {sortedProducts.map((p) => (
             <ProductCard
               key={p.id}
               product={p}
               onAction={handleAction}
               onSelect={handleSelectProduct}
+              onAddToCart={onAddToCart}
               favorite={favoriteIds.includes(Number(p.id))}
               onToggleFavorite={toggleFavorite}
             />

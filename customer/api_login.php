@@ -31,7 +31,9 @@ try {
     }
 
     $escaped = mysqli_real_escape_string($conn, $email);
-    $result  = mysqli_query($conn, "SELECT id, name, email, password, role, status FROM users WHERE email='$escaped' LIMIT 1");
+    // Keep login compatible with databases created from older schemas that do
+    // not yet have the optional users.status column.
+    $result  = mysqli_query($conn, "SELECT * FROM users WHERE email='$escaped' LIMIT 1");
 
     if (!$result || mysqli_num_rows($result) === 0) {
         echo json_encode(["success" => false, "message" => "User not found."]);

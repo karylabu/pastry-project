@@ -209,7 +209,7 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
             className="flex items-center gap-4"
           >
             <img
-              src={`${BASE}/uploads/logo-transparent.png`}
+              src={`${BASE}/uploads/logo.png?v=logo-v2`}
               alt="Logo"
               className="h-14 w-14 object-contain"
             />

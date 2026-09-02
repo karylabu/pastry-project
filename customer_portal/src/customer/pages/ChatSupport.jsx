@@ -168,7 +168,7 @@ export default function ChatSupport() {
         <div className="border-b border-[#f0e6db] px-5 py-7 sm:px-8 lg:px-10">
           <div className="flex items-center gap-3">
             <img
-              src="/assets/logo-transparent.png"
+              src="http://localhost/pastry-project/uploads/logo.png?v=logo-v2"
               alt="Pastry Project logo"
               className="h-11 w-11 rounded-none bg-transparent object-contain"
             />
