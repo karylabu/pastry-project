@@ -6,7 +6,7 @@ import { Link, useNavigate } from "react-router-dom";
 import ProductCard from "../components/ProductCard";
 import ProductModal from "../components/ProductModal";
 import CustomCakeModal from "../components/CustomCakeModal";
-import { CUSTOMER_BASE, LARAVEL_BASE } from "../../services/config";
+import { CUSTOMER_BASE, LARAVEL_BASE, ROOT_BASE } from "../../services/config";
 import { safeParseJson } from "../../services/api";
 
 /* =========================
@@ -147,76 +147,86 @@ function Banner({ onShopNow, onCustomizeNow }) {
 }
 
 const PIZZA_IMAGE_FALLBACKS = {
-  'spinach pizza': 'spinach.png',
+  'spinach pizza': 'Spinach.png',
   'four-cheese pizza': 'four_cheese.png',
-  'breakfast pizza': 'breakfast.png',
-  'hawaiian pizza': 'hawaiian.png',
-  'veggie pizza': 'veggie.png',
-  'pepperoni pizza': 'pepperoni.png',
+  'breakfast pizza': 'Breakfast.png',
+  'hawaiian pizza': 'Hawaiian.png',
+  'veggie pizza': 'Veggie.png',
+  'pepperoni pizza': 'Pepperoni.png',
   'ham and cheese pizza': 'meal7.png',
   'ham & cheese pizza': 'meal7.png',
 };
 
 const COFFEE_IMAGE_FALLBACKS = {
   'americano': 'americano.png',
-  'cappuccino': 'cappuccino.png',
-  'latte': 'latte.png',
-  'white chocolate': 'white.png',
-  'caramel': 'caramel.png',
-  'salted caramel': 'salted.png',
-  'mocha': 'mocha.png',
-  'hazelnut': 'hazelnut.png',
-  'vanilla': 'vanilla.png',
-  'pastry project latte': 'pastry.png',
-  'dirty matcha': 'dirty.png',
-  'matcha latte': 'matcha.png',
-  'spanish latte': 'spanish.png',
+  'cappuccino': 'Capuccino.png',
+  'capuccino': 'Capuccino.png',
+  'pastry project latte': 'Pastryprojlatte.png',
+  'matcha cream latte': 'matcha.png',
+  'matcha latte': 'Matchalatte.png',
+  'latte': 'Pastryprojlatte.png',
+  'white chocolate': 'Whitechocolate(1).png',
+  'caramel': 'Caramel2.png',
+  'salted caramel': 'Saltedcaramel.png',
+  'mocha': 'Mocha.png',
+  'hazelnut': 'Hazelnut.png',
+  'vanilla': 'Vanilla (1).png',
+  'dirty matcha': 'Dirtymatcha.png',
 };
 
 const DRINK_IMAGE_FALLBACKS = {
-  'caramel': 'caramel.png',
-  'salted caramel': 'salted.png',
-  'white chocolate': 'white.png',
-  'oreo': 'oreo.png',
-  'matcha': 'matcha.png',
-  'vanilla': 'vanilla.png',
-  'chocolate chip cream': 'chocolate.png',
-  'strawberry yogurt smoothie': 'strawberry.png',
-  'mango yogurt smoothie': 'mango.png',
-  'blueberry yogurt smoothie': 'blueberry.png',
-  'raspberry yogurt smoothie': 'raspberry.png',
-  'plain yogurt smoothie': 'plain.png',
-  'blueberry ade': 'blueberry.png',
-  'strawberry ade': 'strawberry.png',
-  'mango ade': 'mango.png',
-  'raspberry ade': 'raspberry.png',
-  'passion fruit fizz': 'passion.png',
-  'blueberry fizz': 'blueberry.png',
-  'mango fizz': 'mango.png',
-  'strawberry fizz': 'strawberry.png',
-  'kiwi fizz': 'kiwi.png',
-  'passion fruit tea': 'passion.png',
-  'blueberry fruit tea': 'blueberry.png',
-  'mango fruit tea': 'mango.png',
-  'strawberry fruit tea': 'strawberry.png',
-  'kiwi fruit tea': 'kiwi.png',
+  'caramel': 'Caramel.png',
+  'salted caramel': 'Saltedcaramel (1).png',
+  'white chocolate': 'Whitechocolate(1).png',
+  'oreo': 'Oreo.png',
+  'matcha': 'Matcha.png',
+  'vanilla': 'Vanilla.png',
+  'chocolate chip cream': 'Chocolate.png',
+  'strawberry yogurt smoothie': 'Strawberryyogurtsmoothie.png',
+  'mango yogurt smoothie': 'Mangoyogurtsmoothie.png',
+  'blueberry yogurt smoothie': 'Blueberryyogurtsmoothie.png',
+  'raspberry yogurt smoothie': 'Rasberryyogurtsmoothie.png',
+  'plain yogurt smoothie': 'Plainyogurtsmoothie.png',
+  'chocolate': 'Chocolate.png',
+  'blueberry ade': 'Blueberryade.png',
+  'strawberry ade': 'Strawberryade.png',
+  'mango ade': 'Mangoade.png',
+  'passion fruit fizz': 'Passionfruitfizz.png',
+  'blueberry fizz': 'Blueberryfizz.png',
+  'mango fizz': 'Mangofizz.png',
+  'strawberry fizz': 'Strawberryfizz.png',
+  'kiwi fizz': 'Kiwifizz.png',
+  'passion fruit tea': 'Passionfruittea.png',
+  'blueberry fruit tea': 'Blueberryfruittea.png',
+  'mango fruit tea': 'Mangofruittea.png',
+  'strawberry fruit tea': 'Strawberryfruittea.png',
+  'kiwi fruit tea': 'Kiwifruittea.png',
 };
+
+const STARTER_IMAGE_FALLBACKS = {
+  'cheesy bacon fries': 'cheesy.png',
+  'chicken nuggets': 'chicken.png',
+  'french fries': 'french.png',
+  'mojos hot': 'mojos_hot.png',
+  'mojos': 'mojos.png',
+  'mozzarella sticks': 'mozarella.png',
+  'potato wedges': 'potato.png',
+};
+
+const productImageUrl = (filename) => `${ROOT_BASE}/uploads/${filename}?v=transparent-v26`;
 
 const getCategoryFallbackImage = (category = '') => {
   const normalizedCategory = String(category || '').trim().toLowerCase();
 
-  if (normalizedCategory.includes('coffee')) return `${CUSTOMER_BASE}/uploads/americano.png`;
-  if (normalizedCategory.includes('drink')) return `${CUSTOMER_BASE}/uploads/caramel.png`;
-  if (normalizedCategory.includes('pizza')) return `${CUSTOMER_BASE}/uploads/pepperoni.png`;
+  if (normalizedCategory.includes('coffee')) return `${ROOT_BASE}/uploads/americano.png`;
+  if (normalizedCategory.includes('drink')) return `${ROOT_BASE}/uploads/caramel.png`;
+  if (normalizedCategory.includes('pizza')) return `${ROOT_BASE}/uploads/pepperoni.png`;
+  if (normalizedCategory.includes('starter')) return `${ROOT_BASE}/uploads/chicken.png`;
 
-  return `${CUSTOMER_BASE}/uploads/americano.png`;
+  return `${ROOT_BASE}/uploads/americano.png`;
 };
 
 const resolveProductImage = (product) => {
-  if (product?.image) {
-    return `${CUSTOMER_BASE}/uploads/${product.image}`;
-  }
-
   const productName = String(product?.name || '').trim().toLowerCase();
   const category = String(product?.category || '').trim().toLowerCase();
 
@@ -224,13 +234,18 @@ const resolveProductImage = (product) => {
   if (category.includes('pizza')) fallbackMap = PIZZA_IMAGE_FALLBACKS;
   else if (category.includes('coffee')) fallbackMap = COFFEE_IMAGE_FALLBACKS;
   else if (category.includes('drink')) fallbackMap = DRINK_IMAGE_FALLBACKS;
+  else if (category.includes('starter')) fallbackMap = STARTER_IMAGE_FALLBACKS;
 
   const fallbackFile = fallbackMap
     ? Object.entries(fallbackMap).find(([key]) => productName.includes(key))?.[1]
     : null;
 
   if (fallbackFile) {
-    return `${CUSTOMER_BASE}/uploads/${fallbackFile}`;
+    return productImageUrl(fallbackFile);
+  }
+
+  if (product?.image) {
+    return productImageUrl(product.image);
   }
 
   return getCategoryFallbackImage(category);
@@ -238,6 +253,10 @@ const resolveProductImage = (product) => {
 
 function RecommendationCard({ product, onSelect }) {
   const fallbackImage = getCategoryFallbackImage(product?.category);
+  const normalizedProductName = String(product?.name || '').trim().toLowerCase();
+  const isStarterProduct = /\b(starter|starters)\b/i.test(String(product?.category || ''));
+  const shouldEnlargeDrinkSize = /\b(strawberry fruit tea|matcha|vanilla|mango ade|blueberry ade|blueberry fizz|strawberry fizz|passion fruit tea|kiwi fruit tea)\b/i.test(normalizedProductName);
+  const isSmallCoffeeProduct = /\b(matcha latte|vanilla|white chocolate)\b/i.test(normalizedProductName) && /\bcoffee\b/i.test(String(product?.category || ''));
 
   const sizeOptions = Array.isArray(product?.sizes) && product.sizes.length > 0
     ? product.sizes
@@ -255,8 +274,8 @@ function RecommendationCard({ product, onSelect }) {
     ?? Number(product?.price || 0);
 
   return (
-    <div className="flex h-full min-w-0 flex-col rounded-[30px] border border-stone-200 bg-white p-4 shadow-[0_10px_35px_rgba(15,23,42,0.05)]">
-      <div className="mb-4 flex h-32 w-full items-center justify-center overflow-hidden bg-transparent p-0">
+    <div className="flex h-full min-h-[360px] min-w-0 flex-col rounded-[30px] border border-stone-200 bg-white p-3 shadow-[0_10px_35px_rgba(15,23,42,0.05)]">
+      <div className="mb-5 flex h-[174px] w-full flex-shrink-0 items-center justify-center overflow-hidden rounded-[24px] border border-stone-100 bg-[#f7f5f2] p-3">
         <img
           src={resolveProductImage(product)}
           alt={product.name}
@@ -264,14 +283,21 @@ function RecommendationCard({ product, onSelect }) {
             event.currentTarget.onerror = null;
             event.currentTarget.src = fallbackImage;
           }}
-          className="h-full w-full object-cover object-center transition-transform duration-500 scale-100"
+          className={
+            shouldEnlargeDrinkSize || isSmallCoffeeProduct
+              ? `h-[145px] w-auto max-w-[85%] max-h-[145px] object-contain object-center transition-transform duration-500 ${isSmallCoffeeProduct ? 'scale-110' : 'scale-105'}`
+              : product?.category && /\b(cake|cakes|meal|meals|pasta|starter|starters)\b/i.test(String(product.category))
+                ? 'h-[118px] w-auto max-w-[78%] max-h-[118px] object-contain object-center transition-transform duration-500 scale-100'
+                : 'h-[145px] w-auto max-w-[85%] max-h-[145px] object-contain object-center transition-transform duration-500 scale-100'
+          }
+                  style={isStarterProduct ? { mixBlendMode: 'multiply' } : undefined}
         />
       </div>
 
-      <h3 className="min-h-[2.5rem] line-clamp-2 text-base font-bold leading-tight text-gray-800">{product.name}</h3>
-      <p className="mt-2 text-sm font-semibold text-black">₱{Number(selectedPrice || 0).toLocaleString()}</p>
+      <h3 className="min-h-[2.25rem] line-clamp-2 text-sm font-bold leading-tight text-gray-800">{product.name}</h3>
+      <p className="mt-1.5 text-sm font-semibold text-black">₱{Number(selectedPrice || 0).toLocaleString()}</p>
 
-      <div className="mt-3 flex flex-wrap justify-center gap-1.5">
+      <div className="mt-2.5 flex flex-wrap justify-center gap-1.5">
         {sizeOptions.map((option) => {
           const label = String(option.size || 'Regular');
           const isSelected = selectedSize === label;
@@ -292,10 +318,10 @@ function RecommendationCard({ product, onSelect }) {
         })}
       </div>
 
-      <p className="mt-2 text-xs text-gray-500 line-clamp-2">
+      <p className="mt-2 text-[11px] text-gray-500 line-clamp-2">
         {product.description || 'Freshly baked and customer favorite.'}
       </p>
-      <p className="mt-3 text-[10px] font-semibold uppercase tracking-[0.2em] text-[#d4af37]">
+      <p className="mt-2 text-[9px] font-semibold uppercase tracking-[0.2em] text-[#d4af37]">
         {product.reason}
       </p>
 
@@ -911,7 +937,7 @@ export function buildMustTryList(products = []) {
     });
   }
 
-  return selected.slice(0, 6);
+  return selected.slice(0, 7);
 }
 
 /* =========================
@@ -1059,7 +1085,7 @@ export default function Dashboard({ onAddToCart }) {
               <div className="relative flex shrink-0 items-center justify-center md:h-[290px] md:w-[290px]">
                 <span className="absolute left-4 top-8 h-3 w-3 rotate-45 bg-[#c59a36] opacity-70" />
                 <span className="absolute bottom-8 right-5 h-2 w-2 rotate-45 bg-[#c59a36] opacity-70" />
-                <img src="http://localhost/pastry-project/uploads/giftbox.png" alt="Gold gift box" className="h-44 w-44 rounded-[18px] object-cover shadow-[0_12px_28px_rgba(111,76,24,0.12)] md:h-[290px] md:w-[290px]" />
+                <img src="http://localhost/pastry-project/uploads/giftbox.png?v=welcome-v2" alt="Gold gift box" className="h-44 w-44 rounded-[18px] object-cover shadow-[0_12px_28px_rgba(111,76,24,0.12)] md:h-[290px] md:w-[290px]" />
               </div>
               <div className="flex min-w-0 flex-1 flex-col items-center md:items-start">
                 <p className="text-[9px] font-bold uppercase tracking-[0.42em] text-[#a9853b]">A little welcome treat</p>
@@ -1155,7 +1181,7 @@ export default function Dashboard({ onAddToCart }) {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-8 md:grid-cols-6">
+            <div className="grid grid-cols-2 gap-4 md:grid-cols-6 md:gap-6">
               {recommendedProducts.map((product) => (
                 <RecommendationCard
                   key={product.id}
@@ -1178,7 +1204,7 @@ export default function Dashboard({ onAddToCart }) {
               View Menu
             </button>
           </div>
-          <div className="grid grid-cols-2 gap-8 md:grid-cols-6">
+          <div className="grid grid-cols-2 gap-4 md:grid-cols-6 md:gap-6">
             {bestSellers.map(p => (
             <RecommendationCard
               key={p.id}
@@ -1200,7 +1226,7 @@ export default function Dashboard({ onAddToCart }) {
               Explore More
             </button>
           </div>
-          <div className="grid grid-cols-2 gap-8 md:grid-cols-6">
+          <div className="grid grid-cols-2 gap-4 md:grid-cols-6 md:gap-6">
             {mustTry.map(p => (
             <RecommendationCard
               key={p.id}

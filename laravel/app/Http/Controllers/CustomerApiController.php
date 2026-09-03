@@ -155,7 +155,17 @@ class CustomerApiController extends Controller
         }
 
         $db = getDB();
-        $products = array_values(array_filter($db['products'] ?? [], fn($item) => isset($item['available']) && $item['available']));
+        $products = array_values($db['products'] ?? []);
+
+        foreach ($products as &$product) {
+            if (!isset($product['available'])) {
+                $product['available'] = true;
+            }
+            if (!isset($product['stock'])) {
+                $product['stock'] = 0;
+            }
+        }
+        unset($product);
 
         return $this->corsResponse($products);
     }

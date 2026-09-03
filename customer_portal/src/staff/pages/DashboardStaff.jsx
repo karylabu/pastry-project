@@ -25,6 +25,64 @@ const staffFetch = (url, options = {}) => {
   });
 };
 
+const buildLegacyDashboard = (orders, products, ingredients = []) => {
+  const today = new Date();
+  const isToday = (value) => {
+    const date = new Date(value);
+    return date.toDateString() === today.toDateString();
+  };
+  const completedOrders = orders.filter((order) => String(order.status || '').toLowerCase() === 'completed');
+  const todayOrders = orders.filter((order) => isToday(order.created_at));
+  const todayCompleted = todayOrders.filter((order) => String(order.status || '').toLowerCase() === 'completed');
+  const lowStock = products.filter((product) => Number(product.stock) > 0 && Number(product.stock) <= Number(product.minimum_stock ?? 5));
+  const outOfStock = products.filter((product) => Number(product.stock) <= 0);
+  const lowStockIngredients = ingredients.filter((ingredient) => Number(ingredient.stock) <= Number(ingredient.threshold ?? 0));
+  const outOfStockIngredients = ingredients.filter((ingredient) => Number(ingredient.stock) <= 0);
+  const nearExpiry = ingredients.filter((ingredient) => {
+    if (!ingredient.expiry) return false;
+    const expiry = new Date(`${ingredient.expiry}T00:00:00`);
+    const days = (expiry - new Date(today.toDateString())) / 86400000;
+    return days >= 0 && days <= 7;
+  });
+  const trend = Array.from({ length: 7 }, (_, index) => {
+    const date = new Date(today);
+    date.setHours(0, 0, 0, 0);
+    date.setDate(today.getDate() - (6 - index));
+    const revenue = completedOrders
+      .filter((order) => new Date(order.created_at).toDateString() === date.toDateString())
+      .reduce((total, order) => total + Number(order.total || 0), 0);
+    return { date: date.toISOString().slice(0, 10), revenue, orders: 0 };
+  });
+
+  return {
+    success: true,
+    summary: {
+      orders_today: todayOrders.length,
+      pending_orders: todayOrders.filter((order) => order.status === 'Pending').length,
+      preparing_orders: todayOrders.filter((order) => order.status === 'Preparing').length,
+      sales_today: todayCompleted.reduce((total, order) => total + Number(order.total || 0), 0),
+      sales_yesterday: 0,
+      sales_week: 0,
+      sales_month: 0,
+      low_stock: lowStock.length,
+      out_of_stock: outOfStock.length,
+      production_today: 0,
+      production_planned: null,
+      production_completed: 0,
+      waste_today: 0,
+      waste_value_today: 0,
+    },
+    inventory: { products, low_stock: lowStock, out_of_stock: outOfStock, ingredients, low_stock_ingredients: lowStockIngredients, out_of_stock_ingredients: outOfStockIngredients, near_expiry: nearExpiry },
+    needs_attention: { out_of_stock: outOfStock.length + outOfStockIngredients.length, low_stock: lowStock.length + lowStockIngredients.length, near_expiry: nearExpiry.length, orders_waiting: orders.filter((order) => order.status === 'Pending').length },
+    inventory_health: { in_stock: Math.max(0, products.length + ingredients.length - lowStock.length - outOfStock.length - lowStockIngredients.length - outOfStockIngredients.length), low_stock: lowStock.length + lowStockIngredients.length, out_of_stock: outOfStock.length + outOfStockIngredients.length, near_expiry: nearExpiry.length, total: products.length + ingredients.length },
+    live_orders: orders,
+    production: [],
+    production_summary: { planned: null, produced: 0, remaining: null, planning_available: false },
+    sales_overview: { trend },
+    waste: { by_reason: [] },
+  };
+};
+
 const STATUS_STYLES = {
   Pending:      "bg-gray-100 text-black border border-black/20",
   Confirmed:    "bg-gray-100 text-black border border-black/20",
@@ -399,9 +457,32 @@ export default function DashboardStaff() {
     setDashboardLoading(true);
     setDashboardError(null);
     try {
-      const response = await staffFetch(`${LARAVEL_BASE}/api/staff/dashboard`, { credentials: 'omit' });
-      const data = await response.json();
-      if (!response.ok || !data.success) throw new Error(data.message || 'Unable to load dashboard data.');
+      let response;
+      let data;
+      try {
+        response = await staffFetch(`${LARAVEL_BASE}/api/staff/dashboard`, { credentials: 'omit' });
+        data = await response.json();
+      } catch (error) {
+        data = { success: false, message: error.message };
+      }
+
+      if (!response?.ok || !data?.success) {
+        const [ordersResponse, productsResponse, ingredientsResponse] = await Promise.all([
+          staffFetch(`${STAFF_BASE}/api_orders.php`),
+          staffFetch(`${STAFF_BASE}/api_products.php?action=list`),
+          staffFetch(`${STAFF_BASE}/api_ingredients.php`),
+        ]);
+        const [orders, products, ingredientsData] = await Promise.all([
+          ordersResponse.json(),
+          productsResponse.json(),
+          ingredientsResponse.json(),
+        ]);
+        if (!ordersResponse.ok || !productsResponse.ok || !ingredientsResponse.ok || !Array.isArray(orders) || !Array.isArray(products) || !ingredientsData?.success) {
+          throw new Error(data?.message || 'Unable to load dashboard data.');
+        }
+        data = buildLegacyDashboard(orders, products, ingredientsData.ingredients || []);
+      }
+
       const liveOrders = Array.isArray(data.live_orders) ? data.live_orders : [];
       const currentOrderIds = new Set(liveOrders.map(order => String(order.id)));
       const newPendingOrder = liveOrders.some(order =>

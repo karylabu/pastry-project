@@ -118,12 +118,12 @@ function getProductSizeOptions(PDO $pdo, array $product): array {
    1. GET PRODUCTS
 ========================================================= */
 
-if ($action === 'list') {
+if ($action === 'list' || $action === 'all') {
 
     $stmt = $pdo->query("
         SELECT *
         FROM products
-        WHERE available = 1
+        ORDER BY category, name
     ");
 
     $products = $stmt->fetchAll();

@@ -7,7 +7,7 @@ import { safeParseJson } from '../../services/api';
 import { signInWithGoogle } from "../../services/firebase";
 
 const BASE = CUSTOMER_BASE;
-const LOGO_URL = `${BASE}/../uploads/logo-transparent.png`;
+const LOGO_URL = `${BASE}/../uploads/logo.png?v=logo-v2`;
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const phoneRegex = /^\+?[0-9\s-]{7,15}$/;
 
