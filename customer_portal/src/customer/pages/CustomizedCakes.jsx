@@ -1,11 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import PageShell from '../components/PageShell';
 import { CUSTOMER_BASE } from '../../services/config';
-import { useNavigate } from 'react-router-dom';
 import { safeParseJson } from '../../services/api';
 
 export default function CustomizedCakes() {
-  const navigate = useNavigate();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [contactNumber, setContactNumber] = useState('');
@@ -25,7 +23,6 @@ export default function CustomizedCakes() {
   const [customMessage, setCustomMessage] = useState('');
   const [specialInstructions, setSpecialInstructions] = useState('');
   const [addons, setAddons] = useState([]);
-  const [estimatedPrice, setEstimatedPrice] = useState('');
   const [quantity, setQuantity] = useState(1);
   const [details, setDetails] = useState('');
   const [files, setFiles] = useState([]);
@@ -69,8 +66,6 @@ export default function CustomizedCakes() {
     );
   };
 
-  const totalAmount = Number(estimatedPrice || 0) * Number(quantity || 1);
-
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -95,9 +90,7 @@ export default function CustomizedCakes() {
       fd.append('custom_message', customMessage);
       fd.append('special_instructions', specialInstructions);
       fd.append('addons', JSON.stringify(addons));
-      fd.append('estimated_price', estimatedPrice);
       fd.append('quantity', quantity);
-      fd.append('total_amount', totalAmount);
       fd.append('details', details);
       fd.append('user_id', String(userId || 0));
       files.forEach((f, i) => fd.append('files[]', f, f.name || `file${i}`));
@@ -116,7 +109,7 @@ export default function CustomizedCakes() {
       // The response has already been parsed safely.
 
       if (data && data.success) {
-        setMessage('Request sent. We will contact you soon.');
+        setMessage('The order is submitted. Admin will review it first. Please wait at least 24 hours for the final price and confirmation.');
         setName('');
         setEmail('');
         setContactNumber('');
@@ -136,11 +129,9 @@ export default function CustomizedCakes() {
         setCustomMessage('');
         setSpecialInstructions('');
         setAddons([]);
-        setEstimatedPrice('');
         setQuantity(1);
         setDetails('');
         setFiles([]);
-        setTimeout(() => navigate('/customer/menu'), 1200);
       } else {
         setMessage(data?.message || 'Failed to send request. Please try again.');
       }
@@ -290,23 +281,15 @@ export default function CustomizedCakes() {
               </div>
             </div>
             <div>
-              <p className="text-[13px] font-semibold mb-3 text-slate-900">Order Summary</p>
+              <p className="text-[13px] font-semibold mb-3 text-slate-900">Order Quantity</p>
               <div className="space-y-3">
-                <input value={estimatedPrice} onChange={(e) => setEstimatedPrice(e.target.value)} placeholder="Estimated Price" type="number" min={0} className="border rounded-md px-3 py-2 w-full text-[13px]" />
                 <input value={quantity} onChange={(e) => setQuantity(Number(e.target.value) || 1)} placeholder="Quantity" type="number" min={1} className="border rounded-md px-3 py-2 w-full text-[13px]" />
                 <div className="rounded-xl border border-gray-200 p-4 bg-gray-50">
                   <div className="flex justify-between text-sm text-gray-600">
-                    <span>Estimated Price</span>
-                    <span>₱{Number(estimatedPrice || 0).toLocaleString()}</span>
-                  </div>
-                  <div className="flex justify-between text-sm text-gray-600 mt-2">
                     <span>Quantity</span>
                     <span>{quantity}</span>
                   </div>
-                  <div className="border-t border-gray-200 mt-3 pt-3 flex justify-between text-sm font-semibold">
-                    <span>Total Amount</span>
-                    <span>₱{Number(totalAmount).toLocaleString()}</span>
-                  </div>
+                  <p className="mt-3 border-t border-gray-200 pt-3 text-xs leading-5 text-gray-500">Price pending admin review. Please allow at least 24 hours for your quote.</p>
                 </div>
               </div>
             </div>
@@ -329,7 +312,7 @@ export default function CustomizedCakes() {
           <div className="flex flex-col sm:flex-row items-center gap-3">
             <button disabled={loading} type="submit" className="px-4 py-2 bg-black text-white rounded-md">{loading ? 'Sending…' : 'Send Request'}</button>
             <button type="button" onClick={() => {
-              setName(''); setEmail(''); setContactNumber(''); setPickupDate(''); setPickupTime(''); setDeliveryMethod('Pickup'); setDeliveryAddress(''); setCakeSize('6 inches'); setCustomCakeSize(''); setServings('1'); setCakeFlavor('Chocolate'); setFillingFlavor('Chocolate Ganache'); setFrostingType('Buttercream'); setOccasion('Birthday'); setCustomTheme(''); setCakeColor(''); setCustomMessage(''); setSpecialInstructions(''); setAddons([]); setEstimatedPrice(''); setQuantity(1); setDetails(''); setFiles([]);
+              setName(''); setEmail(''); setContactNumber(''); setPickupDate(''); setPickupTime(''); setDeliveryMethod('Pickup'); setDeliveryAddress(''); setCakeSize('6 inches'); setCustomCakeSize(''); setServings('1'); setCakeFlavor('Chocolate'); setFillingFlavor('Chocolate Ganache'); setFrostingType('Buttercream'); setOccasion('Birthday'); setCustomTheme(''); setCakeColor(''); setCustomMessage(''); setSpecialInstructions(''); setAddons([]); setQuantity(1); setDetails(''); setFiles([]);
             }} className="px-4 py-2 border rounded-md">Reset</button>
             {message && <div className="text-[13px] text-gray-600 ml-3">{message}</div>}
           </div>

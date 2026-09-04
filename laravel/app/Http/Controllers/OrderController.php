@@ -310,21 +310,23 @@ class OrderController extends Controller
             return response()->json(['success' => false, 'message' => 'Order not found.'], 404);
         }
 
-        $order->update(['status' => $request->status]);
+        $oldStatus = (string) $order->status;
+        $newStatus = (string) $request->status;
+        $order->update(['status' => $newStatus]);
 
         // Notify customer about status change
         $type = 'order';
-        if (strtolower($request->status) == 'completed') $type = 'order_completed';
-        if (strtolower($request->status) == 'cancelled') $type = 'order_cancelled';
-        if (strtolower($request->status) == 'to receive') {
+        if (strtolower($newStatus) == 'completed') $type = 'order_completed';
+        if (strtolower($newStatus) == 'cancelled') $type = 'order_cancelled';
+        if (strtolower($newStatus) == 'to receive') {
             $type = 'order_received';
-            $this->sendSmsNotification($order);
         }
+        if ($oldStatus !== $newStatus) $this->sendSmsNotification($order, $newStatus);
 
         DB::table('notifications')->insert([
             'user_id' => $order->user_id,
             'title' => '📦 Order Update',
-            'message' => "Your order #{$order->id} status has been updated to {$request->status}.",
+            'message' => "Your order #{$order->id} status has been updated to {$newStatus}.",
             'type' => $type,
             'is_read' => 0,
             'action_url' => '/customer/orders',
@@ -340,7 +342,7 @@ class OrderController extends Controller
     /**
      * Send SMS notification via iProgSMS.
      */
-    private function sendSmsNotification($order)
+    private function sendSmsNotification($order, string $status)
     {
         try {
             $phone = $order->phone;
@@ -354,7 +356,16 @@ class OrderController extends Controller
                 $phone = '63' . $phone;
             }
 
-            $message = "Good day from Pastry Project! Your order #{$order->id} is now ready for pickup/delivery. Thank you!";
+            $statusMessage = match (strtolower($status)) {
+                'pending' => 'has been received and is awaiting confirmation',
+                'confirmed' => 'has been confirmed',
+                'preparing' => 'is now being prepared',
+                'to receive' => 'is ready for pickup or delivery',
+                'completed' => 'has been completed',
+                'cancelled' => 'has been cancelled',
+                default => "status is now {$status}",
+            };
+            $message = "Pastry Project: Your order #{$order->id} {$statusMessage}.";
 
             $payload = [
                 "api_token"    => "3e0c021fc064ea07bb524064e62125caf19f511e",

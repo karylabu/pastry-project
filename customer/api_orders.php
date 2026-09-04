@@ -48,19 +48,31 @@ try {
     $payment   = mysqli_real_escape_string($conn, $data['payment'] ?? '');
     $address   = mysqli_real_escape_string($conn, $data['address'] ?? '');
     $phone     = mysqli_real_escape_string($conn, $data['phone'] ?? '');
+    $notes     = mysqli_real_escape_string($conn, $data['notes'] ?? '');
     $latitude  = floatval($data['latitude'] ?? 0);
     $longitude = floatval($data['longitude'] ?? 0);
     $customer  = mysqli_real_escape_string($conn, $data['customer'] ?? '');
     $email     = mysqli_real_escape_string($conn, $data['email'] ?? '');
     $user_id   = intval($data['user_id'] ?? 0); // Capture user_id from frontend
+    $orderType = trim((string)($data['order_type'] ?? 'Standard'));
+
+    $currentMonth = (int)(new DateTime('now', new DateTimeZone('Asia/Manila')))->format('n');
+    if ($orderType === 'Urgent' && $currentMonth >= 9) {
+        http_response_code(422);
+        echo json_encode([
+            'status' => 'error',
+            'message' => 'Rush orders are not available during ber months (September to December).',
+        ]);
+        exit;
+    }
 
     /*
     | SCHEMA NOTE: The orders table schema is maintained exclusively through
     | versioned migrations in database/migrations/. This API must never run
     | ALTER TABLE / CREATE TABLE statements at request time.
     */
-    $fields = ['items', 'subtotal', 'delivery_fee', 'total', 'method', 'payment', 'address', 'phone', 'lat', 'lng'];
-    $values = ["'$items'", "'$subtotal'", "'$delivery'", "'$total'", "'$method'", "'$payment'", "'$address'", "'$phone'", "'$latitude'", "'$longitude'"];
+    $fields = ['items', 'subtotal', 'delivery_fee', 'total', 'method', 'payment', 'address', 'phone', 'notes', 'lat', 'lng'];
+    $values = ["'$items'", "'$subtotal'", "'$delivery'", "'$total'", "'$method'", "'$payment'", "'$address'", "'$phone'", "'$notes'", "'$latitude'", "'$longitude'"];
 
     $fields[] = 'customer';
     $values[] = "'$customer'";

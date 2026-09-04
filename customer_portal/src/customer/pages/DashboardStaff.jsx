@@ -199,7 +199,7 @@ function StaffChatInbox({ open, onClose }) {
 
     // Optimistic
     setMessages(prev => [...prev, {
-      id: Date.now(), sender: "staff", message: msg,
+      id: Date.now(), sender: "admin", message: msg,
       image_url: image ? URL.createObjectURL(image) : null,
       created_at: new Date().toISOString()
     }]);
@@ -208,7 +208,7 @@ function StaffChatInbox({ open, onClose }) {
       const formData = new FormData();
       formData.append("order_id", activeOrderId);
       formData.append("message", msg);
-      formData.append("sender", "staff");
+      formData.append("sender", "admin");
       if (image) formData.append("image", image);
 
       await fetch(`${CUSTOMER_BASE}/api_chat_send.php`, {
@@ -347,7 +347,7 @@ function StaffChatInbox({ open, onClose }) {
                     <div className="text-center text-gray-400 text-sm pt-16">No messages yet.</div>
                   )}
                   {messages.map((msg, i) => {
-                    const isStaff    = msg.sender === "staff";
+                    const isStaff    = msg.sender === "staff" || msg.sender === "admin";
                     const isAi       = msg.sender === "ai";
                     const isCustomer = msg.sender === "customer";
                     return (
@@ -359,7 +359,7 @@ function StaffChatInbox({ open, onClose }) {
                         </div>
                         <div className={`max-w-[65%] flex flex-col gap-1 ${isStaff ? "items-end" : "items-start"}`}>
                           <span className="text-[9px] text-gray-400 px-1">
-                            {isStaff ? "Staff" : isAi ? "Pastry AI" : "Customer"} · {formatTime(msg.created_at)}
+                            {isStaff ? "Admin" : isAi ? "Pastry AI" : "Customer"} · {formatTime(msg.created_at)}
                           </span>
                           <div className={`px-4 py-2.5 rounded-2xl text-sm leading-relaxed
                             ${isStaff

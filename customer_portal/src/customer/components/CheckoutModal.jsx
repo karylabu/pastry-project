@@ -40,6 +40,11 @@ const SHOP_OPEN_MINUTES = 8 * 60;
 const SHOP_CLOSE_MINUTES = 20 * 60;
 const SHOP_HOURS_LABEL = '8:00 AM to 8:00 PM';
 
+const isBerMonth = () => {
+  const manilaDate = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Manila' }));
+  return manilaDate.getMonth() >= 8;
+};
+
 const isWithinTanauan = (lat, lng) => {
   return (
     typeof lat === 'number' &&
@@ -61,9 +66,6 @@ export default function CheckoutModal({
   const [loading, setLoading] = useState(false);
   const [locationError, setLocationError] = useState('');
   const [shopOpen, setShopOpen] = useState(true);
-  const [promoCode, setPromoCode] = useState('');
-  const [appliedPromo, setAppliedPromo] = useState(null);
-  const [promoMessage, setPromoMessage] = useState('');
   const modalScrollRef = useRef(null);
 
   const refreshShopStatus = () => {
@@ -78,6 +80,10 @@ export default function CheckoutModal({
     orderType: "Standard",
     address: "",
     phone: "",
+    riderService: "GrabCar",
+    riderName: "",
+    riderContact: "",
+    riderVehicle: "",
     lat: null,
     lng: null,
   });
@@ -138,13 +144,6 @@ export default function CheckoutModal({
       document.body.style.overflow = previousOverflow;
     };
   }, [isOpen]);
-
-  useEffect(() => {
-    if (checkoutData.method === 'Pickup' && appliedPromo?.code === 'WELCOME') {
-      setAppliedPromo(null);
-      setPromoMessage('WELCOME is only available for delivery orders.');
-    }
-  }, [checkoutData.method, appliedPromo?.code]);
 
   const formatSavedAddress = (address) => {
     if (!address) return '';
@@ -562,26 +561,16 @@ export default function CheckoutModal({
 
   const rushFee = checkoutData.orderType === "Urgent" ? 100 : 0;
   const discountAmount = 0;
-  const voucherAmount = appliedPromo?.code === 'WELCOME' && checkoutData.method === 'Deliver'
-    ? deliveryFee
-    : 0;
   const taxAmount = 0;
 
-  const total = subtotal + deliveryFee + rushFee + taxAmount - discountAmount - voucherAmount;
+  const total = subtotal + deliveryFee + rushFee + taxAmount - discountAmount;
+  const berMonths = isBerMonth();
 
-  const applyPromo = () => {
-    const code = promoCode.trim().toUpperCase();
-    if (code === 'WELCOME' && checkoutData.method !== 'Deliver') {
-      setAppliedPromo(null);
-      setPromoMessage('WELCOME is only available for delivery orders.');
-    } else if (code === 'WELCOME') {
-      setAppliedPromo({ code });
-      setPromoMessage('Free delivery applied.');
-    } else {
-      setAppliedPromo(null);
-      setPromoMessage('Invalid promo code. Try WELCOME.');
+  useEffect(() => {
+    if (berMonths && checkoutData.orderType === 'Urgent') {
+      setCheckoutData((current) => ({ ...current, orderType: 'Standard' }));
     }
-  };
+  }, [berMonths, checkoutData.orderType]);
 
   /* =========================
      PLACE ORDER
@@ -590,6 +579,12 @@ export default function CheckoutModal({
 
     if (!shopOpen) {
       alert(`The shop is currently closed. Checkout is available from ${SHOP_HOURS_LABEL}.`);
+      return;
+    }
+
+    if (berMonths && checkoutData.orderType === 'Urgent') {
+      alert('Rush orders are not available during ber months (September to December).');
+      setCheckoutData((current) => ({ ...current, orderType: 'Standard' }));
       return;
     }
 
@@ -612,6 +607,23 @@ export default function CheckoutModal({
       return;
     }
 
+    if (checkoutData.method === "Deliver") {
+      if (!checkoutData.riderName.trim()) {
+        alert("Please enter the rider's name.");
+        return;
+      }
+
+      if (!checkoutData.riderContact.trim()) {
+        alert("Please enter the rider's contact number.");
+        return;
+      }
+
+      if (!checkoutData.riderVehicle.trim()) {
+        alert("Please enter the rider's vehicle or plate reference.");
+        return;
+      }
+    }
+
     if (
       checkoutData.method === 'Deliver' &&
       (!checkoutData.lat || !checkoutData.lng || !isWithinTanauan(checkoutData.lat, checkoutData.lng))
@@ -632,6 +644,10 @@ export default function CheckoutModal({
         }
       })();
 
+      const riderSummary = checkoutData.method === "Deliver"
+        ? `Delivery booking: ${checkoutData.riderService || 'GrabCar'} | Rider: ${checkoutData.riderName.trim()} | Contact: ${checkoutData.riderContact.trim()} | Vehicle: ${checkoutData.riderVehicle.trim()}`
+        : '';
+
       const payload = {
         items: groupedItems.map((item) => ({
           name: item.name,
@@ -646,8 +662,6 @@ export default function CheckoutModal({
         subtotal,
         delivery_fee: deliveryFee,
         rush_fee: rushFee,
-        voucher_code: appliedPromo?.code || '',
-        voucher_amount: voucherAmount,
         total,
 
         user_id: savedUser.id || 0, // Include user_id for proper order association
@@ -659,6 +673,11 @@ export default function CheckoutModal({
         order_type: checkoutData.orderType || "Standard",
         address: checkoutData.address,
         phone: checkoutData.phone,
+        notes: riderSummary,
+        delivery_rider_service: checkoutData.riderService,
+        delivery_rider_name: checkoutData.riderName,
+        delivery_rider_contact: checkoutData.riderContact,
+        delivery_rider_vehicle: checkoutData.riderVehicle,
 
         latitude: checkoutData.lat,
         longitude: checkoutData.lng,
@@ -812,7 +831,7 @@ export default function CheckoutModal({
 
         <motion.div
           ref={modalScrollRef}
-          className="relative my-0 flex max-h-[calc(100vh-8rem)] w-full max-w-[820px] flex-col overflow-y-auto overscroll-contain overflow-x-hidden rounded-[24px] bg-white font-['DM_Sans'] shadow-2xl md:max-h-[calc(100vh-8rem)] md:flex-row"
+          className="relative my-0 flex max-h-[calc(100vh-8rem)] w-full max-w-[860px] flex-col overflow-y-auto overscroll-contain overflow-x-hidden rounded-[24px] bg-white font-['DM_Sans'] shadow-2xl md:max-h-[calc(100vh-8rem)] md:flex-row"
           initial={{ scale: 0.98 }}
           animate={{ scale: 1 }}
         >
@@ -867,6 +886,59 @@ export default function CheckoutModal({
 
             </div>
 
+            {checkoutData.method === "Deliver" && (
+              <div className="mb-6 rounded-2xl border border-amber-200 bg-amber-50 p-3">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-amber-800">
+                  Customer Booked Rider
+                </p>
+                <p className="mt-2 text-xs text-amber-800">
+                  Please book your GrabCar or Lalamove yourself, then enter the rider details below.
+                </p>
+
+                <div className="mt-3 grid gap-2 sm:grid-cols-3">
+                  {['GrabCar', 'Lalamove', 'Other'].map((service) => (
+                    <button
+                      key={service}
+                      type="button"
+                      onClick={() => setCheckoutData({ ...checkoutData, riderService: service })}
+                      className={`rounded-xl border px-3 py-2 text-xs font-semibold transition ${
+                        checkoutData.riderService === service
+                          ? 'border-[#d4af37] bg-[#fff4c7] text-slate-900'
+                          : 'border-amber-200 bg-white text-gray-700'
+                      }`}
+                    >
+                      {service}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                  <input
+                    type="text"
+                    placeholder="Rider's name"
+                    className="w-full rounded-xl border border-amber-200 bg-white p-3 text-sm outline-none"
+                    value={checkoutData.riderName}
+                    onChange={(e) => setCheckoutData({ ...checkoutData, riderName: e.target.value })}
+                  />
+                  <input
+                    type="tel"
+                    placeholder="Rider contact number"
+                    className="w-full rounded-xl border border-amber-200 bg-white p-3 text-sm outline-none"
+                    value={checkoutData.riderContact}
+                    onChange={(e) => setCheckoutData({ ...checkoutData, riderContact: e.target.value })}
+                  />
+                </div>
+
+                <input
+                  type="text"
+                  placeholder="Vehicle / plate / rider reference"
+                  className="mt-2 w-full rounded-xl border border-amber-200 bg-white p-3 text-sm outline-none"
+                  value={checkoutData.riderVehicle}
+                  onChange={(e) => setCheckoutData({ ...checkoutData, riderVehicle: e.target.value })}
+                />
+              </div>
+            )}
+
             {/* PAYMENT */}
             <div className="mb-6 space-y-2">
 
@@ -875,7 +947,7 @@ export default function CheckoutModal({
               </p>
 
               <div className="flex gap-2">
-                {["COD", "GCash"].map((paymentOption) => (
+                {["GCash"].map((paymentOption) => (
                   <button
                     key={paymentOption}
                     onClick={() =>
@@ -907,7 +979,7 @@ export default function CheckoutModal({
               <div className="grid gap-2">
                 {[
                   { value: "Standard", label: "Standard Pre-order", note: "Regular order timing" },
-                  { value: "Urgent", label: "Urgent Rush Order", note: "Priority handling" },
+                  ...(!berMonths ? [{ value: "Urgent", label: "Urgent Rush Order", note: "Priority handling" }] : []),
                 ].map((option) => (
                   <button
                     key={option.value}
@@ -931,6 +1003,11 @@ export default function CheckoutModal({
                   </button>
                 ))}
               </div>
+              {berMonths && (
+                <p className="rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                  Rush orders are unavailable during ber months (September to December).
+                </p>
+              )}
             </div>
 
             {/* CONTACT INFO */}
@@ -1175,33 +1252,10 @@ export default function CheckoutModal({
                 </div>
               )}
 
-              {checkoutData.method === 'Deliver' && <div className="rounded-2xl border border-[#ead9a1] bg-[#fffaf0] p-4">
-                <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#a67c00]">Promo / Voucher</p>
-                <div className="mt-2 flex gap-2">
-                  <input
-                    value={promoCode}
-                    onChange={(event) => setPromoCode(event.target.value)}
-                    onKeyDown={(event) => { if (event.key === 'Enter') applyPromo(); }}
-                    placeholder="Enter promo code"
-                    className="min-w-0 flex-1 rounded-xl border border-[#ead9a1] bg-white px-3 py-2 text-sm uppercase outline-none focus:border-[#2f2f2f]"
-                  />
-                  <button type="button" onClick={applyPromo} className="rounded-xl bg-[#d4af37] px-4 py-2 text-xs font-bold uppercase tracking-[0.12em] text-slate-900 hover:bg-[#c49c20]">Apply</button>
-                </div>
-                <p className="mt-2 text-[11px] text-gray-500">
-                  Try WELCOME for free delivery.
-                </p>
-                {promoMessage && <p className={`mt-2 text-xs font-semibold ${appliedPromo ? 'text-green-700' : 'text-red-600'}`}>{promoMessage}</p>}
-              </div>}
-
               <div className="flex justify-between text-sm text-gray-500">
                 <span>Discount</span>
                 <span>-₱{discountAmount}</span>
               </div>
-
-              {checkoutData.method === 'Deliver' && voucherAmount > 0 && <div className="flex justify-between text-sm text-gray-500">
-                <span>Voucher</span>
-                <span>-₱{voucherAmount}</span>
-              </div>}
 
               <div className="flex justify-between text-sm text-gray-500">
                 <span>Tax</span>
