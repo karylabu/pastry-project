@@ -523,6 +523,25 @@ if ($action === 'recommendations') {
     $columnCheck = $pdo->query("SHOW COLUMNS FROM orders LIKE 'user_id'");
     $hasUserIdColumn = $columnCheck && $columnCheck->rowCount() > 0;
 
+    $orderCountSql = $hasUserIdColumn
+        ? "SELECT COUNT(*) FROM orders WHERE user_id = ? OR LOWER(email) = LOWER(?)"
+        : "SELECT COUNT(*) FROM orders WHERE LOWER(email) = LOWER(?)";
+    $orderCountStmt = $pdo->prepare($orderCountSql);
+    if ($hasUserIdColumn) {
+        $orderCountStmt->execute([$userId, $userEmail]);
+    } else {
+        $orderCountStmt->execute([$userEmail]);
+    }
+
+    if ((int) $orderCountStmt->fetchColumn() === 0) {
+        echo json_encode([
+            'success' => true,
+            'has_order' => false,
+            'items' => [],
+        ]);
+        exit;
+    }
+
         $orderHistorySql = $hasUserIdColumn
                 ? "SELECT o.items, oi.product
            FROM orders o

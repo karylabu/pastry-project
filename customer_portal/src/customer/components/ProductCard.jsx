@@ -307,11 +307,6 @@ export default function ProductCard({
     : variantButtons.length > 0
     ? variantButtons.every((variant) => variant.stock_quantity <= 0)
     : Number(product?.stock ?? 0) <= 0;
-  const stockLabel = overallOutOfStock
-    ? 'Out of stock'
-    : currentVariant && currentVariant.stock_quantity > 0 && currentVariant.stock_quantity < 10
-    ? 'Low stock'
-    : '';
 
   const handleSelection = (variant) => {
     if (variant.stock_quantity <= 0) return;
@@ -395,12 +390,6 @@ export default function ProductCard({
         <p className="text-sm font-semibold text-black mb-4">
           ₱{currentPrice.toLocaleString()}
         </p>
-
-        {stockLabel === 'Low stock' && (
-          <span className="absolute right-0 top-6 rounded-l-full bg-[#FEF3C7] px-3 py-1 text-[10px] font-semibold text-[#92400E] shadow-sm">
-            Low stock
-          </span>
-        )}
 
         <div className="mt-auto flex h-10 w-full shrink-0 items-center gap-2.5 pt-1 pb-1">
           <button

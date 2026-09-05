@@ -23,6 +23,7 @@ $orderId = (intval($oId) > 0) ? intval($oId) : null;
 $message = trim($data['message'] ?? "");
 $sender  = $data['sender'] ?? "customer";
 $conversationId = substr(trim($data['conversation_id'] ?? ''), 0, 64) ?: null;
+$imagePath = null;
 
 if (empty($message) && !isset($_FILES['image'])) {
     echo json_encode(["success" => false, "message" => "Empty message"]);

@@ -21,14 +21,14 @@ export default function OutOfCoverageModal({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 z-[40000] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4"
+          className="fixed inset-x-0 bottom-0 top-[84px] z-[40000] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
         >
           <motion.div
             initial={{ scale: 0.9, opacity: 0, y: 20 }}
             animate={{ scale: 1, opacity: 1, y: 0 }}
             exit={{ scale: 0.9, opacity: 0, y: 20 }}
             transition={{ type: 'spring', damping: 15, stiffness: 300 }}
-            className="w-full max-w-sm max-h-[85vh] bg-white rounded-[24px] shadow-2xl overflow-hidden flex flex-col"
+            className="flex max-h-[calc(100vh-104px)] w-full max-w-sm flex-col overflow-hidden rounded-[24px] bg-white shadow-2xl"
           >
             {/* Header with Icon */}
             <div className="shrink-0 bg-gradient-to-r from-red-50 to-orange-50 px-6 py-5 flex flex-col items-center text-center">

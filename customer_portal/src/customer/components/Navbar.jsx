@@ -7,6 +7,7 @@ import {
   ClipboardList,
   Croissant,
   Gift,
+  Heart,
   AlertTriangle,
   Trash2,
   CheckCheck,
@@ -190,10 +191,16 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
   ========================= */
   const navs = [
     { name: "Home", path: "/customer" },
-    { name: "Menu", path: "/customer/menu" },
+    { name: "Cakes", path: "/customer/menu" },
     { name: "Customize", path: "/customer/customized-cakes" },
     { name: "Orders", path: "/customer/orders" }
   ];
+
+  const accountLinkClass = (path) => `block rounded-2xl px-4 py-3 text-sm transition ${
+    location.pathname === path
+      ? 'bg-gray-100 font-semibold text-black'
+      : 'text-gray-700 hover:bg-gray-100'
+  }`;
 
   return (
     <>
@@ -283,6 +290,16 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
               </div>
             )}
           </div>
+
+          {/* FAVORITES */}
+          <Link
+            to="/customer/favorites"
+            title="Favorites"
+            aria-label="View favorites"
+            className="flex h-12 w-12 items-center justify-center rounded-full text-gray-700 transition hover:bg-gray-100"
+          >
+            <Heart size={20} />
+          </Link>
 
           {/* NOTIFICATIONS */}
           <div ref={notifRef} className="relative">
@@ -441,11 +458,11 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
           {/* CART */}
           <button
             onClick={onCartClick}
-            className="relative bg-black text-white w-14 h-14 rounded-full flex items-center justify-center"
+            className="relative flex h-10 w-10 items-center justify-center rounded-full bg-black text-white"
           >
-            <ShoppingCart size={22} />
+            <ShoppingCart size={17} />
             {cartCount > 0 && (
-              <span className="absolute -top-1 -right-1 bg-[#d4af37] text-black text-[10px] w-5 h-5 rounded-full flex items-center justify-center">
+              <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-[#d4af37] text-[8px] text-black">
                 {cartCount}
               </span>
             )}
@@ -488,50 +505,49 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
                   <Link
                     to="/customer/profile"
                     onClick={() => setOpenAccount(false)}
-                    className="block rounded-2xl px-4 py-3 text-sm text-gray-700 hover:bg-gray-100 transition"
+                    className={accountLinkClass('/customer/profile')}
                   >
                     My Profile
                   </Link>
                   <Link
                     to="/customer/rewards"
                     onClick={() => setOpenAccount(false)}
-                    className="flex items-center gap-2 rounded-2xl px-4 py-3 text-sm font-semibold text-[#a67c00] hover:bg-[#fff8df] transition"
+                    className={accountLinkClass('/customer/rewards')}
                   >
-                    <Gift size={16} />
                     My Rewards
                   </Link>
                   <Link
                     to="/customer/orders"
                     onClick={() => setOpenAccount(false)}
-                    className="block rounded-2xl px-4 py-3 text-sm text-gray-700 hover:bg-gray-100 transition"
+                    className={accountLinkClass('/customer/orders')}
                   >
                     My Orders
                   </Link>
                   <Link
                     to="/customer/customized-cakes"
                     onClick={() => setOpenAccount(false)}
-                    className="block rounded-2xl px-4 py-3 text-sm text-gray-700 hover:bg-gray-100 transition"
+                    className={accountLinkClass('/customer/customized-cakes')}
                   >
                     Customized Cake Orders
                   </Link>
                   <Link
                     to="/customer/favorites"
                     onClick={() => setOpenAccount(false)}
-                    className="block rounded-2xl px-4 py-3 text-sm text-gray-700 hover:bg-gray-100 transition"
+                    className={accountLinkClass('/customer/favorites')}
                   >
                     Favorites
                   </Link>
                   <Link
                     to="/customer/saved-addresses"
                     onClick={() => setOpenAccount(false)}
-                    className="block rounded-2xl px-4 py-3 text-sm text-gray-700 hover:bg-gray-100 transition"
+                    className={accountLinkClass('/customer/saved-addresses')}
                   >
                     Saved Addresses
                   </Link>
                   <Link
                     to="/customer/account-settings"
                     onClick={() => setOpenAccount(false)}
-                    className="block rounded-2xl px-4 py-3 text-sm text-gray-700 hover:bg-gray-100 transition"
+                    className={accountLinkClass('/customer/account-settings')}
                   >
                     Account Settings
                   </Link>

@@ -191,14 +191,14 @@ function StaffChatInbox({ open, onClose }) {
     setInput("");
 
     setMessages(prev => [...prev, {
-      id: Date.now(), sender: "staff", message: msg, created_at: new Date().toISOString()
+      id: Date.now(), sender: "admin", message: msg, created_at: new Date().toISOString()
     }]);
 
     try {
       await fetch(`${CUSTOMER_BASE}/api_chat_send.php`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ order_id: activeOrderId, message: msg, sender: "staff" })
+        body: JSON.stringify({ order_id: activeOrderId, message: msg, sender: "admin" })
       });
       fetchMessages(activeOrderId);
       fetchInbox();
@@ -321,7 +321,7 @@ function StaffChatInbox({ open, onClose }) {
                       <div className="text-center text-black/50 text-[13px] pt-16">No messages yet.</div>
                     )}
                     {messages.map((msg, i) => {
-                      const isStaff    = msg.sender === "staff";
+                      const isStaff    = msg.sender === "staff" || msg.sender === "admin";
                       const isAi       = msg.sender === "ai";
                       return (
                         <div key={msg.id ?? i} className={`flex gap-3 ${isStaff ? "flex-row-reverse" : "flex-row"}`}>

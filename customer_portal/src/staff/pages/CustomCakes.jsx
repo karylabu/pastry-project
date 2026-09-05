@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { jsPDF } from "jspdf";
+import { CalendarDays, ChevronLeft, ChevronRight, Clock3 } from "lucide-react";
 
 /* STAFF NAVBAR */
 import StaffNavbar from "../components/StaffNavbar";
@@ -43,6 +44,7 @@ export default function CustomCakes({ showNavbar = true }) {
   const [toasts, setToasts] = useState([]);
   const [lastRefreshed, setLastRefreshed] = useState(null);
   const [selectedOrder, setSelectedOrder] = useState(null);
+  const [calendarMonth, setCalendarMonth] = useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1));
   const pollRef = useRef(null);
 
   const statusFilterOptions = ["All", "Pending", "Preparing", "To Receive", "Completed", "Cancelled"];
@@ -141,6 +143,42 @@ export default function CustomCakes({ showNavbar = true }) {
       ["Details", formatValue(fallbackValues.details)],
     ].filter(([, value]) => value);
   };
+
+  const getSchedule = (order) => {
+    const parsed = typeof order?.custom_details === "string"
+      ? (() => { try { return JSON.parse(order.custom_details); } catch { return {}; } })()
+      : (order?.custom_details || {});
+    const date = order?.pickup_date || order?.delivery_date || parsed.pickup_date || parsed.delivery_date || "";
+    const time = order?.pickup_time || order?.delivery_time || parsed.pickup_time || parsed.delivery_time || "";
+    return { date: String(date).slice(0, 10), time: String(time) };
+  };
+
+  const formatScheduleTime = (time) => {
+    const match = String(time).trim().match(/^(\d{1,2}):(\d{2})(?::\d{2})?$/);
+    if (!match) return String(time);
+
+    const hour = Number(match[1]);
+    const suffix = hour >= 12 ? "PM" : "AM";
+    const displayHour = hour % 12 || 12;
+    return `${displayHour}:${match[2]} ${suffix}`;
+  };
+
+  const calendarDays = (() => {
+    const firstDay = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth(), 1);
+    const start = new Date(firstDay);
+    start.setDate(firstDay.getDate() - firstDay.getDay());
+    return Array.from({ length: 42 }, (_, index) => {
+      const date = new Date(start);
+      date.setDate(start.getDate() + index);
+      const dateKey = [date.getFullYear(), String(date.getMonth() + 1).padStart(2, "0"), String(date.getDate()).padStart(2, "0")].join("-");
+      return {
+        date,
+        dateKey,
+        isCurrentMonth: date.getMonth() === calendarMonth.getMonth(),
+        orders: orders.filter(order => getSchedule(order).date === dateKey),
+      };
+    });
+  })();
 
   const fetchOrders = (silent = false) => {
     if (!silent) setLoading(true);
@@ -253,6 +291,9 @@ export default function CustomCakes({ showNavbar = true }) {
       .then(data => {
         if (data.success) {
           fetchOrders(true);
+          if (selectedOrder?.id === id) {
+            setSelectedOrder(null);
+          }
           if (status === "To Receive") {
             if (data.sms_sent) {
               addToast(`✓ Order #${id} updated — SMS sent to customer`, "success");
@@ -341,6 +382,75 @@ export default function CustomCakes({ showNavbar = true }) {
             </div>
           </div>
 
+          <section className="mb-6 w-full overflow-hidden rounded-[20px] border border-black/10 bg-white shadow-sm">
+            <div className="flex flex-col gap-3 border-b border-black/10 bg-[#FAFAFA] px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-center gap-3">
+                <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#D4AF37]/15 text-[#9a7411]"><CalendarDays size={18} /></span>
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#9a7411]">Order Schedule</p>
+                  <h2 className="mt-0.5 text-lg font-semibold text-black">{calendarMonth.toLocaleDateString([], { month: "long", year: "numeric" })}</h2>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setCalendarMonth(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() - 1, 1))}
+                  aria-label="Previous month"
+                  className="flex h-9 w-9 items-center justify-center rounded-full border border-black/10 bg-white text-black/60 transition hover:border-black/20 hover:text-black"
+                >
+                  <ChevronLeft size={16} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCalendarMonth(new Date(new Date().getFullYear(), new Date().getMonth(), 1))}
+                  className="rounded-full border border-black/10 bg-white px-3 py-2 text-[11px] font-semibold text-black/70 transition hover:border-black/20 hover:text-black"
+                >
+                  Today
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCalendarMonth(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + 1, 1))}
+                  aria-label="Next month"
+                  className="flex h-9 w-9 items-center justify-center rounded-full border border-black/10 bg-white text-black/60 transition hover:border-black/20 hover:text-black"
+                >
+                  <ChevronRight size={16} />
+                </button>
+              </div>
+            </div>
+            <div className="grid grid-cols-7 border-b border-black/10 bg-[#FAFAFA]">
+              {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+                <div key={day} className="px-2 py-2 text-center text-[10px] font-bold uppercase tracking-[0.14em] text-black/45">{day}</div>
+              ))}
+            </div>
+            <div className="grid grid-cols-7">
+              {calendarDays.map(({ date, dateKey, isCurrentMonth, orders: dayOrders }) => (
+                <div key={dateKey} className={`min-h-[clamp(58px,9vh,86px)] border-b border-r border-black/10 p-1 sm:p-1.5 ${isCurrentMonth ? 'bg-white' : 'bg-black/[0.02]'}`}>
+                  <p className={`text-right text-[11px] font-semibold ${isCurrentMonth ? 'text-black/70' : 'text-black/25'}`}>{date.getDate()}</p>
+                  <div className="mt-1 space-y-1">
+                    {dayOrders.slice(0, 3).map(order => {
+                      const schedule = getSchedule(order);
+                      return (
+                        <button
+                          key={order.id}
+                          type="button"
+                          onClick={() => openOrderDetails(order)}
+                          className="block w-full truncate rounded-lg bg-[#D4AF37]/15 px-1.5 py-1 text-left text-[10px] font-semibold text-black transition hover:bg-[#D4AF37]/30"
+                          title={`Order #${order.id}${schedule.time ? ` at ${formatScheduleTime(schedule.time)}` : ''}`}
+                        >
+                          #{order.id}{schedule.time && <span className="ml-1 font-normal text-black/60">{formatScheduleTime(schedule.time)}</span>}
+                        </button>
+                      );
+                    })}
+                    {dayOrders.length > 3 && <p className="px-1 text-[10px] text-black/45">+{dayOrders.length - 3} more</p>}
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="flex items-center gap-2 px-5 py-3 text-xs text-black/50">
+              <Clock3 size={14} /> Click a scheduled order to review its details.
+            </div>
+          </section>
+
           {loading ? (
             <p className="text-black/50">Loading custom cake requests...</p>
           ) : orders.length === 0 ? (
@@ -416,9 +526,18 @@ export default function CustomCakes({ showNavbar = true }) {
                           {isCancelled || isCompleted || isToReceive ? (
                             <button
                               type="button"
+                              onClick={() => openOrderDetails(order)}
                               className="inline-flex h-8 items-center justify-center rounded-full border border-black/10 bg-white px-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-black/70 transition hover:border-black/20 hover:bg-black/5 hover:text-black"
                             >
                               {isCancelled || isCompleted ? "Review" : "Manage"}
+                            </button>
+                          ) : order.status === "Pending" ? (
+                            <button
+                              type="button"
+                              onClick={() => openOrderDetails(order)}
+                              className="inline-flex h-8 items-center justify-center rounded-full bg-black px-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-white transition hover:bg-[#D4AF37] hover:text-black"
+                            >
+                              Review
                             </button>
                           ) : canAdvance(order.status) ? (
                             <select
@@ -519,6 +638,26 @@ export default function CustomCakes({ showNavbar = true }) {
               </div>
 
               <div className="mt-6 flex flex-wrap justify-end gap-3">
+                {selectedOrder.status === "Pending" && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => updateStatus(selectedOrder.id, "Cancelled")}
+                      disabled={updatingId === selectedOrder.id}
+                      className="inline-flex h-10 items-center justify-center rounded-full border border-red-200 bg-red-50 px-4 text-sm font-semibold text-red-700 transition hover:bg-red-100 disabled:opacity-50"
+                    >
+                      Reject
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => updateStatus(selectedOrder.id, "Preparing")}
+                      disabled={updatingId === selectedOrder.id}
+                      className="inline-flex h-10 items-center justify-center rounded-full bg-black px-5 text-sm font-semibold text-white transition hover:bg-[#D4AF37] hover:text-black disabled:opacity-50"
+                    >
+                      Accept
+                    </button>
+                  </>
+                )}
                 <button
                   type="button"
                   onClick={closeOrderDetails}

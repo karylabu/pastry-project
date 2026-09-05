@@ -68,6 +68,68 @@ function insertCustomerNotification(mysqli $conn, int $userId, string $title, st
     }
 }
 
+function sendOrderStatusSms(?string $phone, int $orderId, string $status): array {
+    if (empty($phone)) {
+        return ['sent' => false, 'error' => 'No phone number found'];
+    }
+
+    $phone = preg_replace('/\D/', '', $phone);
+    if (substr($phone, 0, 2) === '63') {
+        $phone = substr($phone, 2);
+    }
+    $phone = ltrim($phone, '0');
+    if ($phone === '') {
+        return ['sent' => false, 'error' => 'Invalid phone number'];
+    }
+    $phone = '63' . $phone;
+
+    $statusMessage = match ($status) {
+        'Pending' => 'has been received and is awaiting confirmation',
+        'Confirmed' => 'has been confirmed',
+        'Preparing' => 'is now being prepared',
+        'To Receive' => 'is ready for pickup or delivery',
+        'Completed' => 'has been completed',
+        'Cancelled' => 'has been cancelled',
+        default => 'status is now ' . $status,
+    };
+    $message = "Pastry Project: Your order #{$orderId} {$statusMessage}.";
+    $payload = json_encode([
+        'api_token' => '3e0c021fc064ea07bb524064e62125caf19f511e',
+        'phone_number' => $phone,
+        'message' => $message,
+    ]);
+
+    $ch = curl_init('https://www.iprogsms.com/api/v1/sms_messages');
+    if ($ch === false) {
+        return ['sent' => false, 'error' => 'SMS client unavailable'];
+    }
+
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_POST, true);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
+    curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 15);
+    $response = curl_exec($ch);
+    $curlError = curl_error($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+
+    file_put_contents(
+        __DIR__ . '/sms_log.txt',
+        date('Y-m-d H:i:s') . " | ORDER:{$orderId} | STATUS:{$status} | PHONE:{$phone} | HTTP:{$httpCode} | RESPONSE:{$response} | ERROR:{$curlError}\n",
+        FILE_APPEND
+    );
+
+    if ($curlError) {
+        return ['sent' => false, 'error' => $curlError];
+    }
+    if ($httpCode < 200 || $httpCode >= 300) {
+        return ['sent' => false, 'error' => $response ?: "SMS request failed with HTTP {$httpCode}"];
+    }
+
+    return ['sent' => true, 'error' => null];
+}
+
 /* =========================
     DATABASE
  ========================= */
@@ -335,12 +397,7 @@ if (!$id || !in_array($status, $allowedStatuses, true)) {
 ========================= */
 try {
     $conn->begin_transaction();
-<<<<<<< HEAD
-
-    $orderStmt = $conn->prepare("SELECT status, items, total, user_id, email FROM orders WHERE id = ? LIMIT 1 FOR UPDATE");
-=======
-    $orderStmt = $conn->prepare("SELECT status, items FROM orders WHERE id = ? LIMIT 1 FOR UPDATE");
->>>>>>> origin/main
+    $orderStmt = $conn->prepare("SELECT status, items, total, user_id, email, phone FROM orders WHERE id = ? LIMIT 1 FOR UPDATE");
     if (!$orderStmt) {
         throw new Exception("Order lookup failed");
     }
@@ -351,12 +408,7 @@ try {
     $orderStmt->close();
 
     if (!$orderRow) {
-<<<<<<< HEAD
         throw new Exception("Order not found");
-=======
-        $conn->rollback();
-        sendJson(false, "Order not found");
->>>>>>> origin/main
     }
 
     $oldStatus = trim((string) ($orderRow['status'] ?? 'Pending'));
@@ -393,15 +445,7 @@ try {
 
         $planResult = collectInventoryPlan($conn, $orderLines);
         if (!$planResult['success']) {
-<<<<<<< HEAD
             throw new Exception($planResult['message']);
-        }
-
-        $plan = $planResult['plan'];
-        $applyResult = applyInventoryPlan($conn, $id, $status, $plan, $currentUserId);
-=======
-            $conn->rollback();
-            sendJson(false, $planResult['message']);
         }
 
         $plan = $planResult['plan'];
@@ -410,19 +454,12 @@ try {
         $applyResult = $alreadyDeducted
             ? ['success' => true]
             : applyInventoryPlan($conn, $id, $status, $plan, $currentUserId);
->>>>>>> origin/main
         if (!$applyResult['success']) {
             throw new Exception($applyResult['message']);
         }
     }
 
-<<<<<<< HEAD
-    $stmt = $conn->prepare("UPDATE orders SET status=? WHERE id=?");
-    if (!$stmt) {
-        throw new Exception("Prepare failed");
-    }
-=======
-    } elseif ($status === 'Cancelled' && $oldStatus !== 'Cancelled') {
+    if ($status === 'Cancelled' && $oldStatus !== 'Cancelled') {
         $movementStmt = $conn->prepare("SELECT product_id, quantity FROM product_inventory_movements WHERE movement_type = 'Order' AND reference_type = 'order' AND reference_id = ? FOR UPDATE");
         $movementStmt->bind_param('i', $id);
         $movementStmt->execute();
@@ -458,46 +495,20 @@ try {
         $movementStmt->close();
     }
 
-    if (!shouldDeductInventory($oldStatus, $status) && !($status === 'Cancelled' && $oldStatus !== 'Cancelled')) {
-        $stmt = $conn->prepare("UPDATE orders SET status=? WHERE id=?");
-        if (!$stmt) {
-            $conn->rollback();
-            sendJson(false, "Prepare failed");
-        }
->>>>>>> origin/main
+    $stmt = $conn->prepare("UPDATE orders SET status=? WHERE id=?");
+    if (!$stmt) {
+        throw new Exception("Prepare failed");
+    }
 
     $stmt->bind_param("si", $status, $id);
     if (!$stmt->execute()) {
         $stmt->close();
-<<<<<<< HEAD
         throw new Exception("Update failed");
     }
     $stmt->close();
 
     if ($status === 'Completed' && $oldStatus !== 'Completed') {
         awardLoyaltyPoints($conn, $loyaltyUserId, $id, floatval($orderRow['total'] ?? 0));
-=======
->>>>>>> origin/main
-    }
-
-    if (shouldDeductInventory($oldStatus, $status)) {
-        $stmt = $conn->prepare("UPDATE orders SET status=? WHERE id=?");
-        $stmt->bind_param("si", $status, $id);
-        if (!$stmt->execute()) {
-            $stmt->close();
-            $conn->rollback();
-            sendJson(false, "Update failed");
-        }
-        $stmt->close();
-    } elseif ($status === 'Cancelled' && $oldStatus !== 'Cancelled') {
-        $stmt = $conn->prepare("UPDATE orders SET status=? WHERE id=?");
-        $stmt->bind_param("si", $status, $id);
-        if (!$stmt->execute()) {
-            $stmt->close();
-            $conn->rollback();
-            sendJson(false, "Update failed");
-        }
-        $stmt->close();
     }
 
     $conn->commit();
@@ -568,81 +579,16 @@ try {
     /* =========================
        SMS LOGIC
     ========================= */
-    $smsSent  = false;
-    $smsError = null;
-
-    if ($status === "To Receive") {
-        $ps = $conn->prepare("SELECT phone FROM orders WHERE id=?");
-
-        if ($ps) {
-            $ps->bind_param("i", $id);
-            $ps->execute();
-            $row = $ps->get_result()->fetch_assoc();
-            $ps->close();
-
-            $phone = $row['phone'] ?? null;
-
-            if ($phone) {
-                $phone = preg_replace('/\D/', '', $phone);
-
-                if (substr($phone, 0, 2) === '63') {
-                    $phone = substr($phone, 2);
-                }
-                if (substr($phone, 0, 1) === '0') {
-                    $phone = substr($phone, 1);
-                }
-
-                $phone = '63' . $phone;
-                $message = "Good day! Pastry Project. Your order #$id is ready for pickup/delivery.";
-                $payload = json_encode([
-                    "api_token"    => "3e0c021fc064ea07bb524064e62125caf19f511e",
-                    "phone_number" => $phone,
-                    "message"      => $message
-                ]);
-
-                $ch = curl_init("https://www.iprogsms.com/api/v1/sms_messages");
-                if ($ch !== false) {
-                    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-                    curl_setopt($ch, CURLOPT_POST, true);
-                    curl_setopt($ch, CURLOPT_HTTPHEADER, ["Content-Type: application/json"]);
-                    curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
-                    curl_setopt($ch, CURLOPT_TIMEOUT, 15);
-
-                    $response  = curl_exec($ch);
-                    $curlError = curl_error($ch);
-                    $httpCode  = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-                    curl_close($ch);
-
-                    file_put_contents(
-                        __DIR__ . "/sms_log.txt",
-                        date("Y-m-d H:i:s") . " | ORDER:$id | PHONE:$phone | HTTP:$httpCode | RESPONSE:$response | ERROR:$curlError\n",
-                        FILE_APPEND
-                    );
-
-                    if ($curlError) {
-                        $smsError = $curlError;
-                    } elseif ($httpCode >= 200 && $httpCode < 300) {
-                        $smsSent = true;
-                    } else {
-                        $smsError = $response;
-                    }
-                } else {
-                    $smsError = "SMS client unavailable";
-                }
-            } else {
-                $smsError = "No phone number found";
-            }
-        } else {
-            $smsError = "Phone query failed";
-        }
-    }
+    $smsResult = $oldStatus !== $status
+        ? sendOrderStatusSms($orderRow['phone'] ?? null, $id, $status)
+        : ['sent' => false, 'error' => 'Status did not change'];
 
     $conn->close();
     sendJson(true, "Order updated", [
         "id" => $id,
         "status" => $status,
-        "sms_sent" => $smsSent,
-        "sms_error" => $smsError
+        "sms_sent" => $smsResult['sent'],
+        "sms_error" => $smsResult['error']
     ]);
 } catch (Throwable $e) {
     if (isset($conn) && $conn) {

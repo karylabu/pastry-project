@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Routes, Route, Link, useLocation } from 'react-router-dom';
 
-import { CheckCircle } from 'lucide-react';
+import { CheckCircle, ChevronRight, ShoppingBag } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 
 import Navbar from './Navbar';
@@ -212,26 +212,24 @@ export default function CustomerApp() {
         <motion.div
           initial={{ y: 100, x: 0, opacity: 0 }}
           animate={{ y: 0, x: 0, opacity: 1 }}
-          className="fixed left-4 bottom-6 z-[9998] max-w-[580px] w-[calc(100%-2rem)] rounded-[32px] bg-white text-[#171717] shadow-[0_20px_60px_rgba(0,0,0,0.12)] border border-[#f0e4b8] overflow-hidden backdrop-blur-xl sm:left-6"
+          className="fixed bottom-5 left-4 z-[9998] rounded-full border border-[#f0e4b8] bg-white text-[#171717] shadow-[0_12px_30px_rgba(0,0,0,0.14)] sm:left-6"
         >
           <button
             onClick={() => setIsCartOpen(true)}
-            className="w-full flex items-center justify-between gap-4 px-8 py-5 transition-colors hover:bg-gray-50"
+            aria-label={`Open cart with ${cartQuantity} item${cartQuantity === 1 ? '' : 's'} totaling ₱${totalAmount.toLocaleString()}`}
+            className="flex items-center gap-2.5 px-3 py-2.5 transition-colors hover:bg-[#fffaf0]"
           >
-            <div className="flex items-center gap-5">
-               <div className="relative flex h-14 w-14 items-center justify-center rounded-[20px] bg-[#d4af37] text-white shadow-lg">
-                  <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
-                  <span className="absolute -right-2 -top-2 flex h-7 w-7 items-center justify-center rounded-full bg-[#171717] text-[11px] font-black text-white border-2 border-white">{cartQuantity}</span>
-               </div>
-               <div className="flex flex-col text-left">
-                 <span className="text-[10px] uppercase tracking-[0.3em] font-black text-[#d4af37]">Your Bag</span>
-                 <span className="text-2xl font-black leading-tight tracking-tight text-[#171717]">₱{totalAmount.toLocaleString()}</span>
-               </div>
+            <div className="relative flex h-9 w-9 items-center justify-center rounded-full bg-[#d4af37] text-white">
+              <ShoppingBag size={18} />
+              <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full border border-white bg-[#171717] text-[8px] font-black text-white">
+                {cartQuantity}
+              </span>
             </div>
-            <div className="flex items-center gap-2 rounded-2xl bg-[#171717] px-7 py-4 text-[11px] font-black uppercase tracking-[0.2em] text-white shadow-md transition-all hover:bg-[#d4af37] active:scale-95">
-              <span>View Cart</span>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
-            </div>
+            <span className="text-base font-black leading-none text-[#171717]">₱{totalAmount.toLocaleString()}</span>
+            <span className="flex items-center gap-0.5 text-[10px] font-bold text-slate-500">
+              View Cart
+              <ChevronRight size={12} />
+            </span>
           </button>
         </motion.div>
       )}

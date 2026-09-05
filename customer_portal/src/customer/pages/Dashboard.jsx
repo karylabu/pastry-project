@@ -274,8 +274,8 @@ function RecommendationCard({ product, onSelect }) {
     ?? Number(product?.price || 0);
 
   return (
-    <div className="flex h-full min-h-[360px] min-w-0 flex-col rounded-[30px] border border-stone-200 bg-white p-3 shadow-[0_10px_35px_rgba(15,23,42,0.05)]">
-      <div className="mb-5 flex h-[174px] w-full flex-shrink-0 items-center justify-center overflow-hidden rounded-[24px] border border-stone-100 bg-[#f7f5f2] p-3">
+    <div className="flex h-full min-h-[290px] min-w-0 flex-col rounded-[20px] border border-stone-200 bg-white p-2 shadow-[0_8px_20px_rgba(15,23,42,0.03)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_12px_24px_rgba(15,23,42,0.06)]">
+      <div className="mb-3 flex h-[146px] w-full flex-shrink-0 items-center justify-center overflow-hidden rounded-[16px] border border-stone-100 bg-[#f7f5f2] p-2">
         <img
           src={resolveProductImage(product)}
           alt={product.name}
@@ -285,19 +285,19 @@ function RecommendationCard({ product, onSelect }) {
           }}
           className={
             shouldEnlargeDrinkSize || isSmallCoffeeProduct
-              ? `h-[145px] w-auto max-w-[85%] max-h-[145px] object-contain object-center transition-transform duration-500 ${isSmallCoffeeProduct ? 'scale-110' : 'scale-105'}`
+              ? `h-[120px] w-auto max-w-[82%] max-h-[120px] object-contain object-center transition-transform duration-500 ${isSmallCoffeeProduct ? 'scale-110' : 'scale-105'}`
               : product?.category && /\b(cake|cakes|meal|meals|pasta|starter|starters)\b/i.test(String(product.category))
-                ? 'h-[118px] w-auto max-w-[78%] max-h-[118px] object-contain object-center transition-transform duration-500 scale-100'
-                : 'h-[145px] w-auto max-w-[85%] max-h-[145px] object-contain object-center transition-transform duration-500 scale-100'
+                ? 'h-[104px] w-auto max-w-[72%] max-h-[104px] object-contain object-center transition-transform duration-500 scale-100'
+                : 'h-[120px] w-auto max-w-[82%] max-h-[120px] object-contain object-center transition-transform duration-500 scale-100'
           }
                   style={isStarterProduct ? { mixBlendMode: 'multiply' } : undefined}
         />
       </div>
 
-      <h3 className="min-h-[2.25rem] line-clamp-2 text-sm font-bold leading-tight text-gray-800">{product.name}</h3>
-      <p className="mt-1.5 text-sm font-semibold text-black">₱{Number(selectedPrice || 0).toLocaleString()}</p>
+      <h3 className="min-h-[1.6rem] line-clamp-2 text-[12px] font-bold leading-tight text-gray-800">{product.name}</h3>
+      <p className="mt-1 text-[12px] font-semibold text-black">₱{Number(selectedPrice || 0).toLocaleString()}</p>
 
-      <div className="mt-2.5 flex flex-wrap justify-center gap-1.5">
+      <div className="mt-1 flex flex-wrap justify-center gap-1">
         {sizeOptions.map((option) => {
           const label = String(option.size || 'Regular');
           const isSelected = selectedSize === label;
@@ -306,7 +306,7 @@ function RecommendationCard({ product, onSelect }) {
               key={`${product.id}-${label}`}
               type="button"
               onClick={() => setSelectedSize(label)}
-              className={`rounded-full border px-2 py-1 text-[9px] font-semibold uppercase tracking-[0.12em] ${
+              className={`rounded-full border px-1.5 py-0.5 text-[7px] font-semibold uppercase tracking-[0.08em] ${
                 isSelected
                   ? 'border-[#d4af37] bg-[#f7e8b0] text-black'
                   : 'border-stone-200 bg-stone-50 text-stone-600'
@@ -318,16 +318,16 @@ function RecommendationCard({ product, onSelect }) {
         })}
       </div>
 
-      <p className="mt-2 text-[11px] text-gray-500 line-clamp-2">
+      <p className="mt-1 text-[9.5px] text-gray-500 line-clamp-2">
         {product.description || 'Freshly baked and customer favorite.'}
       </p>
-      <p className="mt-2 text-[9px] font-semibold uppercase tracking-[0.2em] text-[#d4af37]">
+      <p className="mt-1 text-[7.5px] font-semibold uppercase tracking-[0.14em] text-[#d4af37]">
         {product.reason}
       </p>
 
       <button
         onClick={() => onSelect?.(product, selectedSize, Number(selectedPrice || product.price || 0))}
-        className="mt-auto h-11 w-full rounded-xl bg-[#111827] py-2.5 text-[10px] font-semibold uppercase tracking-[0.2em] text-white hover:bg-[#d4af37] hover:text-black"
+        className="mt-auto h-8 w-full rounded-[10px] bg-[#111827] py-2 text-[8.5px] font-semibold uppercase tracking-[0.15em] text-white transition-colors hover:bg-[#d4af37] hover:text-black"
       >
         Add to Cart
       </button>
@@ -339,19 +339,27 @@ function RecommendationCard({ product, onSelect }) {
    CHAT BUBBLE COMPONENT
 ========================= */
 export function ChatBubble({ aiMode = false, fullPage = false }) {
-  const [open, setOpen]           = useState(fullPage);
-  const [step, setStep]           = useState(fullPage ? "chatting" : "enter_order"); // enter_order | chatting
-  const [orderId, setOrderId]     = useState("");
-  const [orderError, setOrderError] = useState("");
+  const hasCustomerAccount = typeof window !== 'undefined'
+    ? (() => {
+        try {
+          return Boolean(JSON.parse(localStorage.getItem('user') || 'null')?.id);
+        } catch {
+          return false;
+        }
+      })()
+    : false;
+  const navigate = useNavigate();
+  const [open, setOpen]           = useState(fullPage && hasCustomerAccount);
+  const [step, setStep]           = useState("chatting");
   const [messages, setMessages]   = useState([]);
   const [input, setInput]         = useState("");
   const [sending, setSending]     = useState(false);
   const [staffMode, setStaffMode] = useState(false);
   const [unread, setUnread]       = useState(0);
-  const [orderInput, setOrderInput] = useState("");
   const [selectedImage, setSelectedImage] = useState(null);
   const [showStoreNumber, setShowStoreNumber] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
+  const [showAccountPrompt, setShowAccountPrompt] = useState(false);
   const [conversationId, setConversationId] = useState(() => localStorage.getItem("active_customer_service_chat") || "legacy");
   const [historyIds, setHistoryIds] = useState(() => {
     try { return JSON.parse(localStorage.getItem("customer_service_chat_history") || "[]"); } catch { return []; }
@@ -393,26 +401,20 @@ export function ChatBubble({ aiMode = false, fullPage = false }) {
     }
   }, [messages, sending, step, open]);
 
-  useEffect(() => {
-    if (orderId) {
-      setOrderInput(String(orderId));
-    }
-  }, [orderId]);
-
   /* Poll for new messages every 5s when chat is open */
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
-    if (step === "chatting" && (fullPage || orderId || savedUser?.id)) {
+    if (step === "chatting") {
       fetchMessages();
       pollRef.current = setInterval(fetchMessages, 5000);
     }
     return () => clearInterval(pollRef.current);
-  }, [step, orderId, conversationId, showHistory]);
+  }, [step, conversationId, showHistory]);
 
   const fetchMessages = async () => {
     try {
       const params = new URLSearchParams({
-        order_id: String(orderId || 0),
+        order_id: "0",
         user_id: String(savedUser?.id || 0),
         conversation_id: conversationId
       });
@@ -430,39 +432,12 @@ export function ChatBubble({ aiMode = false, fullPage = false }) {
     }
   };
 
-  const handleOrderSubmit = async () => {
-    const id = parseInt((orderInput || orderId).toString().trim());
-    setOrderError("");
-
-    if (!id) {
-      setOrderError("Please enter your order number.");
+  const sendMessage = async (text, silent = false, activeOrderId = 0) => {
+    if (!hasCustomerAccount) {
+      setShowAccountPrompt(true);
       return;
     }
 
-    setOrderId(String(id));
-
-    // Verify order exists
-    try {
-      const params = new URLSearchParams({
-        order_id: String(id),
-        user_id: String(savedUser?.id || 0),
-        conversation_id: conversationId
-      });
-      const res  = await fetch(`${CUSTOMER_BASE}/api_chat_fetch.php?${params.toString()}`);
-      const data = await safeParseJson(res);
-      if (data.success) {
-        setMessages(data.messages);
-        setStep("chatting");
-
-      } else {
-        setOrderError("Order not found. Please check your order number.");
-      }
-    } catch (e) {
-      setOrderError("Could not connect. Please try again.");
-    }
-  };
-
-  const sendMessage = async (text, silent = false, activeOrderId = parseInt(orderId)) => {
     const msg = text || input.trim();
     const image = silent ? null : selectedImage;
     if (!msg && !image) return;
@@ -482,7 +457,7 @@ export function ChatBubble({ aiMode = false, fullPage = false }) {
       }]);
     }
 
-    const payloadOrderId = activeOrderId || parseInt(orderId) || 0;
+    const payloadOrderId = activeOrderId || 0;
 
     try {
       const formData = new FormData();
@@ -490,7 +465,7 @@ export function ChatBubble({ aiMode = false, fullPage = false }) {
       formData.append("user_id", savedUser?.id || 0);
       formData.append("message", msg);
       formData.append("sender", "customer");
-      formData.append("support_mode", "staff");
+      formData.append("support_mode", "admin");
       formData.append("conversation_id", conversationId);
       if (image) formData.append("image", image);
 
@@ -503,10 +478,6 @@ export function ChatBubble({ aiMode = false, fullPage = false }) {
 
       if (!res.ok || !data.success) {
         throw new Error(data.message || "Message could not be sent");
-      }
-
-      if (data.order_id && !orderId) {
-        setOrderId(String(data.order_id));
       }
 
       await fetchMessages();
@@ -531,8 +502,9 @@ export function ChatBubble({ aiMode = false, fullPage = false }) {
 
   const senderLabel = {
     customer: "You",
-    staff: "Staff",
-    ai: "Staff"
+    staff: "Admin",
+    admin: "Admin",
+    ai: "Admin"
   };
 
   const getImageUrl = (message) => message.image_url || (
@@ -545,10 +517,7 @@ export function ChatBubble({ aiMode = false, fullPage = false }) {
     setMessages([]);
     setInput("");
     setSelectedImage(null);
-    setOrderId("");
-    setOrderInput("");
-    setOrderError("");
-    setStep("enter_order");
+    setStep("chatting");
     setStaffMode(false);
     localStorage.setItem("active_customer_service_chat", nextConversationId);
   };
@@ -569,6 +538,10 @@ export function ChatBubble({ aiMode = false, fullPage = false }) {
         <div className="relative">
           <button
             onClick={() => {
+              if (!hasCustomerAccount) {
+                setShowAccountPrompt(true);
+                return;
+              }
               if (!open) startFreshChat();
               setOpen(o => !o);
               setUnread(0);
@@ -610,11 +583,11 @@ export function ChatBubble({ aiMode = false, fullPage = false }) {
               </div>
               <div className="flex-1">
                 <div className="flex items-center gap-2">
-                  <p className={fullPage ? "text-gray-900 font-bold text-lg sm:text-xl" : "text-white font-semibold text-sm"}>{fullPage ? (showHistory ? "Chat History" : "Customer Service") : "Staff Support"}</p>
+                  <p className={fullPage ? "text-gray-900 font-bold text-lg sm:text-xl" : "text-white font-semibold text-sm"}>{fullPage ? (showHistory ? "Chat History" : "Customer Service") : "Admin Support"}</p>
                   {fullPage && !showHistory && <span className="hidden rounded-full bg-[#e8f5e9] px-2 py-1 text-[9px] font-bold uppercase tracking-[0.12em] text-[#398347] sm:inline-flex">Online</span>}
                 </div>
                 <p className={fullPage ? "text-gray-500 text-xs mt-0.5" : "text-gray-400 text-xs"}>
-                  {fullPage ? "We usually reply instantly" : step === "chatting" ? `Order #${orderId}` : "We usually reply instantly"}
+                  {fullPage ? "We usually reply instantly" : "Admin usually replies promptly"}
                 </p>
               </div>
               {fullPage && (
@@ -647,14 +620,6 @@ export function ChatBubble({ aiMode = false, fullPage = false }) {
                 <>
                   <button
                     type="button"
-                    onClick={() => { setStep("enter_order"); setMessages([]); setOrderId(""); }}
-                    title="Back to choose order number"
-                    className="w-8 h-8 rounded-full text-gray-400 hover:bg-white/10 hover:text-white flex items-center justify-center"
-                  >
-                    <ArrowLeft size={17} />
-                  </button>
-                  <button
-                    type="button"
                     onClick={() => setShowStoreNumber(value => !value)}
                     title="Show store number"
                     aria-label="Show store number"
@@ -669,233 +634,190 @@ export function ChatBubble({ aiMode = false, fullPage = false }) {
               )}
             </div>
 
-            {/* BODY */}
-            {step === "enter_order" ? (
-
-              /* WELCOME SCREEN */
-              <div className="flex-1 min-h-0 overflow-y-auto px-4 py-5 sm:px-8 sm:py-8 gap-4 bg-[#f7f7f7] flex flex-col justify-start">
-                {fullPage && (
-                  <div className="rounded-2xl bg-[#fff7e8] border border-[#f5dfb0] px-4 py-3 flex items-center gap-3 text-[#b76a19]">
-                    <Volume2 size={19} className="flex-shrink-0" />
-                    <p className="text-sm font-medium">We are here to help with your order and concerns.</p>
-                  </div>
-                )}
-                <div className={fullPage ? "rounded-2xl border border-gray-200 bg-white p-5 sm:p-7 shadow-sm" : "rounded-[20px] border border-gray-200 bg-white p-6 shadow-sm"}>
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-[#fdf8ec] flex items-center justify-center">
-                      <MessageCircle size={20} className="text-[#d4af37]" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-semibold text-gray-900">Messages</p>
-                      <p className="text-xs text-gray-500">We’re here to help</p>
-                    </div>
-                  </div>
-
-                  <div className="mt-4">
-                    <p className="text-[15px] font-semibold text-gray-900">{staffMode ? "Connect with staff" : `Hi, ${savedUser?.name || "there"}!`}</p>
-                    <p className="mt-1 text-sm text-gray-600">Choose your order number to view messages.</p>
-                  </div>
-
-                  {fullPage && (
-                    <div className="mt-5 border-t border-gray-100 pt-4">
-                      <p className="text-xs font-semibold text-gray-500">How can we help you today?</p>
-                      <div className="mt-3 grid gap-2 sm:grid-cols-3">
-                        {["Track my order", "Delivery question", "Payment assistance"].map(topic => (
-                          <button key={topic} type="button" onClick={() => setInput(topic)} className="rounded-xl border border-gray-200 bg-white px-3 py-3 text-left text-sm text-gray-700 hover:border-[#e45f32] hover:bg-[#fff7f2]">
-                            {topic}
-                          </button>
-                        ))}
-                      </div>
+            <>
+              {showHistory && (
+                <div className="flex-1 overflow-y-auto bg-gray-50 px-5 py-6 sm:px-10">
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-400">Previous conversations</p>
+                  {historyIds.length === 0 ? (
+                    <p className="mt-4 text-sm text-gray-400">No previous chats yet.</p>
+                  ) : (
+                    <div className="mt-3 space-y-2">
+                      {historyIds.map((id, index) => (
+                        <button key={id} type="button" onClick={() => { setConversationId(id); setShowHistory(false); }} className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-left text-sm text-gray-700 hover:border-[#e45f32] hover:bg-[#fff7f2]">
+                          Conversation {historyIds.length - index}
+                        </button>
+                      ))}
                     </div>
                   )}
-
-                  <div className="mt-2">
-                    <label className="text-[11px] uppercase tracking-[0.2em] text-gray-400">Choose order number</label>
-                    <input
-                      type="text"
-                      inputMode="numeric"
-                      value={orderInput}
-                      onChange={(e) => setOrderInput(e.target.value)}
-                      placeholder="e.g. 123"
-                      className="mt-1 w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-700 outline-none focus:border-[#d4af37]"
-                    />
-                  </div>
-
-                  {orderError && (
-                    <p className="text-xs text-red-500">{orderError}</p>
-                  )}
-
-                  <button
-                    onClick={() => handleOrderSubmit()}
-                    className="mt-2 w-full bg-black text-white rounded-xl py-2.5 text-sm font-semibold hover:bg-[#d4af37] hover:text-black transition-colors"
-                  >
-                    Start Chat
-                  </button>
                 </div>
-              </div>
-
-            ) : (
-
-              /* MESSAGES */
-              <>
-                {showHistory && (
-                  <div className="flex-1 overflow-y-auto bg-gray-50 px-5 py-6 sm:px-10">
-                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-400">Previous conversations</p>
-                    {historyIds.length === 0 ? (
-                      <p className="mt-4 text-sm text-gray-400">No previous chats yet.</p>
-                    ) : (
-                      <div className="mt-3 space-y-2">
-                        {historyIds.map((id, index) => (
-                          <button key={id} type="button" onClick={() => { setConversationId(id); setShowHistory(false); }} className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-left text-sm text-gray-700 hover:border-[#e45f32] hover:bg-[#fff7f2]">
-                            Conversation {historyIds.length - index}
-                          </button>
-                        ))}
+              )}
+              <div
+                ref={messagesContainerRef}
+                onScroll={(event) => {
+                  const element = event.currentTarget;
+                  shouldStickToBottomRef.current = element.scrollHeight - element.scrollTop - element.clientHeight < 24;
+                }}
+                className={showHistory ? "hidden" : "flex-1 min-h-0 overflow-y-auto px-3 py-3 space-y-2.5 bg-gray-50"}
+              >
+                {messages.length === 0 && (
+                  <div className="px-2 pt-5">
+                    <p className="text-center text-gray-400 text-xs">No messages yet. Start a conversation.</p>
+                    {fullPage && (
+                      <div className="mt-5 rounded-2xl border border-gray-200 bg-white p-4">
+                        <p className="text-sm font-semibold text-gray-900">How can we help you today?</p>
+                        <div className="mt-3 grid gap-2 sm:grid-cols-3">
+                          {["Track my order", "Delivery question", "Payment assistance"].map(topic => (
+                            <button key={topic} type="button" onClick={() => setInput(topic)} className="rounded-xl border border-gray-200 bg-white px-3 py-3 text-left text-sm text-gray-700 hover:border-[#e45f32] hover:bg-[#fff7f2]">
+                              {topic}
+                            </button>
+                          ))}
+                        </div>
                       </div>
                     )}
                   </div>
                 )}
-                <div
-                  ref={messagesContainerRef}
-                  onScroll={(event) => {
-                    const element = event.currentTarget;
-                    shouldStickToBottomRef.current = element.scrollHeight - element.scrollTop - element.clientHeight < 24;
-                  }}
-                  className={showHistory ? "hidden" : "flex-1 min-h-0 overflow-y-auto px-3 py-3 space-y-2.5 bg-gray-50"}
-                >
-                  {messages.length === 0 && (
-                    <div className="px-2 pt-5">
-                      <p className="text-center text-gray-400 text-xs">No messages yet. Start a conversation.</p>
-                      {fullPage && (
-                        <div className="mt-5 rounded-2xl border border-gray-200 bg-white p-4">
-                          <p className="text-sm font-semibold text-gray-900">How can we help you today?</p>
-                          <div className="mt-3 grid gap-2 sm:grid-cols-3">
-                            {["Track my order", "Delivery question", "Payment assistance"].map(topic => (
-                              <button key={topic} type="button" onClick={() => setInput(topic)} className="rounded-xl border border-gray-200 bg-white px-3 py-3 text-left text-sm text-gray-700 hover:border-[#e45f32] hover:bg-[#fff7f2]">
-                                {topic}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
 
-                  {messages.map((msg, i) => {
-                    const isCustomer = msg.sender === "customer";
-                    const isAi       = msg.sender === "ai";
+                {messages.map((msg, i) => {
+                  const isCustomer = msg.sender === "customer";
+                  const isAi       = msg.sender === "ai";
 
-                    return (
-                      <div key={msg.id ?? i} className={`flex gap-2 ${isCustomer ? "flex-row-reverse" : "flex-row"}`}>
-                        {/* Avatar */}
-                        <div className={`w-7 h-7 rounded-full flex-shrink-0 flex items-center justify-center text-xs font-bold
-                          ${isCustomer ? "bg-black text-white" : isAi ? "bg-[#d4af37] text-black" : "bg-purple-100 text-purple-700"}`}>
-                          {isCustomer ? <User size={12} /> : isAi ? <Bot size={12} /> : "S"}
-                        </div>
-
-                        <div className={`max-w-[78%] ${isCustomer ? "items-end" : "items-start"} flex flex-col gap-1`}>
-                          <span className="text-[11px] text-gray-400 px-1 opacity-75">
-                            {senderLabel[msg.sender]} · {formatTime(msg.created_at)}
-                          </span>
-                          <div className={`px-3 py-2 rounded-2xl text-[13px] leading-relaxed
-                            ${isCustomer
-                              ? "bg-black text-white rounded-tr-sm"
-                              : isAi
-                              ? "bg-[#fdf8ec] text-gray-800 border border-[#f0e4b8] rounded-tl-sm"
-                              : "bg-white text-gray-800 border border-gray-200 rounded-tl-sm"
-                            }`}>
-                            {getImageUrl(msg) && (
-                              <img
-                                src={getImageUrl(msg)}
-                                alt="Chat attachment"
-                                className="max-w-full max-h-48 rounded-lg object-contain mb-1"
-                              />
-                            )}
-                            {msg.message && <p>{msg.message}</p>}
-                          </div>
-                        </div>
+                  return (
+                    <div key={msg.id ?? i} className={`flex gap-2 ${isCustomer ? "flex-row-reverse" : "flex-row"}`}>
+                      <div className={`w-7 h-7 rounded-full flex-shrink-0 flex items-center justify-center text-xs font-bold
+                        ${isCustomer ? "bg-black text-white" : isAi ? "bg-[#d4af37] text-black" : "bg-purple-100 text-purple-700"}`}>
+                        {isCustomer ? <User size={12} /> : isAi ? <Bot size={12} /> : "S"}
                       </div>
-                    );
-                  })}
 
-                  {sending && (
-                    <div className="flex gap-2 items-center">
-                      <div className="w-7 h-7 rounded-full bg-[#d4af37] flex items-center justify-center">
-                        <Bot size={12} className="text-black" />
-                      </div>
-                      <div className="bg-[#fdf8ec] border border-[#f0e4b8] px-4 py-2 rounded-2xl rounded-tl-sm">
-                        <span className="flex gap-1">
-                          <span className="w-1.5 h-1.5 bg-[#d4af37] rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
-                          <span className="w-1.5 h-1.5 bg-[#d4af37] rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
-                          <span className="w-1.5 h-1.5 bg-[#d4af37] rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
+                      <div className={`max-w-[78%] ${isCustomer ? "items-end" : "items-start"} flex flex-col gap-1`}>
+                        <span className="text-[11px] text-gray-400 px-1 opacity-75">
+                          {senderLabel[msg.sender]} · {formatTime(msg.created_at)}
                         </span>
+                        <div className={`px-3 py-2 rounded-2xl text-[13px] leading-relaxed
+                          ${isCustomer
+                            ? "bg-black text-white rounded-tr-sm"
+                            : isAi
+                            ? "bg-[#fdf8ec] text-gray-800 border border-[#f0e4b8] rounded-tl-sm"
+                            : "bg-white text-gray-800 border border-gray-200 rounded-tl-sm"
+                          }`}>
+                          {getImageUrl(msg) && (
+                            <img
+                              src={getImageUrl(msg)}
+                              alt="Chat attachment"
+                              className="max-w-full max-h-48 rounded-lg object-contain mb-1"
+                            />
+                          )}
+                          {msg.message && <p>{msg.message}</p>}
+                        </div>
                       </div>
                     </div>
-                  )}
+                  );
+                })}
 
-                  <div ref={bottomRef} />
-                </div>
-
-                {/* INPUT */}
-                {!showHistory && <>
-                <div className="border-t border-gray-100 bg-white px-3 pt-2.5">
-                  <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-gray-400">Quick chats</p>
-                  <div className="flex flex-wrap gap-2">
-                  {["Hi, I need help", "Where is my order?", "I want to place an order", "Can I customize a cake?", "How can I pay?"].map((suggestion) => (
-                    <button
-                      key={suggestion}
-                      type="button"
-                      onClick={() => sendMessage(suggestion)}
-                      disabled={sending}
-                      className="rounded-full border border-gray-200 bg-gray-50 px-3 py-1.5 text-[11px] text-gray-600 transition hover:border-black hover:bg-white hover:text-black disabled:cursor-not-allowed disabled:opacity-40"
-                    >
-                      {suggestion}
-                    </button>
-                  ))}
+                {sending && (
+                  <div className="flex gap-2 items-center">
+                    <div className="w-7 h-7 rounded-full bg-[#d4af37] flex items-center justify-center">
+                      <Bot size={12} className="text-black" />
+                    </div>
+                    <div className="bg-[#fdf8ec] border border-[#f0e4b8] px-4 py-2 rounded-2xl rounded-tl-sm">
+                      <span className="flex gap-1">
+                        <span className="w-1.5 h-1.5 bg-[#d4af37] rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
+                        <span className="w-1.5 h-1.5 bg-[#d4af37] rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
+                        <span className="w-1.5 h-1.5 bg-[#d4af37] rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
+                      </span>
+                    </div>
                   </div>
-                </div>
-                <div className="px-3 py-2.5 bg-white flex gap-2 items-end">
-                  <input
-                    ref={imageInputRef}
-                    type="file"
-                    accept="image/jpeg,image/png,image/gif,image/webp"
-                    className="hidden"
-                    onChange={e => setSelectedImage(e.target.files?.[0] || null)}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => imageInputRef.current?.click()}
-                    disabled={sending}
-                    title="Attach picture"
-                    className="w-9 h-9 rounded-full border border-gray-200 text-gray-600 flex items-center justify-center flex-shrink-0 disabled:opacity-40 hover:border-black hover:text-black transition-colors"
-                  >
-                    <Paperclip size={15} />
-                  </button>
-                  <textarea
-                    value={input}
-                    onChange={e => setInput(e.target.value)}
-                    onKeyDown={handleKeyDown}
-                    placeholder="Type your message..."
-                    rows={1}
-                    className="flex-1 resize-none border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-black max-h-20"
-                  />
-                  <button
-                    onClick={() => sendMessage()}
-                    disabled={(!input.trim() && !selectedImage) || sending}
-                    className="w-9 h-9 rounded-full bg-black text-white flex items-center justify-center flex-shrink-0 disabled:opacity-40 hover:bg-[#d4af37] transition-colors"
-                  >
-                    <Send size={14} />
-                  </button>
-                </div></>}
-                {!showHistory && selectedImage && (
-                  <p className="px-3 pb-2 text-[11px] text-gray-500 bg-white truncate">
-                    {selectedImage.name}
-                  </p>
                 )}
-              </>
-            )}
+
+                <div ref={bottomRef} />
+              </div>
+
+              {!showHistory && (
+                <>
+                  <div className="border-t border-gray-100 bg-white px-3 pt-2.5">
+                    <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-gray-400">Quick chats</p>
+                    <div className="flex flex-wrap gap-2">
+                      {["Hi, I need help", "Where is my order?", "I want to place an order", "Can I customize a cake?", "How can I pay?"].map((suggestion) => (
+                        <button
+                          key={suggestion}
+                          type="button"
+                          onClick={() => sendMessage(suggestion)}
+                          disabled={sending}
+                          className="rounded-full border border-gray-200 bg-gray-50 px-3 py-1.5 text-[11px] text-gray-600 transition hover:border-black hover:bg-white hover:text-black disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                          {suggestion}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="px-3 py-2.5 bg-white flex gap-2 items-end">
+                    <input
+                      ref={imageInputRef}
+                      type="file"
+                      accept="image/jpeg,image/png,image/gif,image/webp"
+                      className="hidden"
+                      onChange={e => setSelectedImage(e.target.files?.[0] || null)}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => imageInputRef.current?.click()}
+                      disabled={sending}
+                      title="Attach picture"
+                      className="w-9 h-9 rounded-full border border-gray-200 text-gray-600 flex items-center justify-center flex-shrink-0 disabled:opacity-40 hover:border-black hover:text-black transition-colors"
+                    >
+                      <Paperclip size={15} />
+                    </button>
+                    <textarea
+                      value={input}
+                      onChange={e => setInput(e.target.value)}
+                      onKeyDown={handleKeyDown}
+                      placeholder="Type your message..."
+                      rows={1}
+                      className="flex-1 resize-none border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-black max-h-20"
+                    />
+                    <button
+                      onClick={() => sendMessage()}
+                      disabled={(!input.trim() && !selectedImage) || sending}
+                      className="w-9 h-9 rounded-full bg-black text-white flex items-center justify-center flex-shrink-0 disabled:opacity-40 hover:bg-[#d4af37] transition-colors"
+                    >
+                      <Send size={14} />
+                    </button>
+                  </div>
+                </>
+              )}
+              {!showHistory && selectedImage && (
+                <p className="px-3 pb-2 text-[11px] text-gray-500 bg-white truncate">
+                  {selectedImage.name}
+                </p>
+              )}
+            </>
           </motion.div>
         )}
       </AnimatePresence>
+
+      {showAccountPrompt && (
+        <div className="fixed inset-0 z-[70000] flex items-center justify-center bg-black/40 px-5 backdrop-blur-sm">
+          <div className="w-full max-w-sm rounded-2xl bg-white p-6 text-center shadow-2xl">
+            <h2 className="text-lg font-bold text-gray-900">Account required</h2>
+            <p className="mt-2 text-sm leading-6 text-gray-500">Please log in or create an account before chatting with Admin.</p>
+            <div className="mt-5 flex gap-3">
+              <button
+                type="button"
+                onClick={() => setShowAccountPrompt(false)}
+                className="flex-1 rounded-xl border border-gray-200 px-4 py-2.5 text-xs font-semibold text-gray-600 hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => navigate('/customer/login')}
+                className="flex-1 rounded-xl bg-black px-4 py-2.5 text-xs font-semibold text-white hover:bg-[#d4af37] hover:text-black"
+              >
+                Log in
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
@@ -1094,10 +1016,6 @@ export default function Dashboard({ onAddToCart }) {
                 <div className="my-4 flex items-center gap-2 text-[#c59a36]" aria-hidden="true"><span className="h-px w-14 bg-[#d8bd79]" /><span className="h-1.5 w-1.5 rounded-full bg-current" /><span className="h-px w-14 bg-[#d8bd79]" /></div>
                 <p className="text-xl font-medium text-[#2b2927] md:text-2xl">Enjoy <span className="font-black text-[#bd9028]">FREE DELIVERY</span></p>
                 <p className="mt-1 text-base text-[#4a4642] md:text-lg">on your <strong className="italic">first delivery order.</strong></p>
-                <div className="mt-5 rounded-lg border border-[#d8c28c] bg-[#fffdf9]/75 px-7 py-2.5 text-center">
-                  <p className="text-[9px] font-bold uppercase tracking-[0.28em] text-[#a9853b]">Voucher code</p>
-                  <p className="text-2xl font-black tracking-[0.16em] text-[#171717] md:text-3xl">WELCOME</p>
-                </div>
               </div>
             </div>
           </div>
@@ -1109,11 +1027,11 @@ export default function Dashboard({ onAddToCart }) {
         onCustomizeNow={() => navigate("/customer/customized-cakes")}
       />
 
-      <div className="mx-auto max-w-[1584px] px-6 py-10 md:px-10">
+      <div className="mx-auto max-w-[1584px] px-3 py-6 md:px-5 lg:px-6">
 
         {/* LOYALTY BANNER */}
-        <section className="relative mb-20 px-0">
-          <div className="flex w-full flex-col items-center rounded-[12px] border border-[#e8dfc5] bg-[#f9f5ee] p-5 shadow-sm md:flex-row md:p-5 lg:px-6">
+        <section className="relative mb-10 px-0">
+          <div className="flex w-full flex-col items-center rounded-[12px] border border-[#e8dfc5] bg-[#f9f5ee] p-4 shadow-sm md:flex-row md:p-4 lg:px-5">
 
             {/* Left: Branding */}
             <div className="flex flex-1 items-center gap-5 border-b border-[#e8dfc5] pb-5 md:border-b-0 md:border-r md:pb-0 md:pr-8">
@@ -1173,15 +1091,15 @@ export default function Dashboard({ onAddToCart }) {
         </section>
 
         {recommendedProducts.length > 0 && (
-          <section className="mb-20">
-            <div className="flex justify-between mb-10">
+          <section className="mb-10">
+            <div className="mb-3 flex items-end justify-between">
               <div>
-                <p className="text-[#d4af37] text-xs uppercase tracking-[0.4em] font-black">Smart Picks</p>
-                <h2 className="text-3xl font-bold">Recommended for You</h2>
+                <p className="text-[#d4af37] text-[10px] uppercase tracking-[0.25em] font-black">Smart Picks</p>
+                <h2 className="mt-1 text-lg font-bold md:text-xl">Recommended for You</h2>
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4 md:grid-cols-6 md:gap-6">
+            <div className="grid grid-cols-2 gap-2 md:grid-cols-3 lg:grid-cols-6 md:gap-2.5">
               {recommendedProducts.map((product) => (
                 <RecommendationCard
                   key={product.id}
@@ -1194,17 +1112,17 @@ export default function Dashboard({ onAddToCart }) {
         )}
 
         {/* BEST SELLERS */}
-        <section className="mb-20">
-          <div className="flex justify-between mb-10">
+        <section className="mb-10">
+          <div className="mb-3 flex items-end justify-between">
             <div>
-              <p className="text-[#d4af37] text-xs uppercase tracking-[0.4em] font-black">Customer Favorites</p>
-              <h2 className="text-3xl font-bold">Best Sellers</h2>
+              <p className="text-[#d4af37] text-[10px] uppercase tracking-[0.25em] font-black">Customer Favorites</p>
+              <h2 className="mt-1 text-lg font-bold md:text-xl">Best Sellers</h2>
             </div>
-            <button onClick={() => navigate("/customer/menu")} className="text-xs uppercase tracking-[0.3em] text-gray-400 hover:text-black font-semibold">
+            <button onClick={() => navigate("/customer/menu")} className="text-[8px] uppercase tracking-[0.18em] text-gray-400 hover:text-black font-semibold">
               View Menu
             </button>
           </div>
-          <div className="grid grid-cols-2 gap-4 md:grid-cols-6 md:gap-6">
+          <div className="grid grid-cols-2 gap-2 md:grid-cols-3 lg:grid-cols-6 md:gap-2.5">
             {bestSellers.map(p => (
             <RecommendationCard
               key={p.id}
@@ -1216,17 +1134,17 @@ export default function Dashboard({ onAddToCart }) {
         </section>
 
         {/* MUST TRY */}
-        <section className="pb-10">
-          <div className="flex justify-between mb-10">
+        <section className="pb-6">
+          <div className="mb-3 flex items-end justify-between">
             <div>
-              <p className="text-[#d4af37] text-xs uppercase tracking-[0.4em] font-black">Chef Recommendation</p>
-              <h2 className="text-3xl font-bold">Must Try</h2>
+              <p className="text-[#d4af37] text-[10px] uppercase tracking-[0.25em] font-black">Chef Recommendation</p>
+              <h2 className="mt-1 text-lg font-bold md:text-xl">Must Try</h2>
             </div>
-            <button onClick={() => navigate("/customer/menu")} className="text-xs uppercase tracking-[0.3em] text-gray-400 hover:text-black font-semibold">
+            <button onClick={() => navigate("/customer/menu")} className="text-[8px] uppercase tracking-[0.18em] text-gray-400 hover:text-black font-semibold">
               Explore More
             </button>
           </div>
-          <div className="grid grid-cols-2 gap-4 md:grid-cols-6 md:gap-6">
+          <div className="grid grid-cols-2 gap-2 md:grid-cols-3 lg:grid-cols-6 md:gap-2.5">
             {mustTry.map(p => (
             <RecommendationCard
               key={p.id}
