@@ -518,7 +518,7 @@ try {
         insertAuditLog($conn, $currentUserId, 'orders', 'status_change', 'order', $id, $statusNote);
     }
 
-    $notifLookup = $conn->prepare("SELECT user_id, email, customer, type, order_type FROM orders WHERE id = ?");
+    $notifLookup = $conn->prepare("SELECT user_id, email, customer, type, order_type, EXISTS (SELECT 1 FROM custom_cake_orders WHERE order_id = orders.id) AS is_custom_cake FROM orders WHERE id = ?");
     $notifUserId = 0;
     if ($notifLookup) {
         $notifLookup->bind_param("i", $id);
@@ -544,31 +544,60 @@ try {
             if ($notifUserId > 0) {
                 $orderType = $notifRow['order_type'] ?? $notifRow['type'] ?? 'Standard';
                 $isRush = stripos((string)$orderType, 'rush') !== false;
+                $isCustomCake = (int) ($notifRow['is_custom_cake'] ?? 0) === 1;
 
-                switch ($status) {
-                    case 'Preparing':
-                    case 'Confirmed':
-                        $notifType = $isRush ? 'order_urgent' : 'order_pending';
-                        $notifTitle = $isRush ? 'Rush order accepted' : 'Order confirmed';
-                        $notifMessage = $isRush
-                            ? 'Your rush order is now being prioritized.'
-                            : 'Your order is now being prepared.';
-                        break;
-                    case 'To Receive':
-                    case 'Completed':
-                        $notifType = 'order_ready';
-                        $notifTitle = 'Order ready';
-                        $notifMessage = 'Your order is ready for pickup or delivery.';
-                        break;
-                    case 'Cancelled':
-                        $notifType = 'stockout';
-                        $notifTitle = 'Order cancelled';
-                        $notifMessage = 'Your order has been cancelled. Please contact us for details.';
-                        break;
-                    default:
-                        $notifType = 'account';
-                        $notifTitle = 'Order update';
-                        $notifMessage = 'Your order status has been updated.';
+                if ($isCustomCake) {
+                    switch ($status) {
+                        case 'Preparing':
+                        case 'Confirmed':
+                            $notifType = 'Success';
+                            $notifTitle = 'Custom cake request accepted';
+                            $notifMessage = 'Your custom cake request has been accepted. The order is now being prepared.';
+                            break;
+                        case 'To Receive':
+                            $notifType = 'Success';
+                            $notifTitle = 'Custom cake order ready';
+                            $notifMessage = 'Your custom cake order is ready for pickup or delivery.';
+                            break;
+                        case 'Completed':
+                            $notifType = 'Success';
+                            $notifTitle = 'Custom cake order completed';
+                            $notifMessage = 'Your custom cake order has been completed.';
+                            break;
+                        case 'Cancelled':
+                            $notifType = 'Warning';
+                            $notifTitle = 'Custom cake request declined';
+                            $notifMessage = 'Your custom cake request has been declined. Please contact us for details.';
+                            break;
+                        default:
+                            $notifType = 'Info';
+                            $notifTitle = 'Custom cake request updated';
+                            $notifMessage = "Your custom cake request status is now {$status}.";
+                    }
+                } else {
+                    switch ($status) {
+                        case 'Preparing':
+                        case 'Confirmed':
+                            $notifType = $isRush ? 'order_urgent' : 'order_pending';
+                            $notifTitle = $isRush ? 'Rush order accepted' : 'Order confirmed';
+                            $notifMessage = $isRush ? 'Your rush order is now being prioritized.' : 'Your order is now being prepared.';
+                            break;
+                        case 'To Receive':
+                        case 'Completed':
+                            $notifType = 'order_ready';
+                            $notifTitle = 'Order ready';
+                            $notifMessage = 'Your order is ready for pickup or delivery.';
+                            break;
+                        case 'Cancelled':
+                            $notifType = 'stockout';
+                            $notifTitle = 'Order cancelled';
+                            $notifMessage = 'Your order has been cancelled. Please contact us for details.';
+                            break;
+                        default:
+                            $notifType = 'account';
+                            $notifTitle = 'Order update';
+                            $notifMessage = 'Your order status has been updated.';
+                    }
                 }
 
                 insertCustomerNotification($conn, $notifUserId, $notifTitle, $notifMessage, $notifType, '/customer/orders');

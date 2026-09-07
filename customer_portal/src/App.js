@@ -111,7 +111,7 @@ function App() {
           path="admin/*"
           element={
             <ProtectedRoute
-              allowedRoles={["admin", "administrator", "superadmin", "super_admin", "manager"]}
+              allowedRoles={["admin", "administrator", "superadmin", "super_admin", "manager", "owner", "shop_owner"]}
               loginPath="/admin/login"
               deniedPath="/staff/access-denied"
             >

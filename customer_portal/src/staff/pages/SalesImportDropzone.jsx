@@ -173,6 +173,107 @@ export default function SalesImportDropzone({ onImportComplete }) {
   const [isProcessing, setIsProcessing] = useState(false);
   const [toast, setToast] = useState(null); // { type: 'success' | 'error', message }
   const inputRef = useRef(null);
+    const MAX_FILE_SIZE = 15 * 1024 * 1024;
+    const ACCEPTED_EXTENSIONS = ['xls', 'xlsx'];
+
+    function todayIso() {
+      const date = new Date();
+      return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+    }
+
+    function normalizeHeader(value) {
+      return String(value || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
+    }
+
+    function readValue(row, aliases) {
+      const normalized = Object.entries(row).reduce((result, [key, value]) => {
+        result[normalizeHeader(key)] = value;
+        return result;
+      }, {});
+      const key = aliases.find(alias => normalized[alias] !== undefined);
+      return key ? normalized[key] : '';
+    }
+
+    function parseWorkbook(file) {
+      return file.arrayBuffer().then(buffer => {
+        const workbook = XLSX.read(buffer, { type: 'array', cellDates: true });
+        const sheet = workbook.Sheets[workbook.SheetNames[0]];
+        return XLSX.utils.sheet_to_json(sheet, { defval: '' });
+      });
+    }
+
+    async function hashFile(file) {
+      const digest = await crypto.subtle.digest('SHA-256', await file.arrayBuffer());
+      return Array.from(new Uint8Array(digest)).map(byte => byte.toString(16).padStart(2, '0')).join('');
+    }
+
+    const importFile = async file => {
+      setError('');
+      setResult(null);
+      if (!file) return;
+      const extension = file.name.split('.').pop().toLowerCase();
+      if (!ACCEPTED_EXTENSIONS.includes(extension)) {
+        setError('Only .xlsx and .xls files are allowed.');
+        return;
+      }
+      if (file.size > MAX_FILE_SIZE) {
+        setError('The Excel file must not exceed 15 MB.');
+        return;
+      }
+      setProcessing(true);
+      try {
+        const rows = await parseWorkbook(file);
+        const fileHash = await hashFile(file);
+        const response = await fetch(`${STAFF_BASE}/api_historical_sales.php`, {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ file_hash: fileHash, import_date: importDate, rows }),
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok || !payload.success) throw new Error(payload.message || `Import failed (${response.status}).`);
+        setResult(payload);
+        onImportComplete?.(payload);
+      } catch (importError) {
+        setError(importError.message || 'The Excel file could not be imported.');
+      } finally {
+        setProcessing(false);
+        if (inputRef.current) inputRef.current.value = '';
+      }
+    };
+
+    return (
+      <section className="mb-6 rounded-3xl border border-black/10 bg-white p-5 shadow-[0_8px_24px_rgba(17,24,39,0.04)]">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-[0.24em] text-[#8b5cf6]">Historical sales</p>
+            <h2 className="mt-1 text-lg font-bold text-[#111827]">Import customized cake sales</h2>
+            <p className="mt-1 text-xs text-[#9aa2b1]">Import unique cake names without creating Products or Orders.</p>
+          </div>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+            <label className="text-[10px] font-bold uppercase tracking-[0.16em] text-black/45">Import date
+              <span className="relative mt-1 flex items-center">
+                <CalendarDays size={14} className="pointer-events-none absolute left-3 text-black/40" />
+                <input type="date" value={importDate} onChange={event => setImportDate(event.target.value)} className="rounded-xl border border-black/10 py-2 pl-9 pr-3 text-sm text-black outline-none focus:border-[#8b5cf6]" />
+              </span>
+            </label>
+            <button type="button" onClick={() => inputRef.current?.click()} disabled={processing} className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-black px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#8b5cf6] disabled:opacity-50">
+              {processing ? <Loader2 size={16} className="animate-spin" /> : <UploadCloud size={16} />}
+              Import Excel
+            </button>
+            <input ref={inputRef} type="file" accept=".xls,.xlsx" className="hidden" onChange={event => importFile(event.target.files?.[0])} />
+          </div>
+        </div>
+
+        <div onDragOver={event => { event.preventDefault(); setDragging(true); }} onDragLeave={() => setDragging(false)} onDrop={event => { event.preventDefault(); setDragging(false); importFile(event.dataTransfer.files?.[0]); }} className={`mt-4 flex min-h-20 items-center justify-center rounded-2xl border border-dashed px-4 text-center text-xs transition ${dragging ? 'border-[#8b5cf6] bg-[#f0ebfe]' : 'border-black/10 bg-[#f8fafc] text-black/45'}`}>
+          <div className="flex items-center gap-2"><FileSpreadsheet size={16} /><span>Drop an Excel file here or use Import Excel. Price, 40% down payment, and 60% balance are validated.</span></div>
+        </div>
+
+        {error && <div className="mt-3 flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-700"><XCircle size={15} className="mt-0.5 shrink-0" />{error}</div>}
+        {result && <div className="mt-3 grid gap-2 text-xs sm:grid-cols-3"><div className="flex items-center gap-2 rounded-xl bg-emerald-50 p-3 font-semibold text-emerald-700"><CheckCircle2 size={15} />{result.imported} imported</div><div className="rounded-xl bg-amber-50 p-3 font-semibold text-amber-700">{result.skipped} skipped</div><div className="rounded-xl bg-red-50 p-3 font-semibold text-red-700">{result.errors} errors</div></div>}
+      </section>
+    );
+  }
 
   const showToast = (type, message) => {
     setToast({ type, message });

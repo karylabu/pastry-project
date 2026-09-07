@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useMemo } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   Search,
@@ -21,6 +21,7 @@ import {
   UserCog,
   Megaphone,
   Settings,
+  CalendarDays,
 } from "lucide-react";
 import { BASE, LARAVEL_BASE } from "../../services/config";
 
@@ -44,7 +45,7 @@ function normalizeRole(role) {
 
 function isAdminRole(role) {
   const normalized = normalizeRole(role);
-  return ["admin", "administrator", "superadmin", "super_admin"].includes(normalized);
+  return ["admin", "administrator", "superadmin", "super_admin", "owner", "shop_owner"].includes(normalized);
 }
 
 const NAV_GROUPS = [
@@ -66,6 +67,7 @@ const NAV_GROUPS = [
       { name: "Live Orders", path: "/admin/orders", icon: ShoppingBag },
       { name: "Order History", path: "/admin/orders/history", icon: History },
       { name: "Custom Cake Requests", path: "/admin/custom-cakes", icon: CakeSlice },
+      { name: "Schedule", path: "/admin/schedule", icon: CalendarDays },
     ],
   },
   {
@@ -97,8 +99,6 @@ const NAV_GROUPS = [
   },
 ];
 
-const ALL_NAV_ITEMS = NAV_GROUPS.flatMap((g) => g.items);
-
 export default function AdminNavbar() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -116,6 +116,7 @@ export default function AdminNavbar() {
   const notifRef = useRef(null);
   const searchRef = useRef(null);
   const accountRef = useRef(null);
+
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
@@ -138,11 +139,6 @@ export default function AdminNavbar() {
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
-
-  const currentPage = useMemo(
-    () => ALL_NAV_ITEMS.find((i) => i.path === location.pathname),
-    [location.pathname]
-  );
 
   const fetchNotifications = async () => {
     if (!currentUser?.id) {
@@ -324,7 +320,7 @@ export default function AdminNavbar() {
       )}
 
       {/* ── TOP BAR ── */}
-      <header className="fixed top-0 right-0 left-0 lg:left-[260px] h-[72px] bg-white/95 backdrop-blur-xl border-b border-black/10 z-[9998] flex items-center justify-between px-5 sm:px-8 shadow-sm">
+      <header className="fixed top-0 right-0 left-0 lg:left-[260px] h-[72px] bg-transparent z-[9998] flex items-center justify-between px-5 sm:px-8">
         <div className="flex items-center gap-4 min-w-0">
           <button
             onClick={() => setSidebarOpen(true)}
@@ -333,9 +329,6 @@ export default function AdminNavbar() {
           >
             <MenuIcon size={19} />
           </button>
-          <p className="text-black/80 text-[14px] font-semibold truncate">
-            {currentPage ? currentPage.name : "Dashboard"}
-          </p>
         </div>
 
         <div className="flex items-center gap-2">
@@ -454,8 +447,8 @@ export default function AdminNavbar() {
             {openAccount && (
               <div className="absolute right-0 top-[54px] w-[220px] bg-white border border-black/10 rounded-2xl shadow-2xl overflow-hidden">
                 <div className="px-5 py-4 border-b border-black/10">
-                  <p className="text-[10px] uppercase tracking-wider text-black/50">Admin Account</p>
-                  <h3 className="text-[13px] font-semibold text-black mt-1">Admin</h3>
+                  <p className="text-[10px] uppercase tracking-wider text-black/50">{currentUser?.role === "owner" || currentUser?.role === "shop_owner" ? "Shop Owner Account" : "Admin Account"}</p>
+                  <h3 className="text-[13px] font-semibold text-black mt-1">{currentUser?.name || currentUser?.email || "Admin"}</h3>
                 </div>
                 <div className="p-2">
                   <button onClick={() => { navigate('/admin/dashboard'); setOpenAccount(false); }} className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 text-[13px] text-gray-700 hover:text-gray-900 rounded-lg"><LayoutDashboard size={15} /> Dashboard</button>

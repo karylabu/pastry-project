@@ -33,7 +33,8 @@ $eventDate = trim($_POST['pickup_date'] ?? $_POST['event_date'] ?? '');   // acc
 $details   = trim($_POST['details'] ?? '');
 $userId    = intval($_POST['user_id'] ?? 0);
 if ($userId <= 0) {
-    $userId = null;
+    echo json_encode(['success' => false, 'message' => 'Please log in before sending a custom cake request.']);
+    exit;
 }
 $deliveryAddress = trim($_POST['delivery_address'] ?? '');
 $deliveryMethod = trim($_POST['delivery_method'] ?? 'Pickup');
@@ -88,7 +89,7 @@ $inspoImagesJson = json_encode($savedFiles);
 // ---------------------------------------------------------------
 // 4. INSERT INTO `orders`
 //    Custom cake requests start with no fixed price (quote pending),
-//    so totals are 0 and status is 'Pending Quote'.
+//    so totals are 0 and status is 'Pending'.
 // ---------------------------------------------------------------
 $itemsJson = json_encode([[
     'name'             => 'Custom Cake Request',
@@ -99,7 +100,7 @@ $itemsJson = json_encode([[
 
 $method  = $deliveryMethod ?: 'Pickup';
 $payment = 'COD';      // payment is decided once the quote is confirmed
-$status  = 'Pending Quote';
+$status  = 'Pending';
 
 $customDetails = [
     'customer_name' => $name,

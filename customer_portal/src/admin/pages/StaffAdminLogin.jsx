@@ -48,7 +48,7 @@ export default function StaffAdminLogin() {
       localStorage.setItem("user", JSON.stringify(userWithRole));
       setSuccess("Signed in successfully.");
 
-      if (["admin", "administrator", "superadmin", "super_admin"].includes(normalizedRole)) {
+      if (["admin", "administrator", "superadmin", "super_admin", "owner", "shop_owner"].includes(normalizedRole)) {
         navigate("/admin", { replace: true });
       } else if (normalizedRole === "staff") {
         navigate("/staff/dashboard", { replace: true });
