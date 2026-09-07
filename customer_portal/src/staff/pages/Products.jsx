@@ -97,7 +97,14 @@ export default function Products({ showNavbar = true, allowCatalogManagement = f
     setFetchError(null);
 
     laravelStaffFetch(`${LARAVEL_BASE}/api/staff/products?action=list`)
-      .then(res => res.json())
+      .then((res) => {
+        if (!res.ok) throw new Error(`Products API returned ${res.status}`);
+        return res.json();
+      })
+      .catch(() => staffFetch(`${STAFF_BASE}/api_products.php?action=list`).then((res) => {
+        if (!res.ok) throw new Error(`Legacy products API returned ${res.status}`);
+        return res.json();
+      }))
       .then(data => {
 
         if (Array.isArray(data)) {

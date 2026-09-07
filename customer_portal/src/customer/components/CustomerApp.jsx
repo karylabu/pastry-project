@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Routes, Route, Link, useLocation } from 'react-router-dom';
+import { Navigate, Routes, Route, Link, useLocation } from 'react-router-dom';
 
 import { CheckCircle, ChevronRight, ShoppingBag } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -183,6 +183,20 @@ export default function CustomerApp() {
     !isCheckoutOpen &&
     !['/rewards', '/orders', '/profile', '/checkout', '/customer/rewards', '/customer/orders', '/customer/profile', '/customer/checkout'].includes(normalizedPath) &&
     ['/','/home','/menu','/customized-cakes','/customer','/customer/home','/customer/menu','/customer/customized-cakes'].includes(normalizedPath);
+
+  let storedRole = '';
+  try {
+    storedRole = String(JSON.parse(localStorage.getItem('user') || 'null')?.role || '').trim().toLowerCase();
+  } catch {
+    storedRole = '';
+  }
+
+  if (storedRole && storedRole !== 'customer') {
+    const destination = ['admin', 'administrator', 'superadmin', 'super_admin', 'owner', 'shop_owner'].includes(storedRole)
+      ? '/admin'
+      : '/staff';
+    return <Navigate to={destination} replace />;
+  }
 
   return (
     <div className="min-h-screen bg-white font-['DM_Sans']">

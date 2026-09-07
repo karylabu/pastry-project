@@ -6,6 +6,7 @@ import {
   UploadCloud, FileSpreadsheet, CheckCircle2, AlertCircle
 } from 'lucide-react';
 import StaffNavbar from '../components/StaffNavbar';
+import SalesImportDropzone from './SalesImportDropzone';
 import { BASE, STAFF_BASE, LARAVEL_BASE } from '../../services/config';
 
 const staffFetch = (url, options = {}) => {
@@ -89,9 +90,10 @@ function StatCard({ title, value, sub, icon: Icon, color, soft, trend, isMock })
   return (
     <motion.div
       whileHover={{ y: -3 }}
-      className="bg-white rounded-2xl border p-4 flex flex-col gap-3 relative"
-      style={{ borderColor: C.border, boxShadow: '0 1px 2px rgba(17,24,39,0.04)' }}
+      className="relative flex min-h-[142px] flex-col justify-between overflow-hidden rounded-2xl border bg-white p-4"
+      style={{ borderColor: C.border, boxShadow: '0 4px 14px rgba(17,24,39,0.04)' }}
     >
+      <div className="absolute right-0 top-0 h-1 w-16 rounded-bl-full" style={{ background: color }} />
       {isMock && (
         <span className="absolute top-3 right-3 text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded text-gray-400 bg-gray-50 border border-gray-100">
           sample
@@ -104,7 +106,7 @@ function StatCard({ title, value, sub, icon: Icon, color, soft, trend, isMock })
         <span className="text-sm font-semibold" style={{ color: C.ink }}>{title}</span>
       </div>
       <div>
-        <h2 className="text-3xl font-bold" style={{ color: C.ink }}>{value}</h2>
+        <h2 className="text-[27px] font-bold tracking-tight" style={{ color: C.ink }}>{value}</h2>
         <div className="flex items-center gap-2 mt-1">
           {trend !== undefined && (
             <span className="flex items-center gap-0.5 text-xs font-bold" style={{ color: trend >= 0 ? C.emerald : C.red }}>
@@ -271,6 +273,23 @@ export default function Reports({ showNavbar = true }) {
   const [analyticsCategory, setAnalyticsCategory] = useState('');
   const [analyticsIngredientId, setAnalyticsIngredientId] = useState('');
   const [analyticsMovementType, setAnalyticsMovementType] = useState('');
+  const [historicalSales, setHistoricalSales] = useState([]);
+  const [historicalSalesSummary, setHistoricalSalesSummary] = useState({ total_sales: 0, total_down_payments: 0, total_remaining_balance: 0, records: 0 });
+
+  const loadHistoricalSales = () => {
+    staffFetch(`${STAFF_BASE}/api_historical_sales.php`)
+      .then(response => response.json())
+      .then(data => {
+        if (data.success) {
+          setHistoricalSales(Array.isArray(data.sales) ? data.sales : []);
+          setHistoricalSalesSummary(data.summary || {});
+        }
+      })
+      .catch(() => {
+        setHistoricalSales([]);
+        setHistoricalSalesSummary({ total_sales: 0, total_down_payments: 0, total_remaining_balance: 0, records: 0 });
+      });
+  };
 
   useEffect(() => {
     Promise.all([
@@ -289,6 +308,7 @@ export default function Reports({ showNavbar = true }) {
       setIngredientsRaw(Array.isArray(ingRes?.ingredients) ? ingRes.ingredients : []);
       setLoading(false);
     });
+    loadHistoricalSales();
   }, []);
 
   useEffect(() => {
@@ -354,15 +374,28 @@ export default function Reports({ showNavbar = true }) {
     () => visibleOrders.filter(o => normalizeStatus(o.status) === 'completed'),
     [visibleOrders]
   );
+  const historicalVisibleSales = useMemo(() => {
+    if (dateFilterStart && dateFilterEnd) {
+      return historicalSales.filter(sale => sale.sale_date >= dateFilterStart && sale.sale_date <= dateFilterEnd);
+    }
+    if (range === 'all') return historicalSales;
+    const cutoff = new Date();
+    if (range === 'today') cutoff.setHours(0, 0, 0, 0);
+    else if (range === 'week') cutoff.setDate(cutoff.getDate() - ((cutoff.getDay() + 6) % 7));
+    else if (range === 'month') cutoff.setDate(1);
+    else cutoff.setDate(cutoff.getDate() - Number(range));
+    const cutoffDate = cutoff.toISOString().slice(0, 10);
+    return historicalSales.filter(sale => sale.sale_date >= cutoffDate);
+  }, [historicalSales, range, dateFilterStart, dateFilterEnd]);
   const cancelledOrds = useMemo(
     () => visibleOrders.filter(o => ['cancelled', 'canceled', 'rejected'].includes(normalizeStatus(o.status))),
     [visibleOrders]
   );
 
   /* ── BA-01: Total Revenue & AOV ── */
-  const totalRevenue = useMemo(() => completedOrds.reduce((s, o) => s + Number(o.total || 0), 0), [completedOrds]);
-  const avgOrderValue = useMemo(() => completedOrds.length ? totalRevenue / completedOrds.length : 0, [totalRevenue, completedOrds]);
-  const totalOrdersProcessed = useMemo(() => completedOrds.length, [completedOrds]);
+  const totalRevenue = useMemo(() => completedOrds.reduce((s, o) => s + Number(o.total || 0), 0) + historicalVisibleSales.reduce((s, sale) => s + Number(sale.price || 0), 0), [completedOrds, historicalVisibleSales]);
+  const avgOrderValue = useMemo(() => (completedOrds.length + historicalVisibleSales.length) ? totalRevenue / (completedOrds.length + historicalVisibleSales.length) : 0, [totalRevenue, completedOrds, historicalVisibleSales]);
+  const totalOrdersProcessed = useMemo(() => completedOrds.length + historicalVisibleSales.length, [completedOrds, historicalVisibleSales]);
   const orderFulfillmentText = `${totalOrdersProcessed} completed · ${cancelledOrds.length} cancelled`;
 
   const prevPeriod = useMemo(() => {
@@ -620,27 +653,32 @@ export default function Reports({ showNavbar = true }) {
         <div className="max-w-[1400px] mx-auto px-6 md:px-10 py-6">
 
           {/* HEADER */}
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between mb-6">
-            <div>
-              <h1 className="text-[26px] font-bold" style={{ color: C.ink }}>Business Analytics</h1>
-              <p className="text-sm mt-1" style={{ color: C.sub }}>Revenue, demand patterns, and procurement decision support.</p>
+          <div className="relative mb-6 flex flex-col gap-5 overflow-hidden rounded-3xl border border-black/10 bg-white p-5 shadow-[0_8px_24px_rgba(17,24,39,0.04)] sm:flex-row sm:items-center sm:justify-between sm:p-6">
+            <div className="pointer-events-none absolute -right-8 -top-10 h-32 w-32 rounded-full border-[18px] border-[#f0ebfe]" />
+            <div className="border-l-4 border-[#8b5cf6] pl-4">
+              <p className="text-[10px] font-bold uppercase tracking-[0.28em] text-[#8b5cf6]">Sales intelligence</p>
+              <h1 className="mt-1 text-[28px] font-bold tracking-tight" style={{ color: C.ink }}>Business Analytics</h1>
+              <p className="mt-1 text-sm" style={{ color: C.sub }}>Revenue, demand patterns, and procurement decision support.</p>
             </div>
             <button
+              type="button"
               onClick={exportReport}
-              className="inline-flex items-center gap-2 rounded-2xl bg-black px-5 py-3 text-sm font-semibold text-white hover:bg-[#111827] transition"
+              className="relative inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-black px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-[#8b5cf6]"
             >
-              <span>📥</span>
+              <Download size={16} />
               Download PDF Report
             </button>
           </div>
+
+          <SalesImportDropzone onImportComplete={loadHistoricalSales} />
 
           {/* FILTER ROW — was lg:grid-cols-[1.2fr_0.8fr] wrapping a 2-card
               sm:grid-cols-3 inner grid, which left a dead empty column
               between "Date range" and "Quick timeframe". Now it's a single
               flat 3-column grid so all three cards share the row evenly
               with no leftover gap. */}
-          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-[0.8fr_1.05fr_1.15fr] items-start mb-4">
-            <div className="rounded-2xl bg-white border border-black/10 p-3">
+          <div className="mb-6 grid items-start gap-2 rounded-3xl border border-black/10 bg-white p-2 shadow-[0_4px_14px_rgba(17,24,39,0.03)] sm:grid-cols-2 lg:grid-cols-[0.8fr_1.05fr_1.15fr]">
+            <div className="rounded-2xl border border-transparent bg-[#f8fafc] p-3">
               <p className="text-[10px] uppercase tracking-[0.25em] text-black/50 font-semibold">Interval</p>
               <div className="mt-2.5 flex items-center gap-1.5">
                 {['daily', 'weekly', 'monthly'].map((key) => (
@@ -658,7 +696,7 @@ export default function Reports({ showNavbar = true }) {
                 ))}
               </div>
             </div>
-            <div className="rounded-2xl bg-white border border-black/10 p-3">
+            <div className="rounded-2xl border border-transparent bg-[#f8fafc] p-3">
               <p className="text-[10px] uppercase tracking-[0.25em] text-black/50 font-semibold">Date range</p>
               <div className="mt-2.5 grid gap-2 sm:grid-cols-2">
                 <label className="block text-[11px] text-black/70">From
@@ -679,7 +717,7 @@ export default function Reports({ showNavbar = true }) {
                 </label>
               </div>
             </div>
-            <div className="rounded-2xl bg-white border border-black/10 p-3 flex flex-col gap-2">
+            <div className="flex flex-col gap-2 rounded-2xl border border-transparent bg-[#f8fafc] p-3">
               <p className="text-[10px] uppercase tracking-[0.25em] text-black/50 font-semibold">Quick timeframe</p>
               <div className="flex flex-wrap gap-2">
                 {[['today', 'Today'], ['week', 'This Week'], ['month', 'This Month'], ['all', 'All']].map(([val, label]) => (
@@ -703,23 +741,43 @@ export default function Reports({ showNavbar = true }) {
             </div>
           </div>
 
-          <div className="mb-4 grid gap-2 rounded-2xl border border-black/10 bg-white p-2.5 sm:grid-cols-2 lg:grid-cols-4">
-            <select value={analyticsProductId} onChange={(e) => setAnalyticsProductId(e.target.value)} className="rounded-xl border border-black/10 px-3 py-2 text-sm">
-              <option value="">All products</option>
-              {products.map((product) => <option key={product.id} value={product.id}>{product.name}</option>)}
-            </select>
-            <select value={analyticsCategory} onChange={(e) => setAnalyticsCategory(e.target.value)} className="rounded-xl border border-black/10 px-3 py-2 text-sm">
-              <option value="">All categories</option>
-              {[...new Set(products.map((product) => product.category).filter(Boolean))].map((category) => <option key={category} value={category}>{category}</option>)}
-            </select>
-            <select value={analyticsIngredientId} onChange={(e) => setAnalyticsIngredientId(e.target.value)} className="rounded-xl border border-black/10 px-3 py-2 text-sm">
-              <option value="">All ingredients</option>
-              {ingredientsRaw.map((ingredient) => <option key={ingredient.id} value={ingredient.id}>{ingredient.name}</option>)}
-            </select>
-            <select value={analyticsMovementType} onChange={(e) => setAnalyticsMovementType(e.target.value)} className="rounded-xl border border-black/10 px-3 py-2 text-sm">
-              <option value="">All movement types</option>
-              {['Production', 'Order', 'Cancellation', 'Waste', 'Return', 'Stock Adjustment', 'Inventory Correction'].map((type) => <option key={type} value={type}>{type}</option>)}
-            </select>
+          <div className="mb-6 grid gap-2 rounded-3xl border border-black/10 bg-white p-3 shadow-[0_4px_14px_rgba(17,24,39,0.03)] sm:grid-cols-2 lg:grid-cols-5">
+            <label className="text-[10px] font-bold uppercase tracking-[0.16em] text-black/45">Product
+              <select value={analyticsProductId} onChange={(e) => setAnalyticsProductId(e.target.value)} className="mt-1.5 w-full rounded-xl border border-black/10 bg-white px-3 py-2 text-sm font-normal normal-case tracking-normal text-black outline-none focus:border-[#8b5cf6]">
+                <option value="">All products</option>
+                {products.map((product) => <option key={product.id} value={product.id}>{product.name}</option>)}
+              </select>
+            </label>
+            <label className="text-[10px] font-bold uppercase tracking-[0.16em] text-black/45">Category
+              <select value={analyticsCategory} onChange={(e) => setAnalyticsCategory(e.target.value)} className="mt-1.5 w-full rounded-xl border border-black/10 bg-white px-3 py-2 text-sm font-normal normal-case tracking-normal text-black outline-none focus:border-[#8b5cf6]">
+                <option value="">All categories</option>
+                {[...new Set(products.map((product) => product.category).filter(Boolean))].map((category) => <option key={category} value={category}>{category}</option>)}
+              </select>
+            </label>
+            <label className="text-[10px] font-bold uppercase tracking-[0.16em] text-black/45">Ingredient
+              <select value={analyticsIngredientId} onChange={(e) => setAnalyticsIngredientId(e.target.value)} className="mt-1.5 w-full rounded-xl border border-black/10 bg-white px-3 py-2 text-sm font-normal normal-case tracking-normal text-black outline-none focus:border-[#8b5cf6]">
+                <option value="">All ingredients</option>
+                {ingredientsRaw.map((ingredient) => <option key={ingredient.id} value={ingredient.id}>{ingredient.name}</option>)}
+              </select>
+            </label>
+            <label className="text-[10px] font-bold uppercase tracking-[0.16em] text-black/45">Movement
+              <select value={analyticsMovementType} onChange={(e) => setAnalyticsMovementType(e.target.value)} className="mt-1.5 w-full rounded-xl border border-black/10 bg-white px-3 py-2 text-sm font-normal normal-case tracking-normal text-black outline-none focus:border-[#8b5cf6]">
+                <option value="">All movement types</option>
+                {['Production', 'Order', 'Cancellation', 'Waste', 'Return', 'Stock Adjustment', 'Inventory Correction'].map((type) => <option key={type} value={type}>{type}</option>)}
+              </select>
+            </label>
+            <button
+              type="button"
+              onClick={() => {
+                setAnalyticsProductId('');
+                setAnalyticsCategory('');
+                setAnalyticsIngredientId('');
+                setAnalyticsMovementType('');
+              }}
+              className="self-end rounded-xl border border-black/10 bg-[#f8fafc] px-3 py-2.5 text-sm font-semibold text-black/70 transition hover:bg-black hover:text-white"
+            >
+              Reset filters
+            </button>
           </div>
 
           {loading ? (
@@ -732,7 +790,7 @@ export default function Reports({ showNavbar = true }) {
           ) : (
             <>
               {/* ── CORE METRICS (BA-01, BA-02, BA-03) ── */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-2.5 mb-4">
+              <div className="mb-6 grid grid-cols-1 gap-2.5 sm:grid-cols-2 xl:grid-cols-6">
                 <StatCard
                   title="Total Revenue" icon={DollarSign} color={C.emerald} soft={C.emeraldSoft}
                   value={analytics ? peso(analytics.summary.revenue) : '—'}
@@ -752,6 +810,16 @@ export default function Reports({ showNavbar = true }) {
                   title="Order Fulfillment" icon={AlertTriangle} color={C.amber} soft={C.amberSoft}
                   value={`${fmt(totalOrdersProcessed)} / ${fmt(cancelledOrds.length)}`}
                   sub={orderFulfillmentText}
+                />
+                <StatCard
+                  title="Down Payments" icon={DollarSign} color={C.emerald} soft={C.emeraldSoft}
+                  value={peso(historicalVisibleSales.reduce((sum, sale) => sum + Number(sale.down_payment || 0), 0))}
+                  sub="Imported customized cakes"
+                />
+                <StatCard
+                  title="Remaining Balance" icon={Wallet} color={C.amber} soft={C.amberSoft}
+                  value={peso(historicalVisibleSales.reduce((sum, sale) => sum + Number(sale.remaining_balance || 0), 0))}
+                  sub="Imported customized cakes"
                 />
               </div>
 
@@ -868,7 +936,7 @@ export default function Reports({ showNavbar = true }) {
                     <h3 className="text-base font-bold" style={{ color: C.ink }}>Sales Transactions</h3>
                     <p className="text-xs text-gray-500 mt-1">Detailed sales records for the selected period or custom date range.</p>
                   </div>
-                  <span className="text-[11px] text-gray-500">{completedOrds.length} completed transactions shown</span>
+                  <span className="text-[11px] text-gray-500">{completedOrds.length + historicalVisibleSales.length} sales shown</span>
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm border-separate border-spacing-y-1">
@@ -883,9 +951,10 @@ export default function Reports({ showNavbar = true }) {
                       </tr>
                     </thead>
                     <tbody>
-                      {completedOrds.length === 0 ? (
+                      {completedOrds.length === 0 && historicalVisibleSales.length === 0 ? (
                         <tr><td colSpan={6} className="px-4 py-10 text-center text-gray-400">No completed orders match the selected filters.</td></tr>
-                      ) : completedOrds.map((o) => {
+                      ) : <>
+                        {completedOrds.map((o) => {
                         const itemsText = Array.isArray(o.items) && o.items.length
                           ? o.items.map(item => `${Number(item.qty || 0)}x ${item.name || 'Item'}`).join(', ')
                           : '—';
@@ -912,7 +981,18 @@ export default function Reports({ showNavbar = true }) {
                             </td>
                           </tr>
                         );
-                      })}
+                        })}
+                        {historicalVisibleSales.map((sale) => (
+                          <tr key={`historical-${sale.id}`} className="border-b bg-[#faf8ff]" style={{ borderColor: C.border }}>
+                            <td className="px-4 py-4 text-[13px] text-black/70">{sale.sale_date}</td>
+                            <td className="px-4 py-4 font-semibold text-black">Historical</td>
+                            <td className="max-w-[300px] truncate px-4 py-4 text-[13px] text-black/70">{sale.cake_name}</td>
+                            <td className="px-4 py-4"><span className="inline-flex rounded-full bg-violet-100 px-3 py-1 text-[11px] font-semibold text-violet-700">Customized Cake</span></td>
+                            <td className="px-4 py-4 text-right font-semibold text-black">{peso(sale.price)}</td>
+                            <td className="px-4 py-4"><span className="inline-flex rounded-full bg-amber-100 px-3 py-1 text-[11px] font-semibold text-amber-700">Imported</span></td>
+                          </tr>
+                        ))}
+                      </>}
                     </tbody>
                   </table>
                 </div>

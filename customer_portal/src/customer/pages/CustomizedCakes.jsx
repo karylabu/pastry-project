@@ -1,9 +1,11 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import PageShell from '../components/PageShell';
 import { CUSTOMER_BASE } from '../../services/config';
 import { safeParseJson } from '../../services/api';
 
 export default function CustomizedCakes() {
+  const navigate = useNavigate();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [contactNumber, setContactNumber] = useState('');
@@ -29,15 +31,22 @@ export default function CustomizedCakes() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [userId, setUserId] = useState(0);
+  const [savedContactInfo, setSavedContactInfo] = useState({ name: '', phone: '', email: '' });
 
   useEffect(() => {
     try {
       const storedUser = JSON.parse(localStorage.getItem('user') || 'null');
       if (storedUser?.id) {
+        const savedInfo = {
+          name: storedUser.name || storedUser.full_name || '',
+          email: storedUser.email || '',
+          phone: storedUser.phone || storedUser.phone_number || storedUser.contact_number || '',
+        };
         setUserId(Number(storedUser.id));
-        setName(storedUser.name || '');
-        setEmail(storedUser.email || '');
-        setContactNumber(storedUser.phone || '');
+        setSavedContactInfo(savedInfo);
+        setName(savedInfo.name);
+        setEmail(savedInfo.email);
+        setContactNumber(savedInfo.phone);
       }
     } catch {
       setUserId(0);
@@ -68,6 +77,11 @@ export default function CustomizedCakes() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!userId) {
+      setMessage('Please log in to your customer account before sending a custom cake request.');
+      navigate('/customer/login');
+      return;
+    }
     setLoading(true);
     setMessage('');
     try {
@@ -110,9 +124,9 @@ export default function CustomizedCakes() {
 
       if (data && data.success) {
         setMessage('The order is submitted. Admin will review it first. Please wait at least 24 hours for the final price and confirmation.');
-        setName('');
-        setEmail('');
-        setContactNumber('');
+        setName(savedContactInfo.name);
+        setEmail(savedContactInfo.email);
+        setContactNumber(savedContactInfo.phone);
         setPickupDate('');
         setPickupTime('');
         setDeliveryMethod('Pickup');
@@ -180,9 +194,12 @@ export default function CustomizedCakes() {
             <div>
               <p className="text-[13px] font-semibold mb-3 text-slate-900">Customer Information</p>
               <div className="space-y-3">
-                <input required value={name} onChange={(e) => setName(e.target.value)} placeholder="Full Name" className="border rounded-md px-3 py-2 w-full text-[13px]" />
-                <input required value={contactNumber} onChange={(e) => setContactNumber(e.target.value)} placeholder="Contact Number" className="border rounded-md px-3 py-2 w-full text-[13px]" />
-                <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email Address (optional)" type="email" className="border rounded-md px-3 py-2 w-full text-[13px]" />
+                <input required value={name} onChange={(e) => setName(e.target.value)} placeholder="Full Name" autoComplete="name" list="registered-name-suggestion" className="border rounded-md px-3 py-2 w-full text-[13px]" />
+                <input required value={contactNumber} onChange={(e) => setContactNumber(e.target.value)} placeholder="Contact Number" autoComplete="tel" list="registered-phone-suggestion" className="border rounded-md px-3 py-2 w-full text-[13px]" />
+                <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email Address (optional)" type="email" autoComplete="email" list="registered-email-suggestion" className="border rounded-md px-3 py-2 w-full text-[13px]" />
+                <datalist id="registered-name-suggestion"><option value={savedContactInfo.name} /></datalist>
+                <datalist id="registered-phone-suggestion"><option value={savedContactInfo.phone} /></datalist>
+                <datalist id="registered-email-suggestion"><option value={savedContactInfo.email} /></datalist>
               </div>
             </div>
 
@@ -310,7 +327,7 @@ export default function CustomizedCakes() {
           </div>
 
           <div className="flex flex-col sm:flex-row items-center gap-3">
-            <button disabled={loading} type="submit" className="px-4 py-2 bg-black text-white rounded-md">{loading ? 'Sending…' : 'Send Request'}</button>
+            <button disabled={loading || !userId} type="submit" className="px-4 py-2 bg-black text-white rounded-md disabled:cursor-not-allowed disabled:opacity-50">{loading ? 'Sending…' : userId ? 'Send Request' : 'Log in to Send Request'}</button>
             <button type="button" onClick={() => {
               setName(''); setEmail(''); setContactNumber(''); setPickupDate(''); setPickupTime(''); setDeliveryMethod('Pickup'); setDeliveryAddress(''); setCakeSize('6 inches'); setCustomCakeSize(''); setServings('1'); setCakeFlavor('Chocolate'); setFillingFlavor('Chocolate Ganache'); setFrostingType('Buttercream'); setOccasion('Birthday'); setCustomTheme(''); setCakeColor(''); setCustomMessage(''); setSpecialInstructions(''); setAddons([]); setQuantity(1); setDetails(''); setFiles([]);
             }} className="px-4 py-2 border rounded-md">Reset</button>

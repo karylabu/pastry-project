@@ -368,6 +368,7 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
                     filteredNotifications.map((n) => {
                       const isUnread = !n.read;
                       const type = n.type || "account";
+                      const isCustomCakeNotice = String(n.title || "").toLowerCase().includes("custom cake");
                       const getIcon = () => {
                         switch (type) {
                           case "order_pending":
@@ -386,6 +387,20 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
                       };
 
                       const getBadge = () => {
+                        if (isCustomCakeNotice) {
+                          const noticeTitle = String(n.title || "").toLowerCase();
+                          const declined = type === "Warning" || noticeTitle.includes("declined");
+                          const completed = noticeTitle.includes("completed");
+                          const ready = noticeTitle.includes("ready");
+                          const label = declined
+                            ? "Custom Request Declined"
+                            : completed
+                            ? "Custom Order Completed"
+                            : ready
+                            ? "Custom Order Ready"
+                            : "Custom Request Accepted";
+                          return <span className={`rounded-full px-2.5 py-1 text-[10px] font-semibold ${declined ? "bg-amber-50 text-amber-700" : "bg-emerald-50 text-emerald-700"}`}>{label}</span>;
+                        }
                         switch (type) {
                           case "order_pending":
                             return <span className="rounded-full bg-blue-50 px-2.5 py-1 text-[10px] font-semibold text-blue-700">Standard Pre-order</span>;

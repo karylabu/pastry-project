@@ -149,7 +149,7 @@ export default function Login() {
       setShowLoginSuccess(false);
       const role = justLoggedUser.role;
       if (role === 'staff') navigate('/staff');
-      else if (role === 'admin') navigate('/admin');
+      else if (['admin', 'administrator', 'superadmin', 'super_admin', 'owner', 'shop_owner'].includes(role)) navigate('/admin');
       else navigate('/customer');
     }, 2500);
 

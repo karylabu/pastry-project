@@ -132,6 +132,17 @@ export default function Orders({ showNavbar = true }) {
       items: typeof order.items === "string" ? JSON.parse(order.items) : order.items || [],
     }));
 
+  const isCakeOrder = (order) => {
+    const orderType = String(order?.type || order?.order_type || "").toLowerCase();
+    if (order?.is_customized || orderType.includes("custom")) return false;
+    const items = order.items || [];
+    return items.length > 0 && items.every((item) => {
+      const category = String(item?.category || "").toLowerCase();
+      const name = String(item?.name || "").toLowerCase();
+      return category === "cakes" || category.includes("cake") || name.includes("cake");
+    });
+  };
+
   const fetchIngredients = () => {
     laravelStaffFetch(`${LARAVEL_BASE}/api/staff/inventory/ingredients`)
       .then((res) => res.json())
@@ -145,24 +156,10 @@ export default function Orders({ showNavbar = true }) {
   const fetchOrders = (silent = false) => {
     if (!silent) setLoading(true);
 
-    Promise.all([
-      staffFetch(`${STAFF_BASE}/api_orders.php?custom=1`).then((res) => res.json()).catch(() => []),
-      staffFetch(`${STAFF_BASE}/api_orders.php`).then((res) => res.json()).catch(() => []),
-    ])
-      .then(([customOrders, regularOrders]) => {
-        const combined = [
-          ...normalizeOrders(customOrders, "Customized"),
-          ...normalizeOrders(regularOrders, "Regular"),
-        ];
-
-        const uniqueOrders = Array.from(
-          combined.reduce((map, order) => {
-            if (!map.has(order.id)) map.set(order.id, order);
-            return map;
-          }, new Map()).values()
-        );
-
-        setOrders(uniqueOrders);
+    staffFetch(`${STAFF_BASE}/api_orders.php`)
+      .then((res) => res.json())
+      .then((regularOrders) => {
+        setOrders(normalizeOrders(regularOrders, "Regular").filter(isCakeOrder));
         setConnectionIssue(false);
         setLastRefreshed(new Date());
       })
@@ -292,13 +289,13 @@ export default function Orders({ showNavbar = true }) {
   const wasteOrder = orders.find((order) => order.id === wasteModalOrderId);
 
   return (
-    <div className="min-h-screen bg-[linear-gradient(135deg,#fffdf6_0%,#ffffff_100%)]">
+    <div className="min-h-screen bg-[#f5f3ee]">
       {showNavbar && <StaffNavbar />}
       <Toast toasts={toasts} />
 
       <div className="lg:pl-[260px] pt-[72px]">
-        <div className="mx-auto max-w-[1500px] px-6 py-8 md:px-10">
-          <div className="mb-8 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div className="mx-auto max-w-[1500px] px-5 py-6 md:px-8 lg:px-10">
+          <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <div>
               <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-[#D4AF37]">Staff Control Panel</p>
               <h1 className="text-[26px] font-bold text-black">Live Orders</h1>
@@ -322,19 +319,19 @@ export default function Orders({ showNavbar = true }) {
           </div>
 
           <div className="mb-6 grid gap-3 md:grid-cols-4">
-            <div className="rounded-[24px] border border-black/10 bg-white p-4 shadow-sm">
+            <div className="rounded-2xl border border-black/10 bg-white p-4 shadow-sm">
               <p className="text-[11px] uppercase tracking-[0.2em] text-black/45">Open orders</p>
               <p className="mt-2 text-[22px] font-semibold text-black">{orders.filter((order) => !["Completed", "Cancelled"].includes(order.status)).length}</p>
             </div>
-            <div className="rounded-[24px] border border-black/10 bg-white p-4 shadow-sm">
+            <div className="rounded-2xl border border-black/10 bg-white p-4 shadow-sm">
               <p className="text-[11px] uppercase tracking-[0.2em] text-black/45">Rush orders</p>
               <p className="mt-2 text-[22px] font-semibold text-black">{orders.filter((order) => getUrgency(order).isUrgent).length}</p>
             </div>
-            <div className="rounded-[24px] border border-black/10 bg-white p-4 shadow-sm">
+            <div className="rounded-2xl border border-black/10 bg-white p-4 shadow-sm">
               <p className="text-[11px] uppercase tracking-[0.2em] text-black/45">Low stock alerts</p>
               <p className="mt-2 text-[22px] font-semibold text-black">{lowStockIngredients.length}</p>
             </div>
-            <div className="rounded-[24px] border border-black/10 bg-white p-4 shadow-sm">
+            <div className="rounded-2xl border border-black/10 bg-white p-4 shadow-sm">
               <p className="text-[11px] uppercase tracking-[0.2em] text-black/45">Connection</p>
               <p className={`mt-2 text-[14px] font-semibold ${connectionIssue ? "text-red-600" : "text-black"}`}>{connectionIssue ? "Sync issue" : "Live"}</p>
             </div>
@@ -399,16 +396,76 @@ export default function Orders({ showNavbar = true }) {
           ) : displayedOrders.length === 0 ? (
             <p className="text-black/50">No orders match your search or filter.</p>
           ) : (
-            <div className="grid gap-4 xl:grid-cols-5">
+            <>
+            <div className="overflow-x-auto rounded-2xl border border-black/10 bg-white shadow-sm">
+              <table className="w-full min-w-[1120px] border-collapse">
+                <thead className="bg-[#FAFAFA] text-left text-[10px] uppercase tracking-[0.16em] text-black/50">
+                  <tr className="border-b border-black/10">
+                    <th className="px-4 py-3 font-semibold">Order</th>
+                    <th className="px-4 py-3 font-semibold">Customer</th>
+                    <th className="px-4 py-3 font-semibold">Items</th>
+                    <th className="px-4 py-3 font-semibold">Total</th>
+                    <th className="px-4 py-3 font-semibold">Status</th>
+                    <th className="px-4 py-3 text-right font-semibold">Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {displayedOrders.map((order) => {
+                    const isExpanded = expandedOrderId === order.id;
+                    const urgency = getUrgency(order);
+                    const customerLabel = order.customer || order.customer_name || order.name || order.phone || "";
+                    const itemNames = (order.items || []).slice(0, 2).map((item) => `${item.name} x${item.qty}`).join(", ");
+                    const itemLabel = order.items?.length
+                      ? `${order.items.length} item${order.items.length > 1 ? "s" : ""}${itemNames ? ` • ${itemNames}` : ""}`
+                      : "Cake order";
+                    const addressLabel = order.address || order.delivery_address || order.customer_address || "No address provided";
+
+                    return (
+                      <React.Fragment key={order.id}>
+                        <tr className={`border-b border-black/10 align-middle transition hover:bg-[#FFFDF7] ${urgency.isUrgent ? "bg-[#FFF9E8]" : "bg-white"}`}>
+                          <td className="px-4 py-3 text-[13px] font-semibold text-black">#{order.id}</td>
+                          <td className="px-4 py-3">
+                            <p className="text-[13px] font-semibold text-black">{customerLabel}</p>
+                            <p className="mt-0.5 text-[11px] text-black/50">{order.method || "N/A"} · {order.source}</p>
+                          </td>
+                          <td className="max-w-[260px] px-4 py-3 text-[12px] text-black/65" title={itemLabel}>{itemLabel}</td>
+                          <td className="px-4 py-3 text-[13px] font-semibold text-black">₱{Number(order.total || 0).toLocaleString()}</td>
+                          <td className="px-4 py-3"><span className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-semibold ${statusColors[order.status] ?? "bg-black/5 text-black"}`}>{order.status}</span></td>
+                          <td className="px-4 py-3">
+                            <div className="flex flex-wrap justify-end gap-2">
+                              <button type="button" onClick={() => setExpandedOrderId(isExpanded ? null : order.id)} className="rounded-full border border-black/10 bg-white px-3 py-1.5 text-[11px] font-semibold text-black hover:bg-black hover:text-white">{isExpanded ? "Hide" : "View"}</button>
+                              {!("Completed" === order.status || "Cancelled" === order.status) && <button type="button" onClick={() => advanceOrder(order)} disabled={updatingId === order.id} className="rounded-full bg-black px-3 py-1.5 text-[11px] font-semibold text-white hover:bg-black/80 disabled:opacity-50">{order.status === "Pending" ? "Approve" : order.status === "Preparing" ? "Ready" : "Complete"}</button>}
+                              {!("Completed" === order.status || "Cancelled" === order.status) && <button type="button" onClick={() => updateStatus(order.id, "Cancelled")} disabled={updatingId === order.id} className="rounded-full border border-red-200 bg-red-50 px-3 py-1.5 text-[11px] font-semibold text-red-600 hover:bg-red-100 disabled:opacity-50">Cancel</button>}
+                              <button type="button" onClick={() => openWasteModal(order)} className="rounded-full border border-black/10 bg-[#F7F5EE] px-3 py-1.5 text-[11px] font-semibold text-black hover:bg-black hover:text-white">Waste</button>
+                            </div>
+                          </td>
+                        </tr>
+                        {isExpanded && (
+                          <tr className="border-b border-black/10 bg-[#FFFDF7]">
+                            <td colSpan="6" className="px-4 py-4 text-[11px] leading-5 text-black/70">
+                              <div className="grid gap-4 md:grid-cols-2">
+                                <div><p className="text-[9px] uppercase tracking-[0.2em] text-black/50">Order details</p><p className="mt-1 font-semibold text-black">Order #{order.id}</p><p>{customerLabel}</p><p>{order.method || "N/A"}</p><p>{addressLabel}</p><p>Payment: {order.payment || "N/A"}</p></div>
+                                <div><p className="text-[9px] uppercase tracking-[0.2em] text-black/50">Items</p>{(order.items || []).map((item, index) => <div key={`${order.id}-${index}`} className="flex justify-between border-b border-black/10 py-1 last:border-0"><span>{item.name || "Item"} · Qty {item.qty || 1}</span><strong>₱{Number(item.price || 0).toLocaleString()}</strong></div>)}<div className="mt-2 flex justify-between font-semibold text-black"><span>Total</span><span>₱{Number(order.total || 0).toLocaleString()}</span></div></div>
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+            {false && <div className="grid gap-4 xl:grid-cols-5">
               {BOARD_COLUMNS.map((column) => {
                 const columnOrders = displayedOrders.filter((order) => order.status === column.key);
 
                 return (
-                  <section key={column.key} className="rounded-[28px] border border-black/10 bg-white p-4 shadow-sm">
-                    <div className="mb-4 flex items-center justify-between">
+                    <section key={column.key} className="rounded-2xl border border-black/10 bg-white p-3 shadow-sm">
+                    <div className="mb-3 flex min-h-[58px] items-start justify-between gap-3 border-b border-black/10 pb-3">
                       <div>
                         <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-black/45">{column.title}</p>
-                        <h2 className="text-[15px] font-semibold text-black">{column.description}</h2>
+                        <h2 className="mt-1 text-[12px] leading-4 text-black/60">{column.description}</h2>
                       </div>
                       <span className="rounded-full bg-black px-3 py-1 text-[11px] font-semibold text-white">{columnOrders.length}</span>
                     </div>
@@ -422,17 +479,17 @@ export default function Orders({ showNavbar = true }) {
                         columnOrders.map((order) => {
                           const isExpanded = expandedOrderId === order.id;
                           const urgency = getUrgency(order);
-                          const customerLabel = order.customer || order.customer_name || order.name || order.phone || "No customer";
+                          const customerLabel = order.customer || order.customer_name || order.name || order.phone || "";
                           const itemNames = (order.items || []).slice(0, 2).map((item) => `${item.name} x${item.qty}`).join(", ");
                           const itemLabel = order.items?.length
                             ? `${order.items.length} item${order.items.length > 1 ? "s" : ""}${itemNames ? ` • ${itemNames}` : ""}`
-                            : "No items";
+                            : "Cake order";
                           const addressLabel = order.address || order.delivery_address || order.customer_address || "No address provided";
 
                           return (
                             <div
                               key={order.id}
-                              className={`rounded-[20px] border p-4 shadow-sm ${urgency.isUrgent ? "border-[#D4AF37]/35 bg-[#FFF9E8]" : "border-black/10 bg-white"}`}
+                              className={`rounded-xl border p-3 shadow-sm ${urgency.isUrgent ? "border-[#D4AF37]/35 bg-[#FFF9E8]" : "border-black/10 bg-white"}`}
                             >
                               <div className="flex items-start justify-between gap-2">
                                 <div>
@@ -464,12 +521,6 @@ export default function Orders({ showNavbar = true }) {
                               {order.order_type === "Urgent" && (
                                 <div className="mt-3 rounded-[16px] border border-[#D4AF37]/20 bg-[#FFF8E1] p-3 text-[11px] text-black/70">
                                   <span className="font-semibold">Rush priority fee:</span> ₱100 added for urgent handling.
-                                </div>
-                              )}
-
-                              {inventoryAlert && (
-                                <div className="mt-3 rounded-[16px] border border-[#D4AF37]/20 bg-[#FFF8E1] p-3 text-[11px] text-black/70">
-                                  ⚠️ {inventoryAlert}
                                 </div>
                               )}
 
@@ -565,7 +616,8 @@ export default function Orders({ showNavbar = true }) {
                   </section>
                 );
               })}
-            </div>
+            </div>}
+            </>
           )}
         </div>
       </div>

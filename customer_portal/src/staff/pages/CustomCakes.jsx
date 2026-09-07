@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { jsPDF } from "jspdf";
-import { CalendarDays, ChevronLeft, ChevronRight, Clock3 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 /* STAFF NAVBAR */
 import StaffNavbar from "../components/StaffNavbar";
@@ -35,42 +35,42 @@ function Toast({ toasts }) {
 }
 
 export default function CustomCakes({ showNavbar = true }) {
+  const navigate = useNavigate();
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState("All");
   const [searchId, setSearchId] = useState("");
-  const [sortOption, setSortOption] = useState("Newest");
   const [updatingId, setUpdatingId] = useState(null);
   const [toasts, setToasts] = useState([]);
   const [lastRefreshed, setLastRefreshed] = useState(null);
   const [selectedOrder, setSelectedOrder] = useState(null);
-  const [calendarMonth, setCalendarMonth] = useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1));
+  const [quoteOrder, setQuoteOrder] = useState(null);
+  const [quoteTotal, setQuoteTotal] = useState("");
+  const [downpaymentPercent, setDownpaymentPercent] = useState("50");
+  const [quoteSaving, setQuoteSaving] = useState(false);
   const pollRef = useRef(null);
 
-  const statusFilterOptions = ["All", "Pending", "Preparing", "To Receive", "Completed", "Cancelled"];
-  const sortOptions = ["Newest", "Oldest", "Highest total"];
+  const statusFilterOptions = ["All", "To Review", "Preparing", "To Receive", "Completed", "Cancelled"];
 
   const statusColors = {
-    Pending: "bg-[#D4AF37]/15 text-black border border-[#D4AF37]/30",
-    Preparing: "bg-black/5 text-black border border-black/15",
-    "To Receive": "bg-[#D4AF37]/10 text-black border border-[#D4AF37]/20",
-    Completed: "bg-black text-white border border-black",
-    Cancelled: "bg-black/10 text-black border border-black/20",
-  };
-
-  const statusPriority = {
-    Pending: 0,
-    Preparing: 1,
-    "To Receive": 2,
-    Completed: 3,
-    Cancelled: 4,
+    "To Review": "bg-slate-100 text-slate-700",
+    Pending: "bg-slate-100 text-slate-700",
+    "Pending Quote": "bg-slate-100 text-slate-700",
+    Preparing: "bg-slate-100 text-slate-700",
+    "To Receive": "bg-slate-100 text-slate-700",
+    Completed: "bg-slate-100 text-slate-700",
+    Cancelled: "bg-slate-100 text-slate-700",
   };
 
   const getStatusBadgeClasses = (status) => {
-    const base = "inline-flex h-8 items-center justify-center rounded-full border px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em]";
-    const colorClass = statusColors[status] ?? "bg-black/5 text-black border border-black/20";
+    const base = "inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em]";
+    const colorClass = statusColors[status] ?? "bg-slate-100 text-slate-700";
     return `${base} ${colorClass}`;
   };
+
+  const getStatusLabel = (status) => (
+    status === "Pending" || status === "Pending Quote" ? "To Review" : status
+  );
 
   const addToast = (message, type = "success") => {
     const id = Date.now();
@@ -115,6 +115,9 @@ export default function CustomCakes({ showNavbar = true }) {
       special_instructions: order?.special_instructions || parsed.special_instructions,
       addons: order?.addons || parsed.addons,
       estimated_price: order?.estimated_price || parsed.estimated_price,
+      quoted_total: order?.quoted_total || parsed.quoted_total,
+      downpayment_percent: order?.downpayment_percent || parsed.downpayment_percent,
+      downpayment_amount: order?.downpayment_amount || parsed.downpayment_amount,
       quantity: order?.quantity || parsed.quantity,
       details: order?.details || parsed.details,
     };
@@ -139,46 +142,14 @@ export default function CustomCakes({ showNavbar = true }) {
       ["Special instructions", formatValue(fallbackValues.special_instructions)],
       ["Add-ons", formatValue(fallbackValues.addons)],
       ["Estimated price", formatValue(fallbackValues.estimated_price)],
+      ["Quoted total", formatValue(fallbackValues.quoted_total)],
+      ["Downpayment", fallbackValues.downpayment_percent !== undefined && fallbackValues.downpayment_amount !== undefined
+        ? `${formatValue(fallbackValues.downpayment_percent)}% (₱${formatValue(fallbackValues.downpayment_amount)})`
+        : ""],
       ["Quantity", formatValue(fallbackValues.quantity)],
       ["Details", formatValue(fallbackValues.details)],
     ].filter(([, value]) => value);
   };
-
-  const getSchedule = (order) => {
-    const parsed = typeof order?.custom_details === "string"
-      ? (() => { try { return JSON.parse(order.custom_details); } catch { return {}; } })()
-      : (order?.custom_details || {});
-    const date = order?.pickup_date || order?.delivery_date || parsed.pickup_date || parsed.delivery_date || "";
-    const time = order?.pickup_time || order?.delivery_time || parsed.pickup_time || parsed.delivery_time || "";
-    return { date: String(date).slice(0, 10), time: String(time) };
-  };
-
-  const formatScheduleTime = (time) => {
-    const match = String(time).trim().match(/^(\d{1,2}):(\d{2})(?::\d{2})?$/);
-    if (!match) return String(time);
-
-    const hour = Number(match[1]);
-    const suffix = hour >= 12 ? "PM" : "AM";
-    const displayHour = hour % 12 || 12;
-    return `${displayHour}:${match[2]} ${suffix}`;
-  };
-
-  const calendarDays = (() => {
-    const firstDay = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth(), 1);
-    const start = new Date(firstDay);
-    start.setDate(firstDay.getDate() - firstDay.getDay());
-    return Array.from({ length: 42 }, (_, index) => {
-      const date = new Date(start);
-      date.setDate(start.getDate() + index);
-      const dateKey = [date.getFullYear(), String(date.getMonth() + 1).padStart(2, "0"), String(date.getDate()).padStart(2, "0")].join("-");
-      return {
-        date,
-        dateKey,
-        isCurrentMonth: date.getMonth() === calendarMonth.getMonth(),
-        orders: orders.filter(order => getSchedule(order).date === dateKey),
-      };
-    });
-  })();
 
   const fetchOrders = (silent = false) => {
     if (!silent) setLoading(true);
@@ -201,24 +172,60 @@ export default function CustomCakes({ showNavbar = true }) {
 
   const displayedOrders = orders
     .filter(order => {
-      const matchesFilter = statusFilter === "All" || order.status === statusFilter;
+      const matchesFilter = statusFilter === "All" || getStatusLabel(order.status) === statusFilter;
       const query = searchId.trim();
       const matchesSearch = !query || String(order.id).includes(query);
       return matchesFilter && matchesSearch;
     })
     .sort((a, b) => {
-      const statusDiff = (statusPriority[a.status] ?? 99) - (statusPriority[b.status] ?? 99);
-      if (statusDiff !== 0) return statusDiff;
-      if (sortOption === "Highest total") return Number(b.total) - Number(a.total);
-      const dateA = a.created_at ? new Date(a.created_at).getTime() : Number(a.id);
-      const dateB = b.created_at ? new Date(b.created_at).getTime() : Number(b.id);
-      if (sortOption === "Oldest") return dateA - dateB;
-      return dateB - dateA;
+      return Number(b.id) - Number(a.id);
     });
 
-  const canAdvance = status => status === "Pending" || status === "Preparing";
+  const isPendingRequest = (status) => status === "Pending" || status === "Pending Quote" || status === "To Review";
   const openOrderDetails = (order) => setSelectedOrder(order);
   const closeOrderDetails = () => setSelectedOrder(null);
+  const openQuoteModal = (order) => {
+    setQuoteOrder(order);
+    setQuoteTotal(order.total && Number(order.total) > 0 ? String(order.total) : "");
+    setDownpaymentPercent("50");
+  };
+  const closeQuoteModal = () => {
+    if (!quoteSaving) setQuoteOrder(null);
+  };
+
+  const saveQuoteAndAccept = async () => {
+    const total = Number(quoteTotal);
+    const percent = Number(downpaymentPercent);
+    if (!quoteOrder || !Number.isFinite(total) || total <= 0 || !Number.isFinite(percent) || percent < 0 || percent > 100) {
+      addToast("Enter a valid total price and downpayment percentage.", "error");
+      return;
+    }
+
+    setQuoteSaving(true);
+    try {
+      const quoteResponse = await staffFetch(`${STAFF_BASE}/api_orders.php`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: quoteOrder.id,
+          total,
+          downpayment_percent: percent,
+          downpayment_amount: Number((total * percent / 100).toFixed(2)),
+        }),
+      });
+      const quoteData = await quoteResponse.json().catch(() => ({}));
+      if (!quoteResponse.ok || quoteData.status !== "success") {
+        throw new Error(quoteData.message || "Unable to save the quote.");
+      }
+
+      setQuoteOrder(null);
+      await updateStatus(quoteOrder.id, "Preparing");
+    } catch (error) {
+      addToast(error.message || "Unable to accept the custom order.", "error");
+    } finally {
+      setQuoteSaving(false);
+    }
+  };
 
   const downloadOrderPdf = (order) => {
     const doc = new jsPDF({ unit: "pt", format: "a4" });
@@ -280,6 +287,11 @@ export default function CustomCakes({ showNavbar = true }) {
     doc.save(`custom-cake-request-${order.id || "order"}.pdf`);
   };
 
+  const selectedOrderDetailEntries = selectedOrder ? parseCustomDetails(selectedOrder) : [];
+  const personalInfoLabels = new Set(["Customer name", "Email", "Phone"]);
+  const personalInfoEntries = selectedOrderDetailEntries.filter(([label]) => personalInfoLabels.has(label));
+  const formDetailEntries = selectedOrderDetailEntries.filter(([label]) => !personalInfoLabels.has(label));
+
   const updateStatus = (id, status) => {
     setUpdatingId(id);
     staffFetch(`${STAFF_BASE}/api_update_order_status.php`, {
@@ -287,7 +299,13 @@ export default function CustomCakes({ showNavbar = true }) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id, status }),
     })
-      .then(res => res.json())
+      .then(async (res) => {
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          throw new Error(data.message || `Request failed (${res.status})`);
+        }
+        return data;
+      })
       .then(data => {
         if (data.success) {
           fetchOrders(true);
@@ -304,10 +322,10 @@ export default function CustomCakes({ showNavbar = true }) {
             addToast(`Order #${id} → ${status}`, "success");
           }
         } else {
-          addToast(`Update failed: ${data.message}`, "error");
+          addToast(`Update failed: ${data.message || "The order status was not changed."}`, "error");
         }
       })
-      .catch(() => addToast("Network error — could not update order.", "error"))
+      .catch((error) => addToast(error.message || "Network error — could not update order.", "error"))
       .finally(() => setUpdatingId(null));
   };
 
@@ -318,7 +336,7 @@ export default function CustomCakes({ showNavbar = true }) {
 
       <div className="lg:pl-[260px] pt-[72px]">
         <div className="mx-auto max-w-[1400px] px-6 py-6 md:px-8 lg:px-10 lg:py-8">
-          <div className="mb-6 flex flex-col gap-4 rounded-[28px] border border-black/10 bg-[#FAFAFA] p-5 md:p-6 lg:flex-row lg:items-end lg:justify-between">
+          <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <div className="max-w-2xl">
               <p className="text-[10px] font-bold uppercase tracking-[0.24em] text-[#D4AF37]">
                 Order Management
@@ -328,7 +346,14 @@ export default function CustomCakes({ showNavbar = true }) {
                 Review, filter, and update custom cake requests in a streamlined staff workspace.
               </p>
             </div>
-            <div className="flex flex-wrap items-center gap-3 lg:justify-end">
+            <div className="flex flex-col items-stretch gap-2 lg:items-end">
+              <button
+                type="button"
+                onClick={() => navigate("/admin/schedule")}
+                className="inline-flex h-10 items-center justify-center rounded-full border border-black/10 bg-white px-4 text-sm font-medium text-black/75 transition hover:border-black/20 hover:bg-black/5 hover:text-black"
+              >
+                Schedule
+              </button>
               {lastRefreshed && (
                 <p className="text-xs text-black/60">
                   Updated {lastRefreshed.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
@@ -349,7 +374,7 @@ export default function CustomCakes({ showNavbar = true }) {
                 <button
                   key={option}
                   onClick={() => setStatusFilter(option)}
-                  className={`inline-flex h-10 items-center justify-center rounded-full border px-4 text-sm font-medium transition ${
+                  className={`inline-flex h-8 items-center justify-center rounded-full border px-3 text-xs font-medium transition ${
                     statusFilter === option
                       ? "border-black bg-black text-white"
                       : "border-black/10 bg-white text-black/70 hover:border-black/20 hover:bg-black/5 hover:text-black"
@@ -367,89 +392,8 @@ export default function CustomCakes({ showNavbar = true }) {
                 placeholder="Search Order ID"
                 className="w-full min-w-[280px] rounded-2xl border border-black/10 bg-white px-4 py-3 text-[13px] text-black/80 outline-none transition focus:border-[#D4AF37]"
               />
-              <div className="flex items-center gap-2">
-                <span className="whitespace-nowrap text-[13px] text-black/60">Sort By:</span>
-                <select
-                  value={sortOption}
-                  onChange={e => setSortOption(e.target.value)}
-                  className="rounded-2xl border border-black/10 bg-white px-4 py-3 text-[13px] text-black/80 outline-none"
-                >
-                  {sortOptions.map(option => (
-                    <option key={option} value={option}>{option}</option>
-                  ))}
-                </select>
-              </div>
             </div>
           </div>
-
-          <section className="mb-6 w-full overflow-hidden rounded-[20px] border border-black/10 bg-white shadow-sm">
-            <div className="flex flex-col gap-3 border-b border-black/10 bg-[#FAFAFA] px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
-              <div className="flex items-center gap-3">
-                <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#D4AF37]/15 text-[#9a7411]"><CalendarDays size={18} /></span>
-                <div>
-                  <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#9a7411]">Order Schedule</p>
-                  <h2 className="mt-0.5 text-lg font-semibold text-black">{calendarMonth.toLocaleDateString([], { month: "long", year: "numeric" })}</h2>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setCalendarMonth(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() - 1, 1))}
-                  aria-label="Previous month"
-                  className="flex h-9 w-9 items-center justify-center rounded-full border border-black/10 bg-white text-black/60 transition hover:border-black/20 hover:text-black"
-                >
-                  <ChevronLeft size={16} />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setCalendarMonth(new Date(new Date().getFullYear(), new Date().getMonth(), 1))}
-                  className="rounded-full border border-black/10 bg-white px-3 py-2 text-[11px] font-semibold text-black/70 transition hover:border-black/20 hover:text-black"
-                >
-                  Today
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setCalendarMonth(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + 1, 1))}
-                  aria-label="Next month"
-                  className="flex h-9 w-9 items-center justify-center rounded-full border border-black/10 bg-white text-black/60 transition hover:border-black/20 hover:text-black"
-                >
-                  <ChevronRight size={16} />
-                </button>
-              </div>
-            </div>
-            <div className="grid grid-cols-7 border-b border-black/10 bg-[#FAFAFA]">
-              {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-                <div key={day} className="px-2 py-2 text-center text-[10px] font-bold uppercase tracking-[0.14em] text-black/45">{day}</div>
-              ))}
-            </div>
-            <div className="grid grid-cols-7">
-              {calendarDays.map(({ date, dateKey, isCurrentMonth, orders: dayOrders }) => (
-                <div key={dateKey} className={`min-h-[clamp(58px,9vh,86px)] border-b border-r border-black/10 p-1 sm:p-1.5 ${isCurrentMonth ? 'bg-white' : 'bg-black/[0.02]'}`}>
-                  <p className={`text-right text-[11px] font-semibold ${isCurrentMonth ? 'text-black/70' : 'text-black/25'}`}>{date.getDate()}</p>
-                  <div className="mt-1 space-y-1">
-                    {dayOrders.slice(0, 3).map(order => {
-                      const schedule = getSchedule(order);
-                      return (
-                        <button
-                          key={order.id}
-                          type="button"
-                          onClick={() => openOrderDetails(order)}
-                          className="block w-full truncate rounded-lg bg-[#D4AF37]/15 px-1.5 py-1 text-left text-[10px] font-semibold text-black transition hover:bg-[#D4AF37]/30"
-                          title={`Order #${order.id}${schedule.time ? ` at ${formatScheduleTime(schedule.time)}` : ''}`}
-                        >
-                          #{order.id}{schedule.time && <span className="ml-1 font-normal text-black/60">{formatScheduleTime(schedule.time)}</span>}
-                        </button>
-                      );
-                    })}
-                    {dayOrders.length > 3 && <p className="px-1 text-[10px] text-black/45">+{dayOrders.length - 3} more</p>}
-                  </div>
-                </div>
-              ))}
-            </div>
-            <div className="flex items-center gap-2 px-5 py-3 text-xs text-black/50">
-              <Clock3 size={14} /> Click a scheduled order to review its details.
-            </div>
-          </section>
 
           {loading ? (
             <p className="text-black/50">Loading custom cake requests...</p>
@@ -476,6 +420,13 @@ export default function CustomCakes({ showNavbar = true }) {
                     const isCancelled = order.status === "Cancelled";
                     const isCompleted = order.status === "Completed";
                     const isToReceive = order.status === "To Receive";
+                    const acceptStatus = isPendingRequest(order.status)
+                      ? "Preparing"
+                      : order.status === "Preparing"
+                      ? "To Receive"
+                      : isToReceive
+                      ? "Completed"
+                      : null;
                     const customerLabel = order.phone || order.name || "No Customer";
                     const itemNames = order.items?.slice(0, 2).map(item => `${item.name} x${item.qty}`).join(", ");
                     const itemLabel = order.items?.length > 0
@@ -516,42 +467,36 @@ export default function CustomCakes({ showNavbar = true }) {
                         <td className="px-4 py-4 text-right text-[13px] font-semibold text-black">₱{Number(order.total).toLocaleString()}</td>
                         <td className="px-4 py-4">
                           <span className={getStatusBadgeClasses(order.status)}>
-                            {order.status}
+                            {getStatusLabel(order.status)}
                           </span>
                         </td>
                         <td className="px-4 py-4 text-[12px] text-black/60">
                           {order.created_at ? new Date(order.created_at).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "No Date"}
                         </td>
                         <td className="px-4 py-4 text-right text-sm">
-                          {isCancelled || isCompleted || isToReceive ? (
-                            <button
-                              type="button"
-                              onClick={() => openOrderDetails(order)}
-                              className="inline-flex h-8 items-center justify-center rounded-full border border-black/10 bg-white px-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-black/70 transition hover:border-black/20 hover:bg-black/5 hover:text-black"
-                            >
-                              {isCancelled || isCompleted ? "Review" : "Manage"}
-                            </button>
-                          ) : order.status === "Pending" ? (
-                            <button
-                              type="button"
-                              onClick={() => openOrderDetails(order)}
-                              className="inline-flex h-8 items-center justify-center rounded-full bg-black px-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-white transition hover:bg-[#D4AF37] hover:text-black"
-                            >
-                              Review
-                            </button>
-                          ) : canAdvance(order.status) ? (
-                            <select
-                              value={order.status}
-                              onChange={e => updateStatus(order.id, e.target.value)}
-                              disabled={updatingId === order.id}
-                              className="min-w-[120px] rounded-full border border-black/10 bg-white px-3 py-2 text-[12px] text-black/80 outline-none"
-                            >
-                              <option value="Pending">Pending</option>
-                              <option value="Preparing">Preparing</option>
-                              <option value="To Receive">To Receive</option>
-                            </select>
+                          {isCancelled ? (
+                            <span className="inline-flex h-8 items-center rounded-full bg-slate-100 px-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-700">Declined</span>
+                          ) : isPendingRequest(order.status) ? (
+                            <div className="flex flex-wrap justify-end gap-2">
+                              <button
+                                type="button"
+                                onClick={() => openQuoteModal(order)}
+                                disabled={updatingId === order.id}
+                                className="inline-flex h-8 items-center justify-center rounded-full bg-black px-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-white transition hover:bg-[#D4AF37] hover:text-black disabled:cursor-not-allowed disabled:opacity-40"
+                              >
+                                Accept
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => updateStatus(order.id, "Cancelled")}
+                                disabled={updatingId === order.id}
+                                className="inline-flex h-8 items-center justify-center rounded-full border border-red-200 bg-red-50 px-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-red-700 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-40"
+                              >
+                                Decline
+                              </button>
+                            </div>
                           ) : (
-                            <span className="text-sm text-black/60">No action</span>
+                            <span className="inline-flex h-8 items-center rounded-full bg-slate-100 px-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-700">Accepted</span>
                           )}
                         </td>
                       </tr>
@@ -565,19 +510,67 @@ export default function CustomCakes({ showNavbar = true }) {
       </div>
 
       <AnimatePresence>
+        {quoteOrder && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[80] flex items-center justify-center bg-black/45 p-4"
+          >
+            <motion.div
+              initial={{ opacity: 0, y: 16, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 12, scale: 0.98 }}
+              className="w-full max-w-md rounded-[24px] border border-black/10 bg-white p-6 shadow-2xl"
+            >
+              <p className="text-[10px] font-bold uppercase tracking-[0.24em] text-[#D4AF37]">Accept Custom Order</p>
+              <h2 className="mt-1 text-xl font-semibold text-black">Set price and downpayment</h2>
+              <p className="mt-2 text-sm text-black/60">Order #{quoteOrder.id} · {quoteOrder.name || quoteOrder.customer || "Customer"}</p>
+
+              <div className="mt-5 space-y-4">
+                <label className="block">
+                  <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-black/50">Total price</span>
+                  <div className="mt-1.5 flex items-center rounded-xl border border-black/10 bg-white px-3 focus-within:border-[#D4AF37]">
+                    <span className="text-sm text-black/50">₱</span>
+                    <input type="number" min="0" step="0.01" value={quoteTotal} onChange={(event) => setQuoteTotal(event.target.value)} placeholder="0.00" className="w-full border-0 px-2 py-2.5 text-sm outline-none" autoFocus />
+                  </div>
+                </label>
+                <label className="block">
+                  <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-black/50">Downpayment percentage</span>
+                  <div className="mt-1.5 flex items-center rounded-xl border border-black/10 bg-white px-3 focus-within:border-[#D4AF37]">
+                    <input type="number" min="0" max="100" step="1" value={downpaymentPercent} onChange={(event) => setDownpaymentPercent(event.target.value)} className="w-full border-0 py-2.5 text-sm outline-none" />
+                    <span className="text-sm text-black/50">%</span>
+                  </div>
+                </label>
+                <div className="flex items-center justify-between rounded-xl bg-[#FAFAFA] px-4 py-3 text-sm">
+                  <span className="text-black/60">Downpayment amount</span>
+                  <span className="font-semibold text-black">₱{((Number(quoteTotal) || 0) * (Number(downpaymentPercent) || 0) / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                </div>
+              </div>
+
+              <div className="mt-6 flex justify-end gap-3">
+                <button type="button" onClick={closeQuoteModal} disabled={quoteSaving} className="rounded-full border border-black/10 px-4 py-2.5 text-sm text-black/70 disabled:opacity-50">Cancel</button>
+                <button type="button" onClick={saveQuoteAndAccept} disabled={quoteSaving} className="rounded-full bg-black px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#D4AF37] hover:text-black disabled:opacity-50">{quoteSaving ? "Saving..." : "Accept Order"}</button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
         {selectedOrder && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[70] flex items-center justify-center bg-black/45 p-4"
+            className="fixed inset-0 z-[70] flex items-start justify-center overflow-y-auto bg-black/45 px-4 pb-4 pt-24"
           >
             <motion.div
               initial={{ opacity: 0, y: 16, scale: 0.98 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 12, scale: 0.98 }}
               transition={{ duration: 0.2 }}
-              className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-[28px] border border-black/10 bg-white p-6 shadow-2xl"
+              className="max-h-[calc(100vh-7rem)] w-full max-w-3xl overflow-y-auto rounded-[28px] border border-black/10 bg-white p-6 shadow-2xl"
             >
               <div className="flex items-start justify-between gap-4">
                 <div>
@@ -602,7 +595,7 @@ export default function CustomCakes({ showNavbar = true }) {
                   <div className="mt-3 space-y-2 text-sm text-black/70">
                     <div className="flex items-center justify-between gap-3">
                       <span>Status</span>
-                      <span className={getStatusBadgeClasses(selectedOrder.status)}>{selectedOrder.status}</span>
+                      <span className={getStatusBadgeClasses(getStatusLabel(selectedOrder.status))}>{getStatusLabel(selectedOrder.status)}</span>
                     </div>
                     <div className="flex items-center justify-between gap-3">
                       <span>Total</span>
@@ -616,19 +609,22 @@ export default function CustomCakes({ showNavbar = true }) {
                 </div>
 
                 <div className="rounded-[20px] border border-black/10 bg-[#FAFAFA] p-4">
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-black/50">Requested Items</p>
-                  <p className="mt-3 text-sm leading-6 text-black/70">
-                    {Array.isArray(selectedOrder.items) && selectedOrder.items.length > 0
-                      ? selectedOrder.items.map(item => `${item.name || "Item"} x${item.qty || 1}`).join(", ")
-                      : selectedOrder.details || "No items listed"}
-                  </p>
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-black/50">Personal Information</p>
+                  <div className="mt-3 space-y-3 text-sm text-black/70">
+                    {personalInfoEntries.map(([label, value]) => (
+                      <div key={label}>
+                        <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-black/45">{label}</p>
+                        <p className="mt-1 break-words text-black/75">{value}</p>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
 
               <div className="mt-6 rounded-[24px] border border-black/10 bg-white p-4">
                 <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-black/50">Customer Form Details</p>
                 <div className="mt-4 grid gap-3 md:grid-cols-2">
-                  {parseCustomDetails(selectedOrder).map(([label, value]) => (
+                  {formDetailEntries.map(([label, value]) => (
                     <div key={label} className="rounded-2xl border border-black/10 bg-[#FAFAFA] p-3">
                       <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-black/45">{label}</p>
                       <p className="mt-1 text-sm leading-6 text-black/75">{value}</p>
@@ -638,7 +634,7 @@ export default function CustomCakes({ showNavbar = true }) {
               </div>
 
               <div className="mt-6 flex flex-wrap justify-end gap-3">
-                {selectedOrder.status === "Pending" && (
+                {isPendingRequest(selectedOrder.status) && (
                   <>
                     <button
                       type="button"
@@ -650,7 +646,7 @@ export default function CustomCakes({ showNavbar = true }) {
                     </button>
                     <button
                       type="button"
-                      onClick={() => updateStatus(selectedOrder.id, "Preparing")}
+                      onClick={() => isPendingRequest(selectedOrder.status) ? openQuoteModal(selectedOrder) : updateStatus(selectedOrder.id, "Preparing")}
                       disabled={updatingId === selectedOrder.id}
                       className="inline-flex h-10 items-center justify-center rounded-full bg-black px-5 text-sm font-semibold text-white transition hover:bg-[#D4AF37] hover:text-black disabled:opacity-50"
                     >
