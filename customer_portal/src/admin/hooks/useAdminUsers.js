@@ -63,11 +63,11 @@ export function useAdminUsers({ search = "", role = "all", page = 1 }) {
 
     const activeAccounts = users.filter((user) => String(user.status || "").toLowerCase() === "active").length;
     const suspendedAccounts = users.filter((user) => ["inactive", "banned"].includes(String(user.status || "").toLowerCase())).length;
-    const activeStaff = users.filter((user) => ["admin", "manager", "staff"].includes(String(user.role || "").toLowerCase()) && String(user.status || "").toLowerCase() === "active").length;
+    const activeAdmins = users.filter((user) => String(user.role || "").toLowerCase() === "admin" && String(user.status || "").toLowerCase() === "active").length;
 
     return [
       { label: "Total Users", value: totalUsers, tone: "default" },
-      { label: "Active Staff", value: activeStaff, tone: "default" },
+      { label: "Active Admins", value: activeAdmins, tone: "default" },
       { label: "Suspended Accounts", value: suspendedAccounts, tone: "accent" },
       { label: "Active Accounts", value: activeAccounts, tone: "default" },
     ];

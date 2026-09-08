@@ -18,7 +18,7 @@ class AdminAlertController extends Controller
         }
 
         $user = User::find((int) $userId);
-        if (! $user || ! in_array($user->role, ['admin', 'staff'], true)) {
+        if (! $user || $user->role !== 'admin') {
             return null;
         }
 

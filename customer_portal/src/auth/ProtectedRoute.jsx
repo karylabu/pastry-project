@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
 import { STAFF_BASE } from "../services/config";
 
-const DEFAULT_ALLOWED_ROLES = ["staff", "admin", "administrator", "superadmin", "super_admin", "manager", "owner"];
+const DEFAULT_ALLOWED_ROLES = ["admin"];
 
 /**
  * Reusable route guard.
@@ -11,15 +11,15 @@ const DEFAULT_ALLOWED_ROLES = ["staff", "admin", "administrator", "superadmin", 
  * api_auth_status.php) before rendering children. Never trusts localStorage.
  *
  * Props:
- *  - allowedRoles: roles permitted to view this route (default: staff panel roles)
+ *  - allowedRoles: roles permitted to view this route (default: admin)
  *  - loginPath:    where to send unauthenticated users
  *  - deniedPath:   where to send authenticated-but-unauthorized users
  */
 export default function ProtectedRoute({
   children,
   allowedRoles = DEFAULT_ALLOWED_ROLES,
-  loginPath = "/staff/login",
-  deniedPath = "/staff/access-denied",
+  loginPath = "/admin/login",
+  deniedPath = "/admin/access-denied",
 }) {
   const [state, setState] = useState("checking");
 
@@ -86,7 +86,7 @@ export default function ProtectedRoute({
   }, [loginPath, deniedPath]);
 
   if (state === "checking") {
-    return <div className="flex min-h-screen items-center justify-center text-sm text-black/60">Checking staff access...</div>;
+    return <div className="flex min-h-screen items-center justify-center text-sm text-black/60">Checking admin access...</div>;
   }
   if (state === "login") return <Navigate to={loginPath} replace />;
   if (state === "forbidden") return <Navigate to={deniedPath} replace />;
@@ -98,8 +98,8 @@ export function AccessDenied() {
     <div className="flex min-h-screen items-center justify-center bg-[#f7f2e8] px-4 text-center text-black">
       <div className="rounded-2xl border border-black/10 bg-white p-8 shadow-sm">
         <h1 className="text-xl font-semibold">Access denied</h1>
-        <p className="mt-2 text-sm text-black/60">Your account is not authorized to access staff tools.</p>
-        <a className="mt-5 inline-flex rounded-full bg-black px-4 py-2 text-sm font-semibold text-white" href="/staff/login">Return to staff login</a>
+        <p className="mt-2 text-sm text-black/60">Your account is not authorized to access admin tools.</p>
+        <a className="mt-5 inline-flex rounded-full bg-black px-4 py-2 text-sm font-semibold text-white" href="/admin/login">Return to admin login</a>
       </div>
     </div>
   );

@@ -335,12 +335,7 @@ if (!$id || !in_array($status, $allowedStatuses, true)) {
 ========================= */
 try {
     $conn->begin_transaction();
-<<<<<<< HEAD
-
     $orderStmt = $conn->prepare("SELECT status, items, total, user_id, email FROM orders WHERE id = ? LIMIT 1 FOR UPDATE");
-=======
-    $orderStmt = $conn->prepare("SELECT status, items FROM orders WHERE id = ? LIMIT 1 FOR UPDATE");
->>>>>>> origin/main
     if (!$orderStmt) {
         throw new Exception("Order lookup failed");
     }
@@ -351,12 +346,7 @@ try {
     $orderStmt->close();
 
     if (!$orderRow) {
-<<<<<<< HEAD
         throw new Exception("Order not found");
-=======
-        $conn->rollback();
-        sendJson(false, "Order not found");
->>>>>>> origin/main
     }
 
     $oldStatus = trim((string) ($orderRow['status'] ?? 'Pending'));
@@ -378,13 +368,12 @@ try {
         // Idempotency guard: skip deduction when this order's stock is
         // already deducted (deductions > restorations). Prevents double
         // deduction on status flip-flops like Confirmed -> Pending -> Confirmed.
-        $deductedCount = orderMovementCount($conn, $id, 'Order');
-        $restoredCount = orderMovementCount($conn, $id, 'Cancellation');
-        if ($deductedCount < 0 || $restoredCount < 0) {
-            $conn->rollback();
-            sendJson(false, "Failed to verify order inventory state");
-        }
-        $alreadyDeducted = $deductedCount > 0 && $deductedCount > $restoredCount;
+            $deductedCount = orderMovementCount($conn, $id, 'Order');
+            $restoredCount = orderMovementCount($conn, $id, 'Cancellation');
+            if ($deductedCount < 0 || $restoredCount < 0) {
+                throw new Exception("Failed to verify order inventory state");
+            }
+            $alreadyDeducted = $deductedCount > 0 && $deductedCount > $restoredCount;
 
         $orderLines = loadOrderItemsFromJson($itemsJson);
         if (empty($orderLines)) {
@@ -393,35 +382,16 @@ try {
 
         $planResult = collectInventoryPlan($conn, $orderLines);
         if (!$planResult['success']) {
-<<<<<<< HEAD
             throw new Exception($planResult['message']);
         }
 
         $plan = $planResult['plan'];
-        $applyResult = applyInventoryPlan($conn, $id, $status, $plan, $currentUserId);
-=======
-            $conn->rollback();
-            sendJson(false, $planResult['message']);
-        }
-
-        $plan = $planResult['plan'];
-        // Skip the deduction entirely when this order's stock is already
-        // deducted (deductions > restorations) - prevents double-deduction.
         $applyResult = $alreadyDeducted
             ? ['success' => true]
             : applyInventoryPlan($conn, $id, $status, $plan, $currentUserId);
->>>>>>> origin/main
         if (!$applyResult['success']) {
             throw new Exception($applyResult['message']);
         }
-    }
-
-<<<<<<< HEAD
-    $stmt = $conn->prepare("UPDATE orders SET status=? WHERE id=?");
-    if (!$stmt) {
-        throw new Exception("Prepare failed");
-    }
-=======
     } elseif ($status === 'Cancelled' && $oldStatus !== 'Cancelled') {
         $movementStmt = $conn->prepare("SELECT product_id, quantity FROM product_inventory_movements WHERE movement_type = 'Order' AND reference_type = 'order' AND reference_id = ? FOR UPDATE");
         $movementStmt->bind_param('i', $id);
@@ -458,46 +428,20 @@ try {
         $movementStmt->close();
     }
 
-    if (!shouldDeductInventory($oldStatus, $status) && !($status === 'Cancelled' && $oldStatus !== 'Cancelled')) {
-        $stmt = $conn->prepare("UPDATE orders SET status=? WHERE id=?");
-        if (!$stmt) {
-            $conn->rollback();
-            sendJson(false, "Prepare failed");
-        }
->>>>>>> origin/main
+    $stmt = $conn->prepare("UPDATE orders SET status=? WHERE id=?");
+    if (!$stmt) {
+        throw new Exception("Prepare failed");
+    }
 
     $stmt->bind_param("si", $status, $id);
     if (!$stmt->execute()) {
         $stmt->close();
-<<<<<<< HEAD
         throw new Exception("Update failed");
     }
     $stmt->close();
 
     if ($status === 'Completed' && $oldStatus !== 'Completed') {
         awardLoyaltyPoints($conn, $loyaltyUserId, $id, floatval($orderRow['total'] ?? 0));
-=======
->>>>>>> origin/main
-    }
-
-    if (shouldDeductInventory($oldStatus, $status)) {
-        $stmt = $conn->prepare("UPDATE orders SET status=? WHERE id=?");
-        $stmt->bind_param("si", $status, $id);
-        if (!$stmt->execute()) {
-            $stmt->close();
-            $conn->rollback();
-            sendJson(false, "Update failed");
-        }
-        $stmt->close();
-    } elseif ($status === 'Cancelled' && $oldStatus !== 'Cancelled') {
-        $stmt = $conn->prepare("UPDATE orders SET status=? WHERE id=?");
-        $stmt->bind_param("si", $status, $id);
-        if (!$stmt->execute()) {
-            $stmt->close();
-            $conn->rollback();
-            sendJson(false, "Update failed");
-        }
-        $stmt->close();
     }
 
     $conn->commit();

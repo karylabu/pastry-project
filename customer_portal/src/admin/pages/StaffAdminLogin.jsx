@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Eye, EyeOff, Lock, Mail, ShieldCheck } from "lucide-react";
 import { CUSTOMER_BASE } from "../../services/config";
 
@@ -9,7 +9,6 @@ function normalizeRole(role) {
 
 export default function StaffAdminLogin() {
   const navigate = useNavigate();
-  const location = useLocation();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -17,12 +16,6 @@ export default function StaffAdminLogin() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
-  const [isAdminRoute, setIsAdminRoute] = useState(location.pathname.startsWith("/admin"));
-
-  useEffect(() => {
-    setIsAdminRoute(location.pathname.startsWith("/admin"));
-  }, [location.pathname]);
-
   const handleSubmit = async (event) => {
     event.preventDefault();
     setError("");
@@ -48,12 +41,10 @@ export default function StaffAdminLogin() {
       localStorage.setItem("user", JSON.stringify(userWithRole));
       setSuccess("Signed in successfully.");
 
-      if (["admin", "administrator", "superadmin", "super_admin"].includes(normalizedRole)) {
+      if (normalizedRole === "admin") {
         navigate("/admin", { replace: true });
-      } else if (normalizedRole === "staff") {
-        navigate("/staff/dashboard", { replace: true });
       } else {
-        navigate("/customer", { replace: true });
+        throw new Error("Only admin accounts can access this area.");
       }
     } catch (err) {
       setError(err.message || "Unable to sign in right now.");
@@ -68,17 +59,17 @@ export default function StaffAdminLogin() {
         <div className="flex flex-1 flex-col justify-center bg-black px-6 py-10 text-white sm:px-10 lg:px-14 lg:py-12">
           <div className="inline-flex w-fit items-center gap-2 rounded-full border border-[#D4AF37]/30 bg-[#D4AF37]/10 px-3.5 py-2 text-sm font-semibold uppercase tracking-[0.24em] text-[#F3D06B]">
             <ShieldCheck size={16} />
-            Staff / Admin Access
+            Admin Access
           </div>
           <h1 className="mt-4 text-4xl font-semibold sm:text-5xl">
-            {isAdminRoute ? "Admin Login" : "Staff Login"}
+            Admin Login
           </h1>
           <p className="mt-3 max-w-md text-base leading-7 text-white/70">
-            Use the same credentials for your staff or admin account to reach the operations dashboard.
+            Use your admin credentials to reach the operations dashboard.
           </p>
           <div className="mt-6 rounded-2xl border border-white/10 bg-white/10 p-4 text-base text-white/80">
             <p className="font-semibold text-white">Secure access</p>
-            <p className="mt-1">Only verified staff and admin accounts can sign in here.</p>
+            <p className="mt-1">Only verified admin accounts can sign in here.</p>
           </div>
         </div>
 

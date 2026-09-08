@@ -16,6 +16,14 @@ const laravelStaffFetch = (url, options = {}) => {
   });
 };
 
+const getProductSizeOptions = (product) => (
+  Array.isArray(product?.sizes)
+    ? product.sizes
+    : Array.isArray(product?.variants)
+    ? product.variants
+    : []
+).filter((size) => Number(size?.id) > 0);
+
 export default function Products({ showNavbar = true, allowCatalogManagement = false }) {
 
   const [products, setProducts] = useState([]);
@@ -33,6 +41,7 @@ export default function Products({ showNavbar = true, allowCatalogManagement = f
   const [editSaving, setEditSaving] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [recipeLines, setRecipeLines] = useState([]);
+  const [productionSizeId, setProductionSizeId] = useState("");
   const [bomQty, setBomQty] = useState(1);
   const [bomError, setBomError] = useState(null);
   const [bomLoading, setBomLoading] = useState(false);
@@ -64,6 +73,7 @@ export default function Products({ showNavbar = true, allowCatalogManagement = f
   const [recipeRows, setRecipeRows] = useState([
     { ingredient_id: "", qty: "" }
   ]);
+  const [recipeSizeId, setRecipeSizeId] = useState("");
   const editImageInputRef = useRef(null);
 
   const location = useLocation();
@@ -75,6 +85,8 @@ export default function Products({ showNavbar = true, allowCatalogManagement = f
   const canEditCatalog = Boolean(allowCatalogManagement);
 
   const openEditProductModal = (product) => {
+    const sizeOptions = getProductSizeOptions(product);
+    const firstSizeId = sizeOptions.find((size) => Number(size?.id) > 0)?.id || "";
     setEditProduct({
       ...product,
       name: product.name || "",
@@ -85,6 +97,8 @@ export default function Products({ showNavbar = true, allowCatalogManagement = f
       image: product.image || "",
     });
     setEditImage(null);
+    setRecipeSizeId(firstSizeId ? String(firstSizeId) : "");
+    setRecipeRows([{ ingredient_id: "", qty: "" }]);
     setEditOpen(true);
   };
 
@@ -246,12 +260,17 @@ export default function Products({ showNavbar = true, allowCatalogManagement = f
     navigate(`/staff/products${trimmed ? `?search=${encodeURIComponent(trimmed)}` : ""}`);
   };
 
-  const loadProductRecipe = (productId) => {
+  const loadProductRecipe = (productId, productSizeId) => {
     setBomError(null);
     setRecipeLines([]);
     setBomLoading(true);
 
-    laravelStaffFetch(`${LARAVEL_BASE}/api/staff/products/${encodeURIComponent(productId)}/recipe`)
+    if (!productSizeId) {
+      setBomLoading(false);
+      return;
+    }
+
+    laravelStaffFetch(`${LARAVEL_BASE}/api/staff/products/${encodeURIComponent(productId)}/recipe?product_size_id=${encodeURIComponent(productSizeId)}`)
       .then((res) => res.json())
       .then((data) => {
         if (data?.success) {
@@ -266,9 +285,39 @@ export default function Products({ showNavbar = true, allowCatalogManagement = f
       .finally(() => setBomLoading(false));
   };
 
-  const loadProductionAvailability = async (productId) => {
+  const loadSizeRecipe = (productId, productSizeId) => {
+    if (!productId || !productSizeId) {
+      setRecipeRows([{ ingredient_id: "", qty: "" }]);
+      return;
+    }
+
+    laravelStaffFetch(`${LARAVEL_BASE}/api/staff/products/${encodeURIComponent(productId)}/recipe?product_size_id=${encodeURIComponent(productSizeId)}`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (!data?.success) throw new Error(data?.message || "Unable to load size recipe.");
+        const rows = Array.isArray(data.recipe)
+          ? data.recipe.map((recipe) => ({
+              ingredient_id: String(recipe.ingredient_id),
+              qty: String(recipe.qty),
+            }))
+          : [];
+        setRecipeRows(rows.length > 0 ? rows : [{ ingredient_id: "", qty: "" }]);
+      })
+      .catch(() => setRecipeRows([{ ingredient_id: "", qty: "" }]));
+  };
+
+  useEffect(() => {
+    if (!editOpen || !editProduct?.id || !recipeSizeId) return;
+    loadSizeRecipe(editProduct.id, recipeSizeId);
+  }, [editOpen, editProduct?.id, recipeSizeId]);
+
+  const loadProductionAvailability = async (productId, productSizeId) => {
+    if (!productSizeId) {
+      setProductionAvailability({ is_producible: false, reason: 'Select a cake size first.' });
+      return;
+    }
     try {
-      const res = await laravelStaffFetch(`${LARAVEL_BASE}/api/staff/production/availability/${encodeURIComponent(productId)}`);
+      const res = await laravelStaffFetch(`${LARAVEL_BASE}/api/staff/production/availability/${encodeURIComponent(productId)}?product_size_id=${encodeURIComponent(productSizeId)}`);
       const data = await res.json();
       setProductionAvailability({ is_producible: data?.is_producible === true, reason: data?.availability_reason || null });
     } catch (_) {
@@ -305,10 +354,8 @@ export default function Products({ showNavbar = true, allowCatalogManagement = f
     setHistoryEntries([]);
     if (action === "produce") {
       setRecipeLines([]);
-      loadProductRecipe(product.id);
-      // Load production availability
-      setProductionAvailability({ is_producible: product.is_producible ?? false, reason: product.availability_reason ?? null });
-      loadProductionAvailability(product.id);
+      setProductionSizeId("");
+      setProductionAvailability({ is_producible: false, reason: 'Select a cake size first.' });
     }
     if (action === "history") loadHistory(product.id);
   };
@@ -323,6 +370,11 @@ export default function Products({ showNavbar = true, allowCatalogManagement = f
     const parsedQty = Number(bomQty);
     if (!bomQty || parsedQty <= 0) {
       setBomError("Enter a valid production quantity.");
+      return;
+    }
+
+    if (!productionSizeId) {
+      setBomError("Select a cake size before producing.");
       return;
     }
 
@@ -348,6 +400,7 @@ export default function Products({ showNavbar = true, allowCatalogManagement = f
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         product_id: selectedProduct.id,
+        product_size_id: Number(productionSizeId),
         quantity: parsedQty,
         idempotency_key: window.crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`
       })
@@ -361,6 +414,7 @@ export default function Products({ showNavbar = true, allowCatalogManagement = f
           closeInventoryModal();
           setQty("");
           setBomQty(1);
+          setProductionSizeId("");
           setRecipeLines([]);
         } else {
           setFeedback({ type: "error", text: data.message || "Unable to update inventory. Please try again." });
@@ -773,6 +827,26 @@ export default function Products({ showNavbar = true, allowCatalogManagement = f
                 </p>
 
                 {activeModal === "produce" && <div className="space-y-3 mb-4">
+                  <div>
+                    <label className="mb-1 block text-[11px] font-semibold text-black/70">Cake Size</label>
+                    <select
+                      value={productionSizeId}
+                      onChange={(event) => {
+                        const sizeId = event.target.value;
+                        setProductionSizeId(sizeId);
+                        loadProductRecipe(selectedProduct.id, sizeId);
+                        loadProductionAvailability(selectedProduct.id, sizeId);
+                      }}
+                      className="w-full rounded-xl border border-black/10 bg-white px-3 py-2 text-xs text-black outline-none focus:ring-2 focus:ring-[#D4AF37]"
+                    >
+                      <option value="">Select cake size</option>
+                      {getProductSizeOptions(selectedProduct).map((size) => (
+                        <option key={size.id} value={size.id}>
+                          {size.size} {size.price !== undefined ? `- ₱${Number(size.price).toLocaleString()}` : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                   
                   {/* AVAILABILITY STATUS */}
                   <div className={`rounded-xl p-3 ${productionAvailability.is_producible ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
@@ -1173,6 +1247,59 @@ export default function Products({ showNavbar = true, allowCatalogManagement = f
                   />
                 </div>
 
+                <div className="mt-4 space-y-3 rounded-xl border border-black/10 bg-black/5 p-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <h3 className="text-base font-semibold text-black">Recipe Ingredients</h3>
+                    <button
+                      type="button"
+                      onClick={addRecipeRow}
+                      className="rounded-xl bg-black px-3 py-2 text-xs font-semibold text-white hover:bg-black/90"
+                    >
+                      Add Ingredient
+                    </button>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="block text-[11px] font-semibold text-black/70">Cake Size</label>
+                    <select
+                      value={recipeSizeId}
+                      onChange={(event) => setRecipeSizeId(event.target.value)}
+                      className="w-full rounded-xl border border-black/10 bg-white px-3 py-2 text-xs text-black outline-none focus:ring-2 focus:ring-[#D4AF37]"
+                    >
+                      <option value="">Select cake size</option>
+                      {getProductSizeOptions(editProduct).map((size) => (
+                        <option key={size.id} value={size.id}>
+                          {size.size} {size.price !== undefined ? `- ₱${Number(size.price).toLocaleString()}` : ''}
+                        </option>
+                      ))}
+                    </select>
+                    {!recipeSizeId && <p className="text-[11px] text-amber-700">Add a size before defining its recipe.</p>}
+                  </div>
+                  <div className="space-y-2">
+                    {recipeRows.map((row, index) => (
+                      <div key={index} className="grid gap-2 md:grid-cols-[1.4fr_0.9fr_auto] items-end">
+                        <select
+                          value={row.ingredient_id}
+                          onChange={(e) => updateRecipeRow(index, 'ingredient_id', e.target.value)}
+                          className="w-full rounded-xl border border-black/10 bg-white px-3 py-2 text-xs text-black"
+                        >
+                          <option value="">Select ingredient</option>
+                          {ingredients.map((ing) => <option key={ing.id} value={ing.id}>{ing.name} ({ing.unit})</option>)}
+                        </select>
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={row.qty}
+                          onChange={(e) => updateRecipeRow(index, 'qty', e.target.value)}
+                          className="w-full rounded-xl border border-black/10 bg-white px-3 py-2 text-xs text-black"
+                          placeholder="Qty"
+                        />
+                        <button type="button" onClick={() => removeRecipeRow(index)} className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-600">Remove</button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
                 <div className="mt-4 flex gap-2">
                   <button
                     onClick={async () => {
@@ -1196,11 +1323,11 @@ export default function Products({ showNavbar = true, allowCatalogManagement = f
                           const recipePayload = recipeRows
                             .filter((row) => row.ingredient_id && Number(row.qty) > 0)
                             .map((row) => ({ ingredient_id: Number(row.ingredient_id), qty: Number(row.qty) }));
-                          if (recipePayload.length > 0) {
+                          if (recipeSizeId) {
                             const recipeRes = await laravelStaffFetch(`${LARAVEL_BASE}/api/staff/products/${data.product_id}/recipe`, {
                               method: 'PUT',
                               headers: { 'Content-Type': 'application/json' },
-                              body: JSON.stringify({ recipes: recipePayload }),
+                              body: JSON.stringify({ product_size_id: Number(recipeSizeId), recipes: recipePayload }),
                             });
                             const recipeData = await recipeRes.json().catch(() => ({}));
                             if (!recipeRes.ok || !recipeData.success) throw new Error(recipeData.message || 'Failed to save product recipe.');

@@ -15,10 +15,10 @@ class IngredientBatchController extends Controller
     {
         $user = $this->getAuthenticatedUser($request);
         if (!$user) {
-            return response()->json(['success' => false, 'message' => 'Staff authorization required.'], 401);
+            return response()->json(['success' => false, 'message' => 'Admin authorization required.'], 401);
         }
-        if (!in_array(strtolower((string) $user->role), ['staff', 'manager', 'admin'], true)) {
-            return response()->json(['success' => false, 'message' => 'Staff authorization required.'], 403);
+        if ($user->role !== 'admin') {
+            return response()->json(['success' => false, 'message' => 'Admin authorization required.'], 403);
         }
 
         try {

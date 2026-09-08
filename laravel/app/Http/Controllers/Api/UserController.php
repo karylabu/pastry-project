@@ -34,10 +34,6 @@ class UserController extends Controller
             $payload['phone'] = $payload['phone_number'];
         }
 
-        if (array_key_exists('role', $payload) && $payload['role'] === 'manager') {
-            $payload['role'] = 'staff';
-        }
-
         return $payload;
     }
 
@@ -50,10 +46,6 @@ class UserController extends Controller
 
         if (array_key_exists('password_confirmation', $validated)) {
             unset($validated['password_confirmation']);
-        }
-
-        if (array_key_exists('role', $validated) && $validated['role'] === 'manager') {
-            $validated['role'] = 'staff';
         }
 
         if (array_key_exists('status', $validated) && !in_array($validated['status'], ['active', 'inactive', 'banned'], true)) {
@@ -84,7 +76,7 @@ class UserController extends Controller
 
         if ($request->filled('role')) {
             $role = $request->role;
-            if (in_array($role, ['admin', 'manager', 'staff', 'customer'], true)) {
+            if (in_array($role, ['admin', 'customer'], true)) {
                 $query->where('role', $role);
             }
         }
@@ -114,7 +106,7 @@ class UserController extends Controller
     }
 
     /**
-     * Create a new user or staff account.
+    * Create a new user account.
      */
     public function store(Request $request)
     {
@@ -125,7 +117,7 @@ class UserController extends Controller
             'email' => ['required', 'email', 'max:255', 'unique:users,email'],
             'phone_number' => ['nullable', 'string', 'max:20'],
             'phone' => ['nullable', 'string', 'max:20'],
-            'role' => ['required', Rule::in(['admin', 'manager', 'staff', 'customer'])],
+            'role' => ['required', Rule::in(['admin', 'customer'])],
             'status' => ['required', Rule::in(['active', 'inactive', 'banned'])],
             'password' => ['required', 'string', 'min:8', 'confirmed'],
         ])->validate();
@@ -168,7 +160,7 @@ class UserController extends Controller
             'email' => ['sometimes', 'email', 'max:255', Rule::unique('users')->ignore($user->id)],
             'phone_number' => ['nullable', 'string', 'max:20'],
             'phone' => ['nullable', 'string', 'max:20'],
-            'role' => ['sometimes', Rule::in(['admin', 'manager', 'staff', 'customer'])],
+            'role' => ['sometimes', Rule::in(['admin', 'customer'])],
             'status' => ['sometimes', Rule::in(['active', 'inactive', 'banned'])],
             'password' => ['nullable', 'string', 'min:8', 'confirmed'],
         ])->validate();

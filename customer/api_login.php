@@ -31,7 +31,9 @@ try {
     }
 
     $escaped = mysqli_real_escape_string($conn, $email);
-    $result  = mysqli_query($conn, "SELECT id, name, email, password, role, status FROM users WHERE email='$escaped' LIMIT 1");
+    // The current users schema has no status column; existing accounts are active
+    // unless a future role-management migration adds an explicit status field.
+    $result  = mysqli_query($conn, "SELECT id, name, email, password, role FROM users WHERE email='$escaped' LIMIT 1");
 
     if (!$result || mysqli_num_rows($result) === 0) {
         echo json_encode(["success" => false, "message" => "User not found."]);
@@ -49,10 +51,7 @@ try {
         exit;
     }
 
-    if (strtolower(trim((string) ($user['status'] ?? 'active'))) !== 'active') {
-        echo json_encode(["success" => false, "message" => "This account is deactivated."]);
-        exit;
-    }
+    $accountStatus = 'active';
 
     session_regenerate_id(true);
     $_SESSION['user'] = [
@@ -60,7 +59,7 @@ try {
         'name' => $user['name'],
         'email' => $user['email'],
         'role' => $user['role'],
-        'status' => $user['status'],
+        'status' => $accountStatus,
     ];
 
     // Generate a simple token for the session
@@ -83,7 +82,7 @@ try {
             "name"  => $user['name'],
             "email" => $user['email'],
             "role"  => $user['role'],
-            "status" => $user['status'],
+            "status" => $accountStatus,
         ]
     ]);
 
