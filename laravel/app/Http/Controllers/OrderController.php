@@ -298,7 +298,7 @@ class OrderController extends Controller
     public function updateStatus(Request $request, $id)
     {
         $user = $this->getAuthenticatedUser($request);
-        if (!$user || !in_array($user->role, ['admin', 'staff'])) {
+        if (!$user || $user->role !== 'admin') {
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
         }
 

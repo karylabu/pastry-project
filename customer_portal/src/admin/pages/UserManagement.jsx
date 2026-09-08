@@ -5,8 +5,6 @@ import { useAdminUsers } from "../hooks/useAdminUsers";
 
 const roleStyles = {
   admin: "bg-[#1f1f1f] text-[#f1d06a]",
-  manager: "bg-[#f4ebdc] text-[#7b5914]",
-  staff: "bg-[#f7f3ea] text-[#5d4a2b]",
   customer: "bg-[#f2f2ef] text-[#57524c]",
 };
 
@@ -57,7 +55,7 @@ const initialForm = {
   name: "",
   email: "",
   phone_number: "",
-  role: "staff",
+  role: "customer",
   status: "active",
   password: "",
   password_confirmation: "",
@@ -125,7 +123,7 @@ export default function UserManagement() {
       nextErrors.phone_number = "Please enter a valid phone number.";
     }
 
-    if (!["admin", "manager", "staff", "customer"].includes(payload.role)) {
+    if (!["admin", "customer"].includes(payload.role)) {
       nextErrors.role = "Please choose a valid role.";
     }
 
@@ -145,7 +143,7 @@ export default function UserManagement() {
         originalUser.name || "",
         originalUser.email || "",
         originalUser.phone_number || "",
-        originalUser.role || "staff",
+        originalUser.role || "customer",
         originalUser.status || "active",
       ].join("|") !== [trimmedName, trimmedEmail, trimmedPhone, payload.role, payload.status].join("|");
 
@@ -371,8 +369,6 @@ export default function UserManagement() {
                 >
                   <option value="all">Filter by Role</option>
                   <option value="admin">Admin</option>
-                  <option value="manager">Manager</option>
-                  <option value="staff">Staff</option>
                   <option value="customer">Customer</option>
                 </select>
               </div>
@@ -518,8 +514,6 @@ export default function UserManagement() {
                 <div>
                   <label className="mb-1 block text-[12px] font-medium text-black">Role</label>
                   <select value={form.role} onChange={(event) => setForm({ ...form, role: event.target.value })} className="w-full rounded-full border border-black/10 px-3 py-2 text-[13px] outline-none">
-                    <option value="staff">Staff</option>
-                    <option value="manager">Manager</option>
                     <option value="admin">Admin</option>
                     <option value="customer">Customer</option>
                   </select>

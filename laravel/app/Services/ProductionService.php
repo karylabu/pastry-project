@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\IngredientBatch;
 use App\Models\Product;
+use App\Models\ProductSize;
 use App\Models\ProductionBatchAllocation;
 use App\Models\ProductionTransaction;
 use Illuminate\Support\Facades\DB;
@@ -15,11 +16,14 @@ class ProductionService
     {
     }
 
-    public function checkAvailability(Product $product): array
+    public function checkAvailability(Product $product, int $productSizeId): array
     {
         if (!$product->available) return ['is_producible' => false, 'availability_reason' => 'Product is unavailable'];
-        $recipes = $product->recipes()->where('active', true)->with('ingredient')->orderBy('id')->get();
-        if ($recipes->isEmpty()) return ['is_producible' => false, 'availability_reason' => 'No active recipe'];
+        $size = ProductSize::query()->whereKey($productSizeId)->where('product_id', $product->id)->first();
+        if (!$size) return ['is_producible' => false, 'availability_reason' => 'Invalid cake size for this product'];
+        if (!$size->available) return ['is_producible' => false, 'availability_reason' => 'Cake size is unavailable'];
+        $recipes = $product->recipes()->where('product_size_id', $size->id)->where('active', true)->with('ingredient')->orderBy('id')->get();
+        if ($recipes->isEmpty()) return ['is_producible' => false, 'availability_reason' => 'No recipe is configured for this cake size.'];
 
         foreach ($recipes as $recipe) {
             $usable = $this->inventory->getUsableStock((int) $recipe->ingredient_id);
@@ -35,16 +39,19 @@ class ProductionService
         return ['is_producible' => true, 'availability_reason' => null];
     }
 
-    public function produce(Product $product, int $quantity, string $idempotencyKey, int $userId): array
+    public function produce(Product $product, int $productSizeId, int $quantity, string $idempotencyKey, int $userId): array
     {
-        return DB::transaction(function () use ($product, $quantity, $idempotencyKey, $userId) {
+        return DB::transaction(function () use ($product, $productSizeId, $quantity, $idempotencyKey, $userId) {
             $existing = ProductionTransaction::query()->where('idempotency_key', $idempotencyKey)->first();
             if ($existing) return ['duplicate' => true, 'production' => $existing];
 
             $lockedProduct = Product::query()->whereKey($product->id)->lockForUpdate()->first();
             if (!$lockedProduct) throw new RuntimeException('Product not found.');
-            $recipes = $lockedProduct->recipes()->where('active', true)->with('ingredient')->orderBy('id')->get();
-            if ($recipes->isEmpty()) throw new RuntimeException('No active recipe defined for this product.');
+            $size = ProductSize::query()->whereKey($productSizeId)->where('product_id', $lockedProduct->id)->lockForUpdate()->first();
+            if (!$size) throw new RuntimeException('Invalid cake size for this product.');
+            if (!$size->available) throw new RuntimeException('Cake size is unavailable.');
+            $recipes = $lockedProduct->recipes()->where('product_size_id', $size->id)->where('active', true)->with('ingredient')->orderBy('id')->get();
+            if ($recipes->isEmpty()) throw new RuntimeException('No recipe is configured for this cake size.');
 
             $allocations = [];
             foreach ($recipes as $recipe) {
@@ -76,12 +83,13 @@ class ProductionService
 
             $production = ProductionTransaction::create([
                 'product_id' => $lockedProduct->id,
+                'product_size_id' => $size->id,
                 'quantity' => $quantity,
                 'user_id' => $userId,
                 'idempotency_key' => $idempotencyKey,
             ]);
 
-            $movementNote = "Produced {$quantity} unit(s) of {$lockedProduct->name}";
+            $movementNote = "Produced {$quantity} unit(s) of {$lockedProduct->name} ({$size->size})";
             $beforeByIngredient = [];
             foreach ($allocations as $allocation) {
                 $ingredientId = (int) $allocation['recipe']->ingredient_id;
@@ -105,13 +113,16 @@ class ProductionService
             }
 
             $previousProductStock = (float) $lockedProduct->stock;
+            $previousSizeStock = (float) $size->stock_quantity;
             $lockedProduct->increment('stock', $quantity);
+            $size->increment('stock_quantity', $quantity);
             DB::table('product_inventory_movements')->insert([
                 'product_id' => $lockedProduct->id,
+                'product_size_id' => $size->id,
                 'movement_type' => 'Production',
                 'quantity' => $quantity,
-                'previous_stock' => $previousProductStock,
-                'new_stock' => $previousProductStock + $quantity,
+                'previous_stock' => $previousSizeStock,
+                'new_stock' => $previousSizeStock + $quantity,
                 'reason' => $movementNote,
                 'reference_type' => 'production',
                 'reference_id' => $production->id,
@@ -119,7 +130,12 @@ class ProductionService
                 'created_at' => now(),
             ]);
 
-            return ['duplicate' => false, 'production' => $production->fresh(), 'new_stock' => $previousProductStock + $quantity];
+            return [
+                'duplicate' => false,
+                'production' => $production->fresh(),
+                'new_stock' => $previousProductStock + $quantity,
+                'size_stock' => $previousSizeStock + $quantity,
+            ];
         });
     }
 }

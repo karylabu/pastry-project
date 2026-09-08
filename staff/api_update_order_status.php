@@ -430,13 +430,12 @@ try {
         // Idempotency guard: skip deduction when this order's stock is
         // already deducted (deductions > restorations). Prevents double
         // deduction on status flip-flops like Confirmed -> Pending -> Confirmed.
-        $deductedCount = orderMovementCount($conn, $id, 'Order');
-        $restoredCount = orderMovementCount($conn, $id, 'Cancellation');
-        if ($deductedCount < 0 || $restoredCount < 0) {
-            $conn->rollback();
-            sendJson(false, "Failed to verify order inventory state");
-        }
-        $alreadyDeducted = $deductedCount > 0 && $deductedCount > $restoredCount;
+            $deductedCount = orderMovementCount($conn, $id, 'Order');
+            $restoredCount = orderMovementCount($conn, $id, 'Cancellation');
+            if ($deductedCount < 0 || $restoredCount < 0) {
+                throw new Exception("Failed to verify order inventory state");
+            }
+            $alreadyDeducted = $deductedCount > 0 && $deductedCount > $restoredCount;
 
         $orderLines = loadOrderItemsFromJson($itemsJson);
         if (empty($orderLines)) {

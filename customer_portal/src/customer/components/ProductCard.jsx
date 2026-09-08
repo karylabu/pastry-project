@@ -160,6 +160,9 @@ export default function ProductCard({
       const sizeLabel = variant?.variant_size ?? variant?.size ?? variant?.name ?? variant?.label ?? `Option ${index + 1}`;
       const priceValue = parseFloat(variant?.price ?? variant?.unit_price ?? product?.price ?? 0);
       const stockValue = Number(variant?.stock_quantity ?? variant?.stock ?? variant?.quantity ?? product?.stock ?? 0);
+      const isAvailable = variant?.available === undefined
+        ? stockValue > 0
+        : Boolean(Number(variant.available));
       const rawId = variant?.id;
       const normalizedId = rawId === undefined || rawId === null || rawId === '' || rawId === 0
         ? `${sizeLabel}-${index}`
@@ -181,8 +184,8 @@ export default function ProductCard({
         id: normalizedId,
         size: labelMap[displayLabel] || String(sizeLabel),
         price: Number.isFinite(priceValue) ? priceValue : 0,
-        stock_quantity: Number.isFinite(stockValue) ? stockValue : 0,
-        available: variant?.available ?? stockValue > 0,
+        stock_quantity: isAvailable ? 1 : 0,
+        available: isAvailable,
       };
     });
     const uniqueVariants = normalizedVariants.filter((variant, index, variants) =>
@@ -190,56 +193,10 @@ export default function ProductCard({
         String(candidate.size).trim().toLowerCase() === String(variant.size).trim().toLowerCase()
       ) === index
     );
-    const variantsForDisplay = category === 'PASTA' && !uniqueVariants.some((variant) =>
-      String(variant.size).trim().toLowerCase() === 'meal'
-    )
-      ? [...uniqueVariants, {
-          id: 'meal',
-          size: 'Meal',
-          price: parseFloat(product?.meal_price ?? product?.price ?? 0) || 0,
-          stock_quantity: Number(product?.stock ?? 0),
-          available: Number(product?.stock ?? 0) > 0,
-        }]
-      : uniqueVariants;
-
-    const shouldAddRegular = shouldShowVariantSelector && (category === 'MEALS' || category === 'PASTA' || category === 'RICE MEALS');
-    if (!shouldAddRegular) return variantsForDisplay;
-
-    const hasRegular = variantsForDisplay.some((variant) => {
-      const label = String(variant.size).trim().toLowerCase();
-      return label === 'regular' || label === 'default' || label === 'standard';
-    });
-
-    const filteredVariants = variantsForDisplay.filter((variant) => {
-      const label = String(variant.size).trim().toLowerCase();
-      return label === 'regular' || label === 'meal' || label === 'combo' || label === 'solo' || label === 'sharing';
-    });
-
-    if (hasRegular) return filteredVariants;
-
-    const basePrice = Number.isFinite(parseFloat(product?.price)) ? parseFloat(product.price) : 0;
-
-    return [
-      {
-        id: 'regular',
-        size: 'Regular',
-        price: basePrice,
-        stock_quantity: Number(product?.stock ?? 0),
-        available: Number(product?.stock ?? 0) > 0,
-      },
-      ...filteredVariants,
-    ];
+    return uniqueVariants;
   }, [product?.variants, product?.sizes, product?.price, product?.stock, category, shouldShowVariantSelector]);
 
-  const fallbackOptions = category === 'CAKES'
-    ? ['SLICE', 'SMALL', 'BIG']
-    : category === 'PASTA'
-    ? ['REGULAR', 'MEAL', 'COMBO']
-    : category === 'STARTER'
-    ? ['SOLO', 'SHARING']
-    : category === 'MEALS' || category === 'RICE MEALS'
-    ? ['REGULAR', 'MEAL', 'COMBO']
-    : ['REGULAR', 'MEAL'];
+  const fallbackOptions = [];
 
   const variantButtons = useMemo(() => {
     if (variantSizes.length > 0) {
@@ -268,12 +225,6 @@ export default function ProductCard({
     return selected || variantButtons[0];
   }, [selectedSizeId, variantButtons]);
 
-  const normalizedVariantLabel = (currentVariant?.size || product?.variant || product?.defaultSize || '')
-    .toString()
-    .trim()
-    .toLowerCase();
-  const isRegularSelection = normalizedVariantLabel.includes('regular');
-
   useEffect(() => {
     if (!variantButtons.length) return;
 
@@ -298,15 +249,18 @@ export default function ProductCard({
 
   if (!product) return null;
 
-  const currentPrice = currentVariant
-    ? parseFloat(currentVariant.price) || 0
-    : parseFloat(product.price) || 0;
+  const currentPrice = currentVariant ? parseFloat(currentVariant.price) || 0 : 0;
 
   const overallOutOfStock = isSimpleProduct
     ? Number(product?.available) === 0 || product?.available === false
     : variantButtons.length > 0
     ? variantButtons.every((variant) => variant.stock_quantity <= 0)
     : Number(product?.stock ?? 0) <= 0;
+  const stockLabel = overallOutOfStock
+    ? 'Out of stock'
+    : currentVariant && currentVariant.stock_quantity > 0 && currentVariant.stock_quantity < 10
+    ? 'Low stock'
+    : '';
 
   const handleSelection = (variant) => {
     if (variant.stock_quantity <= 0) return;

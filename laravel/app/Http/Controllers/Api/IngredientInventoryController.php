@@ -12,7 +12,7 @@ class IngredientInventoryController extends Controller
 {
     public function index(Request $request, InventoryService $inventory): JsonResponse
     {
-        if ($response = $this->authorizeStaff($request)) {
+        if ($response = $this->authorizeAdmin($request)) {
             return $response;
         }
 
@@ -24,7 +24,7 @@ class IngredientInventoryController extends Controller
 
     public function batches(Request $request, Ingredient $ingredient, InventoryService $inventory): JsonResponse
     {
-        if ($response = $this->authorizeStaff($request)) {
+        if ($response = $this->authorizeAdmin($request)) {
             return $response;
         }
 
@@ -41,7 +41,7 @@ class IngredientInventoryController extends Controller
 
     public function allBatches(Request $request, InventoryService $inventory): JsonResponse
     {
-        if ($response = $this->authorizeStaff($request)) {
+        if ($response = $this->authorizeAdmin($request)) {
             return $response;
         }
 
@@ -56,15 +56,15 @@ class IngredientInventoryController extends Controller
         ]);
     }
 
-    private function authorizeStaff(Request $request): ?JsonResponse
+    private function authorizeAdmin(Request $request): ?JsonResponse
     {
         $user = $this->getAuthenticatedUser($request);
         if (!$user) {
-            return response()->json(['success' => false, 'message' => 'Staff authorization required.'], 401);
+            return response()->json(['success' => false, 'message' => 'Admin authorization required.'], 401);
         }
 
-        if (!in_array(strtolower((string) $user->role), ['staff', 'manager', 'admin'], true)) {
-            return response()->json(['success' => false, 'message' => 'Staff authorization required.'], 403);
+        if ($user->role !== 'admin') {
+            return response()->json(['success' => false, 'message' => 'Admin authorization required.'], 403);
         }
 
         return null;

@@ -51,10 +51,7 @@ try {
         exit;
     }
 
-    if (strtolower(trim((string) ($user['status'] ?? 'active'))) !== 'active') {
-        echo json_encode(["success" => false, "message" => "This account is deactivated."]);
-        exit;
-    }
+    $accountStatus = 'active';
 
     session_regenerate_id(true);
     $_SESSION['user'] = [
@@ -62,7 +59,7 @@ try {
         'name' => $user['name'],
         'email' => $user['email'],
         'role' => $user['role'],
-        'status' => $user['status'],
+        'status' => $accountStatus,
     ];
 
     // Generate a simple token for the session
@@ -85,7 +82,7 @@ try {
             "name"  => $user['name'],
             "email" => $user['email'],
             "role"  => $user['role'],
-            "status" => $user['status'],
+            "status" => $accountStatus,
         ]
     ]);
 

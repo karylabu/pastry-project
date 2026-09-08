@@ -13,8 +13,6 @@ import Login from "./customer/pages/Login";           // ← your Login.jsx
 import Register from "./customer/pages/Register";
 import ForgotPassword from "./customer/pages/ForgotPassword"; // ← your ForgotPassword.jsx
 
-/* STAFF */
-import StaffApp from "./staff/components/StaffApp";
 import StaffAdminLogin from "./admin/pages/StaffAdminLogin";
 
 /* ADMIN */
@@ -93,17 +91,10 @@ function App() {
         {/* ================= CUSTOMER ================= */}
         <Route path="customer/*" element={<CustomerApp />} />
 
-        {/* ================= STAFF ================= */}
-        <Route path="staff/login" element={<StaffAdminLogin />} />
-        <Route path="staff/access-denied" element={<AccessDenied />} />
-        <Route
-          path="staff/*"
-          element={
-            <ProtectedRoute>
-              <StaffApp />
-            </ProtectedRoute>
-          }
-        />
+        {/* Legacy staff URLs now resolve to the single admin area. */}
+        <Route path="staff/login" element={<Navigate to="/admin/login" replace />} />
+        <Route path="staff/access-denied" element={<Navigate to="/admin/access-denied" replace />} />
+        <Route path="staff/*" element={<Navigate to="/admin" replace />} />
 
         {/* ================= ADMIN ================= */}
         <Route path="admin/login" element={<StaffAdminLogin />} />
@@ -113,7 +104,7 @@ function App() {
             <ProtectedRoute
               allowedRoles={["admin", "administrator", "superadmin", "super_admin", "manager", "owner", "shop_owner"]}
               loginPath="/admin/login"
-              deniedPath="/staff/access-denied"
+              deniedPath="/admin/access-denied"
             >
               <AdminApp />
             </ProtectedRoute>

@@ -48,6 +48,7 @@ class ProductApiController extends Controller
                 // 3. Fetch the actual product models
                 if (!empty($topProductNames)) {
                     $products = Product::where('available', true)
+                        ->whereRaw('LOWER(category) IN (?, ?)', ['cake', 'cakes'])
                         ->where(function($q) use ($topProductNames) {
                             foreach ($topProductNames as $name) {
                                 $q->orWhere('name', 'LIKE', trim($name));
@@ -70,6 +71,7 @@ class ProductApiController extends Controller
                 if ($products->count() < 4) {
                     $idsToExclude = $products->pluck('id')->toArray();
                     $extra = Product::where('available', true)
+                        ->whereRaw('LOWER(category) IN (?, ?)', ['cake', 'cakes'])
                         ->whereNotIn('id', $idsToExclude)
                         ->latest()
                         ->limit(6 - $products->count())
@@ -84,6 +86,7 @@ class ProductApiController extends Controller
                         ->get();
 
                     $productData = $product->toArray();
+                    $productData['sizes'] = $variants;
                     $productData['variants'] = $variants;
                     $results[] = $productData;
                 }
@@ -92,7 +95,9 @@ class ProductApiController extends Controller
             } catch (\Exception $e) {
                 \Log::error('Best sellers error: ' . $e->getMessage());
                 // Safe fallback to latest products
-                $products = Product::where('available', true)->latest()->limit(6)->get();
+                $products = Product::where('available', true)
+                    ->whereRaw('LOWER(category) IN (?, ?)', ['cake', 'cakes'])
+                    ->latest()->limit(6)->get();
                 $results = [];
                 foreach ($products as $product) {
                     $variants = \Illuminate\Support\Facades\DB::table('product_sizes')
@@ -100,6 +105,7 @@ class ProductApiController extends Controller
                         ->get();
 
                     $productData = $product->toArray();
+                    $productData['sizes'] = $variants;
                     $productData['variants'] = $variants;
                     $results[] = $productData;
                 }
@@ -108,7 +114,9 @@ class ProductApiController extends Controller
         }
 
         if ($action === 'list') {
-            $products = Product::where('available', true)->get();
+            $products = Product::where('available', true)
+                ->whereRaw('LOWER(category) IN (?, ?)', ['cake', 'cakes'])
+                ->get();
 
             $results = [];
             foreach ($products as $product) {
@@ -117,6 +125,8 @@ class ProductApiController extends Controller
                     ->get();
 
                 $productData = $product->toArray();
+                $productData['sizes'] = $variants;
+                $productData['sizes'] = $variants;
                 $productData['variants'] = $variants;
                 $results[] = $productData;
             }

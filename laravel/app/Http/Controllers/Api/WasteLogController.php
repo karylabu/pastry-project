@@ -15,7 +15,7 @@ class WasteLogController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
-        if ($response = $this->authorizeStaff($request)) return $response;
+        if ($response = $this->authorizeAdmin($request)) return $response;
 
         $entries = WasteLog::query()->with(['ingredient:id,name,unit', 'batch:id,batch_number'])
             ->where('item_type', 'Raw Material')->orderByDesc('datetime')->get()
@@ -33,7 +33,7 @@ class WasteLogController extends Controller
 
     public function catalogue(Request $request, InventoryService $inventory): JsonResponse
     {
-        if ($response = $this->authorizeStaff($request)) return $response;
+        if ($response = $this->authorizeAdmin($request)) return $response;
         $items = Ingredient::query()->with('batches.discardRequests')->orderBy('name')->get()->map(function (Ingredient $ingredient) use ($inventory) {
             return $ingredient->batches->map(fn ($batch) => [
                 'id' => (int) $ingredient->id,
@@ -54,7 +54,7 @@ class WasteLogController extends Controller
 
     public function store(CreateWasteRequest $request, InventoryService $inventory): JsonResponse
     {
-        if ($response = $this->authorizeStaff($request)) return $response;
+        if ($response = $this->authorizeAdmin($request)) return $response;
         try {
             $user = $this->getAuthenticatedUser($request);
             $waste = $inventory->recordWaste($request->validated(), (int) $user->id);
@@ -69,11 +69,11 @@ class WasteLogController extends Controller
         }
     }
 
-    private function authorizeStaff(Request $request): ?JsonResponse
+    private function authorizeAdmin(Request $request): ?JsonResponse
     {
         $user = $this->getAuthenticatedUser($request);
-        if (!$user) return response()->json(['success' => false, 'message' => 'Staff authorization required.'], 401);
-        if (!in_array(strtolower((string) $user->role), ['staff', 'manager', 'admin'], true)) return response()->json(['success' => false, 'message' => 'Staff authorization required.'], 403);
+        if (!$user) return response()->json(['success' => false, 'message' => 'Admin authorization required.'], 401);
+        if ($user->role !== 'admin') return response()->json(['success' => false, 'message' => 'Admin authorization required.'], 403);
         return null;
     }
 }
