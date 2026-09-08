@@ -343,6 +343,7 @@ export default function Orders() {
     try {
       const res = await fetch(`${CUSTOMER_BASE}/api_cancel_order.php`, {
         method: "POST",
+        credentials: "include",
         headers: {
           "Content-Type": "application/json",
           ...(user?.token ? { Authorization: `Bearer ${user.token}` } : {}),
@@ -352,6 +353,7 @@ export default function Orders() {
       const data = await safeParseJson(res);
       if (data.success) {
         updateLocalStatus(cancelTarget.id, "Cancelled");
+        setStatusFilter("Cancelled");
       } else {
         setActionError(data.message || "Failed to cancel order.");
       }
@@ -1038,12 +1040,11 @@ export default function Orders() {
                         </button>
                       )}
 
-                      {(isPending || isPreparing) && (
+                      {isPending && (
                         <button
                           onClick={() => setCancelTarget(order)}
-                          disabled={processingId === order.id || isPreparing}
+                          disabled={processingId === order.id}
                           className="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 px-3.5 py-2 text-[12px] font-semibold text-slate-900 hover:bg-gray-100 hover:border-gray-300 transition-colors disabled:opacity-40"
-                          title={isPreparing ? 'Preparing orders can no longer be cancelled' : undefined}
                         >
                           {processingId === order.id ? 'Cancelling…' : 'Cancel Order'}
                         </button>

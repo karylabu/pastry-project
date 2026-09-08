@@ -163,6 +163,20 @@ if (json_last_error() !== JSON_ERROR_NONE) {
 // This ensures the frontend can catch 422/4xx errors from PayMongo properly.
 if ($httpCode >= 200 && $httpCode < 300) {
     http_response_code(200);
+
+    $paymentData = $decoded['data'] ?? [];
+    $paymentReference = $paymentData['id'] ?? '';
+    $checkoutUrl = $paymentData['attributes']['checkout_url'] ?? '';
+    if ($paymentReference !== '' && $orderId !== null) {
+        $orderConn = @mysqli_connect('localhost', 'root', '', 'pastry_db');
+        if ($orderConn) {
+            $safeReference = mysqli_real_escape_string($orderConn, $paymentReference);
+            $safeCheckoutUrl = mysqli_real_escape_string($orderConn, $checkoutUrl);
+            $safeOrderId = (int) $orderId;
+            mysqli_query($orderConn, "UPDATE orders SET payment_status = 'pending', payment_reference = '$safeReference', payment_link = '$safeCheckoutUrl' WHERE id = $safeOrderId");
+            mysqli_close($orderConn);
+        }
+    }
 } else {
     // Log non-2xx responses from PayMongo for debugging
     @file_put_contents(

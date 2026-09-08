@@ -35,9 +35,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
                   c.inspo_images AS custom_inspo_images
            FROM orders o
            INNER JOIN custom_cake_orders c ON c.order_id = o.id
+           WHERE NOT (LOWER(o.payment) = 'gcash' AND LOWER(COALESCE(o.payment_status, 'pending')) <> 'paid')
            ORDER BY o.id DESC"
                 : "SELECT o.* FROM orders o
-                     WHERE NOT EXISTS (SELECT 1 FROM custom_cake_orders c WHERE c.order_id = o.id)
+                         WHERE NOT EXISTS (SELECT 1 FROM custom_cake_orders c WHERE c.order_id = o.id)
+                         AND NOT (LOWER(o.payment) = 'gcash' AND LOWER(COALESCE(o.payment_status, 'pending')) <> 'paid')
                      ORDER BY o.id DESC";
 
     $result = $conn->query($sql);

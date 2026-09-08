@@ -9,9 +9,6 @@ require_once __DIR__ . '/../includes/inventory.php';
 $user = requireApiRole(['customer']);
 
 header("Content-Type: application/json");
-header("Access-Control-Allow-Origin: *");
-header("Access-Control-Allow-Methods: POST, OPTIONS");
-header("Access-Control-Allow-Headers: Content-Type");
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     http_response_code(200);
@@ -60,7 +57,7 @@ try {
         exit;
     }
 
-    if (!in_array($row['status'], ['Pending', 'Confirmed', 'Preparing', 'To Receive'], true)) {
+    if ($row['status'] !== 'Pending') {
         $conn->rollback();
         http_response_code(409);
         echo json_encode(["success" => false, "message" => "This order can no longer be cancelled."]);

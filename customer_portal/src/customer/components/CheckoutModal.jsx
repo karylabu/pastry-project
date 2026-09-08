@@ -946,24 +946,28 @@ export default function CheckoutModal({
                 Payment Method
               </p>
 
-              <div className="flex gap-2">
-                {["GCash"].map((paymentOption) => (
+              <div className="grid gap-2 sm:grid-cols-2">
+                {[
+                  { value: "GCash", label: "Pay thru QR" },
+                  { value: "Counter", label: "Pay at the Counter" },
+                ].map((paymentOption) => (
                   <button
-                    key={paymentOption}
+                    key={paymentOption.value}
+                    type="button"
                     onClick={() =>
                       setCheckoutData({
                         ...checkoutData,
-                        payment: paymentOption,
+                        payment: paymentOption.value,
                       })
                     }
                     className={`flex-1 py-2 rounded-xl border text-sm font-medium transition-colors
                     ${
-                      checkoutData.payment === paymentOption
+                      checkoutData.payment === paymentOption.value
                         ? "border-[#d4af37] bg-[#fff4c7] text-slate-900"
                         : "bg-white text-gray-600"
                     }`}
                   >
-                    {paymentOption}
+                    {paymentOption.label}
                   </button>
                 ))}
               </div>
