@@ -5,7 +5,8 @@ import { useNavigate } from "react-router-dom";
 
 /* STAFF NAVBAR */
 import StaffNavbar from "../components/StaffNavbar";
-import { STAFF_BASE } from "../../services/config";
+import { STAFF_BASE, LARAVEL_BASE } from "../../services/config";
+import { safeParseJson } from "../../services/api";
 
 const staffFetch = (url, options = {}) => fetch(url, { credentials: "include", ...options });
 
@@ -308,6 +309,21 @@ export default function CustomCakes({ showNavbar = true }) {
       })
       .then(data => {
         if (data.success) {
+          const targetOrder = orders.find((order) => Number(order.id) === Number(id));
+          const customizedCakeOrderId = targetOrder?.customized_cake_order_id || targetOrder?.custom_details?.recipe_order_id;
+          if (status === "Confirmed" && customizedCakeOrderId) {
+            fetch(`${LARAVEL_BASE}/api/customized-cakes/consume-inventory`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json", Accept: "application/json" },
+              credentials: "include",
+              body: JSON.stringify({ customized_cake_order_id: customizedCakeOrderId, order_id: id }),
+            })
+              .then(safeParseJson)
+              .then((consumption) => {
+                if (!consumption?.success && !consumption?.consumed) addToast(`Order #${id} confirmed, but inventory was not consumed: ${consumption?.message || "review required"}`, "error");
+              })
+              .catch(() => addToast(`Order #${id} confirmed, but inventory consumption needs review.`, "error"));
+          }
           fetchOrders(true);
           if (selectedOrder?.id === id) {
             setSelectedOrder(null);

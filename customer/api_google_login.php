@@ -3,9 +3,20 @@
 
 // Force JSON headers to ensure Flutter receives structured data
 header('Content-Type: application/json');
-header('Access-Control-Allow-Origin: *');
+$request_origin = $_SERVER['HTTP_ORIGIN'] ?? '';
+$allowed_origins = [
+    'http://localhost:3000',
+    'http://127.0.0.1:3000',
+    'http://localhost:5173',
+    'http://127.0.0.1:5173',
+];
+if (in_array($request_origin, $allowed_origins, true)) {
+    header("Access-Control-Allow-Origin: {$request_origin}");
+    header('Access-Control-Allow-Credentials: true');
+    header('Vary: Origin');
+}
 header('Access-Control-Allow-Methods: POST, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type');
+header('Access-Control-Allow-Headers: Content-Type, Accept');
 
 // Disable HTML error reporting to prevent garbage text in JSON output
 ini_set('display_errors', 0);

@@ -1,12 +1,11 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { MessageCircle, X, Send, Bot, User, Headphones, Paperclip, ArrowLeft, Phone, Plus, History, Volume2, ChevronLeft, ChevronRight, Gift, Star, Tag } from "lucide-react";
-import { Link, useNavigate } from "react-router-dom";
+import { MessageCircle, X, Send, Bot, User, Headphones, Paperclip, ArrowLeft, Phone, Plus, History, ChevronLeft, ChevronRight, Gift, Star, Tag } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
-import ProductCard from "../components/ProductCard";
 import ProductModal from "../components/ProductModal";
 import CustomCakeModal from "../components/CustomCakeModal";
-import { CUSTOMER_BASE, LARAVEL_BASE, ROOT_BASE } from "../../services/config";
+import { CUSTOMER_BASE, ROOT_BASE } from "../../services/config";
 import { safeParseJson } from "../../services/api";
 
 /* =========================
@@ -22,34 +21,6 @@ const HERO_SLIDES = [
   {
     type: "video",
     src: "http://localhost/pastry-project/uploads/banner%282%29.mp4",
-  },
-  {
-    type: "image",
-    src: "http://localhost/pastry-project/uploads/banner%283%29.png",
-  },
-  {
-    type: "image",
-    src: "http://localhost/pastry-project/uploads/banner%284%29.png",
-  },
-  {
-    type: "image",
-    src: "http://localhost/pastry-project/uploads/banner%285%29.png",
-  },
-  {
-    type: "image",
-    src: "http://localhost/pastry-project/uploads/banner%286%29.png",
-  },
-  {
-    type: "image",
-    src: "http://localhost/pastry-project/uploads/banner%287%29.png",
-  },
-  {
-    type: "image",
-    src: "http://localhost/pastry-project/uploads/banner%288%29.png",
-  },
-  {
-    type: "video",
-    src: "http://localhost/pastry-project/uploads/banner%289%29.mp4",
   },
 ];
 
@@ -249,6 +220,22 @@ const resolveProductImage = (product) => {
   }
 
   return getCategoryFallbackImage(category);
+};
+
+const resolveCustomReferenceImage = (order) => {
+  let details = order?.custom_details;
+  if (typeof details === 'string') {
+    try { details = JSON.parse(details); } catch { details = null; }
+  }
+
+  let images = details?.inspo_images;
+  if (typeof images === 'string') {
+    try { images = JSON.parse(images); } catch { images = [images]; }
+  }
+  const image = Array.isArray(images) ? images[0] : '';
+  if (!image) return '';
+  if (/^(https?:|data:|blob:)/i.test(image)) return image;
+  return `${ROOT_BASE}/${String(image).replace(/^\/+/, '')}`;
 };
 
 function RecommendationCard({ product, onSelect }) {
@@ -822,19 +809,22 @@ export function ChatBubble({ aiMode = false, fullPage = false }) {
   );
 }
 
+const isCakeProduct = (product) => {
+  const productName = String(product?.name || '').toLowerCase();
+  const nonCakeName = /fries|pizza|pasta|coffee|latte|smoothie|\bade\b|fizz|fruit tea|nuggets|mojos|mozzarella|sandwich/i.test(productName);
+  return /\bcakes?\b/i.test(String(product?.category || '')) && !nonCakeName;
+};
+
 export function buildMustTryList(products = []) {
   const targets = [
     "ube flan",
     "sans rival",
-    "sansrival",
-    "tuna pasta",
-    "cheesy bacon fries",
-    "mojos hot",
-    "breakfast pizza"
+    "sansrival"
   ];
 
   const available = (Array.isArray(products) ? products : [])
     .filter((p) => p && p.name)
+    .filter(isCakeProduct)
     .map((p) => ({
       ...p,
       lowerName: String(p.name).toLowerCase().trim()
@@ -881,6 +871,7 @@ export default function Dashboard({ onAddToCart }) {
   const [products, setProducts] = useState([]);
   const [bestSellerProducts, setBestSellerProducts] = useState([]);
   const [recommendedProducts, setRecommendedProducts] = useState([]);
+  const [recentCompletedOrder, setRecentCompletedOrder] = useState(null);
   const [favoriteIds, setFavoriteIds] = useState([]);
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
   const [selectedProduct, setSelectedProduct]       = useState(null);
@@ -967,9 +958,29 @@ export default function Dashboard({ onAddToCart }) {
       }
     };
 
+    const fetchRecentCompletedOrder = async () => {
+      if (!userId) {
+        setRecentCompletedOrder(null);
+        return;
+      }
+
+      try {
+        const res = await fetch(`${CUSTOMER_BASE}/api_get_orders.php?user_id=${userId}`);
+        const data = await safeParseJson(res);
+        const completedOrder = (Array.isArray(data) ? data : [])
+          .filter((order) => String(order.status || '').toLowerCase() === 'completed')
+          .sort((a, b) => Number(b.id || 0) - Number(a.id || 0))[0] || null;
+        setRecentCompletedOrder(completedOrder);
+      } catch (err) {
+        console.error("Failed to load recent completed order:", err);
+        setRecentCompletedOrder(null);
+      }
+    };
+
     fetchProducts();
     fetchRecommendations();
     fetchBestSellers();
+    fetchRecentCompletedOrder();
     loadFavorites();
 
     const recommendationInterval = setInterval(fetchRecommendations, 10000);
@@ -990,12 +1001,22 @@ export default function Dashboard({ onAddToCart }) {
     setIsProductModalOpen(true);
   };
 
-  const bestSellers = bestSellerProducts;
+  const cakeRecommendations = recommendedProducts.filter(isCakeProduct);
+  const bestSellers = bestSellerProducts.filter(isCakeProduct);
 
   const mustTry = useMemo(() => buildMustTryList(products), [products]);
+  const recentOrderItem = (() => {
+    const item = recentCompletedOrder?.items?.[0];
+    if (!item) return null;
+    const catalogMatch = products.find((product) => (
+      String(product.name || '').trim().toLowerCase() === String(item.name || '').trim().toLowerCase()
+    ));
+    return catalogMatch ? { ...catalogMatch, ...item } : item;
+  })();
+  const recentOrderImage = resolveCustomReferenceImage(recentCompletedOrder) || resolveProductImage(recentOrderItem);
 
   return (
-    <div className="bg-white min-h-screen font-['DM_Sans'] relative">
+    <div className="min-h-screen bg-[#fbfaf5] font-['DM_Sans'] relative">
 
       {isWelcomeOpen && (
         <div className="fixed inset-0 z-[50000] flex items-center justify-center bg-black/55 px-4 py-6 backdrop-blur-[2px]" role="dialog" aria-modal="true" aria-labelledby="welcome-modal-title">
@@ -1027,134 +1048,130 @@ export default function Dashboard({ onAddToCart }) {
         onCustomizeNow={() => navigate("/customer/customized-cakes")}
       />
 
-      <div className="mx-auto max-w-[1584px] px-3 py-6 md:px-5 lg:px-6">
-
-        {/* LOYALTY BANNER */}
-        <section className="relative mb-10 px-0">
-          <div className="flex w-full flex-col items-center rounded-[12px] border border-[#e8dfc5] bg-[#f9f5ee] p-4 shadow-sm md:flex-row md:p-4 lg:px-5">
-
-            {/* Left: Branding */}
-            <div className="flex flex-1 items-center gap-5 border-b border-[#e8dfc5] pb-5 md:border-b-0 md:border-r md:pb-0 md:pr-8">
-              <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-[#e8dfc5]/50 text-[#c5a059]">
-                 <Gift size={28} />
-              </div>
-              <div>
-                 <p className="text-[11px] font-black uppercase tracking-[0.3em] text-[#c5a059]">Pastry Project Rewards</p>
-                 <h2 className="mt-1 text-2xl font-black tracking-tight text-[#171717] md:text-3xl">
-                   Every order comes <br />
-                   with a little extra.
-                 </h2>
-              </div>
-            </div>
-
-            {/* Middle: Perks */}
-            <div className="flex w-full flex-[2] flex-col justify-between py-6 sm:flex-row md:px-8 md:py-0">
-               <div className="flex flex-col items-center text-center">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full border border-[#e8dfc5] text-[#c5a059] mb-3">
-                     <Star size={21} />
-                  </div>
-                  <p className="text-lg font-black text-[#171717]">10 points</p>
-                  <p className="mx-auto mt-1 w-full text-center text-[13px] text-gray-500">Earn for every ₱100 spent.</p>
-               </div>
-
-               <div className="my-8 h-[1px] w-full bg-[#e8dfc5] sm:my-0 sm:h-16 sm:w-[1px]"></div>
-
-               <div className="flex flex-col items-center text-center">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full border border-[#e8dfc5] text-[#c5a059] mb-3">
-                     <Gift size={21} />
-                  </div>
-                  <p className="text-lg font-black text-[#171717]">1,000 points</p>
-                  <p className="mt-1 text-[13px] text-gray-500">Redeem for 5% OFF.</p>
-               </div>
-
-               <div className="my-8 h-[1px] w-full bg-[#e8dfc5] sm:my-0 sm:h-16 sm:w-[1px]"></div>
-
-               <div className="flex flex-col items-center text-center">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full border border-[#e8dfc5] text-[#c5a059] mb-3">
-                     <Tag size={21} />
-                  </div>
-                  <p className="text-lg font-black text-[#171717]">₱100 maximum</p>
-                  <p className="mt-1 text-[13px] text-gray-500">Discount cap per reward.</p>
-               </div>
-            </div>
-
-            {/* Right: Button */}
-            <div className="shrink-0 border-t border-[#e8dfc5] pt-5 md:border-t-0 md:border-l md:pt-0 md:pl-8">
-               <Link
-                  to="/customer/rewards"
-                  className="inline-flex items-center gap-2 rounded-lg bg-[#1a1a1a] px-6 py-3 text-[10px] font-black uppercase tracking-[0.18em] text-white transition-all hover:bg-black active:scale-95"
-               >
-                  My Rewards <ChevronRight size={14} />
-               </Link>
+      <main className="mx-auto max-w-[1380px] px-4 py-7 md:px-7 lg:px-10">
+        <section className="mb-8 grid gap-4 rounded-2xl border border-[#e7dfd0] bg-[#fbf7f0] px-5 py-5 shadow-[0_6px_18px_rgba(91,64,39,0.04)] md:grid-cols-[1.35fr_0.8fr_0.9fr_0.9fr_auto] md:items-center md:gap-0 md:px-6 md:py-4">
+          <div className="flex items-center gap-4 md:border-r md:border-[#e7dfd0] md:pr-6">
+            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-[#ead9bd] text-[#33251e]"><Gift size={27} strokeWidth={1.7} /></div>
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-[0.24em] text-[#9b7b3d]">Pastry Project Rewards</p>
+              <p className="mt-1 text-xl font-black leading-tight text-[#33251e]">Every order comes<br className="hidden lg:block" /> with a little extra.</p>
             </div>
           </div>
+          <div className="flex items-center gap-3 md:justify-center md:border-r md:border-[#e7dfd0] md:px-5">
+            <Star size={21} strokeWidth={1.6} className="text-[#9b7b3d]" />
+            <div><p className="text-base font-black text-[#33251e]">10 points</p><p className="text-[11px] text-[#74675f]">Earn for every<br />₱100 spent.</p></div>
+          </div>
+          <div className="flex items-center gap-3 md:justify-center md:border-r md:border-[#e7dfd0] md:px-5">
+            <Gift size={21} strokeWidth={1.6} className="text-[#9b7b3d]" />
+            <div><p className="text-base font-black text-[#33251e]">1,000 points</p><p className="text-[11px] text-[#74675f]">Redeem for<br />5% OFF.</p></div>
+          </div>
+          <div className="flex items-center gap-3 md:justify-center md:px-5">
+            <Tag size={21} strokeWidth={1.6} className="text-[#9b7b3d]" />
+            <div><p className="text-base font-black text-[#33251e]">₱100 maximum</p><p className="text-[11px] text-[#74675f]">Discount cap<br />per reward.</p></div>
+          </div>
+          <button type="button" onClick={() => navigate('/customer/rewards')} className="inline-flex items-center justify-center gap-1 rounded-lg bg-[#211914] px-4 py-3 text-[10px] font-black uppercase tracking-[0.12em] text-white hover:bg-black md:ml-2">
+            My Rewards <ChevronRight size={13} />
+          </button>
         </section>
 
-        {recommendedProducts.length > 0 && (
-          <section className="mb-10">
-            <div className="mb-3 flex items-end justify-between">
-              <div>
-                <p className="text-[#d4af37] text-[10px] uppercase tracking-[0.25em] font-black">Smart Picks</p>
-                <h2 className="mt-1 text-lg font-bold md:text-xl">Recommended for You</h2>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-2 md:grid-cols-3 lg:grid-cols-6 md:gap-2.5">
-              {recommendedProducts.map((product) => (
-                <RecommendationCard
-                  key={product.id}
-                  product={product}
-                  onSelect={handleSelectProduct}
-                />
-              ))}
-            </div>
-          </section>
-        )}
-
-        {/* BEST SELLERS */}
-        <section className="mb-10">
-          <div className="mb-3 flex items-end justify-between">
+        <section className="mb-9">
+          <div className="mb-4 flex items-end justify-between border-b border-[#e7dfd0] pb-3">
             <div>
-              <p className="text-[#d4af37] text-[10px] uppercase tracking-[0.25em] font-black">Customer Favorites</p>
-              <h2 className="mt-1 text-lg font-bold md:text-xl">Best Sellers</h2>
+              <p className="text-[10px] font-black uppercase tracking-[0.25em] text-[#9b7b3d]">Curated for you</p>
+              <h2 className="mt-1 font-serif text-2xl font-bold text-[#33251e] md:text-3xl">Just for You</h2>
+              <p className="mt-1 text-xs text-[#9b8c83]">Our customers' top picks. You might love these!</p>
             </div>
-            <button onClick={() => navigate("/customer/menu")} className="text-[8px] uppercase tracking-[0.18em] text-gray-400 hover:text-black font-semibold">
-              View Menu
+            <button type="button" onClick={() => navigate('/customer/menu')} className="inline-flex items-center gap-1 text-[10px] font-bold text-[#6f5844] hover:text-black">
+              View all cakes <ChevronRight size={13} />
             </button>
           </div>
-          <div className="grid grid-cols-2 gap-2 md:grid-cols-3 lg:grid-cols-6 md:gap-2.5">
-            {bestSellers.map(p => (
-            <RecommendationCard
-              key={p.id}
-              product={p}
-              onSelect={handleSelectProduct}
-            />
-          ))}
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-4 lg:grid-cols-6">
+            {(cakeRecommendations.length ? cakeRecommendations : bestSellers).slice(0, 4).map((product) => (
+              <RecommendationCard key={product.id} product={product} onSelect={handleSelectProduct} />
+            ))}
           </div>
         </section>
 
-        {/* MUST TRY */}
-        <section className="pb-6">
-          <div className="mb-3 flex items-end justify-between">
+        <section className="mb-9">
+          <div className="mb-4 flex items-end justify-between border-b border-[#e7dfd0] pb-3">
             <div>
-              <p className="text-[#d4af37] text-[10px] uppercase tracking-[0.25em] font-black">Chef Recommendation</p>
-              <h2 className="mt-1 text-lg font-bold md:text-xl">Must Try</h2>
+              <p className="text-[10px] font-black uppercase tracking-[0.25em] text-[#9b7b3d]">Customer favorites</p>
+              <h2 className="mt-1 font-serif text-2xl font-bold text-[#33251e] md:text-3xl">Best Sellers</h2>
             </div>
-            <button onClick={() => navigate("/customer/menu")} className="text-[8px] uppercase tracking-[0.18em] text-gray-400 hover:text-black font-semibold">
-              Explore More
+            <button type="button" onClick={() => navigate('/customer/menu')} className="inline-flex items-center gap-1 text-[10px] font-bold text-[#6f5844] hover:text-black">
+              View all cakes <ChevronRight size={13} />
             </button>
           </div>
-          <div className="grid grid-cols-2 gap-2 md:grid-cols-3 lg:grid-cols-6 md:gap-2.5">
-            {mustTry.map(p => (
-            <RecommendationCard
-              key={p.id}
-              product={p}
-              onSelect={handleSelectProduct}
-            />
-          ))}
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-4 lg:grid-cols-6">
+            {bestSellers.slice(0, 6).map((product) => (
+              <RecommendationCard key={product.id} product={product} onSelect={handleSelectProduct} />
+            ))}
           </div>
         </section>
-      </div>
+
+        <section className="mb-9">
+          <div className="mb-4 flex items-end justify-between border-b border-[#e7dfd0] pb-3">
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-[0.25em] text-[#9b7b3d]">Chef recommendation</p>
+              <h2 className="mt-1 font-serif text-2xl font-bold text-[#33251e] md:text-3xl">Must Try</h2>
+            </div>
+            <button type="button" onClick={() => navigate('/customer/menu')} className="inline-flex items-center gap-1 text-[10px] font-bold text-[#6f5844] hover:text-black">
+              Explore menu <ChevronRight size={13} />
+            </button>
+          </div>
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-4 lg:grid-cols-6">
+            {mustTry.slice(0, 6).map((product) => (
+              <RecommendationCard key={product.id} product={product} onSelect={handleSelectProduct} />
+            ))}
+          </div>
+        </section>
+
+        <section className="grid gap-4 pb-5 md:grid-cols-[1fr_1.2fr]">
+          <div className="rounded-2xl border border-[#e7dfd0] bg-white p-4 shadow-[0_8px_22px_rgba(91,64,39,0.05)] sm:p-5">
+            <div className="mb-4 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="h-1 w-7 rounded-full bg-[#b9955d]" />
+                <h2 className="font-serif text-xl font-bold text-[#33251e]">Recent Order</h2>
+              </div>
+              <button type="button" onClick={() => navigate('/customer/orders')} className="inline-flex items-center gap-1 text-[10px] font-bold text-[#6f5844] hover:text-black">
+                View All Orders <ChevronRight size={13} />
+              </button>
+            </div>
+            {recentCompletedOrder && recentOrderItem ? (
+              <div className="flex flex-col gap-4 rounded-xl border border-[#f0e9df] bg-[#fdfcf9] p-3 sm:flex-row sm:items-center sm:px-4">
+                <img src={recentOrderImage} alt={recentOrderItem.name || 'Completed order'} className="h-20 w-20 shrink-0 rounded-xl bg-[#f5eee5] object-contain p-1" />
+                <div className="min-w-0 flex-1">
+                  <h3 className="truncate text-base font-bold text-[#33251e]">{recentOrderItem.name || 'Your recent order'}</h3>
+                  <p className="mt-1 text-sm font-semibold text-[#33251e]">₱{Number(recentCompletedOrder.total || recentOrderItem.price || 0).toLocaleString()}</p>
+                  <p className="mt-1 text-xs text-[#9b8c83]">Order #{recentCompletedOrder.id} <span className="mx-1">·</span> {recentCompletedOrder.created_at ? new Date(recentCompletedOrder.created_at).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' }) : 'Recently'}</p>
+                </div>
+                <div className="flex items-center gap-3 sm:ml-auto">
+                  <span className="rounded-full bg-[#fff0c7] px-4 py-2 text-xs font-semibold text-[#a47729]">{recentCompletedOrder.status || 'Completed'}</span>
+                  <button type="button" onClick={() => navigate('/customer/orders')} className="rounded-full border border-[#d9c9b8] px-4 py-2 text-xs font-semibold text-[#6f5844] hover:bg-[#f8f1e8]">View Details</button>
+                </div>
+              </div>
+            ) : (
+              <p className="rounded-xl border border-dashed border-[#e7dfd0] px-4 py-7 text-center text-xs text-[#9b8c83]">No completed orders yet.</p>
+            )}
+          </div>
+          <div className="relative min-h-[150px] overflow-hidden rounded-2xl border border-[#d3b58e] bg-[#f3e5d1] px-6 py-5 text-[#33251e] shadow-[0_8px_22px_rgba(91,64,39,0.06)]">
+            <div className="pointer-events-none absolute -right-8 -top-12 h-44 w-44 rotate-12 border-[18px] border-[#e5cba8] opacity-70" />
+            <div className="pointer-events-none absolute bottom-0 right-0 h-3 w-2/5 bg-[#c79c67] opacity-35" />
+            <div className="relative z-10 max-w-[310px]">
+              <p className="text-[9px] font-black uppercase tracking-[0.25em] text-[#87633e]">A sweet little extra</p>
+              <h2 className="mt-1 font-serif text-2xl font-bold leading-tight">Enjoy <span className="text-[#8f5f32]">10% Off</span><br />Your Next Order</h2>
+              <p className="mt-1 text-xs text-[#806c59]">Treat yourself to something freshly baked.</p>
+              <button type="button" onClick={() => navigate('/customer/menu')} className="mt-3 inline-flex items-center gap-1 rounded-full bg-[#33251e] px-4 py-2 text-[10px] font-bold text-white shadow-sm hover:bg-[#5b3b28]">
+                Shop now <ChevronRight size={12} />
+              </button>
+            </div>
+            <div className="absolute bottom-4 right-6 z-10 hidden text-right sm:block">
+              <p className="font-serif text-5xl font-black leading-none text-[#8f5f32]">10%</p>
+              <p className="mt-1 text-[9px] font-black uppercase tracking-[0.2em] text-[#87633e]">off your order</p>
+            </div>
+          </div>
+        </section>
+      </main>
 
       {/* STAFF-CUSTOMER CHAT */}
       <ChatBubble />

@@ -21,9 +21,11 @@ class Cors
             'http://localhost:3000',
             'http://localhost:3001',
             'http://localhost:3002',
+            'http://localhost',
             'http://127.0.0.1:3000',
             'http://127.0.0.1:3001',
             'http://127.0.0.1:3002',
+            'http://127.0.0.1',
         ];
 
         if ($origin && in_array($origin, $allowedOrigins, true)) {
@@ -31,7 +33,7 @@ class Cors
             $response->headers->set('Vary', 'Origin');
             $response->headers->set('Access-Control-Allow-Credentials', 'true');
             $response->headers->set('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
-            $response->headers->set('Access-Control-Allow-Headers', 'Content-Type, Accept, X-Requested-With, X-CSRF-TOKEN');
+            $response->headers->set('Access-Control-Allow-Headers', 'Authorization, Content-Type, Accept, X-Requested-With, X-CSRF-TOKEN, X-User-Id, X-Auth-Token');
         }
 
         return $response;

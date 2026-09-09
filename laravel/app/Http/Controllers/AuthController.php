@@ -76,10 +76,17 @@ class AuthController extends Controller
             return $this->googleCorsResponse(['success' => false, 'message' => 'Firebase ID token is required.'], 422);
         }
 
-        $firebaseResponse = Http::asJson()->post(
-            'https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=' . config('services.firebase.api_key'),
-            ['idToken' => $idToken]
-        );
+        try {
+            $firebaseResponse = $this->firebaseHttpClient()->asJson()->post(
+                'https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=' . config('services.firebase.api_key'),
+                ['idToken' => $idToken]
+            );
+        } catch (\Throwable $e) {
+            return $this->googleCorsResponse([
+                'success' => false,
+                'message' => 'Firebase verification could not run because the PHP CA bundle is missing or invalid. Please configure XAMPP PHP with a valid cacert.pem and restart Apache.',
+            ], 500);
+        }
 
         if (!$firebaseResponse->successful()) {
             return $this->googleCorsResponse(['success' => false, 'message' => 'Firebase Google sign-in token is invalid.'], 401);
@@ -125,6 +132,26 @@ class AuthController extends Controller
         session(['user' => $userData]);
 
         return $this->googleCorsResponse(['success' => true, 'user' => $userData]);
+    }
+
+    private function firebaseHttpClient()
+    {
+        $candidatePaths = [
+            env('PHP_CACERT_PATH'),
+            env('FIREBASE_CA_BUNDLE'),
+            'C:\\xampp\\php\\extras\\ssl\\cacert.pem',
+            'C:\\xampp\\apache\\bin\\curl-ca-bundle.crt',
+            'C:\\Users\\Jerickson Abistado\\cacert.pem',
+            'C:\\Users\\Jerickson Abistado\\AppData\\Local\\Microsoft\\WinGet\\Packages\\PHP.PHP.8.2_Microsoft.Winget.Source_8wekyb3d8bbwe\\cacert.pem',
+        ];
+
+        foreach ($candidatePaths as $path) {
+            if (is_string($path) && trim($path) !== '' && file_exists($path)) {
+                return Http::withOptions(['verify' => $path]);
+            }
+        }
+
+        throw new \RuntimeException('No valid cacert.pem CA bundle was found for PHP cURL. Configure C:\\xampp\\php\\php.ini with curl.cainfo and openssl.cafile, then restart Apache.');
     }
 
     private function googleCorsResponse(array $payload, int $status = 200)

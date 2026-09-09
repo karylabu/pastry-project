@@ -273,6 +273,7 @@ class InventoryService
     {
         return Ingredient::query()
             ->select(['id', 'name', 'unit', 'stock', 'threshold', 'created_at', 'updated_at'])
+            ->where('name', 'not like', '[DEV]%')
             ->with('batches')
             ->orderBy('name')
             ->get()

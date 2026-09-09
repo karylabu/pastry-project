@@ -8,7 +8,7 @@ import { signInWithGoogle } from "../../services/firebase";
 
 // ✅ CORRECT
 const BASE = CUSTOMER_BASE;
-const LOGO_URL = "http://localhost/pastry-project/uploads/logo.png?v=logo-v2";
+const LOGO_URL = "/assets/logo.png";
 const REGISTER_URL = "/customer/register";
 const isCustomerRole = (role) => {
   const normalizedRole = String(role || '').trim().toLowerCase();
@@ -63,6 +63,7 @@ export default function Login() {
         response = await fetch(`${CUSTOMER_BASE}/api_google_login.php`, {
           method: "POST",
           headers: { "Content-Type": "application/json", Accept: "application/json" },
+          credentials: "include",
           body: JSON.stringify(googlePayload),
         });
         data = await safeParseJson(response);
@@ -112,6 +113,7 @@ export default function Login() {
       const res  = await fetch(`${BASE}/api_login.php`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({ email, password }),
       });
       const data = await safeParseJson(res);
@@ -164,7 +166,7 @@ export default function Login() {
         .brand-script { font-family: 'Pacifico', cursive; }
         .pastry-login { background: #fcfbf8; }
         .pastry-login .login-banner { position: absolute; z-index: 0; top: 0; left: 0; height: calc(100% - 105px); width: auto; max-width: none; object-fit: contain; object-position: left top; }
-        .pastry-login .brand-icon-overlay { position: absolute; z-index: 11; top: 8.8%; left: 5.8%; width: 58px; height: 58px; object-fit: contain; background: transparent; mix-blend-mode: multiply; }
+        .pastry-login .brand-icon-overlay { display: none; }
 
         /* Background Blobs */
         .blob-yellow-top { position: absolute; top: -190px; left: -160px; width: 390px; height: 390px; border-radius: 50%; background: #f4bd2f; z-index: 0; opacity: .95; }
@@ -223,15 +225,15 @@ export default function Login() {
         .pastry-login .blob-yellow-top, .pastry-login .blob-black-left, .pastry-login .blob-yellow-bottom, .pastry-login .bg-icon { display: none; }
         .pastry-login .hero-panel { visibility: hidden; }
         .pastry-login .login-card { position: relative; }
-        @media (max-width: 767px) { .pastry-login { background-size: auto 48%; background-position: left top; } .pastry-login .brand-icon-overlay { top: 22px; left: 22px; width: 44px; height: 44px; } }
+        @media (max-width: 767px) { .pastry-login { background-size: auto 48%; background-position: left top; } .pastry-login .login-banner { display: none; } .pastry-login .brand-icon-overlay { top: 22px; left: 22px; width: 44px; height: 44px; } }
       `}</style>
 
       {/* Background Decorations */}
       <div className="blob-yellow-top" />
       <div className="blob-black-left" />
       <div className="blob-yellow-bottom" />
-      <img className="login-banner" src="http://localhost/pastry-project/uploads/login.jpg" alt="" aria-hidden="true" />
-      <img className="brand-icon-overlay" src="http://localhost/pastry-project/uploads/logo.png?v=logo-v2" alt="Pastry Project logo" />
+      <img className="login-banner" src="http://localhost/pastry-project/uploads/login.jpg?v=login-v1" alt="" aria-hidden="true" />
+      <img className="brand-icon-overlay" src={LOGO_URL} alt="Pastry Project logo" />
 
       <div className="bg-icon icon-croissant">🥐</div>
       <div className="bg-icon icon-whisk">🍳</div>

@@ -4,12 +4,17 @@ import { LARAVEL_BASE, STAFF_BASE } from "../../services/config";
 
 const staffFetch = (url, options = {}) => fetch(url, { credentials: "include", ...options });
 const laravelStaffFetch = (url, options = {}) => {
-  let token = '';
-  try { token = JSON.parse(localStorage.getItem('user') || 'null')?.token || ''; } catch (_) { /* no-op */ }
+  let user = null;
+  try { user = JSON.parse(localStorage.getItem('user') || 'null'); } catch (_) { /* no-op */ }
+  const token = user?.token || '';
   return fetch(url, {
     credentials: 'include',
     ...options,
-    headers: { ...(options.headers || {}), ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+    headers: {
+      ...(options.headers || {}),
+      ...(token ? { Authorization: `Bearer ${token}`, 'X-Auth-Token': token } : {}),
+      ...(user?.id ? { 'X-User-Id': String(user.id) } : {}),
+    },
   });
 };
 
@@ -44,6 +49,8 @@ export default function Ingredients({
   const [batchSubmitting, setBatchSubmitting] = useState(false);
   const [ingredientSearch, setIngredientSearch] = useState('');
   const [pendingRequests, setPendingRequests] = useState([]);
+  const [cakeRecipes, setCakeRecipes] = useState([]);
+  const [selectedCakeFlavor, setSelectedCakeFlavor] = useState(null);
   const currentUser = (() => { try { return JSON.parse(window.localStorage.getItem('user') || 'null'); } catch (e) { return null; } })();
   const canApproveDiscard = ['admin', 'administrator', 'superadmin', 'super_admin', 'manager', 'owner'].includes(String(currentUser?.role || '').toLowerCase());
 
@@ -56,6 +63,11 @@ export default function Ingredients({
         // ignore sync errors; still attempt to load existing ingredients
       }
       loadIngredients();
+      try {
+        const response = await fetch(`${LARAVEL_BASE}/api/customized-cakes/recipes`, { headers: { Accept: 'application/json' } });
+        const data = await response.json();
+        setCakeRecipes(data.success ? data.recipes || [] : []);
+      } catch (e) { setCakeRecipes([]); }
       if (canApproveDiscard) loadPendingRequests();
     })();
   }, [canApproveDiscard]);
@@ -86,7 +98,7 @@ export default function Ingredients({
       .then((res) => res.json())
       .then((data) => {
         if (data.success) {
-          setIngredients(data.ingredients || []);
+          setIngredients((data.ingredients || []).filter((ingredient) => !String(ingredient.name || '').startsWith('[DEV]')));
         } else {
           setIngredients([]);
         }
@@ -345,6 +357,10 @@ export default function Ingredients({
   const filteredIngredients = useMemo(() => {
     const term = query.trim().toLowerCase();
     let res = ingredients.slice();
+    if (selectedCakeFlavor) {
+      const recipeIngredientIds = new Set((selectedCakeFlavor.ingredients || []).map((line) => Number(line.ingredient_id)));
+      res = res.filter((item) => recipeIngredientIds.has(Number(item.id)));
+    }
     if (term) {
       res = res.filter((item) =>
         item.name?.toLowerCase().includes(term) ||
@@ -365,7 +381,7 @@ export default function Ingredients({
     else if (sortBy === 'threshold') res.sort((a,b) => Number(b.threshold || 0) - Number(a.threshold || 0));
     else res.sort((a,b) => String(a.name || '').localeCompare(String(b.name || '')));
     return res;
-  }, [ingredients, query, showLowOnly, showExpiredOnly, unitFilter, sortBy]);
+  }, [ingredients, query, showLowOnly, showExpiredOnly, unitFilter, sortBy, selectedCakeFlavor]);
 
   return (
     <div className="min-h-screen bg-white">
@@ -377,6 +393,11 @@ export default function Ingredients({
           <h1 className="text-[26px] font-bold text-black">Ingredients Stock</h1>
           <p className="text-[13px] text-black/60">Keep ingredient inventory visible and ready for replenishment.</p>
         </div>
+
+        {cakeRecipes.length > 0 && <section className="mb-6 rounded-2xl border border-black/10 bg-[#fffdf7] p-5 shadow-sm">
+          <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#9a7411]">Cake Flavor</p>
+          <div className="mt-3 flex flex-wrap gap-2">{cakeRecipes.map((recipe) => <button key={recipe.id} type="button" onClick={() => setSelectedCakeFlavor(recipe)} className={`rounded-xl border px-4 py-2 text-sm font-semibold transition ${selectedCakeFlavor?.id === recipe.id ? 'border-[#D4AF37] bg-[#D4AF37]/20 text-black' : 'border-black/10 bg-white text-black/70 hover:border-[#D4AF37]'}`}>{recipe.flavor_name}</button>)}</div>
+        </section>}
 
         <div className="mb-6 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div className="text-[12px] text-black/60">
@@ -443,7 +464,7 @@ export default function Ingredients({
                 </thead>
                 <tbody>
                   {filteredIngredients.map((item) => {
-                    const isExpired = Boolean(item.has_expired_batches);
+                    const isExpired = Boolean(item.has_expired_batches) && Number(item.usable_stock) <= 0;
                     const thresholdInvalid = Number(item.threshold) <= 0;
                     const low = !thresholdInvalid && Number(item.usable_stock) <= Number(item.threshold || 0);
                     const rowClass = isExpired
@@ -460,10 +481,10 @@ export default function Ingredients({
                           <div className="flex flex-col gap-1">
                             <span>{item.name}</span>
                             <div className="flex flex-wrap gap-2">
-                              {Number(item.discarded_batch_count) > 0 && Number(item.expired_batch_count) === 0 && Number(item.pending_discard_count) === 0 && (
+                              {Number(item.discarded_batch_count) > 0 && Number(item.usable_stock) <= 0 && Number(item.expired_batch_count) === 0 && Number(item.pending_discard_count) === 0 && (
                                 <span className="inline-flex items-center rounded-full bg-gray-200 text-gray-700 px-2 py-1 text-[11px] font-semibold">Discarded</span>
                               )}
-                              {(isExpired || Number(item.expired_batch_count) > 0) && Number(item.discarded_batch_count) === 0 && (
+                              {isExpired && Number(item.discarded_batch_count) === 0 && (
                                 <span className="inline-flex items-center rounded-full bg-red-100 text-red-700 px-2 py-1 text-[11px] font-semibold">Expired</span>
                               )}
                               {Number(item.pending_discard_count) > 0 && <span className="inline-flex items-center rounded-full bg-blue-100 text-blue-800 px-2 py-1 text-[11px] font-semibold">Pending Approval</span>}
@@ -488,8 +509,8 @@ export default function Ingredients({
                         </td>
                         <td className="px-6 py-4">
                           <div className="flex items-center gap-2">
-                            {!(isExpired || Number(item.expired_batch_count) > 0 || Number(item.discarded_batch_count) > 0 || Number(item.pending_discard_count) > 0) && <button onClick={() => openModal('edit', item)} className="rounded-md bg-black text-white px-2 py-1 text-xs font-semibold">Edit</button>}
-                            {(isExpired || Number(item.expired_batch_count) > 0) && Number(item.discarded_batch_count) === 0 && Number(item.pending_discard_count) === 0 && <button onClick={() => openModal('history', item)} className="rounded-md bg-red-100 text-red-800 px-2 py-1 text-xs">Discard</button>}
+                            {Number(item.usable_stock) > 0 && Number(item.pending_discard_count) === 0 && <button onClick={() => openModal('edit', item)} className="rounded-md bg-black text-white px-2 py-1 text-xs font-semibold">Edit</button>}
+                            {isExpired && Number(item.discarded_batch_count) === 0 && Number(item.pending_discard_count) === 0 && <button onClick={() => openModal('history', item)} className="rounded-md bg-red-100 text-red-800 px-2 py-1 text-xs">Discard</button>}
                             <button onClick={() => openModal('history', item)} className="rounded-md bg-gray-100 text-black px-2 py-1 text-xs">History</button>
                           </div>
                         </td>
