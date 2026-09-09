@@ -67,6 +67,7 @@ const NAV_GROUPS = [
       { name: "Live Orders", path: "/admin/orders", icon: ShoppingBag },
       { name: "Order History", path: "/admin/orders/history", icon: History },
       { name: "Custom Cake Requests", path: "/admin/custom-cakes", icon: CakeSlice },
+      { name: "Custom Cake Recipes", path: "/admin/custom-cake-recipes", icon: CakeSlice },
       { name: "Schedule", path: "/admin/schedule", icon: CalendarDays },
     ],
   },

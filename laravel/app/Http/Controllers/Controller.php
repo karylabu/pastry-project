@@ -21,6 +21,9 @@ abstract class Controller
 
         $token = $request->bearerToken();
         if (!$token) {
+            $token = $request->header('X-Auth-Token');
+        }
+        if (!$token) {
             $token = $request->input('token'); // Also support as param
         }
 
@@ -48,7 +51,7 @@ abstract class Controller
         }
 
         // 4. Fallback to user_id in request (for debugging/migration)
-        $userId = $request->input('user_id');
+        $userId = $request->input('user_id') ?: $request->header('X-User-Id');
         if ($userId) {
             return User::find($userId);
         }

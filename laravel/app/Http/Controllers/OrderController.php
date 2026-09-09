@@ -8,6 +8,7 @@ use App\Models\CustomCakeOrder;
 use App\Models\Product;
 use App\Models\User;
 use App\Http\Requests\StoreOrderRequest;
+use App\Services\CustomizedCakeService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
@@ -15,6 +16,10 @@ use Illuminate\Support\Facades\Log;
 
 class OrderController extends Controller
 {
+    public function __construct(private CustomizedCakeService $customizedCakeService)
+    {
+    }
+
     /**
      * Display a listing of orders for the authenticated user.
      */
@@ -312,6 +317,28 @@ class OrderController extends Controller
 
         $oldStatus = (string) $order->status;
         $newStatus = (string) $request->status;
+
+        if (in_array(strtolower($newStatus), ['confirmed', 'approved', 'preparing'], true)) {
+            $customizedCakeOrder = DB::table('customized_cake_orders')
+                ->where('order_id', $order->id)
+                ->first();
+
+            if ($customizedCakeOrder) {
+                try {
+                    $this->customizedCakeService->consumeOrderInventory(
+                        (int) $customizedCakeOrder->id,
+                        (int) $order->id,
+                        (int) $user->id
+                    );
+                } catch (\RuntimeException $exception) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => $exception->getMessage(),
+                    ], 409);
+                }
+            }
+        }
+
         $order->update(['status' => $newStatus]);
 
         // Notify customer about status change

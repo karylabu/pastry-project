@@ -11,11 +11,23 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('users', function (Blueprint $table) {
-            $table->enum('role', ['admin', 'manager', 'staff', 'customer'])->default('customer')->after('email');
-            $table->enum('status', ['active', 'inactive', 'banned'])->default('active')->after('role');
-            $table->string('phone_number')->nullable()->after('status');
-        });
+        if (! Schema::hasColumn('users', 'role')) {
+            Schema::table('users', function (Blueprint $table) {
+                $table->enum('role', ['admin', 'manager', 'staff', 'customer'])->default('customer')->after('email');
+            });
+        }
+
+        if (! Schema::hasColumn('users', 'status')) {
+            Schema::table('users', function (Blueprint $table) {
+                $table->enum('status', ['active', 'inactive', 'banned'])->default('active')->after('role');
+            });
+        }
+
+        if (! Schema::hasColumn('users', 'phone_number')) {
+            Schema::table('users', function (Blueprint $table) {
+                $table->string('phone_number')->nullable()->after('status');
+            });
+        }
     }
 
     /**
@@ -23,8 +35,24 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('users', function (Blueprint $table) {
-            $table->dropColumn(['role', 'status', 'phone_number']);
-        });
+        $columns = [];
+
+        if (Schema::hasColumn('users', 'role')) {
+            $columns[] = 'role';
+        }
+
+        if (Schema::hasColumn('users', 'status')) {
+            $columns[] = 'status';
+        }
+
+        if (Schema::hasColumn('users', 'phone_number')) {
+            $columns[] = 'phone_number';
+        }
+
+        if ($columns !== []) {
+            Schema::table('users', function (Blueprint $table) use ($columns) {
+                $table->dropColumn($columns);
+            });
+        }
     }
 };

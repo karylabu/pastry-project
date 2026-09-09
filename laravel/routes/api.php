@@ -14,10 +14,13 @@ use App\Http\Controllers\Api\DiscardRequestController;
 use App\Http\Controllers\Api\WasteLogController;
 use App\Http\Controllers\Api\RecipeController;
 use App\Http\Controllers\Api\ProductionController;
+use App\Http\Controllers\Api\CustomizedCakeController;
 use App\Http\Controllers\SalesImportController;
 use App\Http\Controllers\NewsletterController;
 use App\Http\Controllers\StaffApiController;
 use App\Http\Controllers\AuthController;
+
+Route::options('{any}', fn () => response()->noContent())->where('any', '.*');
 
 Route::get('products', [ProductController::class, 'index']);
 Route::match(['get', 'options'], 'staff/dashboard', [StaffApiController::class, 'getDashboard']);
@@ -53,6 +56,19 @@ Route::get('staff/products/{product}/recipe', [RecipeController::class, 'show'])
 Route::put('staff/products/{product}/recipe', [RecipeController::class, 'update']);
 Route::get('staff/production/availability/{product}', [ProductionController::class, 'availability']);
 Route::post('staff/production', [ProductionController::class, 'store']);
+
+Route::get('customized-cakes/flavors', [CustomizedCakeController::class, 'flavors']);
+Route::get('customized-cakes/sizes', [CustomizedCakeController::class, 'sizes']);
+Route::get('customized-cakes/recipes', [CustomizedCakeController::class, 'recipes']);
+Route::get('staff/customized-cakes/catalog', [CustomizedCakeController::class, 'adminCatalog']);
+Route::post('staff/customized-cakes/flavors', [CustomizedCakeController::class, 'saveFlavor']);
+Route::patch('staff/customized-cakes/flavors/{flavor}/toggle', [CustomizedCakeController::class, 'toggleFlavor']);
+Route::post('staff/customized-cakes/sizes', [CustomizedCakeController::class, 'saveSize']);
+Route::patch('staff/customized-cakes/sizes/{size}/toggle', [CustomizedCakeController::class, 'toggleSize']);
+Route::put('staff/customized-cakes/recipes', [CustomizedCakeController::class, 'saveRecipe']);
+Route::post('customized-cakes/preview', [CustomizedCakeController::class, 'preview']);
+Route::post('customized-cakes/order', [CustomizedCakeController::class, 'storeOrder']);
+Route::post('customized-cakes/consume-inventory', [CustomizedCakeController::class, 'consume']);
 
 Route::middleware(['api'])->group(function () {
     Route::apiResource('users', UserController::class);

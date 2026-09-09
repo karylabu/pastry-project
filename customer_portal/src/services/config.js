@@ -38,8 +38,9 @@ export const CUSTOMER_BASE = process.env.REACT_APP_CUSTOMER_BASE || (
   useXampp ? `${devBase}/customer` : `${prodBase}`
 );
 export const ROOT_BASE = useXampp ? devBase : prodRootBase;
+const localLaravelDevServer = 'http://localhost/pastry-project/laravel/public';
 export const LARAVEL_BASE = process.env.REACT_APP_LARAVEL_BASE || (
-  useXampp ? `${devBase}/laravel/public` : `${prodRootBase}/laravel/public`
+  useXampp ? localLaravelDevServer : `${prodRootBase}/laravel/public`
 );
 export const STAFF_BASE = process.env.REACT_APP_STAFF_BASE || (
   useXampp ? `${devBase}/staff` : `${prodBase}/staff`

@@ -25,6 +25,7 @@ if ($conn->connect_error) {
 if ($_SERVER['REQUEST_METHOD'] === 'GET') {
 
     $customOnly = isset($_GET['custom']) && (strval($_GET['custom']) === '1' || strtolower(strval($_GET['custom'])) === 'true');
+    $hasCustomizedRecipeOrders = $conn->query("SHOW TABLES LIKE 'customized_cake_orders'")->num_rows > 0;
     $sql = $customOnly
         ? "SELECT o.*, c.cake_size AS custom_cake_size, c.quantity AS custom_quantity,
                   c.flavor AS custom_flavor, c.filling AS custom_filling,
@@ -32,13 +33,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
                   c.theme_design AS custom_theme_design, c.preferred_colors AS custom_preferred_colors,
                   c.tiers AS custom_tiers, c.dedication AS custom_dedication,
                   c.notes AS custom_notes, c.estimated_price AS custom_estimated_price,
-                  c.inspo_images AS custom_inspo_images
+                  c.inspo_images AS custom_inspo_images,
+                  " . ($hasCustomizedRecipeOrders ? "cc.id AS customized_cake_order_id, cc.cake_type AS customized_cake_type, cc.status AS customized_cake_status, cc.notes AS customized_cake_notes" : "NULL AS customized_cake_order_id, NULL AS customized_cake_type, NULL AS customized_cake_status, NULL AS customized_cake_notes") . "
            FROM orders o
-           INNER JOIN custom_cake_orders c ON c.order_id = o.id
-           WHERE NOT (LOWER(o.payment) = 'gcash' AND LOWER(COALESCE(o.payment_status, 'pending')) <> 'paid')
+           LEFT JOIN custom_cake_orders c ON c.order_id = o.id
+           " . ($hasCustomizedRecipeOrders ? "LEFT JOIN customized_cake_orders cc ON cc.order_id = o.id" : "") . "
+           WHERE (c.order_id IS NOT NULL " . ($hasCustomizedRecipeOrders ? "OR cc.order_id IS NOT NULL" : "") . ")
+             AND NOT (LOWER(o.payment) = 'gcash' AND LOWER(COALESCE(o.payment_status, 'pending')) <> 'paid')
            ORDER BY o.id DESC"
                 : "SELECT o.* FROM orders o
-                         WHERE NOT EXISTS (SELECT 1 FROM custom_cake_orders c WHERE c.order_id = o.id)
+                         WHERE NOT EXISTS (SELECT 1 FROM custom_cake_orders c WHERE c.order_id = o.id)" . ($hasCustomizedRecipeOrders ? " AND NOT EXISTS (SELECT 1 FROM customized_cake_orders cc WHERE cc.order_id = o.id)" : "") . "
                          AND NOT (LOWER(o.payment) = 'gcash' AND LOWER(COALESCE(o.payment_status, 'pending')) <> 'paid')
                      ORDER BY o.id DESC";
 
@@ -77,6 +81,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
                 'tiers' => $row['custom_tiers'] ?? '',
                 'custom_message' => $row['custom_dedication'] ?? '',
                 'estimated_price' => $row['custom_estimated_price'] ?? '',
+                'cake_type' => $row['customized_cake_type'] ?? '',
+                'recipe_order_id' => $row['customized_cake_order_id'] ?? '',
+                'recipe_status' => $row['customized_cake_status'] ?? '',
             ];
 
             $row['custom_details'] = $customDetails;
