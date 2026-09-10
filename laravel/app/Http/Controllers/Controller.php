@@ -9,8 +9,7 @@ use Illuminate\Support\Facades\DB;
 abstract class Controller
 {
     /**
-     * Helper to get authenticated user from either Laravel session,
-     * Bearer token (hex), or Bearer token (base64 legacy).
+     * Helper to get authenticated user from Laravel auth or a valid session token.
      */
     protected function getAuthenticatedUser(Request $request)
     {
@@ -37,20 +36,6 @@ abstract class Controller
             if ($session) {
                 return User::find($session->user_id);
             }
-
-            // 3. Try legacy base64 token
-            try {
-                $decoded = json_decode(base64_decode($token), true);
-                if ($decoded && isset($decoded['id'])) {
-                    return User::find($decoded['id']);
-                }
-            } catch (\Exception $e) {}
-        }
-
-        // 4. Fallback to user_id in request (for debugging/migration)
-        $userId = $request->input('user_id');
-        if ($userId) {
-            return User::find($userId);
         }
 
         return null;

@@ -4,7 +4,18 @@ error_reporting(0);
 require_once __DIR__ . '/../includes/api_auth.php';
 require_once __DIR__ . '/../includes/inventory.php';
 
-requireInventoryWrite();
+$authenticatedUser = apiUser();
+if (!$authenticatedUser) {
+    http_response_code(401);
+    echo json_encode(['success' => false, 'message' => 'Authentication required.']);
+    exit;
+}
+
+if (strtolower(trim((string) ($authenticatedUser['role'] ?? ''))) !== 'admin') {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'message' => 'You are not authorized for this action.']);
+    exit;
+}
 
 while (ob_get_level()) {
     ob_end_clean();
@@ -393,14 +404,14 @@ try {
             throw new Exception($applyResult['message']);
         }
     } elseif ($status === 'Cancelled' && $oldStatus !== 'Cancelled') {
-        $movementStmt = $conn->prepare("SELECT product_id, quantity FROM product_inventory_movements WHERE movement_type = 'Order' AND reference_type = 'order' AND reference_id = ? FOR UPDATE");
+        $movementStmt = $conn->prepare("SELECT product_id, SUM(quantity) AS net_quantity FROM product_inventory_movements WHERE movement_type IN ('Order', 'Cancellation') AND reference_type = 'order' AND reference_id = ? GROUP BY product_id FOR UPDATE");
         $movementStmt->bind_param('i', $id);
         $movementStmt->execute();
         $movementResult = $movementStmt->get_result();
         while ($movement = $movementResult->fetch_assoc()) {
             $productId = (int) $movement['product_id'];
-            $restoreQty = abs((float) $movement['quantity']);
-            if ($restoreQty <= 0 || productMovementExists($conn, $productId, 'Cancellation', 'order', $id)) {
+            $restoreQty = max(0, -(float) $movement['net_quantity']);
+            if ($restoreQty <= 0) {
                 continue;
             }
 

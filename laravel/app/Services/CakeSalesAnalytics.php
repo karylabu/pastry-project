@@ -317,15 +317,26 @@ class CakeSalesAnalytics
 
     private function ingredientAnalytics(string $start, string $end, array $regularSales, $sizes): array
     {
+        $inventory = app(InventoryService::class);
+        $ingredients = DB::table('ingredients')->orderBy('name')->get();
+        $usableStockByIngredient = $ingredients->mapWithKeys(fn ($ingredient) => [
+            (int) $ingredient->id => $inventory->getUsableStock((int) $ingredient->id),
+        ]);
         $actualConsumption = DB::table('ingredient_movements as movement')
             ->join('ingredients as ingredient', 'ingredient.id', '=', 'movement.ingredient_id')
             ->where('movement.action', 'stock_out')
             ->where('movement.reference_type', 'production')
             ->whereBetween('movement.created_at', [$start . ' 00:00:00', $end . ' 23:59:59'])
-            ->select('ingredient.id', 'ingredient.name', 'ingredient.unit', 'ingredient.stock', 'ingredient.threshold', DB::raw('SUM(movement.qty) as quantity'))
-            ->groupBy('ingredient.id', 'ingredient.name', 'ingredient.unit', 'ingredient.stock', 'ingredient.threshold')
-            ->orderByDesc('quantity')->get();
-        $ingredients = DB::table('ingredients')->orderBy('name')->get();
+            ->select('ingredient.id', 'ingredient.name', 'ingredient.unit', 'ingredient.threshold', DB::raw('SUM(movement.qty) as quantity'))
+            ->groupBy('ingredient.id', 'ingredient.name', 'ingredient.unit', 'ingredient.threshold')
+            ->orderByDesc('quantity')->get()
+            ->map(function ($row) use ($usableStockByIngredient) {
+                $row->stock = (float) ($usableStockByIngredient[(int) $row->id] ?? 0);
+                return $row;
+            });
+        $ingredients->each(function ($ingredient) use ($usableStockByIngredient) {
+            $ingredient->stock = (float) ($usableStockByIngredient[(int) $ingredient->id] ?? 0);
+        });
         $lowStock = $ingredients->filter(fn ($ingredient) => (float) $ingredient->stock <= (float) $ingredient->threshold)->sortBy('stock')->values();
         $lowStockIds = $lowStock->pluck('id')->map(fn ($id) => (int) $id)->all();
         $recipeQuery = DB::table('product_recipes as recipe')
@@ -390,7 +401,15 @@ class CakeSalesAnalytics
 
     private function inventoryAlerts(): array
     {
-        return ['low_stock_ingredients' => DB::table('ingredients')->whereColumn('stock', '<=', 'threshold')->orderBy('stock')->get()];
+        $inventory = app(InventoryService::class);
+        $ingredients = DB::table('ingredients')->orderBy('name')->get();
+        $ingredients->each(function ($ingredient) use ($inventory) {
+            $ingredient->stock = $inventory->getUsableStock((int) $ingredient->id);
+        });
+
+        return ['low_stock_ingredients' => $ingredients
+            ->filter(fn ($ingredient) => (float) $ingredient->stock <= (float) $ingredient->threshold)
+            ->sortBy('stock')->values()];
     }
 
     private function wasteAnalytics(string $start, string $end): array
@@ -400,8 +419,17 @@ class CakeSalesAnalytics
             ->leftJoin('products as product', 'product.id', '=', 'waste.product_id')
             ->whereBetween('waste.datetime', [$start . ' 00:00:00', $end . ' 23:59:59'])
             ->where('waste.qty', '>', 0)
-            ->select('waste.*', 'ingredient.name as ingredient_name', 'ingredient.unit as ingredient_unit', 'ingredient.stock as ingredient_stock', 'ingredient.threshold as ingredient_threshold', 'product.name as product_name')
+            ->select('waste.*', 'ingredient.name as ingredient_name', 'ingredient.unit as ingredient_unit', 'ingredient.threshold as ingredient_threshold', 'product.name as product_name')
             ->get();
+        $inventory = app(InventoryService::class);
+        $usableStockByIngredient = $rows->pluck('ingredient_id')->filter()->unique()->mapWithKeys(fn ($ingredientId) => [
+            (int) $ingredientId => $inventory->getUsableStock((int) $ingredientId),
+        ]);
+        $rows->each(function ($row) use ($usableStockByIngredient) {
+            if ($row->ingredient_id) {
+                $row->ingredient_stock = (float) ($usableStockByIngredient[(int) $row->ingredient_id] ?? 0);
+            }
+        });
         $byItem = $rows->groupBy(fn ($row) => ($row->ingredient_id ?: 'item') . '|' . ($row->ingredient_unit ?: 'unit'))
             ->map(function ($group) {
                 $first = $group->first();
