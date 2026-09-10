@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\InventoryService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -229,6 +230,10 @@ class StaffApiController extends Controller
                 ->select('id', 'name', 'unit', 'stock', 'threshold', 'expiry')
                 ->orderBy('name')
                 ->get();
+            $inventory = app(InventoryService::class);
+            $ingredients->each(function ($ingredient) use ($inventory) {
+                $ingredient->stock = $inventory->getUsableStock((int) $ingredient->id);
+            });
             $lowStockIngredients = $ingredients->filter(fn ($ingredient) => (float) $ingredient->stock > 0 && (float) $ingredient->stock <= (float) $ingredient->threshold)->values();
             $outOfStockIngredients = $ingredients->filter(fn ($ingredient) => (float) $ingredient->stock <= 0)->values();
 

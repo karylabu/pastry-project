@@ -181,7 +181,7 @@ foreach ($productsRows as $product) {
 $lowStock = array_values(array_filter($inventory, static fn($item) => $item['status'] === 'Low Stock'));
 $outOfStock = array_values(array_filter($inventory, static fn($item) => $item['status'] === 'Out of Stock'));
 $lowStockFrequency = analyticsRows($conn, "SELECT m.product_id, p.name AS product, COUNT(*) AS low_stock_events FROM product_inventory_movements m INNER JOIN products p ON p.id = m.product_id WHERE m.new_stock <= p.minimum_stock AND m.created_at >= ? AND m.created_at < DATE_ADD(?, INTERVAL 1 DAY) GROUP BY m.product_id, p.name ORDER BY low_stock_events DESC", 'ss', [$start . ' 00:00:00', $end]);
-$ingredientInventory = analyticsRows($conn, "SELECT id AS ingredient_id, name AS ingredient, unit, stock, threshold, CASE WHEN stock <= 0 THEN 'Out of Stock' WHEN stock <= threshold THEN 'Low Stock' ELSE 'In Stock' END AS status FROM ingredients ORDER BY stock ASC, name");
+$ingredientInventory = analyticsRows($conn, "SELECT i.id AS ingredient_id, i.name AS ingredient, i.unit, COALESCE(batch_stock.usable_stock, 0) AS stock, i.threshold, CASE WHEN COALESCE(batch_stock.usable_stock, 0) <= 0 THEN 'Out of Stock' WHEN COALESCE(batch_stock.usable_stock, 0) <= i.threshold THEN 'Low Stock' ELSE 'In Stock' END AS status FROM ingredients i LEFT JOIN (SELECT ib.ingredient_id, SUM(ib.quantity_remaining) AS usable_stock FROM ingredient_batches ib WHERE ib.quantity_remaining > 0 AND (ib.expiry_date IS NULL OR ib.expiry_date >= CURDATE()) AND NOT EXISTS (SELECT 1 FROM discard_requests dr WHERE dr.ingredient_batch_id = ib.id AND dr.status = 'Pending') GROUP BY ib.ingredient_id) batch_stock ON batch_stock.ingredient_id = i.id ORDER BY stock ASC, ingredient ASC");
 
 $productPerformance = [];
 foreach ($inventory as $item) {

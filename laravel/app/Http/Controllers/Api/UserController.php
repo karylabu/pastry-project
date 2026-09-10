@@ -64,6 +64,8 @@ class UserController extends Controller
      */
     public function index(Request $request)
     {
+        if ($response = $this->authorizeAdmin($request)) return $response;
+
         $query = User::query()->orderByDesc('created_at');
 
         if ($request->filled('search')) {
@@ -110,6 +112,8 @@ class UserController extends Controller
      */
     public function store(Request $request)
     {
+        if ($response = $this->authorizeAdmin($request)) return $response;
+
         $payload = $this->resolvePayload($request);
 
         $validated = Validator::make($payload, [
@@ -142,6 +146,8 @@ class UserController extends Controller
      */
     public function show(User $user)
     {
+        if ($response = $this->authorizeAdmin(request())) return $response;
+
         return response()->json([
             'success' => true,
             'data' => $user,
@@ -153,6 +159,8 @@ class UserController extends Controller
      */
     public function update(Request $request, User $user)
     {
+        if ($response = $this->authorizeAdmin($request)) return $response;
+
         $payload = $this->resolvePayload($request);
 
         $validated = Validator::make($payload, [
@@ -187,6 +195,8 @@ class UserController extends Controller
      */
     public function destroy(User $user)
     {
+        if ($response = $this->authorizeAdmin(request())) return $response;
+
         $user->update(['status' => 'inactive']);
 
         return response()->json([
@@ -194,5 +204,17 @@ class UserController extends Controller
             'message' => 'User deactivated successfully.',
             'data' => $user->fresh(),
         ]);
+    }
+
+    protected function authorizeAdmin(Request $request): ?\Illuminate\Http\JsonResponse
+    {
+        $user = $this->getAuthenticatedUser($request);
+        if (!$user) {
+            return response()->json(['success' => false, 'message' => 'Admin authorization required.'], 401);
+        }
+        if (strtolower(trim((string) $user->role)) !== 'admin') {
+            return response()->json(['success' => false, 'message' => 'Admin authorization required.'], 403);
+        }
+        return null;
     }
 }

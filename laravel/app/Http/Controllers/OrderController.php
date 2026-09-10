@@ -13,6 +13,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Log;
+use RuntimeException;
 
 class OrderController extends Controller
 {
@@ -93,10 +94,6 @@ class OrderController extends Controller
                         'created_at' => now(),
                     ]);
 
-                    // Deduct stock if product ID is provided
-                    if (isset($item['id'])) {
-                        Product::where('id', $item['id'])->decrement('stock', $item['qty'] ?? 1);
-                    }
                 }
 
                 // Create Notification
@@ -272,19 +269,21 @@ class OrderController extends Controller
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
         }
 
-        $order = Order::where('id', $id)
-            ->where('user_id', $user->id)
-            ->first();
-
-        if (!$order) {
-            return response()->json(['success' => false, 'message' => 'Order not found.'], 404);
+        try {
+            DB::transaction(function () use ($id, $user) {
+                $order = Order::query()->whereKey($id)->lockForUpdate()->first();
+                if (!$order || (int) $order->user_id !== (int) $user->id) {
+                    throw new RuntimeException('Order not found.');
+                }
+                if ($order->status !== 'Pending') {
+                    throw new RuntimeException('Only pending orders can be cancelled.');
+                }
+                $order->update(['status' => 'Cancelled']);
+            });
+        } catch (\Throwable $exception) {
+            $status = $exception->getMessage() === 'Order not found.' ? 404 : 400;
+            return response()->json(['success' => false, 'message' => $exception->getMessage()], $status);
         }
-
-        if ($order->status !== 'Pending') {
-            return response()->json(['success' => false, 'message' => 'Only pending orders can be cancelled.'], 400);
-        }
-
-        $order->update(['status' => 'Cancelled']);
 
         return response()->json([
             'success' => true,
@@ -310,11 +309,46 @@ class OrderController extends Controller
             return response()->json(['success' => false, 'errors' => $validator->errors()], 422);
         }
 
-        $order = Order::find($id);
-        if (!$order) {
-            return response()->json(['success' => false, 'message' => 'Order not found.'], 404);
+        try {
+            $order = DB::transaction(function () use ($id, $request, $user) {
+                $order = Order::query()->whereKey($id)->lockForUpdate()->first();
+                if (!$order) {
+                    throw new RuntimeException('Order not found.');
+                }
+
+                $oldStatus = $order->status;
+                $newStatus = $request->status;
+                if ($oldStatus !== 'Confirmed' && $newStatus === 'Confirmed') {
+                    $this->deductOrderProductStock($order, (int) $user->id);
+                } elseif ($oldStatus === 'Confirmed' && $newStatus === 'Cancelled') {
+                    $this->restoreOrderProductStock($order, (int) $user->id);
+                }
+
+                $order->update(['status' => $newStatus]);
+
+                $type = 'order';
+                if (strtolower($newStatus) === 'completed') $type = 'order_completed';
+                if (strtolower($newStatus) === 'cancelled') $type = 'order_cancelled';
+                if (strtolower($newStatus) === 'to receive') $type = 'order_received';
+
+                DB::table('notifications')->insert([
+                    'user_id' => $order->user_id,
+                    'title' => '📦 Order Update',
+                    'message' => "Your order #{$order->id} status has been updated to {$newStatus}.",
+                    'type' => $type,
+                    'is_read' => 0,
+                    'action_url' => '/customer/orders',
+                    'created_at' => now(),
+                ]);
+
+                return $order->fresh();
+            });
+        } catch (\Throwable $exception) {
+            $status = $exception->getMessage() === 'Order not found.' ? 404 : 409;
+            return response()->json(['success' => false, 'message' => $exception->getMessage()], $status);
         }
 
+        $order = $order->fresh();
         $oldStatus = (string) $order->status;
         $newStatus = (string) $request->status;
 
@@ -339,16 +373,20 @@ class OrderController extends Controller
             }
         }
 
-        $order->update(['status' => $newStatus]);
+        if ($oldStatus !== $newStatus) {
+            $this->sendSmsNotification($order, $newStatus);
+        }
 
-        // Notify customer about status change
+        if (strtolower($newStatus) === 'to receive') {
+            $this->sendSmsNotification($order);
+        }
+
         $type = 'order';
         if (strtolower($newStatus) == 'completed') $type = 'order_completed';
         if (strtolower($newStatus) == 'cancelled') $type = 'order_cancelled';
         if (strtolower($newStatus) == 'to receive') {
             $type = 'order_received';
         }
-        if ($oldStatus !== $newStatus) $this->sendSmsNotification($order, $newStatus);
 
         DB::table('notifications')->insert([
             'user_id' => $order->user_id,
@@ -364,6 +402,83 @@ class OrderController extends Controller
             'success' => true,
             'message' => 'Order status updated successfully.'
         ]);
+    }
+
+    private function orderProductLines(Order $order): array
+    {
+        $lines = [];
+        foreach ($order->items ?? [] as $item) {
+            $productId = (int) ($item['id'] ?? 0);
+            $quantity = (float) ($item['qty'] ?? $item['quantity'] ?? 0);
+            if ($productId <= 0 || $quantity <= 0) continue;
+            $lines[$productId] = ($lines[$productId] ?? 0) + $quantity;
+        }
+
+        return $lines;
+    }
+
+    private function deductOrderProductStock(Order $order, int $userId): void
+    {
+        foreach ($this->orderProductLines($order) as $productId => $quantity) {
+            $product = Product::query()->whereKey($productId)->lockForUpdate()->first();
+            if (!$product) throw new RuntimeException('Product not found for order.');
+
+            $previousStock = (float) $product->stock;
+            if ($previousStock < $quantity) throw new RuntimeException("Insufficient stock for {$product->name}.");
+            $newStock = $previousStock - $quantity;
+            if (!$product->update(['stock' => $newStock])) throw new RuntimeException('Failed to update product stock.');
+
+            $inserted = DB::table('product_inventory_movements')->insert([
+                'product_id' => $productId,
+                'movement_type' => 'Order',
+                'quantity' => -$quantity,
+                'previous_stock' => $previousStock,
+                'new_stock' => $newStock,
+                'reason' => "Order #{$order->id} confirmed",
+                'reference_type' => 'order',
+                'reference_id' => $order->id,
+                'user_id' => $userId,
+                'created_at' => now(),
+            ]);
+            if (!$inserted) throw new RuntimeException('Failed to record product order movement.');
+        }
+    }
+
+    private function restoreOrderProductStock(Order $order, int $userId): void
+    {
+        $deductions = DB::table('product_inventory_movements')
+            ->select('product_id', DB::raw('SUM(quantity) as net_quantity'))
+            ->where('reference_type', 'order')
+            ->where('reference_id', $order->id)
+            ->whereIn('movement_type', ['Order', 'Cancellation'])
+            ->groupBy('product_id')
+            ->get();
+
+        foreach ($deductions as $deduction) {
+            $restoreQuantity = max(0, -(float) $deduction->net_quantity);
+            if ($restoreQuantity <= 0.000001) continue;
+
+            $product = Product::query()->whereKey($deduction->product_id)->lockForUpdate()->first();
+            if (!$product) throw new RuntimeException('Product not found for order restoration.');
+
+            $previousStock = (float) $product->stock;
+            $newStock = $previousStock + $restoreQuantity;
+            if (!$product->update(['stock' => $newStock])) throw new RuntimeException('Failed to restore product stock.');
+
+            $inserted = DB::table('product_inventory_movements')->insert([
+                'product_id' => $product->id,
+                'movement_type' => 'Cancellation',
+                'quantity' => $restoreQuantity,
+                'previous_stock' => $previousStock,
+                'new_stock' => $newStock,
+                'reason' => "Order #{$order->id} cancelled",
+                'reference_type' => 'order',
+                'reference_id' => $order->id,
+                'user_id' => $userId,
+                'created_at' => now(),
+            ]);
+            if (!$inserted) throw new RuntimeException('Failed to record product cancellation movement.');
+        }
     }
 
     /**

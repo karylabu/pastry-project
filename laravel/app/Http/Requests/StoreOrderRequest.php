@@ -15,6 +15,7 @@ class StoreOrderRequest extends FormRequest
     {
         return [
             'items' => 'required|array',
+            'items.*.id' => 'required|integer|exists:products,id',
             'items.*.name' => 'required|string',
             'items.*.qty' => 'required|integer|min:1',
             'items.*.price' => 'required|numeric',
