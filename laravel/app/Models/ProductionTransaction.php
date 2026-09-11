@@ -13,11 +13,16 @@ class ProductionTransaction extends Model
 
     protected $table = 'production_transactions';
 
-    protected $fillable = ['product_id', 'quantity', 'user_id', 'idempotency_key'];
+    protected $fillable = ['product_id', 'product_size_id', 'quantity', 'user_id', 'idempotency_key'];
 
     public function product()
     {
         return $this->belongsTo(Product::class);
+    }
+
+    public function productSize()
+    {
+        return $this->belongsTo(ProductSize::class);
     }
 
     public function allocations()

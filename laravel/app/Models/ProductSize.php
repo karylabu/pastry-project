@@ -14,14 +14,14 @@ class ProductSize extends Model
         'product_id',
         'size',
         'price',
+        'available',
         'stock_quantity',
-        'threshold',
     ];
 
     protected $casts = [
         'price' => 'decimal:2',
-        'stock_quantity' => 'integer',
-        'threshold' => 'integer',
+        'available' => 'boolean',
+        'stock_quantity' => 'float',
     ];
 
     public function product(): BelongsTo
@@ -29,8 +29,13 @@ class ProductSize extends Model
         return $this->belongsTo(Product::class);
     }
 
+    public function recipes()
+    {
+        return $this->hasMany(ProductRecipe::class);
+    }
+
     public function getAvailableAttribute(): bool
     {
-        return $this->stock_quantity > 0;
+        return (bool) $this->getRawOriginal('available');
     }
 }

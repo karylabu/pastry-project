@@ -15,6 +15,7 @@ use App\Http\Controllers\Api\WasteLogController;
 use App\Http\Controllers\Api\RecipeController;
 use App\Http\Controllers\Api\ProductionController;
 use App\Http\Controllers\Api\CustomizedCakeController;
+use App\Http\Controllers\Api\CakeSalesAnalyticsController;
 use App\Http\Controllers\SalesImportController;
 use App\Http\Controllers\NewsletterController;
 use App\Http\Controllers\StaffApiController;
@@ -28,6 +29,7 @@ Route::post('google-login', [AuthController::class, 'googleLogin']);
 Route::options('google-login', [AuthController::class, 'googleLogin']);
 Route::post('sales/import-pdf', [SalesImportController::class, 'store']);
 Route::post('newsletter/subscribe', [NewsletterController::class, 'subscribe']);
+Route::get('admin/analytics/cake-sales', [CakeSalesAnalyticsController::class, 'index']);
 
 // Staff inventory routes
 Route::post('staff/inventory/batches', [IngredientBatchController::class, 'store']);

@@ -162,6 +162,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
+    $authenticatedUser = apiUser();
+    if (!$authenticatedUser) {
+        http_response_code(401);
+        echo json_encode(['success' => false, 'message' => 'Authentication required.']);
+        exit;
+    }
+
+    if (strtolower(trim((string) ($authenticatedUser['role'] ?? ''))) !== 'admin') {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'message' => 'You are not authorized for this action.']);
+        exit;
+    }
+
     $data = json_decode(file_get_contents("php://input"), true);
     if (!is_array($data)) {
         $data = $_POST;

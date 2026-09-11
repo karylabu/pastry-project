@@ -2,12 +2,13 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\InventoryService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Schema;
 
-class StaffController extends Controller
+class AdminController extends Controller
 {
     protected function requireLogin()
     {
@@ -497,7 +498,7 @@ class StaffController extends Controller
 
         DB::transaction(function () use ($ingredientId, $productId, $validated, $userId, $userName) {
             if ($ingredientId) {
-                DB::table('ingredients')->where('id', $ingredientId)->decrement('stock', $validated['qty_lost']);
+                app(InventoryService::class)->synchronizeIngredientStock($ingredientId);
             }
 
             DB::table('variance')->insert([
