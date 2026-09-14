@@ -44,4 +44,21 @@ describe('buildCustomizedCakeSubmissionPayload', () => {
       ],
     }));
   });
+
+  it('keeps the selected reference image metadata in the order payload', () => {
+    const referenceImage = {
+      type: 'example',
+      id: 'birthday-3',
+      url: '/uploads/birthday(3).jpg',
+      name: 'Birthday Cake 3',
+    };
+
+    const payload = buildCustomizedCakeSubmissionPayload(
+      { cakeType: 'single', tiers: [{ flavor_id: 7, size_id: 2 }], userId: 4, referenceImage },
+      [{ id: 7, name: 'Chocolate' }],
+      [{ id: 2, code: '6x3', label: '6x3' }]
+    );
+
+    expect(payload.reference_image).toEqual(referenceImage);
+  });
 });

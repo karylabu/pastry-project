@@ -38,6 +38,10 @@ if ($userId <= 0) {
 }
 $deliveryAddress = trim($_POST['delivery_address'] ?? '');
 $deliveryMethod = trim($_POST['delivery_method'] ?? 'Pickup');
+$deliveryService = trim($_POST['delivery_service'] ?? '');
+$riderName = trim($_POST['rider_name'] ?? '');
+$riderContact = trim($_POST['rider_contact'] ?? '');
+$riderBookingReference = trim($_POST['rider_booking_reference'] ?? '');
 $pickupDate = trim($_POST['pickup_date'] ?? '');
 $pickupTime = trim($_POST['pickup_time'] ?? '');
 $deliveryDate = $pickupDate !== '' ? $pickupDate : null;
@@ -107,7 +111,11 @@ $customDetails = [
     'email' => $email,
     'phone' => $phone,
     'delivery_method' => $deliveryMethod,
+    'delivery_service' => $deliveryService,
     'delivery_address' => $deliveryAddress,
+    'rider_name' => $riderName,
+    'rider_contact' => $riderContact,
+    'rider_booking_reference' => $riderBookingReference,
     'pickup_date' => $pickupDate,
     'pickup_time' => $pickupTime,
     'cake_size' => $cakeSize,

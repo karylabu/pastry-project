@@ -319,10 +319,10 @@ export default function ProductCard({
         const label = currentVariant ? currentVariant.size : fallbackOptions[0];
         onSelect?.(product, label, currentPrice);
       }}
-      className="group relative flex h-full min-h-[360px] min-w-0 flex-col items-center overflow-hidden rounded-[30px] border border-stone-200/70 bg-white p-3 text-center shadow-[0_10px_35px_rgba(15,23,42,0.05)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_18px_45px_rgba(15,23,42,0.08)]"
+      className="group relative flex h-full min-h-[292px] min-w-0 flex-col items-center overflow-hidden rounded-xl border border-[#eadfd8] bg-[#fffaf7] p-2 text-center shadow-[0_5px_14px_rgba(91,64,39,0.06)] transition-all duration-300 hover:-translate-y-0.5 hover:border-[#e7c875] hover:shadow-[0_10px_20px_rgba(91,64,39,0.1)]"
     >
       <div
-        className="mb-5 flex h-[174px] w-full flex-shrink-0 items-center justify-center overflow-hidden rounded-[24px] bg-[#f7f5f2] p-3"
+        className="mb-2 flex h-[130px] w-full flex-shrink-0 items-center justify-center overflow-hidden rounded-lg border border-[#f1e6df] bg-[#f8eee8] p-2"
       >
         <img
           src={resolveProductImage(product)}
@@ -345,18 +345,18 @@ export default function ProductCard({
               ? `h-[145px] w-auto max-w-[85%] max-h-[145px] object-contain object-center${isStrawberryDrinkProduct ? ' translate-y-3' : ''}`
               : isNonDrinkProduct
               ? 'h-[118px] w-auto max-w-[78%] max-h-[118px] object-contain object-center'
-              : 'h-[145px] w-auto max-w-[85%] max-h-[145px] object-contain object-center'
+              : 'h-[118px] w-auto max-w-[85%] max-h-[118px] object-contain object-center'
           }
         />
       </div>
 
       <div className="flex flex-col flex-grow w-full">
-        <h3 className="text-sm font-semibold text-gray-800 leading-tight mb-2 px-1 line-clamp-2 min-h-[2.5rem]">
+        <h3 className="text-[11px] font-bold leading-tight text-[#33251e] mb-1 px-1 line-clamp-2 min-h-[1.7rem]">
           {product.name}
         </h3>
 
         {shouldShowVariantSelector && (
-          <div className="mb-3 flex min-h-[34px] w-full items-center justify-center gap-1 overflow-hidden rounded-full border border-stone-100 bg-stone-50 p-1.5">
+          <div className="mb-1 flex min-h-[25px] w-full items-center justify-center gap-1 overflow-hidden rounded-full border border-[#f1e6df] bg-[#f8f3ee] p-1">
             <div className="flex w-full items-center justify-center gap-1 overflow-hidden">
               {variantButtons.map((variant) => {
                 const disabled = variant.stock_quantity <= 0;
@@ -375,8 +375,8 @@ export default function ProductCard({
                       disabled
                         ? 'cursor-not-allowed border-stone-200 bg-stone-100 text-stone-400'
                         : selected
-                        ? 'border-[#d4af37] bg-[#f7e8b0] text-stone-800 shadow-sm'
-                        : 'border-stone-200 bg-white text-stone-600 hover:border-stone-300 hover:text-stone-800'
+                        ? 'border-[#e7c875] bg-[#fff8df] text-[#8d6a2e] shadow-sm'
+                        : 'border-[#eadfd8] bg-white text-[#765d50] hover:border-[#e7c875] hover:bg-[#fff8df] hover:text-[#8d6a2e]'
                     }`}
                   >
                     {variant.size}
@@ -387,11 +387,11 @@ export default function ProductCard({
           </div>
         )}
 
-        <p className="text-sm font-semibold text-black mb-4">
+        <p className="text-[11px] font-semibold text-[#33251e] mb-2">
           ₱{currentPrice.toLocaleString()}
         </p>
 
-        <div className="mt-auto flex h-10 w-full shrink-0 items-center gap-2.5 pt-1 pb-1">
+        <div className="mt-auto flex h-8 w-full shrink-0 items-center gap-2 pt-1">
           <button
             onClick={(e) => {
               e.stopPropagation();
@@ -411,10 +411,10 @@ export default function ProductCard({
               onAction?.(product, label, currentPrice);
             }}
             disabled={overallOutOfStock}
-            className={`h-10 min-w-0 flex-1 overflow-hidden rounded-xl px-2 py-2 text-[9px] font-semibold uppercase tracking-[0.16em] transition-all ${
+            className={`h-7 min-w-0 flex-1 overflow-hidden rounded-lg border px-2 py-1.5 text-[8px] font-semibold transition-all ${
               overallOutOfStock
                 ? 'cursor-not-allowed bg-gray-300 text-gray-500'
-                : 'bg-[#111827] text-white hover:bg-[#d4af37] hover:text-black'
+                : 'border-[#eadfca] bg-[#fff8e9] text-[#33251e] hover:border-[#e7c875] hover:bg-[#fff8df] hover:text-[#8d6a2e]'
             }`}
           >
             Add to Cart
@@ -427,11 +427,11 @@ export default function ProductCard({
               e.stopPropagation();
               onToggleFavorite?.(product);
             }}
-            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-stone-200 bg-white/90 transition hover:border-black hover:bg-red-50"
+            className="group/favorite inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-[#eadfd8] bg-white transition hover:border-[#d9534f] hover:bg-[#fff5f5]"
           >
             <Heart
               size={15}
-              className={favorite ? 'text-red-500' : 'text-gray-400'}
+              className={favorite ? 'text-red-500' : 'text-gray-400 group-hover/favorite:text-[#d9534f]'}
               fill={favorite ? 'currentColor' : 'none'}
             />
           </button>
