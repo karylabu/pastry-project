@@ -11,12 +11,14 @@ class ProductController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
-        $filterCategory = $request->query('category', 'all');
+        $filterCategory = strtolower(trim((string) $request->query('category', 'cakes')));
 
-        $query = Product::with(['sizes']);
+        $query = Product::with(['sizes'])
+            ->where('available', true)
+            ->whereRaw('LOWER(category) IN (?, ?)', ['cake', 'cakes']);
 
-        if ($filterCategory !== 'all') {
-            $query->where('category', $filterCategory);
+        if ($filterCategory !== 'all' && !in_array($filterCategory, ['cake', 'cakes'], true)) {
+            return response()->json(['success' => true, 'data' => []]);
         }
 
         $products = $query->get()->map(function (Product $product) {
@@ -28,16 +30,14 @@ class ProductController extends Controller
                 'image' => $product->image,
                 'base_price' => (float) $product->price,
                 'product_stock' => (int) $product->stock,
-                'total_stock' => $product->sizes->sum('stock_quantity'),
+                'total_stock' => (int) $product->stock,
                 'available' => (bool) $product->available,
                 'sizes' => $product->sizes->map(function ($size) {
                     return [
                         'id' => $size->id,
                         'size' => $size->size,
                         'price' => (float) $size->price,
-                        'stock_quantity' => (int) $size->stock_quantity,
-                        'threshold' => (int) $size->threshold,
-                        'available' => $size->stock_quantity > 0,
+                        'available' => (bool) $size->available,
                     ];
                 }),
             ];

@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { Activity, AlertTriangle, ArrowRight, BarChart3, ShoppingCart, TrendingUp } from "lucide-react";
-import { CUSTOMER_BASE, STAFF_BASE } from "../../services/config";
+import { Activity, AlertTriangle, ArrowRight, BarChart3, ShoppingCart, TrendingUp, CakeSlice, Package, Sparkles } from "lucide-react";
+import { Bar, CartesianGrid, ComposedChart, Line, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { CUSTOMER_BASE, LARAVEL_BASE, STAFF_BASE } from "../../services/config";
 
 const STATUS_STYLES = {
   Pending: "bg-gray-100 text-black border border-black/20",
@@ -58,10 +59,80 @@ function Panel({ eyebrow, title, action, children, className = "" }) {
   );
 }
 
+function AnalyticsEmpty({ compact = false }) {
+  return (
+    <div className={`px-6 text-center ${compact ? "py-7" : "py-10"}`}>
+      <p className="text-[13px] font-semibold text-black/70">No cake sales data yet.</p>
+      <p className="mt-1 text-[12px] text-black/45">Sales analytics will appear here once completed cake orders are recorded.</p>
+    </div>
+  );
+}
+
+function AnalyticsCard({ label, value, icon: Icon, accent = "gold" }) {
+  const iconClass = accent === "green" ? "bg-emerald-50 text-emerald-700" : accent === "blue" ? "bg-sky-50 text-sky-700" : "bg-[#fff8df] text-[#9b7810]";
+  return (
+    <div className="rounded-2xl border border-black/10 bg-white p-5 shadow-sm">
+      <div className="flex items-start justify-between gap-3">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-black/50">{label}</p>
+        <span className={`flex h-9 w-9 items-center justify-center rounded-xl ${iconClass}`}><Icon size={17} /></span>
+      </div>
+      <p className="mt-4 text-[25px] font-bold leading-none text-black">{value}</p>
+    </div>
+  );
+}
+
+function RankedList({ rows, quantityLabel = "sold", quantityUnitKey = "" }) {
+  if (!rows?.length) return <AnalyticsEmpty />;
+  return (
+    <div className="space-y-2 p-4">
+      {rows.slice(0, 5).map((row, index) => (
+        <div key={`${row.name}-${index}`} className="flex items-center gap-3 rounded-xl px-3 py-2.5 hover:bg-[#fffaf0]">
+          <span className="w-6 text-[11px] font-semibold text-black/40">{String(index + 1).padStart(2, "0")}</span>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center justify-between gap-3">
+              <span className="truncate text-[13px] font-medium text-black/80">{row.name}</span>
+              <span className="shrink-0 text-[12px] font-semibold text-black">{Number(row.quantity || 0).toLocaleString()} {quantityUnitKey ? `${row[quantityUnitKey] || ""} ` : ""}{quantityLabel}</span>
+            </div>
+            <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-gray-100">
+              <div className="h-full rounded-full bg-[#D4AF37]" style={{ width: `${Math.min(100, Number(row.percentage || 0))}%` }} />
+            </div>
+          </div>
+          <span className="w-12 text-right text-[11px] text-black/45">{Number(row.percentage || 0).toFixed(0)}%</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function TrendChart({ rows, metric }) {
+  if (!rows?.length || !rows.some((row) => Number(row.quantity) > 0 || Number(row.revenue) > 0)) return <AnalyticsEmpty />;
+  return (
+    <div className="h-[260px] w-full px-3 pb-4 pt-5 sm:px-6">
+      <ResponsiveContainer width="100%" height="100%">
+        <ComposedChart data={rows} margin={{ top: 8, right: 8, left: -18, bottom: 0 }}>
+          <CartesianGrid stroke="#eef0f4" vertical={false} />
+          <XAxis dataKey="period" tick={{ fontSize: 10, fill: "#6b7280" }} tickLine={false} axisLine={false} />
+          <YAxis yAxisId="quantity" tick={{ fontSize: 10, fill: "#6b7280" }} tickLine={false} axisLine={false} allowDecimals={false} />
+          <YAxis yAxisId="revenue" orientation="right" hide />
+          <Tooltip formatter={(value, name) => [name === "quantity" ? Number(value).toLocaleString() : `₱${Number(value).toLocaleString(undefined, { minimumFractionDigits: 2 })}`, name === "quantity" ? "Cakes sold" : "Revenue"]} />
+          {metric === "revenue" ? <Line yAxisId="revenue" type="monotone" dataKey="revenue" stroke="#D4AF37" strokeWidth={2.5} dot={{ r: 2, fill: "#D4AF37" }} /> : <Bar yAxisId="quantity" dataKey="quantity" fill="#D4AF37" radius={[4, 4, 0, 0]} barSize={18} />}
+        </ComposedChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
 export default function Dashboard() {
   const [orders, setOrders] = useState([]);
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [analytics, setAnalytics] = useState(null);
+  const [analyticsLoading, setAnalyticsLoading] = useState(true);
+  const [analyticsError, setAnalyticsError] = useState(false);
+  const [analyticsPreset, setAnalyticsPreset] = useState("last_7_days");
+  const [trendMetric, setTrendMetric] = useState("revenue");
+  const [customStart, setCustomStart] = useState("");
+  const [customEnd, setCustomEnd] = useState("");
 
   const normalizeOrders = (items = [], source) =>
     (Array.isArray(items) ? items : []).map((order) => ({
@@ -102,6 +173,35 @@ export default function Dashboard() {
     const interval = setInterval(fetchOrders, 10000);
     return () => clearInterval(interval);
   }, []);
+
+  useEffect(() => {
+    const params = new URLSearchParams();
+    if (analyticsPreset === "custom") {
+      if (!customStart || !customEnd) return;
+      params.set("start_date", customStart);
+      params.set("end_date", customEnd);
+    } else {
+      params.set("preset", analyticsPreset);
+    }
+    let token = "";
+    try { token = JSON.parse(localStorage.getItem("user") || "null")?.token || ""; } catch { token = ""; }
+    setAnalyticsLoading(true);
+    setAnalyticsError(false);
+    fetch(`${LARAVEL_BASE}/api/admin/analytics/cake-sales?${params.toString()}`, {
+      credentials: "include",
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    })
+      .then((response) => response.json())
+      .then((data) => {
+        if (!data?.success) throw new Error(data?.message || "Unable to load cake sales analytics.");
+        setAnalytics(data);
+      })
+      .catch(() => {
+        setAnalytics(null);
+        setAnalyticsError(true);
+      })
+      .finally(() => setAnalyticsLoading(false));
+  }, [analyticsPreset, customStart, customEnd]);
 
   useEffect(() => {
     fetch(`${CUSTOMER_BASE}/api_products.php?action=list`)
@@ -203,6 +303,15 @@ export default function Dashboard() {
     { label: "Sales Today", value: `₱${totalSalesToday.toLocaleString()}`, tone: "text-[#D4AF37]" },
   ];
 
+  const analyticsSummary = analytics?.summary || {};
+  const trendRows = analytics?.salesTrend?.daily || [];
+  const regularVsCustomized = analytics?.cakeTypeBreakdown || analytics?.regularVsCustomized || {};
+  const lowStockIngredients = analytics?.ingredientAnalytics?.low_stock || [];
+  const mostUsedIngredients = analytics?.ingredientAnalytics?.most_used || [];
+  const wasteAnalytics = analytics?.wasteAnalytics || {};
+  const hasAnalytics = Boolean(analytics && (analyticsSummary.cakes_sold > 0 || analyticsSummary.cake_revenue > 0));
+  const businessInsights = analytics?.businessInsights || [];
+
   return (
     <div className="min-h-screen bg-white text-black">
       <div className="pt-[72px] lg:pl-[260px]">
@@ -215,6 +324,143 @@ export default function Dashboard() {
 
           <div className="mb-8">
             <StatsStrip stats={stats} />
+          </div>
+
+          <div className="mb-8 space-y-6">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.3em] text-[#D4AF37]">Cake Sales Analytics</p>
+                <h2 className="text-[20px] font-bold text-black">Cake sales summary</h2>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                {[['last_7_days', '7 Days'], ['last_30_days', '30 Days'], ['this_month', 'This Month'], ['custom', 'Custom']].map(([value, label]) => (
+                  <button key={value} type="button" onClick={() => setAnalyticsPreset(value)} className={`rounded-full border px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.12em] ${analyticsPreset === value ? 'border-black bg-black text-white' : 'border-black/10 bg-white text-black/60'}`}>{label}</button>
+                ))}
+              </div>
+            </div>
+
+            {analyticsPreset === "custom" && (
+              <div className="flex flex-wrap gap-2 rounded-xl border border-black/10 bg-white p-3">
+                <input type="date" value={customStart} onChange={(event) => setCustomStart(event.target.value)} className="rounded-lg border border-black/10 px-3 py-2 text-xs" />
+                <input type="date" value={customEnd} onChange={(event) => setCustomEnd(event.target.value)} className="rounded-lg border border-black/10 px-3 py-2 text-xs" />
+              </div>
+            )}
+
+            {analyticsLoading ? <div className="rounded-2xl border border-black/10 bg-white px-6 py-7 text-center text-[13px] text-black/50">Loading cake sales analytics...</div> : analyticsError ? <div className="rounded-2xl border border-amber-200 bg-amber-50/60 px-6 py-7 text-center text-[13px] text-amber-900">Unable to load cake sales analytics.</div> : !hasAnalytics ? <AnalyticsEmpty compact /> : (
+              <>
+                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+                  <AnalyticsCard label="Total Cake Sales" value={Number(analyticsSummary.total_cake_sales || 0).toLocaleString()} icon={CakeSlice} />
+                  <AnalyticsCard label="Cakes Sold" value={Number(analyticsSummary.cakes_sold || 0).toLocaleString()} icon={Package} accent="blue" />
+                  <AnalyticsCard label="Cake Revenue" value={`₱${Number(analyticsSummary.cake_revenue || 0).toLocaleString()}`} icon={TrendingUp} />
+                  <AnalyticsCard label="Regular Cakes" value={Number(analyticsSummary.regular_cakes_sold || 0).toLocaleString()} icon={CakeSlice} accent="green" />
+                  <AnalyticsCard label="Customized Cakes" value={Number(analyticsSummary.customized_cakes_sold || 0).toLocaleString()} icon={Sparkles} />
+                </div>
+
+                <Panel
+                  eyebrow="Sales Trend"
+                  title="Cake sales trend"
+                  action={
+                    <div className="flex gap-2">
+                      {[['revenue', 'Revenue'], ['quantity', 'Cakes Sold']].map(([value, label]) => (
+                        <button key={value} type="button" onClick={() => setTrendMetric(value)} className={`rounded-full border px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.12em] ${trendMetric === value ? 'border-black bg-black text-white' : 'border-black/10 bg-white text-black/60'}`}>{label}</button>
+                      ))}
+                    </div>
+                  }
+                >
+                  <TrendChart rows={trendRows} metric={trendMetric} />
+                </Panel>
+
+                <div className="grid gap-6 lg:grid-cols-2">
+                  <Panel eyebrow="Best Sellers" title="Best-selling flavors"><RankedList rows={analytics.flavors} /></Panel>
+                  <Panel eyebrow="Best Sellers" title="Best-selling sizes"><RankedList rows={analytics.sizes} /></Panel>
+                </div>
+
+                <div className="grid gap-6">
+                  <Panel eyebrow="Customized Cakes" title="Best-selling cake designs"><RankedList rows={analytics.designs} /></Panel>
+                  <Panel eyebrow="Sales Mix" title="Regular vs. customized cakes">
+                    <div className="space-y-4 p-5">
+                      {Object.entries(regularVsCustomized).map(([type, row]) => (
+                        <div key={type}>
+                          <div className="mb-1 flex items-center justify-between gap-3">
+                            <span className="text-[13px] font-medium capitalize text-black/75">{type} cakes</span>
+                            <span className="text-[12px] font-semibold text-black">{Number(row.quantity || 0).toLocaleString()} sold · {Number(row.percentage || 0).toFixed(0)}%</span>
+                          </div>
+                          <div className="h-2 overflow-hidden rounded-full bg-gray-100">
+                            <div className={`h-full rounded-full ${type === 'regular' ? 'bg-[#D4AF37]' : 'bg-sky-300'}`} style={{ width: `${Math.min(100, Number(row.percentage || 0))}%` }} />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </Panel>
+                </div>
+
+                <div className="grid gap-6 lg:grid-cols-2">
+                  <Panel eyebrow="Business Insights" title="What the data suggests">
+                    <div className="space-y-2 p-4">
+                      {businessInsights.map((insight, index) => (
+                        <div key={`${insight.type}-${index}`} className={`flex gap-3 rounded-xl p-3 ${['high_demand_low_stock', 'ingredient_demand', 'waste_risk'].includes(insight.type) ? 'bg-amber-50/80 text-amber-950' : insight.type === 'limited_data' ? 'bg-gray-50 text-black/60' : 'bg-[#fffaf0] text-black/75'}`}>
+                          <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${['high_demand_low_stock', 'ingredient_demand', 'waste_risk'].includes(insight.type) ? 'bg-amber-100 text-amber-700' : 'bg-[#fff1b8] text-[#9b7810]'}`}>
+                            {['high_demand_low_stock', 'ingredient_demand', 'waste_risk'].includes(insight.type) ? <AlertTriangle size={15} /> : <Sparkles size={15} />}
+                          </span>
+                          <div><p className="text-[10px] font-semibold uppercase tracking-[0.16em] opacity-60">{insight.title}</p><p className="mt-1 text-[12px] leading-5">{insight.message}</p></div>
+                        </div>
+                      ))}
+                    </div>
+                  </Panel>
+                </div>
+
+                <div className="grid gap-6">
+                  <Panel eyebrow="Customized Cakes" title="Customized cake preferences">
+                    <div className="grid gap-5 p-4 lg:grid-cols-2">
+                      <div className="rounded-xl border border-black/10 bg-white">
+                        <p className="border-b border-black/10 px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-black/55">Most requested flavors</p>
+                        <RankedList rows={analytics.customizedAnalytics?.flavors} quantityLabel="requests" />
+                      </div>
+                      <div className="rounded-xl border border-black/10 bg-white">
+                        <p className="border-b border-black/10 px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-black/55">Most requested sizes</p>
+                        <RankedList rows={analytics.customizedAnalytics?.sizes} quantityLabel="requests" />
+                      </div>
+                      <div className="rounded-xl border border-black/10 bg-white lg:col-span-2">
+                        <p className="border-b border-black/10 px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-black/55">Popular customization options</p>
+                        <RankedList rows={analytics.customizedAnalytics?.designs} quantityLabel="requests" />
+                      </div>
+                    </div>
+                  </Panel>
+                  <Panel eyebrow="Ingredient Analytics" title="Estimated ingredient consumption">
+                    <div className="space-y-2 p-4">
+                      {mostUsedIngredients.length ? mostUsedIngredients.slice(0, 5).map((ingredient) => <div key={ingredient.id || ingredient.name} className="rounded-xl px-3 py-2.5 hover:bg-[#fffaf0]"><div className="flex items-center justify-between gap-3"><div><p className="text-[13px] text-black/75">{ingredient.name || ingredient.ingredient}</p><p className="mt-1 text-[11px] text-black/45">Current: {Number(ingredient.current_stock || 0).toLocaleString()} {ingredient.unit || ''}</p></div><span className="text-right text-[12px] font-semibold text-black">{Number(ingredient.quantity || ingredient.quantity_consumed || 0).toLocaleString()} {ingredient.unit || ''}<span className="block text-[10px] font-normal text-black/45">estimated usage</span></span></div><div className="mt-2 h-1.5 overflow-hidden rounded-full bg-gray-100"><div className="h-full rounded-full bg-[#D4AF37]" style={{ width: `${Math.min(100, Number(ingredient.percentage || 0))}%` }} /></div>{ingredient.estimated_days_remaining !== null && <p className="mt-1 text-[10px] text-black/45">Estimated remaining: {ingredient.estimated_days_remaining} days</p>}</div>) : <AnalyticsEmpty />}
+                    </div>
+                  </Panel>
+                </div>
+
+                <Panel eyebrow="Inventory" title="Low-stock ingredients">
+                  <div className="grid gap-2 p-4 sm:grid-cols-2 lg:grid-cols-3">
+                    {lowStockIngredients.length ? lowStockIngredients.slice(0, 6).map((ingredient) => <div key={ingredient.id || ingredient.ingredient_id} className="rounded-xl border border-amber-200 bg-amber-50/50 p-3"><p className="text-[13px] font-semibold text-black/80">{ingredient.name || ingredient.ingredient}</p><p className="mt-1 text-[12px] text-amber-800">{ingredient.stock} {ingredient.unit} available · threshold {ingredient.threshold}</p></div>) : <AnalyticsEmpty />}
+                  </div>
+                </Panel>
+
+                <Panel eyebrow="Ingredient Risk" title="High-demand cakes using low-stock ingredients">
+                  <div className="grid gap-3 p-4 md:grid-cols-2">
+                    {analytics.ingredientAnalytics?.high_demand_cakes?.length ? analytics.ingredientAnalytics.high_demand_cakes.slice(0, 6).map((risk, index) => <div key={`${risk.cake}-${risk.ingredient}-${index}`} className="rounded-xl border border-amber-200 bg-amber-50/50 p-4"><p className="text-[13px] font-semibold text-black/80">{risk.cake}</p><p className="mt-1 text-[11px] text-black/55">Estimated demand usage: {Number(risk.estimated_quantity || 0).toLocaleString()} {risk.unit}</p><p className="mt-2 text-[12px] font-semibold text-amber-800">⚠ {risk.ingredient} is low stock</p></div>) : <AnalyticsEmpty />}
+                  </div>
+                </Panel>
+
+                <Panel eyebrow="Ingredient & Waste Analytics" title="Waste and ingredient loss insights">
+                  {Number(wasteAnalytics.records || 0) === 0 ? <div className="px-6 py-7 text-center text-[13px] text-black/60">No waste recorded for this period.</div> : <div className="space-y-6 p-4">
+                    <div className="grid gap-3 sm:grid-cols-3">
+                      <div className="rounded-xl border border-black/10 p-4"><p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-black/45">Waste Records</p><p className="mt-2 text-xl font-bold">{Number(wasteAnalytics.records).toLocaleString()}</p></div>
+                      <div className="rounded-xl border border-black/10 p-4"><p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-black/45">Waste Value</p><p className="mt-2 text-xl font-bold">₱{Number(wasteAnalytics.waste_value || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</p></div>
+                      <div className="rounded-xl border border-black/10 p-4"><p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-black/45">Waste Quantity</p><p className="mt-2 text-sm font-semibold text-black/70">{(wasteAnalytics.total_by_unit || []).map((item) => `${Number(item.quantity).toLocaleString()} ${item.unit}`).join(' · ')}</p></div>
+                    </div>
+                    <div className="grid gap-6 lg:grid-cols-2">
+                      <div><p className="mb-2 px-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-black/45">Most wasted ingredients</p><RankedList rows={wasteAnalytics.by_item || []} quantityLabel="wasted" quantityUnitKey="unit" /></div>
+                      <div><p className="mb-2 px-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-black/45">Waste reasons</p><div className="space-y-2 rounded-xl border border-black/10 p-4">{(wasteAnalytics.by_reason || []).map((reason) => <div key={reason.reason} className="flex items-center justify-between text-[13px]"><span className="text-black/70">{reason.reason || 'Unspecified'}</span><span className="font-semibold text-black">{Number(reason.quantity).toLocaleString()}</span></div>)}</div></div>
+                    </div>
+                    {(wasteAnalytics.high_waste_low_stock || []).length > 0 && <div><p className="mb-2 px-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-black/45">High waste / low stock</p><div className="grid gap-2 sm:grid-cols-2">{wasteAnalytics.high_waste_low_stock.slice(0, 6).map((item) => <div key={item.name} className="rounded-xl border border-amber-200 bg-amber-50/60 p-3"><p className="text-[13px] font-semibold text-black/80">{item.name}</p><p className="mt-1 text-[12px] text-amber-900">{Number(item.quantity).toLocaleString()} {item.unit} wasted · {Number(item.current_stock).toLocaleString()} {item.unit} remaining</p></div>)}</div></div>}
+                  </div>}
+                </Panel>
+              </>
+            )}
           </div>
 
           <div className="mb-8">

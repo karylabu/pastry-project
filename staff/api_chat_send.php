@@ -10,7 +10,18 @@ header('Access-Control-Allow-Headers: Content-Type');
 
 require_once __DIR__ . '/../includes/db.php';
 require_once __DIR__ . '/../includes/api_auth.php';
-requireInventoryWrite();
+$authenticatedUser = apiUser();
+if (!$authenticatedUser) {
+    http_response_code(401);
+    echo json_encode(['success' => false, 'message' => 'Authentication required.']);
+    exit;
+}
+
+if (trim(strtolower((string) ($authenticatedUser['role'] ?? ''))) !== 'admin') {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'message' => 'You are not authorized for this action.']);
+    exit;
+}
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     http_response_code(200);

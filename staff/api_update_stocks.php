@@ -2,7 +2,18 @@
 require_once __DIR__ . '/../includes/api_auth.php';
 require_once __DIR__ . '/../includes/inventory.php';
 
-requireInventoryWrite();
+$authenticatedUser = apiUser();
+if (!$authenticatedUser) {
+    http_response_code(401);
+    echo json_encode(['success' => false, 'message' => 'Authentication required.']);
+    exit;
+}
+
+if (strtolower(trim((string) ($authenticatedUser['role'] ?? ''))) !== 'admin') {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'message' => 'You are not authorized for this action.']);
+    exit;
+}
 
 function getSessionUserId(): int {
     if (session_status() !== PHP_SESSION_ACTIVE) {
@@ -321,8 +332,15 @@ if ($action === "produce") {
             exit;
         }
 
-        $ingredientMasterUpdate = $conn->prepare("UPDATE ingredients SET stock = ?, updated_at = NOW() WHERE id = ?");
-        $ingredientMasterUpdate->bind_param('di', $aggregateAfter, $ingredientId);
+    }
+
+    $batchUpdateStmt->close();
+    $allocInsertStmt->close();
+    $ingredientMovementStmt->close();
+
+    foreach (array_keys($productionIngredientBeforeStock) as $ingredientId) {
+        $ingredientMasterUpdate = $conn->prepare("UPDATE ingredients i SET stock = (SELECT COALESCE(SUM(ib.quantity_remaining), 0) FROM ingredient_batches ib WHERE ib.ingredient_id = i.id AND ib.quantity_remaining > 0 AND (ib.expiry_date IS NULL OR ib.expiry_date >= CURDATE()) AND NOT EXISTS (SELECT 1 FROM discard_requests dr WHERE dr.ingredient_batch_id = ib.id AND dr.status = 'Pending')), updated_at = NOW() WHERE i.id = ?");
+        $ingredientMasterUpdate->bind_param('i', $ingredientId);
         if (!$ingredientMasterUpdate->execute()) {
             $ingredientMasterUpdate->close();
             $conn->rollback();
@@ -334,10 +352,6 @@ if ($action === "produce") {
         }
         $ingredientMasterUpdate->close();
     }
-
-    $batchUpdateStmt->close();
-    $allocInsertStmt->close();
-    $ingredientMovementStmt->close();
 
     $productUpdate = $conn->prepare("UPDATE products SET stock = stock + ? WHERE id = ?");
     $productUpdate->bind_param('ii', $qty, $id);

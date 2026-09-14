@@ -11,7 +11,7 @@ class ProductRecipe extends Model
 
     protected $table = 'product_recipes';
 
-    protected $fillable = ['product_id', 'ingredient_id', 'qty', 'active'];
+    protected $fillable = ['product_id', 'product_size_id', 'ingredient_id', 'qty', 'active'];
 
     protected $casts = [
         'qty' => 'float',
@@ -21,6 +21,11 @@ class ProductRecipe extends Model
     public function product()
     {
         return $this->belongsTo(Product::class);
+    }
+
+    public function productSize()
+    {
+        return $this->belongsTo(ProductSize::class);
     }
 
     public function ingredient()

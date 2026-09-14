@@ -35,17 +35,14 @@ function getStoredUser() {
   }
 }
 
-// Admin-facing nav. Includes everything staff can see (inventory, live
-// orders, order history, custom cake requests, sales reports, waste
-// tracking) plus admin-only tools: predictive demand, supplier
-// management, user management, and customers.
+// Admin-facing navigation contains all internal management functions.
 function normalizeRole(role) {
   return String(role || "").trim().toLowerCase();
 }
 
 function isAdminRole(role) {
   const normalized = normalizeRole(role);
-  return ["admin", "administrator", "superadmin", "super_admin", "owner", "shop_owner"].includes(normalized);
+  return ["admin", "administrator", "superadmin", "super_admin", "manager", "owner", "shop_owner"].includes(normalized);
 }
 
 const NAV_GROUPS = [

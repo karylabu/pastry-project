@@ -123,6 +123,7 @@ if ($action === 'list' || $action === 'all') {
     $stmt = $pdo->query("
         SELECT *
         FROM products
+        " . ($action === 'list' ? "WHERE available = 1 AND LOWER(category) IN ('cake', 'cakes')" : "") . "
         ORDER BY category, name
     ");
 
@@ -130,26 +131,6 @@ if ($action === 'list' || $action === 'all') {
     foreach ($products as &$product) {
         $product['sizes'] = getProductSizeOptions($pdo, $product);
         $product['price'] = (float) ($product['price'] ?? 0);
-        if (empty($product['sizes'])) {
-            $product['price'] = max(
-                (float) ($product['price'] ?? 0),
-                (float) ($product['slice_price'] ?? 0),
-                (float) ($product['small_price'] ?? 0),
-                (float) ($product['big_price'] ?? 0),
-                (float) ($product['meal_price'] ?? 0),
-                (float) ($product['combo_price'] ?? 0),
-                (float) ($product['solo_price'] ?? 0),
-                (float) ($product['sharing_price'] ?? 0)
-            );
-            $product['sizes'] = [
-                [
-                    'id' => 0,
-                    'size' => 'Regular',
-                    'price' => $product['price'],
-                    'available' => (int) ($product['available'] ?? 1),
-                ]
-            ];
-        }
     }
     unset($product);
 
@@ -185,7 +166,7 @@ if ($action === 'bestsellers') {
         }
     }
 
-    $productsStmt = $pdo->query("SELECT * FROM products WHERE available = 1 AND stock > 0");
+    $productsStmt = $pdo->query("SELECT * FROM products WHERE available = 1 AND stock > 0 AND LOWER(category) IN ('cake', 'cakes')");
     $bestSellers = [];
     foreach ($productsStmt->fetchAll() as $product) {
         $name = strtolower(trim((string) ($product['name'] ?? '')));
@@ -660,7 +641,7 @@ if ($action === 'recommendations') {
     $favoriteIds = array_map('intval', $favoriteStmt->fetchAll(PDO::FETCH_COLUMN));
     $favoriteSet = array_fill_keys(array_map('strval', $favoriteIds), true);
 
-    $eligibleProducts = $pdo->query("SELECT * FROM products WHERE available = 1 AND stock > 0 ORDER BY name ASC")->fetchAll();
+    $eligibleProducts = $pdo->query("SELECT * FROM products WHERE available = 1 AND stock > 0 AND LOWER(category) IN ('cake', 'cakes') ORDER BY name ASC")->fetchAll();
 
     $results = [];
     $previousSet = array_fill_keys($previousProducts, true);

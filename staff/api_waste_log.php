@@ -2,7 +2,18 @@
 require_once __DIR__ . '/../includes/api_auth.php';
 require_once __DIR__ . '/../includes/inventory.php';
 
-requireInventoryWrite();
+$authenticatedUser = apiUser();
+if (!$authenticatedUser) {
+    http_response_code(401);
+    echo json_encode(['success' => false, 'message' => 'Authentication required.']);
+    exit;
+}
+
+if (strtolower(trim((string) ($authenticatedUser['role'] ?? ''))) !== 'admin') {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'message' => 'You are not authorized for this action.']);
+    exit;
+}
 /**
  * api_waste_log.php
  *
@@ -117,16 +128,6 @@ function getItemCatalogue($conn) {
     echo json_encode(["success" => true, "items" => $items]);
 }
 
-function synchronizeIngredientStock(mysqli $conn, int $ingredientId): float {
-    $stmt = $conn->prepare('SELECT COALESCE(SUM(quantity_remaining), 0) AS total FROM ingredient_batches WHERE ingredient_id = ?');
-    $stmt->bind_param('i', $ingredientId); $stmt->execute();
-    $total = (float) ($stmt->get_result()->fetch_assoc()['total'] ?? 0); $stmt->close();
-    $update = $conn->prepare('UPDATE ingredients SET stock = ?, updated_at = NOW() WHERE id = ?');
-    $update->bind_param('di', $total, $ingredientId);
-    if (!$update->execute()) { $update->close(); throw new RuntimeException('Failed to synchronize ingredient stock'); }
-    $update->close(); return $total;
-}
-
 function createIngredientWasteEntry(mysqli $conn, array $body, int $ingredientId, string $item, float $qty, string $reason, string $datetime, string $idempotencyKey): void {
     $conn->begin_transaction();
     try {
@@ -138,7 +139,7 @@ function createIngredientWasteEntry(mysqli $conn, array $body, int $ingredientId
 
         $requestedBatchId = max(0, (int) ($body['ingredient_batch_id'] ?? $body['batch_id'] ?? 0));
         if ($requestedBatchId > 0) {
-            $batchStmt = $conn->prepare('SELECT id, batch_number, quantity_remaining FROM ingredient_batches WHERE id = ? AND ingredient_id = ? AND quantity_remaining > 0 FOR UPDATE');
+            $batchStmt = $conn->prepare("SELECT id, batch_number, quantity_remaining FROM ingredient_batches WHERE id = ? AND ingredient_id = ? AND quantity_remaining > 0 AND (expiry_date IS NULL OR expiry_date >= CURDATE()) AND NOT EXISTS (SELECT 1 FROM discard_requests d WHERE d.ingredient_batch_id = ingredient_batches.id AND d.status = 'Pending') FOR UPDATE");
             $batchStmt->bind_param('ii', $requestedBatchId, $ingredientId);
         } else {
             $batchStmt = $conn->prepare("SELECT id, batch_number, quantity_remaining FROM ingredient_batches WHERE ingredient_id = ? AND quantity_remaining > 0 AND (expiry_date IS NULL OR expiry_date >= CURDATE()) AND NOT EXISTS (SELECT 1 FROM discard_requests d WHERE d.ingredient_batch_id = ingredient_batches.id AND d.status = 'Pending') ORDER BY expiry_date IS NULL, expiry_date ASC, id ASC FOR UPDATE");
@@ -176,7 +177,12 @@ function createIngredientWasteEntry(mysqli $conn, array $body, int $ingredientId
             if (!$movement->execute()) { $movement->close(); throw new RuntimeException('Failed to record waste movement'); }
             $movement->close(); $before = $after;
         }
-        $newStock = synchronizeIngredientStock($conn, $ingredientId);
+        $syncStmt = $conn->prepare("SELECT COALESCE(SUM(ib.quantity_remaining), 0) AS total FROM ingredient_batches ib WHERE ib.ingredient_id = ? AND ib.quantity_remaining > 0 AND (ib.expiry_date IS NULL OR ib.expiry_date >= CURDATE()) AND NOT EXISTS (SELECT 1 FROM discard_requests dr WHERE dr.ingredient_batch_id = ib.id AND dr.status = 'Pending')");
+        $syncStmt->bind_param('i', $ingredientId); $syncStmt->execute(); $newStock = (float) ($syncStmt->get_result()->fetch_assoc()['total'] ?? 0); $syncStmt->close();
+        $ingredientUpdate = $conn->prepare('UPDATE ingredients SET stock = ?, updated_at = NOW() WHERE id = ?');
+        $ingredientUpdate->bind_param('di', $newStock, $ingredientId);
+        if (!$ingredientUpdate->execute()) { $ingredientUpdate->close(); throw new RuntimeException('Failed to synchronize ingredient stock'); }
+        $ingredientUpdate->close();
         $conn->commit();
         echo json_encode(['success' => true, 'entry' => ['id' => $newId, 'datetime' => $datetime, 'item' => $item, 'qty' => $qty, 'unit_cost' => $unitCost, 'cost' => round($qty * $unitCost, 2), 'type' => 'Raw Material', 'reason' => $reason], 'new_stock' => $newStock]);
     } catch (Throwable $error) {

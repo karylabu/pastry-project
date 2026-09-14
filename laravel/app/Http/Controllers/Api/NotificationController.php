@@ -21,7 +21,7 @@ class NotificationController extends Controller
 
         $user = User::find($userId);
 
-        if (! $user || ! in_array($user->role, ['admin', 'staff'], true)) {
+        if (! $user || $user->role !== 'admin') {
             return null;
         }
 
@@ -126,7 +126,7 @@ class NotificationController extends Controller
         }
 
         $user = User::find($userId);
-        if (! $user || ! in_array($user->role, ['admin', 'staff'], true)) {
+        if (! $user || $user->role !== 'admin') {
             return response()->json([
                 'success' => false,
                 'message' => 'Unable to register device token for this user.',
@@ -170,7 +170,7 @@ class NotificationController extends Controller
             ], 422);
         }
 
-        $query = User::query()->whereIn('role', ['admin', 'staff']);
+        $query = User::query()->where('role', 'admin');
 
         if (is_array($userIds) && count($userIds) > 0) {
             $query->whereIn('id', $userIds);

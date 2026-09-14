@@ -9,8 +9,7 @@ use Illuminate\Support\Facades\DB;
 abstract class Controller
 {
     /**
-     * Helper to get authenticated user from either Laravel session,
-     * Bearer token (hex), or Bearer token (base64 legacy).
+     * Helper to get authenticated user from Laravel auth or a valid session token.
      */
     protected function getAuthenticatedUser(Request $request)
     {

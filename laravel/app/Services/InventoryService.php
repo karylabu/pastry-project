@@ -61,6 +61,13 @@ class InventoryService
     {
         $newStock = (float) IngredientBatch::query()
             ->where('ingredient_id', $ingredientId)
+            ->where('quantity_remaining', '>', 0)
+            ->where(function ($query) {
+                $query->whereNull('expiry_date')->orWhereDate('expiry_date', '>=', today());
+            })
+            ->whereDoesntHave('discardRequests', function ($query) {
+                $query->where('status', 'Pending');
+            })
             ->sum('quantity_remaining');
 
         Ingredient::query()->whereKey($ingredientId)->update([
@@ -115,7 +122,7 @@ class InventoryService
                 throw new RuntimeException('A discard request is already pending for this batch.');
             }
 
-            return DiscardRequest::create([
+            $discard = DiscardRequest::create([
                 'ingredient_id' => $batch->ingredient_id,
                 'ingredient_batch_id' => $batch->id,
                 'quantity' => $data['quantity'],
@@ -124,6 +131,8 @@ class InventoryService
                 'status' => 'Pending',
                 'requested_by' => $userId,
             ]);
+            $this->synchronizeIngredientStock((int) $batch->ingredient_id);
+            return $discard;
         });
     }
 

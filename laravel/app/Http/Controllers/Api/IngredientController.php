@@ -26,7 +26,7 @@ class IngredientController extends Controller
      */
     public function store(Request $request): JsonResponse
     {
-        if ($response = $this->authorizeStaffManager($request)) {
+        if ($response = $this->authorizeAdmin($request)) {
             return $response;
         }
 
@@ -69,7 +69,7 @@ class IngredientController extends Controller
      */
     public function update(Request $request, Ingredient $ingredient): JsonResponse
     {
-        if ($response = $this->authorizeStaffManager($request)) {
+        if ($response = $this->authorizeAdmin($request)) {
             return $response;
         }
 
@@ -112,7 +112,7 @@ class IngredientController extends Controller
      */
     public function destroy(Request $request, Ingredient $ingredient): JsonResponse
     {
-        if ($response = $this->authorizeStaffManager($request)) {
+        if ($response = $this->authorizeAdmin($request)) {
             return $response;
         }
 
@@ -151,7 +151,7 @@ class IngredientController extends Controller
      */
     public function adjustStock(Request $request, Ingredient $ingredient): JsonResponse
     {
-        if ($response = $this->authorizeStaffManager($request)) {
+        if ($response = $this->authorizeAdmin($request)) {
             return $response;
         }
 
@@ -216,7 +216,7 @@ class IngredientController extends Controller
                 'ingredient' => [
                     'id' => (int) $ingredient->id,
                     'name' => $ingredient->name,
-                    'stock' => (float) $ingredient->stock,
+                    'stock' => (float) $batch->getAttribute('synchronized_stock'),
                     'unit' => $ingredient->unit,
                 ],
             ]);
@@ -253,6 +253,7 @@ class IngredientController extends Controller
 
         $remaining = $qty;
         $totalConsumed = 0;
+        $previousStock = (float) $usableBatches->sum('quantity_remaining');
 
         foreach ($usableBatches as $batch) {
             if ($remaining <= 0.000001) break;
@@ -268,7 +269,7 @@ class IngredientController extends Controller
             }
 
             // Record the movement
-            $previousStock = (float) $ingredient->stock;
+            $newStock = $previousStock - $consumed;
             $this->inventory->recordMovement(
                 (int) $ingredient->id,
                 (int) $batch->id,
@@ -276,11 +277,18 @@ class IngredientController extends Controller
                 $note ?: "Manual stock-out adjustment",
                 $user?->id,
                 'manual_adjustment',
-                0
+                0,
+                $previousStock,
+                $newStock
             );
 
             $totalConsumed += $consumed;
             $remaining -= $consumed;
+            $previousStock = $newStock;
+        }
+
+        if ($remaining > 0.000001) {
+            throw new RuntimeException('Insufficient usable batch stock for stock-out adjustment.');
         }
 
         // Synchronize master stock after all batch reductions
@@ -304,7 +312,7 @@ class IngredientController extends Controller
      */
     public function syncFromRecipes(Request $request): JsonResponse
     {
-        if ($response = $this->authorizeStaffManager($request)) {
+        if ($response = $this->authorizeAdmin($request)) {
             return $response;
         }
 
@@ -344,17 +352,17 @@ class IngredientController extends Controller
     }
 
     /**
-     * Authorize staff or manager role.
+    * Authorize the admin role.
      */
-    private function authorizeStaffManager(Request $request): ?JsonResponse
+    private function authorizeAdmin(Request $request): ?JsonResponse
     {
         $user = $this->getAuthenticatedUser($request);
         if (!$user) {
-            return response()->json(['success' => false, 'message' => 'Staff authorization required.'], 401);
+            return response()->json(['success' => false, 'message' => 'Admin authorization required.'], 401);
         }
 
-        if (!in_array(strtolower((string) $user->role), ['staff', 'manager', 'admin'], true)) {
-            return response()->json(['success' => false, 'message' => 'Staff authorization required.'], 403);
+        if ($user->role !== 'admin') {
+            return response()->json(['success' => false, 'message' => 'Admin authorization required.'], 403);
         }
 
         return null;
