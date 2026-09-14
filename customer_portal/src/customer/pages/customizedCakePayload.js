@@ -33,5 +33,11 @@ export function buildCustomizedCakeSubmissionPayload(formState, flavorOptions = 
     })),
     user_id: Number(formState.userId || 0),
     order_id: formState.orderId || null,
+    reference_image: formState.referenceImage ? {
+      type: formState.referenceImage.type,
+      id: formState.referenceImage.id,
+      url: formState.referenceImage.url,
+      name: formState.referenceImage.name,
+    } : null,
   };
 }

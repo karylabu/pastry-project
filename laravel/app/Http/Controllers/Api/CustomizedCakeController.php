@@ -217,6 +217,9 @@ class CustomizedCakeController extends Controller
         $payload = $request->all();
         $cakeType = $payload['cake_type'] ?? 'single';
         $tiers = $payload['tiers'] ?? [];
+        if (is_string($tiers)) {
+            $tiers = json_decode($tiers, true) ?: [];
+        }
 
         if (!is_array($tiers) || $tiers === []) {
             return response()->json([
@@ -270,7 +273,32 @@ class CustomizedCakeController extends Controller
         }
 
         try {
-            $customizedCakeOrderId = DB::transaction(function () use ($cakeType, $tiers, $payload) {
+            $referenceImage = json_decode((string) ($payload['reference_image'] ?? ''), true);
+            $referenceImage = is_array($referenceImage) ? $referenceImage : null;
+            $uploadedImages = [];
+            if ($request->hasFile('files')) {
+                $destination = public_path('uploads/customized-cakes');
+                if (!is_dir($destination)) mkdir($destination, 0755, true);
+                foreach (array_values((array) $request->file('files')) as $index => $file) {
+                    if ($file->isValid()) {
+                        $name = 'reference_' . uniqid() . '.' . $file->extension();
+                        $file->move($destination, $name);
+                        $uploadedImages[] = [
+                            'type' => $referenceImage['type'] ?? 'upload',
+                            'id' => $referenceImage['id'] ?? ('upload-' . $name),
+                            'url' => ($referenceImage['type'] ?? null) === 'example' ? ($referenceImage['url'] ?? null) : null,
+                            'name' => $referenceImage['name'] ?? $file->getClientOriginalName(),
+                            'path' => 'uploads/customized-cakes/' . $name,
+                        ];
+                        if ($index === 0) break;
+                    }
+                }
+            }
+            if ($uploadedImages === [] && $referenceImage) {
+                $uploadedImages[] = $referenceImage;
+            }
+
+            $customizedCakeOrderId = DB::transaction(function () use ($cakeType, $tiers, $payload, $uploadedImages) {
                 $orderId = !empty($payload['order_id']) ? (int) $payload['order_id'] : null;
                 if (!$orderId && Schema::hasTable('orders')) {
                     $user = !empty($payload['user_id']) ? DB::table('users')->where('id', (int) $payload['user_id'])->first() : null;
@@ -304,6 +332,7 @@ class CustomizedCakeController extends Controller
                     'cake_type' => $cakeType,
                     'status' => 'pending',
                     'notes' => $payload['notes'] ?? null,
+                    'inspo_images' => json_encode($uploadedImages),
                     'created_at' => now(),
                     'updated_at' => now(),
                 ]);

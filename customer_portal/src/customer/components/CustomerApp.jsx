@@ -16,6 +16,12 @@ import PrivacyPage from '../pages/PrivacyPage';
 import Menu from '../pages/Menu';
 import Orders from '../pages/Orders';
 import CustomizedCakes from '../pages/CustomizedCakes';
+import BirthdayDesigns from '../pages/BirthdayDesigns';
+import CutesyDesigns from '../pages/CutesyDesigns';
+import HolidayDesigns from '../pages/HolidayDesigns';
+import KidsDesigns from '../pages/KidsDesigns';
+import WeddingDesigns from '../pages/WeddingDesigns';
+import FloralDesigns from '../pages/FloralDesigns';
 import Profile from '../pages/Profile';
 import Rewards from '../pages/Rewards';
 import Favorites from '../pages/Favorites';
@@ -209,6 +215,12 @@ export default function CustomerApp() {
         <Route path="menu" element={<Menu onAddToCart={addToCart} />} />
         <Route path="orders" element={<Orders />} />
         <Route path="customized-cakes" element={<CustomizedCakes />} />
+        <Route path="birthday-designs" element={<BirthdayDesigns />} />
+        <Route path="cutesy-designs" element={<CutesyDesigns />} />
+        <Route path="holiday-designs" element={<HolidayDesigns />} />
+        <Route path="kids-designs" element={<KidsDesigns />} />
+        <Route path="wedding-designs" element={<WeddingDesigns />} />
+        <Route path="floral-designs" element={<FloralDesigns />} />
         <Route path="profile" element={<Profile />} />
         <Route path="rewards" element={<Rewards />} />
         <Route path="favorites" element={<Favorites />} />

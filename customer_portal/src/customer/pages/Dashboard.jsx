@@ -1,6 +1,29 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { MessageCircle, X, Send, Bot, User, Headphones, Paperclip, ArrowLeft, Phone, Plus, History, ChevronLeft, ChevronRight, Gift, Star, Tag } from "lucide-react";
+import {
+  MessageCircle,
+  X,
+  Send,
+  Bot,
+  User,
+  Headphones,
+  Paperclip,
+  ArrowLeft,
+  Phone,
+  Plus,
+  History,
+  ChevronLeft,
+  ChevronRight,
+  Gift,
+  Star,
+  Tag,
+  Heart,
+  ClipboardList,
+  CakeSlice,
+  Baby,
+  Flower2,
+  Sparkles,
+} from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 import ProductModal from "../components/ProductModal";
@@ -242,6 +265,7 @@ function RecommendationCard({ product, onSelect }) {
   const fallbackImage = getCategoryFallbackImage(product?.category);
   const normalizedProductName = String(product?.name || '').trim().toLowerCase();
   const isStarterProduct = /\b(starter|starters)\b/i.test(String(product?.category || ''));
+  const shouldEnlargeCakeImage = /\b(caramel|sans rival|sansrival)\b/i.test(normalizedProductName);
   const shouldEnlargeDrinkSize = /\b(strawberry fruit tea|matcha|vanilla|mango ade|blueberry ade|blueberry fizz|strawberry fizz|passion fruit tea|kiwi fruit tea)\b/i.test(normalizedProductName);
   const isSmallCoffeeProduct = /\b(matcha latte|vanilla|white chocolate)\b/i.test(normalizedProductName) && /\bcoffee\b/i.test(String(product?.category || ''));
 
@@ -261,8 +285,8 @@ function RecommendationCard({ product, onSelect }) {
     ?? Number(product?.price || 0);
 
   return (
-    <div className="flex h-full min-h-[290px] min-w-0 flex-col rounded-[20px] border border-stone-200 bg-white p-2 shadow-[0_8px_20px_rgba(15,23,42,0.03)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_12px_24px_rgba(15,23,42,0.06)]">
-      <div className="mb-3 flex h-[146px] w-full flex-shrink-0 items-center justify-center overflow-hidden rounded-[16px] border border-stone-100 bg-[#f7f5f2] p-2">
+    <div className="flex h-full min-h-[226px] min-w-0 flex-col rounded-xl border border-[#eadfd8] bg-[#fffaf7] p-2 shadow-[0_5px_14px_rgba(91,64,39,0.06)] transition-all duration-200 hover:-translate-y-0.5 hover:border-[#e7c875] hover:shadow-[0_10px_20px_rgba(91,64,39,0.1)]">
+      <div className="mb-2 flex h-[105px] w-full flex-shrink-0 items-center justify-center overflow-hidden rounded-lg border border-[#f1e6df] bg-[#f8eee8] p-1">
         <img
           src={resolveProductImage(product)}
           alt={product.name}
@@ -272,19 +296,19 @@ function RecommendationCard({ product, onSelect }) {
           }}
           className={
             shouldEnlargeDrinkSize || isSmallCoffeeProduct
-              ? `h-[120px] w-auto max-w-[82%] max-h-[120px] object-contain object-center transition-transform duration-500 ${isSmallCoffeeProduct ? 'scale-110' : 'scale-105'}`
+              ? `h-[92px] w-auto max-w-[82%] max-h-[92px] object-contain object-center transition-transform duration-500 ${isSmallCoffeeProduct ? 'scale-110' : 'scale-105'}`
               : product?.category && /\b(cake|cakes|meal|meals|pasta|starter|starters)\b/i.test(String(product.category))
-                ? 'h-[104px] w-auto max-w-[72%] max-h-[104px] object-contain object-center transition-transform duration-500 scale-100'
-                : 'h-[120px] w-auto max-w-[82%] max-h-[120px] object-contain object-center transition-transform duration-500 scale-100'
+                ? `${shouldEnlargeCakeImage ? 'h-[104px] max-h-[104px] max-w-[90%]' : 'h-[94px] max-h-[94px] max-w-[84%]'} w-auto object-contain object-center transition-transform duration-500 scale-100`
+                : 'h-[92px] w-auto max-w-[82%] max-h-[92px] object-contain object-center transition-transform duration-500 scale-100'
           }
                   style={isStarterProduct ? { mixBlendMode: 'multiply' } : undefined}
         />
       </div>
 
-      <h3 className="min-h-[1.6rem] line-clamp-2 text-[12px] font-bold leading-tight text-gray-800">{product.name}</h3>
-      <p className="mt-1 text-[12px] font-semibold text-black">₱{Number(selectedPrice || 0).toLocaleString()}</p>
+      <h3 className="min-h-[1.35rem] line-clamp-2 text-[11px] font-bold leading-tight text-[#33251e]">{product.name}</h3>
+      <p className="mt-0.5 text-[11px] font-semibold text-[#33251e]">₱{Number(selectedPrice || 0).toLocaleString()}</p>
 
-      <div className="mt-1 flex flex-wrap justify-center gap-1">
+      <div className="mt-1 flex min-h-[16px] flex-wrap justify-center gap-1">
         {sizeOptions.map((option) => {
           const label = String(option.size || 'Regular');
           const isSelected = selectedSize === label;
@@ -305,20 +329,49 @@ function RecommendationCard({ product, onSelect }) {
         })}
       </div>
 
-      <p className="mt-1 text-[9.5px] text-gray-500 line-clamp-2">
-        {product.description || 'Freshly baked and customer favorite.'}
-      </p>
-      <p className="mt-1 text-[7.5px] font-semibold uppercase tracking-[0.14em] text-[#d4af37]">
-        {product.reason}
-      </p>
-
       <button
         onClick={() => onSelect?.(product, selectedSize, Number(selectedPrice || product.price || 0))}
-        className="mt-auto h-8 w-full rounded-[10px] bg-[#111827] py-2 text-[8.5px] font-semibold uppercase tracking-[0.15em] text-white transition-colors hover:bg-[#d4af37] hover:text-black"
+        className="mt-2 h-7 w-full rounded-lg border border-[#eadfca] bg-[#fff8e9] py-1.5 text-[8px] font-semibold text-[#33251e] transition-colors hover:border-[#e7c875] hover:bg-[#fff8df] hover:text-[#8d6a2e]"
       >
         Add to Cart
       </button>
     </div>
+  );
+}
+
+const CUSTOMER_TESTIMONIALS = [
+  { name: 'Alyssa D.', initials: 'AD', quote: 'The cake was so good! Fresh, beautiful, and exactly what I ordered. Will definitely order again!' },
+  { name: 'Mark T.', initials: 'MT', quote: 'Super easy to customize and the design was perfect for my daughter\'s birthday!' },
+  { name: 'Camille S.', initials: 'CS', quote: 'Their cakes are always fresh and delicious! Highly recommended!' },
+  { name: 'Jamie R.', initials: 'JR', quote: 'The details were lovely and the whole ordering experience was smooth.' },
+  { name: 'Nica P.', initials: 'NP', quote: 'Beautiful cake, generous portions, and it arrived right on time.' },
+  { name: 'Daniel C.', initials: 'DC', quote: 'The flavor was amazing. Pastry Project is now our family favorite.' },
+];
+
+function TestimonialsSection() {
+  const [slide, setSlide] = useState(0);
+  const visibleTestimonials = CUSTOMER_TESTIMONIALS.slice(slide, slide + 3);
+  const maxSlide = CUSTOMER_TESTIMONIALS.length - 3;
+
+  return (
+    <section className="relative overflow-hidden bg-[#fffaf0] px-4 py-10 sm:px-8 md:px-12">
+      <div className="mx-auto max-w-[1100px]">
+        <div className="text-center"><p className="text-[9px] font-black uppercase tracking-[0.3em] text-[#9b7b3d]">Customer love</p><h2 className="mt-1 font-serif text-2xl text-[#3c2925] md:text-3xl">Real People, Real Sweet Moments</h2><p className="mt-1 text-xs text-[#765f5d]">See what our customers are saying!</p></div>
+        <div className="relative mt-7 grid gap-4 md:grid-cols-3">
+          {visibleTestimonials.map((testimonial) => (
+            <article key={testimonial.name} className="rounded-xl border border-[#eadfd8] bg-white px-5 py-5 text-center shadow-[0_6px_16px_rgba(91,64,39,0.08)]">
+              <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-[#f5eee5] text-xs font-black text-[#7c654f]">{testimonial.initials}</div>
+              <p className="mt-4 min-h-[72px] text-[11px] leading-5 text-[#413734]">“{testimonial.quote}”</p>
+              <p className="mt-3 text-[11px] font-bold text-[#765d50]">- {testimonial.name}</p>
+              <div className="mt-2 flex justify-center gap-0.5 text-[#e8b52e]" aria-label="5 out of 5 stars">{[1, 2, 3, 4, 5].map((star) => <Star key={star} size={14} fill="currentColor" strokeWidth={1.4} />)}</div>
+            </article>
+          ))}
+          <button type="button" aria-label="Previous testimonials" disabled={slide === 0} onClick={() => setSlide((current) => Math.max(0, current - 1))} className="absolute -left-4 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full border border-[#eadfd8] bg-white text-[#765d50] shadow-sm disabled:opacity-40 md:-left-10"><ChevronLeft size={17} /></button>
+          <button type="button" aria-label="Next testimonials" disabled={slide === maxSlide} onClick={() => setSlide((current) => Math.min(maxSlide, current + 1))} className="absolute -right-4 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full border border-[#eadfd8] bg-white text-[#765d50] shadow-sm disabled:opacity-40 md:-right-10"><ChevronRight size={17} /></button>
+        </div>
+        <div className="mt-5 flex justify-center gap-1.5" aria-label="Testimonial pages">{Array.from({ length: maxSlide + 1 }, (_, index) => <button key={index} type="button" aria-label={`Show testimonial page ${index + 1}`} onClick={() => setSlide(index)} className={`h-1.5 rounded-full transition-all ${slide === index ? 'w-5 bg-[#8d6a2e]' : 'w-1.5 bg-[#eadfca]'}`} />)}</div>
+      </div>
+    </section>
   );
 }
 
@@ -1048,130 +1101,73 @@ export default function Dashboard({ onAddToCart }) {
         onCustomizeNow={() => navigate("/customer/customized-cakes")}
       />
 
-      <main className="mx-auto max-w-[1380px] px-4 py-7 md:px-7 lg:px-10">
-        <section className="mb-8 grid gap-4 rounded-2xl border border-[#e7dfd0] bg-[#fbf7f0] px-5 py-5 shadow-[0_6px_18px_rgba(91,64,39,0.04)] md:grid-cols-[1.35fr_0.8fr_0.9fr_0.9fr_auto] md:items-center md:gap-0 md:px-6 md:py-4">
-          <div className="flex items-center gap-4 md:border-r md:border-[#e7dfd0] md:pr-6">
-            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-[#ead9bd] text-[#33251e]"><Gift size={27} strokeWidth={1.7} /></div>
-            <div>
-              <p className="text-[10px] font-black uppercase tracking-[0.24em] text-[#9b7b3d]">Pastry Project Rewards</p>
-              <p className="mt-1 text-xl font-black leading-tight text-[#33251e]">Every order comes<br className="hidden lg:block" /> with a little extra.</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-3 md:justify-center md:border-r md:border-[#e7dfd0] md:px-5">
-            <Star size={21} strokeWidth={1.6} className="text-[#9b7b3d]" />
-            <div><p className="text-base font-black text-[#33251e]">10 points</p><p className="text-[11px] text-[#74675f]">Earn for every<br />₱100 spent.</p></div>
-          </div>
-          <div className="flex items-center gap-3 md:justify-center md:border-r md:border-[#e7dfd0] md:px-5">
-            <Gift size={21} strokeWidth={1.6} className="text-[#9b7b3d]" />
-            <div><p className="text-base font-black text-[#33251e]">1,000 points</p><p className="text-[11px] text-[#74675f]">Redeem for<br />5% OFF.</p></div>
-          </div>
-          <div className="flex items-center gap-3 md:justify-center md:px-5">
-            <Tag size={21} strokeWidth={1.6} className="text-[#9b7b3d]" />
-            <div><p className="text-base font-black text-[#33251e]">₱100 maximum</p><p className="text-[11px] text-[#74675f]">Discount cap<br />per reward.</p></div>
-          </div>
-          <button type="button" onClick={() => navigate('/customer/rewards')} className="inline-flex items-center justify-center gap-1 rounded-lg bg-[#211914] px-4 py-3 text-[10px] font-black uppercase tracking-[0.12em] text-white hover:bg-black md:ml-2">
-            My Rewards <ChevronRight size={13} />
-          </button>
-        </section>
-
-        <section className="mb-9">
-          <div className="mb-4 flex items-end justify-between border-b border-[#e7dfd0] pb-3">
-            <div>
-              <p className="text-[10px] font-black uppercase tracking-[0.25em] text-[#9b7b3d]">Curated for you</p>
-              <h2 className="mt-1 font-serif text-2xl font-bold text-[#33251e] md:text-3xl">Just for You</h2>
-              <p className="mt-1 text-xs text-[#9b8c83]">Our customers' top picks. You might love these!</p>
-            </div>
-            <button type="button" onClick={() => navigate('/customer/menu')} className="inline-flex items-center gap-1 text-[10px] font-bold text-[#6f5844] hover:text-black">
-              View all cakes <ChevronRight size={13} />
+      <main className="mx-auto max-w-[1380px] px-4 py-5 md:px-7 lg:px-10">
+        <div className="mb-3 grid grid-cols-2 gap-2 px-1 py-1 sm:grid-cols-3 md:grid-cols-6 md:gap-3">
+          {[
+            ['Birthday', CakeSlice, '/customer/birthday-designs'],
+            ['Cutesy', Sparkles, '/customer/cutesy-designs'],
+            ['Holidays', Gift, '/customer/holiday-designs'],
+            ['Kids Themes', Baby, '/customer/kids-designs'],
+            ['Wedding', Heart, '/customer/wedding-designs'],
+            ['Floral Designs', Flower2, '/customer/floral-designs'],
+          ].map(([label, Icon, path]) => (
+            <button
+              key={label}
+              type="button"
+              onClick={() => navigate(path)}
+              className="flex min-w-0 flex-col items-center justify-center gap-2 rounded-xl border border-[#eee4de] bg-white px-2 py-3 text-center text-[#5f514a] transition hover:-translate-y-0.5 hover:border-[#e7c875] hover:bg-[#fff8df] hover:text-[#8d6a2e]"
+            >
+              <Icon size={22} strokeWidth={1.6} className="shrink-0" />
+              <span className="w-full text-[10px] font-semibold leading-tight break-words">{label}</span>
             </button>
-          </div>
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-4 lg:grid-cols-6">
-            {(cakeRecommendations.length ? cakeRecommendations : bestSellers).slice(0, 4).map((product) => (
-              <RecommendationCard key={product.id} product={product} onSelect={handleSelectProduct} />
-            ))}
-          </div>
-        </section>
+          ))}
+        </div>
 
-        <section className="mb-9">
-          <div className="mb-4 flex items-end justify-between border-b border-[#e7dfd0] pb-3">
-            <div>
-              <p className="text-[10px] font-black uppercase tracking-[0.25em] text-[#9b7b3d]">Customer favorites</p>
-              <h2 className="mt-1 font-serif text-2xl font-bold text-[#33251e] md:text-3xl">Best Sellers</h2>
-            </div>
-            <button type="button" onClick={() => navigate('/customer/menu')} className="inline-flex items-center gap-1 text-[10px] font-bold text-[#6f5844] hover:text-black">
-              View all cakes <ChevronRight size={13} />
-            </button>
-          </div>
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-4 lg:grid-cols-6">
-            {bestSellers.slice(0, 6).map((product) => (
-              <RecommendationCard key={product.id} product={product} onSelect={handleSelectProduct} />
-            ))}
-          </div>
-        </section>
-
-        <section className="mb-9">
-          <div className="mb-4 flex items-end justify-between border-b border-[#e7dfd0] pb-3">
-            <div>
-              <p className="text-[10px] font-black uppercase tracking-[0.25em] text-[#9b7b3d]">Chef recommendation</p>
-              <h2 className="mt-1 font-serif text-2xl font-bold text-[#33251e] md:text-3xl">Must Try</h2>
-            </div>
-            <button type="button" onClick={() => navigate('/customer/menu')} className="inline-flex items-center gap-1 text-[10px] font-bold text-[#6f5844] hover:text-black">
-              Explore menu <ChevronRight size={13} />
-            </button>
-          </div>
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-4 lg:grid-cols-6">
-            {mustTry.slice(0, 6).map((product) => (
-              <RecommendationCard key={product.id} product={product} onSelect={handleSelectProduct} />
-            ))}
-          </div>
-        </section>
-
-        <section className="grid gap-4 pb-5 md:grid-cols-[1fr_1.2fr]">
-          <div className="rounded-2xl border border-[#e7dfd0] bg-white p-4 shadow-[0_8px_22px_rgba(91,64,39,0.05)] sm:p-5">
-            <div className="mb-4 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span className="h-1 w-7 rounded-full bg-[#b9955d]" />
-                <h2 className="font-serif text-xl font-bold text-[#33251e]">Recent Order</h2>
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,2.1fr)_minmax(300px,0.88fr)]">
+          <div className="min-w-0">
+            <section className="mb-4 overflow-hidden rounded-xl border border-[#eadfd8] bg-white shadow-[0_5px_18px_rgba(91,64,39,0.05)]">
+              <div className="flex items-center justify-between border-b border-[#f0e7e0] px-4 py-3 sm:px-5">
+                <div><p className="text-[9px] font-black uppercase tracking-[0.28em] text-[#b17876]">Featured cakes</p><h2 className="mt-0.5 font-serif text-xl text-[#33251e] md:text-2xl">Our Best Sellers</h2></div>
+                <button type="button" onClick={() => navigate('/customer/menu')} className="inline-flex items-center gap-1 text-[10px] font-bold text-[#765d50]">View All Cakes <ChevronRight size={13} /></button>
               </div>
-              <button type="button" onClick={() => navigate('/customer/orders')} className="inline-flex items-center gap-1 text-[10px] font-bold text-[#6f5844] hover:text-black">
-                View All Orders <ChevronRight size={13} />
-              </button>
-            </div>
-            {recentCompletedOrder && recentOrderItem ? (
-              <div className="flex flex-col gap-4 rounded-xl border border-[#f0e9df] bg-[#fdfcf9] p-3 sm:flex-row sm:items-center sm:px-4">
-                <img src={recentOrderImage} alt={recentOrderItem.name || 'Completed order'} className="h-20 w-20 shrink-0 rounded-xl bg-[#f5eee5] object-contain p-1" />
-                <div className="min-w-0 flex-1">
-                  <h3 className="truncate text-base font-bold text-[#33251e]">{recentOrderItem.name || 'Your recent order'}</h3>
-                  <p className="mt-1 text-sm font-semibold text-[#33251e]">₱{Number(recentCompletedOrder.total || recentOrderItem.price || 0).toLocaleString()}</p>
-                  <p className="mt-1 text-xs text-[#9b8c83]">Order #{recentCompletedOrder.id} <span className="mx-1">·</span> {recentCompletedOrder.created_at ? new Date(recentCompletedOrder.created_at).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' }) : 'Recently'}</p>
-                </div>
-                <div className="flex items-center gap-3 sm:ml-auto">
-                  <span className="rounded-full bg-[#fff0c7] px-4 py-2 text-xs font-semibold text-[#a47729]">{recentCompletedOrder.status || 'Completed'}</span>
-                  <button type="button" onClick={() => navigate('/customer/orders')} className="rounded-full border border-[#d9c9b8] px-4 py-2 text-xs font-semibold text-[#6f5844] hover:bg-[#f8f1e8]">View Details</button>
-                </div>
+              <div className="grid grid-cols-2 gap-3 p-3 sm:grid-cols-3 xl:grid-cols-5">
+                {(bestSellers.length ? bestSellers : mustTry).slice(0, 5).map((product) => <RecommendationCard key={product.id} product={product} onSelect={handleSelectProduct} />)}
               </div>
-            ) : (
-              <p className="rounded-xl border border-dashed border-[#e7dfd0] px-4 py-7 text-center text-xs text-[#9b8c83]">No completed orders yet.</p>
-            )}
+            </section>
+
+            <section className="mb-4 rounded-xl border border-[#eadfd8] bg-white p-4 shadow-[0_5px_18px_rgba(91,64,39,0.04)] sm:p-5">
+              <div className="mb-3 flex items-center justify-between"><div><p className="text-[9px] font-black uppercase tracking-[0.28em] text-[#b17876]">Curated for you</p><h2 className="mt-0.5 font-serif text-xl text-[#33251e]">Just for You</h2></div><button type="button" onClick={() => navigate('/customer/menu')} className="text-[10px] font-bold text-[#765d50]">View All <ChevronRight size={13} className="inline" /></button></div>
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">{(cakeRecommendations.length ? cakeRecommendations : mustTry).slice(0, 4).map((product) => <RecommendationCard key={product.id} product={product} onSelect={handleSelectProduct} />)}</div>
+            </section>
           </div>
-          <div className="relative min-h-[150px] overflow-hidden rounded-2xl border border-[#d3b58e] bg-[#f3e5d1] px-6 py-5 text-[#33251e] shadow-[0_8px_22px_rgba(91,64,39,0.06)]">
-            <div className="pointer-events-none absolute -right-8 -top-12 h-44 w-44 rotate-12 border-[18px] border-[#e5cba8] opacity-70" />
-            <div className="pointer-events-none absolute bottom-0 right-0 h-3 w-2/5 bg-[#c79c67] opacity-35" />
-            <div className="relative z-10 max-w-[310px]">
-              <p className="text-[9px] font-black uppercase tracking-[0.25em] text-[#87633e]">A sweet little extra</p>
-              <h2 className="mt-1 font-serif text-2xl font-bold leading-tight">Enjoy <span className="text-[#8f5f32]">10% Off</span><br />Your Next Order</h2>
-              <p className="mt-1 text-xs text-[#806c59]">Treat yourself to something freshly baked.</p>
-              <button type="button" onClick={() => navigate('/customer/menu')} className="mt-3 inline-flex items-center gap-1 rounded-full bg-[#33251e] px-4 py-2 text-[10px] font-bold text-white shadow-sm hover:bg-[#5b3b28]">
-                Shop now <ChevronRight size={12} />
-              </button>
-            </div>
-            <div className="absolute bottom-4 right-6 z-10 hidden text-right sm:block">
-              <p className="font-serif text-5xl font-black leading-none text-[#8f5f32]">10%</p>
-              <p className="mt-1 text-[9px] font-black uppercase tracking-[0.2em] text-[#87633e]">off your order</p>
-            </div>
-          </div>
-        </section>
+
+          <aside className="space-y-4">
+            <section className="rounded-xl border border-[#eadfd8] bg-white p-4 shadow-[0_5px_18px_rgba(91,64,39,0.04)]">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex min-w-0 items-center gap-3">
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#fff8e9] text-[#a57c38]"><Gift size={19} /></span>
+                  <div className="min-w-0"><p className="text-[9px] font-black uppercase tracking-[0.2em] text-[#9b7b3d]">Pastry Project Rewards</p><p className="mt-1 max-w-[190px] text-[13px] font-black leading-snug text-[#33251e]">Every order comes with a little extra.</p></div>
+                </div>
+                <button type="button" onClick={() => navigate('/customer/rewards')} className="shrink-0 rounded-lg bg-[#fff8e9] px-3 py-2 text-[9px] font-bold text-[#33251e] hover:bg-[#111111] hover:text-white">View Rewards</button>
+              </div>
+              <div className="mt-3 grid grid-cols-3 gap-2 border-t border-[#eadfca] pt-3 text-center"><div><Star size={15} className="mx-auto text-[#a57c38]" /><p className="mt-1 text-[10px] font-bold text-[#33251e]">10 points</p><p className="text-[8px] text-[#74675f]">per ₱100</p></div><div><Gift size={15} className="mx-auto text-[#a57c38]" /><p className="mt-1 text-[10px] font-bold text-[#33251e]">1,000 points</p><p className="text-[8px] text-[#74675f]">5% OFF</p></div><div><Tag size={15} className="mx-auto text-[#a57c38]" /><p className="mt-1 text-[10px] font-bold text-[#33251e]">₱100 max</p><p className="text-[8px] text-[#74675f]">per reward</p></div></div>
+            </section>
+
+            <section className="rounded-xl border border-[#eadfd8] bg-white p-4 shadow-[0_5px_18px_rgba(91,64,39,0.04)]">
+              <div className="mb-4 flex items-center justify-between"><p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#5d4a42]">Your Order</p><button type="button" onClick={() => navigate('/customer/orders')} className="text-[10px] font-bold text-[#765d50]">View All Orders <ChevronRight size={12} className="inline" /></button></div>
+              <div className="flex items-start justify-between text-center text-[10px] text-[#665b55]"><div className="flex flex-col items-center gap-2"><span className="flex h-10 w-10 items-center justify-center rounded-full border-2 border-[#e7c875] bg-[#fff8e9] text-[#a57c38]"><ClipboardList size={18} /></span><span className="font-semibold">Pending</span><small className="text-[9px] text-[#9b8c83]">Order received</small></div><span className="mt-5 h-px flex-1 bg-[#efd8d4]" /><div className="flex flex-col items-center gap-2"><span className="flex h-10 w-10 items-center justify-center rounded-full border border-[#eadfd8] bg-[#fffaf7] text-[#8e7b70]"><Gift size={18} /></span><span className="font-semibold">Processing</span><small className="text-[9px] text-[#9b8c83]">Baking your cake</small></div><span className="mt-5 h-px flex-1 bg-[#efd8d4]" /><div className="flex flex-col items-center gap-2"><span className="flex h-10 w-10 items-center justify-center rounded-full border border-[#eadfd8] bg-[#fffaf7] text-[#8e7b70]"><ChevronRight size={18} /></span><span className="font-semibold">Delivery</span><small className="text-[9px] text-[#9b8c83]">Almost there!</small></div></div>
+            </section>
+
+            <section className="rounded-xl border border-[#eadfd8] bg-white p-4 shadow-[0_5px_18px_rgba(91,64,39,0.04)]"><p className="mb-3 text-[10px] font-black uppercase tracking-[0.22em] text-[#5d4a42]">Quick Actions</p><div className="grid grid-cols-2 gap-2"><button type="button" onClick={() => setIsCustomCakeOpen(true)} className="flex items-center gap-2 rounded-lg bg-[#fff0f0] px-3 py-3 text-left text-[10px] font-bold text-[#5b4540]"><Gift size={18} className="text-[#c36b77]" />Customize Cake</button><button type="button" onClick={() => navigate('/customer/orders')} className="flex items-center gap-2 rounded-lg bg-[#fff8e9] px-3 py-3 text-left text-[10px] font-bold text-[#5b4540]"><ClipboardList size={18} className="text-[#a57c38]" />View Orders</button><button type="button" onClick={() => navigate('/customer/profile')} className="flex items-center gap-2 rounded-lg bg-[#f7f2fb] px-3 py-3 text-left text-[10px] font-bold text-[#5b4540]"><User size={18} className="text-[#87699a]" />My Profile</button><button type="button" onClick={() => navigate('/customer/chat-support')} className="flex items-center gap-2 rounded-lg bg-[#eef7f4] px-3 py-3 text-left text-[10px] font-bold text-[#5b4540]"><MessageCircle size={18} className="text-[#668e83]" />Chat Support</button></div></section>
+
+            <section className="relative min-h-[132px] overflow-hidden rounded-xl border border-[#eadfd8] bg-white p-3 text-[#3c2925] shadow-[0_5px_18px_rgba(91,64,39,0.04)]"><div className="absolute -right-7 -top-7 h-28 w-28 rounded-full border-[12px] border-[#f3e3b0]" /><div className="relative z-10 max-w-[220px]"><p className="text-[9px] font-black uppercase tracking-[0.24em] text-[#a57c38]">Special Offer</p><h2 className="mt-1 font-serif text-3xl leading-none">10% OFF</h2><p className="mt-1 text-xs leading-5 text-[#765f3d]">on your next order. Treat yourself to something freshly baked.</p><button type="button" onClick={() => navigate('/customer/menu')} className="mt-2 inline-flex items-center gap-1 rounded-full bg-[#33251e] px-4 py-1.5 text-[10px] font-bold text-white">Shop Now <ChevronRight size={12} /></button></div></section>
+          </aside>
+        </div>
+
+        {recentCompletedOrder && recentOrderItem && <section className="mt-4 rounded-xl border border-[#eadfd8] bg-white p-4 shadow-[0_5px_18px_rgba(91,64,39,0.04)]"><div className="flex items-center justify-between"><h2 className="font-serif text-xl text-[#33251e]">Recent Order</h2><button type="button" onClick={() => navigate('/customer/orders')} className="text-[10px] font-bold text-[#765d50]">View Details <ChevronRight size={13} className="inline" /></button></div><div className="mt-3 flex items-center gap-3"><img src={recentOrderImage} alt={recentOrderItem.name || 'Completed order'} className="h-16 w-16 rounded-lg bg-[#f5eee5] object-contain p-1" /><div><h3 className="text-sm font-bold text-[#33251e]">{recentOrderItem.name}</h3><p className="text-xs text-[#9b8c83]">Order #{recentCompletedOrder.id} · {recentCompletedOrder.status || 'Completed'}</p></div></div></section>}
       </main>
+
+      <TestimonialsSection />
 
       {/* STAFF-CUSTOMER CHAT */}
       <ChatBubble />

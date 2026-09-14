@@ -810,16 +810,17 @@ export default function Orders() {
 
   return (
     <>
-      <PageShell background="bg-[#F5F6FA]" padding="px-6 md:px-10 py-8" innerClassName="space-y-0">
+      <PageShell background="bg-[#fbfaf5]" padding="px-4 md:px-7 lg:px-10 py-6" innerClassName="space-y-0">
         {/* HEADER */}
         <div className="mb-6 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
           <div>
-            <h1 className="text-[26px] font-bold tracking-tight text-slate-900">All Order</h1>
-            <p className="mt-1 text-sm text-gray-400">Check all your orders in one place. It's easy to manage.</p>
+            <p className="text-[9px] font-black uppercase tracking-[0.28em] text-[#9b7b3d]">Your orders</p>
+            <h1 className="mt-1 font-serif text-2xl font-bold tracking-tight text-[#33251e] sm:text-3xl">All Orders</h1>
+            <p className="mt-1 text-xs text-[#9b8c83]">Check all your orders in one place. It's easy to manage.</p>
           </div>
           <button
             onClick={handleExport}
-            className="inline-flex items-center gap-2 rounded-xl bg-black px-5 py-2.5 text-[13px] font-semibold text-white shadow-sm shadow-black/20 hover:bg-black/90 transition-colors self-start"
+            className="inline-flex items-center gap-2 rounded-xl border border-[#e7c875] bg-[#fff8df] px-5 py-2.5 text-[12px] font-semibold text-[#8d6a2e] transition-colors hover:bg-[#fff3c4] self-start"
           >
             <Download size={15} />
             Export Order List
@@ -827,14 +828,14 @@ export default function Orders() {
         </div>
 
         {/* TABS + SEARCH */}
-        <div className="mb-4 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 border-b border-gray-200">
+        <div className="mb-4 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 border-b border-[#eadfd8]">
           <div className="flex items-center gap-6 overflow-x-auto">
             {statusOptions.map((s) => (
               <button
                 key={s}
                 onClick={() => setStatusFilter(s)}
                 className={`relative whitespace-nowrap pb-3 text-[13px] font-semibold transition-colors ${
-                  statusFilter === s ? 'text-slate-900' : 'text-gray-400 hover:text-gray-600'
+                  statusFilter === s ? 'text-[#8d6a2e]' : 'text-[#9b8c83] hover:text-[#765d50]'
                 }`}
               >
                 {s === 'All' ? 'All order' : s}
@@ -842,14 +843,14 @@ export default function Orders() {
                   ({statusCounts[s] ?? 0})
                 </span>
                 {statusFilter === s && (
-                  <motion.span layoutId="orderTabUnderline" className="absolute inset-x-0 -bottom-px h-[2px] bg-slate-900 rounded-full" />
+                  <motion.span layoutId="orderTabUnderline" className="absolute inset-x-0 -bottom-px h-[2px] bg-[#e7c875] rounded-full" />
                 )}
               </button>
             ))}
           </div>
 
           <div className="flex items-center gap-3 pb-3">
-            <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-xl px-3 py-2 shadow-sm w-full sm:w-64">
+            <div className="flex items-center gap-2 bg-white border border-[#eadfd8] rounded-xl px-3 py-2 shadow-[0_4px_12px_rgba(91,64,39,0.04)] w-full sm:w-64">
               <Search size={15} className="text-gray-400 shrink-0" />
               <input
                 value={search}
@@ -868,7 +869,7 @@ export default function Orders() {
               initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
-              className="mb-5 flex items-center justify-between bg-slate-100 border border-gray-200 rounded-2xl px-5 py-3"
+              className="mb-5 flex items-center justify-between bg-[#fff8df] border border-[#e7c875] rounded-xl px-5 py-3"
             >
               <p className="text-[12px] text-slate-700 font-semibold">{actionError}</p>
               <button onClick={() => setActionError(null)} className="text-slate-500 hover:text-slate-700">
@@ -879,9 +880,9 @@ export default function Orders() {
         </AnimatePresence>
 
         {/* TABLE CARD */}
-        <div className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden">
+        <div className="bg-white border border-[#eadfd8] rounded-xl shadow-[0_8px_22px_rgba(91,64,39,0.05)] overflow-hidden">
           {/* Table header row */}
-          <div className="hidden md:grid grid-cols-[1.2fr_1.7fr_0.9fr_0.8fr_1fr_1.2fr] items-center gap-4 px-6 py-3.5 border-b border-gray-100 bg-gray-50/60">
+          <div className="hidden md:grid grid-cols-[1.2fr_1.7fr_0.9fr_0.8fr_1fr_1.2fr] items-center gap-4 px-6 py-3.5 border-b border-[#eadfd8] bg-[#fffaf7]">
             <span className="text-[11px] uppercase tracking-[0.12em] text-gray-400 font-semibold">Product</span>
             <span className="text-[11px] uppercase tracking-[0.12em] text-gray-400 font-semibold">Order</span>
             <span className="text-[11px] uppercase tracking-[0.12em] text-gray-400 font-semibold">Date</span>
@@ -945,7 +946,7 @@ export default function Orders() {
                     animate={{ opacity: isCancelled ? 0.65 : 1, y: 0 }}
                     transition={{ duration: 0.2 }}
                     onClick={() => setSelectedOrder(order)}
-                    className="grid grid-cols-1 md:grid-cols-[1.2fr_1.7fr_0.9fr_0.8fr_1fr_1.2fr] items-center gap-3 md:gap-4 px-6 py-4 cursor-pointer hover:bg-gray-50/70 transition-colors"
+                    className="grid grid-cols-1 md:grid-cols-[1.2fr_1.7fr_0.9fr_0.8fr_1fr_1.2fr] items-center gap-3 md:gap-4 px-6 py-4 cursor-pointer hover:bg-[#fffaf0] transition-colors"
                   >
                     {/* Product */}
                     <div className="flex items-center gap-3 min-w-0">

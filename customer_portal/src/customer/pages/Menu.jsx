@@ -171,31 +171,30 @@ export default function Menu({ onAddToCart }) {
   });
 
   return (
-    <PageShell padding="px-6 md:px-10 pt-4 pb-10">
+    <PageShell background="bg-[#fbfaf5]" padding="px-4 md:px-7 lg:px-10 pt-5 pb-10">
 
         {/* HEADER */}
-        <div className="mb-6 flex flex-col gap-5">
+        <div className="mb-5 flex flex-col gap-5 px-1 py-2 sm:flex-row sm:items-end sm:justify-between">
 
           {/* LEFT SIDE TITLE */}
           <div>
-            <p className="mb-2 text-[11px] uppercase tracking-[0.35em] text-gray-400">
-              Pastry Project Menu
+            <p className="mb-1 text-[9px] font-black uppercase tracking-[0.28em] text-[#9b7b3d]">
+              Cakes collection
             </p>
 
-            <h2 className="text-[26px] font-bold tracking-tight text-slate-900 leading-tight sm:text-[28px] lg:text-[30px]">
-              Cakes
-            </h2>
+            <h2 className="font-serif text-2xl font-bold leading-tight text-[#33251e] sm:text-3xl">Find Your Perfect Cake</h2>
+            <p className="mt-1 text-xs text-[#9b8c83]">Freshly baked favorites for every sweet moment.</p>
           </div>
         </div>
 
         {/* FILTER CONTROLS */}
-        <div className="mb-8 flex w-full justify-end">
+        <div className="mb-5 flex w-full justify-end px-1 py-1">
           <div className="flex flex-wrap items-center justify-end gap-2">
               <button
                 type="button"
                 onClick={() => setShowOnlyAvailable(false)}
                 className={`rounded-full border px-3.5 py-2 text-[10px] font-black uppercase tracking-[0.14em] transition ${
-                  !showOnlyAvailable ? 'border-black bg-black text-white' : 'border-gray-200 bg-white text-gray-500 hover:border-black hover:text-black'
+                  !showOnlyAvailable ? 'border-[#e7c875] bg-[#fff8df] text-[#8d6a2e]' : 'border-[#eadfd8] bg-transparent text-[#765d50] hover:border-[#e7c875] hover:bg-[#fff8df] hover:text-[#8d6a2e]'
                 }`}
               >
                 All items
@@ -204,12 +203,12 @@ export default function Menu({ onAddToCart }) {
                 type="button"
                 onClick={() => setShowOnlyAvailable(true)}
                 className={`rounded-full border px-3.5 py-2 text-[10px] font-black uppercase tracking-[0.14em] transition ${
-                  showOnlyAvailable ? 'border-black bg-black text-white' : 'border-gray-200 bg-white text-gray-500 hover:border-black hover:text-black'
+                  showOnlyAvailable ? 'border-[#e7c875] bg-[#fff8df] text-[#8d6a2e]' : 'border-[#eadfd8] bg-transparent text-[#765d50] hover:border-[#e7c875] hover:bg-[#fff8df] hover:text-[#8d6a2e]'
                 }`}
               >
                 Available now
               </button>
-              <label className="flex items-center gap-2 rounded-full border border-gray-200 bg-white px-3.5 py-2 text-[10px] font-black uppercase tracking-[0.14em] text-gray-500">
+              <label className="flex items-center gap-2 rounded-full border border-[#eadfd8] bg-transparent px-3.5 py-2 text-[10px] font-black uppercase tracking-[0.14em] text-[#765d50]">
                 <span>Sort</span>
                 <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className="bg-transparent font-semibold uppercase outline-none text-slate-700">
                   <option value="recommended">Recommended</option>
@@ -222,7 +221,7 @@ export default function Menu({ onAddToCart }) {
         </div>
 
         {/* PRODUCTS */}
-        <div className="grid auto-rows-fr grid-cols-2 items-stretch gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
+        <div className="grid auto-rows-fr grid-cols-2 items-stretch gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
           {sortedProducts.map((p) => (
             <ProductCard
               key={p.id}
