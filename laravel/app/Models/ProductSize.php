@@ -15,13 +15,11 @@ class ProductSize extends Model
         'size',
         'price',
         'available',
-        'stock_quantity',
     ];
 
     protected $casts = [
         'price' => 'decimal:2',
         'available' => 'boolean',
-        'stock_quantity' => 'float',
     ];
 
     public function product(): BelongsTo

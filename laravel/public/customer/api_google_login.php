@@ -42,6 +42,14 @@ try {
         throw new Exception("Invalid request: No data received from app.");
     }
 
+    http_response_code(401);
+    echo json_encode([
+        'status' => 'error',
+        'success' => false,
+        'message' => 'This endpoint does not authenticate posted profile data. Use the verified Google OAuth endpoint.',
+    ]);
+    exit;
+
     $email = trim($data['email'] ?? '');
     $name = trim($data['name'] ?? '');
     $profile_pic = trim($data['photoUrl'] ?? '');

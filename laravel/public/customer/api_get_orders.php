@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/cors.php';
+require_once __DIR__ . '/../../../includes/api_auth.php';
 
 error_reporting(0);
 ini_set('display_errors', 0);
@@ -39,37 +40,21 @@ try {
         $hasCustomCakeOrders = true;
     }
 
-    // Get user identity for filtering
-    $user_id = 0;
-    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-        $data = json_decode(file_get_contents("php://input"), true);
-        $user_id = intval($data['user_id'] ?? $_GET['user_id'] ?? 0);
-    } elseif (!empty($_GET['user_id'])) {
-        $user_id = intval($_GET['user_id']);
+    $authUser = requireApiRole(['customer']);
+    $authenticatedUserId = (int) $authUser['id'];
+    $authenticatedEmail = trim((string) ($authUser['email'] ?? ''));
+    $ownership = [];
+    if ($hasUserId) $ownership[] = 'user_id = ' . $authenticatedUserId;
+    if ($hasEmail && $authenticatedEmail !== '') {
+        $escapedEmail = mysqli_real_escape_string($conn, $authenticatedEmail);
+        $ownership[] = "(user_id IS NULL AND email = '$escapedEmail')";
+    }
+    if (!$ownership) {
+        echo json_encode([]);
+        exit;
     }
 
-    $user_email = trim($_GET['user_email'] ?? '');
-    $customer_name = trim($_GET['customer'] ?? '');
-
-    $filters = [];
-
-    if ($user_id > 0 && $hasUserId) {
-        $filters[] = "user_id = " . intval($user_id);
-    }
-    if ($user_email !== '' && $hasEmail) {
-        $escapedEmail = mysqli_real_escape_string($conn, $user_email);
-        $filters[] = "email = '$escapedEmail'";
-    }
-    if ($customer_name !== '' && $hasCustomer) {
-        $escapedCustomer = mysqli_real_escape_string($conn, $customer_name);
-        $filters[] = "customer = '$escapedCustomer'";
-    }
-
-    if (count($filters) > 0) {
-        $sql = "SELECT * FROM orders WHERE " . implode(' OR ', $filters) . " ORDER BY created_at DESC";
-    } else {
-        $sql = "SELECT * FROM orders ORDER BY created_at DESC";
-    }
+    $sql = "SELECT * FROM orders WHERE (" . implode(' OR ', $ownership) . ") ORDER BY created_at DESC";
 
     $res = mysqli_query($conn, $sql);
 

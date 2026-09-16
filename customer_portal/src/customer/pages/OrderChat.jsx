@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from "react";
 import { X, Send } from "lucide-react";
 import { CUSTOMER_BASE } from "../../services/config";
-import { safeParseJson } from '../../services/api';
+import { getAuthHeaders, safeParseJson } from '../../services/api';
 
 const BASE = CUSTOMER_BASE;
 
@@ -22,11 +22,12 @@ export default function OrderChat({ order, onClose }) {
     if (!orderId) return;
 
     try {
-      const res = await fetch(
-        `${BASE}/api_chat.php?order_id=${orderId}`
-      );
+      const res = await fetch(`${BASE}/api_chat_fetch.php?order_id=${orderId}&conversation_id=legacy`, {
+        credentials: 'include',
+        headers: getAuthHeaders(),
+      });
       const data = await safeParseJson(res);
-      setMessages(Array.isArray(data) ? data : []);
+      setMessages(Array.isArray(data?.messages) ? data.messages : []);
     } catch (err) {
       console.error("Chat load error:", err);
     }
@@ -63,11 +64,11 @@ export default function OrderChat({ order, onClose }) {
     try {
       const res = await fetch(`${BASE}/api_chat_send.php`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        credentials: 'include',
+        headers: { "Content-Type": "application/json", ...getAuthHeaders() },
         body: JSON.stringify({
           order_id: orderId,
           message: text,
-          sender: "customer",
         }),
       });
 

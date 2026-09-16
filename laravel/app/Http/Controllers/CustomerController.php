@@ -278,12 +278,13 @@ class CustomerController extends Controller
         return view('customer.notifications', compact('notifications', 'cartCount'));
     }
 
-    public function logout()
+    public function logout(Request $request)
     {
         if (session_status() === PHP_SESSION_NONE) {
             session_start();
         }
 
+        $this->revokeCurrentToken($request);
         session_destroy();
         return redirect('/login.php');
     }

@@ -201,7 +201,7 @@ export default function Register() {
         throw new Error(data?.message || "Google sign-up failed.");
       }
 
-      localStorage.setItem("user", JSON.stringify(data.user));
+      localStorage.setItem("user", JSON.stringify({ ...data.user, token: data.token || '' }));
       navigate("/customer", { replace: true });
     } catch (error) {
       setError(error?.code === "auth/popup-closed-by-user" ? "Google sign-up was cancelled." : (error.message || "Google sign-up failed."));

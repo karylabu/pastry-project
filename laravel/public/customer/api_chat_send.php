@@ -11,6 +11,7 @@ header("Access-Control-Allow-Methods: POST, OPTIONS");
 header("Access-Control-Allow-Headers: Content-Type, Authorization");
 
 require_once __DIR__ . '/../includes/db.php';
+require_once __DIR__ . '/../../../includes/api_auth.php';
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     http_response_code(200);
@@ -20,20 +21,42 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 $raw = file_get_contents("php://input");
 $data = json_decode($raw, true) ?? $_POST;
 
+$authUser = requireApiRole(['customer', 'admin']);
+$isAdmin = strtolower((string) $authUser['role']) === 'admin';
+$authenticatedUserId = (int) $authUser['id'];
+
 // DEBUG LOGGING
 $clientIP = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
 error_log("[$clientIP] RAW: $raw");
 
-// Fallback for customer_id if user_id is missing (Legacy support)
 $uId = $data['user_id'] ?? $data['customer_id'] ?? 0;
-$userId = (intval($uId) > 0) ? intval($uId) : null;
+$userId = $isAdmin && intval($uId) > 0 ? intval($uId) : $authenticatedUserId;
 
 $oId = $data['order_id'] ?? 0;
 $orderId = (intval($oId) > 0) ? intval($oId) : null;
 
 $message = trim($data['message'] ?? "");
-$sender  = $data['sender'] ?? "customer";
+$sender  = $isAdmin ? 'admin' : 'customer';
 $supportMode = "staff";
+
+if ($orderId !== null) {
+    $orderCheck = $conn->prepare($isAdmin
+        ? 'SELECT user_id FROM orders WHERE id = ? LIMIT 1'
+        : 'SELECT user_id FROM orders WHERE id = ? AND user_id = ? LIMIT 1');
+    if ($isAdmin) {
+        $orderCheck->bind_param('i', $orderId);
+    } else {
+        $orderCheck->bind_param('ii', $orderId, $authenticatedUserId);
+    }
+    $orderCheck->execute();
+    $orderOwner = $orderCheck->get_result()->fetch_assoc();
+    $orderCheck->close();
+    if (!$orderOwner) {
+        echo json_encode(["success" => false, "message" => "You cannot access this order conversation."]);
+        exit();
+    }
+    $userId = (int) ($orderOwner['user_id'] ?? $userId);
+}
 
 if (empty($message)) {
     echo json_encode(["success" => false, "message" => "Empty message"]);

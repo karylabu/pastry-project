@@ -240,7 +240,7 @@ export default function UserManagement() {
       name: user.name || "",
       email: user.email || "",
       phone_number: user.phone_number || "",
-      role: user.role || "staff",
+      role: user.role || "customer",
       status: user.status || "active",
       password: "",
       password_confirmation: "",

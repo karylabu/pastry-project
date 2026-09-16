@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import PageShell from '../components/PageShell';
 import { CUSTOMER_BASE } from '../../services/config';
-import { safeParseJson } from '../../services/api';
+import { getAuthHeaders, safeParseJson } from '../../services/api';
 import { BriefcaseBusiness, Check, ChevronRight, GraduationCap, Home, MapPin, Pencil, Save } from 'lucide-react';
 
 const LABELS = ['Home', 'Work', 'School', 'Other'];
@@ -74,7 +74,10 @@ export default function SavedAddresses() {
 
   const fetchAddresses = async () => {
     try {
-      const res = await fetch(`${CUSTOMER_BASE}/api_addresses.php?user_id=${userId}`);
+      const res = await fetch(`${CUSTOMER_BASE}/api_addresses.php`, {
+        credentials: 'include',
+        headers: getAuthHeaders(),
+      });
       const data = await safeParseJson(res);
       if (data?.status === 'success') {
         const fetchedAddresses = data.addresses || [];
@@ -114,8 +117,9 @@ export default function SavedAddresses() {
     try {
       const res = await fetch(`${CUSTOMER_BASE}/api_addresses.php`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...form, user_id: userId }),
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+        body: JSON.stringify(form),
       });
       const data = await safeParseJson(res);
       if (data?.status === 'success') {

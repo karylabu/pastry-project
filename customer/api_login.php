@@ -42,9 +42,12 @@ try {
 
     $user = mysqli_fetch_assoc($result);
 
-    // Support both plain-text (old) and hashed passwords
-    $passwordValid = ($password === $user['password'])
-                  || password_verify($password, $user['password']);
+    if (!in_array(strtolower(trim((string) ($user['role'] ?? ''))), ['customer', 'admin'], true)) {
+        echo json_encode(["success" => false, "message" => "This account is not eligible for access."]);
+        exit;
+    }
+
+    $passwordValid = password_verify($password, $user['password']);
 
     if (!$passwordValid) {
         echo json_encode(["success" => false, "message" => "Incorrect password."]);

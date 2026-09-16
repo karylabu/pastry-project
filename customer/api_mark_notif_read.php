@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/cors.php';
+require_once __DIR__ . '/../includes/api_auth.php';
 
 error_reporting(0);
 ini_set('display_errors', 0);
@@ -12,6 +13,9 @@ try {
         throw new Exception("Database Connection Failed: " . mysqli_connect_error());
     }
 
+    $authUser = requireApiRole(['customer']);
+    $authenticatedUserId = (int) $authUser['id'];
+
     if (empty($_POST['notification_id'])) {
         throw new Exception("Notification ID is required");
     }
@@ -19,14 +23,14 @@ try {
     $notification_id = intval($_POST['notification_id']);
     
     // Mark notification as read in notifications table
-    $sql = "UPDATE notifications SET is_read = 1 WHERE id = ?";
+    $sql = "UPDATE notifications SET is_read = 1 WHERE id = ? AND user_id = ?";
     $stmt = mysqli_prepare($conn, $sql);
     
     if (!$stmt) {
         throw new Exception("Prepare failed: " . mysqli_error($conn));
     }
     
-    mysqli_stmt_bind_param($stmt, "i", $notification_id);
+    mysqli_stmt_bind_param($stmt, "ii", $notification_id, $authenticatedUserId);
     
     if (!mysqli_stmt_execute($stmt)) {
         throw new Exception("Failed to update notification: " . mysqli_stmt_error($stmt));

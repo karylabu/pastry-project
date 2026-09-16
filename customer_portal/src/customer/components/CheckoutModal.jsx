@@ -3,7 +3,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { X, Loader2, SearchX } from "lucide-react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-import { BASE, CUSTOMER_BASE } from '../../services/config';
+import { BASE, CUSTOMER_BASE, LARAVEL_BASE } from '../../services/config';
+import { getAuthHeaders } from '../../services/api';
 
 // Import marker icon images
 import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
@@ -175,7 +176,10 @@ export default function CheckoutModal({
     setAddressFetchError('');
 
     try {
-      const res = await fetch(`${CUSTOMER_BASE}/api_addresses.php?user_id=${userId}`);
+      const res = await fetch(`${CUSTOMER_BASE}/api_addresses.php`, {
+        credentials: 'include',
+        headers: getAuthHeaders(),
+      });
       if (!res.ok) {
         throw new Error(`Failed to load addresses: ${res.status}`);
       }
@@ -650,23 +654,15 @@ export default function CheckoutModal({
 
       const payload = {
         items: groupedItems.map((item) => ({
+          product_id: item.product_id,
+          product_size_id: item.product_size_id,
           name: item.name,
           product: item.name,
           qty: item.qty,
-          price: item.price,
           image: item.image || item.photo || item.thumbnail || item.img || '',
           selectionDetails: item.selectionDetails || {},
           variant: item.variant || '',
         })),
-
-        subtotal,
-        delivery_fee: deliveryFee,
-        rush_fee: rushFee,
-        total,
-
-        user_id: savedUser.id || 0, // Include user_id for proper order association
-        customer: savedUser.name || "",
-        email: savedUser.email || "",
 
         method: checkoutData.method,
         payment: checkoutData.payment,
@@ -687,7 +683,7 @@ export default function CheckoutModal({
         SAVE ORDER
       ========================= */
 
-      const orderUrl = `${CUSTOMER_BASE}/api_orders.php`;
+      const orderUrl = `${LARAVEL_BASE}/api/orders`;
       console.log("Placing order to", orderUrl, payload);
       const getCookie = (name) => {
         const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
@@ -700,6 +696,7 @@ export default function CheckoutModal({
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          ...getAuthHeaders(),
           ...(xsrf ? { 'X-XSRF-TOKEN': xsrf } : {}),
         },
         body: JSON.stringify(payload),
@@ -723,7 +720,7 @@ export default function CheckoutModal({
 
       console.log('Order API result:', result);
 
-      if (result.status !== "success") {
+      if (result.status !== "success" && result.success !== true) {
         alert(result.message || "Order failed.");
         return;
       }

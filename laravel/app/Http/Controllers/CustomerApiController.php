@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
+use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -54,6 +55,34 @@ class CustomerApiController extends Controller
         return is_array($data) ? $data : [];
     }
 
+    protected function requireCustomer(Request $request)
+    {
+        $user = $this->getAuthenticatedUser($request);
+        if (!$user) {
+            return $this->corsResponse(['success' => false, 'message' => 'Authentication required.'], 401);
+        }
+
+        if (strtolower((string) $user->role) !== 'customer') {
+            return $this->corsResponse(['success' => false, 'message' => 'Customer authorization required.'], 403);
+        }
+
+        return $user;
+    }
+
+    protected function requireAdmin(Request $request)
+    {
+        $user = $this->getAuthenticatedUser($request);
+        if (!$user) {
+            return $this->corsResponse(['success' => false, 'message' => 'Authentication required.'], 401);
+        }
+
+        if (strtolower((string) $user->role) !== 'admin') {
+            return $this->corsResponse(['success' => false, 'message' => 'Admin authorization required.'], 403);
+        }
+
+        return $user;
+    }
+
     public function products(Request $request)
     {
         $this->loadLegacyRequirements();
@@ -64,6 +93,11 @@ class CustomerApiController extends Controller
         $action = $request->query('action', 'list');
 
         if ($action === 'customize' && $request->isMethod('post')) {
+            $user = $this->requireCustomer($request);
+            if (!$user instanceof User) {
+                return $user;
+            }
+
             try {
                 $form = array_merge($request->all(), $this->parseJson($request));
                 \Log::info('Custom cake request:', $form);
@@ -93,10 +127,10 @@ class CustomerApiController extends Controller
                 }
 
                 $orderId = DB::table('orders')->insertGetId([
-                    'customer' => $form['customer'] ?? 'Guest Customer',
-                    'email' => $form['email'] ?? 'guest@email.com',
+                    'customer' => $user->name,
+                    'email' => $user->email,
                     'phone' => $phone,
-                    'user_id' => $form['user_id'] ?? null,
+                    'user_id' => $user->id,
                     'status' => 'Pending',
                     'total' => floatval($form['total'] ?? $form['estimated_price'] ?? 0),
                     'payment' => $form['payment'] ?? 'COD',
@@ -130,18 +164,15 @@ class CustomerApiController extends Controller
                 ]);
 
                 // ✅ Notify User
-                $userId = $form['user_id'] ?? null;
-                if ($userId) {
-                    DB::table('notifications')->insert([
-                        'user_id' => $userId,
-                        'title' => '🎂 Custom Cake Request',
-                        'message' => "We've received your request for order #$orderId. We will review it and provide a quote soon.",
-                        'type' => 'Info',
-                        'is_read' => 0,
-                        'action_url' => '/customer/orders',
-                        'created_at' => now(),
-                    ]);
-                }
+                DB::table('notifications')->insert([
+                    'user_id' => $user->id,
+                    'title' => '🎂 Custom Cake Request',
+                    'message' => "We've received your request for order #$orderId. We will review it and provide a quote soon.",
+                    'type' => 'Info',
+                    'is_read' => 0,
+                    'action_url' => '/customer/orders',
+                    'created_at' => now(),
+                ]);
 
                 return $this->corsResponse([
                     'success' => true,
@@ -192,7 +223,11 @@ class CustomerApiController extends Controller
                 return $this->corsResponse(['success' => false, 'message' => 'User not found.']);
             }
 
-            $passwordValid = ($password === $user->password) || password_verify($password, $user->password);
+            if (!in_array(strtolower((string) $user->role), ['customer', 'admin'], true)) {
+                return $this->corsResponse(['success' => false, 'message' => 'This account is not eligible for access.'], 403);
+            }
+
+            $passwordValid = password_verify($password, $user->password);
             if (!$passwordValid) {
                 return $this->corsResponse(['success' => false, 'message' => 'Incorrect password.']);
             }
@@ -205,7 +240,15 @@ class CustomerApiController extends Controller
                 "phone" => $user->phone ?? '',
             ];
 
-            $token = base64_encode(json_encode(array_merge($userData, ['exp' => time() + 86400])));
+            $token = bin2hex(random_bytes(32));
+            DB::table('user_sessions')->updateOrInsert(
+                ['user_id' => $user->id],
+                [
+                    'token' => $token,
+                    'created_at' => now(),
+                    'expires_at' => now()->addDays(30),
+                ]
+            );
 
             return $this->corsResponse([
                 'success' => true,
@@ -350,6 +393,11 @@ class CustomerApiController extends Controller
 
     public function createOrder(Request $request)
     {
+        $user = $this->requireCustomer($request);
+        if (!$user instanceof User) {
+            return $user;
+        }
+
         $shopNow = now()->setTimezone('Asia/Manila');
         $shopMinutes = ($shopNow->hour * 60) + $shopNow->minute;
         if ($shopMinutes < 480 || $shopMinutes >= 1200) {
@@ -371,21 +419,11 @@ class CustomerApiController extends Controller
         $phone = trim($data['phone'] ?? '');
         $latitude = floatval($data['latitude'] ?? $data['lat'] ?? 0);
         $longitude = floatval($data['longitude'] ?? $data['lng'] ?? 0);
-        $customer = trim($data['customer'] ?? '');
-        $email = trim($data['email'] ?? '');
-        $userId = isset($data['user_id']) ? intval($data['user_id']) : null;
+        $customer = $user->name;
+        $email = $user->email;
+        $userId = (int) $user->id;
         $orderType = $data['order_type'] ?? $data['type'] ?? 'Standard';
         $isCustomized = isset($data['is_customized']) ? intval($data['is_customized']) : 0;
-
-        // Populate from users if missing
-        if ($userId && (empty($customer) || empty($email) || empty($phone))) {
-            $user = DB::table('users')->where('id', $userId)->first();
-            if ($user) {
-                if (empty($customer)) $customer = $user->name;
-                if (empty($email)) $email = $user->email;
-                if (empty($phone)) $phone = $user->phone ?? '';
-            }
-        }
 
         $orderId = DB::table('orders')->insertGetId([
             'items' => json_encode($items),
@@ -439,38 +477,12 @@ class CustomerApiController extends Controller
 
     public function getOrders(Request $request)
     {
-        $userId = intval($request->query('user_id', 0));
-        $email = trim($request->query('user_email', $request->query('email', '')));
-        $customer = trim($request->query('customer', ''));
-        $phone = trim($request->query('phone', ''));
-
-        $query = DB::table('orders');
-
-        if ($userId > 0 || $email !== '' || $customer !== '' || $phone !== '') {
-            $query->where(function($q) use ($userId, $email, $customer, $phone) {
-                if ($userId > 0) $q->orWhere('user_id', $userId);
-                if ($email !== '') {
-                    $q->orWhere('email', $email);
-                    // Also look for other user IDs with this email
-                    $otherIds = DB::table('users')->where('email', $email)->pluck('id')->toArray();
-                    if (!empty($otherIds)) $q->orWhereIn('user_id', $otherIds);
-                }
-                if ($customer !== '') $q->orWhere('customer', 'like', "%$customer%");
-                if ($phone !== '') {
-                    $q->orWhere('phone', $phone);
-                    $phoneIds = DB::table('users')->where('phone', $phone)->pluck('id')->toArray();
-                    if (!empty($phoneIds)) $q->orWhereIn('user_id', $phoneIds);
-                }
-
-                // Special safety for Karyl (as per requirements)
-                if (strpos(strtolower($customer), 'karyl') !== false || strpos(strtolower($email), 'hernandez') !== false) {
-                    $q->orWhere('phone', '09509002527');
-                    $q->orWhere('email', 'customer@pastry.com');
-                }
-            });
-        } else {
-            return $this->corsResponse([]);
+        $user = $this->requireCustomer($request);
+        if (!$user instanceof User) {
+            return $user;
         }
+
+        $query = DB::table('orders')->where('user_id', $user->id);
 
         $orders = $query->orderByDesc('id')->get()->map(function ($row) {
             // Fetch items from order_items if items column is empty
@@ -528,12 +540,19 @@ class CustomerApiController extends Controller
 
         $data = $this->parseJson($request);
         $orderId = intval($data['order_id'] ?? 0);
+        $user = $this->requireCustomer($request);
+        if (!$user instanceof User) {
+            return $user;
+        }
 
         if (!$orderId) {
             return $this->corsResponse(['success' => false, 'message' => 'Invalid order ID.']);
         }
 
-        $status = DB::table('orders')->where('id', $orderId)->value('status');
+        $status = DB::table('orders')
+            ->where('id', $orderId)
+            ->where('user_id', $user->id)
+            ->value('status');
         if (!$status) {
             return $this->corsResponse(['success' => false, 'message' => 'Order not found.']);
         }
@@ -542,7 +561,10 @@ class CustomerApiController extends Controller
             return $this->corsResponse(['success' => false, 'message' => 'Only pending orders can be cancelled.']);
         }
 
-        DB::table('orders')->where('id', $orderId)->update(['status' => 'Cancelled']);
+        DB::table('orders')
+            ->where('id', $orderId)
+            ->where('user_id', $user->id)
+            ->update(['status' => 'Cancelled']);
         return $this->corsResponse(['success' => true]);
     }
 
@@ -554,12 +576,19 @@ class CustomerApiController extends Controller
 
         $data = $this->parseJson($request);
         $orderId = intval($data['order_id'] ?? 0);
+        $user = $this->requireCustomer($request);
+        if (!$user instanceof User) {
+            return $user;
+        }
 
         if (!$orderId) {
             return $this->corsResponse(['success' => false, 'message' => 'Invalid order ID.']);
         }
 
-        $status = DB::table('orders')->where('id', $orderId)->value('status');
+        $status = DB::table('orders')
+            ->where('id', $orderId)
+            ->where('user_id', $user->id)
+            ->value('status');
         if (!$status) {
             return $this->corsResponse(['success' => false, 'message' => 'Order not found.']);
         }
@@ -568,7 +597,10 @@ class CustomerApiController extends Controller
             return $this->corsResponse(['success' => false, 'message' => 'Order is not ready to be confirmed.']);
         }
 
-        DB::table('orders')->where('id', $orderId)->update(['status' => 'Completed']);
+        DB::table('orders')
+            ->where('id', $orderId)
+            ->where('user_id', $user->id)
+            ->update(['status' => 'Completed']);
         return $this->corsResponse(['success' => true]);
     }
 
@@ -576,6 +608,11 @@ class CustomerApiController extends Controller
     {
         if ($request->isMethod('options')) {
             return $this->corsResponse(['success' => true]);
+        }
+
+        $admin = $this->requireAdmin($request);
+        if (!$admin instanceof User) {
+            return $admin;
         }
 
         if ($request->isMethod('get')) {
@@ -601,24 +638,36 @@ class CustomerApiController extends Controller
             return $this->corsResponse(['success' => true, 'messages' => []]);
         }
 
+        $user = $this->getAuthenticatedUser($request);
+        if (!$user) {
+            return $this->corsResponse(['success' => false, 'messages' => []], 401);
+        }
+
+        $isAdmin = strtolower((string) $user->role) === 'admin';
+        if (!$isAdmin && strtolower((string) $user->role) !== 'customer') {
+            return $this->corsResponse(['success' => false, 'messages' => []], 403);
+        }
+
         $orderId = intval($request->query('order_id', 0));
-
-        // Support both user_id and customer_id
-        $userId = intval($request->query('user_id', $request->query('customer_id', 0)));
-
-        $role = $request->query('role', 'customer');
+        $requestedUserId = intval($request->query('user_id', $request->query('customer_id', 0)));
+        $userId = $isAdmin ? $requestedUserId : (int) $user->id;
+        $role = $isAdmin ? 'admin' : 'customer';
         $conversationId = substr(trim((string) $request->query('conversation_id', '')), 0, 64);
 
         if ($userId <= 0 && $orderId <= 0) {
             return $this->corsResponse(['success' => false, 'messages' => []]);
         }
 
+        if (!$isAdmin && $orderId > 0 && !DB::table('orders')->where('id', $orderId)->where('user_id', $user->id)->exists()) {
+            return $this->corsResponse(['success' => false, 'messages' => []], 403);
+        }
+
         // Mark messages as read depending on role
         if ($orderId > 0) {
-            if ($role === 'staff') {
+            if ($role === 'admin') {
                 DB::table('messages')->where('order_id', $orderId)->where('sender', 'customer')->update(['is_read' => 1]);
             } else {
-                $readQuery = DB::table('messages')->where('order_id', $orderId)->whereIn('sender', ['staff', 'ai']);
+                $readQuery = DB::table('messages')->where('order_id', $orderId)->whereIn('sender', ['admin', 'staff', 'ai']);
                 if ($conversationId && $conversationId !== 'legacy') {
                     $readQuery->where('conversation_id', $conversationId);
                 } elseif ($conversationId === 'legacy') {
@@ -629,10 +678,10 @@ class CustomerApiController extends Controller
                 $readQuery->update(['is_read' => 1]);
             }
         } else {
-            if ($role === 'staff') {
+            if ($role === 'admin') {
                 DB::table('messages')->where('user_id', $userId)->where('order_id', 0)->where('sender', 'customer')->update(['is_read' => 1]);
             } else {
-                $readQuery = DB::table('messages')->where('user_id', $userId)->where('order_id', 0)->whereIn('sender', ['staff', 'ai']);
+                $readQuery = DB::table('messages')->where('user_id', $userId)->where('order_id', 0)->whereIn('sender', ['admin', 'staff', 'ai']);
                 if ($conversationId && $conversationId !== 'legacy') {
                     $readQuery->where('conversation_id', $conversationId);
                 } elseif ($conversationId === 'legacy') {
@@ -703,24 +752,37 @@ class CustomerApiController extends Controller
             return $this->corsResponse(['success' => true, 'ai_reply' => null]);
         }
 
+        $user = $this->getAuthenticatedUser($request);
+        if (!$user) {
+            return $this->corsResponse(['success' => false, 'message' => 'Authentication required.'], 401);
+        }
+
+        $isAdmin = strtolower((string) $user->role) === 'admin';
+        if (!$isAdmin && strtolower((string) $user->role) !== 'customer') {
+            return $this->corsResponse(['success' => false, 'message' => 'Chat authorization required.'], 403);
+        }
+
         $data = $this->parseJson($request);
         $orderId = intval($data['order_id'] ?? 0);
+        $requestedUserId = intval($data['user_id'] ?? $data['customer_id'] ?? 0);
+        $userId = $isAdmin ? $requestedUserId : (int) $user->id;
 
-        // Support both user_id and customer_id
-        $userId = intval($data['user_id'] ?? $data['customer_id'] ?? 0);
+        if (!$isAdmin && $orderId > 0 && !DB::table('orders')->where('id', $orderId)->where('user_id', $user->id)->exists()) {
+            return $this->corsResponse(['success' => false, 'message' => 'You cannot access this order conversation.'], 403);
+        }
+
+        if ($isAdmin && $orderId > 0) {
+            $userId = (int) DB::table('orders')->where('id', $orderId)->value('user_id');
+        }
 
         $message = trim($data['message'] ?? '');
-        $sender = $data['sender'] ?? 'customer';
+        $sender = $isAdmin ? 'admin' : 'customer';
         $supportMode = $data['support_mode'] ?? 'ai';
         $conversationId = substr(trim($data['conversation_id'] ?? ''), 0, 64) ?: null;
         $replyToId = isset($data['reply_to_id']) && intval($data['reply_to_id']) > 0 ? intval($data['reply_to_id']) : null;
 
         if (!$message) {
             return $this->corsResponse(['success' => false, 'message' => 'Invalid input']);
-        }
-
-        if (!in_array($sender, ['customer', 'staff', 'ai'])) {
-            $sender = 'customer';
         }
 
         if ($sender === 'customer' && $orderId <= 0 && preg_match('/\b(?:order\s*(?:#|number|no\.?|id)?\s*)?(\d{1,8})\b/i', $message, $matches)) {
@@ -1083,9 +1145,17 @@ PROMPT;
         $data = $this->parseJson($request);
         $orderId = trim($data['order_id'] ?? '');
         $amount = floatval($data['amount'] ?? 0);
+        $user = $this->requireCustomer($request);
+        if (!$user instanceof User) {
+            return $user;
+        }
 
         if (!$orderId || $amount <= 0) {
             return $this->corsResponse(['error' => 'Missing order_id or invalid amount'], 400);
+        }
+
+        if (!DB::table('orders')->where('id', $orderId)->where('user_id', $user->id)->exists()) {
+            return $this->corsResponse(['error' => 'Order not found.'], 404);
         }
 
         $secretKey = env('PAYMONGO_SECRET');
@@ -1164,10 +1234,12 @@ PROMPT;
             return $this->corsResponse(['success' => true]);
         }
 
-        $user_id = intval($request->input('user_id', $request->query('user_id', 0)));
-        if ($user_id <= 0) {
-            return $this->corsResponse(['status' => 'error', 'message' => 'User ID is required'], 400);
+        $user = $this->requireCustomer($request);
+        if (!$user instanceof User) {
+            return $user;
         }
+
+        $user_id = (int) $user->id;
 
         if ($request->isMethod('get')) {
             $addresses = DB::table('addresses')
@@ -1226,6 +1298,17 @@ PROMPT;
 
     public function user(Request $request)
     {
-        return $this->corsResponse($_SESSION['user'] ?? null);
+        $user = $this->getAuthenticatedUser($request);
+        if (!$user || !in_array(strtolower((string) $user->role), ['customer', 'admin'], true)) {
+            return $this->corsResponse(['success' => false, 'message' => 'Authentication required.'], 401);
+        }
+
+        return $this->corsResponse([
+            'id' => (string) $user->id,
+            'name' => $user->name,
+            'email' => $user->email,
+            'role' => $user->role,
+            'phone' => $user->phone ?? '',
+        ]);
     }
 }

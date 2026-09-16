@@ -54,14 +54,69 @@ class OrderController extends Controller
 
         try {
             return DB::transaction(function () use ($request, $user) {
+                $canonicalItems = [];
+                $subtotal = 0.0;
+
+                foreach ($request->items as $item) {
+                    $product = Product::query()
+                        ->whereKey((int) $item['product_id'])
+                        ->where('available', true)
+                        ->whereRaw("LOWER(TRIM(category)) IN ('cake', 'cakes')")
+                        ->first();
+
+                    if (!$product) {
+                        return response()->json([
+                            'success' => false,
+                            'message' => 'Each item must reference an available cake product.',
+                            'errors' => ['items' => ['Invalid or unavailable cake product.']],
+                        ], 422);
+                    }
+
+                    $productSize = $product->sizes()
+                        ->whereKey((int) $item['product_size_id'])
+                        ->where('available', true)
+                        ->first();
+
+                    if (!$productSize) {
+                        return response()->json([
+                            'success' => false,
+                            'message' => 'Each selected cake size must belong to the product and be available.',
+                            'errors' => ['items' => ['Invalid, mismatched, or unavailable cake size.']],
+                        ], 422);
+                    }
+
+                    $quantity = (int) $item['qty'];
+                    $unitPrice = (float) $productSize->price;
+                    $itemSubtotal = $unitPrice * $quantity;
+                    $subtotal += $itemSubtotal;
+
+                    $canonicalItems[] = [
+                        'product_id' => (int) $product->id,
+                        'product_size_id' => (int) $productSize->id,
+                        'name' => $product->name,
+                        'product' => $product->name,
+                        'variant' => $productSize->size,
+                        'qty' => $quantity,
+                        'price' => $unitPrice,
+                        'selectionDetails' => $item['selectionDetails'] ?? [],
+                        'image' => $item['image'] ?? $product->image,
+                    ];
+                }
+
+                $deliveryFee = in_array($request->method, ['Delivery', 'Deliver'], true)
+                    ? 45.0
+                    : 0.0;
+                $rushFee = ($request->order_type ?? 'Standard') === 'Urgent' ? 100.0 : 0.0;
+                $total = $subtotal + $deliveryFee + $rushFee;
+
                 $order = Order::create([
                     'user_id' => $user->id,
                     'customer' => $user->name,
                     'email' => $user->email,
-                    'items' => $request->items,
-                    'subtotal' => $request->subtotal,
-                    'delivery_fee' => $request->delivery_fee,
-                    'total' => $request->total,
+                    'items' => $canonicalItems,
+                    'subtotal' => $subtotal,
+                    'delivery_fee' => $deliveryFee,
+                    'total' => $total,
                     'method' => $request->method,
                     'payment' => $request->payment,
                     'address' => $request->address ?? '',
@@ -82,16 +137,17 @@ class OrderController extends Controller
                     $user->save();
                 }
 
-                foreach ($request->items as $item) {
+                foreach ($canonicalItems as $item) {
                     OrderItem::create([
                         'order_id' => $order->id,
-                        'product' => $item['name'] ?? 'Unknown',
-                        'variant' => $item['variant'] ?? '',
-                        'qty' => $item['qty'] ?? 1,
-                        'price' => $item['price'] ?? 0,
+                        'product_id' => $item['product_id'],
+                        'product_size_id' => $item['product_size_id'],
+                        'product' => $item['product'],
+                        'variant' => $item['variant'],
+                        'qty' => $item['qty'],
+                        'price' => $item['price'],
                         'details' => isset($item['selectionDetails']) ? $item['selectionDetails'] : null,
                         'image' => $item['image'] ?? null,
-                        'created_at' => now(),
                     ]);
 
                 }
@@ -111,6 +167,9 @@ class OrderController extends Controller
                     'success' => true,
                     'message' => 'Order created successfully.',
                     'order_id' => $order->id,
+                    'subtotal' => $subtotal,
+                    'delivery_fee' => $deliveryFee,
+                    'total' => $total,
                     'order' => $order->load('orderItems'),
                     'user' => [
                         'id' => (string)$user->id,

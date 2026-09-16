@@ -38,10 +38,9 @@ export default function StaffAdminLogin() {
 
       const normalizedRole = normalizeRole(data.user?.role);
       const userWithRole = { ...data.user, role: normalizedRole, token: data.token || "" };
-      localStorage.setItem("user", JSON.stringify(userWithRole));
-      setSuccess("Signed in successfully.");
-
-      if (["admin", "administrator", "superadmin", "super_admin", "manager", "owner", "shop_owner"].includes(normalizedRole)) {
+      if (normalizedRole === "admin") {
+        localStorage.setItem("user", JSON.stringify(userWithRole));
+        setSuccess("Signed in successfully.");
         navigate("/admin", { replace: true });
       } else {
         throw new Error("Only admin accounts can access this area.");
