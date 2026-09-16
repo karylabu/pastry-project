@@ -9,6 +9,7 @@ header("Access-Control-Allow-Methods: GET, OPTIONS");
 header("Access-Control-Allow-Headers: Content-Type");
 
 require_once __DIR__ . '/../includes/db.php';
+require_once __DIR__ . '/../includes/api_auth.php';
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     http_response_code(200);
@@ -21,8 +22,13 @@ if (!$conn) {
     exit();
 }
 
+$authUser = requireApiRole(['customer', 'admin']);
+$isCustomer = strtolower((string) $authUser['role']) === 'customer';
+$authenticatedUserId = (int) $authUser['id'];
+
 $orderId = intval($_GET['order_id'] ?? 0);
-$userId = intval($_GET['user_id'] ?? 0);
+$requestedUserId = intval($_GET['user_id'] ?? 0);
+$userId = $isCustomer ? $authenticatedUserId : $requestedUserId;
 $conversationId = substr(trim($_GET['conversation_id'] ?? ''), 0, 64);
 
 if ($orderId < 0) {
@@ -31,8 +37,15 @@ if ($orderId < 0) {
 }
 
 if ($orderId > 0) {
-    $orderCheck = $conn->prepare("SELECT id FROM orders WHERE id=? LIMIT 1");
-    $orderCheck->bind_param("i", $orderId);
+    $orderCheckSql = $isCustomer
+        ? "SELECT id FROM orders WHERE id=? AND user_id=? LIMIT 1"
+        : "SELECT id FROM orders WHERE id=? LIMIT 1";
+    $orderCheck = $conn->prepare($orderCheckSql);
+    if ($isCustomer) {
+        $orderCheck->bind_param("ii", $orderId, $authenticatedUserId);
+    } else {
+        $orderCheck->bind_param("i", $orderId);
+    }
     $orderCheck->execute();
     $orderCheck->store_result();
     if ($orderCheck->num_rows === 0) {
@@ -53,9 +66,11 @@ $bindId = $isDirectChat ? $userId : $orderId;
 $directUserClause = $userId > 0 ? 'user_id=?' : 'user_id IS NULL';
 $markQuery = $isDirectChat
     ? "UPDATE messages SET is_read=1 WHERE {$directUserClause} AND order_id IS NULL AND sender='customer' AND conversation_id=?"
-    : ($conversationId === 'legacy'
-        ? "UPDATE messages SET is_read=1 WHERE (order_id=? OR order_id IS NULL) AND sender='customer' AND (conversation_id=? OR conversation_id IS NULL)"
-        : "UPDATE messages SET is_read=1 WHERE (order_id=? OR order_id IS NULL) AND sender='customer' AND conversation_id=?");
+    : ($isCustomer
+        ? "UPDATE messages SET is_read=1 WHERE order_id=? AND sender IN ('admin', 'staff') AND conversation_id=?"
+        : ($conversationId === 'legacy'
+            ? "UPDATE messages SET is_read=1 WHERE (order_id=? OR order_id IS NULL) AND sender='customer' AND (conversation_id=? OR conversation_id IS NULL)"
+            : "UPDATE messages SET is_read=1 WHERE (order_id=? OR order_id IS NULL) AND sender='customer' AND conversation_id=?"));
 $mark = $conn->prepare($markQuery);
 if ($isDirectChat && $userId === 0) {
     $mark->bind_param("s", $conversationId);
@@ -68,9 +83,11 @@ $mark->close();
 /* Fetch all messages for this order */
 $fetchQuery = $isDirectChat
     ? "SELECT id, sender, message, image_path, is_read, created_at FROM messages WHERE {$directUserClause} AND order_id IS NULL AND conversation_id=? ORDER BY created_at ASC"
-    : ($conversationId === 'legacy'
-        ? "SELECT id, sender, message, image_path, is_read, created_at FROM messages WHERE (order_id=? OR order_id IS NULL) AND (conversation_id=? OR conversation_id IS NULL) ORDER BY created_at ASC"
-        : "SELECT id, sender, message, image_path, is_read, created_at FROM messages WHERE (order_id=? OR order_id IS NULL) AND conversation_id=? ORDER BY created_at ASC");
+    : ($isCustomer
+        ? "SELECT id, sender, message, image_path, is_read, created_at FROM messages WHERE order_id=? AND conversation_id=? ORDER BY created_at ASC"
+        : ($conversationId === 'legacy'
+            ? "SELECT id, sender, message, image_path, is_read, created_at FROM messages WHERE (order_id=? OR order_id IS NULL) AND (conversation_id=? OR conversation_id IS NULL) ORDER BY created_at ASC"
+            : "SELECT id, sender, message, image_path, is_read, created_at FROM messages WHERE (order_id=? OR order_id IS NULL) AND conversation_id=? ORDER BY created_at ASC"));
 $stmt = $conn->prepare($fetchQuery);
 if ($isDirectChat && $userId === 0) {
     $stmt->bind_param("s", $conversationId);

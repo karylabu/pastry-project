@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/cors.php';
 require_once __DIR__ . '/../includes/db.php';
+require_once __DIR__ . '/../includes/api_auth.php';
 
 error_reporting(0);
 ini_set('display_errors', 0);
@@ -16,18 +17,8 @@ try {
     | CREATE TABLE / ALTER TABLE statements at request time.
     */
 
-    // Identify customer_id from request
-    $user_id = 0;
-    if ($_SERVER['REQUEST_METHOD'] === 'GET') {
-        $user_id = intval($_GET['user_id'] ?? 0);
-    } else {
-        $body = json_decode(file_get_contents('php://input'), true) ?: [];
-        $user_id = intval($body['user_id'] ?? $_GET['user_id'] ?? 0);
-    }
-
-    if ($user_id <= 0) {
-        throw new Exception('User ID is required');
-    }
+    $authUser = requireApiRole(['customer']);
+    $user_id = (int) $authUser['id'];
 
     if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         $sql = "SELECT * FROM addresses WHERE customer_id = ? ORDER BY is_default DESC, updated_at DESC";

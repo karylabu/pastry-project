@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import PageShell from '../components/PageShell';
 import { CUSTOMER_BASE } from '../../services/config';
-import { safeParseJson } from '../../services/api';
+import { getAuthHeaders, safeParseJson } from '../../services/api';
 import { Gift, Sparkles, Ticket, ChevronRight, CheckCircle2, Clock3, Truck, BadgePercent } from 'lucide-react';
 
 export default function Rewards() {
@@ -20,7 +20,7 @@ export default function Rewards() {
 
   useEffect(() => {
     if (!user?.id) return;
-    fetch(`${CUSTOMER_BASE}/api_loyalty.php?user_id=${user.id}`)
+    fetch(`${CUSTOMER_BASE}/api_loyalty.php`, { credentials: 'include', headers: getAuthHeaders() })
       .then((response) => safeParseJson(response))
       .then((data) => {
         if (data.success) setLoyalty(data);
@@ -33,11 +33,11 @@ export default function Rewards() {
     setRedeeming(true);
     setRewardMessage('');
     try {
-      const body = new URLSearchParams({ user_id: String(user.id), action: 'redeem', points: '1000' });
-      const data = await safeParseJson(await fetch(`${CUSTOMER_BASE}/api_loyalty.php`, { method: 'POST', body }));
+      const body = new URLSearchParams({ action: 'redeem', points: '1000' });
+      const data = await safeParseJson(await fetch(`${CUSTOMER_BASE}/api_loyalty.php`, { method: 'POST', credentials: 'include', headers: getAuthHeaders(), body }));
       if (!data.success) throw new Error(data.message || 'Unable to redeem points.');
       setRewardMessage(`${data.reward_code}: 5% off, maximum ₱100 discount`);
-      const refreshed = await safeParseJson(await fetch(`${CUSTOMER_BASE}/api_loyalty.php?user_id=${user.id}`));
+      const refreshed = await safeParseJson(await fetch(`${CUSTOMER_BASE}/api_loyalty.php`, { credentials: 'include', headers: getAuthHeaders() }));
       if (refreshed.success) setLoyalty(refreshed);
     } catch (error) {
       setRewardMessage(error.message);

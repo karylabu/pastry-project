@@ -37,7 +37,9 @@ class AuthController extends Controller
 
             if (!$user) {
                 $error = 'User not found.';
-            } elseif (!Hash::check($password, $user->password) && $password !== $user->password) {
+            } elseif (!in_array(strtolower((string) ($user->role ?? '')), ['customer', 'admin'], true)) {
+                $error = 'This account is not eligible for access.';
+            } elseif (!Hash::check($password, $user->password)) {
                 $error = 'Incorrect password.';
             } else {
                 $userData = [
@@ -53,10 +55,6 @@ class AuthController extends Controller
                 // Redirect to React app on port 3000
                 if (strtolower($userData['role']) === 'admin') {
                     return redirect('http://127.0.0.1:3000/admin');
-                } elseif (strtolower($userData['role']) === 'staff') {
-                    return redirect('http://127.0.0.1:3000/staff');
-                }
-
                 return redirect('http://127.0.0.1:3000/customer');
             }
         }
@@ -119,6 +117,20 @@ class AuthController extends Controller
             $user->profile_picture = $profilePicture;
         }
 
+        if (!in_array(strtolower((string) ($user->role ?? '')), ['customer', 'admin'], true)) {
+            return $this->googleCorsResponse(['success' => false, 'message' => 'This account is not eligible for access.'], 403);
+        }
+
+        $token = bin2hex(random_bytes(32));
+        DB::table('user_sessions')->updateOrInsert(
+            ['user_id' => $user->id],
+            [
+                'token' => $token,
+                'created_at' => now(),
+                'expires_at' => now()->addDays(30),
+            ]
+        );
+
         $userData = [
             'id' => $user->id,
             'name' => $user->name,
@@ -129,9 +141,11 @@ class AuthController extends Controller
         ];
 
         $_SESSION['user'] = $userData;
+        $_SESSION['auth_token'] = $token;
         session(['user' => $userData]);
+        session(['auth_token' => $token]);
 
-        return $this->googleCorsResponse(['success' => true, 'user' => $userData]);
+        return $this->googleCorsResponse(['success' => true, 'token' => $token, 'user' => $userData]);
     }
 
     private function firebaseHttpClient()
@@ -381,12 +395,13 @@ class AuthController extends Controller
         return back()->withInput()->with('error', $error);
     }
 
-    public function logout()
+    public function logout(Request $request)
     {
         if (session_status() === PHP_SESSION_NONE) {
             session_start();
         }
 
+        $this->revokeCurrentToken($request);
         unset($_SESSION['user']);
         session()->forget('user');
         session()->flush();

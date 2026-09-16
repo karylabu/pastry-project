@@ -9,7 +9,7 @@ if (!$user) {
 }
 
 $role = strtolower(trim((string) ($user['role'] ?? '')));
-$allowedRoles = ['staff', 'admin', 'administrator', 'superadmin', 'super_admin', 'manager'];
+$allowedRoles = ['admin'];
 if (!in_array($role, $allowedRoles, true)) {
     http_response_code(403);
     echo json_encode(['success' => false, 'message' => 'You are not authorized for staff access.']);

@@ -33,7 +33,7 @@ if (!is_array($staffPageUser) || empty($_SESSION['auth_token'])) {
     exit;
 }
 
-$staffPageRoles = ['staff', 'admin', 'administrator', 'superadmin', 'super_admin', 'manager'];
+$staffPageRoles = ['admin'];
 
 $staffAuthConnection = @new mysqli('localhost', 'root', '', 'pastry_db');
 $staffAuthValid = false;

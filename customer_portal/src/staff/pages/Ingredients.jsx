@@ -52,7 +52,7 @@ export default function Ingredients({
   const [cakeRecipes, setCakeRecipes] = useState([]);
   const [selectedCakeFlavor, setSelectedCakeFlavor] = useState(null);
   const currentUser = (() => { try { return JSON.parse(window.localStorage.getItem('user') || 'null'); } catch (e) { return null; } })();
-  const canApproveDiscard = ['admin', 'administrator', 'superadmin', 'super_admin', 'manager', 'owner'].includes(String(currentUser?.role || '').toLowerCase());
+  const canApproveDiscard = String(currentUser?.role || '').toLowerCase() === 'admin';
 
   useEffect(() => {
     (async () => {

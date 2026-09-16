@@ -5,18 +5,13 @@ header('Access-Control-Allow-Headers: Content-Type');
 header('Content-Type: application/json');
 
 require_once __DIR__ . '/cors.php';
+require_once __DIR__ . '/../includes/api_auth.php';
 
 error_reporting(0);
 ini_set('display_errors', 0);
 
-// Get user_id from query string
-$user_id = isset($_GET['user_id']) ? intval($_GET['user_id']) : null;
-
-if (!$user_id) {
-  error_log("api_get_notifications.php: No user_id provided");
-  echo json_encode([]);
-  exit;
-}
+$authUser = requireApiRole(['customer']);
+$user_id = (int) $authUser['id'];
 
 try {
   // Connect to database

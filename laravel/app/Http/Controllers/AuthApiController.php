@@ -2,13 +2,11 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 
 class AuthApiController extends Controller
@@ -98,12 +96,14 @@ class AuthApiController extends Controller
             ], 200);
         }
 
-        // Support both plain-text (old) and hashed passwords
-        $passwordValid = (
-            $request->password === $user->password ||
-            password_verify($request->password, $user->password) ||
-            Hash::check($request->password, $user->password)
-        );
+        if (!in_array(strtolower((string) $user->role), ['customer', 'admin'], true)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'This account is not eligible for access.',
+            ], 403);
+        }
+
+        $passwordValid = Hash::check($request->password, $user->password);
 
         if (!$passwordValid) {
             Log::warning('Login failed: Incorrect password', ['email' => $request->email]);
@@ -139,13 +139,11 @@ class AuthApiController extends Controller
         }
 
         $userData = $this->formatUserData($user);
-        $jwtToken = base64_encode(json_encode(array_merge($userData, ['exp' => time() + 86400])));
 
         $response = [
             'success' => true,
             'message' => 'Login successful',
             'token' => $token,
-            'jwt_token' => $jwtToken,
             'user' => $userData,
         ];
 

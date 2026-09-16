@@ -315,6 +315,8 @@ export default function ProductModal({ isOpen, onClose, product, allCakes, onAdd
   const handleConfirm = () => {
     onAddToCart({
       ...product,
+      product_id: Number(product.id),
+      product_size_id: currentVariant && Number.isInteger(Number(currentVariant.id)) ? Number(currentVariant.id) : null,
       variant: currentVariant ? currentVariant.size : product.variant || product.defaultSize,
       qty,
       price: parsedUnitPrice + extraCost,

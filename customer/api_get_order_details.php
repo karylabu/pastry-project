@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/cors.php';
+require_once __DIR__ . '/../includes/api_auth.php';
 
 error_reporting(0);
 ini_set('display_errors', 0);
@@ -28,6 +29,7 @@ try {
 
     $hasCustomer = false;
     $hasEmail = false;
+    $hasUserId = false;
     $columnsRes = mysqli_query($conn, "SHOW COLUMNS FROM orders");
     if ($columnsRes) {
         while ($col = mysqli_fetch_assoc($columnsRes)) {
@@ -36,6 +38,9 @@ try {
             }
             if ($col['Field'] === 'email') {
                 $hasEmail = true;
+            }
+            if ($col['Field'] === 'user_id') {
+                $hasUserId = true;
             }
         }
     }
@@ -52,7 +57,19 @@ try {
         $hasCustomCakeOrders = true;
     }
 
-    $sql = "SELECT * FROM orders WHERE id = " . intval($order_id) . " LIMIT 1";
+    $authUser = requireApiRole(['customer']);
+    $authenticatedUserId = (int) $authUser['id'];
+    $authenticatedEmail = trim((string) ($authUser['email'] ?? ''));
+    $ownership = $hasUserId ? 'user_id = ' . $authenticatedUserId : '1 = 0';
+    if ($hasUserId && $hasEmail && $authenticatedEmail !== '') {
+        $escapedEmail = mysqli_real_escape_string($conn, $authenticatedEmail);
+        $ownership .= " OR (user_id IS NULL AND email = '$escapedEmail')";
+    } elseif (!$hasUserId && $hasEmail && $authenticatedEmail !== '') {
+        $escapedEmail = mysqli_real_escape_string($conn, $authenticatedEmail);
+        $ownership = "email = '$escapedEmail'";
+    }
+
+    $sql = "SELECT * FROM orders WHERE id = " . intval($order_id) . " AND ($ownership) LIMIT 1";
     $res = mysqli_query($conn, $sql);
     if (!$res) {
         throw new Exception("SQL Error: " . mysqli_error($conn));

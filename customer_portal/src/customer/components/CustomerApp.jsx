@@ -126,6 +126,8 @@ export default function CustomerApp() {
     const newItems = Array.from({ length: quantity }, (_, idx) => ({
       ...product,
       id: Date.now() + idx,
+      product_id: Number(product.product_id ?? product.id),
+      product_size_id: product.product_size_id ?? null,
       qty: 1,
       price: unitPrice,
     }));

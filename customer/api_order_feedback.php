@@ -3,6 +3,7 @@ error_reporting(0);
 ini_set('display_errors', 0);
 
 require_once __DIR__ . '/cors.php';
+require_once __DIR__ . '/../includes/api_auth.php';
 
 header('Content-Type: application/json');
 
@@ -12,14 +13,17 @@ try {
         throw new Exception('Database connection failed.');
     }
 
+    $authUser = requireApiRole(['customer']);
+    $authenticatedUserId = (int) $authUser['id'];
+
     $data = json_decode(file_get_contents('php://input'), true) ?: [];
     $orderId = intval($data['order_id'] ?? 0);
-    $userId = intval($data['user_id'] ?? 0);
+    $userId = $authenticatedUserId;
     $rating = intval($data['rating'] ?? 0);
     $comment = trim((string)($data['comment'] ?? ''));
 
-    if ($orderId <= 0 || $userId <= 0) {
-        throw new Exception('Invalid order or customer.');
+    if ($orderId <= 0) {
+        throw new Exception('Invalid order.');
     }
     if ($rating < 1 || $rating > 5) {
         throw new Exception('Rating must be between 1 and 5.');

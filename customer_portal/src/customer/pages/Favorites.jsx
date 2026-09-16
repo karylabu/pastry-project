@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import ProductCard from '../components/ProductCard';
 import PageShell from '../components/PageShell';
-import { safeParseJson } from '../../services/api';
+import { getAuthHeaders, safeParseJson } from '../../services/api';
 import { CUSTOMER_BASE } from '../../services/config';
 
 export default function Favorites() {
@@ -29,7 +29,10 @@ export default function Favorites() {
   const loadFavorites = async () => {
     if (userId > 0) {
       try {
-        const response = await fetch(`${CUSTOMER_BASE}/api_favorites.php?user_id=${userId}`);
+        const response = await fetch(`${CUSTOMER_BASE}/api_favorites.php`, {
+          credentials: 'include',
+          headers: getAuthHeaders(),
+        });
         const data = await safeParseJson(response);
         if (data.status === 'success') {
           setFavoriteIds(data.favorites || []);
@@ -76,8 +79,9 @@ export default function Favorites() {
       try {
         await fetch(`${CUSTOMER_BASE}/api_favorites.php`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ user_id: userId, product_id: id, favorite: !currentlyFavorite }),
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+          body: JSON.stringify({ product_id: id, favorite: !currentlyFavorite }),
         });
       } catch (err) {
         console.error('Failed to save favorite to server', err);

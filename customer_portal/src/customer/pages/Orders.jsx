@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, AlertTriangle, PackageCheck, Filter, ChevronDown, Eye, Search, Download, Cookie, Printer, Star } from "lucide-react";
 import PageShell from '../components/PageShell';
-import { safeParseJson } from '../../services/api';
+import { getAuthHeaders, safeParseJson } from '../../services/api';
 import { CUSTOMER_BASE } from "../../services/config";
 
 // ── Cancel Confirmation Dialog ───────────────────────────────────────────────
@@ -241,19 +241,16 @@ export default function Orders() {
   }, [userEmail, userName, user?.id]);
 
   const loadOrders = useCallback(async () => {
-    if (!user?.id && !userEmail && !userName) {
+    if (!user?.token) {
       setOrders([]);
       return;
     }
 
     try {
-      // Send user_id as query parameter for secure filtering
-      const params = new URLSearchParams({
-        user_id: String(user.id || ''),
-        user_email: String(userEmail || ''),
-        customer: String(userName || ''),
+      const res = await fetch(`${CUSTOMER_BASE}/api_get_orders.php`, {
+        credentials: 'include',
+        headers: getAuthHeaders(),
       });
-      const res = await fetch(`${CUSTOMER_BASE}/api_get_orders.php?${params.toString()}`);
       const data = await safeParseJson(res);
       if (Array.isArray(data)) {
         const parsedOrders = data.map((order) => ({
@@ -373,7 +370,8 @@ export default function Orders() {
     try {
       const res = await fetch(`${CUSTOMER_BASE}/api_confirm_received.php`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        headers: { "Content-Type": "application/json", ...getAuthHeaders() },
         body: JSON.stringify({ order_id: receivedTarget.id }),
       });
       const data = await safeParseJson(res);
@@ -397,10 +395,10 @@ export default function Orders() {
     try {
       const res = await fetch(`${CUSTOMER_BASE}/api_order_feedback.php`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         body: JSON.stringify({
           order_id: feedbackTarget.id,
-          user_id: user?.id || feedbackTarget.user_id || 0,
           rating,
           comment,
         }),

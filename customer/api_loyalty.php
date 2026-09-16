@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/cors.php';
+require_once __DIR__ . '/../includes/api_auth.php';
 
 mysqli_report(MYSQLI_REPORT_OFF);
 $conn = @mysqli_connect('localhost', 'root', '', 'pastry_db');
@@ -26,13 +27,9 @@ $conn->query("CREATE TABLE IF NOT EXISTS loyalty_transactions (
 $conn->query("ALTER TABLE loyalty_transactions ADD COLUMN IF NOT EXISTS discount_percent DECIMAL(5,2) NOT NULL DEFAULT 0");
 $conn->query("ALTER TABLE loyalty_transactions ADD COLUMN IF NOT EXISTS max_discount_amount DECIMAL(10,2) NOT NULL DEFAULT 100");
 
-$userId = intval($_GET['user_id'] ?? $_POST['user_id'] ?? 0);
+$authUser = requireApiRole(['customer']);
+$userId = (int) $authUser['id'];
 $action = $_GET['action'] ?? $_POST['action'] ?? 'summary';
-
-if ($userId <= 0) {
-    echo json_encode(['success' => false, 'message' => 'User is required']);
-    exit;
-}
 
 if ($action === 'redeem' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $points = intval($_POST['points'] ?? 0);
@@ -41,26 +38,48 @@ if ($action === 'redeem' && $_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
     }
 
-    $balanceResult = $conn->query("SELECT COALESCE(SUM(points), 0) AS balance FROM loyalty_transactions WHERE user_id = {$userId}");
-    $balanceRow = $balanceResult ? $balanceResult->fetch_assoc() : [];
-    $balance = intval($balanceRow['balance'] ?? 0);
-    if ($points > $balance) {
-        echo json_encode(['success' => false, 'message' => 'Not enough points.']);
+    $conn->begin_transaction();
+    try {
+        $lockStmt = $conn->prepare('SELECT id FROM users WHERE id = ? FOR UPDATE');
+        $lockStmt->bind_param('i', $userId);
+        $lockStmt->execute();
+        $lockStmt->close();
+
+        $balanceStmt = $conn->prepare('SELECT COALESCE(SUM(points), 0) AS balance FROM loyalty_transactions WHERE user_id = ?');
+        $balanceStmt->bind_param('i', $userId);
+        $balanceStmt->execute();
+        $balanceRow = $balanceStmt->get_result()->fetch_assoc() ?: [];
+        $balanceStmt->close();
+        $balance = intval($balanceRow['balance'] ?? 0);
+        if ($points > $balance) {
+            $conn->rollback();
+            echo json_encode(['success' => false, 'message' => 'Not enough points.']);
+            exit;
+        }
+
+        $discountPercent = 5;
+        $maxDiscountAmount = 100;
+        $code = 'PPR-' . strtoupper(bin2hex(random_bytes(4)));
+        $pointsToDeduct = -$points;
+        $stmt = $conn->prepare("INSERT INTO loyalty_transactions (user_id, type, points, discount_percent, max_discount_amount, reward_code) VALUES (?, 'redeem', ?, ?, ?, ?)");
+        $stmt->bind_param('iidds', $userId, $pointsToDeduct, $discountPercent, $maxDiscountAmount, $code);
+        $ok = $stmt->execute();
+        $stmt->close();
+
+        if (!$ok) {
+            $conn->rollback();
+            echo json_encode(['success' => false, 'message' => 'Could not redeem points']);
+            exit;
+        }
+
+        $conn->commit();
+    } catch (Throwable $e) {
+        $conn->rollback();
+        echo json_encode(['success' => false, 'message' => 'Could not redeem points']);
         exit;
     }
 
-    $discountPercent = 5;
-    $maxDiscountAmount = 100;
-    $code = 'PPR-' . strtoupper(bin2hex(random_bytes(4)));
-    $stmt = $conn->prepare("INSERT INTO loyalty_transactions (user_id, type, points, discount_percent, max_discount_amount, reward_code) VALUES (?, 'redeem', ?, ?, ?, ?)");
-    $stmt->bind_param('iidds', $userId, $pointsToDeduct, $discountPercent, $maxDiscountAmount, $code);
-    $pointsToDeduct = -$points;
-    $ok = $stmt->execute();
-    $stmt->close();
-
-    echo json_encode($ok
-        ? ['success' => true, 'message' => 'Reward created', 'reward_code' => $code, 'points' => $points, 'discount_percent' => $discountPercent]
-        : ['success' => false, 'message' => 'Could not redeem points']);
+    echo json_encode(['success' => true, 'message' => 'Reward created', 'reward_code' => $code, 'points' => $points, 'discount_percent' => $discountPercent]);
     exit;
 }
 

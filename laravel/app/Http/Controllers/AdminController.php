@@ -14,7 +14,7 @@ class AdminController extends Controller
     {
         $user = session('user');
         $role = is_array($user) ? strtolower((string) ($user['role'] ?? '')) : '';
-        if (!$user || !in_array($role, ['staff', 'manager', 'admin'], true)) {
+        if (!$user || $role !== 'admin') {
             return redirect('/staff_login.php');
         }
 
@@ -33,9 +33,9 @@ class AdminController extends Controller
             } else {
                 $user = DB::table('users')->where('email', $email)->first();
 
-                if ($user && in_array(strtolower((string) ($user->role ?? '')), ['staff', 'manager', 'admin'], true)
-                    && (Hash::check($password, $user->password) || $user->password === $password)) {
-                    $role = property_exists($user, 'role') && $user->role ? $user->role : 'staff';
+                if ($user && strtolower((string) ($user->role ?? '')) === 'admin'
+                    && Hash::check($password, $user->password)) {
+                    $role = $user->role;
                     session(['user' => [
                         'id' => $user->id,
                         'name' => $user->name,
@@ -52,15 +52,16 @@ class AdminController extends Controller
             return view('staff.login', compact('error'));
         }
 
-        if (session('user') && in_array(strtolower((string) (session('user.role') ?? '')), ['staff', 'manager', 'admin'], true)) {
+        if (session('user') && strtolower((string) (session('user.role') ?? '')) === 'admin') {
             return redirect('/staff/dashboard.php');
         }
 
         return view('staff.login');
     }
 
-    public function logout()
+    public function logout(Request $request)
     {
+        $this->revokeCurrentToken($request);
         session()->forget('user');
         session()->flush();
 
