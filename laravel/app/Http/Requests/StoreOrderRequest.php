@@ -14,13 +14,15 @@ class StoreOrderRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'items' => 'required|array',
-            'items.*.name' => 'required|string',
+            'items' => 'required|array|min:1',
+            'items.*.product_id' => 'required|integer|exists:products,id',
+            'items.*.product_size_id' => 'required|integer|exists:product_sizes,id',
             'items.*.qty' => 'required|integer|min:1',
-            'items.*.price' => 'required|numeric',
-            'subtotal' => 'required|numeric',
-            'delivery_fee' => 'required|numeric',
-            'total' => 'required|numeric',
+            'items.*.name' => 'sometimes|string',
+            'items.*.variant' => 'sometimes|string',
+            'items.*.price' => 'sometimes|numeric',
+            'items.*.selectionDetails' => 'sometimes|array',
+            'items.*.image' => 'sometimes|string|nullable',
             'method' => 'required|string|in:Delivery,Deliver,Pickup',
             'payment' => 'required|string',
             'address' => 'required_if:method,Delivery,Deliver|string|nullable',

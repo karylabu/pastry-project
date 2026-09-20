@@ -17,7 +17,7 @@ function normalizeRole(role) {
 
 function isAdminRole(role) {
   const normalized = normalizeRole(role);
-  return ["admin", "administrator", "superadmin", "super_admin", "owner", "shop_owner"].includes(normalized);
+  return normalized === "admin";
 }
 
 export default function RequireAdmin({ children }) {

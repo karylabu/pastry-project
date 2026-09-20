@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { MessageCircle, X, Send, Bot, User, Headphones, Inbox, Paperclip } from 'lucide-react';
 import { STAFF_BASE, CUSTOMER_BASE } from '../../services/config';
-import { safeParseJson } from '../../services/api';
+import { getAuthHeaders, safeParseJson } from '../../services/api';
 
 import StaffNavbar from '../components/StaffNavbar';
 
@@ -179,7 +179,10 @@ function StaffChatInbox({ open, onClose }) {
 
   const fetchMessages = async (orderId) => {
     try {
-      const res  = await fetch(`${CUSTOMER_BASE}/api_chat_fetch.php?order_id=${orderId}`);
+      const res  = await fetch(`${CUSTOMER_BASE}/api_chat_fetch.php?order_id=${orderId}`, {
+        credentials: 'include',
+        headers: getAuthHeaders(),
+      });
       const data = await safeParseJson(res);
       if (data.success) {
         setMessages(data.messages);
@@ -208,11 +211,12 @@ function StaffChatInbox({ open, onClose }) {
       const formData = new FormData();
       formData.append("order_id", activeOrderId);
       formData.append("message", msg);
-      formData.append("sender", "admin");
       if (image) formData.append("image", image);
 
       await fetch(`${CUSTOMER_BASE}/api_chat_send.php`, {
         method: "POST",
+        credentials: 'include',
+        headers: getAuthHeaders(),
         body: formData
       });
       fetchMessages(activeOrderId);

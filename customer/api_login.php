@@ -42,19 +42,19 @@ try {
 
     $user = mysqli_fetch_assoc($result);
 
-    // Support both plain-text (old) and hashed passwords
-    $passwordValid = ($password === $user['password'])
-                  || password_verify($password, $user['password']);
+    if (!in_array(strtolower(trim((string) ($user['role'] ?? ''))), ['customer', 'admin'], true)) {
+        echo json_encode(["success" => false, "message" => "This account is not eligible for access."]);
+        exit;
+    }
+
+    $passwordValid = password_verify($password, $user['password']);
 
     if (!$passwordValid) {
         echo json_encode(["success" => false, "message" => "Incorrect password."]);
         exit;
     }
 
-    if (strtolower(trim((string) ($user['status'] ?? 'active'))) !== 'active') {
-        echo json_encode(["success" => false, "message" => "This account is deactivated."]);
-        exit;
-    }
+    $accountStatus = 'active';
 
     session_regenerate_id(true);
     $_SESSION['user'] = [
@@ -62,7 +62,7 @@ try {
         'name' => $user['name'],
         'email' => $user['email'],
         'role' => $user['role'],
-        'status' => $user['status'],
+        'status' => $accountStatus,
     ];
 
     // Generate a simple token for the session
@@ -85,7 +85,7 @@ try {
             "name"  => $user['name'],
             "email" => $user['email'],
             "role"  => $user['role'],
-            "status" => $user['status'],
+            "status" => $accountStatus,
         ]
     ]);
 

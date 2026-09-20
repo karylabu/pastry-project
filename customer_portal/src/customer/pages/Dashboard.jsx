@@ -29,7 +29,7 @@ import { useNavigate } from "react-router-dom";
 import ProductModal from "../components/ProductModal";
 import CustomCakeModal from "../components/CustomCakeModal";
 import { CUSTOMER_BASE, ROOT_BASE } from "../../services/config";
-import { safeParseJson } from "../../services/api";
+import { getAuthHeaders, safeParseJson } from "../../services/api";
 
 /* =========================
    HERO BANNER SLIDES
@@ -453,12 +453,11 @@ export function ChatBubble({ aiMode = false, fullPage = false }) {
 
   const fetchMessages = async () => {
     try {
-      const params = new URLSearchParams({
-        order_id: "0",
-        user_id: String(savedUser?.id || 0),
-        conversation_id: conversationId
+      const params = new URLSearchParams({ order_id: "0", conversation_id: conversationId });
+      const res  = await fetch(`${CUSTOMER_BASE}/api_chat_fetch.php?${params.toString()}`, {
+        credentials: 'include',
+        headers: getAuthHeaders(),
       });
-      const res  = await fetch(`${CUSTOMER_BASE}/api_chat_fetch.php?${params.toString()}`);
       const data = await safeParseJson(res);
       if (data.success) {
         setMessages(data.messages);
@@ -502,9 +501,7 @@ export function ChatBubble({ aiMode = false, fullPage = false }) {
     try {
       const formData = new FormData();
       formData.append("order_id", payloadOrderId);
-      formData.append("user_id", savedUser?.id || 0);
       formData.append("message", msg);
-      formData.append("sender", "customer");
       formData.append("support_mode", "admin");
       formData.append("conversation_id", conversationId);
       if (image) formData.append("image", image);
@@ -512,6 +509,8 @@ export function ChatBubble({ aiMode = false, fullPage = false }) {
       const chatApiBase = CUSTOMER_BASE;
       const res  = await fetch(`${chatApiBase}/api_chat_send.php`, {
         method: "POST",
+        credentials: 'include',
+        headers: getAuthHeaders(),
         body: formData
       });
       const data = await safeParseJson(res);
@@ -939,7 +938,10 @@ export default function Dashboard({ onAddToCart }) {
   const loadFavorites = async () => {
     if (userId > 0) {
       try {
-        const response = await fetch(`${CUSTOMER_BASE}/api_favorites.php?user_id=${userId}`);
+        const response = await fetch(`${CUSTOMER_BASE}/api_favorites.php`, {
+          credentials: 'include',
+          headers: getAuthHeaders(),
+        });
         const data = await safeParseJson(response);
         if (data.status === 'success') {
           setFavoriteIds(data.favorites || []);
@@ -1006,7 +1008,10 @@ export default function Dashboard({ onAddToCart }) {
       }
 
       try {
-        const res = await fetch(`${CUSTOMER_BASE}/api_get_orders.php?user_id=${userId}`);
+        const res = await fetch(`${CUSTOMER_BASE}/api_get_orders.php`, {
+          credentials: 'include',
+          headers: getAuthHeaders(),
+        });
         const data = await safeParseJson(res);
         const completedOrder = (Array.isArray(data) ? data : [])
           .filter((order) => String(order.status || '').toLowerCase() === 'completed')

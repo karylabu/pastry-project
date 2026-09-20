@@ -122,16 +122,13 @@ export default function CustomerApp() {
     }
 
     const quantity = Number(product.qty) || 1;
-    const unitPrice =
-      Number(product.price) ||
-      Number(product.basePrice) ||
-      Number(product.small_price) ||
-      Number(product.big_price) ||
-      0;
+    const unitPrice = Number(product.price ?? product.basePrice ?? 0);
 
     const newItems = Array.from({ length: quantity }, (_, idx) => ({
       ...product,
       id: Date.now() + idx,
+      product_id: Number(product.product_id ?? product.id),
+      product_size_id: product.product_size_id ?? null,
       qty: 1,
       price: unitPrice,
     }));

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
@@ -57,6 +58,11 @@ class SalesImportController extends Controller
 
     public function store(Request $request)
     {
+        $user = $this->requireRole($request, 'admin');
+        if (!$user instanceof User) {
+            return $user;
+        }
+
         try {
             $request->validate([
                 'file' => ['required', 'file', 'mimes:pdf', 'max:' . self::MAX_FILE_KB],

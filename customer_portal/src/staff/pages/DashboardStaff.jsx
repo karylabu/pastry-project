@@ -160,7 +160,7 @@ function StaffChatInbox({ open, onClose }) {
 
   const fetchMessages = useCallback(async (orderId) => {
     try {
-      const res  = await fetch(`${CUSTOMER_BASE}/api_chat_fetch.php?order_id=${orderId}`);
+      const res  = await staffFetch(`${CUSTOMER_BASE}/api_chat_fetch.php?order_id=${orderId}`);
       const data = await res.json();
       if (data.success) {
         setMessages(data.messages);
@@ -195,10 +195,10 @@ function StaffChatInbox({ open, onClose }) {
     }]);
 
     try {
-      await fetch(`${CUSTOMER_BASE}/api_chat_send.php`, {
+      await staffFetch(`${CUSTOMER_BASE}/api_chat_send.php`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ order_id: activeOrderId, message: msg, sender: "admin" })
+        body: JSON.stringify({ order_id: activeOrderId, message: msg })
       });
       fetchMessages(activeOrderId);
       fetchInbox();

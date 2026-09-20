@@ -7,6 +7,7 @@ header("Content-Type: application/json");
 header("Access-Control-Allow-Origin: *");
 header("Access-Control-Allow-Methods: POST, OPTIONS");
 header("Access-Control-Allow-Headers: Content-Type");
+require_once __DIR__ . '/../includes/api_auth.php';
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     http_response_code(200);
@@ -19,6 +20,9 @@ try {
         throw new Exception("Database Connection Failed: " . mysqli_connect_error());
     }
 
+    $authUser = requireApiRole(['customer']);
+    $authenticatedUserId = (int) $authUser['id'];
+
     $data = json_decode(file_get_contents("php://input"), true);
     $order_id = intval($data['order_id'] ?? 0);
 
@@ -28,8 +32,11 @@ try {
     }
 
     // Only allow confirming if status is "To Receive"
-    $check = mysqli_query($conn, "SELECT status FROM orders WHERE id = $order_id");
-    $row = mysqli_fetch_assoc($check);
+    $check = $conn->prepare('SELECT status FROM orders WHERE id = ? AND user_id = ? LIMIT 1');
+    $check->bind_param('ii', $order_id, $authenticatedUserId);
+    $check->execute();
+    $row = $check->get_result()->fetch_assoc();
+    $check->close();
 
     if (!$row) {
         echo json_encode(["success" => false, "message" => "Order not found."]);
@@ -41,7 +48,11 @@ try {
         exit;
     }
 
-    $result = mysqli_query($conn, "UPDATE orders SET status = 'Completed' WHERE id = $order_id");
+    $update = $conn->prepare("UPDATE orders SET status = 'Completed' WHERE id = ? AND user_id = ? AND status = 'To Receive'");
+    $update->bind_param('ii', $order_id, $authenticatedUserId);
+    $update->execute();
+    $result = $update->affected_rows === 1;
+    $update->close();
 
     if ($result) {
         echo json_encode(["success" => true]);

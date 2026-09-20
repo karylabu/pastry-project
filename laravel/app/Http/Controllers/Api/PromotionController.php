@@ -17,15 +17,9 @@ class PromotionController extends Controller
 {
     protected function resolveAdminUser(Request $request): ?User
     {
-        $userId = $request->input('user_id') ?? $request->query('user_id');
+        $user = $this->getAuthenticatedUser($request);
 
-        if (! $userId) {
-            return null;
-        }
-
-        $user = User::find((int) $userId);
-
-        if (! $user || ! in_array($user->role, ['admin', 'staff'], true)) {
+        if (! $user || $user->role !== 'admin') {
             return null;
         }
 

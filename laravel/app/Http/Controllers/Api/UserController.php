@@ -34,10 +34,6 @@ class UserController extends Controller
             $payload['phone'] = $payload['phone_number'];
         }
 
-        if (array_key_exists('role', $payload) && $payload['role'] === 'manager') {
-            $payload['role'] = 'staff';
-        }
-
         return $payload;
     }
 
@@ -50,10 +46,6 @@ class UserController extends Controller
 
         if (array_key_exists('password_confirmation', $validated)) {
             unset($validated['password_confirmation']);
-        }
-
-        if (array_key_exists('role', $validated) && $validated['role'] === 'manager') {
-            $validated['role'] = 'staff';
         }
 
         if (array_key_exists('status', $validated) && !in_array($validated['status'], ['active', 'inactive', 'banned'], true)) {
@@ -72,6 +64,8 @@ class UserController extends Controller
      */
     public function index(Request $request)
     {
+        if ($response = $this->authorizeAdmin($request)) return $response;
+
         $query = User::query()->orderByDesc('created_at');
 
         if ($request->filled('search')) {
@@ -84,7 +78,7 @@ class UserController extends Controller
 
         if ($request->filled('role')) {
             $role = $request->role;
-            if (in_array($role, ['admin', 'manager', 'staff', 'customer'], true)) {
+            if (in_array($role, ['admin', 'customer'], true)) {
                 $query->where('role', $role);
             }
         }
@@ -114,10 +108,12 @@ class UserController extends Controller
     }
 
     /**
-     * Create a new user or staff account.
+    * Create a new user account.
      */
     public function store(Request $request)
     {
+        if ($response = $this->authorizeAdmin($request)) return $response;
+
         $payload = $this->resolvePayload($request);
 
         $validated = Validator::make($payload, [
@@ -125,7 +121,7 @@ class UserController extends Controller
             'email' => ['required', 'email', 'max:255', 'unique:users,email'],
             'phone_number' => ['nullable', 'string', 'max:20'],
             'phone' => ['nullable', 'string', 'max:20'],
-            'role' => ['required', Rule::in(['admin', 'manager', 'staff', 'customer'])],
+            'role' => ['required', Rule::in(['admin', 'customer'])],
             'status' => ['required', Rule::in(['active', 'inactive', 'banned'])],
             'password' => ['required', 'string', 'min:8', 'confirmed'],
         ])->validate();
@@ -150,6 +146,8 @@ class UserController extends Controller
      */
     public function show(User $user)
     {
+        if ($response = $this->authorizeAdmin(request())) return $response;
+
         return response()->json([
             'success' => true,
             'data' => $user,
@@ -161,6 +159,8 @@ class UserController extends Controller
      */
     public function update(Request $request, User $user)
     {
+        if ($response = $this->authorizeAdmin($request)) return $response;
+
         $payload = $this->resolvePayload($request);
 
         $validated = Validator::make($payload, [
@@ -168,7 +168,7 @@ class UserController extends Controller
             'email' => ['sometimes', 'email', 'max:255', Rule::unique('users')->ignore($user->id)],
             'phone_number' => ['nullable', 'string', 'max:20'],
             'phone' => ['nullable', 'string', 'max:20'],
-            'role' => ['sometimes', Rule::in(['admin', 'manager', 'staff', 'customer'])],
+            'role' => ['sometimes', Rule::in(['admin', 'customer'])],
             'status' => ['sometimes', Rule::in(['active', 'inactive', 'banned'])],
             'password' => ['nullable', 'string', 'min:8', 'confirmed'],
         ])->validate();
@@ -195,6 +195,8 @@ class UserController extends Controller
      */
     public function destroy(User $user)
     {
+        if ($response = $this->authorizeAdmin(request())) return $response;
+
         $user->update(['status' => 'inactive']);
 
         return response()->json([
@@ -202,5 +204,17 @@ class UserController extends Controller
             'message' => 'User deactivated successfully.',
             'data' => $user->fresh(),
         ]);
+    }
+
+    protected function authorizeAdmin(Request $request): ?\Illuminate\Http\JsonResponse
+    {
+        $user = $this->getAuthenticatedUser($request);
+        if (!$user) {
+            return response()->json(['success' => false, 'message' => 'Admin authorization required.'], 401);
+        }
+        if (strtolower(trim((string) $user->role)) !== 'admin') {
+            return response()->json(['success' => false, 'message' => 'Admin authorization required.'], 403);
+        }
+        return null;
     }
 }

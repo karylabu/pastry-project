@@ -35,17 +35,14 @@ function getStoredUser() {
   }
 }
 
-// Admin-facing nav. Includes everything staff can see (inventory, live
-// orders, order history, custom cake requests, sales reports, waste
-// tracking) plus admin-only tools: predictive demand, supplier
-// management, user management, and customers.
+// Admin-facing navigation contains all internal management functions.
 function normalizeRole(role) {
   return String(role || "").trim().toLowerCase();
 }
 
 function isAdminRole(role) {
   const normalized = normalizeRole(role);
-  return ["admin", "administrator", "superadmin", "super_admin", "owner", "shop_owner"].includes(normalized);
+  return normalized === "admin";
 }
 
 const NAV_GROUPS = [
@@ -237,7 +234,17 @@ export default function AdminNavbar() {
     navigate(`/admin/products${trimmed ? `?search=${encodeURIComponent(trimmed)}` : ""}`);
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    const token = currentUser?.token || '';
+    try {
+      await fetch(`${BASE}/staff/logout.php`, {
+        credentials: 'include',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+    } catch (error) {
+      console.warn('Logout request failed:', error);
+    }
+
     localStorage.removeItem("user");
     setCurrentUser(null);
     navigate("/admin/login", { replace: true });
@@ -448,7 +455,7 @@ export default function AdminNavbar() {
             {openAccount && (
               <div className="absolute right-0 top-[54px] w-[220px] bg-white border border-black/10 rounded-2xl shadow-2xl overflow-hidden">
                 <div className="px-5 py-4 border-b border-black/10">
-                  <p className="text-[10px] uppercase tracking-wider text-black/50">{currentUser?.role === "owner" || currentUser?.role === "shop_owner" ? "Shop Owner Account" : "Admin Account"}</p>
+                  <p className="text-[10px] uppercase tracking-wider text-black/50">Admin Account</p>
                   <h3 className="text-[13px] font-semibold text-black mt-1">{currentUser?.name || currentUser?.email || "Admin"}</h3>
                 </div>
                 <div className="p-2">

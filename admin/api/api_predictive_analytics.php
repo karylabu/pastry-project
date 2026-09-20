@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../../customer/cors.php';
 require_once __DIR__ . '/../../includes/db.php';
+require_once __DIR__ . '/../../includes/api_auth.php';
 
 /*
 | SCHEMA NOTE: The analytics_* tables are created by the versioned migration
@@ -503,6 +504,21 @@ function persistForecastData(mysqli $conn, array $history, array $forecastPayloa
 
 $method = $_SERVER['REQUEST_METHOD'];
 $action = '';
+
+if ($method === 'POST') {
+    $authenticatedUser = apiUser();
+    if (!$authenticatedUser) {
+        http_response_code(401);
+        echo json_encode(['success' => false, 'message' => 'Authentication required.']);
+        exit;
+    }
+
+    if (trim(strtolower((string) ($authenticatedUser['role'] ?? ''))) !== 'admin') {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'message' => 'You are not authorized for this action.']);
+        exit;
+    }
+}
 
 if ($method === 'GET') {
     $action = $_GET['action'] ?? 'overview';

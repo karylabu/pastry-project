@@ -13,15 +13,9 @@ class NotificationController extends Controller
 {
     protected function resolveAdminUser(Request $request): ?User
     {
-        $userId = $request->query('user_id');
+        $user = $this->getAuthenticatedUser($request);
 
-        if (! $userId) {
-            return null;
-        }
-
-        $user = User::find($userId);
-
-        if (! $user || ! in_array($user->role, ['admin', 'staff'], true)) {
+        if (! $user || $user->role !== 'admin') {
             return null;
         }
 
@@ -114,19 +108,11 @@ class NotificationController extends Controller
 
     public function registerDeviceToken(Request $request): JsonResponse
     {
-        $userId = $request->input('user_id');
         $expoToken = $request->input('expo_push_token');
         $fcmToken = $request->input('fcm_token');
 
-        if (! $userId) {
-            return response()->json([
-                'success' => false,
-                'message' => 'User id is required.',
-            ], 422);
-        }
-
-        $user = User::find($userId);
-        if (! $user || ! in_array($user->role, ['admin', 'staff'], true)) {
+        $user = $this->resolveAdminUser($request);
+        if (! $user) {
             return response()->json([
                 'success' => false,
                 'message' => 'Unable to register device token for this user.',
@@ -156,6 +142,13 @@ class NotificationController extends Controller
 
     public function dispatchPushNotification(Request $request): JsonResponse
     {
+        if (! $this->resolveAdminUser($request)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Forbidden.',
+            ], 403);
+        }
+
         $title = $request->input('title');
         $body = $request->input('body');
         $type = $request->input('type', 'info');
@@ -170,7 +163,7 @@ class NotificationController extends Controller
             ], 422);
         }
 
-        $query = User::query()->whereIn('role', ['admin', 'staff']);
+        $query = User::query()->where('role', 'admin');
 
         if (is_array($userIds) && count($userIds) > 0) {
             $query->whereIn('id', $userIds);

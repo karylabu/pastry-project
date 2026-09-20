@@ -9,53 +9,66 @@ use Illuminate\Support\Facades\DB;
 abstract class Controller
 {
     /**
-     * Helper to get authenticated user from either Laravel session,
-     * Bearer token (hex), or Bearer token (base64 legacy).
+     * Helper to get authenticated user from Laravel auth or a valid session token.
      */
     protected function getAuthenticatedUser(Request $request)
     {
-        // 1. Try Laravel standard auth
         if (auth()->check()) {
-            return auth()->user();
+            $user = auth()->user();
+            return $user instanceof User ? $user : null;
         }
 
-        $token = $request->bearerToken();
-        if (!$token) {
-            $token = $request->header('X-Auth-Token');
-        }
-        if (!$token) {
-            $token = $request->input('token'); // Also support as param
+        $token = $request->bearerToken() ?: trim((string) $request->header('X-Auth-Token', ''));
+        if ($token === '') {
+            return null;
         }
 
-        if ($token) {
-            // Remove 'Bearer ' if present in the string
-            $token = str_replace('Bearer ', '', $token);
+        $session = DB::table('user_sessions')
+            ->where('token', $token)
+            ->where(function ($query) {
+                $query->whereNull('expires_at')
+                    ->orWhere('expires_at', '>', now());
+            })
+            ->first();
 
-            // 2. Try hex token (user_sessions)
-            $session = DB::table('user_sessions')
-                ->where('token', $token)
-                ->where('expires_at', '>', now())
-                ->first();
-
-            if ($session) {
-                return User::find($session->user_id);
-            }
-
-            // 3. Try legacy base64 token
-            try {
-                $decoded = json_decode(base64_decode($token), true);
-                if ($decoded && isset($decoded['id'])) {
-                    return User::find($decoded['id']);
-                }
-            } catch (\Exception $e) {}
+        if (!$session) {
+            return null;
         }
 
-        // 4. Fallback to user_id in request (for debugging/migration)
-        $userId = $request->input('user_id') ?: $request->header('X-User-Id');
-        if ($userId) {
-            return User::find($userId);
+        return User::find($session->user_id);
+    }
+
+    protected function requireRole(Request $request, string $role)
+    {
+        $user = $this->getAuthenticatedUser($request);
+        if (!$user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Authentication required.',
+            ], 401);
         }
 
-        return null;
+        if (strtolower((string) $user->role) !== $role) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Forbidden.',
+            ], 403);
+        }
+
+        return $user;
+    }
+
+    protected function revokeCurrentToken(Request $request): void
+    {
+        $tokens = array_filter([
+            $request->bearerToken(),
+            trim((string) $request->header('X-Auth-Token', '')),
+            trim((string) session('auth_token', '')),
+            trim((string) ($_SESSION['auth_token'] ?? '')),
+        ]);
+
+        foreach (array_unique($tokens) as $token) {
+            DB::table('user_sessions')->where('token', $token)->delete();
+        }
     }
 }

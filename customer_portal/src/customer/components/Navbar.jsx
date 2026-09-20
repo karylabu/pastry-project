@@ -16,7 +16,7 @@ import {
 
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { BASE, CUSTOMER_BASE } from '../../services/config';
-import { safeParseJson } from '../../services/api';
+import { getAuthHeaders, safeParseJson } from '../../services/api';
 
 export default function Navbar({ cartCount = 0, onCartClick }) {
 
@@ -78,10 +78,10 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
       console.log("Stored user:", storedUser);
       
       if (storedUser?.id) {
-        const url = `${CUSTOMER_BASE}/api_get_notifications.php?user_id=${storedUser.id}`;
+        const url = `${CUSTOMER_BASE}/api_get_notifications.php`;
         console.log("Fetching notifications from:", url);
         
-        fetch(url)
+        fetch(url, { credentials: 'include', headers: getAuthHeaders() })
           .then(safeParseJson)
           .then(data => {
             console.log("Notifications data:", data);
@@ -155,7 +155,17 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
     setOpenAccount(false);
   };
 
-  const confirmLogout = () => {
+  const confirmLogout = async () => {
+    const token = user?.token || '';
+    try {
+      await fetch(`${CUSTOMER_BASE}/logout.php`, {
+        credentials: 'include',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+    } catch (error) {
+      console.warn('Logout request failed:', error);
+    }
+
     localStorage.removeItem('user');
     setUser(null);
     setShowLogoutConfirm(false);
@@ -182,7 +192,8 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
           unreadNotifs.map(notif =>
             fetch(`${CUSTOMER_BASE}/api_mark_notif_read.php`, {
               method: 'POST',
-              headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+              credentials: 'include',
+              headers: { 'Content-Type': 'application/x-www-form-urlencoded', ...getAuthHeaders() },
               body: `notification_id=${notif.id}`,
             }).catch(err => console.error('Error marking notification as read:', err))
           )
@@ -341,7 +352,8 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
                           unreadNotifs.map((notif) =>
                             fetch(`${CUSTOMER_BASE}/api_mark_notif_read.php`, {
                               method: 'POST',
-                              headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                              credentials: 'include',
+                              headers: { 'Content-Type': 'application/x-www-form-urlencoded', ...getAuthHeaders() },
                               body: `notification_id=${notif.id}`,
                             }).catch(() => {})
                           )

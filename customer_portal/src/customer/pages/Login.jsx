@@ -12,7 +12,7 @@ const LOGO_URL = "/assets/logo.png";
 const REGISTER_URL = "/customer/register";
 const isCustomerRole = (role) => {
   const normalizedRole = String(role || '').trim().toLowerCase();
-  return !normalizedRole || normalizedRole === 'customer';
+  return normalizedRole === 'customer';
 };
 
 // Design tokens
@@ -86,11 +86,12 @@ export default function Login() {
       }
 
       if (!isCustomerRole(data.user?.role)) {
-        throw new Error('Staff and admin accounts must use the staff or admin login.');
+        throw new Error('Only customer accounts can use customer login.');
       }
 
       const googleAccount = {
         ...data.user,
+        token: data.token || '',
         avatar: data.user.avatar || data.user.profile_picture || data.user.profile_image || googleUser?.photoURL || photoURL || '',
       };
       localStorage.setItem("user", JSON.stringify(googleAccount));

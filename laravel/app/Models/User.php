@@ -56,19 +56,11 @@ class User extends Authenticatable
     }
 
     /**
-     * Determine whether this user is an administrator.
+     * Determine whether this user can access management functions.
      */
     public function isAdmin(): bool
     {
         return $this->role === 'admin';
-    }
-
-    /**
-     * Determine whether this user is staff or above.
-     */
-    public function isStaff(): bool
-    {
-        return in_array($this->role, ['admin', 'manager', 'staff'], true);
     }
 
     /**

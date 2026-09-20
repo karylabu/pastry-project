@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/cors.php';
 require_once __DIR__ . '/../includes/db.php';
+require_once __DIR__ . '/../includes/api_auth.php';
 
 error_reporting(0);
 ini_set('display_errors', 0);
@@ -17,18 +18,8 @@ try {
     */
 
     $method = $_SERVER['REQUEST_METHOD'];
-    $user_id = 0;
-
-    if ($method === 'GET') {
-        $user_id = intval($_GET['user_id'] ?? 0);
-    } else {
-        $body = json_decode(file_get_contents('php://input'), true) ?: [];
-        $user_id = intval($body['user_id'] ?? $_GET['user_id'] ?? 0);
-    }
-
-    if ($user_id <= 0) {
-        throw new Exception('User ID is required');
-    }
+    $authUser = requireApiRole(['customer']);
+    $user_id = (int) $authUser['id'];
 
     if ($method === 'GET') {
         $sql = "SELECT product_id FROM favorites WHERE customer_id = ? ORDER BY created_at DESC";

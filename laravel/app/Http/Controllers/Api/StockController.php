@@ -14,6 +14,10 @@ class StockController extends Controller
 {
     public function mutate(Request $request): JsonResponse
     {
+        if ($response = $this->authorizeAdmin($request)) {
+            return $response;
+        }
+
         $validated = $request->validate([
             'product_size_id' => 'required|integer|exists:product_sizes,id',
             'action_type' => 'required|string|in:stock_in,stock_out',
@@ -73,5 +77,17 @@ class StockController extends Controller
                 'total_product_stock' => ProductSize::where('product_id', $productSize->product_id)->sum('stock_quantity'),
             ],
         ]);
+    }
+
+    private function authorizeAdmin(Request $request): ?JsonResponse
+    {
+        $user = $this->getAuthenticatedUser($request);
+        if (!$user) {
+            return response()->json(['success' => false, 'message' => 'Admin authorization required.'], 401);
+        }
+        if ($user->role !== 'admin') {
+            return response()->json(['success' => false, 'message' => 'Admin authorization required.'], 403);
+        }
+        return null;
     }
 }

@@ -15,6 +15,7 @@ class ProduceProductRequest extends FormRequest
     {
         return [
             'product_id' => ['required', 'integer', 'exists:products,id'],
+            'product_size_id' => ['required', 'integer', 'exists:product_sizes,id'],
             'quantity' => ['required', 'integer', 'min:1'],
             'idempotency_key' => ['required', 'string', 'max:100'],
         ];

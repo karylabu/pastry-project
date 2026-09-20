@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\InventoryService;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -58,18 +60,26 @@ class StaffApiController extends Controller
             return $this->corsResponse(['success' => false, 'message' => 'User account not found.'], 401);
         }
 
-        $role = $user->role ?? null;
-        if (!$role || ($role !== 'staff' && $role !== 'admin')) {
-            return $this->corsResponse(['success' => false, 'message' => 'Access denied. Staff only.'], 403);
+        $role = strtolower((string) ($user->role ?? ''));
+        if ($role !== 'admin') {
+            return $this->corsResponse(['success' => false, 'message' => 'Admin access required.'], 403);
         }
 
-        $passwordValid = ($password === $user->password || Hash::check($password, $user->password));
+        $passwordValid = Hash::check($password, $user->password);
 
         if (!$passwordValid) {
             return $this->corsResponse(['success' => false, 'message' => 'Incorrect password.'], 401);
         }
 
-        $token = 'staff_token_' . bin2hex(random_bytes(16));
+        $token = bin2hex(random_bytes(32));
+        DB::table('user_sessions')->updateOrInsert(
+            ['user_id' => $user->id],
+            [
+                'token' => $token,
+                'created_at' => now(),
+                'expires_at' => now()->addDays(30),
+            ]
+        );
 
         return $this->corsResponse([
             'success' => true,
@@ -88,6 +98,11 @@ class StaffApiController extends Controller
     {
         if ($request->isMethod('options')) {
             return $this->corsResponse(['success' => true]);
+        }
+
+        $admin = $this->requireRole($request, 'admin');
+        if (!$admin instanceof User) {
+            return $admin;
         }
 
         if ($request->query('action') === 'update' && $request->isMethod('post')) {
@@ -145,6 +160,11 @@ class StaffApiController extends Controller
 
     public function getOrders(Request $request)
     {
+        $admin = $this->requireRole($request, 'admin');
+        if (!$admin instanceof User) {
+            return $admin;
+        }
+
         try {
             $query = DB::table('orders');
             if ($request->query('custom') == '1') $query->where('is_customized', 1);
@@ -167,6 +187,11 @@ class StaffApiController extends Controller
 
     public function getIngredients(Request $request)
     {
+        $admin = $this->requireRole($request, 'admin');
+        if (!$admin instanceof User) {
+            return $admin;
+        }
+
         try {
             $ingredients = DB::table('ingredients')->orderBy('name')->get();
             return $this->corsResponse(['success' => true, 'ingredients' => $ingredients]);
@@ -181,17 +206,9 @@ class StaffApiController extends Controller
             return $this->corsResponse(['success' => true]);
         }
 
-        $user = session('user');
-        if (!$user && $request->bearerToken()) {
-            $user = DB::table('user_sessions')
-                ->join('users', 'users.id', '=', 'user_sessions.user_id')
-                ->where('user_sessions.token', $request->bearerToken())
-                ->where('user_sessions.expires_at', '>', now())
-                ->first(['users.id', 'users.name', 'users.email', 'users.role']);
-        }
-        $role = is_array($user) ? ($user['role'] ?? null) : ($user->role ?? null);
-        if (!$user || !in_array($role, ['admin', 'manager', 'staff'], true)) {
-            return $this->corsResponse(['success' => false, 'message' => 'Staff authorization required.'], 403);
+        $admin = $this->requireRole($request, 'admin');
+        if (!$admin instanceof User) {
+            return $admin;
         }
 
         try {
@@ -229,6 +246,10 @@ class StaffApiController extends Controller
                 ->select('id', 'name', 'unit', 'stock', 'threshold', 'expiry')
                 ->orderBy('name')
                 ->get();
+            $inventory = app(InventoryService::class);
+            $ingredients->each(function ($ingredient) use ($inventory) {
+                $ingredient->stock = $inventory->getUsableStock((int) $ingredient->id);
+            });
             $lowStockIngredients = $ingredients->filter(fn ($ingredient) => (float) $ingredient->stock > 0 && (float) $ingredient->stock <= (float) $ingredient->threshold)->values();
             $outOfStockIngredients = $ingredients->filter(fn ($ingredient) => (float) $ingredient->stock <= 0)->values();
 
