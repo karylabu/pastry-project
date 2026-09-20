@@ -37,7 +37,9 @@ class AuthController extends Controller
 
             if (!$user) {
                 $error = 'User not found.';
-            } elseif (!Hash::check($password, $user->password) && $password !== $user->password) {
+            } elseif (!in_array(strtolower((string) ($user->role ?? '')), ['customer', 'admin'], true)) {
+                $error = 'This account is not eligible for access.';
+            } elseif (!Hash::check($password, $user->password)) {
                 $error = 'Incorrect password.';
             } else {
                 $userData = [
@@ -53,10 +55,7 @@ class AuthController extends Controller
                 // Redirect to React app on port 3000
                 if (strtolower($userData['role']) === 'admin') {
                     return redirect('http://127.0.0.1:3000/admin');
-                } elseif (strtolower($userData['role']) === 'staff') {
-                    return redirect('http://127.0.0.1:3000/staff');
                 }
-
                 return redirect('http://127.0.0.1:3000/customer');
             }
         }
@@ -77,22 +76,36 @@ class AuthController extends Controller
         }
 
         try {
-            $firebaseResponse = $this->firebaseHttpClient()->asJson()->post(
-                'https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=' . config('services.firebase.api_key'),
-                ['idToken' => $idToken]
-            );
+            $curl = curl_init('https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=' . config('services.firebase.api_key'));
+            curl_setopt_array($curl, [
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_POST => true,
+                CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
+                CURLOPT_POSTFIELDS => json_encode(['idToken' => $idToken]),
+                CURLOPT_CAINFO => $this->firebaseCaPath(),
+                CURLOPT_TIMEOUT => 15,
+            ]);
+            $firebaseBody = curl_exec($curl);
+            $curlError = curl_error($curl);
+            $firebaseStatus = (int) curl_getinfo($curl, CURLINFO_HTTP_CODE);
+            curl_close($curl);
+            if ($firebaseBody === false) {
+                throw new \RuntimeException($curlError ?: 'Firebase request failed.');
+            }
+            $firebaseData = json_decode($firebaseBody, true) ?: [];
         } catch (\Throwable $e) {
+            error_log('Firebase Google login verification error: ' . $e->getMessage());
             return $this->googleCorsResponse([
                 'success' => false,
                 'message' => 'Firebase verification could not run because the PHP CA bundle is missing or invalid. Please configure XAMPP PHP with a valid cacert.pem and restart Apache.',
             ], 500);
         }
 
-        if (!$firebaseResponse->successful()) {
+        if ($firebaseStatus < 200 || $firebaseStatus >= 300) {
             return $this->googleCorsResponse(['success' => false, 'message' => 'Firebase Google sign-in token is invalid.'], 401);
         }
 
-        $firebaseUser = $firebaseResponse->json('users.0');
+        $firebaseUser = $firebaseData['users'][0] ?? null;
         $email = strtolower(trim($firebaseUser['email'] ?? ''));
         $name = trim($firebaseUser['displayName'] ?? '') ?: 'Google User';
         $profilePicture = trim($firebaseUser['photoUrl'] ?? '');
@@ -119,6 +132,20 @@ class AuthController extends Controller
             $user->profile_picture = $profilePicture;
         }
 
+        if (!in_array(strtolower((string) ($user->role ?? '')), ['customer', 'admin'], true)) {
+            return $this->googleCorsResponse(['success' => false, 'message' => 'This account is not eligible for access.'], 403);
+        }
+
+        $token = bin2hex(random_bytes(32));
+        DB::table('user_sessions')->updateOrInsert(
+            ['user_id' => $user->id],
+            [
+                'token' => $token,
+                'created_at' => now(),
+                'expires_at' => now()->addDays(30),
+            ]
+        );
+
         $userData = [
             'id' => $user->id,
             'name' => $user->name,
@@ -129,9 +156,11 @@ class AuthController extends Controller
         ];
 
         $_SESSION['user'] = $userData;
+        $_SESSION['auth_token'] = $token;
         session(['user' => $userData]);
+        session(['auth_token' => $token]);
 
-        return $this->googleCorsResponse(['success' => true, 'user' => $userData]);
+        return $this->googleCorsResponse(['success' => true, 'token' => $token, 'user' => $userData]);
     }
 
     private function firebaseHttpClient()
@@ -152,6 +181,24 @@ class AuthController extends Controller
         }
 
         throw new \RuntimeException('No valid cacert.pem CA bundle was found for PHP cURL. Configure C:\\xampp\\php\\php.ini with curl.cainfo and openssl.cafile, then restart Apache.');
+    }
+
+    private function firebaseCaPath(): string
+    {
+        $candidatePaths = [
+            env('PHP_CACERT_PATH'),
+            env('FIREBASE_CA_BUNDLE'),
+            'C:\\xampp\\php\\extras\\ssl\\cacert.pem',
+            'C:\\Users\\Jerickson Abistado\\cacert.pem',
+        ];
+
+        foreach ($candidatePaths as $path) {
+            if (is_string($path) && trim($path) !== '' && is_readable($path)) {
+                return $path;
+            }
+        }
+
+        throw new \RuntimeException('No readable CA bundle was found for Firebase verification.');
     }
 
     private function googleCorsResponse(array $payload, int $status = 200)
@@ -381,12 +428,13 @@ class AuthController extends Controller
         return back()->withInput()->with('error', $error);
     }
 
-    public function logout()
+    public function logout(Request $request)
     {
         if (session_status() === PHP_SESSION_NONE) {
             session_start();
         }
 
+        $this->revokeCurrentToken($request);
         unset($_SESSION['user']);
         session()->forget('user');
         session()->flush();

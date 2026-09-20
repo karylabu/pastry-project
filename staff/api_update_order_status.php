@@ -413,6 +413,18 @@ try {
 
     $oldStatus = trim((string) ($orderRow['status'] ?? 'Pending'));
     $itemsJson = $orderRow['items'] ?? '[]';
+    $isCustomCakeOrder = false;
+    $customOrderCheck = $conn->prepare(
+        "SELECT EXISTS (SELECT 1 FROM custom_cake_orders WHERE order_id = ?) OR
+                EXISTS (SELECT 1 FROM customized_cake_orders WHERE order_id = ?) AS is_custom_cake"
+    );
+    if ($customOrderCheck) {
+        $customOrderCheck->bind_param('ii', $id, $id);
+        $customOrderCheck->execute();
+        $customOrderRow = $customOrderCheck->get_result()->fetch_assoc();
+        $customOrderCheck->close();
+        $isCustomCakeOrder = (int) ($customOrderRow['is_custom_cake'] ?? 0) === 1;
+    }
     $currentUserId = getSessionUserId();
     $loyaltyUserId = intval($orderRow['user_id'] ?? 0);
     if ($loyaltyUserId <= 0 && !empty($orderRow['email'])) {
@@ -426,7 +438,7 @@ try {
         }
     }
 
-    if (shouldDeductInventory($oldStatus, $status)) {
+    if (shouldDeductInventory($oldStatus, $status) && !$isCustomCakeOrder) {
         // Idempotency guard: skip deduction when this order's stock is
         // already deducted (deductions > restorations). Prevents double
         // deduction on status flip-flops like Confirmed -> Pending -> Confirmed.
@@ -518,7 +530,10 @@ try {
         insertAuditLog($conn, $currentUserId, 'orders', 'status_change', 'order', $id, $statusNote);
     }
 
-    $notifLookup = $conn->prepare("SELECT user_id, email, customer, type, order_type, EXISTS (SELECT 1 FROM custom_cake_orders WHERE order_id = orders.id) AS is_custom_cake FROM orders WHERE id = ?");
+    $notifLookup = $conn->prepare("SELECT user_id, email, customer,
+        (EXISTS (SELECT 1 FROM custom_cake_orders WHERE order_id = orders.id) OR
+         EXISTS (SELECT 1 FROM customized_cake_orders WHERE order_id = orders.id)) AS is_custom_cake
+        FROM orders WHERE id = ?");
     $notifUserId = 0;
     if ($notifLookup) {
         $notifLookup->bind_param("i", $id);
@@ -542,17 +557,19 @@ try {
             }
 
             if ($notifUserId > 0) {
-                $orderType = $notifRow['order_type'] ?? $notifRow['type'] ?? 'Standard';
-                $isRush = stripos((string)$orderType, 'rush') !== false;
                 $isCustomCake = (int) ($notifRow['is_custom_cake'] ?? 0) === 1;
 
                 if ($isCustomCake) {
                     switch ($status) {
                         case 'Preparing':
+                            $notifType = 'Success';
+                            $notifTitle = 'Custom cake order being prepared';
+                            $notifMessage = 'Your accepted custom cake order is now being prepared.';
+                            break;
                         case 'Confirmed':
                             $notifType = 'Success';
                             $notifTitle = 'Custom cake request accepted';
-                            $notifMessage = 'Your custom cake request has been accepted. The order is now being prepared.';
+                            $notifMessage = 'Your custom cake request has been accepted and is awaiting preparation.';
                             break;
                         case 'To Receive':
                             $notifType = 'Success';
@@ -577,24 +594,32 @@ try {
                 } else {
                     switch ($status) {
                         case 'Preparing':
+                            $notifType = 'Success';
+                            $notifTitle = 'Order being prepared';
+                            $notifMessage = 'Your order is now being prepared.';
+                            break;
                         case 'Confirmed':
-                            $notifType = $isRush ? 'order_urgent' : 'order_pending';
-                            $notifTitle = $isRush ? 'Rush order accepted' : 'Order confirmed';
-                            $notifMessage = $isRush ? 'Your rush order is now being prioritized.' : 'Your order is now being prepared.';
+                            $notifType = 'Success';
+                            $notifTitle = 'Order confirmed';
+                            $notifMessage = 'Your order has been confirmed and is awaiting preparation.';
                             break;
                         case 'To Receive':
-                        case 'Completed':
-                            $notifType = 'order_ready';
+                            $notifType = 'Success';
                             $notifTitle = 'Order ready';
                             $notifMessage = 'Your order is ready for pickup or delivery.';
                             break;
+                        case 'Completed':
+                            $notifType = 'Success';
+                            $notifTitle = 'Order completed';
+                            $notifMessage = 'Your order has been completed.';
+                            break;
                         case 'Cancelled':
-                            $notifType = 'stockout';
+                            $notifType = 'Warning';
                             $notifTitle = 'Order cancelled';
                             $notifMessage = 'Your order has been cancelled. Please contact us for details.';
                             break;
                         default:
-                            $notifType = 'account';
+                            $notifType = 'Info';
                             $notifTitle = 'Order update';
                             $notifMessage = 'Your order status has been updated.';
                     }

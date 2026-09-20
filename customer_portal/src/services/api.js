@@ -3,6 +3,15 @@ import { CUSTOMER_BASE } from './config';
 
 const BASE_URL = CUSTOMER_BASE;
 
+export function getAuthHeaders() {
+  try {
+    const user = JSON.parse(localStorage.getItem('user') || 'null');
+    return user?.token ? { Authorization: `Bearer ${user.token}` } : {};
+  } catch {
+    return {};
+  }
+}
+
 export async function safeParseJson(response) {
   if (!response) {
     return {};

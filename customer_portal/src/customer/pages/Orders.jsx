@@ -2,8 +2,8 @@ import React, { useCallback, useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, AlertTriangle, PackageCheck, Filter, ChevronDown, Eye, Search, Download, Cookie, Printer, Star } from "lucide-react";
 import PageShell from '../components/PageShell';
-import { safeParseJson } from '../../services/api';
-import { CUSTOMER_BASE } from "../../services/config";
+import { getAuthHeaders, safeParseJson } from '../../services/api';
+import { CUSTOMER_BASE, ROOT_BASE } from "../../services/config";
 
 // ── Cancel Confirmation Dialog ───────────────────────────────────────────────
 function CancelDialog({ order, onConfirm, onDismiss, isLoading }) {
@@ -241,28 +241,49 @@ export default function Orders() {
   }, [userEmail, userName, user?.id]);
 
   const loadOrders = useCallback(async () => {
-    if (!user?.id && !userEmail && !userName) {
+    if (!user?.token && !user?.id && !user?.email) {
       setOrders([]);
       return;
     }
 
     try {
-      // Send user_id as query parameter for secure filtering
-      const params = new URLSearchParams({
-        user_id: String(user.id || ''),
-        user_email: String(userEmail || ''),
-        customer: String(userName || ''),
-      });
-      const res = await fetch(`${CUSTOMER_BASE}/api_get_orders.php?${params.toString()}`);
-      const data = await safeParseJson(res);
-      if (Array.isArray(data)) {
-        const parsedOrders = data.map((order) => ({
+      const customOrdersUrl = user?.id
+        ? `${CUSTOMER_BASE}/api_get_custom_cakes.php?user_id=${encodeURIComponent(user.id)}`
+        : null;
+      const [ordersResponse, customResponse] = await Promise.all([
+        fetch(`${CUSTOMER_BASE}/api_get_orders.php`, {
+          credentials: 'include',
+          headers: getAuthHeaders(),
+        }),
+        customOrdersUrl
+          ? fetch(customOrdersUrl)
+          : Promise.resolve(null),
+      ]);
+      const data = await safeParseJson(ordersResponse);
+      const customData = customResponse ? await safeParseJson(customResponse) : [];
+      if (Array.isArray(data) || Array.isArray(customData)) {
+        const regularOrders = Array.isArray(data) ? data : [];
+        const customOrders = Array.isArray(customData) ? customData.map((order) => ({
+          ...order,
+          is_customized: 1,
+          custom_details: order.custom_cake_details || order.custom_details || null,
+          items: Array.isArray(order.items) && order.items.length > 0
+            ? order.items
+            : [{ name: 'Custom Cake Request', qty: order.custom_cake_details?.quantity || 1, price: Number(order.total || order.custom_cake_details?.estimated_price || 0) }],
+        })) : [];
+        const mergedById = new Map();
+        [...customOrders, ...regularOrders].forEach((order) => {
+          const key = String(order.id);
+          mergedById.set(key, { ...mergedById.get(key), ...order });
+        });
+        const parsedOrders = Array.from(mergedById.values()).map((order) => ({
           ...order,
           items: normalizeOrderItems(order),
         }));
         const userOrders = filterUserOrders(parsedOrders);
-        setOrders(userOrders);
-        localStorage.setItem(storageKey, JSON.stringify(userOrders));
+        const visibleOrders = userOrders.length > 0 || parsedOrders.length === 0 ? userOrders : parsedOrders;
+        setOrders(visibleOrders);
+        localStorage.setItem(storageKey, JSON.stringify(visibleOrders));
       } else {
         setOrders([]);
         localStorage.setItem(storageKey, JSON.stringify([]));
@@ -271,12 +292,19 @@ export default function Orders() {
       setOrders([]);
       localStorage.setItem(storageKey, JSON.stringify([]));
     }
-  }, [userEmail, user?.id, storageKey]);
+  }, [filterUserOrders, normalizeOrderItems, storageKey, user?.id, user?.token, userEmail]);
 
   useEffect(() => {
     loadOrders();
-    window.addEventListener("ordersUpdated", loadOrders);
-    return () => window.removeEventListener("ordersUpdated", loadOrders);
+    const refreshOrders = () => loadOrders();
+    const interval = window.setInterval(refreshOrders, 15000);
+    window.addEventListener("ordersUpdated", refreshOrders);
+    window.addEventListener("focus", refreshOrders);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener("ordersUpdated", refreshOrders);
+      window.removeEventListener("focus", refreshOrders);
+    };
   }, [loadOrders]);
 
   useEffect(() => {
@@ -373,7 +401,8 @@ export default function Orders() {
     try {
       const res = await fetch(`${CUSTOMER_BASE}/api_confirm_received.php`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        headers: { "Content-Type": "application/json", ...getAuthHeaders() },
         body: JSON.stringify({ order_id: receivedTarget.id }),
       });
       const data = await safeParseJson(res);
@@ -397,10 +426,10 @@ export default function Orders() {
     try {
       const res = await fetch(`${CUSTOMER_BASE}/api_order_feedback.php`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         body: JSON.stringify({
           order_id: feedbackTarget.id,
-          user_id: user?.id || feedbackTarget.user_id || 0,
           rating,
           comment,
         }),
@@ -792,6 +821,36 @@ export default function Orders() {
     const orderType = String(order?.type || '').toLowerCase();
     const isCustomizedOrder = order?.is_customized || orderType.includes('custom');
     if (isCustomizedOrder) {
+      let details = order?.custom_details || order?.custom_cake_details || {};
+      if (typeof details === 'string') {
+        try { details = JSON.parse(details) || {}; } catch { details = {}; }
+      }
+      const references = [
+        details.reference_image,
+        details.reference_images,
+        details.inspo_images,
+        order?.reference_image,
+        order?.inspo_images,
+      ].flatMap((value) => {
+        if (!value) return [];
+        if (typeof value === 'string') {
+          try {
+            const parsed = JSON.parse(value);
+            return Array.isArray(parsed) ? parsed : [parsed];
+          } catch { return [value]; }
+        }
+        return Array.isArray(value) ? value : [value];
+      });
+      const reference = references.find(Boolean);
+      const source = typeof reference === 'string'
+        ? reference
+        : reference?.url || reference?.src || reference?.path || reference?.image;
+      if (source) {
+        if (/^https?:\/\//i.test(source)) return source;
+        if (source.startsWith('/pastry-project/')) return `${window.location.origin}${source}`;
+        if (source.startsWith('/')) return `${window.location.origin}/pastry-project${source}`;
+        return `${ROOT_BASE}/${source.replace(/^\/+/, '')}`;
+      }
       return '/assets/customize/customized_2.jpg';
     }
 

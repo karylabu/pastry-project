@@ -49,7 +49,7 @@ class CustomizedCakeController extends Controller
 
     public function adminCatalog(Request $request): JsonResponse
     {
-        if ($response = $this->authorizeManager($request)) return $response;
+        if ($response = $this->authorizeAdmin($request)) return $response;
         return response()->json([
             'success' => true,
             'flavors' => CakeFlavor::query()->orderBy('name')->get()->map(fn ($flavor) => [
@@ -68,7 +68,7 @@ class CustomizedCakeController extends Controller
 
     public function saveFlavor(Request $request): JsonResponse
     {
-        if ($response = $this->authorizeManager($request)) return $response;
+        if ($response = $this->authorizeAdmin($request)) return $response;
         $data = $request->validate(['name' => 'required|string|max:255', 'active' => 'boolean']);
         $flavor = $request->filled('id') ? CakeFlavor::query()->findOrFail((int) $request->input('id')) : new CakeFlavor();
         $flavor->name = trim($data['name']);
@@ -80,7 +80,7 @@ class CustomizedCakeController extends Controller
 
     public function toggleFlavor(Request $request, CakeFlavor $flavor): JsonResponse
     {
-        if ($response = $this->authorizeManager($request)) return $response;
+        if ($response = $this->authorizeAdmin($request)) return $response;
         $flavor->active = !$flavor->active;
         $flavor->save();
         return response()->json(['success' => true, 'flavor' => $flavor]);
@@ -88,7 +88,7 @@ class CustomizedCakeController extends Controller
 
     public function saveSize(Request $request): JsonResponse
     {
-        if ($response = $this->authorizeManager($request)) return $response;
+        if ($response = $this->authorizeAdmin($request)) return $response;
         $data = $request->validate(['code' => 'required|string|max:30', 'label' => 'required|string|max:50', 'multiplier' => 'required|numeric|min:0', 'active' => 'boolean']);
         $size = $request->filled('id') ? CakeSize::query()->findOrFail((int) $request->input('id')) : new CakeSize();
         $size->code = strtolower(trim($data['code']));
@@ -101,7 +101,7 @@ class CustomizedCakeController extends Controller
 
     public function toggleSize(Request $request, CakeSize $size): JsonResponse
     {
-        if ($response = $this->authorizeManager($request)) return $response;
+        if ($response = $this->authorizeAdmin($request)) return $response;
         $size->active = !$size->active;
         $size->save();
         return response()->json(['success' => true, 'size' => $size]);
@@ -109,7 +109,7 @@ class CustomizedCakeController extends Controller
 
     public function saveRecipe(Request $request): JsonResponse
     {
-        if ($response = $this->authorizeManager($request)) return $response;
+        if ($response = $this->authorizeAdmin($request)) return $response;
         $data = $request->validate([
             'flavor_id' => 'required|integer|exists:cake_flavors,id',
             'ingredients' => 'array',
@@ -136,32 +136,17 @@ class CustomizedCakeController extends Controller
         return response()->json(['success' => true, 'recipes' => $this->service->getRecipes()]);
     }
 
-    private function authorizeManager(Request $request): ?JsonResponse
+    private function authorizeAdmin(Request $request): ?JsonResponse
     {
         $user = $this->getAuthenticatedUser($request);
         if (!$user) return response()->json(['success' => false, 'message' => 'Authentication required.'], 401);
-        if (!in_array(strtolower((string) $user->role), ['manager', 'admin'], true)) return response()->json(['success' => false, 'message' => 'Manager authorization required.'], 403);
+        if (strtolower((string) $user->role) !== 'admin') return response()->json(['success' => false, 'message' => 'Admin authorization required.'], 403);
         return null;
     }
 
     protected function getAuthenticatedUser(Request $request)
     {
-        $user = $request->user() ?: (session('user.id') ? DB::table('users')->find((int) session('user.id')) : null);
-        if ($user) return $user;
-
-        $token = trim((string) $request->header('X-Auth-Token'));
-        $userId = (int) $request->header('X-User-Id');
-        if ($token === '' || $userId <= 0 || !Schema::hasTable('user_sessions')) return null;
-
-        $validSession = DB::table('user_sessions')
-            ->where('user_id', $userId)
-            ->where('token', $token)
-            ->where(function ($query) {
-                $query->whereNull('expires_at')->orWhere('expires_at', '>', now());
-            })
-            ->exists();
-
-        return $validSession ? DB::table('users')->find($userId) : null;
+        return parent::getAuthenticatedUser($request);
     }
 
     public function preview(Request $request): JsonResponse
@@ -190,9 +175,11 @@ class CustomizedCakeController extends Controller
 
     public function consume(Request $request): JsonResponse
     {
+        if ($response = $this->authorizeAdmin($request)) return $response;
+
         $customizedCakeOrderId = (int) $request->input('customized_cake_order_id');
         $orderId = (int) $request->input('order_id');
-        $userId = (int) ($request->input('user_id') ?? 0);
+        $user = $this->getAuthenticatedUser($request);
 
         if ($customizedCakeOrderId <= 0) {
             return response()->json([
@@ -202,7 +189,7 @@ class CustomizedCakeController extends Controller
         }
 
         try {
-            $result = $this->service->consumeOrderInventory($customizedCakeOrderId, $orderId, $userId ?: 1);
+            $result = $this->service->consumeOrderInventory($customizedCakeOrderId, $orderId, (int) $user->id);
             return response()->json($result);
         } catch (RuntimeException $e) {
             return response()->json([
@@ -214,7 +201,16 @@ class CustomizedCakeController extends Controller
 
     public function storeOrder(Request $request): JsonResponse
     {
+        $user = $this->getAuthenticatedUser($request);
+        if (!$user) {
+            return response()->json(['success' => false, 'message' => 'Authentication required.'], 401);
+        }
+        if (strtolower((string) $user->role) !== 'customer') {
+            return response()->json(['success' => false, 'message' => 'Customer authorization required.'], 403);
+        }
+
         $payload = $request->all();
+        $payload['user_id'] = (int) $user->id;
         $cakeType = $payload['cake_type'] ?? 'single';
         $tiers = $payload['tiers'] ?? [];
         if (is_string($tiers)) {
@@ -234,6 +230,13 @@ class CustomizedCakeController extends Controller
                 'success' => false,
                 'message' => 'Choose a valid cake type and tier configuration.',
             ], 422);
+        }
+
+        if (!empty($payload['order_id']) && !DB::table('orders')
+            ->where('id', (int) $payload['order_id'])
+            ->where('user_id', $user->id)
+            ->exists()) {
+            return response()->json(['success' => false, 'message' => 'The linked order does not belong to the authenticated customer.'], 403);
         }
 
         $activeSizes = DB::table('cake_sizes')
@@ -298,23 +301,30 @@ class CustomizedCakeController extends Controller
                 $uploadedImages[] = $referenceImage;
             }
 
-            $customizedCakeOrderId = DB::transaction(function () use ($cakeType, $tiers, $payload, $uploadedImages) {
+            $customizedCakeOrderId = DB::transaction(function () use ($cakeType, $tiers, $payload, $uploadedImages, $user) {
                 $orderId = !empty($payload['order_id']) ? (int) $payload['order_id'] : null;
                 if (!$orderId && Schema::hasTable('orders')) {
-                    $user = !empty($payload['user_id']) ? DB::table('users')->where('id', (int) $payload['user_id'])->first() : null;
                     $orderId = DB::table('orders')->insertGetId([
-                        'customer' => $user->name ?? 'Customer',
-                        'email' => $user->email ?? '',
-                        'phone' => $user->phone ?? null,
-                        'type' => 'Custom',
-                        'status' => 'Pending',
+                        'items' => json_encode([[
+                            'name' => 'Customized Cake',
+                            'qty' => 1,
+                            'price' => 0,
+                            'selectionDetails' => ['details' => $payload['notes'] ?? 'Customized cake request'],
+                        ]]),
+                        'subtotal' => 0,
+                        'delivery_fee' => 0,
                         'total' => 0,
+                        'method' => 'Pickup',
+                        'delivery_date' => null,
+                        'delivery_time' => null,
                         'payment' => 'COD',
                         'address' => '',
-                        'notes' => $payload['notes'] ?? 'Customized cake request',
-                        'order_date' => now()->toDateString(),
+                        'phone' => $user->phone ?? '',
+                        'customer' => $user->name,
+                        'email' => $user->email,
+                        'user_id' => $user->id,
+                        'status' => 'Pending',
                         'created_at' => now(),
-                        'updated_at' => now(),
                     ]);
                     if (Schema::hasTable('order_items')) {
                         DB::table('order_items')->insert([
@@ -360,6 +370,17 @@ class CustomizedCakeController extends Controller
             });
 
             $linkedOrderId = DB::table('customized_cake_orders')->where('id', $customizedCakeOrderId)->value('order_id');
+            if ($linkedOrderId && Schema::hasTable('notifications')) {
+                DB::table('notifications')->insert([
+                    'user_id' => $user->id,
+                    'title' => 'Custom cake request submitted',
+                    'message' => "Your custom cake request #{$linkedOrderId} has been received and is awaiting review.",
+                    'type' => 'Info',
+                    'action_url' => '/customer/orders',
+                    'is_read' => 0,
+                    'created_at' => now(),
+                ]);
+            }
             return response()->json([
                 'success' => true,
                 'customized_cake_order_id' => $customizedCakeOrderId,

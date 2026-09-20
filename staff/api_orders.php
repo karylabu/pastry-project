@@ -34,7 +34,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
                   c.tiers AS custom_tiers, c.dedication AS custom_dedication,
                   c.notes AS custom_notes, c.estimated_price AS custom_estimated_price,
                   c.inspo_images AS custom_inspo_images,
-                  " . ($hasCustomizedRecipeOrders ? "cc.id AS customized_cake_order_id, cc.cake_type AS customized_cake_type, cc.status AS customized_cake_status, cc.notes AS customized_cake_notes" : "NULL AS customized_cake_order_id, NULL AS customized_cake_type, NULL AS customized_cake_status, NULL AS customized_cake_notes") . "
+                  " . ($hasCustomizedRecipeOrders ? "cc.inspo_images AS customized_inspo_images, cc.id AS customized_cake_order_id, cc.cake_type AS customized_cake_type, cc.status AS customized_cake_status, cc.notes AS customized_cake_notes" : "NULL AS customized_inspo_images, NULL AS customized_cake_order_id, NULL AS customized_cake_type, NULL AS customized_cake_status, NULL AS customized_cake_notes") . "
            FROM orders o
            LEFT JOIN custom_cake_orders c ON c.order_id = o.id
            " . ($hasCustomizedRecipeOrders ? "LEFT JOIN customized_cake_orders cc ON cc.order_id = o.id" : "") . "
@@ -87,7 +87,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
             ];
 
             $row['custom_details'] = $customDetails;
-            $row['custom_inspo_images'] = json_decode($row['custom_inspo_images'] ?? '', true) ?: [];
+            $legacyImages = json_decode($row['custom_inspo_images'] ?? '', true) ?: [];
+            $recipeImages = json_decode($row['customized_inspo_images'] ?? '', true) ?: [];
+            $row['custom_inspo_images'] = $legacyImages ?: $recipeImages;
+            unset($row['customized_inspo_images']);
             unset(
                 $row['custom_cake_size'], $row['custom_quantity'], $row['custom_flavor'],
                 $row['custom_filling'], $row['custom_frosting'], $row['custom_occasion'],

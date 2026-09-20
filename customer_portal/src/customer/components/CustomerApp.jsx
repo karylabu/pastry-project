@@ -32,6 +32,7 @@ import ChatSupport from '../pages/ChatSupport';
 import CartModal from './CartModal';
 import CheckoutModal from './CheckoutModal';
 
+
 function GuestAccountPrompt({ onClose }) {
   return (
     <div className="fixed inset-0 z-[100000] flex items-center justify-center bg-black/40 p-6 backdrop-blur-sm" onClick={onClose}>

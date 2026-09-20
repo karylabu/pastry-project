@@ -920,7 +920,6 @@ export default function Dashboard({ onAddToCart }) {
       })()
     : {};
   const userId = savedUser?.id || 0;
-  const welcomeKey = userId ? `pastry_project_welcome_modal_seen_${userId}` : 'pastry_project_welcome_modal_seen_guest';
   const [products, setProducts] = useState([]);
   const [bestSellerProducts, setBestSellerProducts] = useState([]);
   const [recommendedProducts, setRecommendedProducts] = useState([]);
@@ -929,17 +928,6 @@ export default function Dashboard({ onAddToCart }) {
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
   const [selectedProduct, setSelectedProduct]       = useState(null);
   const [isCustomCakeOpen, setIsCustomCakeOpen]     = useState(false);
-  const [isWelcomeOpen, setIsWelcomeOpen] = useState(() => {
-    if (typeof window === 'undefined') return false;
-    return !localStorage.getItem(welcomeKey);
-  });
-
-  const closeWelcomeModal = () => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem(welcomeKey, '1');
-    }
-    setIsWelcomeOpen(false);
-  };
   const favoritesStorageKey = `favorite_product_ids_${userId || 'guest'}`;
 
   const saveLocalFavorites = (next) => {
@@ -1070,31 +1058,6 @@ export default function Dashboard({ onAddToCart }) {
 
   return (
     <div className="min-h-screen bg-[#fbfaf5] font-['DM_Sans'] relative">
-
-      {isWelcomeOpen && (
-        <div className="fixed inset-0 z-[50000] flex items-center justify-center bg-black/55 px-4 py-6 backdrop-blur-[2px]" role="dialog" aria-modal="true" aria-labelledby="welcome-modal-title">
-          <div className="relative w-full max-w-[820px] overflow-hidden rounded-[18px] border border-[#d8c28c] bg-[#F3EBDD] shadow-[0_24px_70px_rgba(0,0,0,0.3)]">
-            <button type="button" onClick={closeWelcomeModal} aria-label="Close welcome promotion" className="absolute right-3 top-3 z-10 flex h-9 w-9 items-center justify-center rounded-full bg-white/80 text-[#332923] shadow-sm transition hover:bg-[#1a1a1a] hover:text-white">
-              <X size={18} />
-            </button>
-            <div className="flex flex-col items-center justify-center px-7 py-9 text-center md:flex-row md:gap-8 md:px-12 md:py-10 md:text-left">
-              <div className="relative flex shrink-0 items-center justify-center md:h-[290px] md:w-[290px]">
-                <span className="absolute left-4 top-8 h-3 w-3 rotate-45 bg-[#c59a36] opacity-70" />
-                <span className="absolute bottom-8 right-5 h-2 w-2 rotate-45 bg-[#c59a36] opacity-70" />
-                <img src="http://localhost/pastry-project/uploads/giftbox.png?v=welcome-v2" alt="Gold gift box" className="h-44 w-44 rounded-[18px] object-cover shadow-[0_12px_28px_rgba(111,76,24,0.12)] md:h-[290px] md:w-[290px]" />
-              </div>
-              <div className="flex min-w-0 flex-1 flex-col items-center md:items-start">
-                <p className="text-[9px] font-bold uppercase tracking-[0.42em] text-[#a9853b]">A little welcome treat</p>
-                <h1 id="welcome-modal-title" className="mt-1 font-serif text-4xl font-black tracking-tight text-[#2c241f] md:text-5xl">WELCOME TO PASTRY PROJECT!</h1>
-                <button type="button" onClick={closeWelcomeModal} className="mt-4 inline-flex items-center gap-2 rounded-lg bg-[#1a1a1a] px-8 py-3 text-[10px] font-black uppercase tracking-[0.2em] text-white transition hover:bg-[#c59a36] hover:text-[#171717]">Continue shopping <ChevronRight size={15} /></button>
-                <div className="my-4 flex items-center gap-2 text-[#c59a36]" aria-hidden="true"><span className="h-px w-14 bg-[#d8bd79]" /><span className="h-1.5 w-1.5 rounded-full bg-current" /><span className="h-px w-14 bg-[#d8bd79]" /></div>
-                <p className="text-xl font-medium text-[#2b2927] md:text-2xl">Enjoy <span className="font-black text-[#bd9028]">FREE DELIVERY</span></p>
-                <p className="mt-1 text-base text-[#4a4642] md:text-lg">on your <strong className="italic">first delivery order.</strong></p>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       <Banner
         onShopNow={() => navigate("/customer/menu")}
