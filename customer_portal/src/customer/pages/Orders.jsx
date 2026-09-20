@@ -3,11 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { X, AlertTriangle, PackageCheck, Filter, ChevronDown, Eye, Search, Download, Cookie, Printer, Star } from "lucide-react";
 import PageShell from '../components/PageShell';
 import { getAuthHeaders, safeParseJson } from '../../services/api';
-<<<<<<< HEAD
 import { CUSTOMER_BASE, ROOT_BASE } from "../../services/config";
-=======
-import { CUSTOMER_BASE } from "../../services/config";
->>>>>>> origin/main
 
 // ── Cancel Confirmation Dialog ───────────────────────────────────────────────
 function CancelDialog({ order, onConfirm, onDismiss, isLoading }) {
