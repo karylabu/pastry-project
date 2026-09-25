@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, AlertTriangle, PackageCheck, Filter, ChevronDown, Eye, Search, Download, Cookie, Printer, Star } from "lucide-react";
+import { X, AlertTriangle, PackageCheck, Filter, ChevronDown, Search, Cookie, Printer, Star } from "lucide-react";
 import PageShell from '../components/PageShell';
 import { getAuthHeaders, safeParseJson } from '../../services/api';
 import { CUSTOMER_BASE, ROOT_BASE } from "../../services/config";
@@ -266,7 +266,33 @@ export default function Orders() {
         const customOrders = Array.isArray(customData) ? customData.map((order) => ({
           ...order,
           is_customized: 1,
-          custom_details: order.custom_cake_details || order.custom_details || null,
+          custom_details: (() => {
+            const legacy = order.custom_cake_details || {};
+            let submitted = {};
+            try {
+              submitted = legacy.notes ? JSON.parse(legacy.notes) : {};
+            } catch {
+              submitted = {};
+            }
+            return {
+              ...submitted,
+              customer_name: submitted.customer_name || order.customer || legacy.customer_name,
+              email: submitted.email || order.email,
+              phone: submitted.phone || order.phone,
+              cake_size: submitted.cake_size || legacy.cake_size,
+              quantity: submitted.quantity || legacy.quantity,
+              cake_flavor: submitted.cake_flavor || legacy.flavor,
+              filling_flavor: submitted.filling_flavor || legacy.filling,
+              frosting_type: submitted.frosting_type || legacy.frosting,
+              occasion: submitted.occasion || legacy.occasion,
+              theme: submitted.theme || legacy.theme_design,
+              cake_color: submitted.cake_color || legacy.preferred_colors,
+              custom_message: submitted.custom_message || legacy.dedication,
+              estimated_price: submitted.estimated_price || legacy.estimated_price,
+              reference_image: submitted.reference_image || null,
+              inspo_images: legacy.inspo_images || submitted.inspo_images || [],
+            };
+          })(),
           items: Array.isArray(order.items) && order.items.length > 0
             ? order.items
             : [{ name: 'Custom Cake Request', qty: order.custom_cake_details?.quantity || 1, price: Number(order.total || order.custom_cake_details?.estimated_price || 0) }],
@@ -292,7 +318,7 @@ export default function Orders() {
       setOrders([]);
       localStorage.setItem(storageKey, JSON.stringify([]));
     }
-  }, [filterUserOrders, normalizeOrderItems, storageKey, user?.id, user?.token, userEmail]);
+  }, [filterUserOrders, normalizeOrderItems, storageKey, user?.email, user?.id, user?.token]);
 
   useEffect(() => {
     loadOrders();
@@ -590,6 +616,30 @@ export default function Orders() {
       ['Details', formatCustomValue(rawCustomDetails.details)],
     ].filter(([, value]) => value);
 
+    const customReferenceImages = [
+      rawCustomDetails.reference_image,
+      rawCustomDetails.reference_images,
+      rawCustomDetails.inspo_images,
+    ].flatMap((value) => {
+      if (!value) return [];
+      if (typeof value === 'string') {
+        try {
+          const parsed = JSON.parse(value);
+          return Array.isArray(parsed) ? parsed : [parsed];
+        } catch {
+          return [value];
+        }
+      }
+      return Array.isArray(value) ? value : [value];
+    }).map((reference) => {
+      const source = typeof reference === 'string'
+        ? reference
+        : reference?.url || reference?.src || reference?.path || reference?.image;
+      if (!source) return null;
+      if (/^https?:\/\//i.test(source)) return source;
+      return `${ROOT_BASE}/${String(source).replace(/^\/+/, '')}`;
+    }).filter(Boolean);
+
     return (
       <motion.div
         initial={{ opacity: 0 }}
@@ -656,6 +706,24 @@ export default function Orders() {
 
                 {showCustomDetails && (
                   <div className="mt-3 space-y-3 rounded-xl border border-amber-100 bg-white/70 p-3">
+                    {customReferenceImages.length > 0 && (
+                      <div className="border-b border-amber-100 pb-3">
+                        <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-gray-500">Reference image</p>
+                        <div className="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-3">
+                          {customReferenceImages.map((src, index) => (
+                            <a key={`${src}-${index}`} href={src} target="_blank" rel="noreferrer" className="block overflow-hidden rounded-xl border border-amber-100 bg-amber-50">
+                              <img src={src} alt={`Customer reference ${index + 1}`} className="h-32 w-full object-cover" onError={(event) => { event.currentTarget.style.display = 'none'; }} />
+                            </a>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {customReferenceImages.length === 0 && (
+                      <div className="border-b border-amber-100 pb-3">
+                        <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-gray-500">Reference image</p>
+                        <p className="mt-1 text-sm text-gray-500">No reference image was submitted for this order.</p>
+                      </div>
+                    )}
                     {customDetailEntries.map(([label, value]) => (
                       <div key={label} className="border-b border-amber-100 pb-2 last:border-b-0 last:pb-0">
                         <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-gray-500">{label}</p>
@@ -727,8 +795,6 @@ export default function Orders() {
   }
 
   // ── Helpers ─────────────────────────────────────────────────────────────────
-  const statusSteps = ["Pending", "Preparing", "To Receive", "Completed"];
-
   const statusOptions = ["All", "Pending", "Preparing", "To Receive", "Completed", "Cancelled"];
 
   const statusCounts = statusOptions.reduce((acc, s) => {
@@ -742,32 +808,6 @@ export default function Orders() {
       if (next.has(id)) next.delete(id); else next.add(id);
       return next;
     });
-  };
-
-  const handleExport = () => {
-    const rows = [
-      ["Order ID", "Customer", "Date", "Items", "Total", "Payment", "Method", "Status"],
-      ...sortedOrders.map((o) => [
-        o.id,
-        o.customer || o.name || "",
-        o.created_at || "",
-        (o.items || []).map((it) => `${it.name} x${it.qty}`).join("; "),
-        o.total,
-        o.payment || "",
-        o.method || "",
-        o.status || "",
-      ]),
-    ];
-    const csv = rows.map((r) => r.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(",")).join("\n");
-    const blob = new Blob([csv], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "my_orders.csv";
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
   };
 
   // Filter and sort orders for display
@@ -877,13 +917,6 @@ export default function Orders() {
             <h1 className="mt-1 font-serif text-2xl font-bold tracking-tight text-[#33251e] sm:text-3xl">All Orders</h1>
             <p className="mt-1 text-xs text-[#9b8c83]">Check all your orders in one place. It's easy to manage.</p>
           </div>
-          <button
-            onClick={handleExport}
-            className="inline-flex items-center gap-2 rounded-xl border border-[#e7c875] bg-[#fff8df] px-5 py-2.5 text-[12px] font-semibold text-[#8d6a2e] transition-colors hover:bg-[#fff3c4] self-start"
-          >
-            <Download size={15} />
-            Export Order List
-          </button>
         </div>
 
         {/* TABS + SEARCH */}

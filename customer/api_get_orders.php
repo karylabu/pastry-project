@@ -50,7 +50,7 @@ try {
     }
     if ($hasEmail && $authenticatedEmail !== '') {
         $escapedEmail = mysqli_real_escape_string($conn, $authenticatedEmail);
-        $ownership[] = "(user_id IS NULL AND email = '$escapedEmail')";
+        $ownership[] = "email = '$escapedEmail'";
     }
 
     if (!$ownership) {

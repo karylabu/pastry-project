@@ -52,19 +52,19 @@ export default function Footer() {
   };
 
   return (
-    <footer className="bg-[#1a1a1a] font-['DM_Sans'] pt-12 pb-0">
-      <div className="max-w-7xl mx-auto px-10">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
+    <footer className="bg-[#1a1a1a] font-['DM_Sans'] pt-8 pb-0">
+      <div className="max-w-7xl mx-auto px-5">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-5 mb-5">
 
           {/* LOGO */}
           <div className="flex flex-col items-start">
-            <div className="w-14 h-14 rounded-full border border-[#d4af37]/50 flex items-center justify-center mb-4">
-              <Cake size={24} className="text-[#d4af37]" />
+            <div className="w-10 h-10 rounded-full border border-[#d4af37]/50 flex items-center justify-center mb-2">
+              <Cake size={19} className="text-[#d4af37]" />
             </div>
             <p className="text-[10px] uppercase tracking-[0.3em] text-gray-500 mb-2">
               Est. 2017
             </p>
-            <h3 className="text-white text-2xl font-black tracking-tight leading-none mb-1">
+            <h3 className="text-white text-lg font-black tracking-tight leading-none mb-1">
               PASTRY PROJECT
             </h3>
             <p className="text-gray-400 text-sm tracking-wide">
@@ -74,10 +74,10 @@ export default function Footer() {
 
           {/* INFORMATION */}
           <div>
-            <p className="text-[#d4af37] text-xs font-black uppercase tracking-[0.3em] mb-5">
+            <p className="text-[#d4af37] text-[10px] font-black uppercase tracking-[0.2em] mb-3">
               Information
             </p>
-            <ul className="space-y-3 text-sm text-gray-300">
+            <ul className="space-y-2 text-xs text-gray-300">
               <li>
                 <Link to="/customer/about-us" onClick={() => window.scrollTo(0, 0)} className="hover:text-white transition">
                   About Us
@@ -103,49 +103,49 @@ export default function Footer() {
 
           {/* GET IN TOUCH */}
           <div>
-            <p className="text-[#d4af37] text-xs font-black uppercase tracking-[0.3em] mb-5">
+            <p className="text-[#d4af37] text-[10px] font-black uppercase tracking-[0.2em] mb-3">
               Get in Touch
             </p>
-            <ul className="space-y-4 text-sm text-gray-300">
-              <li className="flex items-center gap-3">
-                <Phone size={15} className="text-[#d4af37]" />
+            <ul className="space-y-2 text-xs text-gray-300">
+              <li className="flex items-center gap-2">
+                <Phone size={13} className="text-[#d4af37]" />
                 0938-796-2033
               </li>
-              <li className="flex items-center gap-3">
-                <Mail size={15} className="text-[#d4af37]" />
+              <li className="flex items-center gap-2">
+                <Mail size={13} className="text-[#d4af37]" />
                 pastryproject.bc@gmail.com
               </li>
-              <li className="flex items-center gap-3">
-                <HelpCircle size={15} className="text-[#d4af37]" />
+              <li className="flex items-center gap-2">
+                <HelpCircle size={13} className="text-[#d4af37]" />
                 Help Center
               </li>
             </ul>
-            <div className="flex items-center gap-3 mt-6">
-              <a href="#" aria-label="Website" className="w-9 h-9 rounded-full border border-white/20 flex items-center justify-center text-white hover:bg-[#d4af37] hover:text-black hover:border-[#d4af37] transition">
-                <Globe size={15} />
+            <div className="flex items-center gap-2 mt-3">
+              <a href="#" aria-label="Website" className="w-7 h-7 rounded-full border border-white/20 flex items-center justify-center text-white hover:bg-[#d4af37] hover:text-black hover:border-[#d4af37] transition">
+                <Globe size={13} />
               </a>
-              <a href="#" aria-label="Gallery" className="w-9 h-9 rounded-full border border-white/20 flex items-center justify-center text-white hover:bg-[#d4af37] hover:text-black hover:border-[#d4af37] transition">
-                <Camera size={15} />
+              <a href="#" aria-label="Gallery" className="w-7 h-7 rounded-full border border-white/20 flex items-center justify-center text-white hover:bg-[#d4af37] hover:text-black hover:border-[#d4af37] transition">
+                <Camera size={13} />
               </a>
             </div>
           </div>
 
           {/* NEWSLETTER */}
           <div>
-            <p className="text-[#d4af37] text-xs font-black uppercase tracking-[0.3em] mb-5">
+            <p className="text-[#d4af37] text-[10px] font-black uppercase tracking-[0.2em] mb-3">
               Newsletter Sign-Up
             </p>
-            <p className="text-gray-400 text-sm mb-5 leading-relaxed">
+            <p className="text-gray-400 text-xs mb-3 leading-relaxed">
               Subscribe to receive updates on new flavors and special offers.
             </p>
-            <form onSubmit={handleSubscribe} className="flex items-center bg-white rounded-full overflow-hidden pl-5 pr-1 py-1">
+            <form onSubmit={handleSubscribe} className="flex items-center bg-white rounded-full overflow-hidden pl-3 pr-1 py-0.5">
               <input
                 type="email"
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="Your email address"
-                className="flex-1 text-sm text-black outline-none bg-transparent py-2"
+                className="flex-1 text-xs text-black outline-none bg-transparent py-1.5"
               />
               <button
                 type="submit"
@@ -171,11 +171,11 @@ export default function Footer() {
         </div>
 
         {/* BOTTOM BAR */}
-        <div className="border-t border-white/10 pt-4 pb-6 flex flex-col md:flex-row items-center justify-between gap-3">
-          <p className="text-gray-500 text-xs tracking-wide">
+        <div className="border-t border-white/10 pt-3 pb-4 flex flex-col md:flex-row items-center justify-between gap-2">
+          <p className="text-gray-500 text-[10px] tracking-wide">
             © {new Date().getFullYear()} Pastry Project Bakeshop &amp; Café. All rights reserved.
           </p>
-          <p className="text-gray-500 text-xs tracking-wide">
+          <p className="text-gray-500 text-[10px] tracking-wide">
             Baked fresh, made with love.
           </p>
         </div>
