@@ -39,11 +39,11 @@ import { getAuthHeaders, safeParseJson } from "../../services/api";
 const HERO_SLIDES = [
   {
     type: "image",
-    src: "http://localhost/pastry-project/uploads/banner(1).png",
+    src: "http://localhost/pastry-project/uploads/banner(2).jpg",
   },
   {
     type: "video",
-    src: "http://localhost/pastry-project/uploads/banner%282%29.mp4",
+    src: "http://localhost/pastry-project/uploads/banner(2).mp4",
   },
 ];
 
@@ -64,7 +64,7 @@ function Banner({ onShopNow, onCustomizeNow }) {
   }, [slide]);
 
   return (
-    <div className="relative aspect-[4/1] w-full bg-white flex items-center justify-center overflow-hidden font-['DM_Sans']">
+    <div className="relative min-h-screen w-full bg-white flex items-center justify-center overflow-hidden font-['DM_Sans']">
 
       {/* SLIDES */}
       <AnimatePresence mode="wait">
@@ -78,7 +78,7 @@ function Banner({ onShopNow, onCustomizeNow }) {
         >
           {HERO_SLIDES[slide].type === "video" ? (
             <video
-              className="absolute inset-0 w-full h-full object-contain"
+              className="absolute inset-0 w-full h-full object-cover"
               src={HERO_SLIDES[slide].src}
               poster={HERO_SLIDES[slide].poster}
               autoPlay
@@ -90,7 +90,7 @@ function Banner({ onShopNow, onCustomizeNow }) {
             <img
               src={HERO_SLIDES[slide].src}
               alt="Pastry Project banner"
-              className="absolute inset-0 h-full w-full object-contain"
+              className="absolute inset-0 h-full w-full object-cover"
             />
           )}
         </motion.div>
