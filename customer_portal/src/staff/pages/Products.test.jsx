@@ -27,6 +27,16 @@ describe('Products admin catalog', () => {
               image: 'cake.jpg',
               description: 'Sweet and fruity',
             },
+            {
+              id: 2,
+              name: 'Chicken Meal',
+              category: 'Meals',
+              price: 180,
+              stock: 8,
+              minimum_stock: 3,
+              image: 'meal.jpg',
+              description: 'Savory meal',
+            },
           ],
         });
       }
@@ -74,5 +84,6 @@ describe('Products admin catalog', () => {
     });
 
     expect(screen.getByRole('button', { name: /edit/i })).toBeInTheDocument();
+    expect(screen.queryByText('Chicken Meal')).not.toBeInTheDocument();
   });
 });

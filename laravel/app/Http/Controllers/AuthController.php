@@ -55,6 +55,7 @@ class AuthController extends Controller
                 // Redirect to React app on port 3000
                 if (strtolower($userData['role']) === 'admin') {
                     return redirect('http://127.0.0.1:3000/admin');
+                }
                 return redirect('http://127.0.0.1:3000/customer');
             }
         }

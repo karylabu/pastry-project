@@ -72,8 +72,11 @@ export default function Orders({ showNavbar = true }) {
   const [ingredients, setIngredients] = useState([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState("All");
-  const [searchId, setSearchId] = useState("");
-  const [sortOption, setSortOption] = useState("Newest");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [sortBy, setSortBy] = useState("status");
+  const [sortDirection, setSortDirection] = useState("asc");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const [updatingId, setUpdatingId] = useState(null);
   const [toasts, setToasts] = useState([]);
   const [lastRefreshed, setLastRefreshed] = useState(null);
@@ -85,7 +88,6 @@ export default function Orders({ showNavbar = true }) {
   const pollRef = useRef(null);
 
   const statusFilterOptions = ["All", "Pending", "Preparing", "To Receive", "Completed", "Cancelled"];
-  const sortOptions = ["Newest", "Oldest", "Highest total"];
 
   const statusColors = {
     Pending: "bg-[#D4AF37]/15 text-black border border-[#D4AF37]/30",
@@ -199,19 +201,75 @@ export default function Orders({ showNavbar = true }) {
   const displayedOrders = orders
     .filter((order) => {
       const matchesFilter = statusFilter === "All" || order.status === statusFilter;
-      const query = searchId.trim();
-      const matchesSearch = !query || String(order.id).includes(query);
+      const query = searchQuery.trim().toLowerCase();
+      const searchableText = [
+        order.id,
+        order.customer,
+        order.customer_name,
+        order.name,
+        order.phone,
+        order.email,
+        order.method,
+        order.status,
+        order.source,
+        order.address,
+        order.delivery_address,
+        order.total,
+        ...(order.items || []).flatMap((item) => [item.name, item.qty]),
+      ].join(" ").toLowerCase();
+      const matchesSearch = !query || searchableText.includes(query);
       return matchesFilter && matchesSearch;
     })
     .sort((a, b) => {
-      const statusDiff = (statusPriority[a.status] ?? 99) - (statusPriority[b.status] ?? 99);
-      if (statusDiff !== 0) return statusDiff;
-      if (sortOption === "Highest total") return Number(b.total) - Number(a.total);
-      const dateA = a.created_at ? new Date(a.created_at).getTime() : Number(a.id);
-      const dateB = b.created_at ? new Date(b.created_at).getTime() : Number(b.id);
-      if (sortOption === "Oldest") return dateA - dateB;
-      return dateB - dateA;
+      const valueFor = (order) => {
+        if (sortBy === "customer") return String(order.customer || order.customer_name || order.name || order.phone || "").toLowerCase();
+        if (sortBy === "items") return (order.items || []).map((item) => item.name || "").join(" ").toLowerCase();
+        if (sortBy === "total") return Number(order.total) || 0;
+        if (sortBy === "status") return statusPriority[order.status] ?? 99;
+        if (sortBy === "date") return Date.parse(order.created_at || "") || 0;
+        return Number(order.id) || 0;
+      };
+      const firstValue = valueFor(a);
+      const secondValue = valueFor(b);
+      const comparison = typeof firstValue === "string"
+        ? firstValue.localeCompare(secondValue)
+        : firstValue - secondValue;
+      if (comparison !== 0) return sortDirection === "asc" ? comparison : -comparison;
+      return (Date.parse(b.created_at || "") || 0) - (Date.parse(a.created_at || "") || 0);
     });
+
+  const pageCount = Math.max(1, Math.ceil(displayedOrders.length / pageSize));
+  const pageOrders = displayedOrders.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+  const firstVisibleOrder = displayedOrders.length ? (currentPage - 1) * pageSize + 1 : 0;
+  const lastVisibleOrder = Math.min(currentPage * pageSize, displayedOrders.length);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [statusFilter, searchQuery, sortBy, sortDirection, pageSize]);
+
+  useEffect(() => {
+    if (currentPage > pageCount) setCurrentPage(pageCount);
+  }, [currentPage, pageCount]);
+
+  const requestSort = (column) => {
+    if (sortBy === column) {
+      setSortDirection((direction) => direction === "asc" ? "desc" : "asc");
+    } else {
+      setSortBy(column);
+      setSortDirection(["customer", "items"].includes(column) ? "asc" : "desc");
+      if (column === "status") setSortDirection("asc");
+    }
+    setCurrentPage(1);
+  };
+
+  const sortableHeader = (label, column, align = "left") => (
+    <th aria-sort={sortBy === column ? (sortDirection === "asc" ? "ascending" : "descending") : "none"} className={`px-4 py-3 ${align === "right" ? "text-right" : "text-left"} font-semibold`}>
+      <button type="button" onClick={() => requestSort(column)} className={`inline-flex items-center gap-1 hover:text-black ${align === "right" ? "ml-auto" : ""}`}>
+        {label}
+        <span className="text-[10px]" aria-hidden="true">{sortBy === column ? (sortDirection === "asc" ? "↑" : "↓") : "↕"}</span>
+      </button>
+    </th>
+  );
 
   const updateStatus = (id, status) => {
     setUpdatingId(id);
@@ -363,23 +421,12 @@ export default function Orders({ showNavbar = true }) {
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
               <input
                 type="search"
-                value={searchId}
-                onChange={(e) => setSearchId(e.target.value)}
-                placeholder="Search Order ID"
-                className="w-full rounded-2xl border border-black/10 bg-white px-4 py-3 text-[13px] text-black/80 outline-none focus:border-[#D4AF37]"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search orders, customers, or items"
+                aria-label="Search live orders"
+                className="w-full min-w-[280px] rounded-2xl border border-black/10 bg-white px-4 py-3 text-[13px] text-black/80 outline-none focus:border-[#D4AF37]"
               />
-              <div className="flex items-center gap-2">
-                <span className="whitespace-nowrap text-[13px] text-black/60">Sort By:</span>
-                <select
-                  value={sortOption}
-                  onChange={(e) => setSortOption(e.target.value)}
-                  className="rounded-2xl border border-black/10 bg-white px-4 py-3 text-[13px] text-black/80 outline-none"
-                >
-                  {sortOptions.map((option) => (
-                    <option key={option} value={option}>{option}</option>
-                  ))}
-                </select>
-              </div>
             </div>
           </div>
 
@@ -401,16 +448,16 @@ export default function Orders({ showNavbar = true }) {
               <table className="w-full min-w-[1120px] border-collapse">
                 <thead className="bg-[#FAFAFA] text-left text-[10px] uppercase tracking-[0.16em] text-black/50">
                   <tr className="border-b border-black/10">
-                    <th className="px-4 py-3 font-semibold">Order</th>
-                    <th className="px-4 py-3 font-semibold">Customer</th>
-                    <th className="px-4 py-3 font-semibold">Items</th>
-                    <th className="px-4 py-3 font-semibold">Total</th>
-                    <th className="px-4 py-3 font-semibold">Status</th>
+                    {sortableHeader("Order", "order")}
+                    {sortableHeader("Customer", "customer")}
+                    {sortableHeader("Items", "items")}
+                    {sortableHeader("Total", "total")}
+                    {sortableHeader("Status", "status")}
                     <th className="px-4 py-3 text-right font-semibold">Action</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {displayedOrders.map((order) => {
+                  {pageOrders.map((order) => {
                     const isExpanded = expandedOrderId === order.id;
                     const urgency = getUrgency(order);
                     const customerLabel = order.customer || order.customer_name || order.name || order.phone || "";
@@ -455,6 +502,20 @@ export default function Orders({ showNavbar = true }) {
                   })}
                 </tbody>
               </table>
+            </div>
+            <div className="flex flex-col gap-3 px-1 pt-3 text-xs text-black/60 sm:flex-row sm:items-center sm:justify-between">
+              <p>Showing {firstVisibleOrder}–{lastVisibleOrder} of {displayedOrders.length} orders</p>
+              <div className="flex flex-wrap items-center gap-2">
+                <label className="flex items-center gap-2">
+                  Rows
+                  <select value={pageSize} onChange={(event) => setPageSize(Number(event.target.value))} className="rounded-lg border border-black/10 bg-white px-2 py-1.5 text-black">
+                    {[10, 25, 50].map((size) => <option key={size} value={size}>{size}</option>)}
+                  </select>
+                </label>
+                <button type="button" onClick={() => setCurrentPage((page) => Math.max(1, page - 1))} disabled={currentPage === 1} className="rounded-lg border border-black/10 bg-white px-3 py-1.5 disabled:cursor-not-allowed disabled:opacity-40">Previous</button>
+                <span>Page {currentPage} of {pageCount}</span>
+                <button type="button" onClick={() => setCurrentPage((page) => Math.min(pageCount, page + 1))} disabled={currentPage === pageCount} className="rounded-lg border border-black/10 bg-white px-3 py-1.5 disabled:cursor-not-allowed disabled:opacity-40">Next</button>
+              </div>
             </div>
             {false && <div className="grid gap-4 xl:grid-cols-5">
               {BOARD_COLUMNS.map((column) => {

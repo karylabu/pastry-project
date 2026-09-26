@@ -9,19 +9,7 @@ import {
   Menu as MenuIcon,
   X,
   LayoutDashboard,
-  ShoppingBag,
-  Wheat,
-  Cookie,
-  AlertTriangle,
-  History,
-  CakeSlice,
-  Trash2,
-  TrendingUp,
-  Lock,
-  UserCog,
-  Megaphone,
   Settings,
-  CalendarDays,
 } from "lucide-react";
 import { BASE, LARAVEL_BASE } from "../../services/config";
 
@@ -48,51 +36,51 @@ function isAdminRole(role) {
 const NAV_GROUPS = [
   {
     label: "Overview",
-    items: [{ name: "Dashboard", path: "/admin/dashboard", icon: LayoutDashboard }],
+    items: [{ name: "Dashboard", path: "/admin/dashboard" }],
   },
   {
     label: "Inventory Management",
     items: [
-      { name: "Ingredients Stock", path: "/admin/ingredients", icon: Wheat },
-      { name: "Finished Pastries", path: "/admin/products", icon: Cookie },
-      { name: "Low Stock Alerts", path: "/admin/low-stock", icon: AlertTriangle },
+      { name: "Ingredients Stock", path: "/admin/ingredients" },
+      { name: "Cake Recipes", path: "/admin/custom-cake-recipes" },
+      { name: "Products", path: "/admin/products" },
+      { name: "Low Stock Alerts", path: "/admin/low-stock" },
     ],
   },
   {
     label: "Order Management",
     items: [
-      { name: "Live Orders", path: "/admin/orders", icon: ShoppingBag },
-      { name: "Order History", path: "/admin/orders/history", icon: History },
-      { name: "Custom Cake Requests", path: "/admin/custom-cakes", icon: CakeSlice },
-      { name: "Custom Cake Recipes", path: "/admin/custom-cake-recipes", icon: CakeSlice },
-      { name: "Schedule", path: "/admin/schedule", icon: CalendarDays },
+      { name: "Live Orders", path: "/admin/orders" },
+      { name: "Order History", path: "/admin/orders/history" },
+      { name: "Custom Cake Requests", path: "/admin/custom-cakes" },
+      { name: "Schedule", path: "/admin/schedule" },
     ],
   },
   {
     label: "Business Analytics",
     items: [
-      { name: "Sales Reports", path: "/admin/reports", icon: BarChart2 },
-      { name: "Waste Tracking", path: "/admin/waste-tracking", icon: Trash2 },
-      { name: "Predictive Demand", path: "/admin/predictive-demand", icon: TrendingUp },
+      { name: "Sales Reports", path: "/admin/reports" },
+      { name: "Waste Tracking", path: "/admin/waste-tracking" },
+      { name: "Predictive Demand", path: "/admin/predictive-demand" },
     ],
   },
   // Supplier Management removed per request
   {
     label: "Marketing",
     items: [
-      { name: "Promotions", path: "/admin/promotions", icon: Megaphone },
+      { name: "Promotions", path: "/admin/promotions" },
     ],
   },
   {
     label: "User Management",
     items: [
-      { name: "User Management", path: "/admin/users", icon: UserCog },
+      { name: "User Management", path: "/admin/users" },
     ],
   },
   {
     label: "System",
     items: [
-      { name: "Settings", path: "/admin/settings", icon: Settings },
+      { name: "Settings", path: "/admin/settings" },
     ],
   },
 ];
@@ -286,20 +274,18 @@ export default function AdminNavbar() {
               <div className="space-y-1">
                 {group.items.map((item) => {
                   const active = location.pathname === item.path;
-                  const Icon = item.icon;
 
                   return (
                     <Link
                       key={item.path}
                       to={item.path}
                       onClick={() => setSidebarOpen(false)}
-                      className={`relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13px] transition-colors
+                      className={`relative flex items-center px-3 py-2.5 rounded-xl text-[13px] transition-colors
                         ${active ? "bg-gray-100 text-black font-semibold" : "text-black/70 hover:text-black hover:bg-gray-100"}`}
                     >
                       {active && (
                         <span className="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-[3px] rounded-full bg-gray-400" />
                       )}
-                      <Icon size={16} className={active ? "text-gray-600" : ""} />
                       <span className="truncate">{item.name}</span>
                     </Link>
                   );

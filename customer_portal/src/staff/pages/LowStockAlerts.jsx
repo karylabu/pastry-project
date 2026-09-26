@@ -13,7 +13,11 @@ export default function LowStockAlerts({ showNavbar = true }) {
       .then((res) => res.json())
       .then((data) => {
         if (Array.isArray(data)) {
-          setProducts(data.filter((item) => Number(item.stock) <= 5));
+          setProducts(data.filter((item) => {
+            const isCake = String(item.category || "").trim().toLowerCase() === "cakes";
+            const isAvailable = Number(item.available ?? 1) !== 0;
+            return Number(item.stock) <= 5 && isCake && isAvailable;
+          }));
         } else {
           setProducts([]);
         }

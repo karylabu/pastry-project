@@ -16,7 +16,7 @@ import Promotions from "../pages/Promotions";
 import UserManagement from "../pages/UserManagement";
 import SettingsPage from "../pages/Settings";
 import Schedule from "../pages/Schedule";
-import CustomizedCakeRecipes from "../pages/CustomizedCakeRecipes";
+import CakeRecipes from "../pages/CakeRecipes";
 
 const renderWithLayout = (element) => <AdminLayout>{element}</AdminLayout>;
 
@@ -28,7 +28,7 @@ export default function AdminApp() {
       <Route path="orders" element={renderWithLayout(<Orders />)} />
       <Route path="orders/history" element={renderWithLayout(<OrderHistory />)} />
       <Route path="custom-cakes" element={renderWithLayout(<CustomCakes />)} />
-      <Route path="custom-cake-recipes" element={renderWithLayout(<CustomizedCakeRecipes />)} />
+      <Route path="custom-cake-recipes" element={renderWithLayout(<CakeRecipes />)} />
       <Route path="products" element={renderWithLayout(<Products />)} />
       <Route path="reports" element={renderWithLayout(<Reports />)} />
       <Route path="inventory" element={renderWithLayout(<Inventory />)} />
