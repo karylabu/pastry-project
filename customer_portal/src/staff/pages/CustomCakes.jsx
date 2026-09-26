@@ -177,7 +177,9 @@ export default function CustomCakes({ showNavbar = true }) {
 
   const displayedOrders = orders
     .filter(order => {
-      const matchesFilter = statusFilter === "All" || getStatusLabel(order.status) === statusFilter;
+      const matchesFilter = statusFilter === "Pending"
+        ? order.status === "Confirmed" || getStatusLabel(order.status) === statusFilter
+        : statusFilter === "All" || order.status === statusFilter || getStatusLabel(order.status) === statusFilter;
       const query = searchId.trim().toLowerCase();
       const customDetails = typeof order.custom_details === "string"
         ? order.custom_details
