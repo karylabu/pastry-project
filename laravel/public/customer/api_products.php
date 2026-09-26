@@ -51,6 +51,7 @@ if ($action === 'list') {
         SELECT *
         FROM products
         WHERE available = 1
+        ORDER BY category, name
     ");
 
     echo json_encode($stmt->fetchAll());

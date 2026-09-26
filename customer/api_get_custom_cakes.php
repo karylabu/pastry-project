@@ -56,7 +56,6 @@ try {
                 o.id,
                 o.customer,
                 o.email,
-                o.type,
                 o.status,
                 o.total,
                 o.payment,
@@ -87,7 +86,7 @@ try {
             LEFT JOIN users u ON o.user_id = u.id
             LEFT JOIN custom_cake_orders cco ON o.id = cco.order_id
             WHERE o.user_id = $user_id
-            AND (o.type = 'Custom' OR cco.id IS NOT NULL)
+            AND cco.id IS NOT NULL
             ORDER BY o.created_at DESC
         ";
     } elseif ($user_email !== '') {
@@ -98,7 +97,6 @@ try {
                 o.id,
                 o.customer,
                 o.email,
-                o.type,
                 o.status,
                 o.total,
                 o.payment,
@@ -129,7 +127,7 @@ try {
             LEFT JOIN users u ON o.user_id = u.id OR o.email = u.email
             LEFT JOIN custom_cake_orders cco ON o.id = cco.order_id
             WHERE (o.email = '$escapedEmail' OR o.user_id IN (SELECT id FROM users WHERE email = '$escapedEmail'))
-            AND (o.type = 'Custom' OR cco.id IS NOT NULL)
+            AND cco.id IS NOT NULL
             ORDER BY o.created_at DESC
         ";
     } elseif ($customer_name !== '') {
@@ -140,7 +138,6 @@ try {
                 o.id,
                 o.customer,
                 o.email,
-                o.type,
                 o.status,
                 o.total,
                 o.payment,
@@ -171,7 +168,7 @@ try {
             LEFT JOIN users u ON o.user_id = u.id
             LEFT JOIN custom_cake_orders cco ON o.id = cco.order_id
             WHERE (o.customer LIKE '%$escapedName%' OR u.name LIKE '%$escapedName%')
-            AND (o.type = 'Custom' OR cco.id IS NOT NULL)
+            AND cco.id IS NOT NULL
             ORDER BY o.created_at DESC
         ";
     } else {

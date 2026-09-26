@@ -1,6 +1,6 @@
 <?php
 session_start();
-require_once __DIR__ . '/includes/db.php';
+require_once __DIR__ . '/includes/data.php';
 
 $user = $_SESSION['user'] ?? null;
 $products = db_all("SELECT * FROM products WHERE available = 1");

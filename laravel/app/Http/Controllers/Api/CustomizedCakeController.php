@@ -305,19 +305,26 @@ class CustomizedCakeController extends Controller
                 $orderId = !empty($payload['order_id']) ? (int) $payload['order_id'] : null;
                 if (!$orderId && Schema::hasTable('orders')) {
                     $orderId = DB::table('orders')->insertGetId([
-                        'customer' => $user->name,
-                        'email' => $user->email,
-                        'phone' => $user->phone ?? null,
-                        'user_id' => $user->id,
-                        'type' => 'Custom',
-                        'status' => 'Pending',
+                        'items' => json_encode([[
+                            'name' => 'Customized Cake',
+                            'qty' => 1,
+                            'price' => 0,
+                            'selectionDetails' => ['details' => $payload['notes'] ?? 'Customized cake request'],
+                        ]]),
+                        'subtotal' => 0,
+                        'delivery_fee' => 0,
                         'total' => 0,
+                        'method' => 'Pickup',
+                        'delivery_date' => null,
+                        'delivery_time' => null,
                         'payment' => 'COD',
                         'address' => '',
-                        'notes' => $payload['notes'] ?? 'Customized cake request',
-                        'order_date' => now()->toDateString(),
+                        'phone' => $user->phone ?? '',
+                        'customer' => $user->name,
+                        'email' => $user->email,
+                        'user_id' => $user->id,
+                        'status' => 'Pending',
                         'created_at' => now(),
-                        'updated_at' => now(),
                     ]);
                     if (Schema::hasTable('order_items')) {
                         DB::table('order_items')->insert([
@@ -363,6 +370,17 @@ class CustomizedCakeController extends Controller
             });
 
             $linkedOrderId = DB::table('customized_cake_orders')->where('id', $customizedCakeOrderId)->value('order_id');
+            if ($linkedOrderId && Schema::hasTable('notifications')) {
+                DB::table('notifications')->insert([
+                    'user_id' => $user->id,
+                    'title' => 'Custom cake request submitted',
+                    'message' => "Your custom cake request #{$linkedOrderId} has been received and is awaiting review.",
+                    'type' => 'Info',
+                    'action_url' => '/customer/orders',
+                    'is_read' => 0,
+                    'created_at' => now(),
+                ]);
+            }
             return response()->json([
                 'success' => true,
                 'customized_cake_order_id' => $customizedCakeOrderId,
