@@ -39,9 +39,9 @@ class ProductionService
         return ['is_producible' => true, 'availability_reason' => null];
     }
 
-    public function produce(Product $product, int $productSizeId, int $quantity, string $idempotencyKey, int $userId): array
+    public function produce(Product $product, int $productSizeId, int $quantity, string $expiryDate, string $idempotencyKey, int $userId): array
     {
-        return DB::transaction(function () use ($product, $productSizeId, $quantity, $idempotencyKey, $userId) {
+        return DB::transaction(function () use ($product, $productSizeId, $quantity, $expiryDate, $idempotencyKey, $userId) {
             $existing = ProductionTransaction::query()->where('idempotency_key', $idempotencyKey)->first();
             if ($existing) return ['duplicate' => true, 'production' => $existing];
 
@@ -85,6 +85,7 @@ class ProductionService
                 'product_id' => $lockedProduct->id,
                 'product_size_id' => $size->id,
                 'quantity' => $quantity,
+                'expiry_date' => $expiryDate,
                 'user_id' => $userId,
                 'idempotency_key' => $idempotencyKey,
             ]);

@@ -13,7 +13,11 @@ class ProductionTransaction extends Model
 
     protected $table = 'production_transactions';
 
-    protected $fillable = ['product_id', 'product_size_id', 'quantity', 'user_id', 'idempotency_key'];
+    protected $fillable = ['product_id', 'product_size_id', 'quantity', 'expiry_date', 'user_id', 'idempotency_key'];
+
+    protected $casts = [
+        'expiry_date' => 'date',
+    ];
 
     public function product()
     {

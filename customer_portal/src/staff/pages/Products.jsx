@@ -42,6 +42,7 @@ export default function Products({ showNavbar = true, allowCatalogManagement = f
   const [searchTerm, setSearchTerm] = useState("");
   const [recipeLines, setRecipeLines] = useState([]);
   const [productionSizeId, setProductionSizeId] = useState("");
+  const [productionExpiryDate, setProductionExpiryDate] = useState("");
   const [bomQty, setBomQty] = useState(1);
   const [bomError, setBomError] = useState(null);
   const [bomLoading, setBomLoading] = useState(false);
@@ -80,7 +81,7 @@ export default function Products({ showNavbar = true, allowCatalogManagement = f
   const navigate = useNavigate();
 
   // ⭐ NEW: CATEGORY FILTER
-  const [activeCat, setActiveCat] = useState("All");
+  const [activeCat, setActiveCat] = useState(allowCatalogManagement ? "Cakes" : "All");
   const canManageCatalog = Boolean(allowCatalogManagement);
   const canEditCatalog = Boolean(allowCatalogManagement);
 
@@ -362,6 +363,7 @@ export default function Products({ showNavbar = true, allowCatalogManagement = f
     if (action === "produce") {
       setRecipeLines([]);
       setProductionSizeId("");
+      setProductionExpiryDate("");
       setProductionAvailability({ is_producible: false, reason: 'Select a cake size first.' });
     }
     if (action === "history") loadHistory(product.id);
@@ -371,6 +373,7 @@ export default function Products({ showNavbar = true, allowCatalogManagement = f
     setSelectedProduct(null);
     setActiveModal(null);
     setHistoryEntries([]);
+    setProductionExpiryDate("");
   };
 
   const produceFinishedGoods = () => {
@@ -382,6 +385,11 @@ export default function Products({ showNavbar = true, allowCatalogManagement = f
 
     if (!productionSizeId) {
       setBomError("Select a cake size before producing.");
+      return;
+    }
+
+    if (!productionExpiryDate) {
+      setBomError("Enter an expiry date for this production batch.");
       return;
     }
 
@@ -409,6 +417,7 @@ export default function Products({ showNavbar = true, allowCatalogManagement = f
         product_id: selectedProduct.id,
         product_size_id: Number(productionSizeId),
         quantity: parsedQty,
+        expiry_date: productionExpiryDate,
         idempotency_key: window.crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`
       })
     })
@@ -500,9 +509,9 @@ export default function Products({ showNavbar = true, allowCatalogManagement = f
      FILTER PRODUCTS
   ========================= */
   const filteredProducts = products.filter((p) => {
-    const matchesCategory =
-      activeCat === "All" ||
-      p.category?.toLowerCase() === activeCat.toLowerCase();
+    const matchesCategory = allowCatalogManagement
+      ? p.category?.trim().toLowerCase() === "cakes"
+      : activeCat === "All" || p.category?.toLowerCase() === activeCat.toLowerCase();
 
     const query = searchTerm.trim().toLowerCase();
     const matchesSearch =
@@ -513,7 +522,7 @@ export default function Products({ showNavbar = true, allowCatalogManagement = f
     return matchesCategory && matchesSearch;
   });
 
-  const categories = ["All", "Cakes", "Meals", "Pasta", "Starter"];
+  const categories = allowCatalogManagement ? ["Cakes"] : ["All", "Cakes", "Meals", "Pasta", "Starter"];
 
   return (
 
@@ -534,9 +543,8 @@ export default function Products({ showNavbar = true, allowCatalogManagement = f
           </h1>
         </div>
 
-        <div className="grid grid-cols-2 gap-3 mb-6 md:grid-cols-5">
+        <div className="grid grid-cols-2 gap-3 mb-6 md:grid-cols-4">
           {[
-            ["Total Finished Products", inventorySummary?.total_finished_products],
             ["Low Stock", inventorySummary?.low_stock],
             ["Out of Stock", inventorySummary?.out_of_stock],
             ["Today's Production", inventorySummary?.today_production],
@@ -875,6 +883,19 @@ export default function Products({ showNavbar = true, allowCatalogManagement = f
                     className="w-full border border-black/10 rounded-xl px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-[#D4AF37]"
                   />
 
+                  <div>
+                    <label htmlFor="production-expiry-date" className="mb-1 block text-[11px] font-semibold text-black/70">Expiry date</label>
+                    <input
+                      id="production-expiry-date"
+                      type="date"
+                      min={new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10)}
+                      value={productionExpiryDate}
+                      onChange={(event) => setProductionExpiryDate(event.target.value)}
+                      required
+                      className="w-full rounded-xl border border-black/10 px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-[#D4AF37]"
+                    />
+                  </div>
+
                   {bomLoading ? (
                     <p className="text-[12px] text-black/60">Loading recipe...</p>
                   ) : recipeLines.length > 0 ? (
@@ -1009,10 +1030,9 @@ export default function Products({ showNavbar = true, allowCatalogManagement = f
                       onChange={(e) => setNewProduct((prev) => ({ ...prev, category: e.target.value }))}
                       className="w-full rounded-[12px] border border-black/10 px-3 py-2.5 text-[12px] text-black outline-none focus:ring-2 focus:ring-[#D4AF37] focus:ring-offset-2 focus:ring-offset-white"
                     >
-                      <option>Cakes</option>
-                      <option>Meals</option>
-                      <option>Pasta</option>
-                      <option>Starter</option>
+                      {(allowCatalogManagement ? ["Cakes"] : ["Cakes", "Meals", "Pasta", "Starter"]).map((category) => (
+                        <option key={category}>{category}</option>
+                      ))}
                     </select>
                   </div>
 
@@ -1196,6 +1216,7 @@ export default function Products({ showNavbar = true, allowCatalogManagement = f
                       type="text"
                       value={editProduct.category}
                       onChange={(e) => setEditProduct((p) => ({ ...p, category: e.target.value }))}
+                      readOnly={allowCatalogManagement}
                       className="w-full rounded-xl border border-black/10 px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-[#D4AF37]"
                     />
                   </div>

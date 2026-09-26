@@ -27,7 +27,7 @@ class ProductionController extends Controller
         try {
             $user = $this->getAuthenticatedUser($request);
             $product = Product::query()->findOrFail($request->integer('product_id'));
-            $result = $production->produce($product, $request->integer('product_size_id'), $request->integer('quantity'), $request->string('idempotency_key')->toString(), (int) $user->id);
+            $result = $production->produce($product, $request->integer('product_size_id'), $request->integer('quantity'), $request->date('expiry_date')->toDateString(), $request->string('idempotency_key')->toString(), (int) $user->id);
             return response()->json([
                 'status' => 'success',
                 'duplicate' => $result['duplicate'],

@@ -118,15 +118,19 @@ if ($action === 'summary') {
                 COUNT(*) AS total_finished_products,
                 SUM(stock > 0 AND stock <= minimum_stock) AS low_stock,
                 SUM(stock = 0) AS out_of_stock
-             FROM products"
+             FROM products
+             WHERE available = 1 AND LOWER(TRIM(category)) = 'cakes'"
         );
         $summary = $summaryStmt->fetch() ?: [];
         $movementStmt = $pdo->query(
             "SELECT
                 COALESCE(SUM(CASE WHEN movement_type = 'Production' THEN quantity ELSE 0 END), 0) AS today_production,
                 COALESCE(SUM(CASE WHEN movement_type = 'Waste' THEN ABS(quantity) ELSE 0 END), 0) AS today_waste
-             FROM product_inventory_movements
-             WHERE created_at >= CURDATE() AND created_at < CURDATE() + INTERVAL 1 DAY"
+                         FROM product_inventory_movements AS movements
+                         INNER JOIN products ON products.id = movements.product_id
+                         WHERE movements.created_at >= CURDATE() AND movements.created_at < CURDATE() + INTERVAL 1 DAY
+                             AND products.available = 1
+                             AND LOWER(TRIM(products.category)) = 'cakes'"
         );
         $movements = $movementStmt->fetch() ?: [];
         echo json_encode([

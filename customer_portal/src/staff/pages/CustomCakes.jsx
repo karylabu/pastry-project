@@ -42,6 +42,10 @@ export default function CustomCakes({ showNavbar = true }) {
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState("All");
   const [searchId, setSearchId] = useState("");
+  const [sortBy, setSortBy] = useState("order");
+  const [sortDirection, setSortDirection] = useState("desc");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const [updatingId, setUpdatingId] = useState(null);
   const [toasts, setToasts] = useState([]);
   const [lastRefreshed, setLastRefreshed] = useState(null);
@@ -176,15 +180,77 @@ export default function CustomCakes({ showNavbar = true }) {
   const displayedOrders = orders
     .filter(order => {
       const matchesFilter = statusFilter === "Pending"
-        ? order.status === "Confirmed"
+        ? order.status === "Confirmed" || getStatusLabel(order.status) === statusFilter
         : statusFilter === "All" || order.status === statusFilter || getStatusLabel(order.status) === statusFilter;
-      const query = searchId.trim();
-      const matchesSearch = !query || String(order.id).includes(query);
+      const query = searchId.trim().toLowerCase();
+      const customDetails = typeof order.custom_details === "string"
+        ? order.custom_details
+        : JSON.stringify(order.custom_details || {});
+      const searchableText = [
+        order.id,
+        order.name,
+        order.customer_name,
+        order.phone,
+        order.email,
+        order.status,
+        order.details,
+        ...(order.items || []).flatMap(item => [item.name, item.qty]),
+        customDetails,
+      ].join(" ").toLowerCase();
+      const matchesSearch = !query || searchableText.includes(query);
       return matchesFilter && matchesSearch;
     })
     .sort((a, b) => {
-      return Number(b.id) - Number(a.id);
+      const valueFor = (order) => {
+        if (sortBy === "customer") return String(order.name || order.customer_name || order.phone || "").toLowerCase();
+        if (sortBy === "details") return String(order.details || order.items?.map(item => item.name).join(" ") || "").toLowerCase();
+        if (sortBy === "total") return Number(order.total) || 0;
+        if (sortBy === "status") return getStatusLabel(order.status).toLowerCase();
+        if (sortBy === "date") return Date.parse(order.created_at || "") || 0;
+        return Number(order.id) || 0;
+      };
+      const firstValue = valueFor(a);
+      const secondValue = valueFor(b);
+      const comparison = typeof firstValue === "string"
+        ? firstValue.localeCompare(secondValue)
+        : firstValue - secondValue;
+      return sortDirection === "asc" ? comparison : -comparison;
     });
+
+  const pageCount = Math.max(1, Math.ceil(displayedOrders.length / pageSize));
+  const pageOrders = displayedOrders.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+  const firstVisibleOrder = displayedOrders.length ? (currentPage - 1) * pageSize + 1 : 0;
+  const lastVisibleOrder = Math.min(currentPage * pageSize, displayedOrders.length);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchId, statusFilter, pageSize]);
+
+  useEffect(() => {
+    if (currentPage > pageCount) setCurrentPage(pageCount);
+  }, [currentPage, pageCount]);
+
+  const requestSort = (column) => {
+    if (sortBy === column) {
+      setSortDirection(direction => direction === "asc" ? "desc" : "asc");
+    } else {
+      setSortBy(column);
+      setSortDirection(["customer", "details", "status"].includes(column) ? "asc" : "desc");
+    }
+    setCurrentPage(1);
+  };
+
+  const sortableHeader = (label, column, align = "left", width = "") => (
+    <th
+      aria-sort={sortBy === column ? (sortDirection === "asc" ? "ascending" : "descending") : "none"}
+      className={`${width} px-4 py-3 ${align === "right" ? "text-right" : "text-left"} font-semibold`}
+    >
+      <button type="button" onClick={() => requestSort(column)} className={`inline-flex items-center gap-1 hover:text-black ${align === "right" ? "ml-auto" : ""}`}>
+        {label}
+        <span className="text-[10px]" aria-hidden="true">{sortBy === column ? (sortDirection === "asc" ? "↑" : "↓") : "↕"}</span>
+      </button>
+    </th>
+  );
 
   const isPendingRequest = (status) => status === "Pending" || status === "Pending Quote" || status === "To Review";
   const openOrderDetails = (order) => setSelectedOrder(order);
@@ -442,7 +508,8 @@ export default function CustomCakes({ showNavbar = true }) {
                 type="search"
                 value={searchId}
                 onChange={e => setSearchId(e.target.value)}
-                placeholder="Search Order ID"
+                placeholder="Search requests"
+                aria-label="Search custom cake requests"
                 className="w-full min-w-[280px] rounded-2xl border border-black/10 bg-white px-4 py-3 text-[13px] text-black/80 outline-none transition focus:border-[#D4AF37]"
               />
             </div>
@@ -455,21 +522,22 @@ export default function CustomCakes({ showNavbar = true }) {
           ) : displayedOrders.length === 0 ? (
             <p className="text-black/50">No custom cake requests match your filters.</p>
           ) : (
-            <div className="overflow-hidden rounded-[24px] border border-black/10 bg-white shadow-sm">
-              <table className="w-full min-w-[1000px] table-fixed border-collapse">
-                <thead className="bg-[#FAFAFA]">
-                  <tr className="border-b border-black/10 text-[11px] uppercase tracking-[0.14em] text-black/55">
-                    <th className="w-[10%] px-4 py-3 text-left font-semibold">Order</th>
-                    <th className="w-[16%] px-4 py-3 text-left font-semibold">Customer</th>
-                    <th className="w-[30%] px-4 py-3 text-left font-semibold">Details</th>
-                    <th className="w-[10%] px-4 py-3 text-right font-semibold">Total</th>
-                    <th className="w-[14%] px-4 py-3 text-left font-semibold">Status</th>
-                    <th className="w-[10%] px-4 py-3 text-left font-semibold">Date</th>
-                    <th className="w-[10%] px-4 py-3 text-right font-semibold">Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {displayedOrders.map(order => {
+            <div className="space-y-3">
+              <div className="overflow-x-auto rounded-[24px] border border-black/10 bg-white shadow-sm">
+                <table className="w-full min-w-[1000px] table-fixed border-collapse">
+                  <thead className="bg-[#FAFAFA]">
+                    <tr className="border-b border-black/10 text-[11px] uppercase tracking-[0.14em] text-black/55">
+                      {sortableHeader("Order", "order", "left", "w-[10%]")}
+                      {sortableHeader("Customer", "customer", "left", "w-[16%]")}
+                      {sortableHeader("Details", "details", "left", "w-[30%]")}
+                      {sortableHeader("Total", "total", "right", "w-[10%]")}
+                      {sortableHeader("Status", "status", "left", "w-[14%]")}
+                      {sortableHeader("Date", "date", "left", "w-[10%]")}
+                      <th className="w-[10%] px-4 py-3 text-right font-semibold">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {pageOrders.map(order => {
                     const isCancelled = order.status === "Cancelled";
                     const isCompleted = order.status === "Completed";
                     const isToReceive = order.status === "To Receive";
@@ -587,9 +655,24 @@ export default function CustomCakes({ showNavbar = true }) {
                         </td>
                       </tr>
                     );
-                  })}
-                </tbody>
-              </table>
+                    })}
+                  </tbody>
+                </table>
+              </div>
+              <div className="flex flex-col gap-3 px-1 text-xs text-black/60 sm:flex-row sm:items-center sm:justify-between">
+                <p>Showing {firstVisibleOrder}–{lastVisibleOrder} of {displayedOrders.length} requests</p>
+                <div className="flex flex-wrap items-center gap-2">
+                  <label className="flex items-center gap-2">
+                    Rows
+                    <select value={pageSize} onChange={event => setPageSize(Number(event.target.value))} className="rounded-lg border border-black/10 bg-white px-2 py-1.5 text-black">
+                      {[10, 25, 50].map(size => <option key={size} value={size}>{size}</option>)}
+                    </select>
+                  </label>
+                  <button type="button" onClick={() => setCurrentPage(page => Math.max(1, page - 1))} disabled={currentPage === 1} className="rounded-lg border border-black/10 bg-white px-3 py-1.5 disabled:cursor-not-allowed disabled:opacity-40">Previous</button>
+                  <span>Page {currentPage} of {pageCount}</span>
+                  <button type="button" onClick={() => setCurrentPage(page => Math.min(pageCount, page + 1))} disabled={currentPage === pageCount} className="rounded-lg border border-black/10 bg-white px-3 py-1.5 disabled:cursor-not-allowed disabled:opacity-40">Next</button>
+                </div>
+              </div>
             </div>
           )}
         </div>

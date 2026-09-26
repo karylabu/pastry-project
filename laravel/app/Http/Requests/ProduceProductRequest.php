@@ -17,6 +17,7 @@ class ProduceProductRequest extends FormRequest
             'product_id' => ['required', 'integer', 'exists:products,id'],
             'product_size_id' => ['required', 'integer', 'exists:product_sizes,id'],
             'quantity' => ['required', 'integer', 'min:1'],
+            'expiry_date' => ['required', 'date', 'after_or_equal:today'],
             'idempotency_key' => ['required', 'string', 'max:100'],
         ];
     }
