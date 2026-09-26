@@ -123,7 +123,7 @@ if ($action === 'list' || $action === 'all') {
     $stmt = $pdo->query("
         SELECT *
         FROM products
-        " . ($action === 'list' ? "WHERE available = 1 AND LOWER(category) IN ('cake', 'cakes')" : "") . "
+        " . ($action === 'list' ? "WHERE available = 1" : "") . "
         ORDER BY category, name
     ");
 

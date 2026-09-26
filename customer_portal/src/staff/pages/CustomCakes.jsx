@@ -1,11 +1,12 @@
 import React, { useEffect, useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { jsPDF } from "jspdf";
+import { ArrowRight } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 /* STAFF NAVBAR */
 import StaffNavbar from "../components/StaffNavbar";
-import { STAFF_BASE, LARAVEL_BASE } from "../../services/config";
+import { ROOT_BASE, STAFF_BASE, LARAVEL_BASE } from "../../services/config";
 import { safeParseJson } from "../../services/api";
 
 const staffFetch = (url, options = {}) => fetch(url, { credentials: "include", ...options });
@@ -55,11 +56,12 @@ export default function CustomCakes({ showNavbar = true }) {
   const [quoteSaving, setQuoteSaving] = useState(false);
   const pollRef = useRef(null);
 
-  const statusFilterOptions = ["All", "To Review", "Preparing", "To Receive", "Completed", "Cancelled"];
+  const statusFilterOptions = ["All", "To Review", "Pending", "Preparing", "To Receive", "Completed", "Cancelled"];
 
   const statusColors = {
     "To Review": "bg-slate-100 text-slate-700",
     Pending: "bg-slate-100 text-slate-700",
+    Confirmed: "bg-amber-100 text-amber-800",
     "Pending Quote": "bg-slate-100 text-slate-700",
     Preparing: "bg-slate-100 text-slate-700",
     "To Receive": "bg-slate-100 text-slate-700",
@@ -74,7 +76,7 @@ export default function CustomCakes({ showNavbar = true }) {
   };
 
   const getStatusLabel = (status) => (
-    status === "Pending" || status === "Pending Quote" ? "To Review" : status
+    status === "Pending" || status === "Pending Quote" ? "To Review" : status === "Confirmed" ? "Pending" : status
   );
 
   const addToast = (message, type = "success") => {
@@ -288,7 +290,7 @@ export default function CustomCakes({ showNavbar = true }) {
       }
 
       setQuoteOrder(null);
-      await updateStatus(quoteOrder.id, "Preparing");
+      await updateStatus(quoteOrder.id, "Confirmed");
     } catch (error) {
       addToast(error.message || "Unable to accept the custom order.", "error");
     } finally {
@@ -360,6 +362,39 @@ export default function CustomCakes({ showNavbar = true }) {
   const personalInfoLabels = new Set(["Customer name", "Email", "Phone"]);
   const personalInfoEntries = selectedOrderDetailEntries.filter(([label]) => personalInfoLabels.has(label));
   const formDetailEntries = selectedOrderDetailEntries.filter(([label]) => !personalInfoLabels.has(label));
+  const selectedReferenceImages = (() => {
+    let customDetails = selectedOrder?.custom_details || {};
+    if (typeof customDetails === "string") {
+      try { customDetails = JSON.parse(customDetails) || {}; } catch { customDetails = {}; }
+    }
+    const imageSources = [
+      selectedOrder?.custom_inspo_images,
+      selectedOrder?.customized_inspo_images,
+      customDetails.inspo_images,
+      customDetails.reference_images,
+      customDetails.reference_image,
+    ];
+    const images = imageSources.flatMap((source) => {
+      if (!source) return [];
+      if (typeof source === "string") {
+        try { return Array.isArray(JSON.parse(source)) ? JSON.parse(source) : [JSON.parse(source)]; } catch { return []; }
+      }
+      return Array.isArray(source) ? source : [source];
+    });
+
+    return images.map((image, index) => {
+      const source = typeof image === "string" ? image : image?.url || image?.src || image?.path || image?.image;
+      if (!source) return null;
+      const url = /^https?:\/\//i.test(source)
+        ? source
+        : source.startsWith("/pastry-project/")
+          ? `${window.location.origin}${source}`
+          : source.startsWith("/")
+            ? `${window.location.origin}/pastry-project${source}`
+            : `${ROOT_BASE}/${source.replace(/^\/+/, "")}`;
+      return { url, name: typeof image === "string" ? `Reference ${index + 1}` : image.name || image.label || `Reference ${index + 1}` };
+    }).filter(Boolean).filter((image, index, allImages) => allImages.findIndex((candidate) => candidate.url === image.url) === index);
+  })();
 
   const updateStatus = (id, status) => {
     setUpdatingId(id);
@@ -581,6 +616,39 @@ export default function CustomCakes({ showNavbar = true }) {
                                 Decline
                               </button>
                             </div>
+                          ) : order.status === "Confirmed" ? (
+                            <button
+                              type="button"
+                              onClick={() => updateStatus(order.id, "Preparing")}
+                              disabled={updatingId === order.id}
+                              title="Move to Preparing"
+                              aria-label={`Move order #${order.id} to Preparing`}
+                              className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-black text-white transition hover:bg-[#D4AF37] hover:text-black disabled:cursor-not-allowed disabled:opacity-40"
+                            >
+                              <ArrowRight size={16} strokeWidth={2.5} />
+                            </button>
+                          ) : order.status === "Preparing" ? (
+                            <button
+                              type="button"
+                              onClick={() => updateStatus(order.id, "To Receive")}
+                              disabled={updatingId === order.id}
+                              title="Move to To Receive"
+                              aria-label={`Move order #${order.id} to To Receive`}
+                              className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-black text-white transition hover:bg-[#D4AF37] hover:text-black disabled:cursor-not-allowed disabled:opacity-40"
+                            >
+                              <ArrowRight size={16} strokeWidth={2.5} />
+                            </button>
+                          ) : order.status === "To Receive" ? (
+                            <button
+                              type="button"
+                              onClick={() => updateStatus(order.id, "Completed")}
+                              disabled={updatingId === order.id}
+                              title="Move to Completed"
+                              aria-label={`Move order #${order.id} to Completed`}
+                              className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-black text-white transition hover:bg-[#D4AF37] hover:text-black disabled:cursor-not-allowed disabled:opacity-40"
+                            >
+                              <ArrowRight size={16} strokeWidth={2.5} />
+                            </button>
                           ) : (
                             <span className="inline-flex h-8 items-center rounded-full bg-slate-100 px-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-700">Accepted</span>
                           )}
@@ -732,6 +800,31 @@ export default function CustomCakes({ showNavbar = true }) {
                     </div>
                   ))}
                 </div>
+              </div>
+
+              <div className="mt-6 rounded-[24px] border border-black/10 bg-white p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-black/50">Reference Image</p>
+                  <span className="text-[11px] text-black/45">
+                    {selectedReferenceImages.length > 0
+                      ? `${selectedReferenceImages.length} image${selectedReferenceImages.length === 1 ? "" : "s"}`
+                      : "Not provided"}
+                  </span>
+                </div>
+                {selectedReferenceImages.length > 0 ? (
+                  <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
+                    {selectedReferenceImages.map((image) => (
+                      <a key={`${image.url}-${image.name}`} href={image.url} target="_blank" rel="noreferrer" className="group overflow-hidden rounded-2xl border border-black/10 bg-[#FAFAFA]">
+                        <img src={image.url} alt={image.name} className="h-36 w-full object-cover transition group-hover:scale-[1.03]" />
+                        <p className="truncate px-3 py-2 text-[11px] text-black/65">{image.name}</p>
+                      </a>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="mt-4 flex min-h-36 items-center justify-center rounded-2xl border border-dashed border-black/15 bg-[#FAFAFA] px-4 text-center text-sm text-black/45">
+                    No reference image was provided.
+                  </div>
+                )}
               </div>
 
               <div className="mt-6 flex flex-wrap justify-end gap-3">

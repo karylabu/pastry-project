@@ -36,6 +36,21 @@ if ($userId <= 0) {
     echo json_encode(['success' => false, 'message' => 'Please log in before sending a custom cake request.']);
     exit;
 }
+
+if ($name === '' || $email === '' || $phone === '') {
+    $userStmt = $conn->prepare('SELECT name, email, phone FROM users WHERE id = ? LIMIT 1');
+    if ($userStmt) {
+        $userStmt->bind_param('i', $userId);
+        $userStmt->execute();
+        $userRow = $userStmt->get_result()->fetch_assoc() ?: [];
+        $userStmt->close();
+        $name = $name !== '' ? $name : trim((string) ($userRow['name'] ?? ''));
+        $email = $email !== '' ? $email : trim((string) ($userRow['email'] ?? ''));
+        $phone = $phone !== '' ? $phone : trim((string) ($userRow['phone'] ?? ''));
+    }
+}
+
+$name = $name !== '' ? $name : 'Customer';
 $deliveryAddress = trim($_POST['delivery_address'] ?? '');
 $deliveryMethod = trim($_POST['delivery_method'] ?? 'Pickup');
 $deliveryService = trim($_POST['delivery_service'] ?? '');
@@ -75,6 +90,7 @@ if (!is_dir($uploadDir)) {
 }
 
 $savedFiles = [];
+$referenceImage = json_decode(trim($_POST['reference_image'] ?? ''), true);
 if (!empty($_FILES['files']['name'][0])) {
     foreach ($_FILES['files']['tmp_name'] as $i => $tmpName) {
         $originalName = basename($_FILES['files']['name'][$i]);
@@ -87,6 +103,14 @@ if (!empty($_FILES['files']['name'][0])) {
             $savedFiles[] = 'uploads/custom_cake/' . $safeName;
         }
     }
+}
+if (is_array($referenceImage) && !empty($referenceImage['url'])) {
+    $savedFiles[] = [
+        'type' => $referenceImage['type'] ?? 'reference',
+        'id' => $referenceImage['id'] ?? null,
+        'url' => $referenceImage['url'],
+        'name' => $referenceImage['name'] ?? 'Reference image',
+    ];
 }
 $inspoImagesJson = json_encode($savedFiles);
 
@@ -133,6 +157,7 @@ $customDetails = [
     'quantity' => $quantity,
     'total_amount' => $totalAmount,
     'details' => $details,
+    'reference_image' => $referenceImage,
 ];
 $customDetailsJson = json_encode($customDetails);
 
@@ -167,13 +192,20 @@ if (!$stmt2->execute()) {
 $stmt2->close();
 
 // ---------------------------------------------------------------
-// 6. (OPTIONAL) INSERT A NOTIFICATION FOR ADMIN
+// 6. NOTIFY THE CUSTOMER THAT THE REQUEST WAS SUBMITTED
 // ---------------------------------------------------------------
-// Uncomment and adjust to match your `notifications` table columns if you
-// want admins to see an alert as soon as a custom cake request comes in.
-//
-// $msg = "New custom cake request from {$name} (Order #{$orderId})";
-// $conn->query("INSERT INTO notifications (order_id, message, created_at) VALUES ({$orderId}, '" . $conn->real_escape_string($msg) . "', NOW())");
+$notificationStmt = $conn->prepare(
+    "INSERT INTO notifications (user_id, title, message, type, action_url, is_read, created_at)
+     VALUES (?, ?, ?, 'Info', ?, 0, NOW())"
+);
+if ($notificationStmt) {
+    $notificationTitle = 'Custom cake request submitted';
+    $notificationMessage = "Your custom cake request #{$orderId} has been received and is awaiting review.";
+    $notificationUrl = '/customer/orders';
+    $notificationStmt->bind_param('isss', $userId, $notificationTitle, $notificationMessage, $notificationUrl);
+    $notificationStmt->execute();
+    $notificationStmt->close();
+}
 
 echo json_encode([
     'success'  => true,

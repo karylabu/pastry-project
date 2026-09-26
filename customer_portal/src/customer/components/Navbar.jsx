@@ -108,6 +108,14 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
 
   useEffect(() => {
     fetchNotifications();
+    const interval = window.setInterval(fetchNotifications, 10000);
+    const handleWindowFocus = () => fetchNotifications();
+    window.addEventListener('focus', handleWindowFocus);
+
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener('focus', handleWindowFocus);
+    };
   }, []);
 
   /* =========================
@@ -136,8 +144,8 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
 
   const filteredNotifications = useMemo(() => {
     if (notifFilter === "All") return notifications;
-    if (notifFilter === "Active Orders") return notifications.filter((n) => ["order_pending", "order_ready", "order_urgent"].includes(n.type));
-    if (notifFilter === "Reminders & Warnings") return notifications.filter((n) => ["order_expired", "stockout"].includes(n.type));
+    if (notifFilter === "Active Orders") return notifications.filter((n) => ["order_pending", "order_ready", "order_urgent"].includes(n.type) || (n.type === "Success" && n.action_url?.includes("/customer/orders")));
+    if (notifFilter === "Reminders & Warnings") return notifications.filter((n) => ["order_expired", "stockout"].includes(n.type) || (n.type === "Warning" && n.action_url?.includes("/customer/orders")));
     if (notifFilter === "Account Updates") return notifications.filter((n) => ["account", "profile"].includes(n.type));
     return notifications;
   }, [notifications, notifFilter]);
@@ -393,6 +401,10 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
                             return <AlertTriangle className="h-4 w-4 text-red-600" />;
                           case "order_expired":
                             return <Trash2 className="h-4 w-4 text-amber-700" />;
+                          case "Success":
+                            return <Gift className="h-4 w-4 text-emerald-600" />;
+                          case "Warning":
+                            return <AlertTriangle className="h-4 w-4 text-amber-700" />;
                           default:
                             return <CheckCheck className="h-4 w-4 text-gray-600" />;
                         }
