@@ -5,8 +5,6 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { BASE, CUSTOMER_BASE, LARAVEL_BASE } from '../../services/config';
 import { getAuthHeaders } from '../../services/api';
-
-// Import marker icon images
 import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
 import markerIcon from "leaflet/dist/images/marker-icon.png";
 import markerShadow from "leaflet/dist/images/marker-shadow.png";
@@ -14,47 +12,28 @@ import markerShadow from "leaflet/dist/images/marker-shadow.png";
 import useLocationValidation from '../hooks/useLocationValidation';
 import useAddressGeocoding from '../hooks/useAddressGeocoding';
 import OutOfCoverageModal from '../components/OutOfCoverageModal';
-import { addBoundaryVisualization, highlightLocation } from '../utils/mapBoundaryHelper';
+import { isLocationWithinCoverage, TANAUAN_CITY_BOUNDS } from '../utils/locationBoundaryUtils';
 
-// Fix Leaflet default icon issue
 delete L.Icon.Default.prototype._getIconUrl;
-
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: markerIcon2x,
   iconUrl: markerIcon,
   shadowUrl: markerShadow,
 });
 
-const TANAUAN_BOUNDS = {
-  minLat: 13.90,
-  maxLat: 14.20,
-  minLng: 120.95,
-  maxLng: 121.17,
-};
-
-const TANAUAN_CENTER = {
-  lat: 14.0735,
-  lng: 121.0743,
-};
-
 const SHOP_OPEN_MINUTES = 8 * 60;
 const SHOP_CLOSE_MINUTES = 20 * 60;
 const SHOP_HOURS_LABEL = '8:00 AM to 8:00 PM';
+const PICKUP_LOCATION = {
+  name: 'Pastry Project Bakeshop & Cafe',
+  lat: 14.0753416,
+  lng: 121.1377943,
+  address: '30 Bagumbayan Road, Tanauan, Calabarzon 4232',
+};
 
 const isBerMonth = () => {
   const manilaDate = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Manila' }));
   return manilaDate.getMonth() >= 8;
-};
-
-const isWithinTanauan = (lat, lng) => {
-  return (
-    typeof lat === 'number' &&
-    typeof lng === 'number' &&
-    lat >= TANAUAN_BOUNDS.minLat &&
-    lat <= TANAUAN_BOUNDS.maxLat &&
-    lng >= TANAUAN_BOUNDS.minLng &&
-    lng <= TANAUAN_BOUNDS.maxLng
-  );
 };
 
 export default function CheckoutModal({
@@ -68,6 +47,7 @@ export default function CheckoutModal({
   const [locationError, setLocationError] = useState('');
   const [shopOpen, setShopOpen] = useState(true);
   const modalScrollRef = useRef(null);
+  const addressInputRef = useRef(null);
 
   const refreshShopStatus = () => {
     const now = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Manila' }));
@@ -77,14 +57,10 @@ export default function CheckoutModal({
 
   const [checkoutData, setCheckoutData] = useState({
     method: "Deliver",
-    payment: "COD",
+    payment: "GCash",
     orderType: "Standard",
     address: "",
     phone: "",
-    riderService: "GrabCar",
-    riderName: "",
-    riderContact: "",
-    riderVehicle: "",
     lat: null,
     lng: null,
   });
@@ -93,12 +69,60 @@ export default function CheckoutModal({
   const [selectedAddressId, setSelectedAddressId] = useState(null);
   const [addressesLoading, setAddressesLoading] = useState(false);
   const [addressFetchError, setAddressFetchError] = useState('');
+  const [showPhoneSuggestions, setShowPhoneSuggestions] = useState(false);
+  const [showAddressSuggestions, setShowAddressSuggestions] = useState(false);
+  const pickupMapElementRef = useRef(null);
+
+  useEffect(() => {
+    if (!isOpen || checkoutData.method !== 'Pickup' || !pickupMapElementRef.current) return undefined;
+
+    const pickupMap = L.map(pickupMapElementRef.current, {
+      dragging: false,
+      touchZoom: true,
+      scrollWheelZoom: false,
+      doubleClickZoom: true,
+      boxZoom: false,
+      keyboard: false,
+      zoomControl: true,
+    }).setView([PICKUP_LOCATION.lat, PICKUP_LOCATION.lng], 18);
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; OpenStreetMap contributors',
+    }).addTo(pickupMap);
+
+    const pickupMarker = L.marker([PICKUP_LOCATION.lat, PICKUP_LOCATION.lng], {
+      draggable: false,
+      interactive: false,
+      keyboard: false,
+    }).addTo(pickupMap);
+    pickupMarker.bindTooltip(PICKUP_LOCATION.name, {
+      permanent: true,
+      direction: 'top',
+      offset: [0, -28],
+      className: 'pickup-location-tooltip',
+    }).openTooltip();
+
+    const resizeTimer = window.setTimeout(() => pickupMap.invalidateSize(), 100);
+
+    return () => {
+      window.clearTimeout(resizeTimer);
+      pickupMap.remove();
+    };
+  }, [isOpen, checkoutData.method]);
+
+  useEffect(() => {
+    if (!isOpen) return undefined;
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [isOpen]);
 
   // Location boundary validation (hook must live inside the component)
   const locationValidation = useLocationValidation();
-  const boundaryLayersRef = useRef(null);
-  const mapRef = useRef(null);
-  const markerRef = useRef(null);
 
   // Address-search-to-pin geocoding. Biased toward Tanauan so local street
   // and barangay names resolve accurately, but not hard-restricted, so we
@@ -110,7 +134,11 @@ export default function CheckoutModal({
     isSearching: isGeocoding,
     errorMessage: geocodeErrorMessage,
     reset: resetGeocode,
-  } = useAddressGeocoding({ biasBounds: TANAUAN_BOUNDS, debounceMs: 700 });
+  } = useAddressGeocoding({ biasBounds: TANAUAN_CITY_BOUNDS, debounceMs: 700 });
+
+  useEffect(() => {
+    if (!isOpen) resetGeocode();
+  }, [isOpen, resetGeocode]);
 
   const savedUser = typeof window !== 'undefined'
     ? (() => {
@@ -158,6 +186,20 @@ export default function CheckoutModal({
     return parts.join(', ');
   };
 
+  const savedPhoneNumbers = [...new Set([
+    savedUser.phone,
+    savedUser.phone_number,
+    savedUser.contact_number,
+    ...savedAddresses.map((address) => address.contact_number),
+  ].map((phone) => String(phone || '').trim()).filter(Boolean))];
+  const matchingPhoneSuggestions = savedPhoneNumbers.filter((phone) =>
+    phone.toLowerCase().includes(checkoutData.phone.trim().toLowerCase())
+  );
+  const matchingAddressSuggestions = savedAddresses.filter((address) => {
+    const query = checkoutData.address.trim().toLowerCase();
+    return !query || `${address.address_label || ''} ${formatSavedAddress(address)}`.toLowerCase().includes(query);
+  });
+
   const safeParseJson = async (response) => {
     const text = await response.text();
     if (!text) {
@@ -198,9 +240,8 @@ export default function CheckoutModal({
   };
 
   const handleSelectSavedAddress = (address) => {
-    // Saved addresses already carry trusted coordinates from the profile
-    // flow, so this path intentionally does NOT trigger geocoding.
     resetGeocode();
+    setShowAddressSuggestions(false);
 
     if (!address) {
       setSelectedAddressId(null);
@@ -215,14 +256,16 @@ export default function CheckoutModal({
     }
 
     setSelectedAddressId(address.address_id);
+    const formattedAddress = formatSavedAddress(address);
     setCheckoutData((prev) => ({
       ...prev,
       method: 'Deliver',
-      address: formatSavedAddress(address),
+      address: formattedAddress,
       phone: address.contact_number || prev.phone,
       lat: null,
       lng: null,
     }));
+    geocodeNow(formattedAddress);
   };
 
   const applyDefaultSavedAddress = () => {
@@ -232,14 +275,16 @@ export default function CheckoutModal({
     if (!defaultAddress) return;
 
     setSelectedAddressId(defaultAddress.address_id);
+    const formattedAddress = formatSavedAddress(defaultAddress);
     setCheckoutData((prev) => ({
       ...prev,
       method: 'Deliver',
-      address: formatSavedAddress(defaultAddress),
+      address: formattedAddress,
       phone: prev.phone || defaultAddress.contact_number,
       lat: null,
       lng: null,
     }));
+    geocodeNow(formattedAddress);
   };
 
   useEffect(() => {
@@ -252,81 +297,32 @@ export default function CheckoutModal({
     applyDefaultSavedAddress();
   }, [isOpen, savedAddresses]);
 
-  // Runs full boundary validation for a candidate point + address, updates
-  // both the local inline error text and the shared out-of-coverage modal state.
   const validatePoint = (lat, lng, address) => {
     const isValid = locationValidation.validateLocation(lat, lng, address);
 
     setLocationError(
-      isValid || isWithinTanauan(lat, lng)
-        ? ''
-        : 'Delivery location must be within Tanauan city.'
+      isValid ? '' : 'Delivery location must be within Tanauan city.'
     );
-
-    if (mapRef.current) {
-      highlightLocation(mapRef.current, lat, lng, isValid);
-    }
 
     return isValid;
   };
 
-  // Retry handler for the OutOfCoverageModal: re-centers the map on Tanauan
-  // and clears the invalid pin so the user can try again.
-  const handleOutOfCoverageRetry = () => {
+  const handleEditAddress = () => {
     locationValidation.clearValidation();
     setLocationError('');
-
-    if (mapRef.current && markerRef.current) {
-      mapRef.current.setView([TANAUAN_CENTER.lat, TANAUAN_CENTER.lng], 13);
-      markerRef.current.setLatLng([TANAUAN_CENTER.lat, TANAUAN_CENTER.lng]);
-      setCheckoutData((prev) => ({
-        ...prev,
-        lat: TANAUAN_CENTER.lat,
-        lng: TANAUAN_CENTER.lng,
-      }));
-    }
+    addressInputRef.current?.focus();
   };
 
-  /* =========================
-     APPLY A GEOCODED (OR ANY EXTERNALLY-RESOLVED) LAT/LNG TO THE MAP
-     Shared by: address search, marker drag, and geolocation flows.
-  ========================= */
-  const applyResolvedLocation = (lat, lng, address, { flyTo = false } = {}) => {
-    if (!mapRef.current || !markerRef.current) return;
-
+  const applyResolvedLocation = (lat, lng, address) => {
     const isValid = validatePoint(lat, lng, address);
 
     if (!isValid) {
-      // Don't let an out-of-coverage point get saved onto the order.
-      // Briefly show the offending pin (highlightLocation already marks it
-      // red), then reset the map back to the Tanauan view so nothing
-      // invalid is left selected. The OutOfCoverageModal (triggered inside
-      // validatePoint -> locationValidation.validateLocation) prompts the
-      // user to try again.
-      markerRef.current.setLatLng([lat, lng]);
-      mapRef.current.setView([lat, lng], 15);
-
       setCheckoutData((prev) => ({
         ...prev,
         lat: null,
         lng: null,
       }));
-
-      setTimeout(() => {
-        if (!mapRef.current || !markerRef.current) return;
-        mapRef.current.setView([TANAUAN_CENTER.lat, TANAUAN_CENTER.lng], 13);
-        markerRef.current.setLatLng([TANAUAN_CENTER.lat, TANAUAN_CENTER.lng]);
-      }, 900);
-
       return;
-    }
-
-    markerRef.current.setLatLng([lat, lng]);
-
-    if (flyTo) {
-      mapRef.current.flyTo([lat, lng], 17, { duration: 1.1 });
-    } else {
-      mapRef.current.setView([lat, lng], 16);
     }
 
     setCheckoutData((prev) => ({
@@ -336,199 +332,11 @@ export default function CheckoutModal({
     }));
   };
 
-  // React to a successful geocode result: pan/pin the map and run it
-  // through the Tanauan coverage check.
   useEffect(() => {
     if (!geocodeResult) return;
-    applyResolvedLocation(geocodeResult.lat, geocodeResult.lon, checkoutData.address, {
-      flyTo: true,
-    });
+    applyResolvedLocation(geocodeResult.lat, geocodeResult.lon, checkoutData.address);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [geocodeResult]);
-
-  /* =========================
-     MAP INITIALIZATION
-  ========================= */
-  useEffect(() => {
-    if (!isOpen) return;
-
-    if (checkoutData.method === "Deliver") {
-      let isMounted = true;
-      let mapInstance = mapRef.current;
-
-      // CREATE MAP IF NOT EXISTS
-      if (!mapInstance) {
-        // Default location (Tagaytay, Philippines)
-        const defaultLat = TANAUAN_CENTER.lat;
-        const defaultLng = TANAUAN_CENTER.lng;
-        let initialLat = defaultLat;
-        let initialLng = defaultLng;
-
-        mapInstance = L.map("checkout-map").setView(
-          [initialLat, initialLng],
-          12
-        );
-
-        L.tileLayer(
-          "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
-          {
-            attribution: "&copy; OpenStreetMap contributors",
-          }
-        ).addTo(mapInstance);
-
-        const marker = L.marker([initialLat, initialLng], {
-          draggable: true,
-        }).addTo(mapInstance);
-        markerRef.current = marker;
-
-        // Draw the Tanauan coverage boundary on the map
-        boundaryLayersRef.current = addBoundaryVisualization(mapInstance, TANAUAN_BOUNDS);
-
-        // REVERSE GEOCODING FUNCTION
-        const reverseGeocode = async (lat, lng) => {
-          try {
-            const response = await fetch(
-              `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`,
-              {
-                headers: {
-                  'User-Agent': 'PastryShop/1.0'
-                }
-              }
-            );
-
-            if (response.ok) {
-              const text = await response.text();
-              if (text) {
-                try {
-                  const data = JSON.parse(text);
-                  return data.display_name || `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
-                } catch (jsonError) {
-                  console.warn('Reverse geocode returned invalid JSON:', jsonError, text);
-                }
-              }
-            }
-          } catch (error) {
-            console.error('Reverse geocoding failed:', error);
-          }
-          return `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
-        };
-
-        // Request user's device location
-        if (navigator.geolocation) {
-          navigator.geolocation.getCurrentPosition(
-            (position) => {
-              if (!isMounted || !mapRef.current) return;
-
-              const userLat = position.coords.latitude;
-              const userLng = position.coords.longitude;
-
-              // Update map center and marker to user location
-              mapInstance.setView([userLat, userLng], 16);
-              marker.setLatLng([userLat, userLng]);
-
-              // Update address via reverse geocoding
-              reverseGeocode(userLat, userLng).then((address) => {
-                if (!isMounted) return;
-
-                validatePoint(userLat, userLng, address);
-
-                setCheckoutData((prev) => ({
-                  ...prev,
-                  lat: userLat,
-                  lng: userLng,
-                  address: prev.address && selectedAddressId !== null ? prev.address : address,
-                }));
-              });
-            },
-            (error) => {
-              // Geolocation failed or denied, use default location
-              console.log('Geolocation error:', error.message);
-            }
-          );
-        }
-
-        marker.on("dragend", async () => {
-          if (!isMounted || !mapRef.current) return;
-
-          const pos = marker.getLatLng();
-          const lat = pos.lat;
-          const lng = pos.lng;
-
-          // GET ADDRESS VIA REVERSE GEOCODING
-          const address = await reverseGeocode(lat, lng);
-
-          if (!isMounted) return;
-
-          // A manual drag supersedes any pending/typed address search.
-          resetGeocode();
-
-          validatePoint(lat, lng, address);
-
-          setCheckoutData((prev) => ({
-            ...prev,
-            lat: lat,
-            lng: lng,
-            address: address,
-          }));
-        });
-
-        mapRef.current = mapInstance;
-
-        // INITIAL REVERSE GEOCODING FOR DEFAULT LOCATION (fallback if geolocation not available)
-        reverseGeocode(initialLat, initialLng).then((address) => {
-          if (!isMounted) return;
-          setLocationError('');
-          setCheckoutData((prev) => {
-            // Only apply default location address when the user has not already selected a saved address
-            if (prev.address && selectedAddressId !== null) {
-              return prev;
-            }
-            return {
-              ...prev,
-              address: prev.address ? prev.address : address,
-              lat: initialLat,
-              lng: initialLng,
-            };
-          });
-        });
-      }
-
-      // FIX SIZE AFTER SWITCHING TO DELIVER
-      const timer = setTimeout(() => {
-        if (mapRef.current) {
-          mapRef.current.invalidateSize();
-        }
-      }, 300);
-
-      return () => {
-        isMounted = false;
-        clearTimeout(timer);
-      };
-    } else {
-      // REMOVE MAP WHEN SWITCHING AWAY FROM DELIVER
-      if (mapRef.current) {
-        mapRef.current.remove();
-        mapRef.current = null;
-        markerRef.current = null;
-        boundaryLayersRef.current = null;
-      }
-    }
-  }, [isOpen, checkoutData.method]);
-
-  /* =========================
-     CLEANUP MAP ON MODAL CLOSE
-  ========================= */
-  useEffect(() => {
-    if (!isOpen && mapRef.current) {
-      mapRef.current.remove();
-      mapRef.current = null;
-      markerRef.current = null;
-      boundaryLayersRef.current = null;
-    }
-    if (!isOpen) {
-      resetGeocode();
-    }
-  }, [isOpen]);
 
   /* =========================
      GROUP ITEMS
@@ -597,40 +405,14 @@ export default function CheckoutModal({
       return;
     }
 
-    // FIX: Validate GCash number format (must be 09XXXXXXXXX, 11 digits)
-    if (checkoutData.payment === "GCash") {
-      const gcashRegex = /^09\d{9}$/;
-      if (!gcashRegex.test(checkoutData.phone)) {
-        alert("Please enter a valid GCash number (e.g. 09XXXXXXXXX).");
-        return;
-      }
-    }
-
     if (!checkoutData.address && checkoutData.method === "Deliver") {
       alert("Please enter your delivery address.");
       return;
     }
 
-    if (checkoutData.method === "Deliver") {
-      if (!checkoutData.riderName.trim()) {
-        alert("Please enter the rider's name.");
-        return;
-      }
-
-      if (!checkoutData.riderContact.trim()) {
-        alert("Please enter the rider's contact number.");
-        return;
-      }
-
-      if (!checkoutData.riderVehicle.trim()) {
-        alert("Please enter the rider's vehicle or plate reference.");
-        return;
-      }
-    }
-
     if (
       checkoutData.method === 'Deliver' &&
-      (!checkoutData.lat || !checkoutData.lng || !isWithinTanauan(checkoutData.lat, checkoutData.lng))
+      (!checkoutData.lat || !checkoutData.lng || !isLocationWithinCoverage(checkoutData.lat, checkoutData.lng))
     ) {
       alert('Delivery is only available within Tanauan city. Please move the pin or enter a Tanauan address.');
       return;
@@ -647,10 +429,6 @@ export default function CheckoutModal({
           return {};
         }
       })();
-
-      const riderSummary = checkoutData.method === "Deliver"
-        ? `Delivery booking: ${checkoutData.riderService || 'GrabCar'} | Rider: ${checkoutData.riderName.trim()} | Contact: ${checkoutData.riderContact.trim()} | Vehicle: ${checkoutData.riderVehicle.trim()}`
-        : '';
 
       const payload = {
         items: groupedItems.map((item) => ({
@@ -669,11 +447,6 @@ export default function CheckoutModal({
         order_type: checkoutData.orderType || "Standard",
         address: checkoutData.address,
         phone: checkoutData.phone,
-        notes: riderSummary,
-        delivery_rider_service: checkoutData.riderService,
-        delivery_rider_name: checkoutData.riderName,
-        delivery_rider_contact: checkoutData.riderContact,
-        delivery_rider_vehicle: checkoutData.riderVehicle,
 
         latitude: checkoutData.lat,
         longitude: checkoutData.lng,
@@ -820,7 +593,7 @@ export default function CheckoutModal({
     <AnimatePresence>
 
       <motion.div
-        className="fixed inset-0 z-[9999] flex items-start justify-center overflow-hidden bg-black/10 px-4 pb-3 pt-[104px] backdrop-blur-[2px] md:pt-[112px]"
+        className="fixed inset-0 z-[60000] flex min-h-dvh items-center justify-center overflow-y-auto bg-black/40 p-4 backdrop-blur-sm"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
@@ -828,7 +601,7 @@ export default function CheckoutModal({
 
         <motion.div
           ref={modalScrollRef}
-          className="relative my-0 flex max-h-[calc(100vh-8rem)] w-full max-w-[860px] flex-col overflow-y-auto overscroll-contain overflow-x-hidden rounded-[24px] bg-white font-['DM_Sans'] shadow-2xl md:max-h-[calc(100vh-8rem)] md:flex-row"
+          className="relative my-auto flex max-h-[calc(100dvh-2rem)] w-full max-w-[960px] flex-col overflow-y-auto overscroll-contain overflow-x-hidden rounded-[24px] bg-white font-['DM_Sans'] shadow-2xl md:h-[calc(100dvh-2rem)] md:min-h-0 md:overflow-hidden md:flex-row"
           initial={{ scale: 0.98 }}
           animate={{ scale: 1 }}
         >
@@ -836,17 +609,21 @@ export default function CheckoutModal({
           {/* CLOSE BUTTON */}
           <button
             onClick={onClose}
-            className="absolute top-4 right-4 z-50 text-gray-400 hover:text-[#a67c00]"
+            type="button"
+            aria-label="Close checkout"
+            className="absolute right-4 top-4 z-50 flex h-9 w-9 items-center justify-center rounded-full border border-[#eee5db] bg-white text-gray-500 shadow-sm transition hover:border-[#e7c875] hover:bg-[#fff8df] hover:text-[#8d6a2e]"
           >
             <X size={18} />
           </button>
 
           {/* LEFT SIDE */}
-          <div className="relative z-50 min-w-0 flex-1 p-6 pb-10 pointer-events-auto md:p-10 md:pb-12">
+          <div className="relative z-50 min-w-0 flex-1 p-5 pb-8 pointer-events-auto sm:p-7 md:min-h-0 md:overflow-y-auto md:overscroll-contain md:p-8 md:pb-10">
 
-            <h2 className="text-2xl font-semibold text-gray-800 mb-5">
-              Delivery Details
-            </h2>
+            <div className="mb-6 border-b border-[#eee5db] pb-4 pr-10">
+              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#a77b26]">Checkout</p>
+              <h2 className="mt-1 text-2xl font-bold tracking-tight text-[#33251e]">Delivery Details</h2>
+              <p className="mt-1 text-sm text-[#8d7a6e]">Choose how you want to receive and pay for your order.</p>
+            </div>
 
             {/* METHOD */}
             <div className="mb-6 space-y-2">
@@ -855,7 +632,7 @@ export default function CheckoutModal({
                 Order Method
               </p>
 
-              <div className="flex gap-2">
+              <div className="grid grid-cols-2 gap-2">
 
                 {["Deliver", "Pickup"].map((m) => (
 
@@ -865,13 +642,16 @@ export default function CheckoutModal({
                       setCheckoutData({
                         ...checkoutData,
                         method: m,
+                        ...(m === "Deliver" && checkoutData.payment === "Counter"
+                          ? { payment: "GCash" }
+                          : {}),
                       })
                     }
-                    className={`flex-1 py-2 rounded-xl border text-sm font-medium transition-colors
+                    className={`rounded-xl border px-3 py-2.5 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e7c875]
                     ${
                       checkoutData.method === m
-                        ? "border-[#d4af37] bg-[#fff4c7] text-slate-900"
-                        : "bg-white text-gray-600"
+                        ? "border-[#e7c875] bg-[#fff8df] text-[#8d6a2e]"
+                        : "border-[#eee5db] bg-white text-[#765d50] hover:border-[#e7c875] hover:bg-[#fffaf0]"
                     }`}
                   >
                     {m}
@@ -883,57 +663,23 @@ export default function CheckoutModal({
 
             </div>
 
-            {checkoutData.method === "Deliver" && (
-              <div className="mb-6 rounded-2xl border border-amber-200 bg-amber-50 p-3">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-amber-800">
-                  Customer Booked Rider
-                </p>
-                <p className="mt-2 text-xs text-amber-800">
-                  Please book your GrabCar or Lalamove yourself, then enter the rider details below.
-                </p>
-
-                <div className="mt-3 grid gap-2 sm:grid-cols-3">
-                  {['GrabCar', 'Lalamove', 'Other'].map((service) => (
-                    <button
-                      key={service}
-                      type="button"
-                      onClick={() => setCheckoutData({ ...checkoutData, riderService: service })}
-                      className={`rounded-xl border px-3 py-2 text-xs font-semibold transition ${
-                        checkoutData.riderService === service
-                          ? 'border-[#d4af37] bg-[#fff4c7] text-slate-900'
-                          : 'border-amber-200 bg-white text-gray-700'
-                      }`}
-                    >
-                      {service}
-                    </button>
-                  ))}
-                </div>
-
-                <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                  <input
-                    type="text"
-                    placeholder="Rider's name"
-                    className="w-full rounded-xl border border-amber-200 bg-white p-3 text-sm outline-none"
-                    value={checkoutData.riderName}
-                    onChange={(e) => setCheckoutData({ ...checkoutData, riderName: e.target.value })}
-                  />
-                  <input
-                    type="tel"
-                    placeholder="Rider contact number"
-                    className="w-full rounded-xl border border-amber-200 bg-white p-3 text-sm outline-none"
-                    value={checkoutData.riderContact}
-                    onChange={(e) => setCheckoutData({ ...checkoutData, riderContact: e.target.value })}
+            {checkoutData.method === 'Pickup' && (
+              <section className="mb-6 overflow-hidden rounded-2xl border border-[#eee5db] bg-[#fffdfa]">
+                <div className="grid sm:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
+                  <div className="flex flex-col justify-center border-b border-[#eee5db] px-4 py-4 sm:border-b-0 sm:border-r">
+                    <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#a77b26]">Pickup Location</p>
+                    <h3 className="mt-1.5 text-base font-bold leading-tight text-[#33251e]">{PICKUP_LOCATION.name}</h3>
+                    <p className="mt-2 text-xs leading-5 text-[#6f6258]">{PICKUP_LOCATION.address}</p>
+                    <p className="mt-3 inline-flex w-fit rounded-full bg-[#fff4c7] px-2.5 py-1 text-[10px] font-semibold text-[#8d6a2e]">Pickup point</p>
+                  </div>
+                  <div
+                    ref={pickupMapElementRef}
+                    aria-label="Fixed pickup location map"
+                    className="w-full bg-[#f5f1e9]"
+                    style={{ height: 240, minHeight: 240 }}
                   />
                 </div>
-
-                <input
-                  type="text"
-                  placeholder="Vehicle / plate / rider reference"
-                  className="mt-2 w-full rounded-xl border border-amber-200 bg-white p-3 text-sm outline-none"
-                  value={checkoutData.riderVehicle}
-                  onChange={(e) => setCheckoutData({ ...checkoutData, riderVehicle: e.target.value })}
-                />
-              </div>
+              </section>
             )}
 
             {/* PAYMENT */}
@@ -943,11 +689,13 @@ export default function CheckoutModal({
                 Payment Method
               </p>
 
-              <div className="grid gap-2 sm:grid-cols-2">
+              <div className={`grid gap-2 ${checkoutData.method === "Deliver" ? "grid-cols-1" : "sm:grid-cols-2"}`}>
                 {[
                   { value: "GCash", label: "Pay thru QR" },
                   { value: "Counter", label: "Pay at the Counter" },
-                ].map((paymentOption) => (
+                ]
+                  .filter((paymentOption) => checkoutData.method !== "Deliver" || paymentOption.value !== "Counter")
+                  .map((paymentOption) => (
                   <button
                     key={paymentOption.value}
                     type="button"
@@ -957,11 +705,11 @@ export default function CheckoutModal({
                         payment: paymentOption.value,
                       })
                     }
-                    className={`flex-1 py-2 rounded-xl border text-sm font-medium transition-colors
+                    className={`rounded-xl border px-3 py-2.5 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e7c875]
                     ${
                       checkoutData.payment === paymentOption.value
-                        ? "border-[#d4af37] bg-[#fff4c7] text-slate-900"
-                        : "bg-white text-gray-600"
+                        ? "border-[#e7c875] bg-[#fff8df] text-[#8d6a2e]"
+                        : "border-[#eee5db] bg-white text-[#765d50] hover:border-[#e7c875] hover:bg-[#fffaf0]"
                     }`}
                   >
                     {paymentOption.label}
@@ -993,8 +741,8 @@ export default function CheckoutModal({
                     }
                     className={`rounded-2xl border px-4 py-3 text-left transition ${
                       checkoutData.orderType === option.value
-                        ? "border-[#d4af37] bg-[#fff4c7] text-slate-900"
-                        : "border-gray-200 bg-white text-gray-700 hover:border-[#2f2f2f]"
+                        ? "border-[#e7c875] bg-[#fff8df] text-[#8d6a2e]"
+                        : "border-[#eee5db] bg-white text-[#765d50] hover:border-[#e7c875] hover:bg-[#fffaf0]"
                     }`}
                   >
                     <div className="text-sm font-semibold">{option.label}</div>
@@ -1018,6 +766,45 @@ export default function CheckoutModal({
                 Contact Info
               </p>
 
+              {/* PHONE */}
+              <div className="relative">
+                <input
+                  type="tel"
+                  autoComplete="tel"
+                  placeholder="Phone Number"
+                  aria-label="Phone Number"
+                  aria-expanded={showPhoneSuggestions && matchingPhoneSuggestions.length > 0}
+                  className="relative z-[9999] box-border w-full rounded-xl border border-[#e8e1d8] bg-[#fffdfa] p-3 text-sm text-[#33251e] outline-none transition placeholder:text-gray-400 focus:border-[#d4af37] focus:ring-2 focus:ring-[#d4af37]/20 pointer-events-auto"
+                  value={checkoutData.phone}
+                  onFocus={() => setShowPhoneSuggestions(true)}
+                  onBlur={() => setShowPhoneSuggestions(false)}
+                  onChange={(e) =>
+                    setCheckoutData((prev) => ({
+                      ...prev,
+                      phone: e.target.value,
+                    }))
+                  }
+                />
+                {showPhoneSuggestions && matchingPhoneSuggestions.length > 0 && (
+                  <div className="absolute left-0 right-0 top-full z-[10000] mt-1 overflow-hidden rounded-xl border border-[#eadfca] bg-white py-1 shadow-lg">
+                    {matchingPhoneSuggestions.map((phone) => (
+                      <button
+                        key={phone}
+                        type="button"
+                        onMouseDown={(event) => event.preventDefault()}
+                        onClick={() => {
+                          setCheckoutData((prev) => ({ ...prev, phone }));
+                          setShowPhoneSuggestions(false);
+                        }}
+                        className="block w-full px-3 py-2 text-left text-sm text-[#493a30] transition hover:bg-[#fff8df]"
+                      >
+                        {phone}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
               {checkoutData.method === "Deliver" && (
                 <>
                   <div className="space-y-3">
@@ -1029,52 +816,8 @@ export default function CheckoutModal({
                         <span className="text-xs text-gray-500">Loading…</span>
                       )}
                     </div>
-
-                    {addressFetchError ? (
-                      <div className="rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">
-                        {addressFetchError}
-                      </div>
-                    ) : savedAddresses.length === 0 ? (
-                      <div className="rounded-2xl border border-gray-200 bg-white px-4 py-4 text-sm text-gray-500">
-                        No saved addresses yet. Add one in your profile to reuse it here.
-                      </div>
-                    ) : (
-                      <div className="space-y-2">
-                        {savedAddresses.map((address) => (
-                          <button
-                            key={address.address_id}
-                            type="button"
-                            onClick={() => handleSelectSavedAddress(address)}
-                            className={`w-full text-left rounded-2xl border px-4 py-3 transition ${
-                              selectedAddressId === address.address_id
-                                ? 'border-[#d4af37] bg-[#fff4c7] text-slate-900'
-                                : 'border-gray-200 bg-white text-gray-800 hover:border-[#2f2f2f]'
-                            }`}
-                          >
-                            <div className="flex items-center justify-between gap-2">
-                              <div>
-                                <p className="text-sm font-semibold">{address.address_label}</p>
-                                <p className="text-sm text-gray-500 mt-1">{address.recipient_name} • {address.contact_number}</p>
-                              </div>
-                              {address.is_default && (
-                                <span className="rounded-full bg-[#f7e8b0] px-3 py-1 text-[10px] uppercase tracking-[0.2em] text-[#8a6500]">
-                                  Default
-                                </span>
-                              )}
-                            </div>
-                            <p className="mt-2 text-sm leading-snug text-gray-600">
-                              {formatSavedAddress(address)}
-                            </p>
-                          </button>
-                        ))}
-                        <button
-                          type="button"
-                          onClick={() => handleSelectSavedAddress(null)}
-                          className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm font-semibold text-gray-700 transition hover:border-[#d4af37] hover:text-[#8a6500]"
-                        >
-                          Use a different address
-                        </button>
-                      </div>
+                    {addressFetchError && (
+                      <p className="text-xs text-red-700">{addressFetchError}</p>
                     )}
                   </div>
 
@@ -1084,9 +827,16 @@ export default function CheckoutModal({
                       type="text"
                       placeholder="Address"
                       autoComplete="street-address"
-                      className="w-full p-3 pr-9 bg-gray-50 rounded-xl text-sm outline-none relative z-[9999] pointer-events-auto"
+                      aria-label="Delivery address"
+                      aria-expanded={showAddressSuggestions && matchingAddressSuggestions.length > 0}
+                      className="relative z-[9999] w-full rounded-xl border border-[#e8e1d8] bg-[#fffdfa] p-3 pr-9 text-sm text-[#33251e] outline-none transition placeholder:text-gray-400 focus:border-[#d4af37] focus:ring-2 focus:ring-[#d4af37]/20 pointer-events-auto"
                       value={checkoutData.address}
                       onClick={(e) => e.currentTarget.focus()}
+                      onFocus={() => setShowAddressSuggestions(true)}
+                      onBlur={() => {
+                        setShowAddressSuggestions(false);
+                        geocodeNow();
+                      }}
                       onChange={(e) => {
                         const value = e.target.value;
                         setSelectedAddressId(null);
@@ -1096,14 +846,35 @@ export default function CheckoutModal({
                         }));
                         // Debounced geocode: finds the pin as the user types.
                         setGeocodeSearchTerm(value);
+                        setShowAddressSuggestions(true);
                       }}
-                      onBlur={() => geocodeNow()}
                     />
                     {isGeocoding && (
                       <Loader2
                         size={16}
                         className="absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-gray-400 z-[9999]"
                       />
+                    )}
+                    {showAddressSuggestions && matchingAddressSuggestions.length > 0 && (
+                      <div className="absolute left-0 right-0 top-full z-[10000] mt-1 max-h-56 overflow-y-auto rounded-xl border border-[#eadfca] bg-white py-1 shadow-lg">
+                        {matchingAddressSuggestions.map((address) => (
+                          <button
+                            key={address.address_id}
+                            type="button"
+                            onMouseDown={(event) => event.preventDefault()}
+                            onClick={() => handleSelectSavedAddress(address)}
+                            className="block w-full px-3 py-2 text-left transition hover:bg-[#fff8df]"
+                          >
+                            <span className="block text-xs font-semibold text-[#493a30]">
+                              {address.address_label || 'Saved address'}
+                              {address.is_default ? ' · Default' : ''}
+                            </span>
+                            <span className="mt-0.5 block truncate text-[11px] text-[#8d7a6e]">
+                              {formatSavedAddress(address)}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
                     )}
                   </div>
 
@@ -1120,38 +891,7 @@ export default function CheckoutModal({
                     </div>
                   )}
 
-                  {/* MAP */}
-                  <div
-                    id="checkout-map"
-                    className="w-full h-36 rounded-xl border bg-gray-100 mt-2 overflow-hidden"
-                  />
                 </>
-              )}
-
-              {/* PHONE */}
-              <input
-                type="tel"
-                autoComplete="tel"
-                placeholder={
-                  checkoutData.payment === "GCash"
-                    ? "GCash Number (09XXXXXXXXX)"
-                    : "Phone Number"
-                }
-                className="box-border w-full p-3 bg-gray-50 rounded-xl text-sm outline-none relative z-[9999] pointer-events-auto"
-                value={checkoutData.phone}
-                onClick={(e) => e.currentTarget.focus()}
-                onChange={(e) =>
-                  setCheckoutData({
-                    ...checkoutData,
-                    phone: e.target.value,
-                  })
-                }
-              />
-
-              {checkoutData.payment === "GCash" && (
-                <p className="text-xs text-gray-500 mt-2">
-                  Enter your GCash number (09XXXXXXXXX) to receive a payment link.
-                </p>
               )}
 
             </div>
@@ -1159,11 +899,15 @@ export default function CheckoutModal({
           </div>
 
           {/* RIGHT SIDE */}
-          <div className="flex w-full shrink-0 flex-col border-t border-gray-200 bg-[#fafafa] p-6 md:w-[340px] md:border-l md:border-t-0 md:p-8">
+          <div className="flex w-full shrink-0 flex-col border-t border-[#eee5db] bg-[#faf8f2] p-5 sm:p-6 md:min-h-0 md:w-[340px] md:overflow-y-auto md:overscroll-contain md:border-l md:border-t-0 md:p-7">
 
-            <p className="text-xs text-gray-500 uppercase tracking-[0.2em] mb-6">
-              Summary
-            </p>
+            <div className="mb-5 flex items-center justify-between gap-3">
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#a77b26]">Order Summary</p>
+                <p className="mt-1 text-xs text-[#8d7a6e]">{cartItems.length} {cartItems.length === 1 ? "item" : "items"}</p>
+              </div>
+              <span className="rounded-full bg-[#fff0c2] px-3 py-1 text-xs font-bold text-[#8d6a2e]">₱{total.toLocaleString()}</span>
+            </div>
 
             {/* ITEMS */}
             <div className="overflow-y-auto space-y-3 max-h-[200px]">
@@ -1182,7 +926,7 @@ export default function CheckoutModal({
 
                     <img
                       src={`${BASE}/uploads/${item.image}`}
-                      className="w-10 h-10 rounded-lg object-cover"
+                      className="h-11 w-11 rounded-lg border border-[#eee5db] bg-white object-contain p-1"
                       alt=""
                     />
 
@@ -1229,7 +973,7 @@ export default function CheckoutModal({
             </div>
 
             {/* TOTALS */}
-            <div className="mt-6 pt-6 border-t border-gray-200 space-y-2">
+            <div className="mt-5 space-y-2 border-t border-[#e9dfd2] pt-5">
 
               <div className={`rounded-2xl border px-4 py-3 text-sm ${shopOpen ? 'border-green-200 bg-green-50 text-green-700' : 'border-amber-200 bg-amber-50 text-amber-800'}`}>
                 <span className="font-semibold">{shopOpen ? 'Shop is open' : 'Shop is closed'}</span>
@@ -1263,15 +1007,15 @@ export default function CheckoutModal({
                 <span>₱{taxAmount}</span>
               </div>
 
-              <div className="flex justify-between text-base font-semibold pt-2">
+              <div className="flex justify-between rounded-xl border border-[#eadfca] bg-[#fff8e9] px-4 py-3 text-base font-bold text-[#33251e]">
                 <span>Total</span>
-                <span>₱{total}</span>
+                <span>₱{total.toLocaleString()}</span>
               </div>
 
               <button
                 onClick={handlePlaceOrder}
                 disabled={loading || !shopOpen}
-                className="w-full py-4 rounded-2xl mt-4 bg-[#d4af37] text-sm font-bold tracking-[0.18em] uppercase text-slate-900 transition active:scale-95 hover:bg-[#c49c20] disabled:bg-gray-300"
+                className="mt-3 w-full rounded-xl border border-[#eadfca] bg-[#fff8e9] py-3.5 text-sm font-bold uppercase tracking-[0.16em] text-[#33251e] shadow-sm transition hover:border-[#e7c875] hover:bg-[#fff8df] hover:text-[#8d6a2e] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d4af37] disabled:cursor-not-allowed disabled:border-gray-200 disabled:bg-gray-200 disabled:text-gray-500"
               >
                 {loading
                   ? checkoutData.payment === "GCash"
@@ -1294,7 +1038,7 @@ export default function CheckoutModal({
         errorMessage={locationValidation.errorMessage}
         distanceFromCenter={locationValidation.validationState?.distanceFromCenter}
         onClose={locationValidation.clearValidation}
-        onRetryMap={handleOutOfCoverageRetry}
+        onEditAddress={handleEditAddress}
       />
 
     </AnimatePresence>
