@@ -18,6 +18,8 @@ use App\Http\Controllers\Api\CustomizedCakeController;
 use App\Http\Controllers\Api\CakeSalesAnalyticsController;
 use App\Http\Controllers\SalesImportController;
 use App\Http\Controllers\NewsletterController;
+use App\Http\Controllers\OrderController;
+use App\Http\Controllers\CustomerApiController;
 use App\Http\Controllers\StaffApiController;
 use App\Http\Controllers\AuthController;
 
@@ -29,6 +31,9 @@ Route::post('google-login', [AuthController::class, 'googleLogin']);
 Route::options('google-login', [AuthController::class, 'googleLogin']);
 Route::post('sales/import-pdf', [SalesImportController::class, 'store']);
 Route::post('newsletter/subscribe', [NewsletterController::class, 'subscribe']);
+Route::post('orders', [OrderController::class, 'store']);
+Route::get('user', [CustomerApiController::class, 'user']);
+Route::get('staff/orders/{orderId}/discount-id', [StaffApiController::class, 'viewOrderDiscountId']);
 Route::get('admin/analytics/cake-sales', [CakeSalesAnalyticsController::class, 'index']);
 
 // Staff inventory routes

@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import PageShell from '../components/PageShell';
 import {
   Lock,
@@ -15,8 +16,9 @@ import {
   Search,
   Settings as SettingsIcon,
   KeyRound,
+  Monitor,
 } from 'lucide-react';
-import { safeParseJson } from '../../services/api';
+import { getAuthHeaders, safeParseJson } from '../../services/api';
 import { CUSTOMER_BASE } from '../../services/config';
 
 const BASE = CUSTOMER_BASE;
@@ -32,9 +34,12 @@ export default function AccountSettings() {
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [activeSection, setActiveSection] = useState('overview');
   const [searchQuery, setSearchQuery] = useState('');
   const [passwordFormOpen, setPasswordFormOpen] = useState(true);
+  const [sessionsOpen, setSessionsOpen] = useState(false);
+  const [sessions, setSessions] = useState([]);
 
   const [profileForm, setProfileForm] = useState({
     full_name: '',
@@ -74,6 +79,17 @@ export default function AccountSettings() {
   }, []);
 
   useEffect(() => {
+    if (activeSection !== 'security' || !user?.id) return;
+
+    fetch(`${BASE}/api_sessions.php`, { credentials: 'include', headers: getAuthHeaders() })
+      .then(safeParseJson)
+      .then((data) => {
+        if (data?.success && Array.isArray(data.sessions)) setSessions(data.sessions);
+      })
+      .catch(() => setSessions([]));
+  }, [activeSection, user]);
+
+  useEffect(() => {
     if (!toast) return undefined;
     const timer = window.setTimeout(() => setToast(null), 3000);
     return () => window.clearTimeout(timer);
@@ -96,21 +112,21 @@ export default function AccountSettings() {
       title: 'Edit Profile',
       description: 'Update your name, email, phone, and profile photo.',
       icon: <UserCircle2 size={20} />,
-      accent: 'bg-yellow-100 text-yellow-600',
+      accent: 'bg-[#fff4cf] text-[#8b6a24]',
     },
     {
       key: 'security',
       title: 'Security',
       description: 'Change your password and manage sign-in protection.',
       icon: <Lock size={20} />,
-      accent: 'bg-purple-100 text-purple-600',
+      accent: 'bg-[#f6eadf] text-[#9a5b32]',
     },
     {
       key: 'privacy',
       title: 'Privacy and Account',
       description: 'Download your data, log out of devices, or delete your account.',
       icon: <ShieldCheck size={20} />,
-      accent: 'bg-blue-100 text-blue-600',
+      accent: 'bg-[#fff1d8] text-[#a06a2c]',
     },
   ];
 
@@ -224,13 +240,13 @@ export default function AccountSettings() {
 
   const renderField = (label, value, onChange, type = 'text', placeholder = '') => (
     <label className="block">
-      <span className="text-[11px] uppercase tracking-[0.2em] text-gray-600 font-bold">{label}</span>
+      <span className="text-xs uppercase tracking-[0.16em] text-gray-600 font-bold">{label}</span>
       <input
         type={type}
         value={value}
         onChange={onChange}
         placeholder={placeholder}
-        className="mt-2 w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-900 placeholder-gray-400 outline-none"
+        className="mt-2 w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3.5 text-base text-gray-900 placeholder-gray-400 outline-none focus:border-[#d4af37] focus:ring-2 focus:ring-[#f1cf72]/30"
       />
     </label>
   );
@@ -240,13 +256,18 @@ export default function AccountSettings() {
   };
 
   const handleLogoutAllDevices = () => {
+    setShowLogoutConfirm(true);
+  };
+
+  const confirmLogoutAllDevices = () => {
     localStorage.removeItem('user');
+    setShowLogoutConfirm(false);
     showAlert('You have been logged out successfully.', 'success');
     window.location.href = '/customer/login';
   };
 
   const renderProfileSection = () => (
-    <section className="rounded-2xl border border-gray-200 bg-white p-6">
+    <section className="rounded-2xl border border-gray-200 bg-white p-7 md:p-8">
       <div className="flex items-center gap-4">
         <div className="flex h-16 w-16 items-center justify-center rounded-full bg-yellow-50 text-xl font-black text-yellow-600">
           {profileForm.profile_picture ? <img src={profileForm.profile_picture} alt="Profile" className="h-full w-full rounded-full object-cover" /> : initials}
@@ -258,16 +279,16 @@ export default function AccountSettings() {
       </div>
 
       <form onSubmit={handleProfileSave} className="mt-6 space-y-4">
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid gap-5 md:grid-cols-2">
           {renderField('Full Name', profileForm.full_name, (e) => setProfileForm({ ...profileForm, full_name: e.target.value }), 'text', 'Enter full name')}
           {renderField('Username', profileForm.username, (e) => setProfileForm({ ...profileForm, username: e.target.value }), 'text', 'Enter username')}
         </div>
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid gap-5 md:grid-cols-2">
           {renderField('Email Address', profileForm.email, (e) => setProfileForm({ ...profileForm, email: e.target.value }), 'email', 'Enter email address')}
           {renderField('Phone Number', profileForm.phone, (e) => setProfileForm({ ...profileForm, phone: e.target.value }), 'tel', 'Enter phone number')}
         </div>
         {renderField('Profile Picture (optional)', profileForm.profile_picture, (e) => setProfileForm({ ...profileForm, profile_picture: e.target.value }), 'text', 'Paste image URL here')}
-        <button type="submit" disabled={saving} className="rounded-full bg-blue-600 px-5 py-3 text-sm font-bold text-white transition hover:bg-blue-700 disabled:opacity-50">
+        <button type="submit" disabled={saving} className="rounded-full bg-[#e7b866] px-6 py-3.5 text-base font-bold text-[#4a2b20] transition hover:bg-[#f1cf72] disabled:opacity-50">
           {saving ? 'Saving...' : 'Save Profile'}
         </button>
       </form>
@@ -275,14 +296,15 @@ export default function AccountSettings() {
   );
 
   const renderSecuritySection = () => (
-    <section className="space-y-8">
+    <section className="space-y-4">
       <div>
         <h2 className="text-2xl font-bold text-gray-900">Password and security</h2>
         <p className="mt-1 text-sm text-gray-500">Manage your password, login preferences and recovery methods.</p>
       </div>
 
-      {/* Login & recovery */}
-      <div>
+      <div className="grid gap-4 lg:grid-cols-2 lg:items-start">
+        {/* Login & recovery */}
+        <div>
         <h3 className="text-lg font-bold text-gray-900">Login &amp; recovery</h3>
         <p className="mt-1 text-sm text-gray-500">Manage your password and login preferences.</p>
 
@@ -304,27 +326,27 @@ export default function AccountSettings() {
             <div className="px-5 pb-5">
               <form onSubmit={handlePasswordChange} className="space-y-4 pt-1">
                 <label className="block">
-                  <span className="text-[11px] uppercase tracking-[0.2em] text-gray-600 font-bold">Current Password</span>
-                  <div className="mt-2 flex items-center rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
-                    <input type={showPassword ? 'text' : 'password'} value={passwordForm.current_password} onChange={(e) => setPasswordForm({ ...passwordForm, current_password: e.target.value })} className="w-full bg-transparent text-sm text-gray-900 outline-none" />
+                  <span className="text-xs uppercase tracking-[0.16em] text-gray-600 font-bold">Current Password</span>
+                  <div className="mt-2 flex items-center rounded-xl border border-gray-200 bg-gray-50 px-4 py-3.5">
+                    <input type={showPassword ? 'text' : 'password'} value={passwordForm.current_password} onChange={(e) => setPasswordForm({ ...passwordForm, current_password: e.target.value })} className="w-full bg-transparent text-base text-gray-900 outline-none" />
                     <button type="button" onClick={() => setShowPassword(!showPassword)} className="ml-2 text-gray-400">{showPassword ? <EyeOff size={16} /> : <Eye size={16} />}</button>
                   </div>
                 </label>
                 <label className="block">
-                  <span className="text-[11px] uppercase tracking-[0.2em] text-gray-600 font-bold">New Password</span>
-                  <div className="mt-2 flex items-center rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
-                    <input type={showNewPassword ? 'text' : 'password'} value={passwordForm.new_password} onChange={(e) => setPasswordForm({ ...passwordForm, new_password: e.target.value })} className="w-full bg-transparent text-sm text-gray-900 outline-none" />
+                  <span className="text-xs uppercase tracking-[0.16em] text-gray-600 font-bold">New Password</span>
+                  <div className="mt-2 flex items-center rounded-xl border border-gray-200 bg-gray-50 px-4 py-3.5">
+                    <input type={showNewPassword ? 'text' : 'password'} value={passwordForm.new_password} onChange={(e) => setPasswordForm({ ...passwordForm, new_password: e.target.value })} className="w-full bg-transparent text-base text-gray-900 outline-none" />
                     <button type="button" onClick={() => setShowNewPassword(!showNewPassword)} className="ml-2 text-gray-400">{showNewPassword ? <EyeOff size={16} /> : <Eye size={16} />}</button>
                   </div>
                 </label>
                 <label className="block">
-                  <span className="text-[11px] uppercase tracking-[0.2em] text-gray-600 font-bold">Confirm New Password</span>
+                  <span className="text-xs uppercase tracking-[0.16em] text-gray-600 font-bold">Confirm New Password</span>
                   <div className={`mt-2 flex items-center rounded-xl border px-4 py-3 ${
                     passwordForm.new_password && passwordForm.confirm_password && passwordForm.new_password !== passwordForm.confirm_password
                       ? 'border-red-300 bg-red-50'
                       : 'border-gray-200 bg-gray-50'
                   }`}>
-                    <input type={showConfirmPassword ? 'text' : 'password'} value={passwordForm.confirm_password} onChange={(e) => setPasswordForm({ ...passwordForm, confirm_password: e.target.value })} className="w-full bg-transparent text-sm text-gray-900 outline-none" />
+                    <input type={showConfirmPassword ? 'text' : 'password'} value={passwordForm.confirm_password} onChange={(e) => setPasswordForm({ ...passwordForm, confirm_password: e.target.value })} className="w-full bg-transparent text-base text-gray-900 outline-none" />
                     <button type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)} className="ml-2 text-gray-400">{showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}</button>
                   </div>
                   {passwordForm.new_password && passwordForm.confirm_password && passwordForm.new_password !== passwordForm.confirm_password && (
@@ -332,7 +354,7 @@ export default function AccountSettings() {
                   )}
                 </label>
 
-                <button type="submit" disabled={saving} className="rounded-full bg-blue-600 px-5 py-3 text-sm font-bold text-white transition hover:bg-blue-700 disabled:opacity-50">
+                <button type="submit" disabled={saving} className="rounded-full bg-[#e7b866] px-6 py-3.5 text-base font-bold text-[#4a2b20] transition hover:bg-[#f1cf72] disabled:opacity-50">
                   {saving ? 'Updating...' : 'Save Password'}
                 </button>
               </form>
@@ -351,14 +373,45 @@ export default function AccountSettings() {
             <span className="text-xs font-semibold uppercase tracking-[0.15em] text-gray-400">Coming soon</span>
           </div>
         </div>
-      </div>
+        </div>
 
-      {/* Security checks */}
-      <div>
+        {/* Security checks */}
+        <div>
         <h3 className="text-lg font-bold text-gray-900">Security checks</h3>
         <p className="mt-1 text-sm text-gray-500">Review where you're logged in and sign out of devices you don't recognize.</p>
 
         <div className="mt-4 divide-y divide-gray-100 rounded-2xl border border-gray-200 bg-white">
+          <button
+            type="button"
+            onClick={() => setSessionsOpen((open) => !open)}
+            className="flex w-full items-center justify-between px-5 py-4 text-left"
+          >
+            <span className="flex items-center gap-3">
+              <span className="rounded-full bg-[#fff1d8] p-2 text-[#a06a2c]"><Monitor size={16} /></span>
+              <span>
+                <span className="block text-[15px] font-semibold text-gray-900">Where you&apos;re logged in</span>
+                <span className="block text-xs text-gray-500">View the devices using your account.</span>
+              </span>
+            </span>
+            <ChevronDown size={18} className={`text-gray-400 transition-transform ${sessionsOpen ? 'rotate-180' : ''}`} />
+          </button>
+
+          {sessionsOpen && (sessions.length === 0 ? (
+            <div className="px-5 py-4 text-sm text-gray-500">No active device sessions found.</div>
+          ) : sessions.map((session) => (
+            <div key={session.id} className="flex items-center justify-between gap-4 px-5 py-4">
+              <span className="flex min-w-0 items-center gap-3">
+                <span className="rounded-full bg-[#fff1d8] p-2 text-[#a06a2c]"><Monitor size={16} /></span>
+                <span className="min-w-0">
+                  <span className="block truncate text-[15px] font-semibold text-gray-900">{session.device_name}</span>
+                  <span className="block truncate text-xs text-gray-500">{session.ip_address} · Signed in {session.created_at}</span>
+                </span>
+              </span>
+              <span className={`shrink-0 text-[10px] font-bold uppercase tracking-[0.12em] ${session.current ? 'text-[#a06a2c]' : 'text-gray-400'}`}>
+                {session.current ? 'This device' : 'Active'}
+              </span>
+            </div>
+          )))}
           <button
             type="button"
             onClick={handleLogoutAllDevices}
@@ -371,50 +424,51 @@ export default function AccountSettings() {
             <ChevronRight size={18} className="text-gray-400" />
           </button>
         </div>
+        </div>
       </div>
     </section>
   );
 
   const renderPrivacySection = () => (
-    <section className="rounded-2xl border border-gray-200 bg-white p-6">
+    <section className="rounded-2xl border border-gray-200 bg-white p-7 md:p-8">
       <div className="flex items-center gap-3">
-        <div className="rounded-xl bg-blue-100 p-3 text-blue-600"><UserCircle2 size={20} /></div>
+        <div className="rounded-2xl bg-[#fff1d8] p-4 text-[#a06a2c]"><UserCircle2 size={24} /></div>
         <div>
-          <h3 className="text-lg font-bold text-gray-900">Privacy and Account</h3>
-          <p className="text-sm text-gray-600">Download your data or remove your account.</p>
+          <h3 className="text-2xl font-bold text-gray-900">Privacy and Account</h3>
+          <p className="mt-1 text-base text-gray-600">Download your data or remove your account.</p>
         </div>
       </div>
 
-      <div className="mt-6 space-y-3">
-        <button onClick={handleDownloadData} className="flex w-full items-center justify-between rounded-xl border border-gray-200 px-4 py-3 text-left text-sm font-semibold text-gray-700 hover:border-blue-600 hover:text-blue-600">
-          <span className="flex items-center gap-2"><Download size={16} /> Download My Data</span>
+      <div className="mt-8 space-y-4">
+        <button onClick={handleDownloadData} className="flex w-full items-center justify-between rounded-xl border border-gray-200 px-5 py-4 text-left text-base font-semibold text-gray-700 hover:border-[#e7b866] hover:text-[#a06a2c]">
+          <span className="flex items-center gap-3"><Download size={19} /> Download My Data</span>
           <span className="text-xs uppercase tracking-[0.15em] text-gray-500">Optional</span>
         </button>
-        <button onClick={handleLogoutAllDevices} className="flex w-full items-center justify-between rounded-xl border border-gray-200 px-4 py-3 text-left text-sm font-semibold text-gray-700 hover:border-red-600 hover:text-red-600">
-          <span className="flex items-center gap-2"><LogOut size={16} /> Logout from All Devices</span>
+        <button onClick={handleLogoutAllDevices} className="flex w-full items-center justify-between rounded-xl border border-gray-200 px-5 py-4 text-left text-base font-semibold text-gray-700 hover:border-red-600 hover:text-red-600">
+          <span className="flex items-center gap-3"><LogOut size={19} /> Logout from All Devices</span>
           <span className="text-xs uppercase tracking-[0.15em] text-gray-500">Optional</span>
         </button>
-        <button onClick={() => setShowDeleteConfirm(true)} className="flex w-full items-center justify-between rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-left text-sm font-semibold text-red-600">
-          <span className="flex items-center gap-2"><Trash2 size={16} /> Delete Account</span>
+        <button onClick={() => setShowDeleteConfirm(true)} className="flex w-full items-center justify-between rounded-xl border border-red-200 bg-red-50 px-5 py-4 text-left text-base font-semibold text-red-600">
+          <span className="flex items-center gap-3"><Trash2 size={19} /> Delete Account</span>
           <span className="text-xs uppercase tracking-[0.15em] text-red-500">Confirm</span>
         </button>
-        <a href="/privacy.html" className="flex w-full items-center justify-between rounded-xl border border-gray-200 px-4 py-3 text-left text-sm font-semibold text-gray-700 hover:border-blue-600 hover:text-blue-600">
+        <Link to="/customer/privacy-policy" className="flex w-full items-center justify-between rounded-xl border border-gray-200 px-5 py-4 text-left text-base font-semibold text-gray-700 hover:border-[#e7b866] hover:text-[#a06a2c]">
           <span>Privacy Policy</span>
-        </a>
-        <a href="/terms.html" className="flex w-full items-center justify-between rounded-xl border border-gray-200 px-4 py-3 text-left text-sm font-semibold text-gray-700 hover:border-blue-600 hover:text-blue-600">
+        </Link>
+        <Link to="/customer/terms" className="flex w-full items-center justify-between rounded-xl border border-gray-200 px-5 py-4 text-left text-base font-semibold text-gray-700 hover:border-[#e7b866] hover:text-[#a06a2c]">
           <span>Terms & Conditions</span>
-        </a>
+        </Link>
       </div>
     </section>
   );
 
   return (
-    <PageShell background="bg-gray-50" innerClassName="mx-auto flex max-w-[1200px] gap-6">
+    <PageShell background="bg-[#fffaf3]" padding="px-3 py-5 sm:px-5 sm:py-6 md:px-6 md:py-7" innerClassName="mx-auto flex w-full max-w-none gap-5">
         {/* Sidebar */}
         <aside className="hidden w-[280px] shrink-0 md:block">
-          <h1 className="text-2xl font-bold text-gray-900">Settings &amp; privacy</h1>
+          <h1 className="text-[28px] font-bold text-[#4a2b20]">Settings &amp; privacy</h1>
 
-          <div className="mt-4 flex items-center gap-2 rounded-full bg-gray-100 px-4 py-2.5">
+          <div className="mt-4 flex items-center gap-2 rounded-full border border-[#ead8c5] bg-white px-4 py-2.5">
             <Search size={16} className="text-gray-400" />
             <input
               value={searchQuery}
@@ -429,7 +483,7 @@ export default function AccountSettings() {
               setActiveSection('overview');
               setMessage('');
             }}
-            className={`mt-6 flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-lg font-bold ${activeSection === 'overview' ? 'text-blue-600' : 'text-gray-900'}`}
+            className={`mt-6 flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-lg font-bold ${activeSection === 'overview' ? 'text-[#a06a2c]' : 'text-[#4a2b20]'}`}
           >
             <SettingsIcon size={18} /> Your account
           </button>
@@ -442,8 +496,8 @@ export default function AccountSettings() {
                   setActiveSection(item.key);
                   setMessage('');
                 }}
-                className={`flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left text-sm font-semibold transition ${
-                  activeSection === item.key ? 'bg-gray-100 text-gray-900' : 'text-gray-600 hover:bg-gray-100'
+                className={`flex w-full items-center gap-3 rounded-lg px-3.5 py-3.5 text-left text-[15px] font-semibold transition ${
+                  activeSection === item.key ? 'bg-[#fff1d8] text-[#4a2b20]' : 'text-gray-600 hover:bg-[#fff7df]'
                 }`}
               >
                 <span className={`rounded-lg p-2 ${item.accent}`}>{item.icon}</span>
@@ -454,7 +508,7 @@ export default function AccountSettings() {
         </aside>
 
         {/* Main content */}
-        <div className="min-w-0 flex-1 space-y-6">
+        <div className="min-w-0 flex-1 space-y-5">
           {message && (
             <div className={`rounded-xl border px-4 py-3 text-sm ${messageType === 'error' ? 'border-red-200 bg-red-50 text-red-700' : 'border-green-200 bg-green-50 text-green-700'}`}>
               {message}
@@ -465,9 +519,9 @@ export default function AccountSettings() {
             <div className="rounded-2xl border border-gray-200 bg-white p-8 text-sm text-gray-600">Loading your account...</div>
           ) : activeSection === 'overview' ? (
             <>
-              <div className="rounded-2xl border border-gray-200 bg-white p-6 md:p-8">
-                <h2 className="text-2xl font-bold text-gray-900">Find the setting you need</h2>
-                <div className="mt-4 flex items-center gap-3 rounded-full bg-gray-100 px-5 py-3.5">
+              <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-[0_10px_28px_rgba(126,82,35,0.05)] md:p-8">
+                <h2 className="text-[26px] font-bold text-gray-900">Find the setting you need</h2>
+                <div className="mt-3 flex items-center gap-3 rounded-full border border-[#ead8c5] bg-[#fffaf3] px-4 py-3">
                   <Search size={18} className="text-gray-400" />
                   <input
                     value={searchQuery}
@@ -479,7 +533,7 @@ export default function AccountSettings() {
               </div>
 
               <div>
-                <h3 className="mb-4 text-xl font-bold text-gray-900">Most visited settings</h3>
+                <h3 className="mb-5 text-2xl font-bold text-gray-900">Most visited settings</h3>
                 {filteredSections.length === 0 ? (
                   <p className="text-sm text-gray-500">No settings match "{searchQuery}".</p>
                 ) : (
@@ -491,11 +545,11 @@ export default function AccountSettings() {
                           setActiveSection(item.key);
                           setMessage('');
                         }}
-                        className="rounded-2xl border border-gray-200 bg-white p-5 text-left transition hover:border-blue-300"
+                        className="rounded-2xl border border-gray-200 bg-white p-6 text-left transition hover:border-[#e7b866]"
                       >
                         <div className={`inline-flex rounded-full p-3 ${item.accent}`}>{item.icon}</div>
-                        <h4 className="mt-4 text-base font-bold text-gray-900">{item.title}</h4>
-                        <p className="mt-1 text-sm text-gray-600">{item.description}</p>
+                        <h4 className="mt-4 text-lg font-bold text-gray-900">{item.title}</h4>
+                        <p className="mt-1.5 text-[15px] leading-6 text-gray-600">{item.description}</p>
                       </button>
                     ))}
                   </div>
@@ -536,6 +590,19 @@ export default function AccountSettings() {
             <div className="mt-5 flex gap-3">
               <button onClick={() => setShowDeleteConfirm(false)} className="flex-1 rounded-full border border-gray-200 px-4 py-3 text-sm font-semibold text-gray-700">Cancel</button>
               <button onClick={handleDeleteAccount} disabled={saving} className="flex-1 rounded-full bg-red-600 px-4 py-3 text-sm font-semibold text-white disabled:opacity-50">{saving ? 'Deleting...' : 'Delete'}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showLogoutConfirm && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 px-4">
+          <div className="w-full max-w-[420px] rounded-2xl border border-[#ead8c5] bg-white p-6 shadow-2xl">
+            <h3 className="text-xl font-bold text-[#4a2b20]">Log out from all devices?</h3>
+            <p className="mt-2 text-sm leading-6 text-gray-600">You will be signed out of every device using this account.</p>
+            <div className="mt-5 flex gap-3">
+              <button type="button" onClick={() => setShowLogoutConfirm(false)} className="flex-1 rounded-full border border-gray-200 px-4 py-3 text-sm font-semibold text-gray-700 transition hover:bg-gray-50">Cancel</button>
+              <button type="button" onClick={confirmLogoutAllDevices} className="flex-1 rounded-full bg-[#e7b866] px-4 py-3 text-sm font-semibold text-[#4a2b20] transition hover:bg-[#f1cf72]">Log out</button>
             </div>
           </div>
         </div>

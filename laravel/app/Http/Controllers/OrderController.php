@@ -13,6 +13,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 use RuntimeException;
 
 class OrderController extends Controller
@@ -52,8 +53,9 @@ class OrderController extends Controller
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
         }
 
+        $discountIdPath = null;
         try {
-            return DB::transaction(function () use ($request, $user) {
+            return DB::transaction(function () use ($request, $user, &$discountIdPath) {
                 $canonicalItems = [];
                 $subtotal = 0.0;
 
@@ -103,11 +105,21 @@ class OrderController extends Controller
                     ];
                 }
 
-                $deliveryFee = in_array($request->method, ['Delivery', 'Deliver'], true)
-                    ? 45.0
-                    : 0.0;
+                $deliveryFee = 0.0;
                 $rushFee = ($request->order_type ?? 'Standard') === 'Urgent' ? 100.0 : 0.0;
-                $total = $subtotal + $deliveryFee + $rushFee;
+                $discountType = $request->input('discount_type', 'none');
+                $discountAmount = in_array($discountType, ['senior_citizen', 'pwd'], true)
+                    ? round($subtotal * 0.20, 2)
+                    : 0.0;
+                if ($discountAmount > 0) {
+                    $discountIdPath = $request->file('discount_id_image')->store('discount-ids', 'local');
+                    if (!$discountIdPath) {
+                        throw new RuntimeException('Unable to securely save the discount ID image.');
+                    }
+                }
+                $total = $subtotal - $discountAmount + $rushFee;
+                $requiresQrPayment = strtolower((string) $request->payment) === 'gcash';
+                $initialStatus = $requiresQrPayment ? 'Awaiting Payment' : 'Pending';
 
                 $order = Order::create([
                     'user_id' => $user->id,
@@ -116,6 +128,9 @@ class OrderController extends Controller
                     'items' => $canonicalItems,
                     'subtotal' => $subtotal,
                     'delivery_fee' => $deliveryFee,
+                    'discount_type' => $discountType,
+                    'discount' => $discountAmount,
+                    'discount_id_path' => $discountIdPath,
                     'total' => $total,
                     'method' => $request->method,
                     'payment' => $request->payment,
@@ -123,7 +138,7 @@ class OrderController extends Controller
                     'phone' => $request->phone,
                     'lat' => $request->lat,
                     'lng' => $request->lng,
-                    'status' => 'Pending',
+                    'status' => $initialStatus,
                     'payment_status' => 'pending',
                     'order_type' => $request->order_type ?? 'Standard',
                     'is_customized' => $request->is_customized ?? false,
@@ -152,23 +167,27 @@ class OrderController extends Controller
 
                 }
 
-                // Create Notification
-                DB::table('notifications')->insert([
-                    'user_id' => $user->id,
-                    'title' => '🧾 Order Placed',
-                    'message' => "Your order #{$order->id} has been placed successfully and is now pending.",
-                    'type' => 'order_placed',
-                    'is_read' => 0,
-                    'action_url' => '/customer/orders',
-                    'created_at' => now(),
-                ]);
+                if (!$requiresQrPayment) {
+                    DB::table('notifications')->insert([
+                        'user_id' => $user->id,
+                        'title' => '🧾 Order Placed',
+                        'message' => "Your order #{$order->id} has been placed successfully and is now pending.",
+                        'type' => 'Success',
+                        'is_read' => 0,
+                        'action_url' => '/customer/orders',
+                        'created_at' => now(),
+                    ]);
+                }
 
                 return response()->json([
                     'success' => true,
                     'message' => 'Order created successfully.',
                     'order_id' => $order->id,
+                    'status' => $initialStatus,
                     'subtotal' => $subtotal,
                     'delivery_fee' => $deliveryFee,
+                    'discount_type' => $discountType,
+                    'discount' => $discountAmount,
                     'total' => $total,
                     'order' => $order->load('orderItems'),
                     'user' => [
@@ -182,6 +201,9 @@ class OrderController extends Controller
                 ], 201);
             });
         } catch (\Exception $e) {
+            if ($discountIdPath) {
+                Storage::disk('local')->delete($discountIdPath);
+            }
             Log::error('Order creation failed: ' . $e->getMessage());
             return response()->json([
                 'success' => false,
@@ -275,7 +297,7 @@ class OrderController extends Controller
                     'user_id' => $user->id,
                     'title' => '🎂 Custom Cake Request',
                     'message' => "We've received your request for order #{$order->id}. We will review it and provide a quote soon.",
-                    'type' => 'order_placed',
+                    'type' => 'Success',
                     'is_read' => 0,
                     'action_url' => '/customer/orders',
                     'created_at' => now(),

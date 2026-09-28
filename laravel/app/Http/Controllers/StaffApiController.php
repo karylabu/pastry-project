@@ -8,6 +8,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 
 class StaffApiController extends Controller
 {
@@ -185,6 +186,26 @@ class StaffApiController extends Controller
         }
     }
 
+    public function viewOrderDiscountId(Request $request, int $orderId)
+    {
+        $admin = $this->requireRole($request, 'admin');
+        if (!$admin instanceof User) {
+            return $admin;
+        }
+
+        $path = DB::table('orders')->where('id', $orderId)->value('discount_id_path');
+        $disk = Storage::disk('local');
+        if (!$path || !$disk->exists($path)) {
+            return $this->corsResponse(['success' => false, 'message' => 'Discount ID image not found.'], 404);
+        }
+
+        return response()->file($disk->path($path), [
+            'Content-Type' => $disk->mimeType($path) ?: 'application/octet-stream',
+            'Cache-Control' => 'private, no-store',
+            'X-Content-Type-Options' => 'nosniff',
+        ]);
+    }
+
     public function getIngredients(Request $request)
     {
         $admin = $this->requireRole($request, 'admin');
@@ -255,6 +276,10 @@ class StaffApiController extends Controller
 
             $liveOrders = DB::table('orders')
                 ->whereNotIn(DB::raw('LOWER(status)'), ['completed', 'cancelled'])
+                ->where(function ($query) {
+                    $query->whereRaw("LOWER(COALESCE(payment, '')) <> 'gcash'")
+                        ->orWhereRaw("LOWER(COALESCE(payment_status, 'pending')) = 'paid'");
+                })
                 ->orderByDesc('created_at');
 
             $liveOrders = $liveOrders->get();

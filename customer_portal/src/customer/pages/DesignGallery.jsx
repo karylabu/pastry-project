@@ -54,7 +54,7 @@ export default function DesignGallery({ category, folder, description, backPath 
   };
 
   return (
-    <PageShell background="bg-[#fbfaf5]" padding="px-4 py-6 md:px-7 lg:px-10" innerClassName="max-w-6xl">
+    <PageShell background="bg-[#fffaf3]" padding="px-4 py-6 md:px-7 lg:px-10" innerClassName="max-w-6xl">
       <button type="button" onClick={() => navigate(backPath)} className="mb-5 inline-flex items-center gap-2 text-xs font-bold text-[#765d50] transition hover:text-[#8d6a2e]">
         <ArrowLeft size={15} /> Back to customize
       </button>

@@ -241,7 +241,7 @@ export default function CustomerApp() {
           <button
             onClick={() => setIsCartOpen(true)}
             aria-label={`Open cart with ${cartQuantity} item${cartQuantity === 1 ? '' : 's'} totaling ₱${totalAmount.toLocaleString()}`}
-            className="flex items-center gap-2.5 px-3 py-2.5 transition-colors hover:bg-[#fffaf0]"
+            className="flex items-center gap-2.5 rounded-full px-3 py-2.5 transition-colors hover:bg-[#fffaf0] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d4af37]"
           >
             <div className="relative flex h-9 w-9 items-center justify-center rounded-full bg-[#d4af37] text-white">
               <ShoppingBag size={18} />
@@ -298,7 +298,7 @@ export default function CustomerApp() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 25 }}
             transition={{ duration: 0.25 }}
-            className="fixed bottom-6 left-6 z-[999999]"
+            className="fixed bottom-24 left-4 z-[999999] sm:left-6"
           >
             <div className="bg-white border border-green-500 rounded-2xl px-5 py-4 shadow-2xl flex items-center gap-3">
               <div className="w-7 h-7 rounded-full bg-green-500 flex items-center justify-center text-white">

@@ -424,6 +424,8 @@ class CustomerApiController extends Controller
         $userId = (int) $user->id;
         $orderType = $data['order_type'] ?? $data['type'] ?? 'Standard';
         $isCustomized = isset($data['is_customized']) ? intval($data['is_customized']) : 0;
+        $requiresQrPayment = strtolower($payment) === 'gcash';
+        $initialStatus = $requiresQrPayment ? 'Awaiting Payment' : 'Pending';
 
         $orderId = DB::table('orders')->insertGetId([
             'items' => json_encode($items),
@@ -441,7 +443,7 @@ class CustomerApiController extends Controller
             'user_id' => $userId,
             'order_type' => $orderType,
             'is_customized' => $isCustomized,
-            'status' => 'Pending',
+            'status' => $initialStatus,
             'created_at' => now(),
         ]);
 
@@ -459,8 +461,7 @@ class CustomerApiController extends Controller
             ]);
         }
 
-        // ✅ Notify User
-        if ($userId) {
+        if ($userId && !$requiresQrPayment) {
             DB::table('notifications')->insert([
                 'user_id' => $userId,
                 'title' => '🧾 Order Placed',
@@ -472,7 +473,12 @@ class CustomerApiController extends Controller
             ]);
         }
 
-        return $this->corsResponse(['status' => 'success', 'order_id' => $orderId, 'success' => true]);
+        return $this->corsResponse([
+            'status' => 'success',
+            'order_id' => $orderId,
+            'order_status' => $initialStatus,
+            'success' => true,
+        ]);
     }
 
     public function getOrders(Request $request)

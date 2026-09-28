@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  CalendarDays,
   Cake,
   ChevronRight,
   Heart,
@@ -15,6 +14,8 @@ import {
   UserRound,
 } from 'lucide-react';
 import PageShell from '../components/PageShell';
+import { CUSTOMER_BASE } from '../../services/config';
+import { getAuthHeaders, safeParseJson } from '../../services/api';
 
 export default function Profile() {
   const [user, setUser] = useState(null);
@@ -26,6 +27,27 @@ export default function Profile() {
     } catch {
       setUser(null);
     }
+
+    fetch(`${CUSTOMER_BASE}/api_get_user.php`, {
+      credentials: 'include',
+      headers: getAuthHeaders(),
+    })
+      .then(safeParseJson)
+      .then((data) => {
+        if (data?.status === 'success' && data.user) {
+          const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+          const syncedUser = {
+            ...currentUser,
+            ...data.user,
+            avatar: data.user.avatar || data.user.profile_image || currentUser.avatar || '',
+          };
+          setUser(syncedUser);
+          localStorage.setItem('user', JSON.stringify(syncedUser));
+        }
+      })
+      .catch(() => {
+        // Keep the locally cached account visible when the profile request is unavailable.
+      });
   }, []);
 
   const fullName = user?.name || 'Not available';
@@ -38,7 +60,7 @@ export default function Profile() {
   const postalCode = user?.postal_code || '—';
 
   return (
-    <PageShell background="bg-[#fafaf9]" padding="px-4 py-6 sm:px-6 sm:py-8 md:px-10 md:py-10" innerClassName="space-y-5">
+    <PageShell background="bg-[#fffaf3]" padding="px-4 py-6 sm:px-6 sm:py-8 md:px-10 md:py-10" innerClassName="space-y-5">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="mb-2 text-[10px] font-black uppercase tracking-[0.32em] text-[#c59a36]">My Profile</p>
@@ -49,7 +71,7 @@ export default function Profile() {
         </div>
         <Link
           to="/customer/account-settings"
-          className="inline-flex w-fit items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-xs font-bold text-white transition hover:bg-[#c59a36] hover:text-slate-900"
+          className="inline-flex w-fit items-center gap-2 rounded-xl border border-[#e7c878] bg-[#fff4cf] px-4 py-2.5 text-xs font-bold text-[#6b4a2e] transition hover:bg-[#f1cf72]"
         >
           <Settings size={15} />
           Account Settings
@@ -58,27 +80,27 @@ export default function Profile() {
 
       <div className="overflow-hidden rounded-[24px] border border-stone-200 bg-white shadow-[0_12px_35px_rgba(15,23,42,0.05)]">
         {/* Profile header strip */}
-        <div className="relative overflow-hidden bg-[#171717] px-5 py-6 sm:px-8 sm:py-8">
-          <div className="absolute -right-12 -top-16 h-44 w-44 rounded-full border-[18px] border-[#c59a36]/20" />
+        <div className="relative overflow-hidden bg-[#fff7df] px-5 py-6 sm:px-8 sm:py-8">
+          <div className="absolute -right-12 -top-16 h-44 w-44 rounded-full border-[18px] border-[#e7c878]/45" />
           <div className="relative flex flex-col gap-5 sm:flex-row sm:items-center">
-          <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-[22px] bg-white/10 ring-2 ring-[#d4af37]/60">
+          <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-[22px] bg-white ring-2 ring-[#e7c878] shadow-sm">
             {user?.avatar ? (
               <img src={user.avatar} alt={fullName} className="w-full h-full object-cover" />
             ) : (
-              <span className="text-2xl font-semibold text-white">
+              <span className="text-2xl font-semibold text-[#8b5e34]">
                 {firstName?.[0]?.toUpperCase() || 'U'}
               </span>
             )}
           </div>
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <p className="text-xl font-bold text-white">{fullName}</p>
-              <span className="inline-flex items-center gap-1 rounded-full bg-[#d4af37]/15 px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.16em] text-[#f2d77c]">
+              <p className="text-xl font-bold text-[#4a2b20]">{fullName}</p>
+              <span className="inline-flex items-center gap-1 rounded-full bg-[#f1cf72]/35 px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.16em] text-[#8b5e34]">
                 <ShieldCheck size={12} /> {user?.role || 'Customer'}
               </span>
             </div>
-            <p className="mt-2 flex items-center gap-1.5 truncate text-sm text-white/65">
-              <MapPin size={14} className="shrink-0 text-[#d4af37]" />
+            <p className="mt-2 flex items-center gap-1.5 truncate text-sm text-[#8b6b55]">
+              <MapPin size={14} className="shrink-0 text-[#c59a36]" />
               {defaultAddress}
             </p>
           </div>
@@ -86,7 +108,7 @@ export default function Profile() {
         </div>
 
         {/* Personal Information */}
-        <div className="border-b border-stone-100 px-5 py-6 sm:px-8">
+        <div className="border-b border-[#f0e4d5] px-5 py-6 sm:px-8">
           <div className="mb-5 flex items-center justify-between gap-3">
             <div>
               <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#c59a36]">Your details</p>
@@ -97,14 +119,13 @@ export default function Profile() {
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             <Field icon={UserRound} label="Full Name" value={fullName} />
             <Field icon={Mail} label="Email Address" value={user?.email || 'Not available'} />
-            <Field icon={Phone} label="Phone Number" value={user?.phone || 'Not available'} />
-            <Field icon={CalendarDays} label="Date of Birth" value={user?.dob || '—'} />
+            <Field icon={Phone} label="Phone Number" value={user?.phone || user?.phone_number || user?.mobile || 'Not available'} />
             <Field icon={ShieldCheck} label="Account Role" value={user?.role || 'Customer'} />
           </div>
         </div>
 
         {/* Address */}
-        <div className="px-5 py-6 sm:px-8">
+        <div className="bg-[#fffdfa] px-5 py-6 sm:px-8">
           <div className="mb-5 flex items-center justify-between gap-3">
             <div>
               <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#c59a36]">Delivery</p>
@@ -122,7 +143,7 @@ export default function Profile() {
       </div>
 
       {/* Quick Links */}
-      <section className="rounded-[24px] border border-stone-200 bg-white p-5 shadow-[0_10px_28px_rgba(15,23,42,0.03)] sm:p-6">
+      <section className="rounded-[24px] border border-[#eadfce] bg-[#fffdfa] p-5 shadow-[0_10px_28px_rgba(126,82,35,0.06)] sm:p-6">
         <div className="mb-4">
           <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#c59a36]">Shortcuts</p>
           <h2 className="mt-1 text-base font-bold text-slate-900">Quick Links</h2>

@@ -417,27 +417,27 @@ export default function Login() {
         </main>
 
         {/* Footer */}
-        <footer className="flex flex-col items-center justify-between border-t border-gray-100 py-2 md:flex-row md:py-3">
-          <div className="flex items-center gap-4">
+        <footer className="grid grid-cols-1 gap-3 border-t border-gray-100 py-3 md:grid-cols-[1fr_auto_1fr] md:items-center md:py-4">
+          <div className="flex items-center justify-center gap-4 md:justify-start">
             <img src={LOGO_URL} alt="Logo" className="h-10 w-10 opacity-80" />
             <p className="text-sm text-gray-500">
               © 2024 Pastry Project. All rights reserved.
             </p>
           </div>
 
-          <div className="my-2 flex flex-wrap justify-center gap-4 md:my-0 md:gap-8">
+          <div className="flex flex-wrap justify-center gap-4 md:gap-8">
             <Link to="/customer/about-us" className="text-sm font-semibold text-gray-600 hover:text-[#F0B94D]">About Us</Link>
             <Link to="/customer/terms" className="text-sm font-semibold text-gray-600 hover:text-[#F0B94D]">Terms</Link>
             <Link to="/customer/privacy-policy" className="text-sm font-semibold text-gray-600 hover:text-[#F0B94D]">Privacy Policy</Link>
             <Link to="/customer/chat-support" className="text-sm font-semibold text-gray-600 hover:text-[#F0B94D]">Help</Link>
           </div>
 
-          <div className="flex items-center gap-6">
+          <div className="flex items-center justify-center gap-4 md:justify-end">
             <span className="text-sm font-semibold text-gray-600">Follow us</span>
-            <div className="flex gap-4">
-              <a href="https://www.facebook.com" target="_blank" rel="noreferrer" className="text-gray-400 hover:text-[#F0B94D]"><FacebookIcon /></a>
-              <a href="https://www.instagram.com" target="_blank" rel="noreferrer" className="text-gray-400 hover:text-[#F0B94D]"><InstagramIcon /></a>
-              <a href="mailto:pastryproject.bc@gmail.com" className="text-gray-400 hover:text-[#F0B94D]"><MailIcon /></a>
+            <div className="flex items-center gap-3">
+              <a href="https://www.facebook.com/pastryproject.bc" target="_blank" rel="noreferrer" aria-label="Follow Pastry Project on Facebook" title="Facebook" className="text-gray-500 transition hover:text-[#1877F2]"><FacebookIcon /></a>
+              <a href="https://www.instagram.com/pastryproject.bc" target="_blank" rel="noreferrer" aria-label="Follow Pastry Project on Instagram" title="Instagram" className="text-gray-500 transition hover:text-[#E4405F]"><InstagramIcon /></a>
+              <a href="https://mail.google.com/mail/?view=cm&fs=1&to=pastryproject.bc@gmail.com" target="_blank" rel="noreferrer" aria-label="Email Pastry Project in Gmail" title="Open Gmail" className="text-gray-500 transition hover:text-[#F0B94D]"><MailIcon /></a>
             </div>
           </div>
         </footer>

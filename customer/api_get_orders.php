@@ -79,15 +79,19 @@ try {
         }
 
         if ($hasOrderItems) {
-            $itemsRes = mysqli_query($conn, "SELECT product, qty, price FROM order_items WHERE order_id = " . intval($row['id']));
+            $itemsRes = mysqli_query($conn, "SELECT product, variant, qty, price, details FROM order_items WHERE order_id = " . intval($row['id']));
             if ($itemsRes && mysqli_num_rows($itemsRes) > 0) {
                 $lineItems = [];
                 while ($itemRow = mysqli_fetch_assoc($itemsRes)) {
                     $lineItems[] = [
                         "name" => $itemRow['product'],
                         "product" => $itemRow['product'],
+                        "variant" => $itemRow['variant'] ?? '',
                         "qty" => intval($itemRow['qty']),
                         "price" => floatval($itemRow['price']),
+                        "selectionDetails" => !empty($itemRow['details'])
+                            ? (json_decode($itemRow['details'], true) ?? $itemRow['details'])
+                            : null,
                     ];
                 }
                 $items = $lineItems;
@@ -118,12 +122,21 @@ try {
             "user_id" => $hasUserId ? intval($row['user_id'] ?? 0) : 0,
             "customer" => $hasCustomer ? ($row['customer'] ?? '') : '',
             "email" => $hasEmail ? ($row['email'] ?? '') : '',
+            "phone" => $row['phone'] ?? '',
             "items" => $items,
+            "subtotal" => floatval($row['subtotal'] ?? 0),
+            "delivery_fee" => floatval($row['delivery_fee'] ?? 0),
             "total" => floatval($row['total'] ?? 0),
             "payment" => $row['payment'] ?? '',
+            "payment_status" => $row['payment_status'] ?? '',
             "method" => $row['method'] ?? '',
             "address" => $row['address'] ?? '',
+            "delivery_date" => $row['delivery_date'] ?? '',
+            "delivery_time" => $row['delivery_time'] ?? '',
             "status" => $row['status'] ?? 'Pending',
+            "order_type" => $row['order_type'] ?? '',
+            "discount_type" => $row['discount_type'] ?? '',
+            "discount" => floatval($row['discount'] ?? 0),
             "created_at" => $row['created_at'] ?? '',
             "is_customized" => $isCustomizedOrder ? 1 : 0,
             "custom_details" => $customDetails

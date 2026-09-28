@@ -61,6 +61,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
 
     while ($row = $result->fetch_assoc()) {
         $rawItemsByOrderId[(int) $row['id']] = json_decode($row['items'] ?? '[]', true) ?: [];
+        $row['has_discount_id'] = !empty($row['discount_id_path']);
+        unset($row['discount_id_path']);
         $row['items'] = [];
 
         if ($customOnly) {

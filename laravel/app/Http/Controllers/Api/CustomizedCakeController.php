@@ -232,6 +232,13 @@ class CustomizedCakeController extends Controller
             ], 422);
         }
 
+        if ($cakeType === 'two-tier' && (int) ($tiers[0]['flavor_id'] ?? 0) !== (int) ($tiers[1]['flavor_id'] ?? 0)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Both tiers must use the same flavor.',
+            ], 422);
+        }
+
         if (!empty($payload['order_id']) && !DB::table('orders')
             ->where('id', (int) $payload['order_id'])
             ->where('user_id', $user->id)

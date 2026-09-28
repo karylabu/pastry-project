@@ -41,3 +41,14 @@ export function buildCustomizedCakeSubmissionPayload(formState, flavorOptions = 
     } : null,
   };
 }
+
+export function buildTierSelections(cakeType, flavorId, singleSizeId, topSizeId, bottomSizeId) {
+  if (cakeType === 'single') {
+    return [{ flavor_id: flavorId, size_id: singleSizeId }];
+  }
+
+  return [
+    { flavor_id: flavorId, size_id: topSizeId },
+    { flavor_id: flavorId, size_id: bottomSizeId },
+  ];
+}

@@ -4,7 +4,7 @@ export default function PageShell({
   children,
   className = '',
   innerClassName = '',
-  background = 'bg-white',
+  background = 'bg-[#fffaf3]',
   minHeight = 'min-h-screen',
   padding = 'px-6 md:px-10 py-10',
 }) {

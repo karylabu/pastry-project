@@ -146,6 +146,36 @@ export default function Menu({ onAddToCart }) {
   };
 
   const normalizedSearch = urlSearch.toLowerCase();
+
+  const getProductSortPrice = (product) => {
+    const directPrice = Number(product?.price ?? 0);
+    if (Number.isFinite(directPrice) && directPrice > 0) {
+      return directPrice;
+    }
+
+    const variantList = Array.isArray(product?.variants)
+      ? product.variants
+      : Array.isArray(product?.sizes)
+        ? product.sizes
+        : [];
+
+    if (variantList.length === 0) {
+      return 0;
+    }
+
+    const numericPrices = variantList
+      .map((variant) => Number(variant?.price ?? variant?.unit_price ?? 0))
+      .filter((value) => Number.isFinite(value) && value > 0);
+
+    if (numericPrices.length === 0) {
+      return 0;
+    }
+
+    return sortBy === 'price-desc'
+      ? Math.max(...numericPrices)
+      : Math.min(...numericPrices);
+  };
+
   const filtered = products.filter((p) => {
     const matchesSearch = !normalizedSearch ||
       p.name?.toLowerCase().includes(normalizedSearch) ||
@@ -162,10 +192,10 @@ export default function Menu({ onAddToCart }) {
     if (aOut !== bOut) return aOut ? 1 : -1;
 
     if (sortBy === 'price-asc') {
-      return Number(a.price || 0) - Number(b.price || 0);
+      return getProductSortPrice(a) - getProductSortPrice(b);
     }
     if (sortBy === 'price-desc') {
-      return Number(b.price || 0) - Number(a.price || 0);
+      return getProductSortPrice(b) - getProductSortPrice(a);
     }
     if (sortBy === 'name-asc') {
       return (a.name || '').localeCompare(b.name || '');
@@ -175,7 +205,7 @@ export default function Menu({ onAddToCart }) {
   });
 
   return (
-    <PageShell background="bg-[#fbfaf5]" padding="px-4 md:px-7 lg:px-10 pt-5 pb-10">
+    <PageShell background="bg-[#fffaf3]" padding="px-4 md:px-7 lg:px-10 pt-5 pb-10">
 
         {/* HEADER */}
         <div className="mb-5 flex flex-col gap-5 px-1 py-2 sm:flex-row sm:items-end sm:justify-between">

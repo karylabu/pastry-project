@@ -433,6 +433,7 @@ export function ChatBubble({ aiMode = false, fullPage = false }) {
   const [messages, setMessages]   = useState([]);
   const [input, setInput]         = useState("");
   const [sending, setSending]     = useState(false);
+  const [chatError, setChatError] = useState("");
   const [staffMode, setStaffMode] = useState(false);
   const [unread, setUnread]       = useState(0);
   const [selectedImage, setSelectedImage] = useState(null);
@@ -488,25 +489,48 @@ export function ChatBubble({ aiMode = false, fullPage = false }) {
       pollRef.current = setInterval(fetchMessages, 5000);
     }
     return () => clearInterval(pollRef.current);
-  }, [step, conversationId, showHistory]);
+  }, [step, conversationId, showHistory, open]);
 
-  const fetchMessages = async () => {
+  const fetchMessages = async (mergeWithCurrent = false) => {
     try {
-      const params = new URLSearchParams({ order_id: "0", conversation_id: conversationId });
+      const params = new URLSearchParams({
+        order_id: "0",
+        conversation_id: conversationId,
+        mark_read: open ? "1" : "0",
+      });
       const res  = await fetch(`${CUSTOMER_BASE}/api_chat_fetch.php?${params.toString()}`, {
         credentials: 'include',
         headers: getAuthHeaders(),
       });
       const data = await safeParseJson(res);
-      if (data.success) {
-        setMessages(data.messages);
-        if (!open) {
-          const newStaff = data.messages.filter(m => m.sender !== "customer").length;
-          setUnread(newStaff);
-        }
+      if (!res.ok || !data.success) {
+        throw new Error(data.message || `Chat history request failed (${res.status})`);
+      }
+      const fetchedMessages = Array.isArray(data.messages) ? data.messages : [];
+      setMessages(previousMessages => {
+        if (!mergeWithCurrent) return fetchedMessages;
+
+        const merged = new Map(
+          previousMessages
+            .filter(message => !String(message.id).startsWith("pending-"))
+            .map(message => [String(message.id), message])
+        );
+        fetchedMessages.forEach(message => merged.set(String(message.id), message));
+        return Array.from(merged.values()).sort((left, right) => (
+          new Date(left.created_at).getTime() - new Date(right.created_at).getTime()
+        ));
+      });
+      setChatError("");
+      if (!open) {
+        const newStaff = fetchedMessages.filter(message => (
+          ["admin", "staff"].includes(String(message.sender).toLowerCase()) &&
+          Number(message.is_read) === 0
+        )).length;
+        setUnread(newStaff);
       }
     } catch (e) {
       console.error("Chat fetch error:", e);
+      setChatError("Hindi ma-load ang chat history. Pakisubukan ulit.");
     }
   };
 
@@ -525,9 +549,11 @@ export function ChatBubble({ aiMode = false, fullPage = false }) {
       setSending(true);
       setInput("");
       setSelectedImage(null);
+      setChatError("");
       // Optimistic UI
+      const optimisticId = `pending-${Date.now()}`;
       setMessages(prev => [...prev, {
-        id: Date.now(),
+        id: optimisticId,
         sender: "customer",
         message: msg,
         image_url: image ? URL.createObjectURL(image) : null,
@@ -558,9 +584,14 @@ export function ChatBubble({ aiMode = false, fullPage = false }) {
         throw new Error(data.message || "Message could not be sent");
       }
 
-      await fetchMessages();
+      setChatError("");
+      await fetchMessages(true);
     } catch (e) {
       console.error("Send error:", e);
+      if (!silent) {
+        setMessages(prev => prev.filter(message => !String(message.id).startsWith("pending-")));
+      }
+      setChatError("Hindi na-send ang message. Pakisubukan ulit.");
     } finally {
       setSending(false);
     }
@@ -576,6 +607,15 @@ export function ChatBubble({ aiMode = false, fullPage = false }) {
   const formatTime = (ts) => {
     const d = new Date(ts);
     return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  };
+
+  const formatChatDate = (ts) => {
+    const date = new Date(ts);
+    const today = new Date();
+    const isToday = date.toDateString() === today.toDateString();
+    return isToday
+      ? "Today"
+      : date.toLocaleDateString([], { month: "long", day: "numeric", year: "numeric" });
   };
 
   const senderLabel = {
@@ -620,11 +660,10 @@ export function ChatBubble({ aiMode = false, fullPage = false }) {
                 setShowAccountPrompt(true);
                 return;
               }
-              if (!open) startFreshChat();
               setOpen(o => !o);
               setUnread(0);
             }}
-            className="bg-black text-white w-14 h-14 rounded-full flex items-center justify-center shadow-xl hover:bg-[#d4af37] transition-colors"
+            className="bg-[#f1cf72] text-[#5a3a20] w-14 h-14 rounded-full flex items-center justify-center shadow-xl hover:bg-[#e6bb4f] transition-colors"
           >
             {open ? <X size={20} /> : <MessageCircle size={22} />}
           </button>
@@ -645,26 +684,26 @@ export function ChatBubble({ aiMode = false, fullPage = false }) {
             exit={{ opacity: 0, y: 20, scale: 0.95 }}
             transition={{ duration: 0.2 }}
             className={fullPage
-              ? "relative w-full min-h-[calc(100vh-180px)] bg-[#f7f7f7] flex flex-col overflow-hidden"
-              : "fixed bottom-24 right-6 w-[calc(100vw-2rem)] max-w-[460px] sm:w-[460px] bg-white rounded-[20px] shadow-2xl z-[60001] flex flex-col overflow-hidden border border-gray-100"}
+              ? "relative w-full min-h-[calc(100vh-180px)] bg-[#fffaf3] flex flex-col overflow-hidden"
+              : "fixed bottom-24 right-6 w-[calc(100vw-2rem)] max-w-[460px] sm:w-[460px] bg-[#fffaf3] rounded-[20px] shadow-2xl z-[60001] flex flex-col overflow-hidden border border-[#ead8c5]"}
             style={fullPage ? undefined : { height: aiMode ? "min(620px, calc(100vh - 7rem))" : "min(500px, calc(100vh - 7rem))" }}
           >
             {/* HEADER */}
-            <div className={fullPage ? "bg-[#fffdfa] px-4 py-4 sm:px-8 sm:py-5 flex items-center gap-3 sm:gap-4 border-b border-[#eadfd4]" : "bg-black px-5 py-4 flex items-center gap-3"}>
+            <div className={fullPage ? "bg-[#fff8e8] px-4 py-4 sm:px-8 sm:py-5 flex items-center gap-3 sm:gap-4 border-b border-[#ead8c5]" : "bg-[#fff8e8] px-5 py-4 flex items-center gap-3 border-b border-[#ead8c5]"}>
               {fullPage && (
                   <button type="button" onClick={() => setShowHistory(value => !value)} title={showHistory ? "Back to chat" : "View chat history"} aria-label={showHistory ? "Back to chat" : "View chat history"} className="w-9 h-9 rounded-full text-gray-500 hover:bg-gray-100 flex items-center justify-center">
                   <ArrowLeft size={20} />
                 </button>
               )}
-              <div className={fullPage ? "w-11 h-11 rounded-2xl bg-[#fff0e8] flex items-center justify-center flex-shrink-0" : "w-9 h-9 rounded-full bg-[#d4af37] flex items-center justify-center flex-shrink-0"}>
-                <Headphones size={fullPage ? 20 : 16} className={fullPage ? "text-[#e45f32]" : "text-black"} />
+              <div className={fullPage ? "w-11 h-11 rounded-2xl bg-[#f5d9b8] flex items-center justify-center flex-shrink-0" : "w-9 h-9 rounded-full bg-[#e7b866] flex items-center justify-center flex-shrink-0"}>
+                <Headphones size={fullPage ? 20 : 16} className={fullPage ? "text-[#7b3f28]" : "text-[#3b2318]"} />
               </div>
               <div className="flex-1">
                 <div className="flex items-center gap-2">
-                  <p className={fullPage ? "text-gray-900 font-bold text-lg sm:text-xl" : "text-white font-semibold text-sm"}>{fullPage ? (showHistory ? "Chat History" : "Customer Service") : "Admin Support"}</p>
+                  <p className={fullPage ? "text-[#4a2b20] font-bold text-lg sm:text-xl" : "text-[#4a2b20] font-semibold text-sm"}>{fullPage ? (showHistory ? "Chat History" : "Customer Service") : "Admin Support"}</p>
                   {fullPage && !showHistory && <span className="hidden rounded-full bg-[#e8f5e9] px-2 py-1 text-[9px] font-bold uppercase tracking-[0.12em] text-[#398347] sm:inline-flex">Online</span>}
                 </div>
-                <p className={fullPage ? "text-gray-500 text-xs mt-0.5" : "text-gray-400 text-xs"}>
+                <p className={fullPage ? "text-[#9a765d] text-xs mt-0.5" : "text-[#9a765d] text-xs"}>
                   {fullPage ? "We usually reply instantly" : "Admin usually replies promptly"}
                 </p>
               </div>
@@ -701,12 +740,12 @@ export function ChatBubble({ aiMode = false, fullPage = false }) {
                     onClick={() => setShowStoreNumber(value => !value)}
                     title="Show store number"
                     aria-label="Show store number"
-                    className="w-8 h-8 rounded-full text-gray-400 hover:bg-white/10 hover:text-white flex items-center justify-center"
+                    className="w-8 h-8 rounded-full text-[#9a765d] hover:bg-[#f5d9b8] hover:text-[#4a2b20] flex items-center justify-center"
                   >
                     <Phone size={16} />
                   </button>
                   {showStoreNumber && (
-                    <span className="text-xs text-white whitespace-nowrap">0938-796-2033</span>
+                    <span className="text-xs text-[#4a2b20] whitespace-nowrap">0938-796-2033</span>
                   )}
                 </>
               )}
@@ -735,7 +774,7 @@ export function ChatBubble({ aiMode = false, fullPage = false }) {
                   const element = event.currentTarget;
                   shouldStickToBottomRef.current = element.scrollHeight - element.scrollTop - element.clientHeight < 24;
                 }}
-                className={showHistory ? "hidden" : "flex-1 min-h-0 overflow-y-auto px-3 py-3 space-y-2.5 bg-gray-50"}
+                className={showHistory ? "hidden" : "flex-1 min-h-0 overflow-y-auto px-3 py-3 space-y-2.5 bg-[#fffaf3]"}
               >
                 {messages.length === 0 && (
                   <div className="px-2 pt-5">
@@ -758,38 +797,60 @@ export function ChatBubble({ aiMode = false, fullPage = false }) {
                 {messages.map((msg, i) => {
                   const isCustomer = msg.sender === "customer";
                   const isAi       = msg.sender === "ai";
+                  const messageDate = new Date(msg.created_at).toDateString();
+                  const previousDate = i > 0 ? new Date(messages[i - 1].created_at).toDateString() : null;
+                  const showDateSeparator = i === 0 || messageDate !== previousDate;
 
                   return (
-                    <div key={msg.id ?? i} className={`flex gap-2 ${isCustomer ? "flex-row-reverse" : "flex-row"}`}>
-                      <div className={`w-7 h-7 rounded-full flex-shrink-0 flex items-center justify-center text-xs font-bold
-                        ${isCustomer ? "bg-black text-white" : isAi ? "bg-[#d4af37] text-black" : "bg-purple-100 text-purple-700"}`}>
-                        {isCustomer ? <User size={12} /> : isAi ? <Bot size={12} /> : "S"}
-                      </div>
+                    <React.Fragment key={msg.id ?? i}>
+                      {showDateSeparator && (
+                        <div className="flex items-center gap-3 py-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-gray-400">
+                          <span className="h-px flex-1 bg-gray-200" />
+                          <span>{formatChatDate(msg.created_at)}</span>
+                          <span className="h-px flex-1 bg-gray-200" />
+                        </div>
+                      )}
+                      <div className={`flex gap-2 ${isCustomer ? "flex-row-reverse" : "flex-row"}`}>
+                        <div className={`w-7 h-7 rounded-full flex-shrink-0 flex items-center justify-center text-xs font-bold
+                          ${isCustomer ? "bg-[#f1cf72] text-[#5a3a20]" : isAi ? "bg-[#f5d9b8] text-[#7b3f28]" : "bg-[#fff1d8] text-[#9a5b32]"}`}>
+                          {isCustomer ? <User size={12} /> : isAi ? <Bot size={12} /> : "S"}
+                        </div>
 
-                      <div className={`max-w-[78%] ${isCustomer ? "items-end" : "items-start"} flex flex-col gap-1`}>
-                        <span className="text-[11px] text-gray-400 px-1 opacity-75">
-                          {senderLabel[msg.sender]} · {formatTime(msg.created_at)}
-                        </span>
-                        <div className={`px-3 py-2 rounded-2xl text-[13px] leading-relaxed
-                          ${isCustomer
-                            ? "bg-black text-white rounded-tr-sm"
-                            : isAi
-                            ? "bg-[#fdf8ec] text-gray-800 border border-[#f0e4b8] rounded-tl-sm"
-                            : "bg-white text-gray-800 border border-gray-200 rounded-tl-sm"
-                          }`}>
-                          {getImageUrl(msg) && (
-                            <img
-                              src={getImageUrl(msg)}
-                              alt="Chat attachment"
-                              className="max-w-full max-h-48 rounded-lg object-contain mb-1"
-                            />
-                          )}
-                          {msg.message && <p>{msg.message}</p>}
+                        <div className={`max-w-[78%] ${isCustomer ? "items-end" : "items-start"} flex flex-col gap-1`}>
+                          <span className="text-[11px] text-gray-400 px-1 opacity-75">
+                            {senderLabel[msg.sender]} · {formatTime(msg.created_at)}
+                          </span>
+                          <div className={`px-3 py-2 rounded-2xl text-[13px] leading-relaxed
+                            ${isCustomer
+                              ? "bg-[#f1cf72] text-[#4a2b20] rounded-tr-sm"
+                              : isAi
+                              ? "bg-[#fff1d8] text-[#4a2b20] border border-[#efd2a7] rounded-tl-sm"
+                              : "bg-white text-[#4a2b20] border border-[#ead8c5] rounded-tl-sm"
+                            }`}>
+                            {getImageUrl(msg) && (
+                              <img
+                                src={getImageUrl(msg)}
+                                alt="Chat attachment"
+                                className="max-w-full max-h-48 rounded-lg object-contain mb-1"
+                              />
+                            )}
+                            {msg.message && <p>{msg.message}</p>}
+                          </div>
                         </div>
                       </div>
-                    </div>
+                    </React.Fragment>
                   );
                 })}
+
+                {messages.length > 0 && !messages.some(message => (
+                  new Date(message.created_at).toDateString() === new Date().toDateString()
+                )) && (
+                  <div className="flex items-center gap-3 py-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-gray-400">
+                    <span className="h-px flex-1 bg-gray-200" />
+                    <span>Today</span>
+                    <span className="h-px flex-1 bg-gray-200" />
+                  </div>
+                )}
 
                 {sending && (
                   <div className="flex gap-2 items-center">
@@ -806,12 +867,18 @@ export function ChatBubble({ aiMode = false, fullPage = false }) {
                   </div>
                 )}
 
+                {chatError && (
+                  <p className="px-2 text-center text-[11px] text-red-600" role="alert">
+                    {chatError}
+                  </p>
+                )}
+
                 <div ref={bottomRef} />
               </div>
 
               {!showHistory && (
                 <>
-                  <div className="border-t border-gray-100 bg-white px-3 pt-2.5">
+                  <div className="border-t border-[#ead8c5] bg-[#fff6e9] px-3 pt-2.5">
                     <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-gray-400">Quick chats</p>
                     <div className="flex flex-wrap gap-2">
                       {["Hi, I need help", "Where is my order?", "I want to place an order", "Can I customize a cake?", "How can I pay?"].map((suggestion) => (
@@ -827,7 +894,7 @@ export function ChatBubble({ aiMode = false, fullPage = false }) {
                       ))}
                     </div>
                   </div>
-                  <div className="px-3 py-2.5 bg-white flex gap-2 items-end">
+                  <div className="px-3 py-2.5 bg-[#fff6e9] flex gap-2 items-end">
                     <input
                       ref={imageInputRef}
                       type="file"
@@ -850,12 +917,12 @@ export function ChatBubble({ aiMode = false, fullPage = false }) {
                       onKeyDown={handleKeyDown}
                       placeholder="Type your message..."
                       rows={1}
-                      className="flex-1 resize-none border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-black max-h-20"
+                      className="flex-1 resize-none border border-[#dec4aa] rounded-xl bg-white px-3 py-2 text-sm text-[#4a2b20] outline-none focus:border-[#7b3f28] max-h-20"
                     />
                     <button
                       onClick={() => sendMessage()}
                       disabled={(!input.trim() && !selectedImage) || sending}
-                      className="w-9 h-9 rounded-full bg-black text-white flex items-center justify-center flex-shrink-0 disabled:opacity-40 hover:bg-[#d4af37] transition-colors"
+                      className="w-9 h-9 rounded-full bg-[#f1cf72] text-[#5a3a20] flex items-center justify-center flex-shrink-0 disabled:opacity-40 hover:bg-[#e6bb4f] transition-colors"
                     >
                       <Send size={14} />
                     </button>
@@ -1130,7 +1197,7 @@ export default function Dashboard({ onAddToCart }) {
           ))}
         </div>
 
-        <SecondaryBanner onOrderNow={() => navigate("/customer/menu")} />
+        <SecondaryBanner onOrderNow={() => navigate("/customer/customized-cakes")} />
 
         <div className="grid gap-4 lg:grid-cols-[minmax(0,2.1fr)_minmax(300px,0.88fr)]">
           <div className="min-w-0">

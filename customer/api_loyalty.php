@@ -29,6 +29,33 @@ $conn->query("ALTER TABLE loyalty_transactions ADD COLUMN IF NOT EXISTS max_disc
 
 $authUser = requireApiRole(['customer']);
 $userId = (int) $authUser['id'];
+$userEmail = strtolower(trim((string) ($authUser['email'] ?? '')));
+
+// Backfill eligible orders completed before loyalty earning was enabled.
+$completedOrdersStmt = $conn->prepare("SELECT id, total FROM orders
+    WHERE (user_id = ? OR ((user_id IS NULL OR user_id = 0) AND email = ?))
+      AND LOWER(status) = 'completed'
+      AND (LOWER(COALESCE(payment, '')) <> 'gcash' OR LOWER(COALESCE(payment_status, 'pending')) = 'paid')");
+if ($completedOrdersStmt) {
+    $completedOrdersStmt->bind_param('is', $userId, $userEmail);
+    if ($completedOrdersStmt->execute()) {
+        $completedOrders = $completedOrdersStmt->get_result();
+        $earnStmt = $conn->prepare("INSERT IGNORE INTO loyalty_transactions (user_id, order_id, type, points) VALUES (?, ?, 'earn', ?)");
+        if ($earnStmt) {
+            while ($completedOrder = $completedOrders->fetch_assoc()) {
+                $orderId = (int) ($completedOrder['id'] ?? 0);
+                $points = (int) floor(max(0, (float) ($completedOrder['total'] ?? 0)) / 100) * 10;
+                if ($orderId <= 0 || $points <= 0) continue;
+
+                $earnStmt->bind_param('iii', $userId, $orderId, $points);
+                $earnStmt->execute();
+            }
+            $earnStmt->close();
+        }
+    }
+    $completedOrdersStmt->close();
+}
+
 $action = $_GET['action'] ?? $_POST['action'] ?? 'summary';
 
 if ($action === 'redeem' && $_SERVER['REQUEST_METHOD'] === 'POST') {

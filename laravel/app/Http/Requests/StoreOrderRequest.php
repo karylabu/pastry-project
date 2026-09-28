@@ -6,6 +6,14 @@ use Illuminate\Foundation\Http\FormRequest;
 
 class StoreOrderRequest extends FormRequest
 {
+    protected function prepareForValidation(): void
+    {
+        $payload = json_decode((string) $this->input('order_payload'), true);
+        if (is_array($payload)) {
+            $this->merge($payload);
+        }
+    }
+
     public function authorize(): bool
     {
         return true;
@@ -31,6 +39,8 @@ class StoreOrderRequest extends FormRequest
             'lng' => 'nullable|numeric',
             'order_type' => 'nullable|string',
             'is_customized' => 'nullable|boolean',
+            'discount_type' => 'nullable|in:none,senior_citizen,pwd',
+            'discount_id_image' => 'exclude_unless:discount_type,senior_citizen,pwd|required|image|mimes:jpeg,jpg,png,webp|max:5120',
         ];
     }
 }

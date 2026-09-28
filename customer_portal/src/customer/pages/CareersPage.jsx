@@ -2,7 +2,7 @@ import React from "react";
 
 export default function CareersPage() {
   return (
-    <div className="min-h-screen bg-[#f8f5ed] px-6 py-24 text-[#1a1a1a]">
+    <div className="min-h-screen bg-[#fffaf3] px-6 py-24 text-[#1a1a1a]">
       <div className="mx-auto max-w-4xl">
         <p className="text-sm font-semibold uppercase tracking-[0.35em] text-[#d4af37]">Careers</p>
         <h1 className="mt-4 text-4xl font-black tracking-tight">Join the Pastry Project team</h1>
