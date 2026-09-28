@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { X, ShoppingBag, Check } from 'lucide-react';
+import { X, ShoppingBag, Check, Minus, Plus } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { BASE } from '../../services/config';
 
@@ -253,6 +253,7 @@ export default function ProductModal({ isOpen, onClose, product, allCakes, onAdd
 
   const showDrinks = false;
   const showCake = false;
+  const hasAddOns = category.includes('pasta') || category.includes('meal');
 
   const availableCakes = useMemo(
     () =>
@@ -334,7 +335,7 @@ export default function ProductModal({ isOpen, onClose, product, allCakes, onAdd
       <motion.div
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
-        className="relative flex w-full max-w-[360px] flex-col overflow-hidden rounded-[24px] bg-white shadow-2xl max-h-[calc(100vh-32px)]"
+        className="relative flex w-full max-w-[400px] flex-col overflow-hidden rounded-[24px] bg-white shadow-2xl max-h-[calc(100vh-32px)]"
       >
         {/* Floating Close Button */}
         <button
@@ -345,8 +346,8 @@ export default function ProductModal({ isOpen, onClose, product, allCakes, onAdd
         </button>
 
         {/* 1. Image + Header Section, styled like the menu card */}
-        <div className="flex flex-shrink-0 flex-col items-center bg-transparent px-6 pb-3 pt-6 text-center">
-          <div className="mb-3 flex h-[174px] w-full max-w-[174px] items-center justify-center overflow-hidden bg-transparent p-0">
+        <div className="flex flex-shrink-0 flex-col items-center bg-[#faf8f2] px-6 pb-4 pt-5 text-center">
+          <div className="mb-2 flex h-[132px] w-full max-w-[174px] items-center justify-center overflow-hidden bg-transparent p-0">
             <img
               src={resolveProductImage(product)}
               alt={product.name}
@@ -363,12 +364,12 @@ export default function ProductModal({ isOpen, onClose, product, allCakes, onAdd
               style={isDrinkProduct || isSmallCoffeeProduct ? { transform: `scale(${drinkVisualScale})` } : undefined}
               className={
                 isDrinkProduct || isSmallCoffeeProduct
-                  ? 'h-[145px] w-auto max-w-[85%] max-h-[145px] object-contain object-center scale-100'
-                  : 'h-[118px] w-auto max-w-[78%] max-h-[118px] object-contain object-center scale-100'
+                  ? 'h-[124px] w-auto max-w-[85%] max-h-[124px] object-contain object-center scale-100'
+                  : 'h-[106px] w-auto max-w-[78%] max-h-[106px] object-contain object-center scale-100'
               }
             />
           </div>
-          <h2 className="mb-2 px-2 text-lg font-bold tracking-tight text-gray-900">
+          <h2 className="mb-3 px-2 text-xl font-bold tracking-tight text-[#30251f]">
             {product.name}
           </h2>
 
@@ -388,8 +389,8 @@ export default function ProductModal({ isOpen, onClose, product, allCakes, onAdd
                       disabled
                         ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
                         : selected
-                        ? 'bg-black text-white border-black shadow-sm'
-                        : 'bg-white text-gray-700 border-gray-200 hover:border-black hover:text-black'
+                        ? 'border-[#e7c875] bg-[#fff8df] text-[#8d6a2e] shadow-sm'
+                        : 'border-[#eadfd8] bg-white text-[#765d50] hover:border-[#e7c875] hover:bg-[#fff8df] hover:text-[#8d6a2e]'
                     }`}
                   >
                     {v.size}
@@ -401,7 +402,7 @@ export default function ProductModal({ isOpen, onClose, product, allCakes, onAdd
         </div>
 
         {/* 2. Scrollable Content Area */}
-        <div className="min-h-0 flex-1 space-y-5 overflow-y-auto overflow-x-hidden px-6 py-4 no-scrollbar">
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overflow-x-hidden px-6 py-4 no-scrollbar">
           {/* Drink Selection */}
           {showDrinks && (
             <div className="space-y-3">
@@ -447,39 +448,37 @@ export default function ProductModal({ isOpen, onClose, product, allCakes, onAdd
           )}
 
           {/* Quantity and Add-ons Section */}
-          <div className="space-y-3 pb-4">
+          <div className="space-y-3 pb-2">
             <div className="flex items-center justify-between gap-4">
-              <div>
-                <label className="block text-xs font-black uppercase tracking-[0.16em] text-gray-400">
-                  Quantity
-                </label>
-                <p className="text-base font-semibold text-gray-700 mt-1">
-                  {qty} item{qty !== 1 ? 's' : ''}
-                </p>
-              </div>
-              <div className="flex items-center gap-2 rounded-full border border-gray-200 bg-white px-1.5 py-1">
+              <label className="text-xs font-black uppercase tracking-[0.16em] text-gray-500">
+                Quantity
+              </label>
+              <div className="flex items-center gap-2 rounded-full border border-[#e9e3d8] bg-[#faf8f2] px-1.5 py-1">
                 <button
                   onClick={() => setQty((prev) => Math.max(1, prev - 1))}
-                  className="w-7 h-7 rounded-full border border-gray-200 text-gray-600 hover:bg-gray-100 transition"
+                  aria-label="Decrease quantity"
+                  className="flex h-8 w-8 items-center justify-center rounded-full border border-[#e9e3d8] bg-white text-gray-600 transition hover:bg-gray-100"
                   type="button"
                 >
-                  -
+                  <Minus size={14} />
                 </button>
-                <span className="w-8 text-center text-sm font-bold text-gray-900">{qty}</span>
+                <span className="w-8 text-center text-sm font-bold text-gray-900" aria-live="polite">{qty}</span>
                 <button
                   onClick={() => setQty((prev) => prev + 1)}
-                  className="w-7 h-7 rounded-full border border-gray-200 text-gray-600 hover:bg-gray-100 transition"
+                  aria-label="Increase quantity"
+                  className="flex h-8 w-8 items-center justify-center rounded-full border border-[#e9e3d8] bg-white text-gray-600 transition hover:bg-gray-100"
                   type="button"
                 >
-                  +
+                  <Plus size={14} />
                 </button>
               </div>
             </div>
 
-            <label className="block text-xs font-black uppercase tracking-[0.16em] text-gray-400">
-              Extra Add-ons
-            </label>
-            <div className="space-y-2">
+            {hasAddOns && (
+              <div className="space-y-2">
+                <label className="block text-xs font-black uppercase tracking-[0.16em] text-gray-500">
+                  Extra Add-ons
+                </label>
               {category.includes('pasta') && (
                 <AddOnCard
                   label="Garlic Bread"
@@ -505,18 +504,19 @@ export default function ProductModal({ isOpen, onClose, product, allCakes, onAdd
                     />
                   );
                 })}
-            </div>
+              </div>
+            )}
 
-            <div className="mt-4 border-t border-gray-100 pt-4">
+            <div className="mt-2 rounded-xl border border-[#eee8dd] bg-[#faf8f2] px-4 py-3">
               <div className="flex items-center justify-between">
-                <span className="text-base text-gray-500">Unit price</span>
-                <span className="text-base font-semibold text-gray-900">
+                <span className="text-sm text-gray-500">Unit price</span>
+                <span className="text-sm font-semibold text-gray-900">
                   ₱{parsedUnitPrice.toLocaleString()}
                 </span>
               </div>
               <div className="mt-2 flex items-center justify-between">
-                <span className="text-base text-gray-500">Total</span>
-                <span className="text-lg font-bold text-black">₱{totalPrice.toLocaleString()}</span>
+                <span className="text-sm font-semibold text-[#493a30]">Total</span>
+                <span className="text-xl font-bold text-[#493a30]">₱{totalPrice.toLocaleString()}</span>
               </div>
             </div>
           </div>
@@ -530,7 +530,7 @@ export default function ProductModal({ isOpen, onClose, product, allCakes, onAdd
             className={`w-full h-[48px] rounded-[20px] font-black uppercase tracking-[0.16em] text-xs flex items-center justify-center gap-2 active:scale-[0.97] shadow-lg shadow-black/10 ${
               overallOutOfStock
                 ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                : 'bg-black text-white hover:bg-black/90'
+                : 'border border-[#eadfca] bg-[#fff8e9] text-[#33251e] hover:border-[#e7c875] hover:bg-[#fff8df] hover:text-[#8d6a2e]'
             }`}
           >
             <ShoppingBag size={16} />

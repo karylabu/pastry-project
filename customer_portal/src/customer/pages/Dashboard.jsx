@@ -14,6 +14,7 @@ import {
   History,
   ChevronLeft,
   ChevronRight,
+  ArrowRight,
   Gift,
   Star,
   Tag,
@@ -41,15 +42,12 @@ const HERO_SLIDES = [
     type: "image",
     src: `${ROOT_BASE}/uploads/banner(1).png`,
   },
-  {
-    type: "video",
-    src: "http://localhost/pastry-project/uploads/banner(2).mp4",
-  },
 ];
 
 function Banner({ onShopNow, onCustomizeNow }) {
   const [slide, setSlide] = useState(0);
   const total = HERO_SLIDES.length;
+  const currentSlide = HERO_SLIDES[slide] || HERO_SLIDES[0];
 
   const goTo = (i) => setSlide(((i % total) + total) % total);
   const next = () => goTo(slide + 1);
@@ -57,11 +55,11 @@ function Banner({ onShopNow, onCustomizeNow }) {
 
   // auto-advance every 6s, paused while the video slide is showing
   useEffect(() => {
-    if (HERO_SLIDES[slide].type === "video") return;
+    if (!currentSlide || currentSlide.type === "video") return;
     const t = setTimeout(next, 6000);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [slide]);
+  }, [slide, currentSlide]);
 
   return (
     <div className="relative mx-auto aspect-video w-full max-w-[1380px] bg-white flex items-center justify-center overflow-hidden font-['DM_Sans']">
@@ -76,11 +74,11 @@ function Banner({ onShopNow, onCustomizeNow }) {
           transition={{ duration: 0.6 }}
           className="absolute inset-0"
         >
-          {HERO_SLIDES[slide].type === "video" ? (
+          {currentSlide?.type === "video" ? (
             <video
               className="absolute inset-0 w-full h-full object-cover"
-              src={HERO_SLIDES[slide].src}
-              poster={HERO_SLIDES[slide].poster}
+              src={currentSlide.src}
+              poster={currentSlide.poster}
               autoPlay
               muted
               loop
@@ -88,7 +86,7 @@ function Banner({ onShopNow, onCustomizeNow }) {
             />
           ) : (
             <img
-              src={HERO_SLIDES[slide].src}
+              src={currentSlide?.src}
               alt="Pastry Project banner"
               className="absolute inset-0 h-full w-full object-cover"
             />
@@ -107,36 +105,77 @@ function Banner({ onShopNow, onCustomizeNow }) {
         </button>
       )}
 
-      {/* PREV / NEXT ARROWS */}
-      <button
-        onClick={prev}
-        aria-label="Previous slide"
-        className="absolute left-4 md:left-8 top-1/2 -translate-y-1/2 z-20 w-11 h-11 rounded-full bg-white/10 hover:bg-white/20 border border-white/30 text-white flex items-center justify-center backdrop-blur-sm transition"
-      >
-        <ChevronLeft size={20} />
-      </button>
-      <button
-        onClick={next}
-        aria-label="Next slide"
-        className="absolute right-4 md:right-8 top-1/2 -translate-y-1/2 z-20 w-11 h-11 rounded-full bg-white/10 hover:bg-white/20 border border-white/30 text-white flex items-center justify-center backdrop-blur-sm transition"
-      >
-        <ChevronRight size={20} />
-      </button>
-
-      {/* DOT INDICATORS */}
-      <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2">
-        {HERO_SLIDES.map((_, i) => (
+      {total > 1 && (
+        <>
           <button
-            key={i}
-            onClick={() => goTo(i)}
-            aria-label={`Go to slide ${i + 1}`}
-            className={`h-1.5 rounded-full transition-all ${
-              i === slide ? "w-8 bg-[#d4af37]" : "w-3 bg-white/40 hover:bg-white/60"
-            }`}
-          />
-        ))}
-      </div>
+            onClick={prev}
+            aria-label="Previous slide"
+            className="absolute left-4 md:left-8 top-1/2 -translate-y-1/2 z-20 w-11 h-11 rounded-full bg-white/10 hover:bg-white/20 border border-white/30 text-white flex items-center justify-center backdrop-blur-sm transition"
+          >
+            <ChevronLeft size={20} />
+          </button>
+          <button
+            onClick={next}
+            aria-label="Next slide"
+            className="absolute right-4 md:right-8 top-1/2 -translate-y-1/2 z-20 w-11 h-11 rounded-full bg-white/10 hover:bg-white/20 border border-white/30 text-white flex items-center justify-center backdrop-blur-sm transition"
+          >
+            <ChevronRight size={20} />
+          </button>
+        </>
+      )}
+
+      {total > 1 && (
+        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2">
+          {HERO_SLIDES.map((_, i) => (
+            <button
+              key={i}
+              onClick={() => goTo(i)}
+              aria-label={`Go to slide ${i + 1}`}
+              className={`h-1.5 rounded-full transition-all ${
+                i === slide ? "w-8 bg-[#d4af37]" : "w-3 bg-white/40 hover:bg-white/60"
+              }`}
+            />
+          ))}
+        </div>
+      )}
     </div>
+  );
+}
+
+function SecondaryBanner({ onOrderNow }) {
+  const secondaryBanner = {
+    type: "image",
+    src: `${ROOT_BASE}/uploads/banner(2).png`,
+  };
+
+  return (
+    <section className="mb-4 mt-2 overflow-hidden rounded-xl border border-[#eadfd8] bg-white shadow-[0_5px_18px_rgba(91,64,39,0.05)]">
+      <div className="relative h-[200px] w-full overflow-hidden sm:h-[240px] md:h-[290px] lg:h-[340px]">
+        {secondaryBanner.type === "video" ? (
+          <video
+            className="h-full w-full object-cover scale-[1.08]"
+            src={secondaryBanner.src}
+            autoPlay
+            muted
+            loop
+            playsInline
+          />
+        ) : (
+          <img
+            src={secondaryBanner.src}
+            alt="Pastry Project banner"
+            className="h-full w-full object-cover scale-[1.08]"
+          />
+        )}
+        <button
+          type="button"
+          onClick={onOrderNow}
+          className="absolute left-[50%] top-[70%] z-10 inline-flex -translate-y-1/2 items-center gap-3 rounded-full bg-[#73785c] px-5 py-2.5 font-serif text-sm font-medium text-white shadow-sm transition hover:bg-[#5f654a] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2"
+        >
+          Order Now <ArrowRight size={15} strokeWidth={1.8} />
+        </button>
+      </div>
+    </section>
   );
 }
 
@@ -1090,6 +1129,8 @@ export default function Dashboard({ onAddToCart }) {
             </button>
           ))}
         </div>
+
+        <SecondaryBanner onOrderNow={() => navigate("/customer/menu")} />
 
         <div className="grid gap-4 lg:grid-cols-[minmax(0,2.1fr)_minmax(300px,0.88fr)]">
           <div className="min-w-0">

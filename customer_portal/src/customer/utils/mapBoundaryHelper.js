@@ -5,16 +5,13 @@
  */
 
 import L from 'leaflet';
-import { TANAUAN_CITY_BOUNDS, getTanauanMapBounds } from '../utils/locationBoundaryUtils';
+import { TANAUAN_CITY_BOUNDS, TANAUAN_CITY_POLYGON, getTanauanMapBounds } from '../utils/locationBoundaryUtils';
 
 /**
- * Create boundary rectangle for Leaflet map
- * Shows Tanauan City coverage area
+ * Create the municipal boundary for Leaflet map
  */
 export const createBoundaryRectangle = (map) => {
-  const bounds = getTanauanMapBounds();
-
-  const rectangle = L.rectangle(bounds, {
+  const boundary = L.polygon(TANAUAN_CITY_POLYGON.map(([lng, lat]) => [lat, lng]), {
     color: '#D4AF37', // Gold color to match app theme
     weight: 2,
     opacity: 0.7,
@@ -24,7 +21,7 @@ export const createBoundaryRectangle = (map) => {
     dashArray: '5, 5', // Dashed border
   }).addTo(map);
 
-  return rectangle;
+  return boundary;
 };
 
 /**

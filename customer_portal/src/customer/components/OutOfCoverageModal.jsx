@@ -11,7 +11,7 @@ export default function OutOfCoverageModal({
   isOpen,
   errorMessage,
   onClose,
-  onRetryMap,
+  onEditAddress,
   distanceFromCenter,
 }) {
   return (
@@ -21,14 +21,14 @@ export default function OutOfCoverageModal({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-x-0 bottom-0 top-[84px] z-[40000] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
+          className="fixed inset-0 z-[70000] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
         >
           <motion.div
             initial={{ scale: 0.9, opacity: 0, y: 20 }}
             animate={{ scale: 1, opacity: 1, y: 0 }}
             exit={{ scale: 0.9, opacity: 0, y: 20 }}
             transition={{ type: 'spring', damping: 15, stiffness: 300 }}
-            className="flex max-h-[calc(100vh-104px)] w-full max-w-sm flex-col overflow-hidden rounded-[24px] bg-white shadow-2xl"
+            className="flex max-h-[calc(100dvh-2rem)] w-full max-w-sm flex-col overflow-hidden rounded-[24px] bg-white shadow-2xl"
           >
             {/* Header with Icon */}
             <div className="shrink-0 bg-gradient-to-r from-red-50 to-orange-50 px-6 py-5 flex flex-col items-center text-center">
@@ -97,7 +97,7 @@ export default function OutOfCoverageModal({
                 </p>
                 <ul className="text-[12px] text-amber-900 space-y-0.5 ml-4 list-disc leading-4">
                   <li>Select a different address within Tanauan City</li>
-                  <li>Check the map and move the location pin</li>
+                  <li>Update the address to a location in Tanauan City</li>
                   <li>Use a saved address from Tanauan City</li>
                   <li>Contact us for special requests</li>
                 </ul>
@@ -113,10 +113,10 @@ export default function OutOfCoverageModal({
                 Cancel
               </button>
               <button
-                onClick={onRetryMap}
+                onClick={onEditAddress}
                 className="flex-1 h-[42px] rounded-[14px] bg-black text-white font-bold uppercase text-[11px] tracking-[0.1em] transition hover:bg-black/90 active:scale-[0.98] shadow-lg shadow-black/10"
               >
-                Choose Location
+                Edit Address
               </button>
             </div>
           </motion.div>

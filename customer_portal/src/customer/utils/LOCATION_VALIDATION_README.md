@@ -7,12 +7,14 @@ A comprehensive React-based geofencing and location validation system for restri
 ## Components & Files
 
 ### 1. **Location Boundary Utilities** (`locationBoundaryUtils.js`)
-Core geofencing logic with dual-validation approach (bounding box + circular radius).
+Core geofencing logic using the simplified municipal polygon for Tanauan City, Batangas.
+Boundary source: [GeoBoundaries PHL ADM3](https://www.geoboundaries.org/api/current/gbOpen/PHL/ADM3/), based on NAMRIA/PSA/OCHA Philippines data (CC BY 3.0 IGO).
 
 #### Key Functions:
-- `isLocationWithinCoverage(lat, lng)` - Primary validation function
-- `isWithinBoundingBox(lat, lng)` - Rectangular boundary check
-- `isWithinCircularGeofence(lat, lng)` - Circular radius check
+- `isLocationWithinCoverage(lat, lng)` - Primary municipal-polygon validation
+- `isWithinTanauanCity(lat, lng)` - Point-in-polygon check
+- `isWithinBoundingBox(lat, lng)` - Fast polygon-extent pre-check
+- `isWithinCircularGeofence(lat, lng)` - Optional distance visualization only
 - `calculateDistance(lat1, lng1, lat2, lng2)` - Haversine distance formula
 - `getOutOfCoverageMessage(lat, lng)` - User-friendly error messages
 - `validateCoordinates(lat, lng)` - Input sanitization
@@ -22,15 +24,17 @@ Core geofencing logic with dual-validation approach (bounding box + circular rad
 #### Boundary Configuration:
 ```javascript
 const TANAUAN_CITY_BOUNDS = {
-  minLat: 13.8850,   // South
-  maxLat: 14.1200,   // North
-  minLng: 120.9450,  // West
-  maxLng: 121.1100,  // East
+  minLat: 14.027532824,
+  maxLat: 14.155837033,
+  minLng: 121.04335015,
+  maxLng: 121.16116102,
   centerLat: 14.0735,
   centerLng: 121.0743,
-  radiusKm: 8.5      // Circular geofence radius
+  radiusKm: 8.5      // Optional distance visualization only
 }
 ```
+
+The polygon in `TANAUAN_CITY_POLYGON` is the source of truth for both the map outline and order validation.
 
 ### 2. **Location Validation Hook** (`useLocationValidation.js`)
 Custom React hook managing validation state and logic.
@@ -98,8 +102,8 @@ Leaflet map visualization utilities for boundary display.
 
 #### Key Functions:
 - `addBoundaryVisualization(map, options)` - Add all boundary layers
-- `createBoundaryRectangle(map)` - Dashed rectangle boundary
-- `createCircularGeofence(map)` - Circular coverage area
+- `createBoundaryRectangle(map)` - Municipal polygon boundary (legacy function name)
+- `createCircularGeofence(map)` - Optional circular distance visualization
 - `highlightLocation(map, lat, lng, isValid)` - Location feedback
 - `focusOnTanauan(map, zoomLevel)` - Zoom to service area
 - `resetMapToTanauan(map)` - Return to default view
@@ -108,8 +112,8 @@ Leaflet map visualization utilities for boundary display.
 ```javascript
 // Add boundary visualization
 const boundaryLayers = addBoundaryVisualization(mapInstance, {
-  showRectangle: true,  // Show delivery zone
-  showCircle: false,    // Optional circular geofence
+  showRectangle: true,  // Show municipal polygon delivery zone
+  showCircle: false,    // Optional distance visualization, not validation
   showCenter: true      // Show city center
 });
 
@@ -227,19 +231,7 @@ const handlePlaceOrder = async () => {
 
 ## Validation Logic
 
-The system uses a **two-layer validation approach**:
-
-### Layer 1: Bounding Box (Rectangle)
-- Fast rectangular boundary check
-- Prevents obviously wrong locations
-- Bounds: 13.8850°N to 14.1200°N, 120.9450°E to 121.1100°E
-
-### Layer 2: Circular Geofence
-- 8.5km radius from city center
-- Covers actual service area
-- Center: 14.0735°N, 121.0743°E
-
-**A location is valid only if it passes BOTH checks.**
+The system first checks the polygon's bounding box, then tests whether the coordinate lies inside the Tanauan municipal polygon. The same polygon controls the map outline, marker color, coverage alert, and order submission.
 
 ## Haversine Distance Formula
 
@@ -257,7 +249,7 @@ Where:
 ## User Experience Flow
 
 1. **User Opens Map**
-   - Boundary rectangle displayed (dashed gold line)
+  - Tanauan municipal boundary displayed (dashed gold line)
    - Map centered on Tanauan City
    - User's current location loaded (if geolocation enabled)
 
@@ -279,24 +271,24 @@ Where:
 
 ## Customization
 
-### Adjust Boundary Coordinates
-Edit `TANAUAN_CITY_BOUNDS` in `locationBoundaryUtils.js`:
+### Adjust the Delivery Boundary
+Edit `TANAUAN_CITY_POLYGON` in `locationBoundaryUtils.js` to change the service area. `TANAUAN_CITY_BOUNDS` is only its bounding-box pre-check and map extent:
 ```javascript
 const TANAUAN_CITY_BOUNDS = {
-  minLat: 13.8850,    // Change these values
-  maxLat: 14.1200,
-  minLng: 120.9450,
-  maxLng: 121.1100,
+  minLat: 14.027532824,
+  maxLat: 14.155837033,
+  minLng: 121.04335015,
+  maxLng: 121.16116102,
   centerLat: 14.0735,
   centerLng: 121.0743,
-  radiusKm: 8.5       // Adjust radius
+  radiusKm: 8.5       // Optional distance visualization only
 };
 ```
 
 ### Change Boundary Visualization
 In `mapBoundaryHelper.js`, modify colors and styles:
 ```javascript
-const rectangle = L.rectangle(bounds, {
+const boundary = L.polygon(cityBoundaryCoordinates, {
   color: '#D4AF37',        // Change to your color
   weight: 2,
   opacity: 0.7,
@@ -314,12 +306,12 @@ The system validates:
 - ✅ Latitude range (-90 to 90)
 - ✅ Longitude range (-180 to 180)
 - ✅ Coordinates within Philippines
-- ✅ Bounding box check
-- ✅ Circular geofence check
+- ✅ Municipal polygon boundary check
+- ✅ Polygon boundary shown on checkout map
 
 ## Performance Considerations
 
-- **Boundary checks**: O(1) constant time
+- **Boundary checks**: O(n) point-in-polygon check over 65 simplified vertices
 - **Distance calculation**: Single haversine formula execution
 - **Map rendering**: Layers cached in refs
 - **Geolocation**: Only called once on modal open
