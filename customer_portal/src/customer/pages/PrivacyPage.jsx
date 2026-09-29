@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 const sections = [
   "1. Information We Collect",
@@ -19,6 +20,7 @@ const sections = [
 ];
 
 export default function PrivacyPage() {
+  const navigate = useNavigate();
   const [activeSection, setActiveSection] = useState(0);
 
   useEffect(() => {
@@ -49,13 +51,20 @@ export default function PrivacyPage() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-white text-[#1a1a1a]">
-      <header className="border-b border-[#f0e7cb] bg-white/90 backdrop-blur-sm">
+    <div className="min-h-screen bg-[#fffaf3] text-[#1a1a1a]">
+      <header className="border-b border-[#f0e7cb] bg-[#fffdf9] backdrop-blur-sm">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-5 py-4 sm:px-6 lg:px-10">
           <div className="flex items-center gap-3">
-            <img src="http://localhost/pastry-project/uploads/logo.png?v=logo-v2" alt="Pastry Project logo" className="h-11 w-11 rounded-none bg-transparent object-contain" />
-            <div>
-              <p className="text-xl font-black tracking-tight text-[#171717]">Pastry Project</p>
+            <button
+              type="button"
+              onClick={() => navigate(-1)}
+              className="inline-flex items-center gap-2 rounded-full border border-[#d4af37]/40 bg-[#fffaf0] px-3 py-1.5 text-xs font-bold uppercase tracking-[0.14em] text-[#171717] transition hover:border-[#d4af37] hover:bg-[#fdf3d7]"
+            >
+              ← Back
+            </button>
+            <div className="flex items-center gap-3">
+              <img src="http://localhost/pastry-project/uploads/logo.png?v=logo-v2" alt="Pastry Project logo" className="h-10 w-10 rounded-none bg-transparent object-contain" />
+              <p className="text-lg font-black tracking-tight text-[#171717] sm:text-xl">Pastry Project</p>
             </div>
           </div>
         </div>

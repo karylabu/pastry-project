@@ -33,8 +33,13 @@ class Order extends Model
         'email',
         'address_id',
         'order_type',
-        'is_customized'
+        'is_customized',
+        'discount_type',
+        'discount',
+        'discount_id_path'
     ];
+
+    protected $hidden = ['discount_id_path'];
 
     protected $casts = [
         'items' => 'array',

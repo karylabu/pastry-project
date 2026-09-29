@@ -163,7 +163,7 @@ export default function ChatSupport() {
   };
 
   return (
-    <main className="min-h-screen bg-white px-4 py-8 sm:px-6 lg:px-10">
+    <main className="min-h-screen bg-[#fffaf3] px-4 py-8 sm:px-6 lg:px-10">
       <div className="mx-auto max-w-5xl bg-white">
         <div className="border-b border-[#f0e6db] px-5 py-7 sm:px-8 lg:px-10">
           <div className="flex items-center gap-3">

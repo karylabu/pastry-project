@@ -200,12 +200,12 @@ export default function SavedAddresses() {
   };
 
   return (
-    <PageShell background="bg-[#fafaf9]" padding="px-4 py-6 sm:px-6 sm:py-8 md:px-10 md:py-10" innerClassName="space-y-6">
+    <PageShell background="bg-[#fffaf3]" padding="px-4 py-6 sm:px-6 sm:py-8 md:px-8 md:py-9" innerClassName="space-y-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <p className="text-[10px] font-black uppercase tracking-[0.3em] text-[#c59a36]">Delivery Details</p>
-            <h1 className="mt-2 text-2xl font-bold tracking-tight text-slate-900 sm:text-[30px]">Saved Addresses</h1>
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">Save your usual delivery locations for a faster, smoother checkout.</p>
+            <h1 className="mt-2 text-2xl font-bold tracking-tight text-[#4a2b20] sm:text-[30px]">Saved Addresses</h1>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-[#8b6b55]">Save your usual delivery locations for a faster, smoother checkout.</p>
           </div>
           <div className="flex items-center gap-2 rounded-xl border border-[#eadfbf] bg-[#fffaf0] px-3 py-2 text-xs font-semibold text-[#8b681d]">
             <MapPin size={15} />
@@ -214,7 +214,7 @@ export default function SavedAddresses() {
         </div>
 
         <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_390px]">
-          <section ref={formSectionRef} className="space-y-7 rounded-[24px] border border-stone-200 bg-white p-5 shadow-[0_12px_35px_rgba(15,23,42,0.04)] sm:p-7">
+          <section ref={formSectionRef} className="space-y-7 rounded-[24px] border border-[#ead8c5] bg-white p-5 shadow-[0_12px_35px_rgba(126,82,35,0.06)] sm:p-7">
             <div className="flex items-start justify-between gap-4 border-b border-stone-100 pb-5">
               <div>
                 <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#c59a36]">Address book</p>
@@ -230,9 +230,9 @@ export default function SavedAddresses() {
                     type="button"
                     key={label}
                     onClick={() => handleChange('address_label', label)}
-                    className={`flex items-center gap-3 rounded-2xl border px-4 py-3 text-left text-sm font-semibold transition ${form.address_label === label ? 'border-slate-900 bg-slate-900 text-white shadow-sm' : 'border-stone-200 bg-[#fafaf9] text-slate-700 hover:border-[#d4af37]'}`}
+                    className={`flex items-center gap-3 rounded-2xl border px-4 py-3 text-left text-sm font-semibold transition ${form.address_label === label ? 'border-[#e7b866] bg-[#fff1d8] text-[#4a2b20] shadow-sm' : 'border-stone-200 bg-[#fffaf3] text-slate-700 hover:border-[#d4af37]'}`}
                   >
-                    <span className={`flex h-8 w-8 items-center justify-center rounded-xl ${form.address_label === label ? 'bg-[#d4af37] text-slate-900' : 'bg-white text-[#a77b16]'}`}>
+                    <span className={`flex h-8 w-8 items-center justify-center rounded-xl ${form.address_label === label ? 'bg-[#f1cf72] text-[#4a2b20]' : 'bg-white text-[#a77b16]'}`}>
                       {React.createElement(LABEL_ICONS[label], { size: 16 })}
                     </span>
                     <span className="flex-1">{label}</span>
@@ -251,7 +251,7 @@ export default function SavedAddresses() {
                     value={form.recipient_name}
                     onChange={(e) => handleChange('recipient_name', e.target.value)}
                     placeholder="Recipient name"
-                    className="mt-2 w-full rounded-[18px] border border-gray-200 bg-white px-4 py-3 text-sm outline-none focus:border-black"
+                    className="mt-2 w-full rounded-xl border border-[#ead8c5] bg-white px-4 py-3.5 text-sm text-[#4a2b20] outline-none focus:border-[#d4af37] focus:ring-2 focus:ring-[#f1cf72]/30"
                   />
                 </label>
                 <label className="block text-sm text-gray-700">
@@ -261,7 +261,7 @@ export default function SavedAddresses() {
                     onChange={(e) => handleChange('contact_number', e.target.value)}
                     placeholder="09XXXXXXXXX"
                     type="tel"
-                    className="mt-2 w-full rounded-[18px] border border-gray-200 bg-white px-4 py-3 text-sm outline-none focus:border-black"
+                    className="mt-2 w-full rounded-xl border border-[#ead8c5] bg-white px-4 py-3.5 text-sm text-[#4a2b20] outline-none focus:border-[#d4af37] focus:ring-2 focus:ring-[#f1cf72]/30"
                   />
                 </label>
               </div>
@@ -276,7 +276,7 @@ export default function SavedAddresses() {
                     value={form.house_no}
                     onChange={(e) => handleChange('house_no', e.target.value)}
                     placeholder="House/Building number"
-                    className="mt-2 w-full rounded-[18px] border border-gray-200 bg-white px-4 py-3 text-sm outline-none focus:border-black"
+                    className="mt-2 w-full rounded-xl border border-[#ead8c5] bg-white px-4 py-3.5 text-sm text-[#4a2b20] outline-none focus:border-[#d4af37] focus:ring-2 focus:ring-[#f1cf72]/30"
                   />
                 </label>
                 <label className="block text-sm text-gray-700">
@@ -285,7 +285,7 @@ export default function SavedAddresses() {
                     value={form.street}
                     onChange={(e) => handleChange('street', e.target.value)}
                     placeholder="Street name"
-                    className="mt-2 w-full rounded-[18px] border border-gray-200 bg-white px-4 py-3 text-sm outline-none focus:border-black"
+                    className="mt-2 w-full rounded-xl border border-[#ead8c5] bg-white px-4 py-3.5 text-sm text-[#4a2b20] outline-none focus:border-[#d4af37] focus:ring-2 focus:ring-[#f1cf72]/30"
                   />
                 </label>
                 <label className="block text-sm text-gray-700">
@@ -294,7 +294,7 @@ export default function SavedAddresses() {
                     value={form.barangay}
                     onChange={(e) => handleChange('barangay', e.target.value)}
                     placeholder="Barangay"
-                    className="mt-2 w-full rounded-[18px] border border-gray-200 bg-white px-4 py-3 text-sm outline-none focus:border-black"
+                    className="mt-2 w-full rounded-xl border border-[#ead8c5] bg-white px-4 py-3.5 text-sm text-[#4a2b20] outline-none focus:border-[#d4af37] focus:ring-2 focus:ring-[#f1cf72]/30"
                   />
                 </label>
                 <label className="block text-sm text-gray-700">
@@ -303,7 +303,7 @@ export default function SavedAddresses() {
                     value={form.city}
                     onChange={(e) => handleChange('city', e.target.value)}
                     placeholder="City or municipality"
-                    className="mt-2 w-full rounded-[18px] border border-gray-200 bg-white px-4 py-3 text-sm outline-none focus:border-black"
+                    className="mt-2 w-full rounded-xl border border-[#ead8c5] bg-white px-4 py-3.5 text-sm text-[#4a2b20] outline-none focus:border-[#d4af37] focus:ring-2 focus:ring-[#f1cf72]/30"
                   />
                 </label>
                 <label className="block text-sm text-gray-700">
@@ -367,7 +367,7 @@ export default function SavedAddresses() {
               type="submit"
               onClick={handleSubmit}
               disabled={loading}
-              className="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-5 py-3 text-xs font-bold uppercase tracking-[0.16em] text-white transition hover:bg-[#d4af37] hover:text-slate-900 disabled:opacity-60"
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#e7b866] px-6 py-3.5 text-sm font-bold uppercase tracking-[0.16em] text-[#4a2b20] transition hover:bg-[#f1cf72] disabled:opacity-60"
             >
               <Save size={15} />
               {loading ? 'Saving…' : form.address_id ? 'Update Address' : 'Save Address'}
@@ -375,7 +375,7 @@ export default function SavedAddresses() {
           </section>
 
           <aside className="space-y-4 lg:sticky lg:top-24">
-            <div className="rounded-[24px] border border-stone-200 bg-white p-5 shadow-[0_12px_35px_rgba(15,23,42,0.04)] sm:p-6">
+            <div className="rounded-[24px] border border-[#ead8c5] bg-white p-5 shadow-[0_12px_35px_rgba(126,82,35,0.06)] sm:p-6">
               <div className="mb-4 flex items-center justify-between">
                 <div>
                   <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#c59a36]">Your locations</p>
@@ -392,7 +392,7 @@ export default function SavedAddresses() {
               ) : (
                 <div className="space-y-4">
                   {addresses.map((addressItem) => (
-                    <div key={addressItem.address_id} className="rounded-2xl border border-stone-200 bg-[#fafaf9] p-4 transition hover:border-[#d4af37]">
+                    <div key={addressItem.address_id} className="rounded-2xl border border-[#ead8c5] bg-[#fffaf3] p-4 transition hover:border-[#d4af37]">
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex min-w-0 items-start gap-2.5">
                           <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-[#f7edcf] text-[#a77b16]"><MapPin size={15} /></span>
@@ -402,7 +402,7 @@ export default function SavedAddresses() {
                           </div>
                         </div>
                         {addressItem.is_default && (
-                          <span className="shrink-0 rounded-full bg-slate-900 px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.14em] text-white">Default</span>
+                          <span className="shrink-0 rounded-full bg-[#f1cf72] px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.14em] text-[#4a2b20]">Default</span>
                         )}
                       </div>
                       <p className="mt-4 text-[13px] leading-5 text-slate-700">

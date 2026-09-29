@@ -195,6 +195,7 @@ export default function Orders() {
         id: item?.id ?? item?.product_id ?? `${order?.id ?? 'order'}-${index}`,
         name: item?.name || item?.product || item?.title || 'Unnamed item',
         product: item?.product || item?.name || item?.title || 'Unnamed item',
+        variant: item?.variant || '',
         qty: Number(item?.qty || item?.quantity || 1),
         price: Number(item?.price || item?.unit_price || 0),
         image: item?.image || item?.photo || item?.thumbnail || item?.img || '',
@@ -209,6 +210,7 @@ export default function Orders() {
           id: item?.id ?? item?.product_id ?? `${order?.id ?? 'order'}-${index}`,
           name: item?.name || item?.product || item?.title || 'Unnamed item',
           product: item?.product || item?.name || item?.title || 'Unnamed item',
+          variant: item?.variant || '',
           qty: Number(item?.qty || item?.quantity || 1),
           price: Number(item?.price || item?.unit_price || 0),
           image: item?.image || item?.photo || item?.thumbnail || item?.img || '',
@@ -297,6 +299,7 @@ export default function Orders() {
             ? order.items
             : [{ name: 'Custom Cake Request', qty: order.custom_cake_details?.quantity || 1, price: Number(order.total || order.custom_cake_details?.estimated_price || 0) }],
         })) : [];
+        const customizedOrderIds = new Set(customOrders.map((order) => String(order.id)));
         const mergedById = new Map();
         [...customOrders, ...regularOrders].forEach((order) => {
           const key = String(order.id);
@@ -304,6 +307,8 @@ export default function Orders() {
         });
         const parsedOrders = Array.from(mergedById.values()).map((order) => ({
           ...order,
+          is_customized: customizedOrderIds.has(String(order.id)) || Boolean(order.is_customized),
+          custom_details: order.custom_details || order.custom_cake_details || {},
           items: normalizeOrderItems(order),
         }));
         const userOrders = filterUserOrders(parsedOrders);
@@ -499,18 +504,82 @@ export default function Orders() {
 
     if (!order) return null;
     const buildReceiptHTML = (o) => {
-      const itemsHtml = (o.items || []).map(it => `
+      const escapeReceiptHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (character) => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;',
+      }[character]));
+      const formatReceiptValue = (value) => {
+        if (Array.isArray(value)) {
+          return value.map(formatReceiptValue).filter(Boolean).join(', ');
+        }
+        if (value && typeof value === 'object') {
+          return Object.entries(value).map(([key, entry]) => `${key}: ${formatReceiptValue(entry)}`).filter(Boolean).join(' · ');
+        }
+        return String(value ?? '').trim();
+      };
+      const receiptDetails = [
+        ['Customer', formatReceiptValue(o.customer || rawCustomDetails.customer_name || rawCustomDetails.name)],
+        ['Email', formatReceiptValue(o.email || rawCustomDetails.email)],
+        ['Phone', formatReceiptValue(o.phone || rawCustomDetails.phone)],
+        ['Order status', formatReceiptValue(o.status)],
+        ['Order type', formatReceiptValue(o.order_type || rawCustomDetails.cake_type)],
+        ['Payment method', formatReceiptValue(o.payment)],
+        ['Payment status', formatReceiptValue(o.payment_status)],
+        ['Fulfillment method', formatReceiptValue(o.method || rawCustomDetails.delivery_method)],
+        ['Delivery address', formatReceiptValue(o.address || rawCustomDetails.delivery_address)],
+        ['Delivery date', formatReceiptValue(o.delivery_date || rawCustomDetails.delivery_date || rawCustomDetails.pickup_date)],
+        ['Delivery time', formatReceiptValue(o.delivery_time || rawCustomDetails.delivery_time || rawCustomDetails.pickup_time)],
+        ['Subtotal', o.subtotal !== undefined ? `₱${Number(o.subtotal || 0).toLocaleString()}` : ''],
+        ['Delivery fee', o.delivery_fee !== undefined ? `₱${Number(o.delivery_fee || 0).toLocaleString()}` : ''],
+        ['Discount', Number(o.discount || 0) > 0 ? `${formatReceiptValue(o.discount_type)} · ₱${Number(o.discount).toLocaleString()}` : ''],
+      ].filter(([, value]) => value);
+      const receiptDetailsHtml = receiptDetails.map(([label, value]) => `
+        <tr><th style="width:32%;padding:7px;border:1px solid #eee;text-align:left;vertical-align:top">${escapeReceiptHtml(label)}</th><td style="padding:7px;border:1px solid #eee;white-space:pre-wrap">${escapeReceiptHtml(value)}</td></tr>
+      `).join('');
+      const itemsHtml = (o.items || []).map(it => {
+        const variant = formatReceiptValue(it.variant);
+        const selectionDetails = formatReceiptValue(it.selectionDetails || it.details);
+        const itemDetails = [variant, selectionDetails].filter(Boolean).join(' · ');
+        return `
         <tr>
-          <td style="padding:8px;border:1px solid #eee">${(it.name || '')}</td>
-          <td style="padding:8px;border:1px solid #eee;text-align:center">${it.qty}</td>
+          <td style="padding:8px;border:1px solid #eee">${escapeReceiptHtml(it.name || '')}${itemDetails ? `<div style="margin-top:4px;font-size:12px;color:#555">${escapeReceiptHtml(itemDetails)}</div>` : ''}</td>
+          <td style="padding:8px;border:1px solid #eee;text-align:center">${escapeReceiptHtml(it.qty ?? '')}</td>
           <td style="padding:8px;border:1px solid #eee;text-align:right">₱${(Number(it.price) * Number(it.qty)).toLocaleString()}</td>
         </tr>
-      `).join('');
+      `;
+      }).join('');
+      const customizationHtml = isCustomized ? `
+        <section style="margin-top:20px;page-break-inside:avoid">
+          <h2 style="font-size:15px;margin:0 0 8px">Customization Details</h2>
+          ${customDetailEntries.length ? `<table><tbody>${customDetailEntries.map(([label, value]) => `
+            <tr><th style="width:32%;padding:7px;border:1px solid #eee;text-align:left;vertical-align:top">${escapeReceiptHtml(label)}</th><td style="padding:7px;border:1px solid #eee;white-space:pre-wrap">${escapeReceiptHtml(value)}</td></tr>
+          `).join('')}</tbody></table>` : '<p>No customization details were attached to this order.</p>'}
+          ${customReferenceImages.length ? `<h3 style="font-size:13px;margin:16px 0 8px">Reference images</h3><div style="display:flex;flex-wrap:wrap;gap:8px">${customReferenceImages.map((src, index) => `<img src="${escapeReceiptHtml(src)}" alt="Customer reference ${index + 1}" style="max-width:180px;max-height:180px;object-fit:contain;border:1px solid #eee;padding:4px">`).join('')}</div>` : ''}
+        </section>
+      ` : '';
+      const orderDetailsHtml = isCustomized
+        ? customizationHtml
+        : `<h2 style="font-size:15px;margin:18px 0 8px">Order Details</h2><table><tbody>${receiptDetailsHtml}</tbody></table>`;
+      const deliveryAddressHtml = isCustomized ? '' : `
+        <div style="margin-top:18px;font-size:13px;color:#333">
+          <strong>Delivery Address</strong>
+          <div>${escapeReceiptHtml(o.address || '—')}</div>
+        </div>
+      `;
 
-      return `<!doctype html><html><head><meta charset="utf-8"><title>Receipt #${o.id}</title><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{font-family:Arial,Helvetica,sans-serif;color:#111;padding:20px}h1{font-size:18px}table{width:100%;border-collapse:collapse;margin-top:12px}th{background:#f7f7f7;border:1px solid #eee;padding:8px;text-align:left}td{padding:8px;border:1px solid #eee} .meta{margin-top:8px;font-size:13px;color:#444}</style></head><body>
-        <h1>Receipt — Order #${o.id}</h1>
-        <div class="meta">Date: ${o.created_at || ''}</div>
-        <div class="meta">Payment: ${o.payment || ''} — Method: ${o.method || ''}</div>
+      return `<!doctype html><html><head><meta charset="utf-8"><title>Receipt #${escapeReceiptHtml(o.id)}</title><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{font-family:Arial,Helvetica,sans-serif;color:#111;padding:20px}.brand{text-align:center;margin:0 auto 22px}.brand img{display:block;width:68px;height:68px;object-fit:contain;margin:0 auto 6px}.brand-name{font-family:Georgia,'Times New Roman',serif;font-size:25px;font-weight:bold;font-style:italic}.brand-name span{color:#b58b19}.tagline{margin-top:4px;font-size:9px;letter-spacing:3px;text-transform:uppercase;color:#777}h1{font-size:18px}table{width:100%;border-collapse:collapse;margin-top:12px}th{background:#f7f7f7;border:1px solid #eee;padding:8px;text-align:left}td{padding:8px;border:1px solid #eee}.meta{margin-top:8px;font-size:13px;color:#444}@media print{body{padding:0}section,table,img{break-inside:avoid}}</style></head><body>
+        <header class="brand">
+          <img src="${escapeReceiptHtml(`${ROOT_BASE}/uploads/logo.png?v=logo-v2`)}" alt="Pastry Project logo">
+          <div class="brand-name">Pastry <span>Project</span></div>
+          <div class="tagline">Baked fresh daily</div>
+        </header>
+        <h1>Receipt — Order #${escapeReceiptHtml(o.id)}</h1>
+        <div class="meta">Date: ${escapeReceiptHtml(o.created_at || '')}</div>
+        ${orderDetailsHtml}
+        <h2 style="font-size:15px;margin:18px 0 8px">Items</h2>
         <table>
           <thead><tr><th>Item</th><th style="width:80px">Qty</th><th style="width:120px">Total</th></tr></thead>
           <tbody>
@@ -520,14 +589,11 @@ export default function Orders() {
             <tr>
               <td style="padding:8px;border:1px solid #eee"></td>
               <td style="padding:8px;border:1px solid #eee;text-align:right;font-weight:bold">Grand Total</td>
-              <td style="padding:8px;border:1px solid #eee;text-align:right;font-weight:bold">₱${Number(o.total).toLocaleString()}</td>
+              <td style="padding:8px;border:1px solid #eee;text-align:right;font-weight:bold">₱${Number(o.total || 0).toLocaleString()}</td>
             </tr>
           </tfoot>
         </table>
-        <div style="margin-top:18px;font-size:13px;color:#333">
-          <strong>Delivery Address</strong>
-          <div>${o.address || '—'}</div>
-        </div>
+        ${deliveryAddressHtml}
       </body></html>`;
     };
 
@@ -538,8 +604,18 @@ export default function Orders() {
         if (!w) return alert('Unable to open print window. Please allow popups.');
         w.document.write(html);
         w.document.close();
-        w.focus();
-        setTimeout(() => { w.print(); }, 250);
+        const imagesReady = Promise.all(Array.from(w.document.images).map((image) => (
+          image.complete
+            ? Promise.resolve()
+            : new Promise((resolve) => {
+                image.addEventListener('load', resolve, { once: true });
+                image.addEventListener('error', resolve, { once: true });
+              })
+        )));
+        imagesReady.then(() => {
+          w.focus();
+          w.print();
+        });
       } catch (err) {
         console.error(err);
         alert('Failed to open print window.');
@@ -566,6 +642,9 @@ export default function Orders() {
 
     const isCustomized = Boolean(
       order.is_customized ||
+      order.custom_details ||
+      order.custom_cake_details ||
+      String(order.order_type || '').toLowerCase().includes('custom') ||
       String(order.type || '').toLowerCase() === 'custom' ||
       String(order.type || '').toLowerCase() === 'customized' ||
       (order.items || []).some((item) => String(item.name || '').toLowerCase().includes('custom'))
@@ -584,7 +663,15 @@ export default function Orders() {
 
     const formatCustomValue = (value) => {
       if (Array.isArray(value)) {
-        return value.filter(Boolean).join(', ');
+        return value.map((item) => {
+          if (item && typeof item === 'object') {
+            return Object.entries(item).map(([key, entryValue]) => `${key}: ${formatCustomValue(entryValue)}`).filter(Boolean).join(' · ');
+          }
+          return String(item ?? '');
+        }).filter(Boolean).join(', ');
+      }
+      if (value && typeof value === 'object') {
+        return Object.entries(value).map(([key, entryValue]) => `${key}: ${formatCustomValue(entryValue)}`).filter(Boolean).join(' · ');
       }
       if (value === null || value === undefined || value === '') {
         return '';
@@ -597,10 +684,16 @@ export default function Orders() {
       ['Email', formatCustomValue(rawCustomDetails.email)],
       ['Phone', formatCustomValue(rawCustomDetails.phone)],
       ['Delivery method', formatCustomValue(rawCustomDetails.delivery_method)],
-      ['Delivery address', formatCustomValue(rawCustomDetails.delivery_address)],
+      ['Delivery address', formatCustomValue(rawCustomDetails.delivery_address || order.address || '—')],
+      ['Delivery service', formatCustomValue(rawCustomDetails.delivery_service)],
+      ['Rider name', formatCustomValue(rawCustomDetails.rider_name)],
+      ['Rider contact', formatCustomValue(rawCustomDetails.rider_contact)],
+      ['Booking/reference', formatCustomValue(rawCustomDetails.rider_booking_reference)],
       ['Pickup date', formatCustomValue(rawCustomDetails.pickup_date)],
       ['Pickup time', formatCustomValue(rawCustomDetails.pickup_time)],
+      ['Cake type', formatCustomValue(rawCustomDetails.cake_type)],
       ['Cake size', formatCustomValue(rawCustomDetails.cake_size)],
+      ['Tier details', formatCustomValue(rawCustomDetails.tier_details)],
       ['Servings', formatCustomValue(rawCustomDetails.servings)],
       ['Cake flavor', formatCustomValue(rawCustomDetails.cake_flavor)],
       ['Filling flavor', formatCustomValue(rawCustomDetails.filling_flavor)],

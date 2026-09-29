@@ -27,7 +27,7 @@ const offerings = [
 
 export default function AboutUsPage() {
   return (
-    <div className="min-h-screen bg-white text-[#171717]">
+    <div className="min-h-screen bg-[#fffaf3] text-[#171717]">
       <section className="relative overflow-hidden bg-white">
         <div className="relative mx-auto grid max-w-7xl gap-10 px-5 py-12 sm:px-6 lg:grid-cols-[1.1fr_0.9fr] lg:px-10 lg:py-14">
           <div className="flex flex-col justify-center">

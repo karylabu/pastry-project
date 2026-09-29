@@ -27,7 +27,7 @@ $oId = $data['order_id'] ?? 0;
 $orderId = (intval($oId) > 0) ? intval($oId) : null;
 $message = trim($data['message'] ?? "");
 $sender  = $isAdmin ? 'admin' : 'customer';
-$conversationId = substr(trim($data['conversation_id'] ?? ''), 0, 64) ?: null;
+$conversationId = substr(trim($data['conversation_id'] ?? ''), 0, 64) ?: 'legacy';
 $imagePath = null;
 
 if ($orderId !== null) {
@@ -54,24 +54,6 @@ if (empty($message) && !isset($_FILES['image'])) {
     exit();
 }
 
-/* =========================
-   SAVE MESSAGE
-========================= */
-/*
-| SCHEMA NOTE: The messages table columns (user_id, updated_at) are maintained
-| through versioned migrations in database/migrations/. This API must never run
-| ALTER TABLE statements at request time.
-*/
-
-$query = "INSERT INTO messages (order_id, user_id, sender, message, created_at) VALUES (?, ?, ?, ?, NOW())";
-$stmt = $conn->prepare($query);
-
-if (!$stmt) {
-    error_log("DB PREPARE ERROR: " . $conn->error);
-    echo json_encode(["success" => false, "message" => "DB Error: " . $conn->error]);
-    exit();
-}
-
 if (isset($_FILES['image']) && $_FILES['image']['error'] === UPLOAD_ERR_OK) {
     $targetDir = __DIR__ . "/uploads/chat/";
     if (!is_dir($targetDir)) mkdir($targetDir, 0777, true);
@@ -85,9 +67,16 @@ if (isset($_FILES['image']) && $_FILES['image']['error'] === UPLOAD_ERR_OK) {
 $query = "INSERT INTO messages (order_id, user_id, sender, message, image_path, conversation_id, created_at) VALUES (?, ?, ?, ?, ?, ?, NOW())";
 $stmt = $conn->prepare($query);
 
-if ($stmt) {
-    $stmt->bind_param("iissss", $orderId, $userId, $sender, $message, $imagePath, $conversationId);
-    if ($stmt->execute()) {
+if (!$stmt) {
+    http_response_code(500);
+    error_log("DB PREPARE ERROR: " . $conn->error);
+    echo json_encode(["success" => false, "message" => "Unable to save message."]);
+    $conn->close();
+    exit();
+}
+
+$stmt->bind_param("iissss", $orderId, $userId, $sender, $message, $imagePath, $conversationId);
+if ($stmt->execute()) {
         $insertedId = $stmt->insert_id;
         $stmt->close();
 
@@ -149,11 +138,9 @@ if ($stmt) {
             "ai_reply" => $aiReply,
             "order_id" => $orderId
         ]);
-    } else {
-        echo json_encode(["success" => false, "message" => "Execute error: " . $stmt->error]);
-    }
 } else {
-    echo json_encode(["success" => false, "message" => "DB Prepare Error: " . $conn->error]);
+    http_response_code(500);
+    echo json_encode(["success" => false, "message" => "Unable to save message."]);
 }
 
 $conn->close();

@@ -5,6 +5,7 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { BASE, CUSTOMER_BASE, LARAVEL_BASE } from '../../services/config';
 import { getAuthHeaders } from '../../services/api';
+import { identifyDiscountIdType } from '../utils/discountIdOcr';
 import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
 import markerIcon from "leaflet/dist/images/marker-icon.png";
 import markerShadow from "leaflet/dist/images/marker-shadow.png";
@@ -46,8 +47,14 @@ export default function CheckoutModal({
   const [loading, setLoading] = useState(false);
   const [locationError, setLocationError] = useState('');
   const [shopOpen, setShopOpen] = useState(true);
+  const [discountType, setDiscountType] = useState('none');
+  const [discountIdFile, setDiscountIdFile] = useState(null);
+  const [discountIdPreview, setDiscountIdPreview] = useState('');
+  const [discountIdScan, setDiscountIdScan] = useState({ state: 'idle', message: '' });
   const modalScrollRef = useRef(null);
   const addressInputRef = useRef(null);
+  const discountIdScanRunRef = useRef(0);
+  const discountOcrWorkerRef = useRef(null);
 
   const refreshShopStatus = () => {
     const now = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Manila' }));
@@ -72,6 +79,76 @@ export default function CheckoutModal({
   const [showPhoneSuggestions, setShowPhoneSuggestions] = useState(false);
   const [showAddressSuggestions, setShowAddressSuggestions] = useState(false);
   const pickupMapElementRef = useRef(null);
+
+  useEffect(() => {
+    if (!discountIdFile) {
+      setDiscountIdPreview('');
+      return undefined;
+    }
+
+    const previewUrl = URL.createObjectURL(discountIdFile);
+    setDiscountIdPreview(previewUrl);
+    return () => URL.revokeObjectURL(previewUrl);
+  }, [discountIdFile]);
+
+  useEffect(() => () => {
+    discountIdScanRunRef.current += 1;
+    if (discountOcrWorkerRef.current) {
+      void discountOcrWorkerRef.current.terminate();
+      discountOcrWorkerRef.current = null;
+    }
+  }, []);
+
+  const scanDiscountId = async (file, expectedType) => {
+    const runId = ++discountIdScanRunRef.current;
+    setDiscountIdScan({ state: 'scanning', message: 'Checking ID text in your browser...' });
+
+    const previousWorker = discountOcrWorkerRef.current;
+    discountOcrWorkerRef.current = null;
+    if (previousWorker) await previousWorker.terminate();
+
+    let worker;
+    try {
+      const { createWorker } = await import('tesseract.js');
+      worker = await createWorker('eng');
+      if (runId !== discountIdScanRunRef.current) {
+        await worker.terminate();
+        worker = null;
+        return;
+      }
+      discountOcrWorkerRef.current = worker;
+
+      const { data: { text } } = await worker.recognize(file);
+      if (runId !== discountIdScanRunRef.current) return;
+
+      const detectedType = identifyDiscountIdType(text);
+      if (detectedType === expectedType) {
+        setDiscountIdScan({
+          state: 'match',
+          message: `Possible ${expectedType === 'pwd' ? 'PWD' : 'Senior Citizen'} ID text found. Admin will still verify the image.`,
+        });
+      } else if (detectedType && detectedType !== 'ambiguous') {
+        setDiscountIdScan({
+          state: 'mismatch',
+          message: `The text looks like a ${detectedType === 'pwd' ? 'PWD' : 'Senior Citizen'} ID. Choose the matching discount or upload the correct ID.`,
+        });
+      } else {
+        setDiscountIdScan({
+          state: 'unreadable',
+          message: 'Could not identify the ID type from this photo. Upload a clearer, well-lit image.',
+        });
+      }
+    } catch {
+      if (runId === discountIdScanRunRef.current) {
+        setDiscountIdScan({ state: 'error', message: 'ID text scan failed. Try again with a clearer photo.' });
+      }
+    } finally {
+      if (worker && discountOcrWorkerRef.current === worker) {
+        discountOcrWorkerRef.current = null;
+        await worker.terminate();
+      }
+    }
+  };
 
   useEffect(() => {
     if (!isOpen || checkoutData.method !== 'Pickup' || !pickupMapElementRef.current) return undefined;
@@ -366,16 +443,11 @@ export default function CheckoutModal({
     0
   );
 
-  const deliveryFee =
-    checkoutData.method === "Deliver" && cartItems.length > 0
-      ? 45
-      : 0;
-
   const rushFee = checkoutData.orderType === "Urgent" ? 100 : 0;
-  const discountAmount = 0;
+  const discountAmount = discountType === 'none' ? 0 : Number((subtotal * 0.2).toFixed(2));
   const taxAmount = 0;
 
-  const total = subtotal + deliveryFee + rushFee + taxAmount - discountAmount;
+  const total = subtotal + rushFee + taxAmount - discountAmount;
   const berMonths = isBerMonth();
 
   useEffect(() => {
@@ -418,6 +490,13 @@ export default function CheckoutModal({
       return;
     }
 
+    if (discountType !== 'none' && (!discountIdFile || discountIdScan.state !== 'match')) {
+      alert(discountIdScan.state === 'scanning'
+        ? 'Wait for the ID text scan to finish.'
+        : 'Upload a clearer ID photo and wait for a matching ID type before applying this discount.');
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -445,11 +524,12 @@ export default function CheckoutModal({
         method: checkoutData.method,
         payment: checkoutData.payment,
         order_type: checkoutData.orderType || "Standard",
+        discount_type: discountType,
         address: checkoutData.address,
         phone: checkoutData.phone,
 
-        latitude: checkoutData.lat,
-        longitude: checkoutData.lng,
+        lat: checkoutData.lat,
+        lng: checkoutData.lng,
       };
 
       /* =========================
@@ -464,15 +544,17 @@ export default function CheckoutModal({
       };
 
       const xsrf = getCookie('XSRF-TOKEN');
+      const formData = new FormData();
+      formData.append('order_payload', JSON.stringify(payload));
+      if (discountIdFile) formData.append('discount_id_image', discountIdFile);
 
       const response = await fetch(orderUrl, {
         method: "POST",
         headers: {
-          "Content-Type": "application/json",
           ...getAuthHeaders(),
           ...(xsrf ? { 'X-XSRF-TOKEN': xsrf } : {}),
         },
-        body: JSON.stringify(payload),
+        body: formData,
       });
 
       let result;
@@ -514,7 +596,7 @@ export default function CheckoutModal({
             },
             body: JSON.stringify({
               order_id: result.order_id,
-              amount: total,
+              amount: Number(result.total ?? total),
               payment_method: checkoutData.payment,
             }),
           }
@@ -985,9 +1067,72 @@ export default function CheckoutModal({
                 <span>₱{subtotal}</span>
               </div>
 
-              <div className="flex justify-between text-sm text-gray-500">
-                <span>Shipping</span>
-                <span>₱{deliveryFee}</span>
+              <div className="space-y-2 rounded-xl border border-[#eee5db] bg-white p-3">
+                <label htmlFor="checkout-discount-type" className="block text-xs font-semibold text-[#765d50]">
+                  Senior Citizen / PWD Discount
+                </label>
+                <select
+                  id="checkout-discount-type"
+                  value={discountType}
+                  onChange={(event) => {
+                    const nextType = event.target.value;
+                    setDiscountType(nextType);
+                    if (nextType === 'none') {
+                      setDiscountIdFile(null);
+                      setDiscountIdScan({ state: 'idle', message: '' });
+                      discountIdScanRunRef.current += 1;
+                    } else if (discountIdFile) {
+                      scanDiscountId(discountIdFile, nextType);
+                    }
+                  }}
+                  className="w-full rounded-lg border border-[#e8e1d8] bg-[#fffdfa] p-2.5 text-sm text-[#33251e] outline-none focus:border-[#d4af37] focus:ring-2 focus:ring-[#d4af37]/20"
+                >
+                  <option value="none">No discount</option>
+                  <option value="senior_citizen">Senior Citizen - 20%</option>
+                  <option value="pwd">PWD - 20%</option>
+                </select>
+                {discountType !== 'none' && (
+                  <div className="space-y-2">
+                    <label htmlFor="discount-id-image" className="block text-xs leading-relaxed text-[#765d50]">
+                      Upload a clear photo of the valid ID. Required for this discount; only authorized admin can view it.
+                    </label>
+                    <input
+                      id="discount-id-image"
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      capture="environment"
+                      required
+                      onChange={(event) => {
+                        const file = event.target.files?.[0] || null;
+                        event.target.value = '';
+                        const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
+                        if (file && (!allowedTypes.includes(file.type) || file.size > 5 * 1024 * 1024)) {
+                          alert('Choose a JPG, PNG, or WEBP image no larger than 5 MB.');
+                          event.target.value = '';
+                          setDiscountIdFile(null);
+                          setDiscountIdScan({ state: 'idle', message: '' });
+                          return;
+                        }
+                        setDiscountIdFile(file);
+                        if (file) scanDiscountId(file, discountType);
+                        else setDiscountIdScan({ state: 'idle', message: '' });
+                      }}
+                      className="block w-full text-xs text-[#765d50] file:mr-3 file:rounded-lg file:border-0 file:bg-[#fff0c2] file:px-3 file:py-2 file:text-xs file:font-semibold file:text-[#6f5523]"
+                    />
+                    {discountIdPreview && (
+                      <img
+                        src={discountIdPreview}
+                        alt="Preview of uploaded discount ID"
+                        className="max-h-48 w-full rounded-lg border border-[#e8e1d8] bg-white object-contain"
+                      />
+                    )}
+                    {discountIdScan.message && (
+                      <p className={`text-xs ${discountIdScan.state === 'match' ? 'text-green-700' : discountIdScan.state === 'scanning' ? 'text-[#765d50]' : 'text-amber-800'}`}>
+                        {discountIdScan.message}
+                      </p>
+                    )}
+                  </div>
+                )}
               </div>
 
               {rushFee > 0 && (
@@ -997,10 +1142,12 @@ export default function CheckoutModal({
                 </div>
               )}
 
-              <div className="flex justify-between text-sm text-gray-500">
-                <span>Discount</span>
-                <span>-₱{discountAmount}</span>
-              </div>
+              {discountAmount > 0 && (
+                <div className="flex justify-between text-sm text-green-700">
+                  <span>{discountType === 'pwd' ? 'PWD discount (20%)' : 'Senior Citizen discount (20%)'}</span>
+                  <span>-₱{discountAmount.toFixed(2)}</span>
+                </div>
+              )}
 
               <div className="flex justify-between text-sm text-gray-500">
                 <span>Tax</span>

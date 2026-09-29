@@ -56,7 +56,12 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
       .then(safeParseJson)
       .then(data => {
         if (data?.status === 'success' && data.user) {
-          setUser(data.user);
+          const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
+          setUser({
+            ...storedUser,
+            ...data.user,
+            avatar: data.user.avatar || data.user.profile_image || data.user.profile_picture || storedUser.avatar || '',
+          });
         }
       })
       .catch(() => {
@@ -146,7 +151,10 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
     if (notifFilter === "All") return notifications;
     if (notifFilter === "Active Orders") return notifications.filter((n) => ["order_pending", "order_ready", "order_urgent"].includes(n.type) || (n.type === "Success" && n.action_url?.includes("/customer/orders")));
     if (notifFilter === "Reminders & Warnings") return notifications.filter((n) => ["order_expired", "stockout"].includes(n.type) || (n.type === "Warning" && n.action_url?.includes("/customer/orders")));
-    if (notifFilter === "Account Updates") return notifications.filter((n) => ["account", "profile"].includes(n.type));
+    if (notifFilter === "Account Updates") return notifications.filter((n) =>
+      ["account", "profile"].includes(n.type) ||
+      (n.type === "Info" && n.action_url?.includes("/customer/account-settings"))
+    );
     return notifications;
   }, [notifications, notifFilter]);
 
@@ -221,6 +229,14 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
       : 'text-gray-700 hover:bg-gray-100'
   }`;
 
+  const accountAvatar = user?.avatar || user?.profile_image || user?.profile_picture || '';
+  const accountInitials = (user?.name || user?.full_name || 'U')
+    .split(' ')
+    .slice(0, 2)
+    .map((part) => part[0])
+    .join('')
+    .toUpperCase();
+
   return (
     <>
     <nav className="sticky top-0 z-[50000] bg-white/90 backdrop-blur-xl border-b border-gray-100 px-6 xl:px-10 py-5">
@@ -273,7 +289,7 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
         </div>
 
         {/* RIGHT */}
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-6">
 
           {/* SEARCH */}
           <div ref={searchRef} className="relative">
@@ -514,7 +530,13 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
               onClick={() => setOpenAccount(!openAccount)}
               className="w-12 h-12 rounded-full bg-gray-100 border border-gray-200 flex items-center justify-center hover:border-[#d4af37] transition-all"
             >
-              <User size={20} className="text-gray-700" />
+              {accountAvatar ? (
+                <img src={accountAvatar} alt={user?.name || 'Account'} className="h-full w-full rounded-full object-cover" />
+              ) : user ? (
+                <span className="text-sm font-bold text-[#8b5e34]">{accountInitials}</span>
+              ) : (
+                <User size={20} className="text-gray-700" />
+              )}
             </button>
             {openAccount && (
               <div className="absolute right-0 top-[65px] w-[260px] bg-white border border-gray-100 rounded-[28px] shadow-2xl overflow-hidden">

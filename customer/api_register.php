@@ -36,8 +36,8 @@ try {
     $phone    = trim($data['phone'] ?? '');
     $password = $data['password'] ?? '';
 
-    if (!$name || !$email || !$password) {
-        echo json_encode(["success" => false, "message" => "Please fill in Name, Email and Password."]);
+    if (!$name || !$email || !$phone || !$password) {
+        echo json_encode(["success" => false, "message" => "Please fill in Name, Email, Phone Number and Password."]);
         exit;
     }
 

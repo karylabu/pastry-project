@@ -1,13 +1,12 @@
 import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { ArrowLeft } from "lucide-react";
 import { CUSTOMER_BASE, LARAVEL_BASE } from "../../services/config";
 import { safeParseJson } from '../../services/api';
 import { signInWithGoogle } from "../../services/firebase";
 
 const BASE = CUSTOMER_BASE;
-const LOGO_URL = `${BASE}/../uploads/logo.png?v=logo-v2`;
+const LOGO_URL = "/assets/logo.png";
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const phoneRegex = /^\+?[0-9\s-]{7,15}$/;
 
@@ -38,7 +37,7 @@ const validateConfirmPassword = (value, compareValue) => {
 };
 
 const validatePhone = (value) => {
-  if (!value.trim()) return "";
+  if (!value.trim()) return "Phone number is required.";
   if (!phoneRegex.test(value.trim())) return "Please enter a valid phone number.";
   return "";
 };
@@ -211,242 +210,288 @@ export default function Register() {
   };
 
   return (
-    <div
-      className="min-h-screen flex items-center justify-center p-6 font-['Inter'] relative overflow-hidden"
-      style={{
-        backgroundImage: "url('/assets/bg.jpg')",
-        backgroundSize: "cover",
-        backgroundPosition: "center",
-      }}
-    >
+    <div className="pastry-register relative min-h-screen w-full overflow-hidden bg-[#f8f4eb] font-['DM_Sans'] text-[#171717]">
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700;800&family=Pacifico&display=swap');
+
+        .brand-script { font-family: 'Pacifico', cursive; }
+        .pastry-register { background: #fcfbf8; }
+        .pastry-register .register-banner { position: absolute; z-index: 0; top: 0; left: 0; height: calc(100% - 105px); width: auto; max-width: none; object-fit: contain; object-position: left top; }
+        .pastry-register .hero-panel { visibility: hidden; }
+
+        .pastry-register .login-card {
+          background: rgba(255,255,255,0.96);
+          border: 1px solid rgba(203, 213, 225, 0.8);
+          border-radius: 28px;
+          box-shadow: 0 18px 55px rgba(35, 28, 20, 0.14);
+          backdrop-filter: blur(8px);
+          z-index: 10;
+        }
+
+        .pastry-register .register-input {
+          height: 52px;
+          border: 1px solid #d8d5cf;
+          border-radius: 12px;
+          padding: 0 14px;
+          transition: all 0.2s;
+          font-size: 15px;
+        }
+        .pastry-register .register-input:focus {
+          border-color: #F0B94D;
+          box-shadow: 0 0 0 4px rgba(240, 185, 77, 0.1);
+          outline: none;
+        }
+
+        .pastry-register .btn-primary {
+          height: 48px;
+          background: #F0B94D;
+          color: #171717;
+          font-weight: 700;
+          border-radius: 12px;
+          transition: all 0.2s;
+        }
+        .pastry-register .btn-primary:hover { background: #E5AE3D; }
+
+        .pastry-register .btn-secondary {
+          height: 52px;
+          border: 1.5px solid #E5E7EB;
+          background: white;
+          border-radius: 12px;
+          transition: all 0.2s;
+        }
+        .pastry-register .btn-secondary:hover { background: #F9FAFB; }
+
+        @media (max-width: 767px) {
+          .pastry-register .register-banner { display: none; }
+        }
       `}</style>
 
-      <div className="absolute inset-0 bg-black/70 backdrop-blur-[6px]" />
+      <img className="register-banner" src={`${BASE}/../uploads/login.jpg?v=login-v1`} alt="" aria-hidden="true" />
 
-      <motion.div
-        initial={{ opacity: 0, y: 14 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.22 }}
-        className="relative z-10 w-full max-w-[520px] rounded-[24px] shadow-[0_20px_60px_rgba(0,0,0,0.4)]"
-      >
-        <div className="relative overflow-hidden rounded-t-[24px] bg-[#fbf6ec] px-8 pb-6 pt-7">
-          <p className="mb-3 text-center text-[10px] font-semibold uppercase tracking-[0.2em] text-[#9d7b4b]">
-            EST. 2017
-          </p>
-
-          <div className="flex flex-col items-center justify-center gap-2">
-            <div className="flex h-16 w-16 items-center justify-center">
-              <img src={LOGO_URL} alt="Logo" className="mx-auto block h-full w-full object-contain" />
+      <div className="relative z-10 flex min-h-screen w-full flex-col">
+        <main className="flex flex-1 flex-col py-4 lg:flex-row lg:items-center lg:justify-between lg:gap-0 lg:py-0">
+          <div className="hero-panel hidden w-full flex-1 flex-col justify-center py-3 lg:flex lg:w-[53%] lg:py-0 lg:pl-[5.9vw]">
+            <div className="mb-6 flex items-center gap-1">
+              <img src={LOGO_URL} alt="Logo" className="h-14 w-14 object-contain" />
+              <div>
+                <h1 className="brand-script text-2xl leading-none text-[#F0B94D]">
+                  Pastry <span className="text-[#171717]">Project</span>
+                </h1>
+                <p className="text-[9px] font-bold uppercase tracking-[0.3em] text-[#171717] opacity-80">Sweetening moments</p>
+              </div>
             </div>
-            <div className="text-center">
-              <h1 className="text-[22px] font-semibold leading-[1.05] tracking-tight text-[#3b2318] sm:text-[24px]">
-                Pastry Project
-              </h1>
-              <p className="mt-1 text-[11px] leading-snug text-[#8c6d54]">
-                Bakeshop & Cafe
-              </p>
+
+            <div className="max-w-[420px] space-y-4 text-[#171717]">
+              <div className="rounded-[24px] border border-[#f2d181] bg-[#fffaf0] px-5 py-4 shadow-sm">
+                <p className="text-xs font-bold uppercase tracking-[0.25em] text-[#A8354A]">Fresh start</p>
+                <h2 className="mt-2 text-3xl font-extrabold leading-tight text-[#171717]">Create your account</h2>
+                <p className="mt-2 text-sm text-[#171717]/70">Enjoy personalized orders, saved favorites, and fast checkout for your favorite pastries.</p>
+              </div>
             </div>
           </div>
 
-          <p className="mt-5 text-center text-[11px] leading-snug text-[#6b4a3a]">
-            Create an account to start ordering your favorites.
-          </p>
-        </div>
-
-        <div className="overflow-hidden rounded-b-[24px] bg-[#fbf6ec] px-8 pb-7 pt-6">
-          <button
-            onClick={() => navigate("/customer/login")}
-            className="mb-4 flex items-center gap-2 text-xs text-[#6b4a3a] transition hover:text-black"
-          >
-            <ArrowLeft size={14} /> Back to Login
-          </button>
-
-          <p className="mb-3 text-[10px] font-semibold uppercase tracking-[0.2em] text-[#6b4a3a]">
-            Create Account
-          </p>
-
-          {error && (
-            <div className="bg-[#A8354A]/10 text-[#8A2A3C] border border-[#A8354A]/25 rounded-xl px-3 py-2 text-[12px] mb-3">
-              {error}
-            </div>
-          )}
-
-          <form onSubmit={handleSubmit} className="space-y-3">
-            <div>
-              <label className="mb-1.5 block text-xs font-semibold text-black">Full Name</label>
-              <input
-                type="text"
-                placeholder="Full Name"
-                value={name}
-                onBlur={() => handleBlur("name")}
-                onChange={(e) => {
-                  setName(e.target.value);
-                  if (touched.name) {
-                    setErrors((prev) => ({ ...prev, name: validateName(e.target.value) }));
-                  }
-                }}
-                className="h-[46px] w-full rounded-xl border border-black/15 bg-white px-4 text-sm text-black outline-none transition-all focus:border-[#F0B94D] focus:ring-2 focus:ring-[#F0B94D]/30"
-              />
-              {touched.name && errors.name && <p className="mt-1 text-[10px] text-[#A8354A]">{errors.name}</p>}
-            </div>
-
-            <div>
-              <label className="mb-1.5 block text-xs font-semibold text-black">Email Address</label>
-              <input
-                type="email"
-                placeholder="Email Address"
-                value={email}
-                onBlur={() => handleBlur("email")}
-                onChange={(e) => {
-                  setEmail(e.target.value);
-                  if (touched.email) {
-                    setErrors((prev) => ({ ...prev, email: validateEmail(e.target.value) }));
-                  }
-                }}
-                className="h-[46px] w-full rounded-xl border border-black/15 bg-white px-4 text-sm text-black outline-none transition-all focus:border-[#F0B94D] focus:ring-2 focus:ring-[#F0B94D]/30"
-              />
-              {touched.email && errors.email && <p className="mt-1 text-[10px] text-[#A8354A]">{errors.email}</p>}
-            </div>
-
-            <div>
-              <label className="mb-1.5 block text-xs font-semibold text-black">Phone Number (Optional)</label>
-              <input
-                type="tel"
-                placeholder="Phone Number"
-                value={phone}
-                onBlur={() => handleBlur("phone")}
-                onChange={(e) => {
-                  setPhone(e.target.value);
-                  if (touched.phone) {
-                    setErrors((prev) => ({ ...prev, phone: validatePhone(e.target.value) }));
-                  }
-                }}
-                className="h-[46px] w-full rounded-xl border border-black/15 bg-white px-4 text-sm text-black outline-none transition-all focus:border-[#F0B94D] focus:ring-2 focus:ring-[#F0B94D]/30"
-              />
-              {touched.phone && errors.phone && <p className="mt-1 text-[10px] text-[#A8354A]">{errors.phone}</p>}
-            </div>
-
-            <div>
-              <label className="mb-1.5 block text-xs font-semibold text-black">Password</label>
-              <input
-                type="password"
-                placeholder="Password"
-                value={password}
-                onBlur={() => handleBlur("password")}
-                onChange={(e) => {
-                  setPassword(e.target.value);
-                  if (touched.password) {
-                    setErrors((prev) => ({ ...prev, password: validatePassword(e.target.value) }));
-                  }
-                }}
-                className="h-[46px] w-full rounded-xl border border-black/15 bg-white px-4 text-sm text-black outline-none transition-all focus:border-[#F0B94D] focus:ring-2 focus:ring-[#F0B94D]/30"
-              />
-              {touched.password && errors.password && <p className="mt-1 text-[10px] text-[#A8354A]">{errors.password}</p>}
-            </div>
-
-            <div>
-              <label className="mb-1.5 block text-xs font-semibold text-black">Confirm Password</label>
-              <input
-                type="password"
-                placeholder="Confirm Password"
-                value={confirmPassword}
-                onBlur={() => handleBlur("confirmPassword")}
-                onChange={(e) => {
-                  setConfirmPassword(e.target.value);
-                  if (touched.confirmPassword) {
-                    setErrors((prev) => ({ ...prev, confirmPassword: validateConfirmPassword(e.target.value, password) }));
-                  }
-                }}
-                className="h-[46px] w-full rounded-xl border border-black/15 bg-white px-4 text-sm text-black outline-none transition-all focus:border-[#F0B94D] focus:ring-2 focus:ring-[#F0B94D]/30"
-              />
-              {touched.confirmPassword && errors.confirmPassword && <p className="mt-1 text-[10px] text-[#A8354A]">{errors.confirmPassword}</p>}
-            </div>
-
-            <div className="flex flex-col gap-2 pt-1 text-xs leading-relaxed text-black/70">
-              <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={agreeTerms}
-                  onBlur={() => handleBlur("terms")}
-                  onChange={(e) => {
-                    setAgreeTerms(e.target.checked);
-                    if (touched.terms) {
-                      setErrors((prev) => ({ ...prev, terms: e.target.checked ? "" : "Please accept the Terms & Conditions." }));
-                    }
-                  }}
-                  className="w-3.5 h-3.5 rounded border-black/20 text-[#F0B94D] focus:ring-[#F0B94D]"
-                />
-                <span>
-                  I agree to the
-                  <a
-                    href="/terms.html"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="ml-1 underline decoration-[#F0B94D] decoration-2 underline-offset-2 text-black hover:text-black"
-                  >
-                    Terms & Conditions
-                  </a>
-                  .
-                </span>
-              </label>
-              <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={agreePrivacy}
-                  onBlur={() => handleBlur("privacy")}
-                  onChange={(e) => {
-                    setAgreePrivacy(e.target.checked);
-                    if (touched.privacy) {
-                      setErrors((prev) => ({ ...prev, privacy: e.target.checked ? "" : "Please accept the Privacy Policy." }));
-                    }
-                  }}
-                  className="w-3.5 h-3.5 rounded border-black/20 text-[#F0B94D] focus:ring-[#F0B94D]"
-                />
-                <span>
-                  I agree to the
-                  <a
-                    href="/privacy.html"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="ml-1 underline decoration-[#F0B94D] decoration-2 underline-offset-2 text-black hover:text-black"
-                  >
-                    Privacy Policy
-                  </a>
-                  .
-                </span>
-              </label>
-              {touched.terms && errors.terms && <p className="ml-5 text-[10px] text-[#A8354A]">{errors.terms}</p>}
-              {touched.privacy && errors.privacy && <p className="ml-5 text-[10px] text-[#A8354A]">{errors.privacy}</p>}
-            </div>
-
-            <button
-              type="submit"
-              disabled={loading || !isFormValid}
-              className="h-11 w-full rounded-full bg-[#F0B94D] text-[15px] font-bold uppercase tracking-[0.08em] text-black transition-all hover:bg-[#e0a934] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40"
+          <div className="flex w-full flex-1 items-center justify-center px-4 pb-5 pt-5 lg:justify-end lg:px-[4vw]">
+            <motion.div
+              initial={{ opacity: 0, y: 14 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.22 }}
+              className="login-card w-full max-w-[500px] px-5 py-4 sm:px-7 sm:py-5"
             >
-              {loading ? "Creating account…" : "Create account"}
-            </button>
+              <div className="mb-5 text-center lg:text-left">
+                <h2 className="text-2xl font-extrabold text-[#171717]">Create Account</h2>
+                <p className="mt-1 text-xs text-[#171717]/60">Create an account to start ordering your favorites.</p>
+              </div>
 
-            <div className="flex items-center gap-3 py-1">
-              <div className="h-px flex-1 bg-black/15" />
-              <span className="text-[11px] text-black/60">or</span>
-              <div className="h-px flex-1 bg-black/15" />
-            </div>
+              {error && (
+                <div className="mb-4 rounded-xl border border-red-100 bg-red-50 p-4 text-sm text-red-600">
+                  {error}
+                </div>
+              )}
 
-            <button
-              type="button"
-              onClick={handleGoogleSignup}
-              disabled={googleLoading}
-              className="flex h-11 w-full items-center justify-center gap-2 rounded-full border border-black/15 bg-white text-[15px] font-medium text-black transition-all hover:bg-black/5 disabled:opacity-60"
-            >
-              <GoogleIcon />
-              {googleLoading ? "Redirecting…" : "Sign Up with Google"}
-            </button>
-          </form>
-        </div>
-      </motion.div>
+              <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-x-4 gap-y-2 sm:grid-cols-2">
+                <div>
+                  <label className="mb-1.5 block text-xs font-bold text-[#171717]">Full Name</label>
+                  <input
+                    type="text"
+                    placeholder="Full Name"
+                    value={name}
+                    onBlur={() => handleBlur("name")}
+                    onChange={(e) => {
+                      setName(e.target.value);
+                      if (touched.name) {
+                        setErrors((prev) => ({ ...prev, name: validateName(e.target.value) }));
+                      }
+                    }}
+                    className="register-input w-full bg-white text-[#171717]"
+                  />
+                  {touched.name && errors.name && <p className="mt-1 text-[10px] text-[#A8354A]">{errors.name}</p>}
+                </div>
+
+                <div>
+                  <label className="mb-1.5 block text-xs font-bold text-[#171717]">Email Address</label>
+                  <input
+                    type="email"
+                    placeholder="Email Address"
+                    value={email}
+                    onBlur={() => handleBlur("email")}
+                    onChange={(e) => {
+                      setEmail(e.target.value);
+                      if (touched.email) {
+                        setErrors((prev) => ({ ...prev, email: validateEmail(e.target.value) }));
+                      }
+                    }}
+                    className="register-input w-full bg-white text-[#171717]"
+                  />
+                  {touched.email && errors.email && <p className="mt-1 text-[10px] text-[#A8354A]">{errors.email}</p>}
+                </div>
+
+                <div>
+                  <label className="mb-1.5 block text-xs font-bold text-[#171717]">Phone Number</label>
+                  <input
+                    type="tel"
+                    required
+                    placeholder="Phone Number"
+                    value={phone}
+                    onBlur={() => handleBlur("phone")}
+                    onChange={(e) => {
+                      setPhone(e.target.value);
+                      if (touched.phone) {
+                        setErrors((prev) => ({ ...prev, phone: validatePhone(e.target.value) }));
+                      }
+                    }}
+                    className="register-input w-full bg-white text-[#171717]"
+                  />
+                  {touched.phone && errors.phone && <p className="mt-1 text-[10px] text-[#A8354A]">{errors.phone}</p>}
+                </div>
+
+                <div>
+                  <label className="mb-1.5 block text-xs font-bold text-[#171717]">Password</label>
+                  <input
+                    type="password"
+                    placeholder="Password"
+                    value={password}
+                    onBlur={() => handleBlur("password")}
+                    onChange={(e) => {
+                      setPassword(e.target.value);
+                      if (touched.password) {
+                        setErrors((prev) => ({ ...prev, password: validatePassword(e.target.value) }));
+                      }
+                    }}
+                    className="register-input w-full bg-white text-[#171717]"
+                  />
+                  {touched.password && errors.password && <p className="mt-1 text-[10px] text-[#A8354A]">{errors.password}</p>}
+                </div>
+
+                <div className="sm:col-span-2">
+                  <label className="mb-1.5 block text-xs font-bold text-[#171717]">Confirm Password</label>
+                  <input
+                    type="password"
+                    placeholder="Confirm Password"
+                    value={confirmPassword}
+                    onBlur={() => handleBlur("confirmPassword")}
+                    onChange={(e) => {
+                      setConfirmPassword(e.target.value);
+                      if (touched.confirmPassword) {
+                        setErrors((prev) => ({ ...prev, confirmPassword: validateConfirmPassword(e.target.value, password) }));
+                      }
+                    }}
+                    className="register-input w-full bg-white text-[#171717]"
+                  />
+                  {touched.confirmPassword && errors.confirmPassword && <p className="mt-1 text-[10px] text-[#A8354A]">{errors.confirmPassword}</p>}
+                </div>
+
+                <div className="flex flex-col gap-2 pt-1 text-xs leading-relaxed text-[#171717]/80 sm:col-span-2">
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={agreeTerms}
+                      onBlur={() => handleBlur("terms")}
+                      onChange={(e) => {
+                        setAgreeTerms(e.target.checked);
+                        if (touched.terms) {
+                          setErrors((prev) => ({ ...prev, terms: e.target.checked ? "" : "Please accept the Terms & Conditions." }));
+                        }
+                      }}
+                      className="h-4 w-4 rounded border-black/20 text-[#F0B94D] focus:ring-[#F0B94D]"
+                    />
+                    <span>
+                      I agree to the
+                      <Link to="/customer/terms" className="ml-1 font-semibold text-[#171717] underline decoration-[#F0B94D] decoration-2 underline-offset-2 hover:text-black">
+                        Terms
+                      </Link>
+                      .
+                    </span>
+                  </label>
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={agreePrivacy}
+                      onBlur={() => handleBlur("privacy")}
+                      onChange={(e) => {
+                        setAgreePrivacy(e.target.checked);
+                        if (touched.privacy) {
+                          setErrors((prev) => ({ ...prev, privacy: e.target.checked ? "" : "Please accept the Privacy Policy." }));
+                        }
+                      }}
+                      className="h-4 w-4 rounded border-black/20 text-[#F0B94D] focus:ring-[#F0B94D]"
+                    />
+                    <span>
+                      I agree to the
+                      <a href="/privacy.html" target="_blank" rel="noopener noreferrer" className="ml-1 font-semibold text-[#171717] underline decoration-[#F0B94D] decoration-2 underline-offset-2 hover:text-black">
+                        Privacy Policy
+                      </a>
+                      .
+                    </span>
+                  </label>
+                  {touched.terms && errors.terms && <p className="ml-5 text-[10px] text-[#A8354A]">{errors.terms}</p>}
+                  {touched.privacy && errors.privacy && <p className="ml-5 text-[10px] text-[#A8354A]">{errors.privacy}</p>}
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={loading || !isFormValid}
+                  className="btn-primary w-full text-sm active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40 sm:col-span-2"
+                >
+                  {loading ? "Creating account…" : "Create account"}
+                </button>
+
+                <div className="flex items-center gap-4 py-1 sm:col-span-2">
+                  <div className="h-px flex-1 bg-gray-200" />
+                  <span className="text-sm text-gray-400">or</span>
+                  <div className="h-px flex-1 bg-gray-200" />
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleGoogleSignup}
+                  disabled={googleLoading}
+                  className="btn-secondary flex w-full items-center justify-center gap-3 text-sm font-semibold text-[#171717] active:scale-[0.98] disabled:opacity-50 sm:col-span-2"
+                >
+                  <GoogleIcon />
+                  {googleLoading ? "Redirecting…" : "Sign Up with Google"}
+                </button>
+
+                <p className="mt-2 text-center text-xs text-[#171717]/80 sm:col-span-2">
+                  Already have an account? <Link to="/customer/login" className="font-bold text-[#F0B94D] hover:underline">Log in</Link>
+                </p>
+              </form>
+            </motion.div>
+          </div>
+        </main>
+
+        <footer className="relative z-10 flex flex-col items-center justify-between border-t border-gray-200 bg-white/70 px-5 py-3 md:flex-row md:px-8">
+          <div className="flex items-center gap-3">
+            <img src={LOGO_URL} alt="Logo" className="h-9 w-9 opacity-80" />
+            <p className="text-sm text-gray-500">© 2024 Pastry Project. All rights reserved.</p>
+          </div>
+          <div className="my-2 flex flex-wrap justify-center gap-4 md:my-0 md:gap-6">
+            <Link to="/customer/about-us" className="text-sm font-semibold text-gray-600 hover:text-[#F0B94D]">About Us</Link>
+            <Link to="/customer/terms" className="text-sm font-semibold text-gray-600 hover:text-[#F0B94D]">Terms</Link>
+            <Link to="/customer/privacy-policy" className="text-sm font-semibold text-gray-600 hover:text-[#F0B94D]">Privacy Policy</Link>
+            <Link to="/customer/chat-support" className="text-sm font-semibold text-gray-600 hover:text-[#F0B94D]">Help</Link>
+          </div>
+        </footer>
+      </div>
     </div>
   );
 }

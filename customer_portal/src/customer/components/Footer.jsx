@@ -1,10 +1,7 @@
 import React, { useState } from "react";
 import { Link } from "react-router-dom";
-import { Cake, Phone, Mail, HelpCircle, Globe, Camera, Loader2 } from "lucide-react";
-
-const API_BASE = (typeof window !== "undefined" && window.location.origin)
-  ? `${window.location.origin}/GitHub/Capstone--Development%20-%20Copy/laravel/public`
-  : "http://127.0.0.1/GitHub/Capstone--Development%20-%20Copy/laravel/public";
+import { Cake, Phone, Mail, HelpCircle, Loader2 } from "lucide-react";
+import { LARAVEL_BASE } from "../../services/config";
 
 export default function Footer() {
   const [email, setEmail] = useState("");
@@ -30,7 +27,7 @@ export default function Footer() {
     setStatus({ type: "idle", message: "" });
 
     try {
-      const response = await fetch(`${API_BASE}/api/newsletter/subscribe`, {
+      const response = await fetch(`${LARAVEL_BASE}/api/newsletter/subscribe`, {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
         body: new URLSearchParams({ email: normalizedEmail }),
@@ -84,13 +81,8 @@ export default function Footer() {
                 </Link>
               </li>
               <li>
-                <Link to="/customer/careers" onClick={() => window.scrollTo(0, 0)} className="hover:text-white transition">
-                  Careers
-                </Link>
-              </li>
-              <li>
                 <Link to="/customer/terms" onClick={() => window.scrollTo(0, 0)} className="hover:text-white transition">
-                  Terms and Conditions
+                  Terms
                 </Link>
               </li>
               <li>
@@ -120,14 +112,6 @@ export default function Footer() {
                 Help Center
               </li>
             </ul>
-            <div className="flex items-center gap-2 mt-3">
-              <a href="#" aria-label="Website" className="w-7 h-7 rounded-full border border-white/20 flex items-center justify-center text-white hover:bg-[#d4af37] hover:text-black hover:border-[#d4af37] transition">
-                <Globe size={13} />
-              </a>
-              <a href="#" aria-label="Gallery" className="w-7 h-7 rounded-full border border-white/20 flex items-center justify-center text-white hover:bg-[#d4af37] hover:text-black hover:border-[#d4af37] transition">
-                <Camera size={13} />
-              </a>
-            </div>
           </div>
 
           {/* NEWSLETTER */}

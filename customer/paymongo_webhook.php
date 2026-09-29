@@ -83,10 +83,34 @@ if (!$conn) {
     exit;
 }
 
-$stmt = $conn->prepare("UPDATE orders SET payment_status = 'paid' WHERE id = ? AND LOWER(payment) = 'gcash'");
+$stmt = $conn->prepare("UPDATE orders SET payment_status = 'paid', status = 'Pending' WHERE id = ? AND LOWER(payment) = 'gcash' AND LOWER(COALESCE(payment_status, 'pending')) <> 'paid' AND status IN ('Awaiting Payment', 'Pending')");
 $stmt->bind_param('i', $orderId);
 $stmt->execute();
+$paymentConfirmed = $stmt->affected_rows > 0;
 $stmt->close();
+
+if ($paymentConfirmed) {
+    $userStmt = $conn->prepare('SELECT user_id FROM orders WHERE id = ?');
+    $userStmt->bind_param('i', $orderId);
+    $userStmt->execute();
+    $userResult = $userStmt->get_result();
+    $orderRow = $userResult ? $userResult->fetch_assoc() : null;
+    $userStmt->close();
+
+    if (!empty($orderRow['user_id'])) {
+        $userId = (int) $orderRow['user_id'];
+        $title = '🧾 Order Placed';
+        $message = "Your order #$orderId has been paid and is now pending.";
+        $type = 'Success';
+        $isRead = 0;
+        $actionUrl = '/customer/orders';
+        $notificationStmt = $conn->prepare('INSERT INTO notifications (user_id, title, message, type, is_read, action_url, created_at) VALUES (?, ?, ?, ?, ?, ?, NOW())');
+        $notificationStmt->bind_param('isssis', $userId, $title, $message, $type, $isRead, $actionUrl);
+        $notificationStmt->execute();
+        $notificationStmt->close();
+    }
+}
+
 $conn->close();
 
-echo json_encode(['status' => 'success', 'order_id' => $orderId]);
+echo json_encode(['status' => $paymentConfirmed ? 'success' : 'ignored', 'order_id' => $orderId]);

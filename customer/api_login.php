@@ -72,9 +72,15 @@ try {
     // Store token in database for validation (optional but recommended)
     $token_escaped = mysqli_real_escape_string($conn, $token);
     $user_id = intval($user['id']);
-    mysqli_query($conn, "INSERT INTO user_sessions (user_id, token, created_at, expires_at) 
-                         VALUES ($user_id, '$token_escaped', NOW(), DATE_ADD(NOW(), INTERVAL 30 DAY))
-                         ON DUPLICATE KEY UPDATE token='$token_escaped', created_at=NOW(), expires_at=DATE_ADD(NOW(), INTERVAL 30 DAY)");
+    $userAgent = $_SERVER['HTTP_USER_AGENT'] ?? 'Unknown browser';
+    $deviceName = preg_match('/Edg\//i', $userAgent) ? 'Microsoft Edge'
+        : (preg_match('/Chrome\//i', $userAgent) ? 'Google Chrome'
+        : (preg_match('/Firefox\//i', $userAgent) ? 'Mozilla Firefox'
+        : (preg_match('/Safari\//i', $userAgent) ? 'Safari' : 'Unknown browser')));
+    $deviceNameEscaped = mysqli_real_escape_string($conn, $deviceName);
+    $ipAddressEscaped = mysqli_real_escape_string($conn, $_SERVER['REMOTE_ADDR'] ?? 'Unknown');
+    mysqli_query($conn, "INSERT INTO user_sessions (user_id, token, device_name, ip_address, created_at, expires_at)
+                         VALUES ($user_id, '$token_escaped', '$deviceNameEscaped', '$ipAddressEscaped', NOW(), DATE_ADD(NOW(), INTERVAL 30 DAY))");
 
     // Return user info — store this in localStorage on the React side
     echo json_encode([

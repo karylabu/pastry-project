@@ -1,4 +1,4 @@
-import { buildCustomizedCakeSubmissionPayload } from './customizedCakePayload';
+import { buildCustomizedCakeSubmissionPayload, buildTierSelections } from './customizedCakePayload';
 
 describe('buildCustomizedCakeSubmissionPayload', () => {
   it('maps a legacy form selection to a single-tier Laravel payload', () => {
@@ -23,26 +23,11 @@ describe('buildCustomizedCakeSubmissionPayload', () => {
     );
   });
 
-  it('keeps separate flavor and size ids for two tiers', () => {
-    const payload = buildCustomizedCakeSubmissionPayload(
-      {
-        cakeType: 'two-tier',
-        tiers: [
-          { flavor_id: 7, size_id: 2 },
-          { flavor_id: 8, size_id: 3 },
-        ],
-      },
-      [{ id: 7, name: 'Moist Chocolate' }, { id: 8, name: 'Red Velvet' }],
-      [{ id: 2, code: '6x5', label: '6x5' }, { id: 3, code: '8x5', label: '8x5' }]
-    );
-
-    expect(payload).toEqual(expect.objectContaining({
-      cake_type: 'two-tier',
-      tiers: [
-        { flavor_id: 7, size_id: 2 },
-        { flavor_id: 8, size_id: 3 },
-      ],
-    }));
+  it('uses one flavor for both tiers while keeping their sizes separate', () => {
+    expect(buildTierSelections('two-tier', 7, null, 2, 3)).toEqual([
+      { flavor_id: 7, size_id: 2 },
+      { flavor_id: 7, size_id: 3 },
+    ]);
   });
 
   it('keeps the selected reference image metadata in the order payload', () => {

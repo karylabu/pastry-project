@@ -6,7 +6,15 @@ import StaffNavbar from "../components/StaffNavbar";
 import { STAFF_BASE, LARAVEL_BASE } from "../../services/config";
 
 const staffFetch = (url, options = {}) => fetch(url, { credentials: "include", ...options });
-const laravelStaffFetch = (url, options = {}) => fetch(url, { credentials: "include", ...options });
+const laravelStaffFetch = (url, options = {}) => {
+  let token = '';
+  try { token = JSON.parse(localStorage.getItem('user') || 'null')?.token || ''; } catch (_) { /* no-op */ }
+  return fetch(url, {
+    credentials: 'include',
+    ...options,
+    headers: { ...(options.headers || {}), ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+  });
+};
 
 const POLL_INTERVAL = 15000;
 
@@ -81,11 +89,18 @@ export default function Orders({ showNavbar = true }) {
   const [toasts, setToasts] = useState([]);
   const [lastRefreshed, setLastRefreshed] = useState(null);
   const [expandedOrderId, setExpandedOrderId] = useState(null);
+  const [discountIdPreviews, setDiscountIdPreviews] = useState({});
+  const [discountIdLoading, setDiscountIdLoading] = useState(null);
   const [connectionIssue, setConnectionIssue] = useState(false);
   const [wasteModalOrderId, setWasteModalOrderId] = useState(null);
   const [wasteForm, setWasteForm] = useState({ item: "", qty: "1", reason: "Production loss" });
   const [wasteSubmitting, setWasteSubmitting] = useState(false);
   const pollRef = useRef(null);
+  const discountIdPreviewUrlsRef = useRef({});
+
+  useEffect(() => () => {
+    Object.values(discountIdPreviewUrlsRef.current).forEach((url) => URL.revokeObjectURL(url));
+  }, []);
 
   const statusFilterOptions = ["All", "Pending", "Preparing", "To Receive", "Completed", "Cancelled"];
 
@@ -125,6 +140,24 @@ export default function Orders({ showNavbar = true }) {
     const id = Date.now();
     setToasts((prev) => [...prev, { id, message, type }]);
     setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 4000);
+  };
+
+  const viewDiscountId = async (orderId) => {
+    if (discountIdPreviewUrlsRef.current[orderId]) return;
+
+    setDiscountIdLoading(orderId);
+    try {
+      const response = await laravelStaffFetch(`${LARAVEL_BASE}/api/staff/orders/${orderId}/discount-id`);
+      if (!response.ok) throw new Error('Unable to load the private ID image.');
+
+      const previewUrl = URL.createObjectURL(await response.blob());
+      discountIdPreviewUrlsRef.current[orderId] = previewUrl;
+      setDiscountIdPreviews((current) => ({ ...current, [orderId]: previewUrl }));
+    } catch (error) {
+      addToast(error.message || 'Unable to load the private ID image.', 'error');
+    } finally {
+      setDiscountIdLoading(null);
+    }
   };
 
   const normalizeOrders = (items, source) =>
@@ -494,6 +527,32 @@ export default function Orders({ showNavbar = true }) {
                                 <div><p className="text-[9px] uppercase tracking-[0.2em] text-black/50">Order details</p><p className="mt-1 font-semibold text-black">Order #{order.id}</p><p>{customerLabel}</p><p>{order.method || "N/A"}</p><p>{addressLabel}</p><p>Payment: {order.payment || "N/A"}</p></div>
                                 <div><p className="text-[9px] uppercase tracking-[0.2em] text-black/50">Items</p>{(order.items || []).map((item, index) => <div key={`${order.id}-${index}`} className="flex justify-between border-b border-black/10 py-1 last:border-0"><span>{item.name || "Item"} · Qty {item.qty || 1}</span><strong>₱{Number(item.price || 0).toLocaleString()}</strong></div>)}<div className="mt-2 flex justify-between font-semibold text-black"><span>Total</span><span>₱{Number(order.total || 0).toLocaleString()}</span></div></div>
                               </div>
+                              {order.discount_type && order.discount_type !== 'none' && (
+                                <div className="mt-4 rounded-xl border border-black/10 bg-white p-3">
+                                  <p className="text-[9px] uppercase tracking-[0.2em] text-black/50">Discount proof</p>
+                                  <p className="mt-1 font-semibold text-black">
+                                    {order.discount_type === 'pwd' ? 'PWD' : 'Senior Citizen'} · 20% (₱{Number(order.discount || 0).toFixed(2)})
+                                  </p>
+                                  {order.has_discount_id && discountIdPreviews[order.id] ? (
+                                    <img
+                                      src={discountIdPreviews[order.id]}
+                                      alt={`${order.discount_type === 'pwd' ? 'PWD' : 'Senior Citizen'} ID for order ${order.id}`}
+                                      className="mt-3 max-h-80 w-full rounded-lg border border-black/10 bg-black/[0.03] object-contain"
+                                    />
+                                  ) : order.has_discount_id ? (
+                                    <button
+                                      type="button"
+                                      onClick={() => viewDiscountId(order.id)}
+                                      disabled={discountIdLoading === order.id}
+                                      className="mt-2 rounded-lg bg-black px-3 py-2 text-xs font-semibold text-white disabled:opacity-60"
+                                    >
+                                      {discountIdLoading === order.id ? 'Loading ID...' : 'View uploaded ID'}
+                                    </button>
+                                  ) : (
+                                    <p className="mt-2 text-xs text-red-700">No ID image attached.</p>
+                                  )}
+                                </div>
+                              )}
                             </td>
                           </tr>
                         )}
