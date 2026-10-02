@@ -2,6 +2,7 @@
 
 require_once __DIR__ . '/cors.php';
 require_once __DIR__ . '/../includes/db.php';
+require_once __DIR__ . '/../includes/realtime_events.php';
 
 // Debug: log incoming request headers, cookies, and session info to help diagnose 419 errors
 $debugLog = __DIR__ . '/debug_api_orders.log';
@@ -106,6 +107,8 @@ try {
                 mysqli_query($conn, "INSERT INTO order_items (order_id, product, qty, price) VALUES ('$orderId', '$itemName', '$itemQty', '$itemPrice')");
             }
         }
+
+        publishRealtimeEvent($conn, 'order.updated', $user_id, $orderId);
 
         echo json_encode([
             "status" => "success",

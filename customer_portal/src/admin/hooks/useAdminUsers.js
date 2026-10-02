@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ROOT_BASE } from "../../services/config";
+import { getAuthHeaders } from "../../services/api";
 
 const buildUsersUrl = ({ search = "", role = "all", page = 1, perPage = 10 }) => {
   const url = new URL(`${ROOT_BASE}/laravel/public/api/users`);
@@ -34,7 +35,10 @@ export function useAdminUsers({ search = "", role = "all", page = 1 }) {
     setError("");
 
     try {
-      const response = await fetch(buildUsersUrl({ search, role, page, perPage: 10 }));
+      const response = await fetch(buildUsersUrl({ search, role, page, perPage: 10 }), {
+        credentials: "include",
+        headers: { Accept: "application/json", ...getAuthHeaders() },
+      });
       const payload = await response.json();
 
       if (Array.isArray(payload)) {
@@ -84,7 +88,8 @@ export function useAdminUsers({ search = "", role = "all", page = 1 }) {
     try {
       const response = await fetch(`${ROOT_BASE}/laravel/public/api_users.php`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        headers: { "Content-Type": "application/json", ...getAuthHeaders() },
         body: JSON.stringify({ action: "status", user_id: userId, status: nextStatus }),
       });
 
@@ -94,12 +99,8 @@ export function useAdminUsers({ search = "", role = "all", page = 1 }) {
       }
     } catch (err) {
       setUsers(previousUsers);
-
-      if (err?.message === "Unable to update user status.") {
-        setError("Unable to update user status.");
-      } else {
-        setError("Unable to update user status.");
-      }
+      setError("Unable to update user status.");
+      throw err;
     }
   }, [users]);
 

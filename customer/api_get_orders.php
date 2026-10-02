@@ -58,12 +58,23 @@ try {
         exit;
     }
 
-    $sql = "SELECT * FROM orders WHERE (" . implode(' OR ', $ownership) . ") ORDER BY created_at DESC";
+        $sql = "SELECT * FROM orders WHERE (" . implode(' OR ', $ownership) . ")
+            AND NOT (LOWER(COALESCE(payment, '')) IN ('gcash', 'qrph') AND LOWER(COALESCE(payment_status, '')) = 'failed')
+            ORDER BY created_at DESC";
 
     $res = mysqli_query($conn, $sql);
 
     if (!$res) {
         throw new Exception("SQL Error: " . mysqli_error($conn));
+    }
+
+    $orderNumbers = [];
+    $numberResult = mysqli_query($conn, "SELECT id FROM orders ORDER BY created_at ASC, id ASC");
+    if ($numberResult) {
+        $displayNumber = 1;
+        while ($numberRow = mysqli_fetch_assoc($numberResult)) {
+            $orderNumbers[(int) $numberRow['id']] = $displayNumber++;
+        }
     }
 
     $orders = [];
@@ -119,6 +130,7 @@ try {
 
         $orders[] = [
             "id" => intval($row['id']),
+            "order_number" => $orderNumbers[(int) $row['id']] ?? intval($row['id']),
             "user_id" => $hasUserId ? intval($row['user_id'] ?? 0) : 0,
             "customer" => $hasCustomer ? ($row['customer'] ?? '') : '',
             "email" => $hasEmail ? ($row['email'] ?? '') : '',
@@ -127,6 +139,7 @@ try {
             "subtotal" => floatval($row['subtotal'] ?? 0),
             "delivery_fee" => floatval($row['delivery_fee'] ?? 0),
             "total" => floatval($row['total'] ?? 0),
+            "downpayment_amount" => isset($row['downpayment_amount']) ? floatval($row['downpayment_amount']) : null,
             "payment" => $row['payment'] ?? '',
             "payment_status" => $row['payment_status'] ?? '',
             "method" => $row['method'] ?? '',
@@ -138,7 +151,7 @@ try {
             "discount_type" => $row['discount_type'] ?? '',
             "discount" => floatval($row['discount'] ?? 0),
             "created_at" => $row['created_at'] ?? '',
-            "is_customized" => $isCustomizedOrder ? 1 : 0,
+            "is_customized" => ($isCustomizedOrder || !empty($row['is_customized']) || strcasecmp((string) ($row['order_type'] ?? ''), 'Customized') === 0) ? 1 : 0,
             "custom_details" => $customDetails
         ];
     }

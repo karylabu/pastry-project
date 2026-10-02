@@ -148,7 +148,8 @@ export default function AccountSettings() {
     try {
       const res = await fetch(`${BASE}/api_update_profile.php`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         body: JSON.stringify({ user_id: user.id, ...profileForm }),
       });
       const data = await safeParseJson(res);
@@ -194,7 +195,8 @@ export default function AccountSettings() {
     try {
       const res = await fetch(`${BASE}/api_change_password.php`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         body: JSON.stringify({ user_id: user.id, ...passwordForm }),
       });
       const data = await safeParseJson(res);
@@ -220,7 +222,8 @@ export default function AccountSettings() {
     try {
       const res = await fetch(`${BASE}/api_delete_account.php`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         body: JSON.stringify({ user_id: user.id, password: deletePassword }),
       });
       const data = await safeParseJson(res);

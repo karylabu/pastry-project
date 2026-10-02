@@ -177,13 +177,15 @@ export default function Menu({ onAddToCart }) {
   };
 
   const filtered = products.filter((p) => {
+    const normalizedCategory = String(p.category || '').trim().toLowerCase();
+    const matchesCategory = normalizedCategory === 'cake' || normalizedCategory === 'cakes';
     const matchesSearch = !normalizedSearch ||
       p.name?.toLowerCase().includes(normalizedSearch) ||
       p.description?.toLowerCase().includes(normalizedSearch) ||
       p.category?.toLowerCase().includes(normalizedSearch);
     const matchesAvailability = !showOnlyAvailable || Number(p.stock || 0) > 0;
 
-    return matchesSearch && matchesAvailability;
+    return matchesCategory && matchesSearch && matchesAvailability;
   });
 
   const sortedProducts = filtered.slice().sort((a, b) => {

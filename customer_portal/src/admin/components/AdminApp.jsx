@@ -1,5 +1,5 @@
 import React from "react";
-import { Routes, Route } from "react-router-dom";
+import { Navigate, Routes, Route } from "react-router-dom";
 
 import AdminLayout from "../layouts/AdminLayout";
 import Dashboard from "../pages/Dashboard";
@@ -9,7 +9,6 @@ import Reports from "../pages/Reports";
 import Inventory from "../pages/Inventory";
 import CustomCakes from "../pages/CustomCakes";
 import OrderHistory from "../pages/OrderHistory";
-import LowStockAlerts from "../pages/LowStockAlerts";
 import WasteTracking from "../pages/WasteTracking";
 import PredictiveAnalytics from "../pages/PredictiveAnalytics";
 import Promotions from "../pages/Promotions";
@@ -17,6 +16,7 @@ import UserManagement from "../pages/UserManagement";
 import SettingsPage from "../pages/Settings";
 import Schedule from "../pages/Schedule";
 import CakeRecipes from "../pages/CakeRecipes";
+import Reviews from "../pages/Reviews";
 
 const renderWithLayout = (element) => <AdminLayout>{element}</AdminLayout>;
 
@@ -30,10 +30,11 @@ export default function AdminApp() {
       <Route path="custom-cakes" element={renderWithLayout(<CustomCakes />)} />
       <Route path="custom-cake-recipes" element={renderWithLayout(<CakeRecipes />)} />
       <Route path="products" element={renderWithLayout(<Products />)} />
+      <Route path="small-cakes" element={<Navigate to="/admin/products?category=Small%20Cakes" replace />} />
       <Route path="reports" element={renderWithLayout(<Reports />)} />
+      <Route path="reviews" element={renderWithLayout(<Reviews />)} />
       <Route path="inventory" element={renderWithLayout(<Inventory />)} />
       <Route path="ingredients" element={renderWithLayout(<Inventory />)} />
-      <Route path="low-stock" element={renderWithLayout(<LowStockAlerts />)} />
       <Route path="waste-tracking" element={renderWithLayout(<WasteTracking />)} />
       <Route path="predictive-demand" element={renderWithLayout(<PredictiveAnalytics />)} />
       <Route path="promotions" element={renderWithLayout(<Promotions />)} />

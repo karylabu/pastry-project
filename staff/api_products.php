@@ -157,26 +157,30 @@ if ($action === 'list') {
 
         $sql = "SELECT * FROM products";
         $stmt = $pdo->query($sql);
-        $hasVariantsTable = (bool) $pdo->query(
-            "SELECT COUNT(*) FROM information_schema.tables
-             WHERE table_schema = DATABASE() AND table_name = 'product_variants'"
-        )->fetchColumn();
 
         $products = [];
 
         while ($row = $stmt->fetch()) {
             $productId = intval($row['id']);
+            $sizeStmt = $pdo->prepare(
+                "SELECT id, size, price, available
+                 FROM product_sizes
+                 WHERE product_id = ? AND LOWER(size) <> 'slice'
+                 ORDER BY FIELD(LOWER(size), 'small', 'big'), id"
+            );
+            $sizeStmt->execute([$productId]);
+            $sizes = $sizeStmt->fetchAll();
 
-            $variants = [];
-            if ($hasVariantsTable) {
-                $variantStmt = $pdo->prepare(
-                    "SELECT id, variant_size, stock_quantity, threshold, price
-                     FROM product_variants
-                     WHERE product_id = ?
-                     ORDER BY FIELD(variant_size, 'slice', 'small', 'big')"
-                );
-                $variantStmt->execute([$productId]);
-                $variants = $variantStmt->fetchAll();
+            $bigSizePrice = 0.0;
+            foreach ($sizes as $size) {
+                if (strtolower(trim((string) $size['size'])) === 'big') {
+                    $bigSizePrice = (float) $size['price'];
+                    break;
+                }
+            }
+            $basePrice = $bigSizePrice > 0 ? $bigSizePrice : (float) ($row['big_price'] ?? 0);
+            if ($basePrice <= 0) {
+                $basePrice = (float) ($row['price'] ?? 0);
             }
 
             $availability = checkProductionAvailability($pdo, $productId);
@@ -185,23 +189,23 @@ if ($action === 'list') {
                 "id" => $productId,
                 "name" => $row["name"],
                 "category" => $row["category"],
-                "price" => $row["price"],
+                "price" => $basePrice,
+                "small_price" => (float) ($row['small_price'] ?? 0),
+                "big_price" => $bigSizePrice > 0 ? $bigSizePrice : (float) ($row['big_price'] ?? 0),
                 "image" => $row["image"],
                 "stock" => $row["stock"] ?? 0,
                 "minimum_stock" => $row["minimum_stock"] ?? 5,
                 "available" => $row["available"] ?? 1,
                 "is_producible" => $availability['is_producible'],
                 "availability_reason" => $availability['reason'],
-                "variants" => array_map(function ($variant) {
+                "sizes" => array_map(function ($size) {
                     return [
-                        'id' => intval($variant['id']),
-                        'variant_size' => $variant['variant_size'],
-                        'stock_quantity' => intval($variant['stock_quantity']),
-                        'threshold' => intval($variant['threshold']),
-                        'price' => (float)$variant['price'],
-                        'available' => intval($variant['stock_quantity']) > 0,
+                        'id' => intval($size['id']),
+                        'size' => $size['size'],
+                        'price' => (float) $size['price'],
+                        'available' => (bool) $size['available'],
                     ];
-                }, $variants),
+                }, $sizes),
             ];
         }
 
@@ -227,6 +231,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $name = trim($_POST['name'] ?? '');
         $category = trim($_POST['category'] ?? '');
         $price = floatval($_POST['price'] ?? 0);
+        $priceSize = strtolower(trim($_POST['price_size'] ?? ''));
         $stock = intval($_POST['stock'] ?? 0);
         $description = trim($_POST['description'] ?? '');
 
@@ -314,6 +319,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             echo json_encode(["success" => false, "error" => "Stock cannot be negative"]);
             exit;
         }
+        if ($priceSize !== '' && !in_array($priceSize, ['small', 'big'], true)) {
+            echo json_encode(["success" => false, "error" => "Invalid cake size price"]);
+            exit;
+        }
 
         try {
             // Handle image upload if present
@@ -343,7 +352,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $params = [];
             if ($name !== '') { $fields[] = 'name = ?'; $params[] = $name; }
             if ($category !== '') { $fields[] = 'category = ?'; $params[] = $category; }
-            if ($price > 0) { $fields[] = 'price = ?'; $params[] = $price; }
+            if ($price > 0 && $priceSize !== 'small') { $fields[] = 'price = ?'; $params[] = $price; }
             if (isset($_POST['stock'])) { $fields[] = 'stock = ?'; $params[] = $stock; }
             if ($description !== '') { $fields[] = 'description = ?'; $params[] = $description; }
             if ($imageName !== null) { $fields[] = 'image = ?'; $params[] = $imageName; }
@@ -355,6 +364,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             $previousStock = null;
             $pdo->beginTransaction();
+            if ($priceSize !== '') {
+                if ($price <= 0) {
+                    throw new RuntimeException('Price must be greater than zero.');
+                }
+
+                $sizeUpdate = $pdo->prepare(
+                    "UPDATE product_sizes SET price = ? WHERE product_id = ? AND LOWER(TRIM(size)) = ?"
+                );
+                $sizeUpdate->execute([$price, $id, $priceSize]);
+
+                $sizeExists = $pdo->prepare(
+                    "SELECT id FROM product_sizes WHERE product_id = ? AND LOWER(TRIM(size)) = ? LIMIT 1"
+                );
+                $sizeExists->execute([$id, $priceSize]);
+                if (!$sizeExists->fetchColumn()) {
+                    throw new RuntimeException('This cake size has no saved price row.');
+                }
+            }
             if (isset($_POST['stock'])) {
                 $stockStmt = $pdo->prepare("SELECT stock FROM products WHERE id = ? FOR UPDATE");
                 $stockStmt->execute([$id]);

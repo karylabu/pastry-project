@@ -6,15 +6,8 @@
  * Accepts user_id, user_email, or customer name as query parameters.
  */
 
-header('Access-Control-Allow-Origin: *');
-header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type');
-header('Content-Type: application/json');
-
-if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-    http_response_code(204);
-    exit;
-}
+require_once __DIR__ . '/cors.php';
+require_once __DIR__ . '/../includes/api_auth.php';
 
 error_reporting(0);
 ini_set('display_errors', 0);
@@ -25,32 +18,16 @@ try {
         throw new Exception("Database Connection Failed: " . mysqli_connect_error());
     }
 
-    $user_id = 0;
-    $user_email = '';
+    $authUser = requireApiRole(['customer']);
+    $user_id = (int) $authUser['id'];
+    $user_email = trim((string) ($authUser['email'] ?? ''));
     $customer_name = '';
-
-    // Get identity from GET
-    if (isset($_GET['user_id'])) $user_id = intval($_GET['user_id']);
-    if (isset($_GET['user_email'])) $user_email = trim($_GET['user_email']);
-    if (isset($_GET['email'])) $user_email = trim($_GET['email']);
-    if (isset($_GET['customer'])) $customer_name = trim($_GET['customer']);
-
-    // Get identity from POST
-    $rawPost = file_get_contents("php://input");
-    if (!empty($rawPost)) {
-        $data = json_decode($rawPost, true);
-        if ($data) {
-            if (isset($data['user_id'])) $user_id = intval($data['user_id']);
-            if (isset($data['email'])) $user_email = trim($data['email']);
-            if (isset($data['user_email'])) $user_email = trim($data['user_email']);
-            if (isset($data['customer'])) $customer_name = trim($data['customer']);
-        }
-    }
 
     $orders = [];
 
     if ($user_id > 0) {
-        // Fetch by user_id - Join with users table to get account details
+        // Include older orders linked only by email, but never trust identity query parameters.
+        $escapedEmail = mysqli_real_escape_string($conn, $user_email);
         $query = "
             SELECT 
                 o.id,
@@ -83,9 +60,9 @@ try {
                 cco.estimated_price,
                 cco.inspo_images
             FROM orders o
-            LEFT JOIN users u ON o.user_id = u.id
+            LEFT JOIN users u ON o.user_id = u.id OR o.email = u.email
             LEFT JOIN custom_cake_orders cco ON o.id = cco.order_id
-            WHERE o.user_id = $user_id
+            WHERE (o.user_id = $user_id OR o.email = '$escapedEmail')
             AND cco.id IS NOT NULL
             ORDER BY o.created_at DESC
         ";
@@ -183,7 +160,17 @@ try {
         throw new Exception("Query failed: " . mysqli_error($conn));
     }
 
+    $orderNumbers = [];
+    $numberResult = mysqli_query($conn, "SELECT id FROM orders ORDER BY created_at ASC, id ASC");
+    if ($numberResult) {
+        $displayNumber = 1;
+        while ($numberRow = mysqli_fetch_assoc($numberResult)) {
+            $orderNumbers[(int) $numberRow['id']] = $displayNumber++;
+        }
+    }
+
     while ($row = mysqli_fetch_assoc($result)) {
+        $row['order_number'] = $orderNumbers[(int) $row['id']] ?? (int) $row['id'];
         // Parse JSON fields
         if (is_string($row['items'])) {
             $row['items'] = json_decode($row['items'], true) ?: [];

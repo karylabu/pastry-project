@@ -1,6 +1,6 @@
 import React from "react";
-import StaffProducts from "../../staff/pages/Products";
+import StaffProducts from "../operations/pages/Products";
 
-export default function Products() {
-  return <StaffProducts showNavbar={false} allowCatalogManagement={true} />;
+export default function Products(props) {
+  return <StaffProducts allowCatalogManagement={true} {...props} />;
 }

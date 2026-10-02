@@ -7,6 +7,7 @@ use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 use PHPMailer\PHPMailer\PHPMailer;
 use PHPMailer\PHPMailer\Exception;
 use Symfony\Component\Process\Process;
@@ -35,7 +36,7 @@ class CustomerApiController extends Controller
         }
     }
 
-    protected function corsResponse($payload, int $status = 200)
+    protected function corsResponse(mixed $payload, int $status = 200)
     {
         return response()->json($payload, $status)
             ->header('Access-Control-Allow-Origin', '*')
@@ -100,7 +101,7 @@ class CustomerApiController extends Controller
 
             try {
                 $form = array_merge($request->all(), $this->parseJson($request));
-                \Log::info('Custom cake request:', $form);
+                Log::info('Custom cake request:', $form);
 
                 $flavor = trim($form['flavor'] ?? $form['cake_flavor'] ?? '');
                 $tiers = trim($form['tiers'] ?? $form['cake_size'] ?? '');
@@ -133,7 +134,7 @@ class CustomerApiController extends Controller
                     'user_id' => $user->id,
                     'status' => 'Pending',
                     'total' => floatval($form['total'] ?? $form['estimated_price'] ?? 0),
-                    'payment' => $form['payment'] ?? 'COD',
+                    'payment' => 'QRPh',
                     'address' => $form['address'] ?? '',
                     'method' => $method,
                     'order_type' => 'Customized',
@@ -180,7 +181,7 @@ class CustomerApiController extends Controller
                     'order_id' => $orderId,
                 ]);
             } catch (\Exception $e) {
-                \Log::error('Customization error: ' . $e->getMessage());
+                Log::error('Customization error: ' . $e->getMessage());
                 return $this->corsResponse(['success' => false, 'message' => 'Error: ' . $e->getMessage()], 500);
             }
         }
@@ -209,7 +210,7 @@ class CustomerApiController extends Controller
             }
 
             $data = $this->parseJson($request);
-            \Log::info('Login attempt for email: ' . ($data['email'] ?? 'not provided'));
+            Log::info('Login attempt for email: ' . ($data['email'] ?? 'not provided'));
 
             $email = trim($data['email'] ?? '');
             $password = trim($data['password'] ?? '');
@@ -257,7 +258,7 @@ class CustomerApiController extends Controller
                 'user' => $userData,
             ]);
         } catch (\Exception $e) {
-            \Log::error('Login error: ' . $e->getMessage());
+            Log::error('Login error: ' . $e->getMessage());
             return $this->corsResponse(['success' => false, 'message' => 'Server error: ' . $e->getMessage()], 500);
         }
     }
@@ -424,7 +425,7 @@ class CustomerApiController extends Controller
         $userId = (int) $user->id;
         $orderType = $data['order_type'] ?? $data['type'] ?? 'Standard';
         $isCustomized = isset($data['is_customized']) ? intval($data['is_customized']) : 0;
-        $requiresQrPayment = strtolower($payment) === 'gcash';
+        $requiresQrPayment = in_array(strtolower($payment), ['gcash', 'qrph'], true);
         $initialStatus = $requiresQrPayment ? 'Awaiting Payment' : 'Pending';
 
         $orderId = DB::table('orders')->insertGetId([
@@ -571,6 +572,7 @@ class CustomerApiController extends Controller
             ->where('id', $orderId)
             ->where('user_id', $user->id)
             ->update(['status' => 'Cancelled']);
+        app(\App\Services\RealtimeEventPublisher::class)->orderUpdated((int) $user->id, $orderId);
         return $this->corsResponse(['success' => true]);
     }
 
@@ -599,7 +601,7 @@ class CustomerApiController extends Controller
             return $this->corsResponse(['success' => false, 'message' => 'Order not found.']);
         }
 
-        if ($status !== 'To Receive') {
+        if ($status !== 'Ready for Pickup') {
             return $this->corsResponse(['success' => false, 'message' => 'Order is not ready to be confirmed.']);
         }
 
@@ -607,6 +609,7 @@ class CustomerApiController extends Controller
             ->where('id', $orderId)
             ->where('user_id', $user->id)
             ->update(['status' => 'Completed']);
+        app(\App\Services\RealtimeEventPublisher::class)->orderUpdated((int) $user->id, $orderId);
         return $this->corsResponse(['success' => true]);
     }
 
@@ -630,12 +633,26 @@ class CustomerApiController extends Controller
         $action = $data['action'] ?? '';
         $userId = intval($data['user_id'] ?? 0);
 
-        if ($action === 'delete' && $userId) {
-            DB::table('users')->where('id', $userId)->delete();
-            return $this->corsResponse(['status' => 'success', 'message' => 'User deleted']);
+        if ($userId <= 0 || !DB::table('users')->where('id', $userId)->exists()) {
+            return $this->corsResponse(['success' => false, 'status' => 'error', 'message' => 'User not found.'], 404);
         }
 
-        return $this->corsResponse(['status' => 'error', 'message' => 'Invalid action']);
+        if ($action === 'status') {
+            $status = strtolower(trim((string) ($data['status'] ?? '')));
+            if (!in_array($status, ['active', 'inactive', 'banned'], true)) {
+                return $this->corsResponse(['success' => false, 'status' => 'error', 'message' => 'Invalid account status.'], 422);
+            }
+
+            DB::table('users')->where('id', $userId)->update(['status' => $status]);
+            return $this->corsResponse(['success' => true, 'status' => 'success', 'message' => 'User status updated.']);
+        }
+
+        if ($action === 'delete') {
+            DB::table('users')->where('id', $userId)->update(['status' => 'inactive']);
+            return $this->corsResponse(['success' => true, 'status' => 'success', 'message' => 'User deactivated.']);
+        }
+
+        return $this->corsResponse(['success' => false, 'status' => 'error', 'message' => 'Invalid action.'], 422);
     }
 
     public function chatFetch(Request $request)
@@ -753,7 +770,7 @@ class CustomerApiController extends Controller
 
     public function chatSend(Request $request)
     {
-        \Log::info('ChatSend reached', ['method' => $request->method(), 'url' => $request->fullUrl()]);
+        Log::info('ChatSend reached', ['method' => $request->method(), 'url' => $request->fullUrl()]);
         if ($request->isMethod('options')) {
             return $this->corsResponse(['success' => true, 'ai_reply' => null]);
         }
@@ -821,10 +838,12 @@ class CustomerApiController extends Controller
                     'created_at' => now(),
                 ]);
             } catch (\Exception $e2) {
-                \Log::error('ChatSend error: ' . $e2->getMessage());
+                Log::error('ChatSend error: ' . $e2->getMessage());
                 return $this->corsResponse(['success' => false, 'message' => 'Database error'], 500);
             }
         }
+
+        app(\App\Services\RealtimeEventPublisher::class)->chatUpdated($userId, $orderId, (string) ($conversationId ?? ''));
 
         $aiReply = null;
         $needsStaff = false;
@@ -897,7 +916,7 @@ class CustomerApiController extends Controller
                     })
                     ->all();
             } catch (\Throwable $e) {
-                \Log::warning('Best seller lookup failed', ['error' => $e->getMessage()]);
+                Log::warning('Best seller lookup failed', ['error' => $e->getMessage()]);
             }
 
             if (empty($bestSellerCounts)) {
@@ -1057,7 +1076,7 @@ PROMPT;
                             $responseData = json_decode($responseBody, true) ?: [];
                             $aiReply = trim((string) ($responseData['candidates'][0]['content']['parts'][0]['text'] ?? '')) ?: null;
                             if (!$aiReply) {
-                                \Log::warning('Gemini curl transport failed', [
+                                Log::warning('Gemini curl transport failed', [
                                     'exit_code' => $process->getExitCode(),
                                     'error' => trim($process->getErrorOutput()),
                                     'api_error' => $responseData['error']['message'] ?? 'No candidates returned',
@@ -1090,7 +1109,7 @@ PROMPT;
                         }
                     }
                 } catch (\Throwable $e) {
-                    \Log::warning('AI chat provider unavailable', ['provider' => $provider, 'error' => $e->getMessage()]);
+                    Log::warning('AI chat provider unavailable', ['provider' => $provider, 'error' => $e->getMessage()]);
                 }
             }
 
@@ -1150,18 +1169,80 @@ PROMPT;
 
         $data = $this->parseJson($request);
         $orderId = trim($data['order_id'] ?? '');
-        $amount = floatval($data['amount'] ?? 0);
+        $paymentType = strtolower(trim((string) ($data['payment_type'] ?? 'full')));
         $user = $this->requireCustomer($request);
         if (!$user instanceof User) {
             return $user;
         }
 
-        if (!$orderId || $amount <= 0) {
-            return $this->corsResponse(['error' => 'Missing order_id or invalid amount'], 400);
+        if (!$orderId || !in_array($paymentType, ['full', 'downpayment', 'balance'], true)) {
+            return $this->corsResponse(['error' => 'Missing order_id or invalid payment type.'], 400);
         }
 
-        if (!DB::table('orders')->where('id', $orderId)->where('user_id', $user->id)->exists()) {
+        $order = DB::table('orders')
+            ->where('id', $orderId)
+            ->where('user_id', $user->id)
+            ->first(['id', 'status', 'total', 'downpayment_amount', 'payment', 'payment_status', 'is_customized', 'order_type']);
+        if (!$order) {
             return $this->corsResponse(['error' => 'Order not found.'], 404);
+        }
+
+        $customOrder = (bool) ($order->is_customized ?? false)
+            || strcasecmp((string) ($order->order_type ?? ''), 'Customized') === 0;
+        if (!$customOrder && Schema::hasTable('custom_cake_orders')) {
+            $customOrder = DB::table('custom_cake_orders')->where('order_id', $orderId)->exists();
+        }
+        if (!$customOrder && Schema::hasTable('customized_cake_orders')) {
+            $customOrder = DB::table('customized_cake_orders')->where('order_id', $orderId)->exists();
+        }
+        $downpaymentAmount = (float) ($order->downpayment_amount ?? 0);
+        if ($customOrder && $downpaymentAmount <= 0 && Schema::hasTable('custom_cake_orders')) {
+            $quoteNotes = DB::table('custom_cake_orders')->where('order_id', $orderId)->value('notes');
+            $quoteDetails = is_string($quoteNotes) ? json_decode($quoteNotes, true) : [];
+            if (is_array($quoteDetails)) {
+                $downpaymentAmount = (float) ($quoteDetails['downpayment_amount'] ?? 0);
+                if ($downpaymentAmount <= 0 && (float) ($quoteDetails['downpayment_percent'] ?? 0) > 0) {
+                    $downpaymentAmount = round((float) $order->total * (float) $quoteDetails['downpayment_percent'] / 100, 2);
+                }
+                if ($downpaymentAmount > 0) {
+                    DB::table('orders')->where('id', $orderId)->update(['downpayment_amount' => $downpaymentAmount]);
+                }
+            }
+        }
+        $paymentStatus = strtolower((string) ($order->payment_status ?? 'pending'));
+        if (!in_array(strtolower((string) $order->payment), ['qrph', 'gcash'], true)
+            || !in_array($order->status, ['Awaiting Payment', 'Awaiting Balance Payment'], true)
+            || in_array($paymentStatus, ['paid', 'proof_submitted'], true)) {
+            return $this->corsResponse(['error' => 'This order is not awaiting a payment.'], 409);
+        }
+
+        $amount = 0.0;
+        if ($paymentType === 'balance') {
+            if (!$customOrder || $order->status !== 'Awaiting Balance Payment' || $downpaymentAmount <= 0) {
+                return $this->corsResponse(['error' => 'The remaining balance is not available for this order.'], 409);
+            }
+            $amount = round((float) $order->total - $downpaymentAmount, 2);
+            if ($amount < 1) {
+                return $this->corsResponse(['error' => 'No remaining balance is due.'], 409);
+            }
+        } elseif ($order->status !== 'Awaiting Payment') {
+            return $this->corsResponse(['error' => 'This payment stage is no longer active.'], 409);
+        } elseif ($paymentType === 'downpayment') {
+            if (!$customOrder) {
+                return $this->corsResponse(['error' => 'Downpayment is only available for custom cake orders.'], 409);
+            }
+            $amount = $downpaymentAmount > 0 ? $downpaymentAmount : (float) ($data['amount'] ?? 0);
+            if ($amount <= 0 || $amount >= (float) $order->total) {
+                return $this->corsResponse(['error' => 'The quoted downpayment is invalid.'], 409);
+            }
+            if ($downpaymentAmount <= 0) {
+                DB::table('orders')->where('id', $orderId)->update(['downpayment_amount' => $amount]);
+            }
+        } else {
+            $amount = (float) ($data['amount'] ?? 0);
+            if ($amount <= 0 || abs($amount - (float) $order->total) > 0.01) {
+                return $this->corsResponse(['error' => 'The payment amount does not match the order total.'], 409);
+            }
         }
 
         $secretKey = env('PAYMONGO_SECRET');
@@ -1170,25 +1251,33 @@ PROMPT;
         }
 
         $amountCents = (int) round($amount * 100);
-        if ($amountCents < 2000) {
-            return $this->corsResponse(['error' => 'Amount must be at least ₱20.00'], 400);
+        if ($amountCents < 100) {
+            return $this->corsResponse(['error' => 'Payment amount must be at least PHP 1.00.'], 400);
         }
 
         $payload = [
-            'data' => [
-                'attributes' => [
-                    'amount' => $amountCents,
-                    'currency' => 'PHP',
-                    'description' => 'Pastry Order #' . $orderId,
-                    'remarks' => 'Pastry Shop Order',
-                ],
-            ],
+            'amount' => $amountCents,
+            'currency' => 'PHP',
+            'description' => 'Pastry Order #' . $orderId . ($paymentType === 'balance' ? ' Remaining Balance' : ''),
+            'remarks' => $paymentType === 'balance' ? 'Custom cake order remaining balance' : 'Pastry Shop Order',
         ];
 
         $response = Http::withBasicAuth($secretKey, '')->withHeaders([
             'accept' => 'application/json',
             'content-type' => 'application/json',
-        ])->post('https://api.paymongo.com/v1/links', $payload);
+        ])->post('https://api.paymongo.com/v1/payment_links', $payload);
+
+        $paymentData = $response->json('data', []);
+        $paymentUrl = $paymentData['url'] ?? '';
+        $paymentReference = $paymentData['id'] ?? '';
+        if ($response->successful() && $paymentUrl !== '' && $paymentReference !== '') {
+            DB::table('orders')->where('id', $orderId)->update([
+                'payment_status' => 'pending',
+                'payment_reference' => $paymentReference,
+                'payment_link' => $paymentUrl,
+            ]);
+            app(\App\Services\RealtimeEventPublisher::class)->orderUpdated((int) $user->id, (int) $orderId);
+        }
 
         return response()->json($response->json(), $response->status())
             ->header('Access-Control-Allow-Origin', '*');
@@ -1206,7 +1295,7 @@ PROMPT;
         if ($action === 'add') {
             add_to_cart(
                 (int)$request->input('product_id', 0),
-                $request->input('size', 'slice'),
+                $request->input('size', 'small'),
                 (int)$request->input('quantity', 1)
             );
 

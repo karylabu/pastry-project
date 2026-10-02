@@ -127,6 +127,7 @@ CREATE TABLE `analytics_sales_history` (
   `product_name` varchar(255) NOT NULL,
   `sale_date` date NOT NULL,
   `units_sold` decimal(10,2) NOT NULL DEFAULT 0.00,
+  `revenue` decimal(10,2) NOT NULL DEFAULT 0.00,
   `created_at` datetime NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
@@ -482,6 +483,8 @@ CREATE TABLE `messages` (
   `is_read` tinyint(1) NOT NULL DEFAULT 0,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `user_id` int(11) DEFAULT NULL,
+  `customer_name` varchar(255) DEFAULT NULL,
+  `customer_email` varchar(255) DEFAULT NULL,
   `device_name` varchar(120) DEFAULT NULL,
   `ip_address` varchar(45) DEFAULT NULL,
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
@@ -567,10 +570,16 @@ CREATE TABLE `orders` (
   `lat` decimal(10,7) DEFAULT NULL,
   `lng` decimal(10,7) DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
-  `status` enum('Pending','Confirmed','Preparing','To Receive','Completed','Cancelled') NOT NULL DEFAULT 'Pending',
+  `status` enum('Awaiting Payment','Pending','Confirmed','Preparing','To Receive','Completed','Cancelled') NOT NULL DEFAULT 'Pending',
   `payment_status` varchar(50) DEFAULT 'pending',
+  `discount_type` varchar(32) NOT NULL DEFAULT 'none',
+  `discount` decimal(10,2) NOT NULL DEFAULT 0.00,
+  `discount_id_path` varchar(255) DEFAULT NULL,
+  `order_type` varchar(64) NOT NULL DEFAULT 'Standard',
+  `is_customized` tinyint(1) NOT NULL DEFAULT 0,
   `payment_link` text DEFAULT NULL,
   `payment_reference` varchar(255) DEFAULT NULL,
+  `payment_proof_path` varchar(255) DEFAULT NULL,
   `customer` varchar(255) DEFAULT '',
   `email` varchar(255) DEFAULT '',
   `user_id` int(11) DEFAULT NULL,
@@ -735,7 +744,8 @@ CREATE TABLE `order_items` (
   `price` decimal(10,2) NOT NULL,
   `details` text DEFAULT NULL,
   `image` varchar(255) DEFAULT NULL,
-  `product_id` int(11) DEFAULT NULL
+  `product_id` int(11) DEFAULT NULL,
+  `product_size_id` int(11) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
@@ -1228,43 +1238,30 @@ CREATE TABLE `product_sizes` (
 --
 
 INSERT INTO `product_sizes` (`id`, `product_id`, `size`, `price`, `available`) VALUES
-(40, 9, 'slice', 100.00, 1),
 (41, 9, 'small', 450.00, 1),
 (42, 9, 'big', 790.00, 1),
-(43, 10, 'slice', 100.00, 1),
 (44, 10, 'small', 450.00, 1),
 (45, 10, 'big', 790.00, 1),
-(46, 11, 'slice', 105.00, 1),
 (47, 11, 'small', 490.00, 1),
 (48, 11, 'big', 880.00, 1),
-(49, 12, 'slice', 105.00, 1),
 (50, 12, 'small', 490.00, 1),
 (51, 12, 'big', 880.00, 1),
-(52, 13, 'slice', 105.00, 1),
 (53, 13, 'small', 490.00, 1),
 (54, 13, 'big', 880.00, 1),
-(55, 14, 'slice', 105.00, 1),
 (56, 14, 'small', 490.00, 1),
 (57, 14, 'big', 880.00, 1),
-(58, 15, 'slice', 110.00, 1),
 (59, 15, 'small', 510.00, 1),
 (60, 15, 'big', 920.00, 1),
-(61, 16, 'slice', 110.00, 1),
 (62, 16, 'small', 510.00, 1),
 (63, 16, 'big', 920.00, 1),
-(64, 17, 'slice', 110.00, 1),
 (65, 17, 'small', 530.00, 1),
 (66, 17, 'big', 950.00, 1),
-(67, 18, 'slice', 110.00, 1),
 (68, 18, 'small', 530.00, 1),
 (69, 18, 'big', 950.00, 1),
-(70, 19, 'slice', 105.00, 1),
 (71, 19, 'small', 530.00, 1),
 (72, 19, 'big', 1000.00, 1),
-(73, 20, 'slice', 135.00, 1),
 (74, 20, 'small', 700.00, 1),
 (75, 20, 'big', 1300.00, 1),
-(76, 21, 'slice', 175.00, 1),
 (77, 21, 'small', 900.00, 1),
 (78, 21, 'big', 1750.00, 1);
 
@@ -1518,6 +1515,8 @@ CREATE TABLE `user_sessions` (
   `id` int(11) NOT NULL,
   `user_id` int(11) NOT NULL,
   `token` varchar(255) NOT NULL,
+  `device_name` varchar(120) DEFAULT NULL,
+  `ip_address` varchar(45) DEFAULT NULL,
   `created_at` datetime DEFAULT current_timestamp(),
   `expires_at` datetime DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
@@ -1767,7 +1766,8 @@ ALTER TABLE `orders`
 ALTER TABLE `order_items`
   ADD PRIMARY KEY (`id`),
   ADD KEY `idx_order` (`order_id`),
-  ADD KEY `fk_order_items_product` (`product_id`);
+  ADD KEY `fk_order_items_product` (`product_id`),
+  ADD KEY `idx_order_items_product_size_id` (`product_size_id`);
 
 --
 -- Indexes for table `password_resets`
@@ -2213,7 +2213,8 @@ ALTER TABLE `orders`
 --
 ALTER TABLE `order_items`
   ADD CONSTRAINT `fk_order_items_order` FOREIGN KEY (`order_id`) REFERENCES `orders` (`id`) ON DELETE CASCADE,
-  ADD CONSTRAINT `fk_order_items_product` FOREIGN KEY (`product_id`) REFERENCES `products` (`id`) ON DELETE SET NULL;
+  ADD CONSTRAINT `fk_order_items_product` FOREIGN KEY (`product_id`) REFERENCES `products` (`id`) ON DELETE SET NULL,
+  ADD CONSTRAINT `fk_order_items_product_size` FOREIGN KEY (`product_size_id`) REFERENCES `product_sizes` (`id`) ON DELETE SET NULL;
 
 --
 -- Constraints for table `production_batch_allocations`

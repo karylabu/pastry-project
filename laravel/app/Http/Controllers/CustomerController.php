@@ -71,7 +71,7 @@ class CustomerController extends Controller
             if ($request->has('add_to_cart')) {
                 add_to_cart(
                     (int)$request->input('product_id', 0),
-                    $request->input('size', 'slice'),
+                    $request->input('size', 'small'),
                     (int)$request->input('quantity', 1)
                 );
 

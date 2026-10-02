@@ -10,7 +10,7 @@ header("Access-Control-Allow-Origin: *");
 header("Access-Control-Allow-Methods: POST, OPTIONS");
 header("Access-Control-Allow-Headers: Content-Type, Authorization");
 
-require_once __DIR__ . '/../includes/db.php';
+require_once __DIR__ . '/../../../includes/db.php';
 require_once __DIR__ . '/../../../includes/api_auth.php';
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
@@ -38,11 +38,13 @@ $orderId = (intval($oId) > 0) ? intval($oId) : null;
 $message = trim($data['message'] ?? "");
 $sender  = $isAdmin ? 'admin' : 'customer';
 $supportMode = "staff";
+$customerName = '';
+$customerEmail = '';
 
 if ($orderId !== null) {
     $orderCheck = $conn->prepare($isAdmin
-        ? 'SELECT user_id FROM orders WHERE id = ? LIMIT 1'
-        : 'SELECT user_id FROM orders WHERE id = ? AND user_id = ? LIMIT 1');
+        ? 'SELECT user_id, customer, email FROM orders WHERE id = ? LIMIT 1'
+        : 'SELECT user_id, customer, email FROM orders WHERE id = ? AND user_id = ? LIMIT 1');
     if ($isAdmin) {
         $orderCheck->bind_param('i', $orderId);
     } else {
@@ -56,6 +58,20 @@ if ($orderId !== null) {
         exit();
     }
     $userId = (int) ($orderOwner['user_id'] ?? $userId);
+    $customerName = trim((string) ($orderOwner['customer'] ?? ''));
+    $customerEmail = trim((string) ($orderOwner['email'] ?? ''));
+}
+
+if ($customerName === '' || $customerEmail === '') {
+    $userStmt = $conn->prepare('SELECT name, email FROM users WHERE id = ? LIMIT 1');
+    if ($userStmt) {
+        $userStmt->bind_param('i', $userId);
+        $userStmt->execute();
+        $userRow = $userStmt->get_result()->fetch_assoc() ?: [];
+        $userStmt->close();
+        $customerName = $customerName !== '' ? $customerName : trim((string) ($userRow['name'] ?? ''));
+        $customerEmail = $customerEmail !== '' ? $customerEmail : trim((string) ($userRow['email'] ?? ''));
+    }
 }
 
 if (empty($message)) {
@@ -72,7 +88,7 @@ $conn->query("ALTER TABLE messages ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP
 $conn->query("ALTER TABLE messages ADD COLUMN IF NOT EXISTS image_path VARCHAR(255) NULL");
 $conn->query("ALTER TABLE messages MODIFY order_id INT NULL");
 
-$query = "INSERT INTO messages (order_id, user_id, sender, message, created_at) VALUES (?, ?, ?, ?, NOW())";
+$query = "INSERT INTO messages (order_id, user_id, customer_name, customer_email, sender, message, created_at) VALUES (?, ?, ?, ?, ?, ?, NOW())";
 $stmt = $conn->prepare($query);
 
 if (!$stmt) {
@@ -81,7 +97,7 @@ if (!$stmt) {
     exit();
 }
 
-$stmt->bind_param("iiss", $orderId, $userId, $sender, $message);
+$stmt->bind_param("iissss", $orderId, $userId, $customerName, $customerEmail, $sender, $message);
 
 if ($stmt->execute()) {
     $stmt->close();

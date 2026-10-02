@@ -440,6 +440,8 @@ export default function CustomizedCakes() {
 
       const res = await fetch(`${CUSTOMER_BASE}/api_custom_cake.php`, {
         method: 'POST',
+        credentials: 'include',
+        headers: { ...getAuthHeaders() },
         body: fd,
       });
 

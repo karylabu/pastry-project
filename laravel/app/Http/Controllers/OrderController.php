@@ -6,7 +6,6 @@ use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\CustomCakeOrder;
 use App\Models\Product;
-use App\Models\User;
 use App\Http\Requests\StoreOrderRequest;
 use App\Services\CustomizedCakeService;
 use Illuminate\Http\Request;
@@ -63,44 +62,73 @@ class OrderController extends Controller
                     $product = Product::query()
                         ->whereKey((int) $item['product_id'])
                         ->where('available', true)
-                        ->whereRaw("LOWER(TRIM(category)) IN ('cake', 'cakes')")
                         ->first();
 
                     if (!$product) {
                         return response()->json([
                             'success' => false,
-                            'message' => 'Each item must reference an available cake product.',
-                            'errors' => ['items' => ['Invalid or unavailable cake product.']],
+                            'message' => 'Each item must reference an available product.',
+                            'errors' => ['items' => ['Invalid or unavailable product.']],
                         ], 422);
                     }
 
-                    $productSize = $product->sizes()
-                        ->whereKey((int) $item['product_size_id'])
-                        ->where('available', true)
-                        ->first();
+                    $productSizeId = (int) ($item['product_size_id'] ?? 0);
+                    $productSizes = $product->sizes();
+                    $hasConfiguredSizes = $productSizes->exists();
+                    $productSize = $productSizeId > 0
+                        ? $productSizes->whereKey($productSizeId)->where('available', true)->first()
+                        : null;
 
-                    if (!$productSize) {
+                    if (($productSizeId > 0 && !$productSize) || ($hasConfiguredSizes && !$productSize)) {
                         return response()->json([
                             'success' => false,
-                            'message' => 'Each selected cake size must belong to the product and be available.',
-                            'errors' => ['items' => ['Invalid, mismatched, or unavailable cake size.']],
+                            'message' => 'Each selected product size must belong to the product and be available.',
+                            'errors' => ['items' => ['Invalid, mismatched, or unavailable product size.']],
                         ], 422);
                     }
 
                     $quantity = (int) $item['qty'];
-                    $unitPrice = (float) $productSize->price;
+                    $variant = $productSize?->size ?? (string) ($item['variant'] ?? '');
+                    $unitPrice = $productSize
+                        ? (float) $productSize->price
+                        : $this->resolveLegacyProductPrice($product, $variant);
+                    if ($unitPrice === null || $unitPrice <= 0) {
+                        return response()->json([
+                            'success' => false,
+                            'message' => 'The selected product variant is unavailable.',
+                            'errors' => ['items' => ['Invalid or unavailable product variant.']],
+                        ], 422);
+                    }
+
+                    $selectionDetails = $item['selectionDetails'] ?? [];
+                    $addOns = $this->resolveOrderAddOns(
+                        $product,
+                        is_array($selectionDetails) ? ($selectionDetails['extras'] ?? []) : []
+                    );
+                    if ($addOns === null) {
+                        return response()->json([
+                            'success' => false,
+                            'message' => 'One or more selected add-ons are unavailable.',
+                            'errors' => ['items' => ['Invalid product add-on.']],
+                        ], 422);
+                    }
+                    if ($addOns) {
+                        $selectionDetails['extras'] = $addOns;
+                        $unitPrice += array_sum(array_column($addOns, 'price'));
+                    }
+
                     $itemSubtotal = $unitPrice * $quantity;
                     $subtotal += $itemSubtotal;
 
                     $canonicalItems[] = [
                         'product_id' => (int) $product->id,
-                        'product_size_id' => (int) $productSize->id,
+                        'product_size_id' => $productSize ? (int) $productSize->id : null,
                         'name' => $product->name,
                         'product' => $product->name,
-                        'variant' => $productSize->size,
+                        'variant' => $variant,
                         'qty' => $quantity,
                         'price' => $unitPrice,
-                        'selectionDetails' => $item['selectionDetails'] ?? [],
+                        'selectionDetails' => $selectionDetails,
                         'image' => $item['image'] ?? $product->image,
                     ];
                 }
@@ -118,7 +146,7 @@ class OrderController extends Controller
                     }
                 }
                 $total = $subtotal - $discountAmount + $rushFee;
-                $requiresQrPayment = strtolower((string) $request->payment) === 'gcash';
+                $requiresQrPayment = in_array(strtolower((string) $request->payment), ['gcash', 'qrph'], true);
                 $initialStatus = $requiresQrPayment ? 'Awaiting Payment' : 'Pending';
 
                 $order = Order::create([
@@ -167,6 +195,8 @@ class OrderController extends Controller
 
                 }
 
+                app(\App\Services\RealtimeEventPublisher::class)->orderUpdated((int) $user->id, (int) $order->id);
+
                 if (!$requiresQrPayment) {
                     DB::table('notifications')->insert([
                         'user_id' => $user->id,
@@ -212,6 +242,159 @@ class OrderController extends Controller
         }
     }
 
+    public function submitPaymentProof(Request $request, int $orderId)
+    {
+        $user = $this->getAuthenticatedUser($request);
+        if (!$user) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+
+        $request->validate([
+            'payment_proof' => 'required|image|mimes:jpeg,jpg,png,webp|max:5120',
+        ]);
+
+        $order = Order::query()->whereKey($orderId)->where('user_id', $user->id)->first();
+        if (!$order) {
+            return response()->json(['success' => false, 'message' => 'Order not found.'], 404);
+        }
+
+        if (!in_array(strtolower((string) $order->payment), ['gcash', 'qrph'], true)
+            || !in_array($order->status, ['Awaiting Payment', 'Awaiting Balance Payment'], true)
+            || in_array(strtolower((string) $order->payment_status), ['failed', 'paid', 'proof_submitted'], true)) {
+            return response()->json(['success' => false, 'message' => 'This order is not awaiting a QR payment.'], 409);
+        }
+
+        $newPath = $request->file('payment_proof')->store('payment-proofs', 'local');
+        if (!$newPath) {
+            return response()->json(['success' => false, 'message' => 'Unable to save payment proof.'], 500);
+        }
+
+        $oldPath = $order->payment_proof_path;
+        try {
+            $order->update([
+                'payment_proof_path' => $newPath,
+                'payment_status' => 'proof_submitted',
+            ]);
+        } catch (\Throwable $exception) {
+            Storage::disk('local')->delete($newPath);
+            Log::error('Payment proof save failed: ' . $exception->getMessage());
+            return response()->json(['success' => false, 'message' => 'Unable to save payment proof.'], 500);
+        }
+
+        if ($oldPath && $oldPath !== $newPath) {
+            Storage::disk('local')->delete($oldPath);
+        }
+
+        app(\App\Services\RealtimeEventPublisher::class)->orderUpdated((int) $user->id, $orderId);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Payment proof submitted for review.',
+            'payment_status' => 'proof_submitted',
+        ]);
+    }
+
+    public function markPaymentFailed(Request $request, int $orderId)
+    {
+        $user = $this->getAuthenticatedUser($request);
+        if (!$user) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+
+        try {
+            $updated = DB::transaction(function () use ($orderId, $user) {
+                $order = Order::query()->whereKey($orderId)->lockForUpdate()->first();
+                if (!$order || (int) $order->user_id !== (int) $user->id) {
+                    return response()->json(['success' => false, 'message' => 'Order not found.'], 404);
+                }
+                if (!in_array(strtolower((string) $order->payment), ['gcash', 'qrph'], true) || $order->status !== 'Awaiting Payment') {
+                    return response()->json(['success' => false, 'message' => 'Order is no longer awaiting payment setup.'], 409);
+                }
+                if (in_array(strtolower((string) $order->payment_status), ['paid', 'proof_submitted'], true)) {
+                    return response()->json(['success' => false, 'message' => 'Payment has already been submitted.'], 409);
+                }
+
+                $order->update([
+                    'status' => 'Cancelled',
+                    'payment_status' => 'failed',
+                ]);
+
+                return true;
+            });
+
+            if ($updated instanceof \Illuminate\Http\JsonResponse) {
+                return $updated;
+            }
+        } catch (\Throwable $exception) {
+            Log::error('Payment setup failure update failed: ' . $exception->getMessage());
+            return response()->json(['success' => false, 'message' => 'Unable to update payment status.'], 500);
+        }
+
+        return response()->json(['success' => true, 'payment_status' => 'failed']);
+    }
+
+    private function resolveLegacyProductPrice(Product $product, string $variant): ?float
+    {
+        $category = strtolower(trim((string) $product->category));
+        $priceFields = match ($category) {
+            'cake', 'cakes' => [
+                'small' => 'small_price',
+                'big' => 'big_price',
+            ],
+            'meal', 'meals', 'pasta', 'pizza' => [
+                'regular' => 'price',
+                'meal' => 'meal_price',
+                'combo' => 'combo_price',
+            ],
+            'starter', 'starters' => [
+                'solo' => 'solo_price',
+                'sharing' => 'sharing_price',
+            ],
+            default => ['regular' => 'price'],
+        };
+
+        $variant = strtolower(trim($variant));
+        if ($variant === '') {
+            $variant = array_key_first($priceFields);
+        }
+
+        $priceField = $priceFields[$variant] ?? null;
+        if (!$priceField) {
+            return null;
+        }
+
+        $price = (float) ($product->{$priceField} ?? 0);
+        return $price > 0 ? $price : null;
+    }
+
+    private function resolveOrderAddOns(Product $product, array $extras): ?array
+    {
+        $category = strtolower(trim((string) $product->category));
+        $allowedAddOns = [];
+
+        if (str_contains($category, 'pasta')) {
+            $allowedAddOns['Garlic Bread'] = 15.0;
+        }
+        if (str_contains($category, 'meal')) {
+            $allowedAddOns['Extra Rice'] = 35.0;
+            $allowedAddOns['Extra Sauce'] = 10.0;
+        }
+
+        $resolved = [];
+        $seen = [];
+        foreach ($extras as $extra) {
+            $name = trim((string) ($extra['name'] ?? ''));
+            if (!array_key_exists($name, $allowedAddOns) || isset($seen[$name])) {
+                return null;
+            }
+
+            $seen[$name] = true;
+            $resolved[] = ['name' => $name, 'price' => $allowedAddOns[$name]];
+        }
+
+        return $resolved;
+    }
+
     /**
      * Handle custom cake order requests.
      */
@@ -249,7 +432,7 @@ class OrderController extends Controller
                     'delivery_fee' => 0,
                     'status' => 'Pending',
                     'total' => floatval($request->input('total', $request->input('estimated_price', 0))),
-                    'payment' => $request->input('payment', 'COD'),
+                    'payment' => 'QRPh',
                     'address' => $request->input('address', ''),
                     'method' => $request->input('method', 'Pickup'),
                     'delivery_date' => $request->input('date'),
@@ -292,6 +475,8 @@ class OrderController extends Controller
                     'created_at' => now(),
                 ]);
 
+                app(\App\Services\RealtimeEventPublisher::class)->orderUpdated((int) $user->id, (int) $order->id);
+
                 // Notify User
                 DB::table('notifications')->insert([
                     'user_id' => $user->id,
@@ -318,7 +503,7 @@ class OrderController extends Controller
     /**
      * Display the specified order.
      */
-    public function show(Request $request, $id)
+    public function show(Request $request, int $id)
     {
         $user = $this->getAuthenticatedUser($request);
         if (!$user) {
@@ -343,7 +528,7 @@ class OrderController extends Controller
     /**
      * Cancel an order.
      */
-    public function cancel(Request $request, $id)
+    public function cancel(Request $request, int $id)
     {
         $user = $this->getAuthenticatedUser($request);
         if (!$user) {
@@ -375,7 +560,7 @@ class OrderController extends Controller
     /**
      * Update order status (Admin/Staff only).
      */
-    public function updateStatus(Request $request, $id)
+    public function updateStatus(Request $request, int $id)
     {
         $user = $this->getAuthenticatedUser($request);
         if (!$user || $user->role !== 'admin') {
@@ -410,7 +595,7 @@ class OrderController extends Controller
                 $type = 'order';
                 if (strtolower($newStatus) === 'completed') $type = 'order_completed';
                 if (strtolower($newStatus) === 'cancelled') $type = 'order_cancelled';
-                if (strtolower($newStatus) === 'to receive') $type = 'order_received';
+                if (strtolower($newStatus) === 'ready for pickup') $type = 'order_received';
 
                 DB::table('notifications')->insert([
                     'user_id' => $order->user_id,
@@ -458,14 +643,14 @@ class OrderController extends Controller
             $this->sendSmsNotification($order, $newStatus);
         }
 
-        if (strtolower($newStatus) === 'to receive') {
-            $this->sendSmsNotification($order);
+        if (strtolower($newStatus) === 'ready for pickup') {
+            $this->sendSmsNotification($order, $newStatus);
         }
 
         $type = 'order';
         if (strtolower($newStatus) == 'completed') $type = 'order_completed';
         if (strtolower($newStatus) == 'cancelled') $type = 'order_cancelled';
-        if (strtolower($newStatus) == 'to receive') {
+        if (strtolower($newStatus) == 'ready for pickup') {
             $type = 'order_received';
         }
 
@@ -565,7 +750,7 @@ class OrderController extends Controller
     /**
      * Send SMS notification via iProgSMS.
      */
-    private function sendSmsNotification($order, string $status)
+    private function sendSmsNotification(Order $order, string $status)
     {
         try {
             $phone = $order->phone;
@@ -583,7 +768,7 @@ class OrderController extends Controller
                 'pending' => 'has been received and is awaiting confirmation',
                 'confirmed' => 'has been confirmed',
                 'preparing' => 'is now being prepared',
-                'to receive' => 'is ready for pickup or delivery',
+                'ready for pickup' => 'is ready for pickup',
                 'completed' => 'has been completed',
                 'cancelled' => 'has been cancelled',
                 default => "status is now {$status}",

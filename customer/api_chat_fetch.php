@@ -58,16 +58,16 @@ if ($orderId > 0) {
 
 if ($orderId > 0) {
     if ($isCustomer) {
-        $sql = "SELECT id, sender, message, image_path, is_read, created_at FROM messages WHERE order_id=? AND (conversation_id=? OR conversation_id IS NULL OR conversation_id='legacy') ORDER BY created_at ASC";
+        $sql = "SELECT id, sender, customer_name, customer_email, message, image_path, is_read, created_at FROM messages WHERE order_id=? AND (conversation_id=? OR conversation_id IS NULL OR conversation_id='legacy') ORDER BY created_at ASC";
         $stmt = $conn->prepare($sql);
         $stmt->bind_param('is', $orderId, $conversationId);
     } else {
-        $stmt = $conn->prepare('SELECT id, sender, message, image_path, is_read, created_at FROM messages WHERE order_id=? ORDER BY created_at ASC');
+        $stmt = $conn->prepare('SELECT id, sender, customer_name, customer_email, message, image_path, is_read, created_at FROM messages WHERE order_id=? ORDER BY created_at ASC');
         $stmt->bind_param('i', $orderId);
     }
 } else {
     if ($markRead) {
-        $markStmt = $conn->prepare("UPDATE messages SET is_read=1 WHERE sender IN ('admin', 'staff') AND (user_id=? OR user_id IS NULL)");
+        $markStmt = $conn->prepare("UPDATE messages SET is_read=1 WHERE sender IN ('admin', 'staff') AND user_id=?");
         if ($markStmt) {
             $markStmt->bind_param('i', $userId);
             $markStmt->execute();
@@ -75,7 +75,7 @@ if ($orderId > 0) {
         }
     }
 
-    $stmt = $conn->prepare("SELECT id, sender, message, image_path, is_read, created_at FROM messages WHERE (user_id=? OR (user_id IS NULL AND sender IN ('admin', 'staff'))) ORDER BY created_at ASC");
+    $stmt = $conn->prepare("SELECT id, sender, customer_name, customer_email, message, image_path, is_read, created_at FROM messages WHERE user_id=? ORDER BY created_at ASC");
     $stmt->bind_param('i', $userId);
 }
 
@@ -91,10 +91,10 @@ if ($stmt) {
 
 if (empty($messages) && $isCustomer) {
     if ($orderId > 0) {
-        $fallback = $conn->prepare('SELECT id, sender, message, image_path, is_read, created_at FROM messages WHERE order_id=? ORDER BY created_at ASC');
+        $fallback = $conn->prepare('SELECT id, sender, customer_name, customer_email, message, image_path, is_read, created_at FROM messages WHERE order_id=? ORDER BY created_at ASC');
         $fallback->bind_param('i', $orderId);
     } else {
-        $fallback = $conn->prepare("SELECT id, sender, message, image_path, is_read, created_at FROM messages WHERE (user_id=? OR (user_id IS NULL AND sender IN ('admin', 'staff'))) ORDER BY created_at ASC");
+        $fallback = $conn->prepare('SELECT id, sender, customer_name, customer_email, message, image_path, is_read, created_at FROM messages WHERE user_id=? ORDER BY created_at ASC');
         $fallback->bind_param('i', $userId);
     }
     if ($fallback) {

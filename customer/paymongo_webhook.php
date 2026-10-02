@@ -83,7 +83,7 @@ if (!$conn) {
     exit;
 }
 
-$stmt = $conn->prepare("UPDATE orders SET payment_status = 'paid', status = 'Pending' WHERE id = ? AND LOWER(payment) = 'gcash' AND LOWER(COALESCE(payment_status, 'pending')) <> 'paid' AND status IN ('Awaiting Payment', 'Pending')");
+$stmt = $conn->prepare("UPDATE orders SET payment_status = 'paid', status = 'Pending' WHERE id = ? AND LOWER(payment) IN ('gcash', 'qrph') AND LOWER(COALESCE(payment_status, 'pending')) <> 'paid' AND status IN ('Awaiting Payment', 'Pending')");
 $stmt->bind_param('i', $orderId);
 $stmt->execute();
 $paymentConfirmed = $stmt->affected_rows > 0;

@@ -35,8 +35,11 @@ try {
             $product_id =
                 (int)($data['product_id'] ?? 0);
 
-            $size =
-                $data['size'] ?? 'slice';
+            $size = strtolower(trim((string) ($data['size'] ?? 'small')));
+
+            if ($size === 'slice') {
+                $size = 'small';
+            }
 
             $quantity =
                 (int)($data['quantity'] ?? 1);
@@ -76,10 +79,6 @@ try {
 
             // PRICE
             $price = 0;
-
-            if ($size === 'slice') {
-                $price = $product['slice_price'];
-            }
 
             if ($size === 'small') {
                 $price = $product['small_price'];

@@ -25,6 +25,7 @@ class User extends Authenticatable
         'password',
         'role',
         'status',
+        'phone',
         'phone_number',
         'subscribed_promo',
         'expo_push_token',

@@ -99,7 +99,7 @@ $itemsJson = json_encode([[
 ]]);
 
 $method  = $deliveryMethod ?: 'Pickup';
-$payment = 'COD';      // payment is decided once the quote is confirmed
+$payment = 'QRPh';     // payment is collected after the quote is confirmed
 $status  = 'Pending';
 
 $customDetails = [

@@ -6,10 +6,11 @@ while (ob_get_level()) ob_end_clean();
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: POST, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type');
+header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With');
 
 require_once __DIR__ . '/../includes/db.php';
 require_once __DIR__ . '/../includes/api_auth.php';
+require_once __DIR__ . '/../includes/realtime_events.php';
 $authenticatedUser = apiUser();
 if (!$authenticatedUser) {
     http_response_code(401);
@@ -35,10 +36,16 @@ if (!$conn) {
 }
 
 $data = json_decode(file_get_contents('php://input'), true);
+if (!is_array($data)) {
+    $data = $_POST;
+}
 $orderId = intval($data['order_id'] ?? 0);
 $message = trim($data['message'] ?? '');
 $sender = $data['sender'] ?? 'admin';
 $imagePath = null;
+$customerName = '';
+$customerEmail = '';
+$customerUserId = 0;
 
 if (isset($_FILES['image']) && $_FILES['image']['error'] === UPLOAD_ERR_OK) {
     if ($_FILES['image']['size'] > 5 * 1024 * 1024) {
@@ -76,6 +83,17 @@ if ($orderId <= 0 || ($message === '' && $imagePath === null)) {
     exit();
 }
 
+$identityStmt = $conn->prepare('SELECT user_id, customer, email FROM orders WHERE id = ? LIMIT 1');
+if ($identityStmt) {
+    $identityStmt->bind_param('i', $orderId);
+    $identityStmt->execute();
+    $identity = $identityStmt->get_result()->fetch_assoc() ?: [];
+    $identityStmt->close();
+    $customerUserId = (int) ($identity['user_id'] ?? 0);
+    $customerName = trim((string) ($identity['customer'] ?? ''));
+    $customerEmail = trim((string) ($identity['email'] ?? ''));
+}
+
 if (!in_array($sender, ['admin', 'staff', 'customer'], true)) {
     $sender = 'admin';
 }
@@ -90,10 +108,11 @@ if ($sender === 'staff' || $sender === 'customer') {
 | statements at request time.
 */
 
-$stmt = $conn->prepare('INSERT INTO messages (order_id, sender, message, image_path, is_read, created_at) VALUES (?, ?, ?, ?, 1, NOW())');
-$stmt->bind_param('isss', $orderId, $sender, $message, $imagePath);
+$stmt = $conn->prepare('INSERT INTO messages (order_id, user_id, customer_name, customer_email, sender, message, image_path, is_read, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, 1, NOW())');
+$stmt->bind_param('iisssss', $orderId, $customerUserId, $customerName, $customerEmail, $sender, $message, $imagePath);
 $stmt->execute();
 $stmt->close();
+publishRealtimeEvent($conn, 'chat.updated', $customerUserId, $orderId);
 
 $conn->close();
 

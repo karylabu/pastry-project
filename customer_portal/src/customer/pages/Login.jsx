@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import ForgotPassword from "./ForgotPassword";
-import { CUSTOMER_BASE, LARAVEL_BASE } from "../../services/config";
+import { CUSTOMER_BASE, LARAVEL_BASE, ROOT_BASE } from "../../services/config";
 import { safeParseJson } from '../../services/api';
 import { signInWithGoogle } from "../../services/firebase";
 
@@ -233,7 +233,7 @@ export default function Login() {
       <div className="blob-yellow-top" />
       <div className="blob-black-left" />
       <div className="blob-yellow-bottom" />
-      <img className="login-banner" src="http://localhost/pastry-project/uploads/login.jpg?v=login-v1" alt="" aria-hidden="true" />
+      <img className="login-banner" src={`${ROOT_BASE}/uploads/login.jpg?v=login-v1`} alt="" aria-hidden="true" />
       <img className="brand-icon-overlay" src={LOGO_URL} alt="Pastry Project logo" />
 
       <div className="bg-icon icon-croissant">🥐</div>

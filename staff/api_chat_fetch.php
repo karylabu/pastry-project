@@ -6,7 +6,7 @@ while (ob_get_level()) ob_end_clean();
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: GET, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type');
+header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With');
 
 require_once __DIR__ . '/../includes/db.php';
 require_once __DIR__ . '/../includes/api_auth.php';

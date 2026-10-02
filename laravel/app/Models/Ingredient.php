@@ -14,11 +14,13 @@ class Ingredient extends Model
     protected $fillable = [
         'name',
         'unit',
+        'unit_cost',
         'threshold',
     ];
 
     protected $casts = [
         'stock' => 'float',
+        'unit_cost' => 'float',
         'threshold' => 'float',
         'expiry' => 'date',
     ];

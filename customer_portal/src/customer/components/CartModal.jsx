@@ -1,6 +1,6 @@
 
 import React, { useEffect, useMemo } from "react";
-import { BASE } from '../../services/config';
+import { CUSTOMER_BASE } from '../../services/config';
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Trash2, Plus, Minus, ShoppingBag } from "lucide-react";
 
@@ -127,7 +127,7 @@ export default function CartModal({ isOpen, onClose, items = [], setItems, onChe
                     {/* Image */}
                     <div className="h-16 w-16 flex-shrink-0 overflow-hidden rounded-lg border border-[#f1e6df] bg-[#f8eee8] sm:h-20 sm:w-20">
                       <img
-                        src={`${BASE}/uploads/${item?.image || ''}`}
+                        src={`${CUSTOMER_BASE}/uploads/${item?.image || ''}`}
                         alt={item?.name}
                         className="w-full h-full object-contain"
                         onError={(e) => { e.target.src = 'https://via.placeholder.com/150?text=Item'; }}
@@ -223,7 +223,7 @@ export default function CartModal({ isOpen, onClose, items = [], setItems, onChe
               {groupedItems.map((item) => (
                 <div key={item._key} className="flex items-center gap-3">
                   <img
-                    src={`${BASE}/uploads/${item?.image || ''}`}
+                    src={`${CUSTOMER_BASE}/uploads/${item?.image || ''}`}
                     className="w-10 h-10 rounded-full object-cover border border-gray-100"
                     alt=""
                     onError={(e) => { e.target.src = 'https://via.placeholder.com/50?text=Item'; }}

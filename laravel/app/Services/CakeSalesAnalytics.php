@@ -4,6 +4,7 @@ namespace App\Services;
 
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Collection;
 use RuntimeException;
 
 class CakeSalesAnalytics
@@ -105,7 +106,42 @@ class CakeSalesAnalytics
             'ingredientAnalytics' => $ingredientAnalytics,
             'inventoryAlerts' => $this->inventoryAlerts(),
             'wasteAnalytics' => $wasteAnalytics,
+            'reviewAnalytics' => $this->reviewAnalytics($start, $end),
             'businessInsights' => $this->businessInsights($summary, $flavors, $sizesBySale, $designs, $ingredientAnalytics, $wasteAnalytics),
+        ];
+    }
+
+    private function reviewAnalytics(string $start, string $end): array
+    {
+        if (!Schema::hasTable('order_feedback')) {
+            return ['count' => 0, 'average_rating' => 0, 'rating_distribution' => [], 'recent' => []];
+        }
+
+        $reviews = DB::table('order_feedback as feedback')
+            ->leftJoin('users', 'users.id', '=', 'feedback.user_id')
+            ->whereBetween('feedback.created_at', [$start . ' 00:00:00', $end . ' 23:59:59']);
+
+        $summary = (clone $reviews)
+            ->selectRaw('COUNT(*) as count, COALESCE(AVG(feedback.rating), 0) as average_rating')
+            ->first();
+        $distribution = (clone $reviews)
+            ->selectRaw('feedback.rating, COUNT(*) as count')
+            ->groupBy('feedback.rating')
+            ->pluck('count', 'rating')
+            ->all();
+        $recent = (clone $reviews)
+            ->select('feedback.id', 'feedback.order_id', 'feedback.rating', 'feedback.comment', 'feedback.created_at', 'users.name as customer_name')
+            ->orderByDesc('feedback.created_at')
+            ->limit(5)
+            ->get()
+            ->map(fn ($review) => (array) $review)
+            ->all();
+
+        return [
+            'count' => (int) ($summary->count ?? 0),
+            'average_rating' => round((float) ($summary->average_rating ?? 0), 2),
+            'rating_distribution' => $distribution,
+            'recent' => $recent,
         ];
     }
 
@@ -141,14 +177,14 @@ class CakeSalesAnalytics
         return $items;
     }
 
-    private function resolveProduct(array $item, $byId, $byName)
+    private function resolveProduct(array $item, Collection $byId, Collection $byName): ?object
     {
         $productId = (int) ($item['product_id'] ?? $item['id'] ?? 0);
         if ($productId > 0 && $byId->has($productId)) return $byId->get($productId);
         return $byName->get($this->nameKey($item['name'] ?? $item['product'] ?? ''));
     }
 
-    private function resolveItemPrice(array $item, $product, $sizes): float
+    private function resolveItemPrice(array $item, object $product, Collection $sizes): float
     {
         $captured = (float) ($item['price'] ?? $item['unit_price'] ?? 0);
         if ($captured > 0) return $captured;
@@ -159,7 +195,7 @@ class CakeSalesAnalytics
         return 0.0;
     }
 
-    private function resolveSize(array $item, $sizes): string
+    private function resolveSize(array $item, Collection $sizes): string
     {
         $variant = trim((string) ($item['variant'] ?? ''));
         if ($variant !== '') return $variant;
@@ -497,7 +533,7 @@ class CakeSalesAnalytics
         return [$start, $end];
     }
 
-    private function nameKey($name): string
+    private function nameKey(string $name): string
     {
         return strtolower(trim(preg_replace('/\\s+/', ' ', (string) $name)));
     }

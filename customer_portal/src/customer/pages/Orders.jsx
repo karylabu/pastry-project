@@ -1,9 +1,10 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, AlertTriangle, PackageCheck, Filter, ChevronDown, Search, Cookie, Printer, Star } from "lucide-react";
+import { X, AlertTriangle, PackageCheck, Filter, ChevronDown, Search, Cookie, Printer, Star, CreditCard } from "lucide-react";
 import PageShell from '../components/PageShell';
 import { getAuthHeaders, safeParseJson } from '../../services/api';
-import { CUSTOMER_BASE, ROOT_BASE } from "../../services/config";
+import { subscribeRealtime } from '../../services/realtime';
+import { CUSTOMER_BASE, LARAVEL_BASE, ROOT_BASE } from "../../services/config";
 
 // ── Cancel Confirmation Dialog ───────────────────────────────────────────────
 function CancelDialog({ order, onConfirm, onDismiss, isLoading }) {
@@ -27,7 +28,7 @@ function CancelDialog({ order, onConfirm, onDismiss, isLoading }) {
           <AlertTriangle size={26} className="text-slate-700" strokeWidth={1.8} />
         </div>
         <h3 className="text-[20px] font-black text-gray-900 text-center leading-tight mb-2">
-          Cancel Order #{order.id}?
+          Cancel Order #{order.order_number ?? order.id}?
         </h3>
         <p className="text-[12px] text-gray-400 text-center leading-relaxed mb-8">
           This action cannot be undone. Your pending order will be permanently cancelled.
@@ -77,7 +78,7 @@ function ReceivedDialog({ order, onConfirm, onDismiss, isLoading }) {
           Confirm Receipt?
         </h3>
         <p className="text-[12px] text-gray-400 text-center leading-relaxed mb-8">
-          Confirm that you have received Order #{order.id}. This will mark it as <span className="text-slate-900 font-bold">Completed</span>.
+          Confirm that you have received Order #{order.order_number ?? order.id}. This will mark it as <span className="text-slate-900 font-bold">Completed</span>.
         </p>
         <div className="flex gap-3">
           <button
@@ -95,6 +96,73 @@ function ReceivedDialog({ order, onConfirm, onDismiss, isLoading }) {
           </button>
         </div>
       </motion.div>
+    </motion.div>
+  );
+}
+
+function PaymentProofDialog({ order, onSubmit, onDismiss, isLoading, error }) {
+  const [file, setFile] = useState(null);
+  const [fileError, setFileError] = useState('');
+
+  const handleSubmit = (event) => {
+    event.preventDefault();
+    if (!file) {
+      setFileError('Choose a screenshot or photo of your completed payment.');
+      return;
+    }
+    onSubmit(file);
+  };
+
+  const handleFileChange = (event) => {
+    const selected = event.target.files?.[0] || null;
+    if (selected && selected.size > 5 * 1024 * 1024) {
+      setFile(null);
+      setFileError('The image must be 5 MB or smaller.');
+      return;
+    }
+    setFile(selected);
+    setFileError('');
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 p-6 backdrop-blur-sm"
+      onClick={onDismiss}
+    >
+      <motion.form
+        initial={{ scale: 0.92, opacity: 0, y: 16 }}
+        animate={{ scale: 1, opacity: 1, y: 0 }}
+        exit={{ scale: 0.92, opacity: 0, y: 16 }}
+        transition={{ type: 'spring', damping: 24, stiffness: 260 }}
+        onSubmit={handleSubmit}
+        onClick={(event) => event.stopPropagation()}
+        className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl"
+      >
+        <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#9b7b3d]">QRPh payment</p>
+        <h2 className="mt-2 text-xl font-semibold text-slate-900">Send payment proof</h2>
+        <p className="mt-2 text-sm leading-6 text-slate-600">
+          Upload a screenshot or photo of your completed transfer for Order #{order.id}. Admin will review it before preparing your order.
+        </p>
+        <label className="mt-5 block text-sm font-medium text-slate-700" htmlFor="payment-proof-file">Payment screenshot</label>
+        <input
+          id="payment-proof-file"
+          type="file"
+          accept="image/jpeg,image/png,image/webp"
+          onChange={handleFileChange}
+          className="mt-2 block w-full text-sm text-slate-700 file:mr-3 file:rounded-lg file:border-0 file:bg-slate-900 file:px-3 file:py-2 file:text-xs file:font-semibold file:text-white"
+        />
+        {file && <p className="mt-2 truncate text-xs text-slate-500">{file.name}</p>}
+        {(fileError || error) && <p className="mt-3 text-sm text-red-700">{fileError || error}</p>}
+        <div className="mt-6 flex justify-end gap-2">
+          <button type="button" onClick={onDismiss} className="rounded-lg border border-slate-200 px-4 py-2 text-sm text-slate-700" disabled={isLoading}>Cancel</button>
+          <button type="submit" disabled={isLoading || !file} className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">
+            {isLoading ? 'Sending…' : 'Submit proof'}
+          </button>
+        </div>
+      </motion.form>
     </motion.div>
   );
 }
@@ -131,7 +199,7 @@ function FeedbackDialog({ order, onSubmit, onDismiss, isLoading }) {
           <Star size={26} fill="currentColor" strokeWidth={1.8} />
         </div>
         <h3 className="mb-2 text-center text-[20px] font-black leading-tight text-gray-900">How was your order?</h3>
-        <p className="mb-6 text-center text-[12px] leading-relaxed text-gray-400">Order #{order.id} is completed. Share your rating and comment.</p>
+        <p className="mb-6 text-center text-[12px] leading-relaxed text-gray-400">Order #{order.order_number ?? order.id} is completed. Share your rating and comment.</p>
         <div className="mb-5 flex justify-center gap-2" aria-label="Order rating">
           {[1, 2, 3, 4, 5].map((value) => (
             <button
@@ -177,11 +245,15 @@ export default function Orders() {
   const [expandedIds, setExpandedIds] = useState(new Set());
   const [cancelTarget, setCancelTarget]   = useState(null);
   const [receivedTarget, setReceivedTarget] = useState(null);
+  const [paymentProofTarget, setPaymentProofTarget] = useState(null);
   const [processingId, setProcessingId]   = useState(null);
+  const [payingOrderId, setPayingOrderId] = useState(null);
+  const [paymentProofError, setPaymentProofError] = useState('');
   const [actionError, setActionError]     = useState(null);
   const [catalogProducts, setCatalogProducts] = useState([]);
   const [feedbackTarget, setFeedbackTarget] = useState(null);
   const [feedbackSubmitting, setFeedbackSubmitting] = useState(false);
+  const [feedbackPromptSuppressed, setFeedbackPromptSuppressed] = useState(false);
 
   const userEmail = user?.email?.toLowerCase?.();
   const userName  = user?.name?.toLowerCase?.();
@@ -250,7 +322,7 @@ export default function Orders() {
 
     try {
       const customOrdersUrl = user?.id
-        ? `${CUSTOMER_BASE}/api_get_custom_cakes.php?user_id=${encodeURIComponent(user.id)}`
+        ? `${CUSTOMER_BASE}/api_get_custom_cakes.php`
         : null;
       const [ordersResponse, customResponse] = await Promise.all([
         fetch(`${CUSTOMER_BASE}/api_get_orders.php`, {
@@ -258,7 +330,10 @@ export default function Orders() {
           headers: getAuthHeaders(),
         }),
         customOrdersUrl
-          ? fetch(customOrdersUrl)
+          ? fetch(customOrdersUrl, {
+              credentials: 'include',
+              headers: getAuthHeaders(),
+            })
           : Promise.resolve(null),
       ]);
       const data = await safeParseJson(ordersResponse);
@@ -327,26 +402,28 @@ export default function Orders() {
 
   useEffect(() => {
     loadOrders();
+    const unsubscribe = subscribeRealtime((event) => {
+      if (event.type === 'order.updated') loadOrders();
+    });
     const refreshOrders = () => loadOrders();
-    const interval = window.setInterval(refreshOrders, 15000);
     window.addEventListener("ordersUpdated", refreshOrders);
     window.addEventListener("focus", refreshOrders);
     return () => {
-      window.clearInterval(interval);
+      unsubscribe();
       window.removeEventListener("ordersUpdated", refreshOrders);
       window.removeEventListener("focus", refreshOrders);
     };
   }, [loadOrders]);
 
   useEffect(() => {
-    if (feedbackTarget) return;
+    if (feedbackTarget || feedbackPromptSuppressed) return;
     const completedOrder = orders.find((order) => (
       String(order.status || '').toLowerCase() === 'completed' &&
       !localStorage.getItem(`order_feedback_submitted_${order.id}`) &&
       !localStorage.getItem(`order_feedback_dismissed_${order.id}`)
     ));
     if (completedOrder) setFeedbackTarget(completedOrder);
-  }, [orders, feedbackTarget]);
+  }, [orders, feedbackTarget, feedbackPromptSuppressed]);
 
   useEffect(() => {
     const loadCatalogProducts = async () => {
@@ -450,6 +527,57 @@ export default function Orders() {
     }
   };
 
+  const handlePaymentProofSubmit = async (file) => {
+    if (!paymentProofTarget) return;
+    setProcessingId(paymentProofTarget.id);
+    setPaymentProofError('');
+    try {
+      const formData = new FormData();
+      formData.append('payment_proof', file);
+      const response = await fetch(`${LARAVEL_BASE}/api/orders/${paymentProofTarget.id}/payment-proof`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { Accept: 'application/json', ...getAuthHeaders() },
+        body: formData,
+      });
+      const result = await safeParseJson(response);
+      if (!response.ok || !result?.success) {
+        throw new Error(result?.message || 'Unable to submit payment proof.');
+      }
+      setPaymentProofTarget(null);
+      await loadOrders();
+    } catch (error) {
+      setPaymentProofError(error.message || 'Unable to submit payment proof.');
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
+  const handlePayCustomizedDownpayment = async (order, amount, paymentType = 'downpayment') => {
+    setPayingOrderId(order.id);
+    setActionError(null);
+    try {
+      const response = await fetch(`${CUSTOMER_BASE}/create_payment.php`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json', ...getAuthHeaders() },
+        body: JSON.stringify({ order_id: order.id, amount, payment_method: 'QRPh', payment_type: paymentType }),
+      });
+      const paymentData = await safeParseJson(response);
+      if (!response.ok) {
+        throw new Error(paymentData?.errors?.[0]?.detail || paymentData?.error || paymentData?.message || 'Unable to create the PayMongo payment link.');
+      }
+
+      const checkoutUrl = paymentData?.data?.url || paymentData?.data?.attributes?.checkout_url;
+      if (!checkoutUrl) throw new Error('PayMongo did not return a checkout link.');
+      window.location.assign(checkoutUrl);
+    } catch (error) {
+      setActionError(error.message || 'Unable to open PayMongo. Please try again.');
+    } finally {
+      setPayingOrderId(null);
+    }
+  };
+
   const handleFeedbackSubmit = async ({ rating, comment }) => {
     if (!feedbackTarget) return;
     setFeedbackSubmitting(true);
@@ -468,6 +596,7 @@ export default function Orders() {
       const data = await safeParseJson(res);
       if (!data.success) throw new Error(data.message || 'Failed to save feedback.');
       localStorage.setItem(`order_feedback_submitted_${feedbackTarget.id}`, '1');
+      setFeedbackPromptSuppressed(true);
       setFeedbackTarget(null);
     } catch (error) {
       setActionError(error.message || 'Unable to save your feedback. Please try again.');
@@ -576,7 +705,7 @@ export default function Orders() {
           <div class="brand-name">Pastry <span>Project</span></div>
           <div class="tagline">Baked fresh daily</div>
         </header>
-        <h1>Receipt — Order #${escapeReceiptHtml(o.id)}</h1>
+        <h1>Receipt — Order #${escapeReceiptHtml(o.order_number ?? o.id)}</h1>
         <div class="meta">Date: ${escapeReceiptHtml(o.created_at || '')}</div>
         ${orderDetailsHtml}
         <h2 style="font-size:15px;margin:18px 0 8px">Items</h2>
@@ -629,7 +758,7 @@ export default function Orders() {
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `receipt_${o.id}.html`;
+        a.download = `receipt_${o.order_number ?? o.id}.html`;
         document.body.appendChild(a);
         a.click();
         a.remove();
@@ -888,7 +1017,7 @@ export default function Orders() {
   }
 
   // ── Helpers ─────────────────────────────────────────────────────────────────
-  const statusOptions = ["All", "Pending", "Preparing", "To Receive", "Completed", "Cancelled"];
+  const statusOptions = ["All", "Awaiting Payment", "Pending", "Preparing", "Awaiting Balance Payment", "Ready for Pickup", "Completed", "Cancelled"];
 
   const statusCounts = statusOptions.reduce((acc, s) => {
     acc[s] = s === 'All' ? orders.length : orders.filter((o) => String(o.status || '').toLowerCase() === s.toLowerCase()).length;
@@ -943,9 +1072,11 @@ export default function Orders() {
     switch (status) {
       case "Pending":    return "bg-slate-100 text-slate-700";
       case "Preparing":  return "bg-slate-100 text-slate-700";
-      case "To Receive": return "bg-slate-100 text-slate-700";
+      case "Ready for Pickup": return "bg-emerald-50 text-emerald-800";
       case "Completed":  return "bg-slate-100 text-slate-700";
       case "Cancelled":  return "bg-slate-100 text-slate-700";
+      case "Awaiting Payment": return "bg-amber-50 text-amber-800";
+      case "Awaiting Balance Payment": return "bg-amber-50 text-amber-800";
       default:           return "bg-gray-100 text-gray-600";
     }
   };
@@ -980,9 +1111,9 @@ export default function Orders() {
         : reference?.url || reference?.src || reference?.path || reference?.image;
       if (source) {
         if (/^https?:\/\//i.test(source)) return source;
-        if (source.startsWith('/pastry-project/')) return `${window.location.origin}${source}`;
-        if (source.startsWith('/')) return `${window.location.origin}/pastry-project${source}`;
-        return `${ROOT_BASE}/${source.replace(/^\/+/, '')}`;
+        const legacyProjectPath = source.match(/^\/(?:GitHub\/)?pastry-project\/(.*)$/);
+        const relativePath = legacyProjectPath ? legacyProjectPath[1] : source.replace(/^\/+/, '');
+        return `${ROOT_BASE}/${relativePath}`;
       }
       return '/assets/customize/customized_2.jpg';
     }
@@ -1097,8 +1228,11 @@ export default function Orders() {
             <div className="divide-y divide-gray-100">
               {sortedOrders.map((order, idx) => {
                 const isCancelled  = order.status === "Cancelled";
+                const isAwaitingPayment = order.status === 'Awaiting Payment' && ['gcash', 'qrph'].includes(String(order.payment || '').toLowerCase());
+                const isAwaitingBalancePayment = order.status === 'Awaiting Balance Payment' && ['gcash', 'qrph'].includes(String(order.payment || '').toLowerCase());
+                const hasPaymentProof = String(order.payment_status || '').toLowerCase() === 'proof_submitted';
                 const isPending    = order.status === "Pending";
-                const isToReceive  = order.status === "To Receive";
+                const isToReceive  = order.status === "Ready for Pickup";
                 const isCompleted  = order.status === "Completed";
                 const isPreparing  = order.status === "Preparing";
                 const isExpanded   = expandedIds.has(order.id);
@@ -1111,10 +1245,27 @@ export default function Orders() {
                   String(order.type || '').toLowerCase() === 'customized' ||
                   items.some((item) => String(item.name || '').toLowerCase().includes('custom'))
                 );
+                const customPaymentDetails = order.custom_details && typeof order.custom_details === 'string'
+                  ? (() => { try { return JSON.parse(order.custom_details); } catch { return {}; } })()
+                  : (order.custom_details || order.custom_cake_details || {});
+                const quotedDownpayment = Number(order.downpayment_amount ?? customPaymentDetails.downpayment_amount);
+                const downpaymentPercent = Number(customPaymentDetails.downpayment_percent ?? 50);
+                const customDownpaymentAmount = Number.isFinite(quotedDownpayment)
+                  ? quotedDownpayment
+                  : Number((Number(order.total || 0) * downpaymentPercent / 100).toFixed(2));
+                const customBalanceAmount = Math.max(0, Number((Number(order.total || 0) - customDownpaymentAmount).toFixed(2)));
                 const productImage = getProductThumbnail(order, primaryItem);
 
                 const paymentHint = isCancelled
                   ? 'Order cancelled'
+                  : isAwaitingPayment
+                  ? hasPaymentProof
+                    ? 'Proof submitted — awaiting Admin review'
+                    : 'Send payment proof for review'
+                  : isAwaitingBalancePayment
+                  ? hasPaymentProof
+                    ? 'Balance proof submitted — awaiting Admin review'
+                    : 'Remaining balance payment required'
                   : isPending
                   ? 'Please complete before pickup'
                   : isPreparing
@@ -1184,7 +1335,7 @@ export default function Orders() {
 
                     {/* Order id + status */}
                     <div className="flex flex-col gap-1.5">
-                      <p className="text-xs text-gray-400">Order: <span className="text-slate-600 font-medium">#{order.id}</span></p>
+                      <p className="text-xs text-gray-400">Order: <span className="text-slate-600 font-medium">#{order.order_number ?? order.id}</span></p>
                       <span className={`inline-flex w-fit items-center rounded-full px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.1em] ${getStatusStyle(order.status)}`}>
                         {order.status}
                       </span>
@@ -1206,6 +1357,55 @@ export default function Orders() {
 
                     {/* Actions */}
                     <div className="flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
+                      {isAwaitingPayment && (
+                        <>
+                          {isCustomized && !hasPaymentProof && (
+                            <button
+                              type="button"
+                              onClick={() => handlePayCustomizedDownpayment(order, customDownpaymentAmount)}
+                              disabled={payingOrderId === order.id || customDownpaymentAmount <= 0}
+                              title={customDownpaymentAmount <= 0 ? 'Ask Admin to enter a downpayment amount.' : 'Pay the custom order downpayment with PayMongo'}
+                              className="inline-flex items-center gap-1.5 rounded-lg bg-amber-500 px-3.5 py-2 text-[12px] font-semibold text-slate-950 transition-colors hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                              <CreditCard size={14} />
+                              {payingOrderId === order.id ? 'Opening…' : `Pay ₱${customDownpaymentAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                            </button>
+                          )}
+                          {hasPaymentProof
+                            ? <span className="text-right text-[11px] font-semibold text-amber-700">Proof submitted</span>
+                            : <button
+                              onClick={() => { setPaymentProofError(''); setPaymentProofTarget(order); }}
+                              className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-3.5 py-2 text-[12px] font-semibold text-white hover:bg-slate-800 transition-colors"
+                            >
+                              Submit proof
+                            </button>}
+                        </>
+                      )}
+                      {isAwaitingBalancePayment && isCustomized && (
+                        <>
+                          {!hasPaymentProof && (
+                            <button
+                              type="button"
+                              onClick={() => handlePayCustomizedDownpayment(order, customBalanceAmount, 'balance')}
+                              disabled={payingOrderId === order.id || customBalanceAmount <= 0}
+                              title={customBalanceAmount <= 0 ? 'The order has no remaining balance.' : 'Pay the remaining custom cake balance with PayMongo'}
+                              className="inline-flex items-center gap-1.5 rounded-lg bg-amber-500 px-3.5 py-2 text-[12px] font-semibold text-slate-950 transition-colors hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                              <CreditCard size={14} />
+                              {payingOrderId === order.id ? 'Opening…' : `Pay balance ₱${customBalanceAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                            </button>
+                          )}
+                          {hasPaymentProof
+                            ? <span className="text-right text-[11px] font-semibold text-amber-700">Balance proof submitted</span>
+                            : <button
+                              type="button"
+                              onClick={() => { setPaymentProofError(''); setPaymentProofTarget(order); }}
+                              className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-3.5 py-2 text-[12px] font-semibold text-white hover:bg-slate-800 transition-colors"
+                            >
+                              Submit proof
+                            </button>}
+                        </>
+                      )}
                       {isToReceive && (
                         <button
                           onClick={() => setReceivedTarget(order)}
@@ -1267,6 +1467,18 @@ export default function Orders() {
             onConfirm={handleReceivedConfirm}
             onDismiss={() => setReceivedTarget(null)}
             isLoading={processingId === receivedTarget?.id}
+          />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {paymentProofTarget && (
+          <PaymentProofDialog
+            order={paymentProofTarget}
+            onSubmit={handlePaymentProofSubmit}
+            onDismiss={() => setPaymentProofTarget(null)}
+            isLoading={processingId === paymentProofTarget.id}
+            error={paymentProofError}
           />
         )}
       </AnimatePresence>

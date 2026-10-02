@@ -1,5 +1,5 @@
 ﻿import React, { useEffect, useMemo, useState } from 'react';
-import { BASE } from '../../services/config';
+import { CUSTOMER_BASE } from '../../services/config';
 import { Heart } from 'lucide-react';
 
 const PIZZA_IMAGE_FALLBACKS = {
@@ -60,16 +60,16 @@ const DRINK_IMAGE_FALLBACKS = {
 };
 
 const STARTER_IMAGE_FALLBACKS = {
-  'cheesy bacon fries': 'cheesy.png',
+  'cheesy bacon fries': 'cheesy.jpg',
   'chicken nuggets': 'chicken.png',
-  'french fries': 'french.png',
-  'mojos hot': 'mojos_hot.png',
-  'mojos': 'mojos.png',
-  'mozzarella sticks': 'mozarella.png',
-  'potato wedges': 'potato.png',
+  'french fries': 'french.jpg',
+  'mojos hot': 'mojos_hot.jpg',
+  'mojos': 'mojos.jpg',
+  'mozzarella sticks': 'mozarella.jpg',
+  'potato wedges': 'potato.jpg',
 };
 
-const productImageUrl = (filename) => `${BASE}/uploads/${filename}?v=transparent-v25`;
+const productImageUrl = (filename) => `${CUSTOMER_BASE}/uploads/${filename}?v=transparent-v25`;
 
 const DRINK_VISUAL_SCALES = {
   'blueberry ade': 1.12,
@@ -114,7 +114,7 @@ const resolveProductImage = (product) => {
     return productImageUrl(fallbackFile);
   }
 
-  if (category.includes('coffee')) return `${BASE}/uploads/americano.png`;
+  if (category.includes('coffee')) return productImageUrl('americano.png');
   if (category.includes('drink')) return productImageUrl('Caramel.png');
   if (category.includes('pizza')) return productImageUrl('Pepperoni.png');
 
@@ -193,8 +193,8 @@ export default function ProductCard({
         String(candidate.size).trim().toLowerCase() === String(variant.size).trim().toLowerCase()
       ) === index
     );
-    return uniqueVariants;
-  }, [product?.variants, product?.sizes, product?.price, product?.stock, category, shouldShowVariantSelector]);
+    return uniqueVariants.filter((variant) => !isCakeProduct || variant.size.toLowerCase() !== 'slice');
+  }, [product?.variants, product?.sizes, product?.price, product?.stock, category, shouldShowVariantSelector, isCakeProduct]);
 
   const fallbackOptions = [];
 
@@ -289,7 +289,14 @@ export default function ProductCard({
               : category.includes('pizza')
               ? 'pepperoni.png'
               : 'americano.png';
-            event.currentTarget.src = productImageUrl(fallback);
+              const image = event.currentTarget;
+              const fallbackUrl = productImageUrl(fallback);
+              if (image.dataset.fallbackAttempted || image.src === fallbackUrl) {
+                image.style.visibility = 'hidden';
+                return;
+              }
+              image.dataset.fallbackAttempted = 'true';
+              image.src = fallbackUrl;
           }}
           style={isDrinkProduct || isSmallCoffeeProduct ? {
             transform: `scale(${drinkVisualScale})${isStrawberryDrinkProduct ? ' translateY(0.75rem)' : ''}`,

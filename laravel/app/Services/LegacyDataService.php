@@ -39,7 +39,7 @@ class LegacyDataService
         return get_cart_items();
     }
 
-    public function addToCart(int $productId, string $size = 'slice', int $quantity = 1): bool
+    public function addToCart(int $productId, string $size = 'small', int $quantity = 1): bool
     {
         return add_to_cart($productId, $size, $quantity);
     }

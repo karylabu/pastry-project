@@ -3,6 +3,7 @@ ini_set('display_errors', 0);
 error_reporting(0);
 require_once __DIR__ . '/../includes/api_auth.php';
 require_once __DIR__ . '/../includes/inventory.php';
+require_once __DIR__ . '/../includes/realtime_events.php';
 
 $authenticatedUser = apiUser();
 if (!$authenticatedUser) {
@@ -79,7 +80,7 @@ function insertCustomerNotification(mysqli $conn, int $userId, string $title, st
     }
 }
 
-function sendOrderStatusSms(?string $phone, int $orderId, string $status): array {
+function sendOrderStatusSms(?string $phone, int $orderId, string $status, bool $isCustomCakeOrder = false, ?float $downpaymentAmount = null): array {
     if (empty($phone)) {
         return ['sent' => false, 'error' => 'No phone number found'];
     }
@@ -95,15 +96,37 @@ function sendOrderStatusSms(?string $phone, int $orderId, string $status): array
     $phone = '63' . $phone;
 
     $statusMessage = match ($status) {
-        'Pending' => 'has been received and is awaiting confirmation',
-        'Confirmed' => 'has been confirmed',
+        'Pending' => $isCustomCakeOrder
+            ? 'has had its downpayment verified and is pending preparation'
+            : 'has been received and is awaiting confirmation',
+        'Confirmed' => $isCustomCakeOrder
+            ? 'your customized cake order has been accepted and is awaiting preparation'
+            : 'has been confirmed and is awaiting preparation',
+        'Awaiting Payment' => $isCustomCakeOrder
+            ? 'is awaiting the required downpayment'
+            : 'is awaiting payment',
+        'Awaiting Balance Payment' => 'is awaiting the remaining balance payment',
         'Preparing' => 'is now being prepared',
-        'To Receive' => 'is ready for pickup or delivery',
+        'Ready for Pickup' => 'is ready for pickup',
         'Completed' => 'has been completed',
         'Cancelled' => 'has been cancelled',
         default => 'status is now ' . $status,
     };
-    $message = "Pastry Project: Your order #{$orderId} {$statusMessage}.";
+    if ($status === 'Awaiting Payment' && $isCustomCakeOrder) {
+        $amountText = $downpaymentAmount !== null ? ' of ₱' . number_format($downpaymentAmount, 2) : '';
+        $message = "Pastry Project: Your custom cake order #{$orderId} was accepted. Please send the downpayment{$amountText} and submit your payment proof in your account.";
+    } elseif ($status === 'Awaiting Balance Payment' && $isCustomCakeOrder) {
+        $amountText = $downpaymentAmount !== null ? ' of ₱' . number_format($downpaymentAmount, 2) : '';
+        $message = "Pastry Project: Your custom cake order #{$orderId} is prepared and pickup is pending payment. Please pay the remaining balance{$amountText} and submit your payment proof in your account.";
+    } elseif ($status === 'Pending' && $isCustomCakeOrder) {
+        $message = "Pastry Project: Your downpayment for custom cake order #{$orderId} was verified. Your order is now pending preparation.";
+    } elseif ($status === 'Confirmed' && $isCustomCakeOrder) {
+        $message = "Pastry Project: Order #{$orderId}, {$statusMessage}.";
+    } elseif ($status === 'Ready for Pickup' && $isCustomCakeOrder) {
+        $message = "Pastry Project: Your custom cake order #{$orderId} is ready for pickup.";
+    } else {
+        $message = "Pastry Project: Your order #{$orderId} {$statusMessage}.";
+    }
     $payload = json_encode([
         'api_token' => '3e0c021fc064ea07bb524064e62125caf19f511e',
         'phone_number' => $phone,
@@ -315,7 +338,7 @@ function applyInventoryPlan(mysqli $conn, int $orderId, string $status, array $p
 function shouldDeductInventory(string $oldStatus, string $newStatus): bool {
     $newStatus = trim($newStatus);
     $oldStatus = trim($oldStatus);
-    return $newStatus === 'Confirmed' && $oldStatus !== 'Confirmed';
+    return in_array($newStatus, ['Confirmed', 'Preparing'], true) && $oldStatus !== $newStatus;
 }
 
 /**
@@ -398,7 +421,7 @@ if (empty($data) && !empty($_POST)) {
 $id = isset($data['id']) ? intval($data['id']) : 0;
 $status = isset($data['status']) ? trim($data['status']) : "";
 
-$allowedStatuses = ['Pending', 'Confirmed', 'Preparing', 'To Receive', 'Completed', 'Cancelled'];
+$allowedStatuses = ['Awaiting Payment', 'Awaiting Balance Payment', 'Pending', 'Confirmed', 'Preparing', 'Ready for Pickup', 'Completed', 'Cancelled'];
 if (!$id || !in_array($status, $allowedStatuses, true)) {
     sendJson(false, "Invalid input");
 }
@@ -408,7 +431,7 @@ if (!$id || !in_array($status, $allowedStatuses, true)) {
 ========================= */
 try {
     $conn->begin_transaction();
-    $orderStmt = $conn->prepare("SELECT status, items, total, user_id, email, phone FROM orders WHERE id = ? LIMIT 1 FOR UPDATE");
+    $orderStmt = $conn->prepare("SELECT status, items, total, downpayment_amount, user_id, email, phone, payment, payment_status, payment_proof_path FROM orders WHERE id = ? LIMIT 1 FOR UPDATE");
     if (!$orderStmt) {
         throw new Exception("Order lookup failed");
     }
@@ -423,18 +446,90 @@ try {
     }
 
     $oldStatus = trim((string) ($orderRow['status'] ?? 'Pending'));
+    $isGcashOrder = strtolower(trim((string) ($orderRow['payment'] ?? ''))) === 'gcash';
+    $paymentStatus = strtolower(trim((string) ($orderRow['payment_status'] ?? 'pending')));
+    if ($isGcashOrder && $status === 'Preparing' && !in_array($paymentStatus, ['paid', 'proof_submitted'], true)) {
+        throw new Exception('Verify GCash payment before preparing this order');
+    }
+    if ($isGcashOrder && $status === 'Preparing' && $paymentStatus === 'proof_submitted' && empty($orderRow['payment_proof_path'])) {
+        throw new Exception('Payment proof is missing for this order');
+    }
     $itemsJson = $orderRow['items'] ?? '[]';
     $isCustomCakeOrder = false;
-    $customOrderCheck = $conn->prepare(
-        "SELECT EXISTS (SELECT 1 FROM custom_cake_orders WHERE order_id = ?) OR
-                EXISTS (SELECT 1 FROM customized_cake_orders WHERE order_id = ?) AS is_custom_cake"
-    );
-    if ($customOrderCheck) {
+    $customOrderSql = "SELECT EXISTS (SELECT 1 FROM custom_cake_orders WHERE order_id = ?)";
+    $customOrderTables = $conn->query("SHOW TABLES LIKE 'customized_cake_orders'");
+    $hasCustomizedRecipeOrders = $customOrderTables && $customOrderTables->num_rows > 0;
+    if ($hasCustomizedRecipeOrders) {
+        $customOrderSql .= " OR EXISTS (SELECT 1 FROM customized_cake_orders WHERE order_id = ?)";
+    }
+    $customOrderCheck = $conn->prepare($customOrderSql . ' AS is_custom_cake');
+    if (!$customOrderCheck) {
+        throw new Exception('Custom cake order lookup failed');
+    }
+    if ($hasCustomizedRecipeOrders) {
         $customOrderCheck->bind_param('ii', $id, $id);
-        $customOrderCheck->execute();
-        $customOrderRow = $customOrderCheck->get_result()->fetch_assoc();
+    } else {
+        $customOrderCheck->bind_param('i', $id);
+    }
+    if (!$customOrderCheck->execute()) {
         $customOrderCheck->close();
-        $isCustomCakeOrder = (int) ($customOrderRow['is_custom_cake'] ?? 0) === 1;
+        throw new Exception('Custom cake order lookup failed');
+    }
+    $customOrderRow = $customOrderCheck->get_result()->fetch_assoc();
+    $customOrderCheck->close();
+    $isCustomCakeOrder = (int) ($customOrderRow['is_custom_cake'] ?? 0) === 1;
+    $storedDownpaymentAmount = (float) ($orderRow['downpayment_amount'] ?? 0);
+    if ($isCustomCakeOrder && $storedDownpaymentAmount <= 0 && $conn->query("SHOW TABLES LIKE 'custom_cake_orders'")->num_rows > 0) {
+        $quoteStmt = $conn->prepare('SELECT notes FROM custom_cake_orders WHERE order_id = ? LIMIT 1');
+        if ($quoteStmt) {
+            $quoteStmt->bind_param('i', $id);
+            $quoteStmt->execute();
+            $quoteNotes = $quoteStmt->get_result()->fetch_assoc()['notes'] ?? '';
+            $quoteStmt->close();
+            $quoteDetails = json_decode((string) $quoteNotes, true);
+            if (is_array($quoteDetails)) {
+                $storedDownpaymentAmount = (float) ($quoteDetails['downpayment_amount'] ?? 0);
+                if ($storedDownpaymentAmount <= 0 && (float) ($quoteDetails['downpayment_percent'] ?? 0) > 0) {
+                    $storedDownpaymentAmount = round((float) $orderRow['total'] * (float) $quoteDetails['downpayment_percent'] / 100, 2);
+                }
+            }
+        }
+    }
+    $isRequestingDownpayment = $isCustomCakeOrder && $oldStatus === 'Pending' && $status === 'Awaiting Payment';
+    $isAcceptingDownpayment = $isCustomCakeOrder && $oldStatus === 'Awaiting Payment' && $status === 'Pending';
+    $isRequestingBalancePayment = $isCustomCakeOrder && $oldStatus === 'Preparing' && $status === 'Awaiting Balance Payment';
+    $isAcceptingBalancePayment = $isCustomCakeOrder && $oldStatus === 'Awaiting Balance Payment' && $status === 'Ready for Pickup';
+    $isReviewingGcashProof = $isGcashOrder && $oldStatus === 'Awaiting Payment' && $status === 'Pending';
+    $downpaymentAmount = isset($data['downpayment_amount']) && is_numeric($data['downpayment_amount'])
+        ? max(0, (float) $data['downpayment_amount'])
+        : null;
+
+    if ($status === 'Awaiting Payment' && !$isRequestingDownpayment) {
+        throw new Exception('Only a reviewed custom cake request can move to Awaiting Payment.');
+    }
+    if ($isRequestingDownpayment && ($downpaymentAmount === null || $downpaymentAmount <= 0 || $downpaymentAmount >= (float) $orderRow['total'])) {
+        throw new Exception('A downpayment amount between zero and the order total is required.');
+    }
+    if ($status === 'Awaiting Balance Payment' && !$isRequestingBalancePayment) {
+        throw new Exception('Only a custom cake order in preparation can request its remaining balance.');
+    }
+    if ($isRequestingBalancePayment && $paymentStatus !== 'paid') {
+        throw new Exception('The downpayment must be verified before requesting the remaining balance.');
+    }
+    if ($isRequestingBalancePayment && ($storedDownpaymentAmount <= 0 || $storedDownpaymentAmount >= (float) $orderRow['total'])) {
+        throw new Exception('The accepted downpayment quote is missing or invalid. Update the custom cake quote before requesting its balance.');
+    }
+    if ($isCustomCakeOrder && $status === 'Ready for Pickup' && !$isAcceptingBalancePayment) {
+        throw new Exception('A custom cake must have an approved remaining-balance proof before it is ready for pickup.');
+    }
+    if ($isAcceptingDownpayment && ($paymentStatus !== 'proof_submitted' || empty($orderRow['payment_proof_path']))) {
+        throw new Exception('Verify the submitted downpayment proof before accepting payment.');
+    }
+    if ($isAcceptingBalancePayment && ($paymentStatus !== 'proof_submitted' || empty($orderRow['payment_proof_path']))) {
+        throw new Exception('Verify the submitted remaining-balance proof before marking this order ready for pickup.');
+    }
+    if ($isReviewingGcashProof && ($paymentStatus !== 'proof_submitted' || empty($orderRow['payment_proof_path']))) {
+        throw new Exception('Verify the submitted GCash payment proof before moving this order to Pending.');
     }
     $currentUserId = getSessionUserId();
     $loyaltyUserId = intval($orderRow['user_id'] ?? 0);
@@ -517,12 +612,24 @@ try {
         $movementStmt->close();
     }
 
-    $stmt = $conn->prepare("UPDATE orders SET status=? WHERE id=?");
+    if ($isRequestingDownpayment) {
+        $stmt = $conn->prepare("UPDATE orders SET status=?, payment_status='pending', downpayment_amount=? WHERE id=?");
+        if ($stmt) $stmt->bind_param('sdi', $status, $downpaymentAmount, $id);
+    } elseif ($isRequestingBalancePayment) {
+        $stmt = $conn->prepare("UPDATE orders SET status=?, payment_status='pending', downpayment_amount=? WHERE id=?");
+        if ($stmt) $stmt->bind_param('sdi', $status, $storedDownpaymentAmount, $id);
+    } elseif ($isAcceptingDownpayment || $isAcceptingBalancePayment || $isReviewingGcashProof || ($isGcashOrder && $status === 'Preparing' && $paymentStatus === 'proof_submitted')) {
+        $stmt = $conn->prepare("UPDATE orders SET status=?, payment_status='paid' WHERE id=?");
+    } else {
+        $stmt = $conn->prepare("UPDATE orders SET status=? WHERE id=?");
+    }
     if (!$stmt) {
         throw new Exception("Prepare failed");
     }
 
-    $stmt->bind_param("si", $status, $id);
+    if (!$isRequestingDownpayment && !$isRequestingBalancePayment) {
+        $stmt->bind_param("si", $status, $id);
+    }
     if (!$stmt->execute()) {
         $stmt->close();
         throw new Exception("Update failed");
@@ -534,16 +641,18 @@ try {
     }
 
     $conn->commit();
+    publishRealtimeEvent($conn, 'order.updated', $loyaltyUserId, $id);
 
     if ($currentUserId > 0) {
         $statusNote = "Order #{$id} status changed from {$oldStatus} to {$status}";
         insertAuditLog($conn, $currentUserId, 'orders', 'status_change', 'order', $id, $statusNote);
     }
 
-    $notifLookup = $conn->prepare("SELECT user_id, email, customer,
-        (EXISTS (SELECT 1 FROM custom_cake_orders WHERE order_id = orders.id) OR
-         EXISTS (SELECT 1 FROM customized_cake_orders WHERE order_id = orders.id)) AS is_custom_cake
-        FROM orders WHERE id = ?");
+    $customNotificationCheck = "EXISTS (SELECT 1 FROM custom_cake_orders WHERE order_id = orders.id)";
+    if ($hasCustomizedRecipeOrders) {
+        $customNotificationCheck .= " OR EXISTS (SELECT 1 FROM customized_cake_orders WHERE order_id = orders.id)";
+    }
+    $notifLookup = $conn->prepare("SELECT user_id, email, customer, ({$customNotificationCheck}) AS is_custom_cake FROM orders WHERE id = ?");
     $notifUserId = 0;
     if ($notifLookup) {
         $notifLookup->bind_param("i", $id);
@@ -581,10 +690,25 @@ try {
                             $notifTitle = 'Custom cake request accepted';
                             $notifMessage = 'Your custom cake request has been accepted and is awaiting preparation.';
                             break;
-                        case 'To Receive':
+                        case 'Awaiting Payment':
+                            $notifType = 'Info';
+                            $notifTitle = 'Custom cake downpayment required';
+                            $notifMessage = 'Your custom cake quote is ready. Please submit the downpayment and payment proof.';
+                            break;
+                        case 'Awaiting Balance Payment':
+                            $notifType = 'Info';
+                            $notifTitle = 'Custom cake balance due';
+                            $notifMessage = 'Your custom cake is prepared. Pay the remaining balance and submit payment proof before pickup.';
+                            break;
+                        case 'Pending':
                             $notifType = 'Success';
-                            $notifTitle = 'Custom cake order ready';
-                            $notifMessage = 'Your custom cake order is ready for pickup or delivery.';
+                            $notifTitle = 'Custom cake downpayment verified';
+                            $notifMessage = 'Your downpayment was verified. Your custom cake order is pending preparation.';
+                            break;
+                        case 'Ready for Pickup':
+                            $notifType = 'Success';
+                            $notifTitle = 'Custom cake ready for pickup';
+                            $notifMessage = 'Your remaining-balance payment was verified. Your custom cake is ready for pickup.';
                             break;
                         case 'Completed':
                             $notifType = 'Success';
@@ -613,7 +737,7 @@ try {
                             $notifTitle = 'Order confirmed';
                             $notifMessage = 'Your order has been confirmed and is awaiting preparation.';
                             break;
-                        case 'To Receive':
+                        case 'Ready for Pickup':
                             $notifType = 'Success';
                             $notifTitle = 'Order ready';
                             $notifMessage = 'Your order is ready for pickup or delivery.';
@@ -643,8 +767,11 @@ try {
     /* =========================
        SMS LOGIC
     ========================= */
+    $notificationPaymentAmount = $isRequestingBalancePayment
+        ? max(0, (float) $orderRow['total'] - $storedDownpaymentAmount)
+        : $downpaymentAmount;
     $smsResult = $oldStatus !== $status
-        ? sendOrderStatusSms($orderRow['phone'] ?? null, $id, $status)
+        ? sendOrderStatusSms($orderRow['phone'] ?? null, $id, $status, $isCustomCakeOrder, $notificationPaymentAmount)
         : ['sent' => false, 'error' => 'Status did not change'];
 
     $conn->close();

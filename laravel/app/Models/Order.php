@@ -29,6 +29,7 @@ class Order extends Model
         'payment_status',
         'payment_link',
         'payment_reference',
+        'downpayment_amount',
         'customer',
         'email',
         'address_id',
@@ -36,16 +37,18 @@ class Order extends Model
         'is_customized',
         'discount_type',
         'discount',
-        'discount_id_path'
+        'discount_id_path',
+        'payment_proof_path'
     ];
 
-    protected $hidden = ['discount_id_path'];
+    protected $hidden = ['discount_id_path', 'payment_proof_path'];
 
     protected $casts = [
         'items' => 'array',
         'subtotal' => 'decimal:2',
         'delivery_fee' => 'decimal:2',
         'total' => 'decimal:2',
+        'downpayment_amount' => 'decimal:2',
         'lat' => 'decimal:7',
         'lng' => 'decimal:7',
         'is_customized' => 'boolean',

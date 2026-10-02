@@ -8,6 +8,7 @@ import {
   UploadCloud,
 } from "lucide-react";
 import { ROOT_BASE } from "../../services/config";
+import { getAuthHeaders } from "../../services/api";
 
 // ---------------------------------------------------------------------------
 // Forecast chart — historical actuals rendered as a solid area, forecast
@@ -272,9 +273,15 @@ export default function PredictiveAnalytics() {
       const query = new URLSearchParams();
       if (options.action) query.set("action", options.action);
       query.set("period", String(period));
+      const headers = {
+        Accept: "application/json",
+        ...getAuthHeaders(),
+        ...(!options.formData && options.action === "refresh" ? { "Content-Type": "application/json" } : {}),
+      };
       const response = await fetch(`${ROOT_BASE}/admin/api/api_predictive_analytics.php?${query.toString()}`, {
         method: options.action === "refresh" ? "POST" : "GET",
-        headers: options.formData ? undefined : { "Content-Type": "application/json" },
+        credentials: "include",
+        headers,
         body: options.formData ? options.formData : (options.action === "refresh" ? JSON.stringify({ action: "refresh", period }) : undefined),
       });
       const data = await response.json().catch(() => ({}));
@@ -322,6 +329,8 @@ export default function PredictiveAnalytics() {
     try {
       const response = await fetch(`${ROOT_BASE}/admin/api/api_predictive_analytics.php`, {
         method: "POST",
+        credentials: "include",
+        headers: { Accept: "application/json", ...getAuthHeaders() },
         body: formData,
       });
       const data = await response.json().catch(() => ({}));
@@ -346,21 +355,19 @@ export default function PredictiveAnalytics() {
   };
 
   return (
-    <div className="min-h-screen bg-[#f8f7f2]">
+    <div className="min-h-screen bg-[#fbfaf5]">
       <div className="lg:pl-[260px] pt-[72px]">
-        <div className="mx-auto max-w-[1400px] px-6 py-8 md:px-10">
-          <div className="mb-8 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div className="mx-auto max-w-[1400px] px-4 py-5 sm:px-6 md:px-8 lg:px-10 lg:py-7">
+          <div className="mb-4 flex flex-col gap-4 border-b border-[#e8dfd4] pb-4 lg:flex-row lg:items-end lg:justify-between">
             <div>
-              <p className="text-[10px] font-bold uppercase tracking-[0.35em] text-[#D4AF37]">Admin Intelligence</p>
-              <h1 className="text-[26px] font-bold text-black">Predictive Analytics</h1>
-              <p className="mt-1 text-[13px] text-black/60">
-                Forecast pastry demand, plan procurement, and surface high-risk stockouts before they happen.
-              </p>
+              <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.24em] text-[#92701e]">Business analytics</p>
+              <h1 className="text-[26px] font-bold leading-tight text-[#33251e] sm:text-[30px]">Predictive Demand</h1>
+              <p className="mt-1.5 text-[13px] text-[#74675f]">Forecast pastry demand and plan production before stock runs low.</p>
             </div>
-            <div className="flex flex-wrap items-center gap-3">
-              <div className="inline-flex rounded-full border border-black/10 bg-white p-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="inline-flex h-10 items-center rounded-md border border-[#e8dfd4] bg-white p-1">
                 {[7, 14, 30].map((value) => (
-                  <button key={value} type="button" onClick={() => setPeriod(value)} className={`rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${period === value ? "bg-black text-white" : "text-black/60 hover:text-black"}`}>
+                  <button key={value} type="button" onClick={() => setPeriod(value)} aria-pressed={period === value} className={`h-8 rounded px-3 text-[11px] font-semibold transition-colors ${period === value ? "bg-[#fff4cd] text-[#33251e]" : "text-[#74675f] hover:text-[#33251e]"}`}>
                     {value} Days
                   </button>
                 ))}
@@ -369,12 +376,12 @@ export default function PredictiveAnalytics() {
                 type="button"
                 onClick={handleRunForecast}
                 disabled={isWorking}
-                className="inline-flex items-center rounded-full bg-black px-4 py-2 text-sm font-semibold text-white transition hover:bg-black/90 disabled:opacity-50"
+                className="inline-flex h-10 items-center rounded-md bg-[#33251e] px-3.5 text-[11px] font-semibold text-white transition hover:bg-[#5b4540] disabled:opacity-50"
               >
                 <Calculator size={16} className="mr-2" />
                 Run Forecast
               </button>
-              <label className="flex cursor-pointer items-center gap-2 rounded-full border border-black/10 bg-white px-4 py-2 text-sm font-medium text-black/70 shadow-sm transition hover:text-black">
+              <label className="flex h-10 cursor-pointer items-center gap-2 rounded-md border border-[#e8dfd4] bg-white px-3.5 text-[11px] font-semibold text-[#65574d] transition hover:bg-[#faf7f2]">
                 <UploadCloud size={16} />
                 <span>Upload CSV</span>
                 <input type="file" accept=".csv" className="hidden" onChange={handleFileUpload} />
@@ -382,45 +389,34 @@ export default function PredictiveAnalytics() {
             </div>
           </div>
 
-          <div className="mb-6 rounded-[24px] border border-black/10 bg-white p-5 shadow-sm">
-            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-              <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.25em] text-black/50">Data Ingestion</p>
-                <p className="mt-1 flex items-center gap-2 text-sm text-black/70">
-                  {isWorking && <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#D4AF37]" />}
-                  {statusMessage}
-                </p>
-                {errorMessage ? <p className="mt-1 text-sm text-red-600">{errorMessage}</p> : null}
-              </div>
-              <div className="inline-flex items-center gap-2 rounded-full bg-[#f7f2e8] px-3 py-2 text-sm text-[#8b6a12]">
-                <FileText size={16} />
-                Uses live orders and ingredient inventory from the existing system
-              </div>
-            </div>
+          <div className="mb-5 flex flex-wrap items-center justify-between gap-2 border-b border-[#e8dfd4] pb-3 text-[11px]">
+            <p className="flex items-center gap-2 text-[#65574d]" role="status" aria-live="polite"><span className={`h-2 w-2 rounded-full ${isWorking ? "animate-pulse bg-[#d4af37]" : "bg-[#81906c]"}`} />{statusMessage}</p>
+            <p className="inline-flex items-center gap-1.5 text-[#74675f]"><FileText size={13} /> Live orders and ingredient inventory</p>
+            {errorMessage ? <p className="w-full rounded-md bg-[#fff4cd] px-3 py-2 text-[11px] text-[#33251e]">{errorMessage}</p> : null}
           </div>
 
-          <div className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-            <div className="min-w-0 rounded-[24px] border border-black/10 bg-white p-4 shadow-sm">
-              <p className="text-[11px] uppercase tracking-[0.2em] text-black/45">Projected demand</p>
-              <p className="mt-2 text-[22px] font-semibold text-black">{forecast.summary.totalProjectedDemand.toFixed(1)} units</p>
+          <div className="mb-5 grid grid-cols-2 gap-2.5 sm:grid-cols-3 xl:grid-cols-5">
+            <div className="min-w-0 rounded-lg border border-t-[3px] border-[#e9e1d9] border-t-[#c9a94f] bg-white px-3.5 py-3">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-black/55">Projected demand</p>
+              <p className="mt-2 text-[22px] font-bold text-black">{forecast.summary.totalProjectedDemand.toFixed(1)} units</p>
             </div>
-            <div className="min-w-0 rounded-[24px] border border-black/10 bg-white p-4 shadow-sm">
-              <p className="text-[11px] uppercase tracking-[0.2em] text-black/45">Demand trend</p>
-              <p className={`mt-2 text-[22px] font-semibold ${Number(forecast.summary.trendPercent) >= 0 ? "text-emerald-700" : "text-red-700"}`}>
+            <div className="min-w-0 rounded-lg border border-t-[3px] border-[#e9e1d9] border-t-[#81906c] bg-white px-3.5 py-3">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-black/55">Demand trend</p>
+              <p className={`mt-2 text-[22px] font-bold ${Number(forecast.summary.trendPercent) >= 0 ? "text-[#68815d]" : "text-black"}`}>
                 {forecast.summary.trendPercent == null ? "—" : `${forecast.summary.trendPercent >= 0 ? "↑" : "↓"} ${Math.abs(forecast.summary.trendPercent)}%`}
               </p>
             </div>
-            <div className="min-w-0 rounded-[24px] border border-black/10 bg-white p-4 shadow-sm">
-              <p className="text-[11px] uppercase tracking-[0.2em] text-black/45">High priority</p>
-              <p className="mt-2 text-[22px] font-semibold text-black">{forecast.summary.highPriorityCount}</p>
+            <div className="min-w-0 rounded-lg border border-t-[3px] border-[#e9e1d9] border-t-[#c87954] bg-white px-3.5 py-3">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-black/55">High priority</p>
+              <p className="mt-2 text-[22px] font-bold text-black">{forecast.summary.highPriorityCount}</p>
             </div>
-            <div className="min-w-0 rounded-[24px] border border-black/10 bg-white p-4 shadow-sm">
-              <p className="text-[11px] uppercase tracking-[0.2em] text-black/45">Reorder recommendations</p>
-              <p className="mt-2 text-[22px] font-semibold text-black">{forecast.summary.recommendationCount}</p>
+            <div className="min-w-0 rounded-lg border border-t-[3px] border-[#e9e1d9] border-t-[#d4af37] bg-white px-3.5 py-3">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-black/55">Reorder recommendations</p>
+              <p className="mt-2 text-[22px] font-bold text-black">{forecast.summary.recommendationCount}</p>
             </div>
-            <div className="min-w-0 rounded-[24px] border border-black/10 bg-white p-4 shadow-sm">
-              <p className="text-[11px] uppercase tracking-[0.2em] text-black/45">Processing status</p>
-              <p className={`mt-2 text-[14px] font-semibold ${isWorking ? "text-[#D4AF37]" : "text-black"}`}>
+            <div className="min-w-0 rounded-lg border border-t-[3px] border-[#e9e1d9] border-t-black/30 bg-white px-3.5 py-3">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-black/55">Processing status</p>
+              <p className={`mt-2 text-[14px] font-bold ${isWorking ? "text-[#9b7810]" : "text-black"}`}>
                 {isWorking ? "Running" : "Ready"}
               </p>
             </div>
@@ -488,11 +484,11 @@ export default function PredictiveAnalytics() {
                 <select value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)} className="rounded-xl border border-black/10 px-3 py-2 text-xs"><option value="">All categories</option>{[...new Set(forecast.products.map((product) => product.category))].map((category) => <option key={category} value={category}>{category}</option>)}</select>
               </div>
             </div>
-            <div className="overflow-x-auto"><table className="min-w-[900px] text-left text-sm"><thead><tr className="border-b border-black/10 text-[10px] uppercase tracking-[0.16em] text-black/50"><th className="py-3 pr-4">Product</th><th className="py-3 pr-4">Recent</th>{Array.from({ length: period }, (_, index) => <th key={index} className="py-3 pr-4">D+{index + 1}</th>)}<th className="py-3 pr-4">Total</th><th className="py-3">Priority</th></tr></thead><tbody>{filteredProducts.length ? filteredProducts.map((product) => <tr key={product.product} className="border-b border-black/10 last:border-0 hover:bg-[#fafaf8]"><td className="py-3 pr-4 font-semibold text-black">{product.product}</td><td className="py-3 pr-4 text-black/70">{product.recentDemand}</td>{product.forecast.map((value, index) => <td key={index} className="py-3 pr-4 text-black/70">{value}</td>)}<td className="py-3 pr-4 font-semibold">{product.totalForecast}</td><td className="py-3"><span className="rounded-full bg-[#f7f2e8] px-2.5 py-1 text-[10px] font-semibold">{product.priority}</span></td></tr>) : <tr><td colSpan={period + 4} className="py-6 text-center text-sm text-black/50">No product forecast data is available.</td></tr>}</tbody></table></div>
+            <div className="overflow-x-auto"><table className="min-w-[1020px] text-left text-sm"><thead><tr className="border-b border-black/10 text-[10px] uppercase tracking-[0.16em] text-black/50"><th className="py-3 pr-4">Product</th><th className="py-3 pr-4">Recent</th>{Array.from({ length: period }, (_, index) => <th key={index} className="py-3 pr-4">D+{index + 1}</th>)}<th className="py-3 pr-4">Total</th><th className="py-3 pr-4">Pre-order Qty</th><th className="py-3">Priority</th></tr></thead><tbody>{filteredProducts.length ? filteredProducts.map((product) => <tr key={product.product} className="border-b border-black/10 last:border-0 hover:bg-[#fafaf8]"><td className="py-3 pr-4 font-semibold text-black">{product.product}</td><td className="py-3 pr-4 text-black/70">{product.recentDemand}</td>{product.forecast.map((value, index) => <td key={index} className="py-3 pr-4 text-black/70">{value}</td>)}<td className="py-3 pr-4 font-semibold">{product.totalForecast}</td><td className="py-3 pr-4 font-semibold">{product.recommendedPreorderQuantity ?? 0}</td><td className="py-3"><span className="rounded-full bg-[#f7f2e8] px-2.5 py-1 text-[10px] font-semibold">{product.priority}</span></td></tr>) : <tr><td colSpan={period + 5} className="py-6 text-center text-sm text-black/50">No product forecast data is available.</td></tr>}</tbody></table></div>
           </div>
 
           <div className="mb-6 grid gap-4 xl:grid-cols-2">
-            <div className="rounded-[24px] border border-black/10 bg-white p-5 shadow-sm"><p className="text-[11px] font-semibold uppercase tracking-[0.25em] text-black/50">Production Recommendations</p><h2 className="mb-4 text-lg font-semibold text-black">What to produce</h2><div className="space-y-2">{filteredProducts.filter((product) => product.recommendedProduction > 0).length ? filteredProducts.filter((product) => product.recommendedProduction > 0).map((product) => <div key={product.product} className="flex items-center justify-between border-b border-black/10 py-3 text-sm"><span className="font-semibold">{product.product}</span><span>{product.recommendedProduction} units <b className="ml-2 text-black/50">{product.priority}</b></span></div>) : <p className="text-sm text-black/50">Current stock covers the projected demand.</p>}</div></div>
+            <div className="rounded-[24px] border border-black/10 bg-white p-5 shadow-sm"><p className="text-[11px] font-semibold uppercase tracking-[0.25em] text-black/50">Pre-order Planning</p><h2 className="mb-4 text-lg font-semibold text-black">Suggested pre-order quantities</h2><div className="space-y-2">{filteredProducts.filter((product) => product.recommendedPreorderQuantity > 0).length ? filteredProducts.filter((product) => product.recommendedPreorderQuantity > 0).map((product) => <div key={product.product} className="flex items-center justify-between border-b border-black/10 py-3 text-sm"><span className="font-semibold">{product.product}</span><span>{product.recommendedPreorderQuantity} units <b className="ml-2 text-black/50">{product.priority}</b></span></div>) : <p className="text-sm text-black/50">Current stock covers the projected demand.</p>}</div></div>
             <div className="rounded-[24px] border border-black/10 bg-white p-5 shadow-sm"><p className="text-[11px] font-semibold uppercase tracking-[0.25em] text-black/50">Top Forecasted Products</p><h2 className="mb-4 text-lg font-semibold text-black">Highest projected demand</h2><div className="space-y-3">{[...forecast.products].sort((a, b) => b.totalForecast - a.totalForecast).slice(0, 5).map((product) => <div key={product.product}><div className="mb-1 flex justify-between text-xs"><span>{product.product}</span><b>{product.totalForecast}</b></div><div className="h-2 rounded-full bg-slate-100"><div className="h-2 rounded-full bg-[#D4AF37] transition-[width] duration-500" style={{ width: `${Math.min(100, product.totalForecast / Math.max(...forecast.products.map((item) => item.totalForecast), 1) * 100)}%` }} /></div></div>)}</div></div>
           </div>
 

@@ -43,7 +43,7 @@ $action = $_GET['action'] ?? 'list';
 
 function getProductSizeOptions(PDO $pdo, array $product): array {
     $productId = (int) ($product['id'] ?? 0);
-    $stmt = $pdo->prepare("SELECT id, size, price, available FROM product_sizes WHERE product_id = ? ORDER BY FIELD(size, 'slice', 'small', 'big', 'regular', 'meal', 'combo', 'solo', 'sharing'), id");
+    $stmt = $pdo->prepare("SELECT id, size, price, available FROM product_sizes WHERE product_id = ? AND LOWER(size) <> 'slice' ORDER BY FIELD(size, 'small', 'big', 'regular', 'meal', 'combo', 'solo', 'sharing'), id");
     $stmt->execute([$productId]);
     $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
@@ -75,7 +75,6 @@ function getProductSizeOptions(PDO $pdo, array $product): array {
 
     if ($category === 'cakes') {
         $sizeChecks = [
-            ['size' => 'slice', 'price' => (float) ($product['slice_price'] ?? 0)],
             ['size' => 'small', 'price' => (float) ($product['small_price'] ?? 0)],
             ['size' => 'big', 'price' => (float) ($product['big_price'] ?? 0)],
         ];
@@ -185,7 +184,6 @@ if ($action === 'bestsellers') {
         if (empty($product['sizes'])) {
             $product['price'] = max(
                 (float) ($product['price'] ?? 0),
-                (float) ($product['slice_price'] ?? 0),
                 (float) ($product['small_price'] ?? 0),
                 (float) ($product['big_price'] ?? 0),
                 (float) ($product['meal_price'] ?? 0),
@@ -482,19 +480,9 @@ if ($action === 'add' && $_SERVER['REQUEST_METHOD'] === 'POST') {
 ========================================================= */
 
 if ($action === 'recommendations') {
-    session_start();
-
-    $requestedUserId = isset($_GET['user_id']) ? (int) $_GET['user_id'] : 0;
-    $userId = $requestedUserId > 0 ? $requestedUserId : ((int) ($_SESSION['user']['id'] ?? 0));
-
-    if ($userId <= 0) {
-        http_response_code(401);
-        echo json_encode([
-            'success' => false,
-            'message' => 'Authentication required.'
-        ]);
-        exit;
-    }
+    require_once __DIR__ . '/../includes/api_auth.php';
+    $authUser = requireApiRole(['customer']);
+    $userId = (int) $authUser['id'];
 
     $userStmt = $pdo->prepare("SELECT email FROM users WHERE id = ? LIMIT 1");
     $userStmt->execute([$userId]);

@@ -116,12 +116,13 @@ try {
             "email" => $hasEmail ? ($row['email'] ?? '') : '',
             "items" => $items,
             "total" => floatval($row['total'] ?? 0),
+            "downpayment_amount" => isset($row['downpayment_amount']) ? floatval($row['downpayment_amount']) : null,
             "payment" => $row['payment'] ?? '',
             "method" => $row['method'] ?? '',
             "address" => $row['address'] ?? '',
             "status" => $row['status'] ?? 'Pending',
             "created_at" => $row['created_at'] ?? '',
-            "is_customized" => $isCustomizedOrder ? 1 : 0,
+            "is_customized" => ($isCustomizedOrder || !empty($row['is_customized']) || strcasecmp((string) ($row['order_type'] ?? ''), 'Customized') === 0) ? 1 : 0,
             "custom_details" => $customDetails
         ];
     }

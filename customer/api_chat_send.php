@@ -8,6 +8,7 @@ header("Access-Control-Allow-Headers: Content-Type");
 
 require_once __DIR__ . '/../includes/db.php';
 require_once __DIR__ . '/../includes/api_auth.php';
+require_once __DIR__ . '/../includes/realtime_events.php';
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     http_response_code(200);
@@ -29,11 +30,13 @@ $message = trim($data['message'] ?? "");
 $sender  = $isAdmin ? 'admin' : 'customer';
 $conversationId = substr(trim($data['conversation_id'] ?? ''), 0, 64) ?: 'legacy';
 $imagePath = null;
+$customerName = '';
+$customerEmail = '';
 
 if ($orderId !== null) {
     $orderCheck = $conn->prepare($isAdmin
-        ? 'SELECT user_id FROM orders WHERE id = ? LIMIT 1'
-        : 'SELECT user_id FROM orders WHERE id = ? AND user_id = ? LIMIT 1');
+        ? 'SELECT user_id, customer, email FROM orders WHERE id = ? LIMIT 1'
+        : 'SELECT user_id, customer, email FROM orders WHERE id = ? AND user_id = ? LIMIT 1');
     if ($isAdmin) {
         $orderCheck->bind_param('i', $orderId);
     } else {
@@ -47,6 +50,20 @@ if ($orderId !== null) {
         exit();
     }
     $userId = (int) ($orderOwner['user_id'] ?? $userId);
+    $customerName = trim((string) ($orderOwner['customer'] ?? ''));
+    $customerEmail = trim((string) ($orderOwner['email'] ?? ''));
+}
+
+if ($customerName === '' || $customerEmail === '') {
+    $userStmt = $conn->prepare('SELECT name, email FROM users WHERE id = ? LIMIT 1');
+    if ($userStmt) {
+        $userStmt->bind_param('i', $userId);
+        $userStmt->execute();
+        $userRow = $userStmt->get_result()->fetch_assoc() ?: [];
+        $userStmt->close();
+        $customerName = $customerName !== '' ? $customerName : trim((string) ($userRow['name'] ?? ''));
+        $customerEmail = $customerEmail !== '' ? $customerEmail : trim((string) ($userRow['email'] ?? ''));
+    }
 }
 
 if (empty($message) && !isset($_FILES['image'])) {
@@ -64,7 +81,7 @@ if (isset($_FILES['image']) && $_FILES['image']['error'] === UPLOAD_ERR_OK) {
     }
 }
 
-$query = "INSERT INTO messages (order_id, user_id, sender, message, image_path, conversation_id, created_at) VALUES (?, ?, ?, ?, ?, ?, NOW())";
+$query = "INSERT INTO messages (order_id, user_id, customer_name, customer_email, sender, message, image_path, conversation_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())";
 $stmt = $conn->prepare($query);
 
 if (!$stmt) {
@@ -75,7 +92,7 @@ if (!$stmt) {
     exit();
 }
 
-$stmt->bind_param("iissss", $orderId, $userId, $sender, $message, $imagePath, $conversationId);
+$stmt->bind_param("iissssss", $orderId, $userId, $customerName, $customerEmail, $sender, $message, $imagePath, $conversationId);
 if ($stmt->execute()) {
         $insertedId = $stmt->insert_id;
         $stmt->close();
@@ -132,6 +149,7 @@ if ($stmt->execute()) {
             }
         }
 
+        publishRealtimeEvent($conn, 'chat.updated', $userId, (int) ($orderId ?? 0), $conversationId);
         echo json_encode([
             "success" => true,
             "message" => "Sent",

@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { X, Loader2, SearchX } from "lucide-react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-import { BASE, CUSTOMER_BASE, LARAVEL_BASE } from '../../services/config';
+import { CUSTOMER_BASE, LARAVEL_BASE } from '../../services/config';
 import { getAuthHeaders } from '../../services/api';
 import { identifyDiscountIdType } from '../utils/discountIdOcr';
 import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
@@ -64,7 +64,7 @@ export default function CheckoutModal({
 
   const [checkoutData, setCheckoutData] = useState({
     method: "Deliver",
-    payment: "GCash",
+    payment: "QRPh",
     orderType: "Standard",
     address: "",
     phone: "",
@@ -498,6 +498,22 @@ export default function CheckoutModal({
     }
 
     setLoading(true);
+    let paymentOrderId = null;
+    let paymentSetupStarted = false;
+    let paymentLinkReady = false;
+
+    const markPaymentSetupFailed = async () => {
+      if (!paymentOrderId) return;
+      try {
+        await fetch(`${LARAVEL_BASE}/api/orders/${paymentOrderId}/payment-failure`, {
+          method: 'POST',
+          credentials: 'include',
+          headers: { Accept: 'application/json', ...getAuthHeaders() },
+        });
+      } catch (error) {
+        console.error('Could not mark failed payment setup:', error);
+      }
+    };
 
     try {
 
@@ -545,11 +561,23 @@ export default function CheckoutModal({
 
       const xsrf = getCookie('XSRF-TOKEN');
       const formData = new FormData();
-      formData.append('order_payload', JSON.stringify(payload));
+      const appendFormData = (value, key) => {
+        if (Array.isArray(value)) {
+          value.forEach((entry, index) => appendFormData(entry, `${key}[${index}]`));
+        } else if (value && typeof value === 'object') {
+          Object.entries(value).forEach(([childKey, childValue]) => {
+            appendFormData(childValue, `${key}[${childKey}]`);
+          });
+        } else if (value !== null && value !== undefined) {
+          formData.append(key, String(value));
+        }
+      };
+      Object.entries(payload).forEach(([key, value]) => appendFormData(value, key));
       if (discountIdFile) formData.append('discount_id_image', discountIdFile);
 
       const response = await fetch(orderUrl, {
         method: "POST",
+        credentials: "include",
         headers: {
           ...getAuthHeaders(),
           ...(xsrf ? { 'X-XSRF-TOKEN': xsrf } : {}),
@@ -579,19 +607,23 @@ export default function CheckoutModal({
         alert(result.message || "Order failed.");
         return;
       }
+      paymentOrderId = result.order_id;
 
       /* =========================
          PAYMONGO FLOW
       ========================= */
 
-      if (checkoutData.payment === "GCash") {
+      if (checkoutData.payment === "QRPh") {
+        paymentSetupStarted = true;
 
         const paymentResponse = await fetch(
           `${CUSTOMER_BASE}/create_payment.php`,
           {
             method: "POST",
+            credentials: "include",
             headers: {
               "Content-Type": "application/json",
+              ...getAuthHeaders(),
               ...(xsrf ? { 'X-XSRF-TOKEN': xsrf } : {}),
             },
             body: JSON.stringify({
@@ -614,6 +646,7 @@ export default function CheckoutModal({
           } catch (e) {
             errMsg = e.message || errMsg;
           }
+          await markPaymentSetupFailed();
           alert(errMsg);
           return;
         }
@@ -622,6 +655,7 @@ export default function CheckoutModal({
         try {
           paymentData = await safeParseJson(paymentResponse);
         } catch (parseErr) {
+          await markPaymentSetupFailed();
           console.error('Failed to parse PayMongo JSON:', parseErr.message);
           alert(`Payment provider returned invalid response: ${parseErr.message}`);
           return;
@@ -629,11 +663,14 @@ export default function CheckoutModal({
 
         console.log('PayMongo response:', paymentData);
 
-        const checkoutUrl = paymentData?.data?.attributes?.checkout_url;
+        const checkoutUrl = paymentData?.data?.url || paymentData?.data?.attributes?.checkout_url;
         if (!checkoutUrl) {
+          await markPaymentSetupFailed();
           alert("Payment URL not returned by PayMongo.");
           return;
         }
+
+        paymentLinkReady = true;
 
         // FIX: Clear cart AFTER we have a valid checkout URL, right before redirect.
         // Previously the cart was cleared before the URL check, so a missing URL
@@ -657,6 +694,10 @@ export default function CheckoutModal({
       onClose();
 
     } catch (err) {
+
+      if (paymentSetupStarted && !paymentLinkReady) {
+        await markPaymentSetupFailed();
+      }
 
       console.error('Place order error:', err);
       const msg = (err && err.message) ? err.message : String(err);
@@ -725,7 +766,7 @@ export default function CheckoutModal({
                         ...checkoutData,
                         method: m,
                         ...(m === "Deliver" && checkoutData.payment === "Counter"
-                          ? { payment: "GCash" }
+                          ? { payment: "QRPh" }
                           : {}),
                       })
                     }
@@ -773,7 +814,7 @@ export default function CheckoutModal({
 
               <div className={`grid gap-2 ${checkoutData.method === "Deliver" ? "grid-cols-1" : "sm:grid-cols-2"}`}>
                 {[
-                  { value: "GCash", label: "Pay thru QR" },
+                  { value: "QRPh", label: "QRPh" },
                   { value: "Counter", label: "Pay at the Counter" },
                 ]
                   .filter((paymentOption) => checkoutData.method !== "Deliver" || paymentOption.value !== "Counter")
@@ -1007,7 +1048,7 @@ export default function CheckoutModal({
                   <div key={idx} className="flex gap-3">
 
                     <img
-                      src={`${BASE}/uploads/${item.image}`}
+                      src={`${CUSTOMER_BASE}/uploads/${item.image}`}
                       className="h-11 w-11 rounded-lg border border-[#eee5db] bg-white object-contain p-1"
                       alt=""
                     />
@@ -1165,7 +1206,7 @@ export default function CheckoutModal({
                 className="mt-3 w-full rounded-xl border border-[#eadfca] bg-[#fff8e9] py-3.5 text-sm font-bold uppercase tracking-[0.16em] text-[#33251e] shadow-sm transition hover:border-[#e7c875] hover:bg-[#fff8df] hover:text-[#8d6a2e] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d4af37] disabled:cursor-not-allowed disabled:border-gray-200 disabled:bg-gray-200 disabled:text-gray-500"
               >
                 {loading
-                  ? checkoutData.payment === "GCash"
+                  ? checkoutData.payment === "QRPh"
                     ? "REDIRECTING..."
                     : "SAVING..."
                   : shopOpen ? "PLACE ORDER" : "SHOP CLOSED"}

@@ -57,7 +57,14 @@ class DiscardRequestController extends Controller
         try {
             $user = $this->getAuthenticatedUser($request);
             $discard = $inventory->createDiscardRequest($request->validated(), (int) $user->id);
-            return response()->json(['success' => true, 'message' => 'Discard request submitted.', 'request_id' => $discard->id, 'request' => $discard], 201);
+            $autoApproved = $discard->status === 'Approved';
+            return response()->json([
+                'success' => true,
+                'message' => $autoApproved ? 'Expired stock discarded and recorded as waste.' : 'Discard request submitted.',
+                'request_id' => $discard->id,
+                'auto_approved' => $autoApproved,
+                'request' => $discard,
+            ], 201);
         } catch (Throwable $exception) {
             return response()->json(['success' => false, 'message' => $exception->getMessage()], 409);
         }

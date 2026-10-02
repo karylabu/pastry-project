@@ -16,8 +16,9 @@ try {
     if (!$conn) throw new Exception("Database connection failed.");
 
     /*
-    | SCHEMA NOTE: The user_sessions table is created by the versioned migration
-    | database/migrations/2026_08_25_01_user_sessions.sql. This API must never run
+    | SCHEMA NOTE: The user_sessions table is created by the base schema. Session
+    | device metadata is added by database/migrations/2026_09_29_01_add_device_metadata_to_user_sessions.sql.
+    | This API must never run
     | CREATE TABLE / ALTER TABLE statements at request time.
     */
 

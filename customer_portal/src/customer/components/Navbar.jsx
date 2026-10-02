@@ -18,6 +18,18 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { BASE, CUSTOMER_BASE } from '../../services/config';
 import { getAuthHeaders, safeParseJson } from '../../services/api';
 
+const getNotificationCategory = (notification) => {
+  const type = notification.type || 'account';
+  const title = String(notification.title || '').toLowerCase();
+  const actionUrl = String(notification.action_url || '');
+
+  if (type === 'Success' && title.includes('order placed') && actionUrl.startsWith('/customer/orders')) {
+    return 'order_pending';
+  }
+
+  return type;
+};
+
 export default function Navbar({ cartCount = 0, onCartClick }) {
 
   const location = useLocation();
@@ -52,7 +64,10 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
       setUser(null);
     }
 
-    fetch(`${CUSTOMER_BASE}/api_get_user.php`)
+    fetch(`${CUSTOMER_BASE}/api_get_user.php`, {
+      credentials: 'include',
+      headers: getAuthHeaders(),
+    })
       .then(safeParseJson)
       .then(data => {
         if (data?.status === 'success' && data.user) {
@@ -149,7 +164,7 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
 
   const filteredNotifications = useMemo(() => {
     if (notifFilter === "All") return notifications;
-    if (notifFilter === "Active Orders") return notifications.filter((n) => ["order_pending", "order_ready", "order_urgent"].includes(n.type) || (n.type === "Success" && n.action_url?.includes("/customer/orders")));
+    if (notifFilter === "Active Orders") return notifications.filter((n) => ["order_pending", "order_ready", "order_urgent"].includes(getNotificationCategory(n)) || (n.type === "Success" && n.action_url?.includes("/customer/orders")));
     if (notifFilter === "Reminders & Warnings") return notifications.filter((n) => ["order_expired", "stockout"].includes(n.type) || (n.type === "Warning" && n.action_url?.includes("/customer/orders")));
     if (notifFilter === "Account Updates") return notifications.filter((n) =>
       ["account", "profile"].includes(n.type) ||
@@ -403,7 +418,7 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
                   ) : (
                     filteredNotifications.map((n) => {
                       const isUnread = !n.read;
-                      const type = n.type || "account";
+                      const type = getNotificationCategory(n);
                       const isCustomCakeNotice = String(n.title || "").toLowerCase().includes("custom cake");
                       const getIcon = () => {
                         switch (type) {

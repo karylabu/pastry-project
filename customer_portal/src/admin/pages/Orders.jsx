@@ -1,6 +1,6 @@
 import React from "react";
-import StaffOrders from "../../staff/pages/Orders";
+import StaffOrders from "../operations/pages/Orders";
 
 export default function Orders() {
-  return <StaffOrders showNavbar={false} />;
+  return <StaffOrders />;
 }

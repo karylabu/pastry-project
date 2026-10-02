@@ -4,7 +4,6 @@ namespace Tests\Feature;
 
 use App\Models\Ingredient;
 use App\Models\IngredientBatch;
-use App\Models\IngredientMovement;
 use App\Models\Product;
 use App\Models\ProductRecipe;
 use App\Models\User;
@@ -43,6 +42,7 @@ class IngredientBatchStockInTest extends TestCase
             $table->id();
             $table->string('name');
             $table->string('unit');
+            $table->decimal('unit_cost', 10, 2)->default(0);
             $table->decimal('stock', 10, 3)->default(0);
             $table->decimal('threshold', 10, 3)->default(0);
             $table->date('expiry')->nullable();
@@ -106,7 +106,7 @@ class IngredientBatchStockInTest extends TestCase
 
         Schema::create('ingredient_batches', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('ingredient_id');
+            $table->foreignId('ingredient_id')->constrained()->cascadeOnDelete();
             $table->string('batch_number');
             $table->decimal('quantity_received', 10, 3);
             $table->decimal('quantity_remaining', 10, 3);
@@ -178,9 +178,139 @@ class IngredientBatchStockInTest extends TestCase
         });
     }
 
+    private function createTestUser(array $attributes): User
+    {
+        $user = User::factory()->createOne($attributes);
+        if (!$user instanceof User) {
+            throw new \LogicException('Expected the user factory to create one User.');
+        }
+
+        return $user;
+    }
+
+    public function test_admin_can_delete_ingredient_with_active_batches(): void
+    {
+        $admin = $this->createTestUser(['role' => 'admin']);
+        $ingredient = Ingredient::create(['name' => 'Delete Me', 'unit' => 'kg', 'stock' => 5]);
+        $batch = IngredientBatch::create([
+            'ingredient_id' => $ingredient->id,
+            'batch_number' => 'DELETE-001',
+            'quantity_received' => 5,
+            'quantity_remaining' => 5,
+        ]);
+
+        $response = $this->actingAs($admin)->deleteJson("/api/staff/ingredients/{$ingredient->id}");
+        $response->assertOk()->assertJsonPath('success', true);
+
+        $this->assertDatabaseMissing('ingredients', ['id' => $ingredient->id]);
+        $this->assertDatabaseMissing('ingredient_batches', ['id' => $batch->id]);
+    }
+
+    public function test_ingredient_creation_saves_unit_cost_to_initial_batch_and_waste(): void
+    {
+        $admin = $this->createTestUser(['role' => 'admin']);
+
+        $response = $this->actingAs($admin)->postJson('/api/staff/ingredients', [
+            'name' => 'Priced Flour',
+            'unit' => 'kg',
+            'threshold' => 2,
+            'stock' => 3,
+            'unit_cost' => 18.75,
+        ]);
+
+        $response->assertCreated()
+            ->assertJsonPath('ingredient.stock', 3)
+            ->assertJsonPath('ingredient.unit_cost', 18.75);
+
+        $ingredientId = $response->json('ingredient.id');
+        $batch = IngredientBatch::where('ingredient_id', $ingredientId)->firstOrFail();
+        $this->assertSame(18.75, (float) $batch->unit_cost);
+        $this->actingAs($admin)
+            ->getJson('/api/staff/inventory/ingredients')
+            ->assertOk()
+            ->assertJsonPath('ingredients.0.stock_value', 56.25);
+
+        $this->actingAs($admin)->postJson('/api/staff/inventory/waste', [
+            'ingredient_id' => $ingredientId,
+            'ingredient_batch_id' => $batch->id,
+            'quantity' => 2,
+            'reason' => 'Expired',
+        ])->assertOk()
+            ->assertJsonPath('entry.unit_cost', 18.75)
+            ->assertJsonPath('entry.cost', 37.5);
+
+        $this->actingAs($admin)
+            ->getJson('/api/staff/inventory/ingredients')
+            ->assertOk()
+            ->assertJsonPath('ingredients.0.stock_value', 18.75);
+    }
+
+    public function test_admin_can_discard_expired_batch_without_approval_and_hide_fully_discarded_ingredient(): void
+    {
+        $admin = $this->createTestUser(['role' => 'admin']);
+        $ingredient = Ingredient::create(['name' => 'Expired Cream', 'unit' => 'kg', 'stock' => 4]);
+        $batch = IngredientBatch::create([
+            'ingredient_id' => $ingredient->id,
+            'batch_number' => 'CREAM-EXPIRED',
+            'quantity_received' => 4,
+            'quantity_remaining' => 4,
+            'expiry_date' => today()->subDay(),
+            'unit_cost' => 12.5,
+        ]);
+        $otherBatch = IngredientBatch::create([
+            'ingredient_id' => $ingredient->id,
+            'batch_number' => 'CREAM-EXPIRED-2',
+            'quantity_received' => 2,
+            'quantity_remaining' => 2,
+            'expiry_date' => today()->subDay(),
+            'unit_cost' => 12.5,
+        ]);
+
+        $this->actingAs($admin)->postJson('/api/staff/inventory/discards', [
+            'ingredient_id' => $ingredient->id,
+            'ingredient_batch_id' => $batch->id,
+            'quantity' => 4,
+            'reason' => 'Expired',
+        ])->assertCreated()
+            ->assertJsonPath('auto_approved', true)
+            ->assertJsonPath('request.status', 'Approved');
+
+        $this->actingAs($admin)
+            ->getJson('/api/staff/inventory/ingredients')
+            ->assertOk()
+            ->assertJsonFragment(['id' => $ingredient->id]);
+
+        $this->actingAs($admin)->postJson('/api/staff/inventory/discards', [
+            'ingredient_id' => $ingredient->id,
+            'ingredient_batch_id' => $otherBatch->id,
+            'quantity' => 2,
+            'reason' => 'Expired',
+        ])->assertCreated()->assertJsonPath('auto_approved', true);
+
+        $this->assertDatabaseHas('ingredient_batches', ['id' => $batch->id, 'quantity_remaining' => 0]);
+        $this->assertDatabaseHas('ingredient_batches', ['id' => $otherBatch->id, 'quantity_remaining' => 0]);
+        $this->assertDatabaseHas('discard_requests', [
+            'ingredient_batch_id' => $batch->id,
+            'status' => 'Approved',
+            'approved_by' => $admin->id,
+        ]);
+        $this->assertDatabaseHas('waste_log', [
+            'ingredient_id' => $ingredient->id,
+            'ingredient_batch_id' => $batch->id,
+            'qty' => 4,
+            'reason' => 'Expired',
+        ]);
+        $this->assertDatabaseCount('waste_log', 2);
+
+        $this->actingAs($admin)
+            ->getJson('/api/staff/inventory/ingredients')
+            ->assertOk()
+            ->assertJsonMissing(['id' => $ingredient->id]);
+    }
+
     public function test_authorized_staff_can_receive_a_batch_and_sync_cache(): void
     {
-        $user = User::factory()->create(['role' => 'staff']);
+        $user = $this->createTestUser(['role' => 'staff']);
         $ingredient = Ingredient::create(['name' => 'Flour', 'unit' => 'kg', 'stock' => 0, 'threshold' => 2]);
 
         $response = $this->actingAs($user)->postJson('/api/staff/inventory/batches', [
@@ -213,7 +343,7 @@ class IngredientBatchStockInTest extends TestCase
 
     public function test_invalid_quantity_is_rejected(): void
     {
-        $user = User::factory()->create(['role' => 'staff']);
+        $user = $this->createTestUser(['role' => 'staff']);
         $ingredient = Ingredient::create(['name' => 'Flour', 'unit' => 'kg']);
 
         $this->actingAs($user)->postJson('/api/staff/inventory/batches', [
@@ -225,7 +355,7 @@ class IngredientBatchStockInTest extends TestCase
 
     public function test_duplicate_batch_number_is_rejected(): void
     {
-        $user = User::factory()->create(['role' => 'staff']);
+        $user = $this->createTestUser(['role' => 'staff']);
         $ingredient = Ingredient::create(['name' => 'Flour', 'unit' => 'kg']);
         $payload = ['ingredient_id' => $ingredient->id, 'batch_number' => 'FLOUR-004', 'quantity_received' => 1];
 
@@ -236,7 +366,7 @@ class IngredientBatchStockInTest extends TestCase
 
     public function test_authorized_ingredient_listing_uses_usable_batch_stock(): void
     {
-        $user = User::factory()->create(['role' => 'staff']);
+        $user = $this->createTestUser(['role' => 'staff']);
         $ingredient = Ingredient::create(['name' => 'Sugar', 'unit' => 'kg', 'stock' => 999, 'threshold' => 2]);
         IngredientBatch::create(['ingredient_id' => $ingredient->id, 'batch_number' => 'SUGAR-VALID', 'quantity_received' => 4, 'quantity_remaining' => 4, 'expiry_date' => today()->addDay()]);
         IngredientBatch::create(['ingredient_id' => $ingredient->id, 'batch_number' => 'SUGAR-EXPIRED', 'quantity_received' => 3, 'quantity_remaining' => 3, 'expiry_date' => today()->subDay()]);
@@ -258,7 +388,7 @@ class IngredientBatchStockInTest extends TestCase
 
     public function test_expired_depleted_and_pending_discard_batches_are_not_usable(): void
     {
-        $user = User::factory()->create(['role' => 'manager']);
+        $user = $this->createTestUser(['role' => 'manager']);
         $ingredient = Ingredient::create(['name' => 'Butter', 'unit' => 'kg']);
         $expired = IngredientBatch::create(['ingredient_id' => $ingredient->id, 'batch_number' => 'BUTTER-EXPIRED', 'quantity_received' => 2, 'quantity_remaining' => 2, 'expiry_date' => today()->subDay()]);
         IngredientBatch::create(['ingredient_id' => $ingredient->id, 'batch_number' => 'BUTTER-EMPTY', 'quantity_received' => 1, 'quantity_remaining' => 0, 'expiry_date' => today()->addDay()]);
@@ -277,7 +407,7 @@ class IngredientBatchStockInTest extends TestCase
 
     public function test_multiple_batches_are_aggregated_and_batch_fields_are_returned(): void
     {
-        $user = User::factory()->create(['role' => 'staff']);
+        $user = $this->createTestUser(['role' => 'staff']);
         $ingredient = Ingredient::create(['name' => 'Flour', 'unit' => 'kg']);
         IngredientBatch::create(['ingredient_id' => $ingredient->id, 'batch_number' => 'FLOUR-LATE', 'quantity_received' => 5, 'quantity_remaining' => 5, 'expiry_date' => today()->addDays(10), 'supplier' => 'Supplier', 'unit_cost' => 12.5, 'notes' => 'Note']);
         IngredientBatch::create(['ingredient_id' => $ingredient->id, 'batch_number' => 'FLOUR-EARLY', 'quantity_received' => 2.5, 'quantity_remaining' => 2.5, 'expiry_date' => today()->addDay()]);
@@ -292,7 +422,7 @@ class IngredientBatchStockInTest extends TestCase
 
     public function test_discard_request_requires_matching_batch_and_quantity(): void
     {
-        $user = User::factory()->create(['role' => 'staff']);
+        $user = $this->createTestUser(['role' => 'staff']);
         $other = Ingredient::create(['name' => 'Sugar', 'unit' => 'kg']);
         $ingredient = Ingredient::create(['name' => 'Flour', 'unit' => 'kg']);
         $batch = IngredientBatch::create(['ingredient_id' => $ingredient->id, 'batch_number' => 'FLOUR-DISCARD', 'quantity_received' => 4, 'quantity_remaining' => 4]);
@@ -307,8 +437,8 @@ class IngredientBatchStockInTest extends TestCase
 
     public function test_staff_can_create_and_manager_can_approve_expired_discard(): void
     {
-        $staff = User::factory()->create(['role' => 'staff']);
-        $manager = User::factory()->create(['role' => 'manager']);
+        $staff = $this->createTestUser(['role' => 'staff']);
+        $manager = $this->createTestUser(['role' => 'manager']);
         $ingredient = Ingredient::create(['name' => 'Butter', 'unit' => 'kg', 'stock' => 8]);
         $batch = IngredientBatch::create(['ingredient_id' => $ingredient->id, 'batch_number' => 'BUTTER-DISCARD', 'quantity_received' => 8, 'quantity_remaining' => 8, 'expiry_date' => today()->subDay(), 'unit_cost' => 10]);
 
@@ -326,8 +456,8 @@ class IngredientBatchStockInTest extends TestCase
 
     public function test_manager_can_reject_discard_and_approval_cannot_repeat(): void
     {
-        $staff = User::factory()->create(['role' => 'staff']);
-        $manager = User::factory()->create(['role' => 'manager']);
+        $staff = $this->createTestUser(['role' => 'staff']);
+        $manager = $this->createTestUser(['role' => 'manager']);
         $ingredient = Ingredient::create(['name' => 'Cocoa', 'unit' => 'kg']);
         $batch = IngredientBatch::create(['ingredient_id' => $ingredient->id, 'batch_number' => 'COCOA-DISCARD', 'quantity_received' => 2, 'quantity_remaining' => 2]);
         $created = $this->actingAs($staff)->postJson('/api/staff/inventory/discards', [
@@ -341,7 +471,7 @@ class IngredientBatchStockInTest extends TestCase
 
     public function test_staff_waste_deducts_the_selected_batch_and_records_audit(): void
     {
-        $user = User::factory()->create(['role' => 'staff']);
+        $user = $this->createTestUser(['role' => 'staff']);
         $ingredient = Ingredient::create(['name' => 'Flour', 'unit' => 'kg', 'stock' => 999]);
         $batch = IngredientBatch::create(['ingredient_id' => $ingredient->id, 'batch_number' => 'FLOUR-WASTE', 'quantity_received' => 6, 'quantity_remaining' => 6, 'unit_cost' => 14.5]);
 
@@ -358,7 +488,7 @@ class IngredientBatchStockInTest extends TestCase
 
     public function test_duplicate_waste_idempotency_key_does_not_deduct_twice(): void
     {
-        $user = User::factory()->create(['role' => 'staff']);
+        $user = $this->createTestUser(['role' => 'staff']);
         $ingredient = Ingredient::create(['name' => 'Sugar', 'unit' => 'kg']);
         $batch = IngredientBatch::create(['ingredient_id' => $ingredient->id, 'batch_number' => 'SUGAR-WASTE', 'quantity_received' => 5, 'quantity_remaining' => 5]);
         $payload = ['ingredient_id' => $ingredient->id, 'ingredient_batch_id' => $batch->id, 'quantity' => 1, 'reason' => 'Expired', 'idempotency_key' => 'waste-test-2'];
@@ -371,7 +501,7 @@ class IngredientBatchStockInTest extends TestCase
 
     public function test_waste_rejects_mismatched_or_pending_discard_batches(): void
     {
-        $user = User::factory()->create(['role' => 'staff']);
+        $user = $this->createTestUser(['role' => 'staff']);
         $first = Ingredient::create(['name' => 'Cocoa', 'unit' => 'kg']);
         $second = Ingredient::create(['name' => 'Butter', 'unit' => 'kg']);
         $batch = IngredientBatch::create(['ingredient_id' => $first->id, 'batch_number' => 'COCOA-WASTE', 'quantity_received' => 3, 'quantity_remaining' => 3]);
@@ -388,7 +518,7 @@ class IngredientBatchStockInTest extends TestCase
 
     public function test_recipe_retrieval_returns_active_recipe_and_usable_stock_only(): void
     {
-        $user = User::factory()->create(['role' => 'staff']);
+        $user = $this->createTestUser(['role' => 'staff']);
         $product = Product::create(['name' => 'Cake', 'category' => 'Cakes', 'price' => 100, 'stock' => 0, 'available' => true]);
         $ingredient = Ingredient::create(['name' => 'Flour', 'unit' => 'kg', 'stock' => 999, 'expiry' => today()->subDay()]);
         IngredientBatch::create(['ingredient_id' => $ingredient->id, 'batch_number' => 'FLOUR-RECIPE', 'quantity_received' => 4, 'quantity_remaining' => 4, 'expiry_date' => today()->addDay()]);
@@ -402,7 +532,7 @@ class IngredientBatchStockInTest extends TestCase
 
     public function test_recipe_retrieval_excludes_inactive_rows_and_expired_batches(): void
     {
-        $user = User::factory()->create(['role' => 'staff']);
+        $user = $this->createTestUser(['role' => 'staff']);
         $product = Product::create(['name' => 'Cake', 'category' => 'Cakes', 'price' => 100, 'stock' => 0, 'available' => true]);
         $ingredient = Ingredient::create(['name' => 'Cocoa', 'unit' => 'kg', 'stock' => 100]);
         IngredientBatch::create(['ingredient_id' => $ingredient->id, 'batch_number' => 'COCOA-EXPIRED', 'quantity_received' => 8, 'quantity_remaining' => 8, 'expiry_date' => today()->subDay()]);
@@ -414,7 +544,7 @@ class IngredientBatchStockInTest extends TestCase
 
     public function test_recipe_update_validates_positive_quantities_and_duplicate_ingredients(): void
     {
-        $user = User::factory()->create(['role' => 'manager']);
+        $user = $this->createTestUser(['role' => 'manager']);
         $product = Product::create(['name' => 'Cake', 'category' => 'Cakes', 'price' => 100, 'stock' => 0, 'available' => true]);
         $ingredient = Ingredient::create(['name' => 'Sugar', 'unit' => 'kg']);
 
@@ -435,7 +565,7 @@ class IngredientBatchStockInTest extends TestCase
 
     public function test_production_availability_uses_valid_batches_and_manual_product_availability(): void
     {
-        $user = User::factory()->create(['role' => 'staff']);
+        $user = $this->createTestUser(['role' => 'staff']);
         $product = Product::create(['name' => 'Cake', 'category' => 'Cakes', 'price' => 100, 'stock' => 0, 'available' => true]);
         $ingredient = Ingredient::create(['name' => 'Flour', 'unit' => 'kg', 'stock' => 999]);
         IngredientBatch::create(['ingredient_id' => $ingredient->id, 'batch_number' => 'FLOUR-OLD', 'quantity_received' => 10, 'quantity_remaining' => 10, 'expiry_date' => today()->subDay()]);
@@ -450,7 +580,7 @@ class IngredientBatchStockInTest extends TestCase
 
     public function test_production_consumes_fefo_batches_and_records_all_audits(): void
     {
-        $user = User::factory()->create(['role' => 'staff']);
+        $user = $this->createTestUser(['role' => 'staff']);
         $product = Product::create(['name' => 'Cake', 'category' => 'Cakes', 'price' => 100, 'stock' => 3, 'available' => true]);
         $ingredient = Ingredient::create(['name' => 'Flour', 'unit' => 'kg', 'stock' => 999]);
         $early = IngredientBatch::create(['ingredient_id' => $ingredient->id, 'batch_number' => 'FLOUR-EARLY', 'quantity_received' => 2, 'quantity_remaining' => 2, 'expiry_date' => today()->addDay()]);
@@ -470,7 +600,7 @@ class IngredientBatchStockInTest extends TestCase
 
     public function test_duplicate_production_idempotency_does_not_consume_twice(): void
     {
-        $user = User::factory()->create(['role' => 'staff']);
+        $user = $this->createTestUser(['role' => 'staff']);
         $product = Product::create(['name' => 'Cake', 'category' => 'Cakes', 'price' => 100, 'stock' => 0, 'available' => true]);
         $ingredient = Ingredient::create(['name' => 'Sugar', 'unit' => 'kg']);
         $batch = IngredientBatch::create(['ingredient_id' => $ingredient->id, 'batch_number' => 'SUGAR-PROD', 'quantity_received' => 5, 'quantity_remaining' => 5]);

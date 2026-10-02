@@ -83,6 +83,7 @@ class ProductApiController extends Controller
                 foreach ($products->take(10) as $product) {
                     $variants = \Illuminate\Support\Facades\DB::table('product_sizes')
                         ->where('product_id', $product->id)
+                        ->whereRaw('LOWER(size) <> ?', ['slice'])
                         ->get();
 
                     $productData = $product->toArray();
@@ -102,6 +103,7 @@ class ProductApiController extends Controller
                 foreach ($products as $product) {
                     $variants = \Illuminate\Support\Facades\DB::table('product_sizes')
                         ->where('product_id', $product->id)
+                        ->whereRaw('LOWER(size) <> ?', ['slice'])
                         ->get();
 
                     $productData = $product->toArray();
@@ -122,6 +124,7 @@ class ProductApiController extends Controller
             foreach ($products as $product) {
                 $variants = \Illuminate\Support\Facades\DB::table('product_sizes')
                     ->where('product_id', $product->id)
+                    ->whereRaw('LOWER(size) <> ?', ['slice'])
                     ->get();
 
                 $productData = $product->toArray();

@@ -3,12 +3,14 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\IngredientBatch;
 use App\Models\Ingredient;
-use App\Models\IngredientMovement;
+use App\Models\User;
 use App\Services\InventoryService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use RuntimeException;
 
 /**
  * Ingredient CRUD Controller
@@ -34,14 +36,37 @@ class IngredientController extends Controller
             'name' => 'required|string|max:255|unique:ingredients,name',
             'unit' => 'required|string|max:50',
             'threshold' => 'required|numeric|min:0',
+            'stock' => 'sometimes|required|numeric|min:0',
+            'unit_cost' => 'sometimes|required|numeric|min:0',
+            'expiry' => 'nullable|date',
         ]);
 
         try {
-            $ingredient = Ingredient::create([
-                'name' => $validated['name'],
-                'unit' => $validated['unit'],
-                'threshold' => (float) $validated['threshold'],
-            ]);
+            $userId = (int) ($this->getAuthenticatedUser($request)?->id ?? 0);
+            $unitCost = (float) ($validated['unit_cost'] ?? 0);
+            $ingredient = DB::transaction(function () use ($validated, $userId, $unitCost) {
+                $ingredient = Ingredient::create([
+                    'name' => $validated['name'],
+                    'unit' => $validated['unit'],
+                    'unit_cost' => $unitCost,
+                    'threshold' => (float) $validated['threshold'],
+                ]);
+
+                $initialStock = (float) ($validated['stock'] ?? 0);
+                if ($initialStock > 0) {
+                    $this->inventory->receiveBatch($ingredient, [
+                        'batch_number' => 'INITIAL_' . time() . '_' . uniqid(),
+                        'quantity_received' => $initialStock,
+                        'purchase_date' => now()->toDateString(),
+                        'expiry_date' => $validated['expiry'] ?? null,
+                        'supplier' => 'Initial Stock',
+                        'unit_cost' => $unitCost,
+                        'notes' => 'Initial stock at ingredient creation',
+                    ], $userId);
+                }
+
+                return $ingredient->fresh();
+            });
 
             return response()->json([
                 'success' => true,
@@ -51,6 +76,7 @@ class IngredientController extends Controller
                     'name' => $ingredient->name,
                     'unit' => $ingredient->unit,
                     'stock' => (float) $ingredient->stock,
+                    'unit_cost' => (float) $ingredient->unit_cost,
                     'threshold' => (float) $ingredient->threshold,
                     'expiry' => $ingredient->expiry?->format('Y-m-d'),
                     'created_at' => $ingredient->created_at->toIso8601String(),
@@ -118,14 +144,6 @@ class IngredientController extends Controller
 
         try {
             $name = $ingredient->name;
-            
-            // Check if ingredient has active batches
-            if ($ingredient->batches()->where('quantity_remaining', '>', 0)->exists()) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Cannot delete ingredient with active batches. Please discard or use all batches first.',
-                ], 409);
-            }
 
             $ingredient->delete();
 
@@ -195,7 +213,7 @@ class IngredientController extends Controller
     /**
      * Handle manual stock-in by creating a batch and synchronizing stock.
      */
-    private function handleManualStockIn(Ingredient $ingredient, float $qty, string $note, $user): JsonResponse
+    private function handleManualStockIn(Ingredient $ingredient, float $qty, string $note, ?User $user): JsonResponse
     {
         try {
             $batchNumber = 'MANUAL_' . time() . '_' . uniqid();
@@ -228,7 +246,7 @@ class IngredientController extends Controller
     /**
      * Handle manual stock-out by finding a usable batch and recording as waste.
      */
-    private function handleManualStockOut(Ingredient $ingredient, float $qty, string $note, $user): JsonResponse
+    private function handleManualStockOut(Ingredient $ingredient, float $qty, string $note, ?User $user): JsonResponse
     {
         // Find usable batches in FEFO order (null expiry first, then earliest expiry)
         $usableBatches = IngredientBatch::query()

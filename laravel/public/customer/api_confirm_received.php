@@ -8,6 +8,7 @@ header("Access-Control-Allow-Origin: *");
 header("Access-Control-Allow-Methods: POST, OPTIONS");
 header("Access-Control-Allow-Headers: Content-Type");
 require_once __DIR__ . '/../../../includes/api_auth.php';
+require_once __DIR__ . '/../../../includes/realtime_events.php';
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     http_response_code(200);
@@ -31,7 +32,7 @@ try {
         exit;
     }
 
-    // Only allow confirming if status is "To Receive"
+    // Customers confirm orders only after they are marked ready for pickup.
     $check = $conn->prepare('SELECT status FROM orders WHERE id = ? AND user_id = ? LIMIT 1');
     $check->bind_param('ii', $order_id, $authenticatedUserId);
     $check->execute();
@@ -43,18 +44,19 @@ try {
         exit;
     }
 
-    if ($row['status'] !== 'To Receive') {
+    if ($row['status'] !== 'Ready for Pickup') {
         echo json_encode(["success" => false, "message" => "Order is not ready to be confirmed."]);
         exit;
     }
 
-    $update = $conn->prepare("UPDATE orders SET status = 'Completed' WHERE id = ? AND user_id = ? AND status = 'To Receive'");
+    $update = $conn->prepare("UPDATE orders SET status = 'Completed' WHERE id = ? AND user_id = ? AND status = 'Ready for Pickup'");
     $update->bind_param('ii', $order_id, $authenticatedUserId);
     $update->execute();
     $result = $update->affected_rows === 1;
     $update->close();
 
     if ($result) {
+        publishRealtimeEvent($conn, 'order.updated', $authenticatedUserId, $order_id);
         echo json_encode(["success" => true]);
     } else {
         throw new Exception("SQL Error: " . mysqli_error($conn));

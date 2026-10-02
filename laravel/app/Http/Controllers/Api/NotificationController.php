@@ -5,9 +5,12 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\AdminNotification;
 use App\Models\User;
+use App\Services\InventoryService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Schema;
 
 class NotificationController extends Controller
 {
@@ -32,6 +35,8 @@ class NotificationController extends Controller
                 'message' => 'Unauthorized notification request.',
             ], 403);
         }
+
+        $this->syncInventoryNotifications($user);
 
         $notifications = AdminNotification::forUser($user->id)
             ->unread()
@@ -60,6 +65,138 @@ class NotificationController extends Controller
                 'unread_count' => $unreadCount,
             ],
         ]);
+    }
+
+    private function syncInventoryNotifications(User $user): void
+    {
+        if (! Schema::hasTable('notifications')) {
+            return;
+        }
+
+        $activeAlerts = [];
+
+        if (Schema::hasTable('products')) {
+            $thresholdColumn = Schema::hasColumn('products', 'minimum_stock')
+                ? 'minimum_stock'
+                : (Schema::hasColumn('products', 'reorder_level') ? 'reorder_level' : null);
+            $productQuery = DB::table('products')->select('id', 'name', 'stock');
+            if ($thresholdColumn) {
+                $productQuery->addSelect("{$thresholdColumn} as threshold");
+            }
+
+            foreach ($productQuery->get() as $product) {
+                $stock = (float) ($product->stock ?? 0);
+                $threshold = (float) ($product->threshold ?? 0);
+                $status = $stock <= 0 ? 'out_of_stock' : ($threshold > 0 && $stock <= $threshold ? 'low_stock' : null);
+                if ($status === null) {
+                    continue;
+                }
+
+                $name = (string) ($product->name ?: 'Product');
+                $activeAlerts["product:{$product->id}:{$status}"] = [
+                    'title' => ($status === 'out_of_stock' ? 'Out of stock: ' : 'Low stock: ') . $name,
+                    'message' => $status === 'out_of_stock'
+                        ? "Product \"{$name}\" is out of stock."
+                        : "Product \"{$name}\" has {$stock} remaining (threshold {$threshold}).",
+                    'data' => [
+                        'item_type' => 'product',
+                        'item_id' => (int) $product->id,
+                        'status' => $status,
+                        'stock' => $stock,
+                        'threshold' => $threshold,
+                    ],
+                    'action_url' => '/admin/products',
+                ];
+            }
+        }
+
+        if (Schema::hasTable('ingredients')) {
+            $inventory = app(InventoryService::class);
+            foreach (DB::table('ingredients')->select('id', 'name', 'unit', 'threshold')->get() as $ingredient) {
+                $stock = $inventory->getUsableStock((int) $ingredient->id);
+                $threshold = (float) ($ingredient->threshold ?? 0);
+                $status = $stock <= 0 ? 'out_of_stock' : ($threshold > 0 && $stock <= $threshold ? 'low_stock' : null);
+                if ($status === null) {
+                    continue;
+                }
+
+                $name = (string) ($ingredient->name ?: 'Ingredient');
+                $unit = trim((string) ($ingredient->unit ?? ''));
+                $stockText = rtrim(rtrim(number_format($stock, 3, '.', ''), '0'), '.');
+                $thresholdText = rtrim(rtrim(number_format($threshold, 3, '.', ''), '0'), '.');
+                $activeAlerts["ingredient:{$ingredient->id}:{$status}"] = [
+                    'title' => ($status === 'out_of_stock' ? 'Out of stock: ' : 'Low stock: ') . $name,
+                    'message' => $status === 'out_of_stock'
+                        ? "Ingredient \"{$name}\" is out of stock."
+                        : "Ingredient \"{$name}\" has {$stockText}" . ($unit !== '' ? " {$unit}" : '') . " remaining (threshold {$thresholdText}).",
+                    'data' => [
+                        'item_type' => 'ingredient',
+                        'item_id' => (int) $ingredient->id,
+                        'status' => $status,
+                        'stock' => $stock,
+                        'threshold' => $threshold,
+                        'unit' => $unit,
+                    ],
+                    'action_url' => '/admin/ingredients',
+                ];
+            }
+        }
+
+        $existing = AdminNotification::query()
+            ->where('user_id', $user->id)
+            ->whereIn('type', ['inventory_alert', 'low_stock'])
+            ->orderByDesc('id')
+            ->get();
+        $currentNotifications = [];
+
+        foreach ($existing as $notification) {
+            $data = $notification->data ?? [];
+            $alertKey = $data['alert_key'] ?? null;
+            if (! $alertKey && $notification->type === 'low_stock' && ! empty($data['ingredient_id'])) {
+                $alertKey = 'ingredient:' . $data['ingredient_id'] . ':low_stock';
+            }
+
+            if (! $alertKey) {
+                continue;
+            }
+
+            $isActive = ! array_key_exists('active', $data) || (bool) $data['active'];
+            if (! isset($activeAlerts[$alertKey])) {
+                if ($isActive) {
+                    $data['active'] = false;
+                    $notification->data = $data;
+                    $notification->is_read = true;
+                    $notification->read_at = now();
+                    $notification->save();
+                }
+                continue;
+            }
+
+            if ($isActive && ! isset($currentNotifications[$alertKey])) {
+                $currentNotifications[$alertKey] = $notification;
+            } elseif ($isActive) {
+                $notification->is_read = true;
+                $notification->read_at = now();
+                $notification->save();
+            }
+        }
+
+        foreach ($activeAlerts as $alertKey => $alert) {
+            if (isset($currentNotifications[$alertKey])) {
+                continue;
+            }
+
+            $notification = new AdminNotification();
+            $notification->user_id = $user->id;
+            $notification->type = 'inventory_alert';
+            $notification->title = $alert['title'];
+            $notification->message = $alert['message'];
+            $notification->data = array_merge($alert['data'], ['alert_key' => $alertKey, 'active' => true]);
+            $notification->action_url = $alert['action_url'];
+            $notification->is_read = false;
+            $notification->created_at = now();
+            $notification->save();
+        }
     }
 
     public function markAsRead(Request $request, int $id): JsonResponse

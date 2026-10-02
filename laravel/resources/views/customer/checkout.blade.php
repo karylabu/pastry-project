@@ -50,7 +50,7 @@
                 Payment method
                 <select name="payment" style="width:100%;padding:12px;border:1px solid #ddd;border-radius:10px;">
                     <option value="COD">Cash on Delivery</option>
-                    <option value="GCASH">GCash</option>
+                    <option value="QRPH">QRPh</option>
                     <option value="PAYMONGO">PayMongo</option>
                 </select>
             </label>

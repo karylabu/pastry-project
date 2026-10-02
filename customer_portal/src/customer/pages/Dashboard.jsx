@@ -31,6 +31,7 @@ import ProductModal from "../components/ProductModal";
 import CustomCakeModal from "../components/CustomCakeModal";
 import { CUSTOMER_BASE, ROOT_BASE } from "../../services/config";
 import { getAuthHeaders, safeParseJson } from "../../services/api";
+import { subscribeRealtime } from "../../services/realtime";
 
 /* =========================
    HERO BANNER SLIDES
@@ -41,6 +42,10 @@ const HERO_SLIDES = [
   {
     type: "image",
     src: `${ROOT_BASE}/uploads/banner(1).png`,
+  },
+  {
+    type: "video",
+    src: `${ROOT_BASE}/uploads/banner(2).mp4`,
   },
 ];
 
@@ -246,17 +251,19 @@ const STARTER_IMAGE_FALLBACKS = {
   'potato wedges': 'potato.png',
 };
 
-const productImageUrl = (filename) => `${ROOT_BASE}/uploads/${filename}?v=transparent-v26`;
+const productImageUrl = (filename) => `${CUSTOMER_BASE}/uploads/${filename}?v=transparent-v26`;
 
 const getCategoryFallbackImage = (category = '') => {
   const normalizedCategory = String(category || '').trim().toLowerCase();
 
   if (normalizedCategory.includes('coffee')) return `${ROOT_BASE}/uploads/americano.png`;
-  if (normalizedCategory.includes('drink')) return `${ROOT_BASE}/uploads/caramel.png`;
-  if (normalizedCategory.includes('pizza')) return `${ROOT_BASE}/uploads/pepperoni.png`;
-  if (normalizedCategory.includes('starter')) return `${ROOT_BASE}/uploads/chicken.png`;
+  if (normalizedCategory.includes('coffee')) return productImageUrl('americano.png');
+  if (normalizedCategory.includes('drink')) return productImageUrl('caramel.png');
+  if (normalizedCategory.includes('pizza')) return productImageUrl('pepperoni.png');
+  if (normalizedCategory.includes('starter')) return productImageUrl('chicken.png');
 
   return `${ROOT_BASE}/uploads/americano.png`;
+  return productImageUrl('americano.png');
 };
 
 const resolveProductImage = (product) => {
@@ -308,8 +315,11 @@ function RecommendationCard({ product, onSelect }) {
   const shouldEnlargeDrinkSize = /\b(strawberry fruit tea|matcha|vanilla|mango ade|blueberry ade|blueberry fizz|strawberry fizz|passion fruit tea|kiwi fruit tea)\b/i.test(normalizedProductName);
   const isSmallCoffeeProduct = /\b(matcha latte|vanilla|white chocolate)\b/i.test(normalizedProductName) && /\bcoffee\b/i.test(String(product?.category || ''));
 
+  const cakeSizeOptions = Array.isArray(product?.sizes)
+    ? product.sizes.filter((option) => String(option.size || '').trim().toLowerCase() !== 'slice')
+    : [];
   const sizeOptions = Array.isArray(product?.sizes) && product.sizes.length > 0
-    ? product.sizes
+    ? cakeSizeOptions.length > 0 ? cakeSizeOptions : [{ size: 'Small', price: Number(product?.small_price || 0) }, { size: 'Big', price: Number(product?.big_price || 0) }]
     : [{ size: 'Regular', price: Number(product?.price || 0) }];
 
   const [selectedSize, setSelectedSize] = useState(sizeOptions[0]?.size || 'Regular');
@@ -481,14 +491,16 @@ export function ChatBubble({ aiMode = false, fullPage = false }) {
     }
   }, [messages, sending, step, open]);
 
-  /* Poll for new messages every 5s when chat is open */
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (step === "chatting") {
       fetchMessages();
-      pollRef.current = setInterval(fetchMessages, 5000);
+      return subscribeRealtime((event) => {
+        if (event.type === "chat.updated" && (!event.conversation_id || event.conversation_id === conversationId)) {
+          fetchMessages(true);
+        }
+      });
     }
-    return () => clearInterval(pollRef.current);
+    return undefined;
   }, [step, conversationId, showHistory, open]);
 
   const fetchMessages = async (mergeWithCurrent = false) => {
@@ -663,12 +675,12 @@ export function ChatBubble({ aiMode = false, fullPage = false }) {
               setOpen(o => !o);
               setUnread(0);
             }}
-            className="bg-[#f1cf72] text-[#5a3a20] w-14 h-14 rounded-full flex items-center justify-center shadow-xl hover:bg-[#e6bb4f] transition-colors"
+            className="bg-black text-white w-14 h-14 rounded-full flex items-center justify-center shadow-xl hover:bg-gray-800 transition-colors"
           >
             {open ? <X size={20} /> : <MessageCircle size={22} />}
           </button>
           {unread > 0 && !open && (
-            <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center font-bold">
+              <span className="absolute -top-1 -right-1 bg-white text-black border border-black text-xs w-5 h-5 rounded-full flex items-center justify-center font-bold">
               {unread}
             </span>
           )}
@@ -684,26 +696,26 @@ export function ChatBubble({ aiMode = false, fullPage = false }) {
             exit={{ opacity: 0, y: 20, scale: 0.95 }}
             transition={{ duration: 0.2 }}
             className={fullPage
-              ? "relative w-full min-h-[calc(100vh-180px)] bg-[#fffaf3] flex flex-col overflow-hidden"
-              : "fixed bottom-24 right-6 w-[calc(100vw-2rem)] max-w-[460px] sm:w-[460px] bg-[#fffaf3] rounded-[20px] shadow-2xl z-[60001] flex flex-col overflow-hidden border border-[#ead8c5]"}
+              ? "relative w-full min-h-[calc(100vh-180px)] bg-[#f5f5f5] flex flex-col overflow-hidden"
+              : "fixed bottom-24 right-6 w-[calc(100vw-2rem)] max-w-[460px] sm:w-[460px] bg-[#f5f5f5] rounded-[20px] shadow-2xl z-[60001] flex flex-col overflow-hidden border border-[#d5d5d5]"}
             style={fullPage ? undefined : { height: aiMode ? "min(620px, calc(100vh - 7rem))" : "min(500px, calc(100vh - 7rem))" }}
           >
             {/* HEADER */}
-            <div className={fullPage ? "bg-[#fff8e8] px-4 py-4 sm:px-8 sm:py-5 flex items-center gap-3 sm:gap-4 border-b border-[#ead8c5]" : "bg-[#fff8e8] px-5 py-4 flex items-center gap-3 border-b border-[#ead8c5]"}>
+            <div className={fullPage ? "bg-black px-4 py-4 sm:px-8 sm:py-5 flex items-center gap-3 sm:gap-4 border-b border-black text-white" : "bg-black px-5 py-4 flex items-center gap-3 border-b border-black text-white"}>
               {fullPage && (
                   <button type="button" onClick={() => setShowHistory(value => !value)} title={showHistory ? "Back to chat" : "View chat history"} aria-label={showHistory ? "Back to chat" : "View chat history"} className="w-9 h-9 rounded-full text-gray-500 hover:bg-gray-100 flex items-center justify-center">
                   <ArrowLeft size={20} />
                 </button>
               )}
-              <div className={fullPage ? "w-11 h-11 rounded-2xl bg-[#f5d9b8] flex items-center justify-center flex-shrink-0" : "w-9 h-9 rounded-full bg-[#e7b866] flex items-center justify-center flex-shrink-0"}>
-                <Headphones size={fullPage ? 20 : 16} className={fullPage ? "text-[#7b3f28]" : "text-[#3b2318]"} />
+                  <div className={fullPage ? "w-11 h-11 rounded-2xl bg-white flex items-center justify-center flex-shrink-0" : "w-9 h-9 rounded-full bg-white flex items-center justify-center flex-shrink-0"}>
+                <Headphones size={fullPage ? 20 : 16} className="text-black" />
               </div>
               <div className="flex-1">
                 <div className="flex items-center gap-2">
-                  <p className={fullPage ? "text-[#4a2b20] font-bold text-lg sm:text-xl" : "text-[#4a2b20] font-semibold text-sm"}>{fullPage ? (showHistory ? "Chat History" : "Customer Service") : "Admin Support"}</p>
-                  {fullPage && !showHistory && <span className="hidden rounded-full bg-[#e8f5e9] px-2 py-1 text-[9px] font-bold uppercase tracking-[0.12em] text-[#398347] sm:inline-flex">Online</span>}
+                  <p className={fullPage ? "text-white font-bold text-lg sm:text-xl" : "text-white font-semibold text-sm"}>{fullPage ? (showHistory ? "Chat History" : "Customer Service") : "Admin Support"}</p>
+                  {fullPage && !showHistory && <span className="hidden rounded-full bg-white px-2 py-1 text-[9px] font-bold uppercase tracking-[0.12em] text-black sm:inline-flex">Online</span>}
                 </div>
-                <p className={fullPage ? "text-[#9a765d] text-xs mt-0.5" : "text-[#9a765d] text-xs"}>
+                <p className={fullPage ? "text-white/65 text-xs mt-0.5" : "text-white/65 text-xs"}>
                   {fullPage ? "We usually reply instantly" : "Admin usually replies promptly"}
                 </p>
               </div>
@@ -740,12 +752,12 @@ export function ChatBubble({ aiMode = false, fullPage = false }) {
                     onClick={() => setShowStoreNumber(value => !value)}
                     title="Show store number"
                     aria-label="Show store number"
-                    className="w-8 h-8 rounded-full text-[#9a765d] hover:bg-[#f5d9b8] hover:text-[#4a2b20] flex items-center justify-center"
+                    className="w-8 h-8 rounded-full text-white/70 hover:bg-white hover:text-black flex items-center justify-center"
                   >
                     <Phone size={16} />
                   </button>
                   {showStoreNumber && (
-                    <span className="text-xs text-[#4a2b20] whitespace-nowrap">0938-796-2033</span>
+                    <span className="text-xs text-white whitespace-nowrap">0938-796-2033</span>
                   )}
                 </>
               )}
@@ -753,7 +765,7 @@ export function ChatBubble({ aiMode = false, fullPage = false }) {
 
             <>
               {showHistory && (
-                <div className="flex-1 overflow-y-auto bg-gray-50 px-5 py-6 sm:px-10">
+                <div className="flex-1 overflow-y-auto bg-[#f5f5f5] px-5 py-6 sm:px-10">
                   <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-400">Previous conversations</p>
                   {historyIds.length === 0 ? (
                     <p className="mt-4 text-sm text-gray-400">No previous chats yet.</p>
@@ -774,7 +786,7 @@ export function ChatBubble({ aiMode = false, fullPage = false }) {
                   const element = event.currentTarget;
                   shouldStickToBottomRef.current = element.scrollHeight - element.scrollTop - element.clientHeight < 24;
                 }}
-                className={showHistory ? "hidden" : "flex-1 min-h-0 overflow-y-auto px-3 py-3 space-y-2.5 bg-[#fffaf3]"}
+                className={showHistory ? "hidden" : "flex-1 min-h-0 overflow-y-auto px-3 py-3 space-y-2.5 bg-[#f5f5f5]"}
               >
                 {messages.length === 0 && (
                   <div className="px-2 pt-5">
@@ -812,7 +824,7 @@ export function ChatBubble({ aiMode = false, fullPage = false }) {
                       )}
                       <div className={`flex gap-2 ${isCustomer ? "flex-row-reverse" : "flex-row"}`}>
                         <div className={`w-7 h-7 rounded-full flex-shrink-0 flex items-center justify-center text-xs font-bold
-                          ${isCustomer ? "bg-[#f1cf72] text-[#5a3a20]" : isAi ? "bg-[#f5d9b8] text-[#7b3f28]" : "bg-[#fff1d8] text-[#9a5b32]"}`}>
+                          ${isCustomer ? "bg-black text-white" : isAi ? "bg-[#e5e5e5] text-black" : "bg-white border border-[#d5d5d5] text-black"}`}>
                           {isCustomer ? <User size={12} /> : isAi ? <Bot size={12} /> : "S"}
                         </div>
 
@@ -820,12 +832,12 @@ export function ChatBubble({ aiMode = false, fullPage = false }) {
                           <span className="text-[11px] text-gray-400 px-1 opacity-75">
                             {senderLabel[msg.sender]} · {formatTime(msg.created_at)}
                           </span>
-                          <div className={`px-3 py-2 rounded-2xl text-[13px] leading-relaxed
+                              <div className={`px-3 py-2 rounded-2xl text-[13px] leading-relaxed
                             ${isCustomer
-                              ? "bg-[#f1cf72] text-[#4a2b20] rounded-tr-sm"
+                              ? "bg-black text-white rounded-tr-sm"
                               : isAi
-                              ? "bg-[#fff1d8] text-[#4a2b20] border border-[#efd2a7] rounded-tl-sm"
-                              : "bg-white text-[#4a2b20] border border-[#ead8c5] rounded-tl-sm"
+                              ? "bg-[#e5e5e5] text-black border border-[#d5d5d5] rounded-tl-sm"
+                              : "bg-white text-black border border-[#d5d5d5] rounded-tl-sm"
                             }`}>
                             {getImageUrl(msg) && (
                               <img
@@ -854,14 +866,14 @@ export function ChatBubble({ aiMode = false, fullPage = false }) {
 
                 {sending && (
                   <div className="flex gap-2 items-center">
-                    <div className="w-7 h-7 rounded-full bg-[#d4af37] flex items-center justify-center">
-                      <Bot size={12} className="text-black" />
+                    <div className="w-7 h-7 rounded-full bg-black flex items-center justify-center">
+                      <Bot size={12} className="text-white" />
                     </div>
-                    <div className="bg-[#fdf8ec] border border-[#f0e4b8] px-4 py-2 rounded-2xl rounded-tl-sm">
+                    <div className="bg-white border border-[#d5d5d5] px-4 py-2 rounded-2xl rounded-tl-sm">
                       <span className="flex gap-1">
-                        <span className="w-1.5 h-1.5 bg-[#d4af37] rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
-                        <span className="w-1.5 h-1.5 bg-[#d4af37] rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
-                        <span className="w-1.5 h-1.5 bg-[#d4af37] rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
+                        <span className="w-1.5 h-1.5 bg-black rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
+                        <span className="w-1.5 h-1.5 bg-black rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
+                        <span className="w-1.5 h-1.5 bg-black rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
                       </span>
                     </div>
                   </div>
@@ -878,7 +890,7 @@ export function ChatBubble({ aiMode = false, fullPage = false }) {
 
               {!showHistory && (
                 <>
-                  <div className="border-t border-[#ead8c5] bg-[#fff6e9] px-3 pt-2.5">
+                  <div className="border-t border-[#d5d5d5] bg-white px-3 pt-2.5">
                     <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-gray-400">Quick chats</p>
                     <div className="flex flex-wrap gap-2">
                       {["Hi, I need help", "Where is my order?", "I want to place an order", "Can I customize a cake?", "How can I pay?"].map((suggestion) => (
@@ -887,14 +899,14 @@ export function ChatBubble({ aiMode = false, fullPage = false }) {
                           type="button"
                           onClick={() => sendMessage(suggestion)}
                           disabled={sending}
-                          className="rounded-full border border-gray-200 bg-gray-50 px-3 py-1.5 text-[11px] text-gray-600 transition hover:border-black hover:bg-white hover:text-black disabled:cursor-not-allowed disabled:opacity-40"
+                          className="rounded-full border border-gray-200 bg-white px-3 py-1.5 text-[11px] text-gray-600 transition hover:border-black hover:bg-black hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
                         >
                           {suggestion}
                         </button>
                       ))}
                     </div>
                   </div>
-                  <div className="px-3 py-2.5 bg-[#fff6e9] flex gap-2 items-end">
+                  <div className="px-3 py-2.5 bg-white flex gap-2 items-end">
                     <input
                       ref={imageInputRef}
                       type="file"
@@ -917,12 +929,12 @@ export function ChatBubble({ aiMode = false, fullPage = false }) {
                       onKeyDown={handleKeyDown}
                       placeholder="Type your message..."
                       rows={1}
-                      className="flex-1 resize-none border border-[#dec4aa] rounded-xl bg-white px-3 py-2 text-sm text-[#4a2b20] outline-none focus:border-[#7b3f28] max-h-20"
+                      className="flex-1 resize-none border border-[#d5d5d5] rounded-xl bg-white px-3 py-2 text-sm text-black outline-none focus:border-black max-h-20"
                     />
                     <button
                       onClick={() => sendMessage()}
                       disabled={(!input.trim() && !selectedImage) || sending}
-                      className="w-9 h-9 rounded-full bg-[#f1cf72] text-[#5a3a20] flex items-center justify-center flex-shrink-0 disabled:opacity-40 hover:bg-[#e6bb4f] transition-colors"
+                      className="w-9 h-9 rounded-full bg-black text-white flex items-center justify-center flex-shrink-0 disabled:opacity-40 hover:bg-gray-800 transition-colors"
                     >
                       <Send size={14} />
                     </button>
@@ -955,7 +967,7 @@ export function ChatBubble({ aiMode = false, fullPage = false }) {
               <button
                 type="button"
                 onClick={() => navigate('/customer/login')}
-                className="flex-1 rounded-xl bg-black px-4 py-2.5 text-xs font-semibold text-white hover:bg-[#d4af37] hover:text-black"
+                className="flex-1 rounded-xl bg-black px-4 py-2.5 text-xs font-semibold text-white hover:bg-gray-800"
               >
                 Log in
               </button>
@@ -1083,7 +1095,10 @@ export default function Dashboard({ onAddToCart }) {
       }
 
       try {
-        const res = await fetch(`${CUSTOMER_BASE}/api_products.php?action=recommendations&user_id=${userId}`);
+        const res = await fetch(`${CUSTOMER_BASE}/api_products.php?action=recommendations`, {
+          credentials: 'include',
+          headers: getAuthHeaders(),
+        });
         const data = await safeParseJson(res);
         if (data?.success && Array.isArray(data.items)) {
           setRecommendedProducts(data.items);

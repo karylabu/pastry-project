@@ -1,6 +1,6 @@
 import React from "react";
-import StaffReports from "../../staff/pages/Reports";
+import StaffReports from "../operations/pages/Reports";
 
 export default function Reports() {
-  return <StaffReports showNavbar={false} />;
+  return <StaffReports />;
 }

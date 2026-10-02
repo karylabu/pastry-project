@@ -1,13 +1,11 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
-use Illuminate\Http\Request;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\CustomerApiController;
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\StaffApiController;
-use App\Http\Controllers\AdminApiController;
 use App\Http\Controllers\AuthController;
 
 Route::post('/api/google-login', [AuthController::class, 'googleLogin']);
@@ -265,18 +263,6 @@ Route::match(['get', 'options'], '/staff/api/ingredient-history', [StaffApiContr
 Route::match(['get', 'options'], '/staff/api/notifications', [StaffApiController::class, 'getNotifications'])
     ->withoutMiddleware([Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
 Route::match(['post', 'options'], '/staff/api/mark-notification-read', [StaffApiController::class, 'markNotificationRead'])
-    ->withoutMiddleware([Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
-
-// Admin API routes (for Flutter app)
-Route::match(['post', 'options'], '/admin/api/login', [AdminApiController::class, 'login'])
-    ->withoutMiddleware([Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
-Route::match(['get', 'options'], '/admin/api/orders', [AdminApiController::class, 'getOrders'])
-    ->withoutMiddleware([Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
-Route::match(['get', 'options'], '/admin/api/products', [AdminApiController::class, 'getProducts'])
-    ->withoutMiddleware([Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
-Route::match(['get', 'options'], '/admin/api/customers', [AdminApiController::class, 'getCustomers'])
-    ->withoutMiddleware([Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
-Route::match(['get', 'options'], '/admin/api/dashboard', [AdminApiController::class, 'getDashboardStats'])
     ->withoutMiddleware([Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
 
 // Redirect admin users to the legacy admin products page for the same behavior

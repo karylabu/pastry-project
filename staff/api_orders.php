@@ -38,12 +38,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
            FROM orders o
            LEFT JOIN custom_cake_orders c ON c.order_id = o.id
            " . ($hasCustomizedRecipeOrders ? "LEFT JOIN customized_cake_orders cc ON cc.order_id = o.id" : "") . "
-           WHERE (c.order_id IS NOT NULL " . ($hasCustomizedRecipeOrders ? "OR cc.order_id IS NOT NULL" : "") . ")
-             AND NOT (LOWER(o.payment) = 'gcash' AND LOWER(COALESCE(o.payment_status, 'pending')) <> 'paid')
+                     WHERE (c.order_id IS NOT NULL " . ($hasCustomizedRecipeOrders ? "OR cc.order_id IS NOT NULL" : "") . ")
            ORDER BY o.id DESC"
                 : "SELECT o.* FROM orders o
                          WHERE NOT EXISTS (SELECT 1 FROM custom_cake_orders c WHERE c.order_id = o.id)" . ($hasCustomizedRecipeOrders ? " AND NOT EXISTS (SELECT 1 FROM customized_cake_orders cc WHERE cc.order_id = o.id)" : "") . "
-                         AND NOT (LOWER(o.payment) = 'gcash' AND LOWER(COALESCE(o.payment_status, 'pending')) <> 'paid')
+                         AND NOT (LOWER(o.payment) = 'gcash' AND LOWER(COALESCE(o.payment_status, 'pending')) NOT IN ('paid', 'proof_submitted'))
                      ORDER BY o.id DESC";
 
     $result = $conn->query($sql);
@@ -58,11 +57,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
 
     $ordersById = [];
     $rawItemsByOrderId = [];
+    $orderNumbers = [];
+    $numberResult = $conn->query("SELECT id FROM orders ORDER BY created_at ASC, id ASC");
+    if ($numberResult) {
+        $displayNumber = 1;
+        while ($numberRow = $numberResult->fetch_assoc()) {
+            $orderNumbers[(int) $numberRow['id']] = $displayNumber++;
+        }
+    }
 
     while ($row = $result->fetch_assoc()) {
+        $row['order_number'] = $orderNumbers[(int) $row['id']] ?? (int) $row['id'];
         $rawItemsByOrderId[(int) $row['id']] = json_decode($row['items'] ?? '[]', true) ?: [];
         $row['has_discount_id'] = !empty($row['discount_id_path']);
+        $row['has_payment_proof'] = !empty($row['payment_proof_path']) && strtolower((string) ($row['payment_status'] ?? '')) === 'proof_submitted';
         unset($row['discount_id_path']);
+        unset($row['payment_proof_path']);
         $row['items'] = [];
 
         if ($customOnly) {
@@ -204,7 +214,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         ? floatval($data['downpayment_amount'])
         : null;
 
-    if (!$id || !$hasTotal || $total < 0 || ($hasDownpayment && ($downpaymentPercent < 0 || $downpaymentPercent > 100))) {
+    $quotedDownpayment = $downpaymentAmount ?? ($hasDownpayment ? round($total * ($downpaymentPercent / 100), 2) : null);
+    if (!$id || !$hasTotal || $total <= 0 || ($hasDownpayment && ($downpaymentPercent < 0 || $downpaymentPercent >= 100)) || ($hasDownpayment && ($quotedDownpayment <= 0 || $quotedDownpayment >= $total))) {
         echo json_encode([
             "status" => "error",
             "message" => "Missing or invalid data"
@@ -212,8 +223,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
     }
 
-    $stmt = $conn->prepare("UPDATE orders SET total = ? WHERE id = ?");
-    $stmt->bind_param("di", $total, $id);
+    $stmt = $hasDownpayment
+        ? $conn->prepare("UPDATE orders SET total = ?, downpayment_amount = ? WHERE id = ?")
+        : $conn->prepare("UPDATE orders SET total = ? WHERE id = ?");
+    if ($hasDownpayment) {
+        $stmt->bind_param("ddi", $total, $quotedDownpayment, $id);
+    } else {
+        $stmt->bind_param("di", $total, $id);
+    }
     if ($stmt->execute()) {
         echo json_encode([
             "status" => "success"
@@ -240,7 +257,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
             $details['quoted_total'] = $total;
             $details['downpayment_percent'] = $downpaymentPercent;
-            $details['downpayment_amount'] = $downpaymentAmount ?? round($total * ($downpaymentPercent / 100), 2);
+            $details['downpayment_amount'] = $quotedDownpayment;
             $updatedNotes = json_encode($details);
 
             $notesStmt = $conn->prepare("UPDATE custom_cake_orders SET notes = ? WHERE order_id = ?");

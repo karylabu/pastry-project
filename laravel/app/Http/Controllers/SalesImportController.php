@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 use Smalot\PdfParser\Parser as PdfParser;
@@ -106,16 +107,123 @@ class SalesImportController extends Controller
         }
 
         $dedupedRows = $this->deduplicate($rows);
+        if (count($dedupedRows) > 5000) {
+            return response()->json([
+                'success' => false,
+                'message' => 'The PDF contains too many sales rows. Limit imports to 5,000 rows.',
+            ], 422);
+        }
+
         $itemsSold = array_sum(array_column($dedupedRows, 'quantity'));
         $revenue = round(array_sum(array_column($dedupedRows, 'total')), 2);
+        $importId = $this->persistRows(
+            $dedupedRows,
+            $file->getClientOriginalName(),
+            'POS PDF',
+            count($rows) + count($warnings)
+        );
 
         return response()->json([
             'success' => true,
+            'import_id' => $importId,
             'items_sold' => $itemsSold,
             'revenue' => $revenue,
             'rows' => $dedupedRows,
             'warnings' => $warnings,
         ]);
+    }
+
+    public function storeRows(Request $request)
+    {
+        $user = $this->requireRole($request, 'admin');
+        if (!$user instanceof User) {
+            return $user;
+        }
+
+        $validated = $request->validate([
+            'file_name' => ['required', 'string', 'max:255'],
+            'rows' => ['required', 'array', 'min:1', 'max:5000'],
+            'rows.*.name' => ['required', 'string', 'max:255'],
+            'rows.*.quantity' => ['required', 'numeric', 'min:0.01'],
+            'rows.*.total' => ['required', 'numeric', 'min:0'],
+            'rows.*.sale_date' => ['nullable', 'date_format:Y-m-d'],
+        ]);
+
+        $rows = array_map(static fn (array $row) => [
+            'name' => trim($row['name']),
+            'quantity' => (float) $row['quantity'],
+            'total' => round((float) $row['total'], 2),
+            'sale_date' => $row['sale_date'] ?? now()->toDateString(),
+        ], $validated['rows']);
+        $importId = $this->persistRows($rows, $validated['file_name'], 'POS CSV', count($rows));
+
+        return response()->json([
+            'success' => true,
+            'import_id' => $importId,
+            'items_sold' => array_sum(array_column($rows, 'quantity')),
+            'revenue' => round(array_sum(array_column($rows, 'total')), 2),
+            'rows_processed' => count($rows),
+        ], 201);
+    }
+
+    public function history(Request $request)
+    {
+        $user = $this->requireRole($request, 'admin');
+        if (!$user instanceof User) {
+            return $user;
+        }
+
+        $rows = DB::table('analytics_sales_history')
+            ->whereNotNull('import_id')
+            ->orderByDesc('sale_date')
+            ->orderByDesc('id')
+            ->get(['id', 'product_name', 'sale_date', 'units_sold', 'revenue']);
+
+        return response()->json([
+            'success' => true,
+            'sales' => $rows->map(static fn ($row) => [
+                'id' => (int) $row->id,
+                'cake_name' => $row->product_name,
+                'sale_date' => $row->sale_date,
+                'units_sold' => (float) $row->units_sold,
+                'price' => (float) $row->revenue,
+            ]),
+            'summary' => [
+                'records' => $rows->count(),
+                'total_sales' => (float) $rows->sum('revenue'),
+                'total_down_payments' => 0,
+                'total_remaining_balance' => 0,
+            ],
+        ]);
+    }
+
+    private function persistRows(array $rows, string $fileName, string $sourceName, int $rowsReceived): int
+    {
+        $now = now();
+
+        return DB::transaction(function () use ($rows, $fileName, $sourceName, $rowsReceived, $now): int {
+            $importId = (int) DB::table('analytics_imports')->insertGetId([
+                'file_name' => basename($fileName),
+                'source_name' => $sourceName,
+                'uploaded_at' => $now,
+                'status' => 'completed',
+                'rows_received' => $rowsReceived,
+                'rows_processed' => count($rows),
+            ]);
+
+            $historyRows = array_map(static fn (array $row) => [
+                'import_id' => $importId,
+                'product_name' => $row['name'],
+                'sale_date' => $row['sale_date'] ?? $now->toDateString(),
+                'units_sold' => $row['quantity'],
+                'revenue' => $row['total'],
+                'created_at' => $now,
+            ], $rows);
+
+            DB::table('analytics_sales_history')->insert($historyRows);
+
+            return $importId;
+        });
     }
 
     /**

@@ -19,7 +19,7 @@ class StaffApiController extends Controller
         }
     }
 
-    protected function corsResponse($payload, int $status = 200)
+    protected function corsResponse(array $payload, int $status = 200)
     {
         $origin = request()->header('Origin');
         $response = response()->json($payload, $status)
@@ -199,8 +199,45 @@ class StaffApiController extends Controller
             return $this->corsResponse(['success' => false, 'message' => 'Discount ID image not found.'], 404);
         }
 
-        return response()->file($disk->path($path), [
-            'Content-Type' => $disk->mimeType($path) ?: 'application/octet-stream',
+        $fileContents = $disk->get($path);
+        if ($fileContents === null) {
+            return $this->corsResponse(['success' => false, 'message' => 'Discount ID image not found.'], 404);
+        }
+
+        $mimeType = (new \finfo(FILEINFO_MIME_TYPE))->buffer($fileContents) ?: 'application/octet-stream';
+        return response($fileContents, 200, [
+            'Content-Type' => $mimeType,
+            'Cache-Control' => 'private, no-store',
+            'X-Content-Type-Options' => 'nosniff',
+        ]);
+    }
+
+    public function viewOrderPaymentProof(Request $request, int $orderId)
+    {
+        $admin = $this->requireRole($request, 'admin');
+        if (!$admin instanceof User) {
+            return $admin;
+        }
+
+        $order = DB::table('orders')->where('id', $orderId)->first(['payment_proof_path', 'payment_status']);
+        $path = $order->payment_proof_path ?? null;
+        if (!$path || strtolower((string) ($order->payment_status ?? '')) !== 'proof_submitted') {
+            return $this->corsResponse(['success' => false, 'message' => 'Payment proof not found.'], 404);
+        }
+
+        $disk = Storage::disk('local');
+        if (!$disk->exists($path)) {
+            return $this->corsResponse(['success' => false, 'message' => 'Payment proof not found.'], 404);
+        }
+
+        $fileContents = $disk->get($path);
+        if ($fileContents === null) {
+            return $this->corsResponse(['success' => false, 'message' => 'Payment proof not found.'], 404);
+        }
+
+        $mimeType = (new \finfo(FILEINFO_MIME_TYPE))->buffer($fileContents) ?: 'application/octet-stream';
+        return response($fileContents, 200, [
+            'Content-Type' => $mimeType,
             'Cache-Control' => 'private, no-store',
             'X-Content-Type-Options' => 'nosniff',
         ]);
@@ -277,7 +314,7 @@ class StaffApiController extends Controller
             $liveOrders = DB::table('orders')
                 ->whereNotIn(DB::raw('LOWER(status)'), ['completed', 'cancelled'])
                 ->where(function ($query) {
-                    $query->whereRaw("LOWER(COALESCE(payment, '')) <> 'gcash'")
+                    $query->whereRaw("LOWER(COALESCE(payment, '')) NOT IN ('gcash', 'qrph')")
                         ->orWhereRaw("LOWER(COALESCE(payment_status, 'pending')) = 'paid'");
                 })
                 ->orderByDesc('created_at');

@@ -20,6 +20,11 @@ function analyticsDate(string $value, string $fallback): string
     return $value;
 }
 
+function analyticsIsCakeCategory(string $category): bool
+{
+    return str_contains(strtolower(trim($category)), 'cake');
+}
+
 function analyticsRows(mysqli $conn, string $sql, string $types = '', array $values = []): array
 {
     $stmt = $conn->prepare($sql);
@@ -52,7 +57,8 @@ function analyticsOrderItems(array $orders, array $products, int $filterProductI
             $name = trim((string) ($item['name'] ?? $item['product'] ?? ''));
             $itemProductId = (int) ($item['product_id'] ?? $item['id'] ?? 0);
             $product = $itemProductId > 0 ? ($products[$itemProductId] ?? null) : ($productByName[strtolower($name)] ?? null);
-            $category = trim((string) ($item['category'] ?? ($product['category'] ?? 'Other')));
+            $category = trim((string) ($product['category'] ?? ($item['category'] ?? 'Other')));
+            if (!analyticsIsCakeCategory($category)) continue;
             if ($filterProductId > 0 && $itemProductId !== $filterProductId && (int) ($product['id'] ?? 0) !== $filterProductId) continue;
             if ($filterCategory !== '' && strtolower($category) !== strtolower($filterCategory)) continue;
             $quantity = max(0, (float) ($item['qty'] ?? $item['quantity'] ?? 0));
@@ -86,29 +92,67 @@ foreach ($productsRows as $product) $products[(int) $product['id']] = $product;
 
 $orderRows = analyticsRows($conn, "SELECT id, items, total, created_at FROM orders WHERE LOWER(status) = 'completed' AND created_at >= ? AND created_at < DATE_ADD(?, INTERVAL 1 DAY) ORDER BY created_at", 'ss', [$start . ' 00:00:00', $end]);
 $sales = analyticsOrderItems($orderRows, $products, $productId, $category);
+$customCakeRows = analyticsRows($conn, "SELECT custom.order_id, custom.quantity, custom.flavor, custom.estimated_price, orders.subtotal, orders.total FROM custom_cake_orders AS custom INNER JOIN orders ON orders.id = custom.order_id WHERE LOWER(orders.status) = 'completed' AND orders.created_at >= ? AND orders.created_at < DATE_ADD(?, INTERVAL 1 DAY) ORDER BY orders.created_at", 'ss', [$start . ' 00:00:00', $end]);
+$customCakeSales = [];
+if ($productId === 0 && ($category === '' || stripos($category, 'customized') !== false)) {
+    foreach ($customCakeRows as $customCake) {
+        $quantity = max(1, (float) ($customCake['quantity'] ?? 1));
+        $revenueAmount = (float) ($customCake['subtotal'] ?? 0) > 0
+            ? (float) $customCake['subtotal']
+            : ((float) ($customCake['total'] ?? 0) > 0
+                ? (float) $customCake['total']
+                : (float) ($customCake['estimated_price'] ?? 0) * $quantity);
+        $flavor = trim((string) ($customCake['flavor'] ?? ''));
+        $customCakeSales[] = [
+            'product_id' => 0,
+            'product' => $flavor !== '' ? 'Customized Cake - ' . $flavor : 'Customized Cake',
+            'category' => 'Customized Cakes',
+            'sold' => $quantity,
+            'revenue' => $revenueAmount,
+        ];
+    }
+}
 $revenue = 0.0;
 foreach ($orderRows as $order) $revenue += (float) $order['total'];
 $ordersCount = count($orderRows);
 
-$historicalRows = analyticsRows($conn, 'SELECT id, cake_name, price, down_payment, remaining_balance, sale_date FROM sales WHERE sale_date >= ? AND sale_date <= ? ORDER BY sale_date', 'ss', [$start, $end]);
+$historicalRows = analyticsRows($conn, 'SELECT product_name, sale_date, units_sold, revenue FROM analytics_sales_history WHERE import_id IS NOT NULL AND sale_date >= ? AND sale_date <= ? ORDER BY sale_date', 'ss', [$start, $end]);
 $historicalRevenue = 0.0;
 $historicalDownPayments = 0.0;
 $historicalRemainingBalance = 0.0;
+$historicalRecords = 0;
 $historicalDaily = [];
 $historicalProducts = [];
 foreach ($historicalRows as $historical) {
-    $price = (float) $historical['price'];
-    $historicalRevenue += $price;
-    $historicalDownPayments += (float) $historical['down_payment'];
-    $historicalRemainingBalance += (float) $historical['remaining_balance'];
+    $name = trim((string) $historical['product_name']);
+    $quantity = (float) $historical['units_sold'];
+    $revenueAmount = (float) $historical['revenue'];
+    $productIdForSale = 0;
+    $productCategory = 'Imported Sales';
+    foreach ($productsRows as $productRow) {
+        if (strcasecmp(trim((string) $productRow['name']), $name) === 0) {
+            $productIdForSale = (int) $productRow['id'];
+            $productCategory = (string) $productRow['category'];
+            break;
+        }
+    }
+    if (!analyticsIsCakeCategory($productCategory)) continue;
+    if ($productId > 0 && $productIdForSale !== $productId) continue;
+    if ($category !== '' && strcasecmp($productCategory, $category) !== 0) continue;
+
+    $historicalRecords++;
+    $historicalRevenue += $revenueAmount;
     $date = (string) $historical['sale_date'];
     if (!isset($historicalDaily[$date])) $historicalDaily[$date] = ['date' => $date, 'revenue' => 0, 'orders' => 0];
-    $historicalDaily[$date]['revenue'] += $price;
+    $historicalDaily[$date]['revenue'] += $revenueAmount;
     $historicalDaily[$date]['orders']++;
-    $historicalProducts[$historical['cake_name']] = ($historicalProducts[$historical['cake_name']] ?? 0) + $price;
+    if (!isset($historicalProducts[$name])) $historicalProducts[$name] = ['product_id' => $productIdForSale, 'product' => $name, 'category' => $productCategory, 'sold' => 0, 'revenue' => 0];
+    $historicalProducts[$name]['sold'] += $quantity;
+    $historicalProducts[$name]['revenue'] += $revenueAmount;
 }
 $revenue += $historicalRevenue;
-$ordersCount += count($historicalRows);
+$ordersCount += $historicalRecords;
+$sales = array_merge($sales, $customCakeSales);
 
 $dailyRevenue = analyticsRows($conn, "SELECT DATE(created_at) AS date, COALESCE(SUM(total), 0) AS revenue, COUNT(*) AS orders FROM orders WHERE LOWER(status) = 'completed' AND created_at >= ? AND created_at < DATE_ADD(?, INTERVAL 1 DAY) GROUP BY DATE(created_at) ORDER BY date", 'ss', [$start . ' 00:00:00', $end]);
 $dailyRevenueByDate = [];
@@ -119,12 +163,11 @@ foreach ($historicalDaily as $date => $daily) {
 }
 $dailyRevenue = array_values($dailyRevenueByDate);
 usort($dailyRevenue, static fn($a, $b) => strcmp($a['date'], $b['date']));
-$historicalProductSales = [];
-foreach ($historicalProducts as $name => $amount) $historicalProductSales[] = ['product_id' => 0, 'product' => $name, 'category' => 'Customized Cake', 'sold' => 1, 'revenue' => $amount];
+$historicalProductSales = array_values($historicalProducts);
 $sales = array_merge($sales, $historicalProductSales);
 usort($sales, static fn($a, $b) => $b['revenue'] <=> $a['revenue']);
-$productionByProduct = analyticsRows($conn, "SELECT pt.product_id, p.name AS product, p.category, SUM(pt.quantity) AS quantity FROM production_transactions pt INNER JOIN products p ON p.id = pt.product_id WHERE pt.created_at >= ? AND pt.created_at < DATE_ADD(?, INTERVAL 1 DAY) " . ($productId > 0 ? 'AND pt.product_id = ? ' : '') . ($category !== '' ? 'AND LOWER(p.category) = LOWER(?) ' : '') . "GROUP BY pt.product_id, p.name, p.category ORDER BY quantity DESC", $productId > 0 && $category !== '' ? 'ssis' : ($productId > 0 ? 'ssi' : ($category !== '' ? 'sss' : 'ss')), $productId > 0 && $category !== '' ? [$start . ' 00:00:00', $end, $productId, $category] : ($productId > 0 ? [$start . ' 00:00:00', $end, $productId] : ($category !== '' ? [$start . ' 00:00:00', $end, $category] : [$start . ' 00:00:00', $end])));
-$productionByDay = analyticsRows($conn, "SELECT DATE(pt.created_at) AS date, SUM(pt.quantity) AS quantity FROM production_transactions pt INNER JOIN products p ON p.id = pt.product_id WHERE pt.created_at >= ? AND pt.created_at < DATE_ADD(?, INTERVAL 1 DAY) " . ($productId > 0 ? 'AND pt.product_id = ? ' : '') . ($category !== '' ? 'AND LOWER(p.category) = LOWER(?) ' : '') . "GROUP BY DATE(pt.created_at) ORDER BY date", $productId > 0 && $category !== '' ? 'ssis' : ($productId > 0 ? 'ssi' : ($category !== '' ? 'sss' : 'ss')), $productId > 0 && $category !== '' ? [$start . ' 00:00:00', $end, $productId, $category] : ($productId > 0 ? [$start . ' 00:00:00', $end, $productId] : ($category !== '' ? [$start . ' 00:00:00', $end, $category] : [$start . ' 00:00:00', $end])));
+$productionByProduct = analyticsRows($conn, "SELECT pt.product_id, p.name AS product, p.category, SUM(pt.quantity) AS quantity FROM production_transactions pt INNER JOIN products p ON p.id = pt.product_id WHERE LOWER(p.category) LIKE '%cake%' AND pt.created_at >= ? AND pt.created_at < DATE_ADD(?, INTERVAL 1 DAY) " . ($productId > 0 ? 'AND pt.product_id = ? ' : '') . ($category !== '' ? 'AND LOWER(p.category) = LOWER(?) ' : '') . "GROUP BY pt.product_id, p.name, p.category ORDER BY quantity DESC", $productId > 0 && $category !== '' ? 'ssis' : ($productId > 0 ? 'ssi' : ($category !== '' ? 'sss' : 'ss')), $productId > 0 && $category !== '' ? [$start . ' 00:00:00', $end, $productId, $category] : ($productId > 0 ? [$start . ' 00:00:00', $end, $productId] : ($category !== '' ? [$start . ' 00:00:00', $end, $category] : [$start . ' 00:00:00', $end])));
+$productionByDay = analyticsRows($conn, "SELECT DATE(pt.created_at) AS date, SUM(pt.quantity) AS quantity FROM production_transactions pt INNER JOIN products p ON p.id = pt.product_id WHERE LOWER(p.category) LIKE '%cake%' AND pt.created_at >= ? AND pt.created_at < DATE_ADD(?, INTERVAL 1 DAY) " . ($productId > 0 ? 'AND pt.product_id = ? ' : '') . ($category !== '' ? 'AND LOWER(p.category) = LOWER(?) ' : '') . "GROUP BY DATE(pt.created_at) ORDER BY date", $productId > 0 && $category !== '' ? 'ssis' : ($productId > 0 ? 'ssi' : ($category !== '' ? 'sss' : 'ss')), $productId > 0 && $category !== '' ? [$start . ' 00:00:00', $end, $productId, $category] : ($productId > 0 ? [$start . ' 00:00:00', $end, $productId] : ($category !== '' ? [$start . ' 00:00:00', $end, $category] : [$start . ' 00:00:00', $end])));
 
 $movementConditions = ['m.created_at >= ?', 'm.created_at < DATE_ADD(?, INTERVAL 1 DAY)'];
 $movementTypes = 'ss';
@@ -132,8 +175,8 @@ $movementValues = [$start . ' 00:00:00', $end];
 if ($productId > 0) { $movementConditions[] = 'm.product_id = ?'; $movementTypes .= 'i'; $movementValues[] = $productId; }
 if ($movementType !== '') { $movementConditions[] = 'm.movement_type = ?'; $movementTypes .= 's'; $movementValues[] = $movementType; }
 $movementWhere = implode(' AND ', $movementConditions);
-$movementSummary = analyticsRows($conn, "SELECT m.movement_type, SUM(m.quantity) AS quantity FROM product_inventory_movements m WHERE {$movementWhere} GROUP BY m.movement_type ORDER BY ABS(SUM(m.quantity)) DESC", $movementTypes, $movementValues);
-$movementByProduct = analyticsRows($conn, "SELECT m.product_id, p.name AS product, SUM(CASE WHEN m.quantity < 0 THEN -m.quantity ELSE 0 END) AS consumed, SUM(m.quantity) AS net_change FROM product_inventory_movements m INNER JOIN products p ON p.id = m.product_id WHERE {$movementWhere} GROUP BY m.product_id, p.name ORDER BY consumed DESC", $movementTypes, $movementValues);
+$movementSummary = analyticsRows($conn, "SELECT m.movement_type, SUM(m.quantity) AS quantity FROM product_inventory_movements m INNER JOIN products p ON p.id = m.product_id WHERE {$movementWhere} AND LOWER(p.category) LIKE '%cake%' GROUP BY m.movement_type ORDER BY ABS(SUM(m.quantity)) DESC", $movementTypes, $movementValues);
+$movementByProduct = analyticsRows($conn, "SELECT m.product_id, p.name AS product, SUM(CASE WHEN m.quantity < 0 THEN -m.quantity ELSE 0 END) AS consumed, SUM(m.quantity) AS net_change FROM product_inventory_movements m INNER JOIN products p ON p.id = m.product_id WHERE {$movementWhere} AND LOWER(p.category) LIKE '%cake%' GROUP BY m.product_id, p.name ORDER BY consumed DESC", $movementTypes, $movementValues);
 
 $ingredientConditions = ['im.created_at >= ?', 'im.created_at < DATE_ADD(?, INTERVAL 1 DAY)', "im.action = 'stock_out'", "im.reference_type = 'production'"];
 $ingredientTypes = 'ss';
@@ -148,9 +191,10 @@ $wasteValues = [$start . ' 00:00:00', $end];
 if ($productId > 0) { $wasteConditions[] = 'w.product_id = ?'; $wasteTypes .= 'i'; $wasteValues[] = $productId; }
 if ($ingredientId > 0) { $wasteConditions[] = 'w.ingredient_id = ?'; $wasteTypes .= 'i'; $wasteValues[] = $ingredientId; }
 $wasteWhere = implode(' AND ', $wasteConditions);
-$wasteRows = analyticsRows($conn, "SELECT w.id, w.item, w.qty, w.unit_cost, w.item_type, w.reason, w.product_id, w.ingredient_id, w.datetime, COALESCE(p.name, i.name, w.item) AS item_name FROM waste_log w LEFT JOIN products p ON p.id = w.product_id LEFT JOIN ingredients i ON i.id = w.ingredient_id WHERE {$wasteWhere} ORDER BY w.datetime DESC", $wasteTypes, $wasteValues);
+$wasteRows = analyticsRows($conn, "SELECT w.id, w.item, w.qty, w.unit_cost, w.item_type, w.reason, w.product_id, w.ingredient_id, w.datetime, COALESCE(p.name, i.name, w.item) AS item_name FROM waste_log w LEFT JOIN products p ON p.id = w.product_id LEFT JOIN ingredients i ON i.id = w.ingredient_id WHERE {$wasteWhere} AND (w.product_id IS NULL OR LOWER(p.category) LIKE '%cake%') ORDER BY w.datetime DESC", $wasteTypes, $wasteValues);
 $wasteByReason = analyticsRows($conn, "SELECT reason, SUM(qty) AS quantity, SUM(qty * unit_cost) AS cost FROM waste_log w WHERE {$wasteWhere} GROUP BY reason ORDER BY cost DESC", $wasteTypes, $wasteValues);
 $wasteByDate = analyticsRows($conn, "SELECT DATE(datetime) AS date, SUM(qty) AS quantity, SUM(qty * unit_cost) AS cost FROM waste_log w WHERE {$wasteWhere} GROUP BY DATE(datetime) ORDER BY date", $wasteTypes, $wasteValues);
+$wasteBySeason = analyticsRows($conn, "SELECT YEAR(w.datetime) AS year, CASE WHEN MONTH(w.datetime) IN (12, 1, 2) THEN 'Cool Dry (Dec-Feb)' WHEN MONTH(w.datetime) IN (3, 4, 5) THEN 'Hot Dry (Mar-May)' ELSE 'Rainy (Jun-Nov)' END AS season, SUM(w.qty) AS quantity, SUM(w.qty * w.unit_cost) AS cost, COUNT(*) AS records FROM waste_log w WHERE {$wasteWhere} GROUP BY YEAR(w.datetime), season ORDER BY year, MIN(MONTH(w.datetime))", $wasteTypes, $wasteValues);
 $wasteCost = 0.0; $wasteQuantity = 0.0;
 $wasteByProduct = []; $wasteByIngredient = [];
 foreach ($wasteRows as $waste) {
@@ -168,11 +212,12 @@ foreach ($wasteRows as $waste) {
     unset($target);
 }
 
-$productionCostRow = analyticsScalar($conn, "SELECT COALESCE(SUM(pt.quantity * p.production_cost), 0) AS cost FROM production_transactions pt INNER JOIN products p ON p.id = pt.product_id WHERE pt.created_at >= ? AND pt.created_at < DATE_ADD(?, INTERVAL 1 DAY)" . ($productId > 0 ? ' AND pt.product_id = ?' : ''), $productId > 0 ? 'ssi' : 'ss', $productId > 0 ? [$start . ' 00:00:00', $end, $productId] : [$start . ' 00:00:00', $end]);
+$productionCostRow = analyticsScalar($conn, "SELECT COALESCE(SUM(pt.quantity * p.production_cost), 0) AS cost FROM production_transactions pt INNER JOIN products p ON p.id = pt.product_id WHERE LOWER(p.category) LIKE '%cake%' AND pt.created_at >= ? AND pt.created_at < DATE_ADD(?, INTERVAL 1 DAY)" . ($productId > 0 ? ' AND pt.product_id = ?' : ''), $productId > 0 ? 'ssi' : 'ss', $productId > 0 ? [$start . ' 00:00:00', $end, $productId] : [$start . ' 00:00:00', $end]);
 $productionCost = (float) ($productionCostRow['cost'] ?? 0);
 
 $inventory = [];
 foreach ($productsRows as $product) {
+    if (!analyticsIsCakeCategory((string) $product['category'])) continue;
     if ($productId > 0 && (int) $product['id'] !== $productId) continue;
     if ($category !== '' && strcasecmp($category, (string) $product['category']) !== 0) continue;
     $stock = (float) $product['stock']; $minimum = (float) $product['minimum_stock'];
@@ -180,7 +225,7 @@ foreach ($productsRows as $product) {
 }
 $lowStock = array_values(array_filter($inventory, static fn($item) => $item['status'] === 'Low Stock'));
 $outOfStock = array_values(array_filter($inventory, static fn($item) => $item['status'] === 'Out of Stock'));
-$lowStockFrequency = analyticsRows($conn, "SELECT m.product_id, p.name AS product, COUNT(*) AS low_stock_events FROM product_inventory_movements m INNER JOIN products p ON p.id = m.product_id WHERE m.new_stock <= p.minimum_stock AND m.created_at >= ? AND m.created_at < DATE_ADD(?, INTERVAL 1 DAY) GROUP BY m.product_id, p.name ORDER BY low_stock_events DESC", 'ss', [$start . ' 00:00:00', $end]);
+$lowStockFrequency = analyticsRows($conn, "SELECT m.product_id, p.name AS product, COUNT(*) AS low_stock_events FROM product_inventory_movements m INNER JOIN products p ON p.id = m.product_id WHERE LOWER(p.category) LIKE '%cake%' AND m.new_stock <= p.minimum_stock AND m.created_at >= ? AND m.created_at < DATE_ADD(?, INTERVAL 1 DAY) GROUP BY m.product_id, p.name ORDER BY low_stock_events DESC", 'ss', [$start . ' 00:00:00', $end]);
 $ingredientInventory = analyticsRows($conn, "SELECT i.id AS ingredient_id, i.name AS ingredient, i.unit, COALESCE(batch_stock.usable_stock, 0) AS stock, i.threshold, CASE WHEN COALESCE(batch_stock.usable_stock, 0) <= 0 THEN 'Out of Stock' WHEN COALESCE(batch_stock.usable_stock, 0) <= i.threshold THEN 'Low Stock' ELSE 'In Stock' END AS status FROM ingredients i LEFT JOIN (SELECT ib.ingredient_id, SUM(ib.quantity_remaining) AS usable_stock FROM ingredient_batches ib WHERE ib.quantity_remaining > 0 AND (ib.expiry_date IS NULL OR ib.expiry_date >= CURDATE()) AND NOT EXISTS (SELECT 1 FROM discard_requests dr WHERE dr.ingredient_batch_id = ib.id AND dr.status = 'Pending') GROUP BY ib.ingredient_id) batch_stock ON batch_stock.ingredient_id = i.id ORDER BY stock ASC, ingredient ASC");
 
 $productPerformance = [];
@@ -191,22 +236,72 @@ foreach ($inventory as $item) {
     foreach ($wasteByProduct as $waste) if ((int) $waste['id'] === $item['product_id']) $item['waste'] = (float) $waste['quantity'];
     $productPerformance[] = $item;
 }
+if ($customCakeSales) {
+    $productPerformance[] = [
+        'product_id' => 0,
+        'product' => 'Customized Cakes',
+        'category' => 'Customized Cakes',
+        'current_stock' => 0,
+        'minimum_stock' => 0,
+        'status' => 'Made to order',
+        'sold' => array_sum(array_column($customCakeSales, 'sold')),
+        'produced' => 0,
+        'waste' => 0,
+    ];
+}
+
+$salesByProduct = [];
+foreach ($sales as $sale) {
+    $saleProductId = (int) ($sale['product_id'] ?? 0);
+    if ($saleProductId <= 0) continue;
+    $salesByProduct[$saleProductId] = ($salesByProduct[$saleProductId] ?? 0) + (float) ($sale['sold'] ?? 0);
+}
+$lowStockEventsByProduct = [];
+foreach ($lowStockFrequency as $row) {
+    $lowStockEventsByProduct[(int) $row['product_id']] = (int) $row['low_stock_events'];
+}
+$productsWithSales = array_filter($salesByProduct, static fn($sold) => $sold > 0);
+$highSalesThreshold = count($productsWithSales) > 0
+    ? array_sum($productsWithSales) / count($productsWithSales)
+    : 0;
+$frequentStockoutThreshold = 2;
+$highSalesStockoutRisk = [];
+foreach ($inventory as $product) {
+    $productIdForDiagnostic = (int) $product['product_id'];
+    $sold = (float) ($salesByProduct[$productIdForDiagnostic] ?? 0);
+    $stockoutEvents = (int) ($lowStockEventsByProduct[$productIdForDiagnostic] ?? 0);
+    if ($sold <= 0 || $sold < $highSalesThreshold || $stockoutEvents < $frequentStockoutThreshold) continue;
+    $highSalesStockoutRisk[] = [
+        'product_id' => $productIdForDiagnostic,
+        'product' => $product['product'],
+        'sold' => $sold,
+        'low_stock_events' => $stockoutEvents,
+        'current_stock' => (float) $product['current_stock'],
+        'sales_threshold' => round($highSalesThreshold, 2),
+    ];
+}
+usort($highSalesStockoutRisk, static fn($a, $b) => $b['low_stock_events'] <=> $a['low_stock_events'] ?: $b['sold'] <=> $a['sold']);
 
 $todayRevenue = analyticsScalar($conn, "SELECT COALESCE(SUM(total), 0) AS revenue, COUNT(*) AS orders FROM orders WHERE LOWER(status) = 'completed' AND DATE(created_at) = CURDATE()");
-$todayHistorical = analyticsScalar($conn, "SELECT COALESCE(SUM(price), 0) AS revenue, COUNT(*) AS orders FROM sales WHERE sale_date = CURDATE()");
+$todayHistorical = analyticsScalar($conn, "SELECT COALESCE(SUM(revenue), 0) AS revenue, COUNT(*) AS orders FROM analytics_sales_history WHERE import_id IS NOT NULL AND sale_date = CURDATE()");
 $weekRevenue = analyticsScalar($conn, "SELECT COALESCE(SUM(total), 0) AS revenue FROM orders WHERE LOWER(status) = 'completed' AND created_at >= DATE_SUB(CURDATE(), INTERVAL WEEKDAY(CURDATE()) DAY) AND created_at < CURDATE() + INTERVAL 1 DAY");
-$weekHistorical = analyticsScalar($conn, "SELECT COALESCE(SUM(price), 0) AS revenue FROM sales WHERE sale_date >= DATE_SUB(CURDATE(), INTERVAL WEEKDAY(CURDATE()) DAY) AND sale_date < CURDATE() + INTERVAL 1 DAY");
+$weekHistorical = analyticsScalar($conn, "SELECT COALESCE(SUM(revenue), 0) AS revenue FROM analytics_sales_history WHERE import_id IS NOT NULL AND sale_date >= DATE_SUB(CURDATE(), INTERVAL WEEKDAY(CURDATE()) DAY) AND sale_date < CURDATE() + INTERVAL 1 DAY");
 $monthRevenue = analyticsScalar($conn, "SELECT COALESCE(SUM(total), 0) AS revenue FROM orders WHERE LOWER(status) = 'completed' AND YEAR(created_at) = YEAR(CURDATE()) AND MONTH(created_at) = MONTH(CURDATE())");
-$monthHistorical = analyticsScalar($conn, "SELECT COALESCE(SUM(price), 0) AS revenue FROM sales WHERE YEAR(sale_date) = YEAR(CURDATE()) AND MONTH(sale_date) = MONTH(CURDATE())");
+$monthHistorical = analyticsScalar($conn, "SELECT COALESCE(SUM(revenue), 0) AS revenue FROM analytics_sales_history WHERE import_id IS NOT NULL AND YEAR(sale_date) = YEAR(CURDATE()) AND MONTH(sale_date) = MONTH(CURDATE())");
 
 analyticsJson(true, [
     'filters' => ['start_date' => $start, 'end_date' => $end, 'product_id' => $productId ?: null, 'category' => $category ?: null, 'ingredient_id' => $ingredientId ?: null, 'movement_type' => $movementType ?: null],
-    'summary' => ['revenue' => $revenue, 'orders' => $ordersCount, 'customized_cake_sales' => count($historicalRows), 'total_down_payments' => $historicalDownPayments, 'total_remaining_balance' => $historicalRemainingBalance, 'average_order_value' => $ordersCount ? $revenue / $ordersCount : null, 'today_revenue' => (float) ($todayRevenue['revenue'] ?? 0) + (float) ($todayHistorical['revenue'] ?? 0), 'today_orders' => (int) ($todayRevenue['orders'] ?? 0) + (int) ($todayHistorical['orders'] ?? 0), 'weekly_revenue' => (float) ($weekRevenue['revenue'] ?? 0) + (float) ($weekHistorical['revenue'] ?? 0), 'monthly_revenue' => (float) ($monthRevenue['revenue'] ?? 0) + (float) ($monthHistorical['revenue'] ?? 0), 'production_quantity' => array_sum(array_map(static fn($row) => (float) $row['quantity'], $productionByProduct)), 'waste_quantity' => $wasteQuantity, 'waste_cost' => $wasteCost, 'production_cost' => $productionCost, 'waste_rate' => $productionCost > 0 ? ($wasteCost / $productionCost) * 100 : null],
+    'summary' => ['revenue' => $revenue, 'orders' => $ordersCount, 'customized_cake_sales' => 0, 'imported_sales_records' => $historicalRecords, 'total_down_payments' => $historicalDownPayments, 'total_remaining_balance' => $historicalRemainingBalance, 'average_order_value' => $ordersCount ? $revenue / $ordersCount : null, 'today_revenue' => (float) ($todayRevenue['revenue'] ?? 0) + (float) ($todayHistorical['revenue'] ?? 0), 'today_orders' => (int) ($todayRevenue['orders'] ?? 0) + (int) ($todayHistorical['orders'] ?? 0), 'weekly_revenue' => (float) ($weekRevenue['revenue'] ?? 0) + (float) ($weekHistorical['revenue'] ?? 0), 'monthly_revenue' => (float) ($monthRevenue['revenue'] ?? 0) + (float) ($monthHistorical['revenue'] ?? 0), 'production_quantity' => array_sum(array_map(static fn($row) => (float) $row['quantity'], $productionByProduct)), 'waste_quantity' => $wasteQuantity, 'waste_cost' => $wasteCost, 'production_cost' => $productionCost, 'waste_rate' => $productionCost > 0 ? ($wasteCost / $productionCost) * 100 : null],
     'sales' => ['daily' => $dailyRevenue, 'best_selling_products' => array_slice($sales, 0, 10)],
     'production' => ['by_product' => $productionByProduct, 'by_day' => $productionByDay],
     'inventory' => ['products' => $inventory, 'low_stock' => $lowStock, 'out_of_stock' => $outOfStock, 'low_stock_frequency' => $lowStockFrequency, 'ingredient_inventory' => $ingredientInventory, 'movement_summary' => $movementSummary, 'movement_by_product' => $movementByProduct, 'fast_moving' => array_slice($movementByProduct, 0, 10), 'slow_moving' => array_slice(array_reverse($movementByProduct), 0, 10)],
     'ingredient_consumption' => $ingredientConsumption,
-    'waste' => ['by_reason' => $wasteByReason, 'by_product' => array_values($wasteByProduct), 'by_ingredient' => array_values($wasteByIngredient), 'by_date' => $wasteByDate],
+    'waste' => ['by_reason' => $wasteByReason, 'by_product' => array_values($wasteByProduct), 'by_ingredient' => array_values($wasteByIngredient), 'by_date' => $wasteByDate, 'by_season' => $wasteBySeason],
     'product_performance' => $productPerformance,
+    'diagnostics' => [
+        'high_sales_stockout_risk' => $highSalesStockoutRisk,
+        'high_sales_threshold' => round($highSalesThreshold, 2),
+        'frequent_stockout_threshold' => $frequentStockoutThreshold,
+    ],
     'has_data' => ['sales' => $ordersCount > 0, 'production' => count($productionByProduct) > 0, 'waste' => count($wasteRows) > 0, 'ingredient_consumption' => count($ingredientConsumption) > 0],
 ]);

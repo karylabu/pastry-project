@@ -5,6 +5,7 @@ ini_set('display_errors', 0);
 
 require_once __DIR__ . '/../includes/api_auth.php';
 require_once __DIR__ . '/../includes/inventory.php';
+require_once __DIR__ . '/../includes/realtime_events.php';
 
 $user = requireApiRole(['customer']);
 
@@ -118,6 +119,7 @@ try {
 
     if ($result) {
         $conn->commit();
+        publishRealtimeEvent($conn, 'order.updated', $userId, $order_id);
         echo json_encode(["success" => true]);
     } else {
         throw new Exception("SQL Error: " . mysqli_error($conn));

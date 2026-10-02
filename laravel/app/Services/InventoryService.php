@@ -7,8 +7,8 @@ use App\Models\IngredientBatch;
 use App\Models\IngredientMovement;
 use App\Models\DiscardRequest;
 use App\Models\WasteLog;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Database\UniqueConstraintViolationException;
 use RuntimeException;
 
 class InventoryService
@@ -29,12 +29,21 @@ class InventoryService
                     'purchase_date' => $data['purchase_date'] ?? null,
                     'expiry_date' => $data['expiry_date'] ?? null,
                     'supplier' => $data['supplier'] ?? null,
-                    'unit_cost' => $data['unit_cost'] ?? 0,
+                    'unit_cost' => isset($data['unit_cost']) && $data['unit_cost'] !== ''
+                        ? $data['unit_cost']
+                        : (float) $lockedIngredient->unit_cost,
                     'notes' => $data['notes'] ?? null,
                     'created_by' => $userId,
                 ]);
-            } catch (UniqueConstraintViolationException $exception) {
-                throw new RuntimeException('This batch number already exists for the ingredient.');
+            } catch (QueryException $exception) {
+                $isUniqueViolation = in_array((string) $exception->getCode(), ['23000', '23505'], true)
+                    || in_array((int) ($exception->errorInfo[1] ?? 0), [19, 1062], true);
+
+                if (!$isUniqueViolation) {
+                    throw $exception;
+                }
+
+                throw new RuntimeException('This batch number already exists for the ingredient.', 0, $exception);
             }
 
             $newStock = $this->synchronizeIngredientStock($lockedIngredient->id);
@@ -122,6 +131,7 @@ class InventoryService
                 throw new RuntimeException('A discard request is already pending for this batch.');
             }
 
+            $isExpired = $batch->expiry_date !== null && $batch->expiry_date->isBefore(today());
             $discard = DiscardRequest::create([
                 'ingredient_id' => $batch->ingredient_id,
                 'ingredient_batch_id' => $batch->id,
@@ -130,8 +140,14 @@ class InventoryService
                 'notes' => $data['notes'] ?? null,
                 'status' => 'Pending',
                 'requested_by' => $userId,
+                'requested_at' => now(),
             ]);
             $this->synchronizeIngredientStock((int) $batch->ingredient_id);
+
+            if ($isExpired && $discard->reason === 'Expired') {
+                return $this->approveDiscard((int) $discard->id, $userId);
+            }
+
             return $discard;
         });
     }
@@ -283,28 +299,47 @@ class InventoryService
         return Ingredient::query()
             ->select(['id', 'name', 'unit', 'stock', 'threshold', 'created_at', 'updated_at'])
             ->where('name', 'not like', '[DEV]%')
-            ->with('batches')
+            ->with('batches.discardRequests')
             ->orderBy('name')
             ->get()
             ->map(function (Ingredient $ingredient) {
                 $batches = $ingredient->batches;
+                $fullyDiscardedExpired = $batches->isNotEmpty()
+                    && $batches->every(fn (IngredientBatch $batch) => (float) $batch->quantity_remaining <= 0)
+                    && $batches->contains(fn (IngredientBatch $batch) => $batch->discardRequests->contains(
+                        fn (DiscardRequest $discard) => $discard->status === 'Approved' && $discard->reason === 'Expired'
+                    ));
+
+                if ($fullyDiscardedExpired) {
+                    return null;
+                }
+
                 $usableStock = $this->getUsableStock($ingredient->id);
+                $stockValue = $batches
+                    ->filter(fn (IngredientBatch $batch) => (float) $batch->quantity_remaining > 0
+                        && ($batch->expiry_date === null || !$batch->expiry_date->isBefore(today()))
+                        && !$batch->discardRequests->contains(fn (DiscardRequest $discard) => $discard->status === 'Pending'))
+                    ->sum(fn (IngredientBatch $batch) => (float) $batch->quantity_remaining * (float) $batch->unit_cost);
 
                 return [
                     'id' => (int) $ingredient->id,
                     'name' => $ingredient->name,
                     'unit' => $ingredient->unit,
                     'stock' => (float) $ingredient->stock,
+                    'unit_cost' => (float) $ingredient->unit_cost,
+                    'stock_value' => round((float) $stockValue, 2),
                     'threshold' => (float) $ingredient->threshold,
                     'usable_stock' => $usableStock,
                     'has_usable_stock' => $usableStock > 0,
                     'has_expired_batches' => $batches->contains(fn (IngredientBatch $batch) => $batch->quantity_remaining > 0 && $batch->expiry_date?->isBefore(today())),
                     'batch_count' => $batches->count(),
                     'expired_batch_count' => $batches->filter(fn (IngredientBatch $batch) => $batch->quantity_remaining > 0 && $batch->expiry_date?->isBefore(today()))->count(),
-                    'pending_discard_count' => $batches->filter(fn (IngredientBatch $batch) => $batch->discardRequests()->where('status', 'Pending')->exists())->count(),
+                    'pending_discard_count' => $batches->filter(fn (IngredientBatch $batch) => $batch->discardRequests->contains(fn (DiscardRequest $discard) => $discard->status === 'Pending'))->count(),
                     'discarded_batch_count' => $batches->where('quantity_remaining', '<=', 0)->count(),
                 ];
-            });
+            })
+            ->filter()
+            ->values();
     }
 
     public function getIngredientBatches(Ingredient $ingredient)

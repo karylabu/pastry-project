@@ -11,8 +11,11 @@
  * connection file (e.g. require 'db.php';) if you already have one.
  */
 
-header('Content-Type: application/json');
-header('Access-Control-Allow-Origin: *');
+require_once __DIR__ . '/cors.php';
+require_once __DIR__ . '/../includes/api_auth.php';
+require_once __DIR__ . '/../includes/realtime_events.php';
+
+$authUser = requireApiRole(['customer']);
 
 // ---------------------------------------------------------------
 // 1. DATABASE CONNECTION
@@ -31,11 +34,7 @@ $email     = trim($_POST['email'] ?? '');
 $phone     = trim($_POST['phone'] ?? '');
 $eventDate = trim($_POST['pickup_date'] ?? $_POST['event_date'] ?? '');   // accept pickup_date or event_date
 $details   = trim($_POST['details'] ?? '');
-$userId    = intval($_POST['user_id'] ?? 0);
-if ($userId <= 0) {
-    echo json_encode(['success' => false, 'message' => 'Please log in before sending a custom cake request.']);
-    exit;
-}
+$userId    = (int) $authUser['id'];
 
 if ($name === '' || $email === '' || $phone === '') {
     $userStmt = $conn->prepare('SELECT name, email, phone FROM users WHERE id = ? LIMIT 1');
@@ -127,7 +126,7 @@ $itemsJson = json_encode([[
 ]]);
 
 $method  = $deliveryMethod ?: 'Pickup';
-$payment = 'COD';      // payment is decided once the quote is confirmed
+$payment = 'QRPh';     // payment is collected after the quote is confirmed
 $status  = 'Pending';
 
 $customDetails = [
@@ -190,6 +189,7 @@ if (!$stmt2->execute()) {
     exit;
 }
 $stmt2->close();
+publishRealtimeEvent($conn, 'order.updated', $userId, $orderId);
 
 // ---------------------------------------------------------------
 // 6. NOTIFY THE CUSTOMER THAT THE REQUEST WAS SUBMITTED

@@ -271,7 +271,7 @@ function db_place_order($data) {
 
 function add_to_cart(
     $productId,
-    $size = 'slice',
+    $size = 'small',
     $quantity = 1
 ) {
 
@@ -362,11 +362,11 @@ function add_to_cart(
                 } else {
 
                     $price =
-                        ($p['slice_price'] ?? 0) > 0
-                        ? $p['slice_price']
-                        : $p['price'];
+                        $p['small_price']
+                        ??
+                        $p['price'];
 
-                    $size = 'slice';
+                    $size = 'small';
                 }
             }
 

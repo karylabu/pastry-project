@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { ROOT_BASE } from "../../services/config";
 
 const sections = [
   "Overview",
@@ -70,7 +71,7 @@ export default function TermsPage() {
               ← Back
             </button>
             <div className="flex items-center gap-3">
-              <img src="http://localhost/pastry-project/uploads/logo.png?v=logo-v2" alt="Pastry Project logo" className="h-10 w-10 rounded-none bg-transparent object-contain" />
+              <img src={`${ROOT_BASE}/uploads/logo.png?v=logo-v2`} alt="Pastry Project logo" className="h-10 w-10 rounded-none bg-transparent object-contain" />
               <p className="text-lg font-black tracking-tight text-[#171717] sm:text-xl">Pastry Project</p>
             </div>
           </div>

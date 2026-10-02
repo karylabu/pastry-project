@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight, Cake, Gift, MapPinned, Sparkles, Truck, Star } from 'lucide-react';
+import { ROOT_BASE } from '../../services/config';
 
 const offerings = [
   {
@@ -32,7 +33,7 @@ export default function AboutUsPage() {
         <div className="relative mx-auto grid max-w-7xl gap-10 px-5 py-12 sm:px-6 lg:grid-cols-[1.1fr_0.9fr] lg:px-10 lg:py-14">
           <div className="flex flex-col justify-center">
             <div className="mb-4 flex items-center gap-3">
-              <img src="http://localhost/pastry-project/uploads/logo.png?v=logo-v2" alt="Pastry Project logo" className="h-12 w-12 rounded-none bg-transparent object-contain" />
+              <img src={`${ROOT_BASE}/uploads/logo.png?v=logo-v2`} alt="Pastry Project logo" className="h-12 w-12 rounded-none bg-transparent object-contain" />
               <p className="text-2xl font-black tracking-tight text-[#171717]">Pastry Project</p>
             </div>
 

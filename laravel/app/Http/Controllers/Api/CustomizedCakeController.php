@@ -324,7 +324,7 @@ class CustomizedCakeController extends Controller
                         'method' => 'Pickup',
                         'delivery_date' => null,
                         'delivery_time' => null,
-                        'payment' => 'COD',
+                        'payment' => 'QRPh',
                         'address' => '',
                         'phone' => $user->phone ?? '',
                         'customer' => $user->name,
@@ -345,7 +345,7 @@ class CustomizedCakeController extends Controller
                 }
 
                 $customizedCakeOrderId = DB::table('customized_cake_orders')->insertGetId([
-                    'order_id' => $payload['order_id'] ?? null,
+                    'order_id' => $orderId,
                     'cake_type' => $cakeType,
                     'status' => 'pending',
                     'notes' => $payload['notes'] ?? null,
@@ -371,6 +371,7 @@ class CustomizedCakeController extends Controller
 
                 if ($orderId) {
                     DB::table('customized_cake_orders')->where('id', $customizedCakeOrderId)->update(['order_id' => $orderId]);
+                    app(\App\Services\RealtimeEventPublisher::class)->orderUpdated((int) $user->id, (int) $orderId);
                 }
 
                 return $customizedCakeOrderId;

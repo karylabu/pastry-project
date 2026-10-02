@@ -31,6 +31,7 @@ function loadSecretKey($key) {
     $envFiles = [
         __DIR__ . '/.env',
         __DIR__ . '/../.env',
+        __DIR__ . '/../../.env',
     ];
 
     foreach ($envFiles as $envFile) {
@@ -79,43 +80,24 @@ if (!$orderId || $amount <= 0) {
 }
 
 // ─── AMOUNT VALIDATION ────────────────────────────────────────────────────────
-// FIX: PayMongo minimum is ₱20.00 (2000 centavos); reject anything below.
 $amountCents = (int) round($amount * 100);
-
-if ($amountCents < 2000) {
+if ($amountCents < 100) {
     http_response_code(400);
-    echo json_encode(["error" => "Amount must be at least ₱20.00"]);
+    echo json_encode(["error" => "Payment amount must be at least PHP 1.00."]);
     exit;
 }
 
 // ─── BUILD PAYMONGO PAYLOAD ───────────────────────────────────────────────────
-// Map our payment methods to PayMongo's source types
-$sourceTypeMap = [
-    'GCash'    => 'gcash',
-    'PayMaya'  => 'paymaya',
-    'COD'      => 'card',  // Default to card for COD (won't be used)
-    'Credit Card' => 'card'
-];
-
-$sourceType = $sourceTypeMap[$paymentMethod] ?? 'card';
-
 $payload = [
-    "data" => [
-        "attributes" => [
-            "amount"      => $amountCents,
-            "currency"    => "PHP",
-            "description" => "Pastry Order #" . $orderId,
-            "remarks"     => "Pastry Shop Order",
-            "source" => [
-                "type" => $sourceType
-            ]
-        ]
-    ]
+    "amount" => $amountCents,
+    "currency" => "PHP",
+    "description" => "Pastry Order #" . $orderId,
+    "remarks" => "Pastry Shop Order",
 ];
 
 // ─── CALL PAYMONGO API ────────────────────────────────────────────────────────
 $ch = curl_init();
-curl_setopt($ch, CURLOPT_URL,            "https://api.paymongo.com/v1/links");
+curl_setopt($ch, CURLOPT_URL,            "https://api.paymongo.com/v1/payment_links");
 curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
 curl_setopt($ch, CURLOPT_POST,           true);
 curl_setopt($ch, CURLOPT_TIMEOUT,        15); // FIX: add timeout so it doesn't hang forever

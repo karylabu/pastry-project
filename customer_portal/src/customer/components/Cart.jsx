@@ -1,7 +1,7 @@
 import React from 'react';
 import { X, Trash2, ShoppingBag, Plus, Minus } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { BASE } from '../../services/config';
+import { CUSTOMER_BASE } from '../../services/config';
 
 export default function Cart({
   isOpen,
@@ -127,6 +127,7 @@ export default function Cart({
                         <div className="w-20 h-20 rounded-2xl bg-gray-50 overflow-hidden flex items-center justify-center p-2 flex-shrink-0">
                           <img
                             src={`${BASE}/uploads/${item?.image || ''}`}
+                                                        src={`${CUSTOMER_BASE}/uploads/${item?.image || ''}`}
                             alt={item?.name || 'Product'}
                             className="w-full h-full object-contain"
                             onError={(e) => { e.target.src = 'https://via.placeholder.com/150?text=Item'; }}

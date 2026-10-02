@@ -389,6 +389,7 @@ function buildDetailedForecastPayload(array $history, array $products, array $in
         }
 
         $recommendedProduction = max(0, round($totalForecast - (float) ($catalogue['stock'] ?? 0), 2));
+        $recommendedPreorderQuantity = max(0, (int) ceil($totalForecast - max(0, (float) ($catalogue['stock'] ?? 0))));
         $priority = $recommendedProduction > max(1, (float) ($catalogue['stock'] ?? 0)) ? 'High' : ($recommendedProduction > 0 ? 'Medium' : 'Low');
         if ($recommendedProduction > 0) $actions[] = ['type' => 'production', 'product' => $productName, 'message' => "Increase {$productName} production by {$recommendedProduction} units.", 'priority' => $priority];
         $forecastProducts[] = [
@@ -396,6 +397,7 @@ function buildDetailedForecastPayload(array $history, array $products, array $in
             'forecast' => $forecastSeries, 'totalForecast' => $totalForecast, 'trend' => round($trend, 2),
             'trendPercent' => $previousEquivalent > 0 ? round((($totalForecast - $previousEquivalent) / $previousEquivalent) * 100, 2) : null,
             'currentStock' => (float) ($catalogue['stock'] ?? 0), 'recommendedProduction' => $recommendedProduction,
+            'recommendedPreorderQuantity' => $recommendedPreorderQuantity,
             'priority' => $priority, 'ingredients' => $ingredientRows, 'history' => array_values($daily),
         ];
     }
@@ -432,7 +434,6 @@ function persistForecastData(mysqli $conn, array $history, array $forecastPayloa
         return;
     }
 
-    mysqli_query($conn, "DELETE FROM analytics_sales_history");
     mysqli_query($conn, "DELETE FROM analytics_forecasts");
     mysqli_query($conn, "DELETE FROM analytics_reorder_logs");
     mysqli_query($conn, "DELETE FROM analytics_procurement_alerts");
@@ -441,20 +442,24 @@ function persistForecastData(mysqli $conn, array $history, array $forecastPayloa
         mysqli_query($conn, "UPDATE analytics_imports SET rows_processed = " . count($history) . " WHERE id = $importId");
     }
 
-    $stmtHistory = mysqli_prepare($conn, "INSERT INTO analytics_sales_history (import_id, product_name, sale_date, units_sold) VALUES (?, ?, ?, ?)");
+    $stmtHistory = $importId > 0
+        ? mysqli_prepare($conn, "INSERT INTO analytics_sales_history (import_id, product_name, sale_date, units_sold) VALUES (?, ?, ?, ?)")
+        : null;
     $stmtForecast = mysqli_prepare($conn, "INSERT INTO analytics_forecasts (product_name, forecast_date, predicted_units, confidence_score) VALUES (?, ?, ?, ?)");
     $stmtReorder = mysqli_prepare($conn, "INSERT INTO analytics_reorder_logs (product_name, ingredient_name, recommended_qty, status) VALUES (?, ?, ?, ?)");
     $stmtAlert = mysqli_prepare($conn, "INSERT INTO analytics_procurement_alerts (product_name, ingredient_name, severity, message) VALUES (?, ?, ?, ?)");
 
-    foreach ($history as $entry) {
-        $product = normalizeProductName($entry['product'] ?? '');
-        $date = $entry['date'] ?? '';
-        $qty = (float) ($entry['quantity'] ?? 0);
-        if (!$product || !$date) {
-            continue;
+    if ($stmtHistory) {
+        foreach ($history as $entry) {
+            $product = normalizeProductName($entry['product'] ?? '');
+            $date = $entry['date'] ?? '';
+            $qty = (float) ($entry['quantity'] ?? 0);
+            if (!$product || !$date) {
+                continue;
+            }
+            mysqli_stmt_bind_param($stmtHistory, 'issd', $importId, $product, $date, $qty);
+            mysqli_stmt_execute($stmtHistory);
         }
-        mysqli_stmt_bind_param($stmtHistory, 'issd', $importId, $product, $date, $qty);
-        mysqli_stmt_execute($stmtHistory);
     }
 
     foreach ($forecastPayload['products'] ?? [] as $productData) {

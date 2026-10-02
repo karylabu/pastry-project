@@ -491,8 +491,8 @@ required></textarea>
 Cash on Delivery
 </option>
 
-<option value="GCash">
-GCash
+<option value="QRPh">
+QRPh
 </option>
 
 <option value="PayMaya">

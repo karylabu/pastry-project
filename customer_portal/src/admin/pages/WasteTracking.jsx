@@ -1,6 +1,6 @@
 import React from "react";
-import StaffWasteTracking from "../../staff/pages/WasteTracking";
+import StaffWasteTracking from "../operations/pages/WasteTracking";
 
 export default function WasteTracking() {
-  return <StaffWasteTracking showNavbar={false} />;
+  return <StaffWasteTracking />;
 }
