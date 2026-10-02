@@ -74,6 +74,8 @@ Route::get('/find_config.php', [CustomerController::class, 'findConfig']);
 
 Route::any('/api_products.php', [CustomerApiController::class, 'products'])
     ->withoutMiddleware([Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
+Route::any('/api/login', [CustomerApiController::class, 'login'])
+    ->withoutMiddleware([Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
 Route::any('/api_login.php', [CustomerApiController::class, 'login'])
     ->withoutMiddleware([Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
 Route::any('/api_forgot_password.php', [CustomerApiController::class, 'forgotPassword'])

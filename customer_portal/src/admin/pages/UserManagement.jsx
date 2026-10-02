@@ -1,26 +1,23 @@
 import React, { useEffect, useState } from "react";
-import { Eye, Loader2, Pencil, Plus, Search, ShieldCheck, Trash2, UserPlus } from "lucide-react";
+import { ChevronLeft, ChevronRight, Eye, Loader2, Pencil, Plus, Search, ShieldCheck, Trash2, UserPlus } from "lucide-react";
 import { LARAVEL_BASE } from "../../services/config";
 import { getAuthHeaders } from "../../services/api";
 import { useAdminUsers } from "../hooks/useAdminUsers";
 
 const roleStyles = {
-  admin: "bg-[#1f1f1f] text-[#f1d06a]",
-  customer: "bg-[#f2f2ef] text-[#57524c]",
+  admin: "border border-[#f0dfa4] bg-[#fff4cd] text-[#80600a]",
+  customer: "border border-[#e9e1d9] bg-[#f7f4ef] text-[#65574d]",
 };
 
 function MetricCard({ label, value, tone }) {
-  const toneClasses =
-    tone === "accent"
-      ? "bg-[#1f1f1f] text-white"
-      : "border border-black/10 bg-white text-black";
+  const accent = tone === "accent" ? "border-t-[#c87954]" : "border-t-[#d4af37]";
 
   return (
-    <div className={`rounded-[20px] p-3.5 shadow-[0_10px_30px_rgba(0,0,0,0.04)] ${toneClasses}`}>
-      <p className={`text-[9px] font-semibold uppercase tracking-[0.26em] ${tone === "accent" ? "text-[#f1d06a]" : "text-black/55"}`}>
+    <div className={`rounded-lg border border-[#e9e1d9] border-t-[3px] ${accent} bg-white px-4 py-3.5 shadow-[0_3px_12px_rgba(60,42,28,0.035)]`}>
+      <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#74675f]">
         {label}
       </p>
-      <p className="mt-2 text-[20px] font-semibold tracking-tight">{value}</p>
+      <p className="mt-2 text-[25px] font-bold leading-none text-[#33251e]">{value}</p>
     </div>
   );
 }
@@ -28,7 +25,7 @@ function MetricCard({ label, value, tone }) {
 function RoleBadge({ role }) {
   const normalizedRole = String(role || "customer").toLowerCase();
   return (
-    <span className={`rounded-full px-2.5 py-1 text-[10px] font-semibold capitalize ${roleStyles[normalizedRole] || roleStyles.customer}`}>
+    <span className={`inline-flex rounded-md px-2 py-1 text-[10px] font-semibold capitalize ${roleStyles[normalizedRole] || roleStyles.customer}`}>
       {normalizedRole}
     </span>
   );
@@ -40,14 +37,15 @@ function StatusToggle({ checked, onChange, disabled = false }) {
       type="button"
       onClick={onChange}
       disabled={disabled}
-      className={`inline-flex items-center gap-2 ${disabled ? "opacity-70" : "cursor-pointer"}`}
+      className={`inline-flex items-center gap-2 ${disabled ? "cursor-wait opacity-70" : "cursor-pointer"}`}
       role="switch"
       aria-checked={checked}
+      aria-label={`Account ${checked ? "active" : "inactive"}`}
     >
-      <span className={`relative inline-flex h-6 w-11 items-center rounded-full transition ${checked ? "bg-[#1f1f1f]" : "bg-[#ddd5c7]"}`}>
-        <span className={`inline-block h-5 w-5 rounded-full bg-white shadow-sm transition ${checked ? "translate-x-5" : "translate-x-1"}`} />
+      <span className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition ${checked ? "bg-[#81906c]" : "bg-[#c8c0b6]"}`}>
+        <span className={`inline-block h-4 w-4 rounded-full bg-white shadow-sm transition ${checked ? "translate-x-4" : "translate-x-0.5"}`} />
       </span>
-      <span className={`text-[12px] font-medium capitalize ${checked ? "text-black" : "text-black/60"}`}>{checked ? "active" : "inactive"}</span>
+      <span className={`text-[11px] font-medium capitalize ${checked ? "text-[#61734f]" : "text-[#8f8076]"}`}>{checked ? "active" : "inactive"}</span>
     </button>
   );
 }
@@ -65,6 +63,7 @@ const initialForm = {
 export default function UserManagement() {
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
+  const [page, setPage] = useState(1);
   const [selectedUser, setSelectedUser] = useState(null);
   const [viewingUser, setViewingUser] = useState(null);
   const [loadingViewedUser, setLoadingViewedUser] = useState(false);
@@ -78,11 +77,22 @@ export default function UserManagement() {
   const [formErrors, setFormErrors] = useState({});
   const [form, setForm] = useState(initialForm);
 
-  const { users, loading, error, metrics, handleStatusToggle, refetch } = useAdminUsers({
+  const { users, pagination, loading, error, metrics, handleStatusToggle, refetch } = useAdminUsers({
     search,
     role: roleFilter,
-    page: 1,
+    page,
   });
+
+  const currentPage = Number(pagination?.current_page || page);
+  const lastPage = Math.max(1, Number(pagination?.last_page || 1));
+  const perPage = Number(pagination?.per_page || 10);
+  const totalRecords = Number(pagination?.total ?? users.length);
+  const firstRecord = totalRecords ? (currentPage - 1) * perPage + 1 : 0;
+  const lastRecord = Math.min(currentPage * perPage, totalRecords);
+
+  useEffect(() => {
+    if (pagination && page > lastPage) setPage(lastPage);
+  }, [lastPage, page, pagination]);
 
   useEffect(() => {
     if (!notice.message) return;
@@ -343,135 +353,137 @@ export default function UserManagement() {
   };
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-[#fbfaf5] font-['DM_Sans'] text-[#33251e]">
       <div className="pt-[72px] lg:pl-[260px]">
-        <div className="mx-auto max-w-[1400px] px-6 py-6 md:px-10">
-          <section className="mb-5 rounded-[20px] border border-black/10 bg-white p-5 shadow-sm sm:p-6">
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-              <div className="max-w-2xl">
-                <p className="text-[9px] font-bold uppercase tracking-[0.32em] text-[#D4AF37]">Admin Workspace</p>
-                <h1 className="mt-2 text-[22px] font-semibold tracking-tight text-black sm:text-[24px]">User Management</h1>
-                <p className="mt-2 text-[13px] leading-5 text-black/65">
-                  Manage system permissions, active staff accounts, and customer access profiles from one polished console.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  resetForm();
-                  setSelectedUser(null);
-                  setIsModalOpen(true);
-                }}
-                className="inline-flex items-center justify-center gap-2 rounded-full bg-black px-3.5 py-2 text-[12px] font-semibold text-white transition hover:bg-black/90"
-              >
-                <Plus size={16} />
-                Add New User
-              </button>
+        <div className="mx-auto max-w-[1400px] px-4 py-5 sm:px-6 md:px-8 lg:px-10 lg:py-7">
+          <div className="mb-5 flex flex-col gap-4 border-b border-[#e8dfd4] pb-5 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.24em] text-[#92701e]">Access control</p>
+              <h1 className="text-[26px] font-bold leading-tight text-[#33251e] sm:text-[30px]">User Management</h1>
+              <p className="mt-1.5 text-[13px] text-[#74675f]">Manage account access, roles, and status.</p>
             </div>
+            <button
+              type="button"
+              onClick={() => {
+                resetForm();
+                setSelectedUser(null);
+                setIsModalOpen(true);
+              }}
+              className="inline-flex h-10 items-center justify-center gap-2 self-start rounded-lg bg-[#33251e] px-4 text-[12px] font-semibold text-white transition hover:bg-[#5b4540] sm:self-auto"
+            >
+              <Plus size={15} />
+              Add user
+            </button>
+          </div>
 
-            <div className="mt-6 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-              {metrics.map((item) => (
-                <MetricCard key={item.label} label={item.label} value={item.value} tone={item.tone} />
-              ))}
-            </div>
+          <section className="mb-5 grid gap-2.5 sm:grid-cols-2 xl:grid-cols-4">
+            {metrics.map((item) => (
+              <MetricCard key={item.label} label={item.label} value={item.value} tone={item.tone} />
+            ))}
           </section>
 
-          <section className="mb-5 rounded-[18px] border border-black/10 bg-white p-3 shadow-sm">
-            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-              <div className="flex flex-1 items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-2.5 focus-within:border-slate-400 focus-within:ring-2 focus-within:ring-slate-100">
-                <Search size={16} className="text-black/45" />
+          <section className="mb-4 rounded-lg border border-[#e9e1d9] bg-white p-3 shadow-[0_3px_12px_rgba(60,42,28,0.035)] sm:p-4">
+            <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_220px]">
+              <label className="relative block">
+                <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#9b8c83]" aria-hidden="true" />
                 <input
                   value={search}
-                  onChange={(event) => setSearch(event.target.value)}
+                  onChange={(event) => {
+                    setSearch(event.target.value);
+                    setPage(1);
+                  }}
                   placeholder="Search by name or email"
-                  className="w-full bg-transparent text-[13px] text-black outline-none placeholder:text-black/40"
+                  aria-label="Search users by name or email"
+                  className="h-10 w-full rounded-lg border border-[#e8dfd4] bg-white pl-9 pr-3 text-[12px] text-[#33251e] outline-none transition placeholder:text-[#a99a8e] focus:border-[#b89646] focus:ring-2 focus:ring-[#d4af37]/15"
                 />
-              </div>
-              <div className="flex flex-col gap-2 sm:flex-row">
-                <select
-                  value={roleFilter}
-                  onChange={(event) => setRoleFilter(event.target.value)}
-                  className="rounded-full border border-black/10 bg-white px-3 py-2 text-[13px] text-black outline-none"
-                >
-                  <option value="all">Filter by Role</option>
-                  <option value="admin">Admin</option>
-                  <option value="customer">Customer</option>
-                </select>
-              </div>
+              </label>
+              <select
+                value={roleFilter}
+                onChange={(event) => {
+                  setRoleFilter(event.target.value);
+                  setPage(1);
+                }}
+                aria-label="Filter users by role"
+                className="h-10 rounded-lg border border-[#e8dfd4] bg-white px-3 text-[12px] text-[#33251e] outline-none transition focus:border-[#b89646] focus:ring-2 focus:ring-[#d4af37]/15"
+              >
+                <option value="all">All roles</option>
+                <option value="admin">Admin</option>
+                <option value="customer">Customer</option>
+              </select>
             </div>
           </section>
 
-          <section className="overflow-hidden rounded-[20px] border border-black/10 bg-white shadow-[0_10px_36px_rgba(0,0,0,0.05)]">
+          <section className="overflow-hidden rounded-lg border border-[#e9e1d9] bg-white shadow-[0_3px_12px_rgba(60,42,28,0.035)]">
             {notice.message ? (
-              <div className={`border-b border-black/10 px-5 py-3 text-[12px] ${notice.type === "success" ? "bg-[#f7fdf7] text-[#25633d]" : "bg-[#fff4f4] text-[#8b2e2e]"}`}>
+              <div role="status" className={`border-b px-4 py-3 text-[12px] sm:px-5 ${notice.type === "success" ? "border-[#d8e7d5] bg-[#edf5eb] text-[#4f7654]" : "border-[#efd8d4] bg-[#fff0f0] text-[#8d5357]"}`}>
                 {notice.message}
               </div>
             ) : null}
             {error ? (
-              <div className="border-b border-black/10 bg-[#fff4f4] px-5 py-3 text-[12px] text-[#8b2e2e]">
+              <div role="alert" className="border-b border-[#efd8d4] bg-[#fff0f0] px-4 py-3 text-[12px] text-[#8d5357] sm:px-5">
                 {error}
               </div>
             ) : null}
 
-            <div className="flex flex-col gap-3 border-b border-black/10 px-5 py-3.5 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-col gap-2 border-b border-[#f0e9e2] px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
               <div>
-                <h2 className="text-[15px] font-semibold text-black">Account Directory</h2>
-                <p className="text-[12px] text-black/60">{users.length} records found</p>
+                <h2 className="text-[13px] font-semibold text-[#33251e]">Account directory</h2>
+                <p className="mt-0.5 text-[11px] text-[#8f8076]">{totalRecords.toLocaleString()} total accounts</p>
               </div>
-              <div className="inline-flex items-center gap-2 rounded-full bg-slate-50 px-3 py-1.5 text-[12px] text-slate-600">
-                <ShieldCheck size={16} />
-                Secure access control
+              <div className="inline-flex items-center gap-2 text-[11px] text-[#74675f]">
+                <ShieldCheck size={15} className="text-[#9b7810]" />
+                Role-based access
               </div>
             </div>
 
             <div className="overflow-x-auto">
-              <table className="min-w-full text-left text-[13px]">
+              <table className="min-w-[680px] w-full text-left text-[12px]">
                 <thead>
-                  <tr className="border-b border-black/10 bg-slate-50 text-[11px] uppercase tracking-[0.24em] text-black/50">
-                    <th className="px-5 py-3 font-semibold">User</th>
-                    <th className="px-5 py-3 font-semibold">Role</th>
-                    <th className="px-5 py-3 font-semibold">Status</th>
-                    <th className="px-5 py-3 font-semibold">Actions</th>
+                  <tr className="border-b border-[#f0e9e2] bg-[#fbf7f2] text-[9px] uppercase tracking-[0.14em] text-[#9b8c83]">
+                    <th className="px-4 py-3 font-semibold sm:px-5">User</th>
+                    <th className="px-4 py-3 font-semibold sm:px-5">Role</th>
+                    <th className="px-4 py-3 font-semibold sm:px-5">Status</th>
+                    <th className="px-4 py-3 font-semibold sm:px-5">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {loading ? (
                     <tr>
-                      <td colSpan="4" className="px-6 py-10 text-center text-black/60">
+                      <td colSpan="4" className="px-6 py-10 text-center text-[12px] text-[#74675f]" role="status">
                         <div className="flex items-center justify-center gap-2">
-                          <Loader2 size={16} className="animate-spin" />
-                          Loading users…
+                          <Loader2 size={15} className="animate-spin text-[#92701e]" />
+                          Loading users...
                         </div>
                       </td>
                     </tr>
                   ) : users.length === 0 ? (
                     <tr>
-                      <td colSpan="4" className="px-5 py-10 text-center text-[12px] text-black/60">
+                      <td colSpan="4" className="px-5 py-12 text-center text-[12px] text-[#74675f]">
                         No users found for the current search or filter.
                       </td>
                     </tr>
                   ) : (
                     users.map((user) => (
-                      <tr key={user.id} className="border-b border-black/10 transition-colors duration-200 last:border-0 hover:bg-[#faf7ef]">
-                        <td className="px-5 py-4">
-                          <div className="font-medium text-black">{user.name}</div>
-                          <div className="mt-1 text-[12px] text-black/50">{user.email}</div>
+                      <tr key={user.id} className="border-b border-[#f0e9e2] last:border-0 hover:bg-[#fffaf0]">
+                        <td className="px-4 py-3.5 sm:px-5">
+                          <div className="font-semibold text-[#33251e]">{user.name}</div>
+                          <div className="mt-0.5 text-[11px] text-[#8f8076]">{user.email}</div>
                         </td>
-                        <td className="px-5 py-4">
+                        <td className="px-4 py-3.5 sm:px-5">
                           <RoleBadge role={user.role} />
                         </td>
-                        <td className="px-5 py-4">
+                        <td className="px-4 py-3.5 sm:px-5">
                           <StatusToggle checked={String(user.status || "").toLowerCase() === "active"} onChange={() => handleQuickStatusToggle(user)} disabled={updatingStatusId === user.id} />
                         </td>
-                        <td className="px-5 py-4">
-                          <div className="flex items-center gap-2">
-                            <button type="button" onClick={() => openEditModal(user)} className="rounded-full p-2 text-black/70 transition hover:bg-black/5 hover:text-black" aria-label="Edit user">
+                        <td className="px-4 py-3.5 sm:px-5">
+                          <div className="flex items-center gap-1.5">
+                            <button type="button" onClick={() => openEditModal(user)} className="rounded-md p-2 text-[#74675f] transition hover:bg-[#fff4cd] hover:text-[#80600a]" aria-label={`Edit ${user.name}`} title="Edit user">
                               <Pencil size={16} />
                             </button>
-                            <button type="button" onClick={() => handleViewUser(user)} disabled={loadingViewedUser} className="rounded-full p-2 text-black/70 transition hover:bg-black/5 hover:text-black disabled:opacity-60" aria-label="View user">
+                            <button type="button" onClick={() => handleViewUser(user)} disabled={loadingViewedUser} className="rounded-md p-2 text-[#74675f] transition hover:bg-[#fff4cd] hover:text-[#80600a] disabled:opacity-60" aria-label={`View ${user.name}`} title="View user">
                               <Eye size={16} />
                             </button>
-                            <button type="button" onClick={() => confirmDeleteUser(user)} disabled={deletingUserId === user.id} className="rounded-full p-2 text-black/70 transition hover:bg-black/5 hover:text-black disabled:cursor-not-allowed disabled:opacity-60" aria-label="Delete user">
+                            <button type="button" onClick={() => confirmDeleteUser(user)} disabled={deletingUserId === user.id} className="rounded-md p-2 text-[#8d5357] transition hover:bg-[#fff0f0] disabled:cursor-not-allowed disabled:opacity-60" aria-label={`Delete ${user.name}`} title="Delete user">
                               {deletingUserId === user.id ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
                             </button>
                           </div>
@@ -482,43 +494,72 @@ export default function UserManagement() {
                 </tbody>
               </table>
             </div>
+            {lastPage > 1 ? (
+              <div className="flex flex-col gap-3 border-t border-[#f0e9e2] bg-[#fcfaf7] px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+                <p className="text-[11px] text-[#8f8076]" aria-live="polite">
+                  Showing {firstRecord}–{lastRecord} of {totalRecords.toLocaleString()} users · Page {currentPage} of {lastPage}
+                </p>
+                <div className="flex gap-2 self-end sm:self-auto">
+                  <button
+                    type="button"
+                    onClick={() => setPage((current) => Math.max(1, current - 1))}
+                    disabled={currentPage <= 1 || loading}
+                    aria-label="Previous users page"
+                    title="Previous page"
+                    className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-[#e8dfd4] bg-white text-[#5f514a] transition hover:border-[#c9a94f] hover:bg-[#fffaf0] disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    <ChevronLeft size={17} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPage((current) => Math.min(lastPage, current + 1))}
+                    disabled={currentPage >= lastPage || loading}
+                    aria-label="Next users page"
+                    title="Next page"
+                    className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-[#e8dfd4] bg-white text-[#5f514a] transition hover:border-[#c9a94f] hover:bg-[#fffaf0] disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    <ChevronRight size={17} />
+                  </button>
+                </div>
+              </div>
+            ) : null}
           </section>
         </div>
       </div>
 
       {viewingUser && (
-        <div className="fixed inset-0 z-[55] flex items-center justify-center bg-black/40 px-4" onClick={() => { setViewingUser(null); setViewUserError(""); }}>
-          <section className="w-full max-w-md rounded-[20px] border border-black/10 bg-white p-6 shadow-xl" role="dialog" aria-modal="true" aria-labelledby="view-user-title" onClick={(event) => event.stopPropagation()}>
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/40 px-4" onClick={() => { setViewingUser(null); setViewUserError(""); }}>
+          <section className="w-full max-w-md rounded-lg border border-[#e9e1d9] bg-white p-5 shadow-xl" role="dialog" aria-modal="true" aria-labelledby="view-user-title" onClick={(event) => event.stopPropagation()}>
             <div className="flex items-start justify-between gap-4">
               <div>
-                <p className="text-[9px] font-bold uppercase tracking-[0.25em] text-[#9b7810]">Account Details</p>
-                <h2 id="view-user-title" className="mt-1 text-[18px] font-semibold text-black">{loadingViewedUser ? "Loading account..." : viewingUser.name}</h2>
+                <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#92701e]">Account details</p>
+                <h2 id="view-user-title" className="mt-1 text-[18px] font-semibold text-[#33251e]">{loadingViewedUser ? "Loading account..." : viewingUser.name}</h2>
               </div>
-              <button type="button" onClick={() => { setViewingUser(null); setViewUserError(""); }} className="rounded-md px-2 py-1 text-[12px] text-black/60 hover:bg-black/5">Close</button>
+              <button type="button" onClick={() => { setViewingUser(null); setViewUserError(""); }} className="rounded-md border border-[#e8dfd4] px-3 py-2 text-[11px] font-medium text-[#65574d] transition hover:bg-[#fbf7f2]">Close</button>
             </div>
-            {viewUserError ? <p role="status" className="mt-3 text-[11px] text-[#8b2e2e]">{viewUserError} Showing the available directory record.</p> : null}
-            <dl className="mt-5 space-y-3 text-[12px]">
-              <div className="flex justify-between gap-4 border-b border-black/5 pb-2"><dt className="text-black/55">Email</dt><dd className="break-all text-right font-medium text-black">{viewingUser.email || "Not provided"}</dd></div>
-              <div className="flex justify-between gap-4 border-b border-black/5 pb-2"><dt className="text-black/55">Phone</dt><dd className="text-right font-medium text-black">{viewingUser.phone_number || viewingUser.phone || "Not provided"}</dd></div>
-              <div className="flex justify-between gap-4 border-b border-black/5 pb-2"><dt className="text-black/55">Role</dt><dd className="capitalize font-medium text-black">{viewingUser.role || "customer"}</dd></div>
-              <div className="flex justify-between gap-4 border-b border-black/5 pb-2"><dt className="text-black/55">Status</dt><dd className="capitalize font-medium text-black">{viewingUser.status || "active"}</dd></div>
-              <div className="flex justify-between gap-4"><dt className="text-black/55">Joined</dt><dd className="text-right font-medium text-black">{viewingUser.created_at ? new Date(viewingUser.created_at).toLocaleDateString() : "Not available"}</dd></div>
+            {viewUserError ? <p role="status" className="mt-3 rounded-md border border-[#efd8d4] bg-[#fff0f0] px-3 py-2 text-[11px] text-[#8d5357]">{viewUserError} Showing the available directory record.</p> : null}
+            <dl className="mt-5 divide-y divide-[#f0e9e2] text-[12px]">
+              <div className="flex justify-between gap-4 py-3 first:pt-0"><dt className="text-[#8f8076]">Email</dt><dd className="break-all text-right font-medium text-[#33251e]">{viewingUser.email || "Not provided"}</dd></div>
+              <div className="flex justify-between gap-4 py-3"><dt className="text-[#8f8076]">Phone</dt><dd className="text-right font-medium text-[#33251e]">{viewingUser.phone_number || viewingUser.phone || "Not provided"}</dd></div>
+              <div className="flex justify-between gap-4 py-3"><dt className="text-[#8f8076]">Role</dt><dd className="capitalize font-medium text-[#33251e]">{viewingUser.role || "customer"}</dd></div>
+              <div className="flex justify-between gap-4 py-3"><dt className="text-[#8f8076]">Status</dt><dd className="capitalize font-medium text-[#33251e]">{viewingUser.status || "active"}</dd></div>
+              <div className="flex justify-between gap-4 py-3 last:pb-0"><dt className="text-[#8f8076]">Joined</dt><dd className="text-right font-medium text-[#33251e]">{viewingUser.created_at ? new Date(viewingUser.created_at).toLocaleDateString() : "Not available"}</dd></div>
             </dl>
           </section>
         </div>
       )}
 
       {confirmAction && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 px-4">
-          <div className="w-full max-w-md rounded-[24px] border border-black/10 bg-white p-6 shadow-xl">
-            <p className="text-[9px] font-bold uppercase tracking-[0.32em] text-[#D4AF37]">Confirm Action</p>
-            <h3 className="mt-2 text-[18px] font-semibold text-black">{confirmAction.title}</h3>
-            <p className="mt-2 text-[13px] leading-5 text-black/70">{confirmAction.message}</p>
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/40 px-4">
+          <div className="w-full max-w-md rounded-lg border border-[#e9e1d9] bg-white p-5 shadow-xl">
+            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#92701e]">Confirm action</p>
+            <h3 className="mt-2 text-[18px] font-semibold text-[#33251e]">{confirmAction.title}</h3>
+            <p className="mt-2 text-[13px] leading-5 text-[#74675f]">{confirmAction.message}</p>
             <div className="mt-6 flex justify-end gap-3">
-              <button type="button" onClick={() => setConfirmAction(null)} className="rounded-full border border-black/10 px-4 py-2 text-[12px] font-medium text-black/70">
+              <button type="button" onClick={() => setConfirmAction(null)} className="rounded-md border border-[#e8dfd4] px-4 py-2 text-[12px] font-medium text-[#65574d] transition hover:bg-[#fbf7f2]">
                 Cancel
               </button>
-              <button type="button" onClick={executeConfirmAction} className="rounded-full bg-black px-4 py-2 text-[12px] font-semibold text-white">
+              <button type="button" onClick={executeConfirmAction} className="rounded-md bg-[#33251e] px-4 py-2 text-[12px] font-semibold text-white transition hover:bg-[#5b4540]">
                 Confirm
               </button>
             </div>
@@ -527,14 +568,14 @@ export default function UserManagement() {
       )}
 
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-          <div className="w-full max-w-xl rounded-[24px] border border-black/10 bg-white p-6 shadow-xl">
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/40 px-4">
+          <div className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-lg border border-[#e9e1d9] bg-white p-5 shadow-xl sm:p-6">
             <div className="mb-5 flex items-start justify-between">
               <div>
-                <p className="text-[9px] font-bold uppercase tracking-[0.32em] text-[#D4AF37]">Create Account</p>
-                <h2 className="text-[18px] font-semibold text-black">{selectedUser ? "Edit User" : "Add New User"}</h2>
+                <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#92701e]">Account</p>
+                <h2 className="text-[18px] font-semibold text-[#33251e]">{selectedUser ? "Edit User" : "Add New User"}</h2>
               </div>
-              <button type="button" onClick={() => { setIsModalOpen(false); setSelectedUser(null); }} className="text-[12px] text-black/60">
+              <button type="button" onClick={() => { setIsModalOpen(false); setSelectedUser(null); }} className="rounded-md border border-[#e8dfd4] px-3 py-2 text-[11px] font-medium text-[#65574d] transition hover:bg-[#fbf7f2]">
                 Close
               </button>
             </div>
@@ -542,26 +583,26 @@ export default function UserManagement() {
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="grid gap-4 md:grid-cols-2">
                 <div>
-                  <label className="mb-1 block text-[12px] font-medium text-black">Name</label>
-                  <input value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} className="w-full rounded-full border border-black/10 px-3 py-2 text-[13px] outline-none" />
+                  <label className="mb-1.5 block text-[11px] font-medium text-[#65574d]">Name</label>
+                  <input value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} className="h-10 w-full rounded-md border border-[#e8dfd4] px-3 text-[12px] text-[#33251e] outline-none transition focus:border-[#b89646] focus:ring-2 focus:ring-[#d4af37]/15" />
                   {formErrors.name ? <p className="mt-1 text-[11px] text-[#8b2e2e]">{formErrors.name}</p> : null}
                 </div>
                 <div>
-                  <label className="mb-1 block text-[12px] font-medium text-black">Email</label>
-                  <input type="email" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} className="w-full rounded-full border border-black/10 px-3 py-2 text-[13px] outline-none" />
+                  <label className="mb-1.5 block text-[11px] font-medium text-[#65574d]">Email</label>
+                  <input type="email" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} className="h-10 w-full rounded-md border border-[#e8dfd4] px-3 text-[12px] text-[#33251e] outline-none transition focus:border-[#b89646] focus:ring-2 focus:ring-[#d4af37]/15" />
                   {formErrors.email ? <p className="mt-1 text-[11px] text-[#8b2e2e]">{formErrors.email}</p> : null}
                 </div>
               </div>
 
               <div className="grid gap-4 md:grid-cols-2">
                 <div>
-                  <label className="mb-1 block text-[12px] font-medium text-black">Phone</label>
-                  <input value={form.phone_number} onChange={(event) => setForm({ ...form, phone_number: event.target.value })} className="w-full rounded-full border border-black/10 px-3 py-2 text-[13px] outline-none" />
+                  <label className="mb-1.5 block text-[11px] font-medium text-[#65574d]">Phone</label>
+                  <input value={form.phone_number} onChange={(event) => setForm({ ...form, phone_number: event.target.value })} className="h-10 w-full rounded-md border border-[#e8dfd4] px-3 text-[12px] text-[#33251e] outline-none transition focus:border-[#b89646] focus:ring-2 focus:ring-[#d4af37]/15" />
                   {formErrors.phone_number ? <p className="mt-1 text-[11px] text-[#8b2e2e]">{formErrors.phone_number}</p> : null}
                 </div>
                 <div>
-                  <label className="mb-1 block text-[12px] font-medium text-black">Role</label>
-                  <select value={form.role} onChange={(event) => setForm({ ...form, role: event.target.value })} className="w-full rounded-full border border-black/10 px-3 py-2 text-[13px] outline-none">
+                  <label className="mb-1.5 block text-[11px] font-medium text-[#65574d]">Role</label>
+                  <select value={form.role} onChange={(event) => setForm({ ...form, role: event.target.value })} className="h-10 w-full rounded-md border border-[#e8dfd4] bg-white px-3 text-[12px] text-[#33251e] outline-none transition focus:border-[#b89646] focus:ring-2 focus:ring-[#d4af37]/15">
                     <option value="admin">Admin</option>
                     <option value="customer">Customer</option>
                   </select>
@@ -571,8 +612,8 @@ export default function UserManagement() {
 
               <div className="grid gap-4 md:grid-cols-2">
                 <div>
-                  <label className="mb-1 block text-[12px] font-medium text-black">Status</label>
-                  <select value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value })} className="w-full rounded-full border border-black/10 px-3 py-2 text-[13px] outline-none">
+                  <label className="mb-1.5 block text-[11px] font-medium text-[#65574d]">Status</label>
+                  <select value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value })} className="h-10 w-full rounded-md border border-[#e8dfd4] bg-white px-3 text-[12px] text-[#33251e] outline-none transition focus:border-[#b89646] focus:ring-2 focus:ring-[#d4af37]/15">
                     <option value="active">Active</option>
                     <option value="inactive">Inactive</option>
                     <option value="banned">Banned</option>
@@ -580,23 +621,23 @@ export default function UserManagement() {
                   {formErrors.status ? <p className="mt-1 text-[11px] text-[#8b2e2e]">{formErrors.status}</p> : null}
                 </div>
                 <div>
-                  <label className="mb-1 block text-[12px] font-medium text-black">Password</label>
-                  <input type="password" value={form.password} onChange={(event) => setForm({ ...form, password: event.target.value })} className="w-full rounded-full border border-black/10 px-3 py-2 text-[13px] outline-none" />
+                  <label className="mb-1.5 block text-[11px] font-medium text-[#65574d]">Password</label>
+                  <input type="password" value={form.password} onChange={(event) => setForm({ ...form, password: event.target.value })} className="h-10 w-full rounded-md border border-[#e8dfd4] px-3 text-[12px] text-[#33251e] outline-none transition focus:border-[#b89646] focus:ring-2 focus:ring-[#d4af37]/15" />
                   {formErrors.password ? <p className="mt-1 text-[11px] text-[#8b2e2e]">{formErrors.password}</p> : null}
                 </div>
               </div>
 
               <div>
-                <label className="mb-1 block text-[12px] font-medium text-black">Confirm Password</label>
-                <input type="password" value={form.password_confirmation} onChange={(event) => setForm({ ...form, password_confirmation: event.target.value })} className="w-full rounded-full border border-black/10 px-3 py-2 text-[13px] outline-none" />
+                <label className="mb-1.5 block text-[11px] font-medium text-[#65574d]">Confirm Password</label>
+                <input type="password" value={form.password_confirmation} onChange={(event) => setForm({ ...form, password_confirmation: event.target.value })} className="h-10 w-full rounded-md border border-[#e8dfd4] px-3 text-[12px] text-[#33251e] outline-none transition focus:border-[#b89646] focus:ring-2 focus:ring-[#d4af37]/15" />
                 {formErrors.password_confirmation ? <p className="mt-1 text-[11px] text-[#8b2e2e]">{formErrors.password_confirmation}</p> : null}
               </div>
 
               <div className="flex justify-end gap-3 pt-2">
-                <button type="button" onClick={() => { setIsModalOpen(false); setSelectedUser(null); }} className="rounded-full border border-black/10 px-4 py-2 text-[12px] font-medium text-black/70">
+                <button type="button" onClick={() => { setIsModalOpen(false); setSelectedUser(null); }} className="rounded-md border border-[#e8dfd4] px-4 py-2 text-[12px] font-medium text-[#65574d] transition hover:bg-[#fbf7f2]">
                   Cancel
                 </button>
-                <button type="submit" disabled={savingUser} className="inline-flex items-center gap-2 rounded-full bg-black px-4 py-2 text-[12px] font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60">
+                <button type="submit" disabled={savingUser} className="inline-flex items-center gap-2 rounded-md bg-[#33251e] px-4 py-2 text-[12px] font-semibold text-white transition hover:bg-[#5b4540] disabled:cursor-not-allowed disabled:opacity-60">
                   {savingUser ? <Loader2 size={16} className="animate-spin" /> : <UserPlus size={16} />}
                   {selectedUser ? "Save Changes" : "Create User"}
                 </button>

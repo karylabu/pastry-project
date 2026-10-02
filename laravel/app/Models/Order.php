@@ -18,6 +18,7 @@ class Order extends Model
         'delivery_fee',
         'total',
         'method',
+        'delivery_service',
         'delivery_date',
         'delivery_time',
         'payment',

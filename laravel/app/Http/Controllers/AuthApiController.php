@@ -149,6 +149,14 @@ class AuthApiController extends Controller
 
         $userData = $this->formatUserData($user);
 
+        if (session_status() === PHP_SESSION_NONE) {
+            session_start();
+        }
+        $_SESSION['user'] = $userData;
+        $_SESSION['auth_token'] = $token;
+        session(['user' => $userData]);
+        session(['auth_token' => $token]);
+
         $response = [
             'success' => true,
             'message' => 'Login successful',

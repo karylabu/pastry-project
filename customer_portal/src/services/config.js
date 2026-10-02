@@ -2,7 +2,16 @@
 const origin = typeof window !== "undefined" ? window.location.origin : "";
 
 export function resolveProjectBase(baseOrigin = origin, suffix = "") {
-  const projectPath = "/GitHub/pastry-project";
+  const detectedProjectPath = typeof window !== "undefined"
+    ? [
+        "/pastry-project",
+        "/GitHub/pastry-project",
+        "/GitHub/Capstone--Development",
+        "/GitHub/Capstone--Development - Copy"
+      ].find((path) => window.location.pathname === path || window.location.pathname.startsWith(`${path}/`))
+    : null;
+
+  const projectPath = detectedProjectPath || "/pastry-project";
   const normalizedBase = (baseOrigin || "http://localhost").replace(/\/$/, "");
   const normalizedSuffix = suffix ? `/${suffix.replace(/^\/+|\/+$/g, "")}` : "";
 
@@ -34,4 +43,4 @@ export const LARAVEL_BASE = process.env.REACT_APP_LARAVEL_BASE || (
 );
 // Customer APIs are routed through Laravel; legacy URL routes remain compatibility aliases.
 export const CUSTOMER_BASE = process.env.REACT_APP_CUSTOMER_BASE || LARAVEL_BASE;
-export const STAFF_BASE = process.env.REACT_APP_STAFF_BASE || `${LARAVEL_BASE}/staff`;
+export const STAFF_BASE = process.env.REACT_APP_STAFF_BASE || `${ROOT_BASE}/staff`;

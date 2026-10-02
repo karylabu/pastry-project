@@ -47,11 +47,8 @@ export default function CustomizedCakes() {
   const [pickupDate, setPickupDate] = useState('');
   const [pickupTime, setPickupTime] = useState('');
   const [deliveryMethod, setDeliveryMethod] = useState('Pickup');
+  const [deliveryService, setDeliveryService] = useState('');
   const [deliveryAddress, setDeliveryAddress] = useState('');
-  const [deliveryService, setDeliveryService] = useState('Lalamove');
-  const [riderName, setRiderName] = useState('');
-  const [riderContact, setRiderContact] = useState('');
-  const [riderBookingReference, setRiderBookingReference] = useState('');
   const [cakeType, setCakeType] = useState('single');
   const [singleSizeId, setSingleSizeId] = useState('');
   const [twoTierPreset, setTwoTierPreset] = useState('standard');
@@ -76,6 +73,39 @@ export default function CustomizedCakes() {
   const [showSavedAddressSuggestions, setShowSavedAddressSuggestions] = useState(false);
   const [flavorCatalog, setFlavorCatalog] = useState([]);
   const [sizeCatalog, setSizeCatalog] = useState([]);
+  const [masonryOffsets, setMasonryOffsets] = useState([0, 0, 0]);
+
+  useEffect(() => {
+    const form = document.getElementById('custom-cake-request-form');
+    if (!form) return undefined;
+
+    const breakpoint = window.matchMedia('(min-width: 1280px)');
+    const firstRowCards = [1, 2, 3].map((step) => form.querySelector(`[data-custom-card="${step}"]`));
+    if (firstRowCards.some((card) => !card)) return undefined;
+
+    const updateOffsets = () => {
+      const nextOffsets = breakpoint.matches
+        ? firstRowCards.map((card) => Math.min(0, Math.round(card.getBoundingClientRect().height - Math.max(...firstRowCards.map((rowCard) => rowCard.getBoundingClientRect().height)))))
+        : [0, 0, 0];
+
+      setMasonryOffsets((currentOffsets) => (
+        currentOffsets.every((offset, index) => offset === nextOffsets[index]) ? currentOffsets : nextOffsets
+      ));
+    };
+
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(updateOffsets);
+    firstRowCards.forEach((card) => observer?.observe(card));
+    window.addEventListener('resize', updateOffsets);
+    breakpoint.addEventListener('change', updateOffsets);
+    const frame = window.requestAnimationFrame(updateOffsets);
+
+    return () => {
+      observer?.disconnect();
+      window.cancelAnimationFrame(frame);
+      window.removeEventListener('resize', updateOffsets);
+      breakpoint.removeEventListener('change', updateOffsets);
+    };
+  }, []);
 
   useEffect(() => {
     const previews = files.map((file) => ({
@@ -315,6 +345,10 @@ export default function CustomizedCakes() {
       navigate('/customer/login');
       return;
     }
+    if (deliveryMethod === 'Delivery' && !deliveryService) {
+      setMessage('Choose Lalamove or GrabCar for delivery.');
+      return;
+    }
     setLoading(true);
     setMessage('');
     try {
@@ -342,9 +376,6 @@ export default function CustomizedCakes() {
         delivery_method: deliveryMethod,
         delivery_address: deliveryAddress,
         delivery_service: deliveryMethod === 'Delivery' ? deliveryService : '',
-        rider_name: deliveryMethod === 'Delivery' ? riderName : '',
-        rider_contact: deliveryMethod === 'Delivery' ? riderContact : '',
-        rider_booking_reference: deliveryMethod === 'Delivery' ? riderBookingReference : '',
         pickup_date: pickupDate,
         pickup_time: pickupTime,
         cake_type: cakeType === 'single' ? 'Single Tier' : selectedTwoTierPreset.label,
@@ -375,16 +406,13 @@ export default function CustomizedCakes() {
       laravelForm.append('tiers', JSON.stringify(payload.tiers));
       laravelForm.append('order_id', '');
       laravelForm.append('notes', orderNotes);
+      laravelForm.append('delivery_service', deliveryMethod === 'Delivery' ? deliveryService : '');
       laravelForm.append('reference_image', JSON.stringify(referenceImage ? {
         type: referenceImage.type,
         id: referenceImage.id,
         url: referenceImage.url,
         name: referenceImage.name,
       } : null));
-      laravelForm.append('delivery_service', deliveryService);
-      laravelForm.append('rider_name', riderName);
-      laravelForm.append('rider_contact', riderContact);
-      laravelForm.append('rider_booking_reference', riderBookingReference);
       files.forEach((file, index) => laravelForm.append('files[]', file, file.name || `file${index}`));
 
       const laravelRes = await fetch(`${LARAVEL_BASE}/api/customized-cakes/order`, {
@@ -415,10 +443,7 @@ export default function CustomizedCakes() {
       fd.append('pickup_time', pickupTime);
       fd.append('delivery_method', deliveryMethod);
       fd.append('delivery_address', deliveryAddress);
-      fd.append('delivery_service', deliveryService);
-      fd.append('rider_name', riderName);
-      fd.append('rider_contact', riderContact);
-      fd.append('rider_booking_reference', riderBookingReference);
+      fd.append('delivery_service', deliveryMethod === 'Delivery' ? deliveryService : '');
       fd.append('user_id', String(userId || 0));
       fd.append('cake_type', cakeType);
       fd.append('tiers', JSON.stringify(selectedTiers));
@@ -472,8 +497,8 @@ export default function CustomizedCakes() {
   };
 
   return (
-    <PageShell background="bg-[#fffaf3]" padding="px-4 md:px-7 lg:px-10 py-6" innerClassName="max-w-[1180px]">
-      <section className="relative mb-5 min-h-[230px] overflow-hidden rounded-[18px] border border-[#eadfd8] bg-[#fffaf0] shadow-[0_8px_22px_rgba(91,64,39,0.05)] sm:min-h-[260px]">
+    <PageShell background="bg-[#fffaf3]" padding="px-4 md:px-7 lg:px-10 py-4" innerClassName="max-w-[1180px]">
+      <section className="relative mb-4 min-h-[230px] overflow-hidden rounded-[18px] border border-[#eadfd8] bg-[#fffaf0] shadow-[0_8px_22px_rgba(91,64,39,0.05)] sm:min-h-[260px]">
         <div className="absolute inset-y-0 right-0 w-full sm:w-[56%]">
           <img src="/assets/customize/customize_1.jpg" alt="Floral custom cake" className="h-full w-full object-cover opacity-90" />
           <div className="absolute inset-0 bg-gradient-to-r from-[#fffaf0] via-[#fffaf0]/80 to-transparent" />
@@ -496,7 +521,7 @@ export default function CustomizedCakes() {
         </div>
       </section>
 
-      <div className="mb-8 grid grid-cols-2 gap-2 rounded-[18px] border border-[#eadfd8] bg-white p-2 shadow-[0_5px_18px_rgba(91,64,39,0.04)] sm:grid-cols-3 md:grid-cols-6 md:gap-3">
+      <div className="mb-5 grid grid-cols-2 gap-2 rounded-[18px] border border-[#eadfd8] bg-white p-2 shadow-[0_5px_18px_rgba(91,64,39,0.04)] sm:grid-cols-3 md:grid-cols-6 md:gap-3">
         {[
           ['Birthday', CakeSlice, '/customer/birthday-designs'],
           ['Cutesy', Sparkles, '/customer/cutesy-designs'],
@@ -517,8 +542,8 @@ export default function CustomizedCakes() {
         ))}
       </div>
 
-      <div className="mb-10">
-        <div className="mb-4 flex items-end justify-between px-1">
+      <div className="mb-6">
+        <div className="mb-3 flex items-end justify-between px-1">
           <div>
             <p className="text-[9px] font-black uppercase tracking-[0.28em] text-[#9b7b3d]">Featured designs</p>
             <h2 className="mt-1 font-serif text-2xl font-bold text-[#33251e]">Featured Designs</h2>
@@ -569,42 +594,105 @@ export default function CustomizedCakes() {
       <form
         id="custom-cake-request-form"
         onSubmit={handleSubmit}
-        className="rounded-[14px] border border-[#eadfd8] bg-white p-4 shadow-[0_8px_22px_rgba(91,64,39,0.05)] sm:p-5"
+        className="rounded-[14px] border border-[#eadfd8] bg-white p-3 shadow-[0_8px_22px_rgba(91,64,39,0.05)] sm:p-4"
       >
-        <div className="mb-4 border-b border-[#f0e6dc] pb-3">
+        <div className="mb-3 border-b border-[#f0e6dc] pb-2">
           <div>
             <p className="text-[9px] font-black uppercase tracking-[0.24em] text-[#9b7b3d]">Your custom order</p>
-            <h2 className="mt-1 font-serif text-2xl font-bold text-[#33251e]">Cake Customization Details</h2>
-            <p className="mt-1 text-[11px] text-[#8d7a6e]"><span className="font-bold text-red-600">*</span> Required information</p>
+            <h2 className="mt-1 font-serif text-xl font-bold text-[#33251e] sm:text-2xl">Cake Customization Details</h2>
+            <p className="mt-1 text-xs text-[#8d7a6e]"><span className="font-bold text-red-600">*</span> Required information</p>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1.05fr_1.05fr_0.9fr]">
-          <div className="space-y-4">
-            <div className="rounded-xl border border-[#f0e6dc] bg-[#fffdf9] p-4">
-              <p className="mb-3 flex items-center gap-2 text-[13px] font-bold text-[#6b4f1d]">
+        <div className="grid grid-cols-1 items-start gap-2 lg:grid-cols-2 xl:grid-cols-[1.05fr_1.05fr_0.9fr]">
+          <div className="flex flex-col gap-2 lg:contents">
+            <div data-custom-card="1" className="rounded-xl border border-[#f0e6dc] bg-[#fffdf9] p-3 lg:order-1 xl:order-1">
+              <p className="mb-3 flex items-center gap-2 text-sm font-bold text-[#6b4f1d]">
                 <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#fff3c8] text-[11px]">1</span>
                 Customer Information
               </p>
-              <div className="space-y-3">
-                <label className="block text-[11px] font-semibold text-[#6b4f1d]">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label className="block text-xs font-semibold text-[#6b4f1d]">
                   Full Name <span aria-hidden="true" className="text-red-600">*</span>
-                  <input required value={name} onChange={(event) => setName(event.target.value)} placeholder="Enter full name" className="mt-1 w-full rounded-lg border border-[#eadfd8] bg-white px-3 py-2.5 text-[13px] font-normal text-[#6b4f1d] outline-none transition focus:border-[#e5bd45] focus:ring-2 focus:ring-[#fff1bd]" />
+                  <input required value={name} onChange={(event) => setName(event.target.value)} placeholder="Enter full name" className="mt-1.5 min-h-11 w-full rounded-lg border border-[#eadfd8] bg-white px-3 py-2.5 text-sm font-normal text-[#33251e] outline-none transition placeholder:text-[#a99a8e] focus:border-[#c9972d] focus:ring-2 focus:ring-[#fff1bd]" />
                 </label>
-                <label className="block text-[11px] font-semibold text-[#6b4f1d]">
+                <label className="block text-xs font-semibold text-[#6b4f1d]">
                   Contact Number <span aria-hidden="true" className="text-red-600">*</span>
-                  <input required value={contactNumber} onChange={(event) => setContactNumber(event.target.value)} placeholder="Enter contact number" className="mt-1 w-full rounded-lg border border-[#eadfd8] bg-white px-3 py-2.5 text-[13px] font-normal text-[#6b4f1d] outline-none transition focus:border-[#e5bd45] focus:ring-2 focus:ring-[#fff1bd]" />
+                  <input required value={contactNumber} onChange={(event) => setContactNumber(event.target.value)} placeholder="Enter contact number" className="mt-1.5 min-h-11 w-full rounded-lg border border-[#eadfd8] bg-white px-3 py-2.5 text-sm font-normal text-[#33251e] outline-none transition placeholder:text-[#a99a8e] focus:border-[#c9972d] focus:ring-2 focus:ring-[#fff1bd]" />
                 </label>
-                <label className="block text-[11px] font-semibold text-[#6b4f1d]">
-                  Email Address
-                  <input value={email} onChange={(event) => setEmail(event.target.value)} placeholder="Enter email address" type="email" className="mt-1 w-full rounded-lg border border-[#eadfd8] bg-white px-3 py-2.5 text-[13px] font-normal text-[#6b4f1d] outline-none transition focus:border-[#e5bd45] focus:ring-2 focus:ring-[#fff1bd]" />
+                <label className="block text-xs font-semibold text-[#6b4f1d]">
+                  Email Address <span aria-hidden="true" className="text-red-600">*</span>
+                  <input required value={email} onChange={(event) => setEmail(event.target.value)} placeholder="Enter email address" type="email" className="mt-1.5 min-h-11 w-full rounded-lg border border-[#eadfd8] bg-white px-3 py-2.5 text-sm font-normal text-[#33251e] outline-none transition placeholder:text-[#a99a8e] focus:border-[#c9972d] focus:ring-2 focus:ring-[#fff1bd]" />
                 </label>
-                <label className="block text-[11px] font-semibold text-[#6b4f1d]">
-                  Address {deliveryMethod === 'Delivery' && <span aria-hidden="true" className="text-red-600">*</span>}
+              </div>
+            </div>
+
+            <div data-custom-card="2" className="rounded-xl border border-[#f0e6dc] bg-[#fffdf9] p-3 lg:order-2 xl:order-2">
+              <p className="mb-3 flex items-center gap-2 text-sm font-bold text-[#6b4f1d]">
+                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#fff3c8] text-[11px]">2</span>
+                Order Information
+              </p>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="grid grid-cols-2 gap-2 sm:col-span-2">
+                  {['Pickup', 'Delivery'].map((option) => (
+                    <button
+                      key={option}
+                      type="button"
+                      onClick={() => {
+                        setDeliveryMethod(option);
+                        if (option === 'Pickup') setDeliveryService('');
+                      }}
+                      aria-pressed={deliveryMethod === option}
+                      className={`min-h-11 rounded-xl border px-3 py-2 text-sm font-semibold transition ${
+                        deliveryMethod === option
+                          ? 'border-[#c9972d] bg-[#fff1bd] text-[#5f4715] shadow-sm'
+                          : 'border-[#eadfd8] bg-white text-[#5f514a] hover:border-[#d4af37] hover:bg-[#fffaf0]'
+                      }`}
+                    >
+                      {option}
+                    </button>
+                  ))}
+                </div>
+
+                {deliveryMethod === 'Delivery' && (
+                  <div className="space-y-3 sm:col-span-2">
+                    <div className="rounded-xl border border-[#e9d8ae] bg-[#fffaf0] px-3.5 py-3 text-sm text-[#6b4f1d]">
+                      <p className="font-semibold">You will book the delivery rider yourself.</p>
+                      <p className="mt-0.5 text-xs leading-5 text-[#8d7a6e]">Choose a service and arrange the booking directly.</p>
+                    </div>
+                    <div>
+                      <p className="mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-[#8f8076]">Delivery service <span className="text-red-600">*</span></p>
+                      <div className="grid grid-cols-2 gap-2" role="group" aria-label="Delivery service">
+                        {['Lalamove', 'GrabCar'].map((service) => (
+                          <button
+                            key={service}
+                            type="button"
+                            aria-pressed={deliveryService === service}
+                            onClick={() => setDeliveryService(service)}
+                            className={`min-h-11 rounded-xl border px-3 py-2 text-sm font-semibold transition ${deliveryService === service ? 'border-[#c9972d] bg-[#fff1bd] text-[#5f4715] shadow-sm' : 'border-[#eadfd8] bg-white text-[#5f514a] hover:border-[#d4af37] hover:bg-[#fffaf0]'}`}
+                          >
+                            {service}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                <label className="block text-xs font-semibold text-[#6b4f1d]">
+                  {deliveryMethod === 'Delivery' ? 'Delivery date' : 'Pickup date'} <span aria-hidden="true" className="text-red-600">*</span>
+                  <input required value={pickupDate} onChange={(event) => setPickupDate(event.target.value)} type="date" className="mt-1.5 min-h-11 w-full rounded-lg border border-[#eadfd8] bg-white px-3 py-2.5 text-sm text-[#33251e] outline-none transition focus:border-[#c9972d] focus:ring-2 focus:ring-[#fff1bd]" />
+                </label>
+                <label className="block text-xs font-semibold text-[#6b4f1d]">
+                  {deliveryMethod === 'Delivery' ? 'Delivery time' : 'Pickup time'} <span aria-hidden="true" className="text-red-600">*</span>
+                  <input required value={pickupTime} onChange={(event) => setPickupTime(event.target.value)} type="time" className="mt-1.5 min-h-11 w-full rounded-lg border border-[#eadfd8] bg-white px-3 py-2.5 text-sm text-[#33251e] outline-none transition focus:border-[#c9972d] focus:ring-2 focus:ring-[#fff1bd]" />
+                </label>
+                <label className="block text-xs font-semibold text-[#6b4f1d] sm:col-span-2">
+                  {deliveryMethod === 'Delivery' ? 'Delivery Address' : 'Address'} <span aria-hidden="true" className="text-red-600">*</span>
                   {addressesLoading && <span className="ml-1 font-normal text-[#8d7a6e]">Loading saved suggestions...</span>}
-                  <div className="relative mt-1">
+                  <div className="relative mt-1.5">
                     <textarea
-                      required={deliveryMethod === 'Delivery'}
+                      required
                       value={deliveryAddress}
                       onFocus={() => setShowSavedAddressSuggestions(savedAddresses.length > 0)}
                       onBlur={() => window.setTimeout(() => setShowSavedAddressSuggestions(false), 120)}
@@ -614,7 +702,7 @@ export default function CustomizedCakes() {
                       }}
                       placeholder="Type an address or choose a saved suggestion"
                       rows={2}
-                      className="w-full rounded-lg border border-[#eadfd8] bg-white px-3 py-2.5 text-[13px] font-normal text-[#6b4f1d] outline-none transition focus:border-[#e5bd45] focus:ring-2 focus:ring-[#fff1bd]"
+                      className="w-full rounded-lg border border-[#eadfd8] bg-white px-3 py-2.5 text-sm font-normal text-[#33251e] outline-none transition placeholder:text-[#a99a8e] focus:border-[#c9972d] focus:ring-2 focus:ring-[#fff1bd]"
                     />
                     {showSavedAddressSuggestions && savedAddresses.length > 0 && (
                       <div role="listbox" className="absolute left-0 right-0 top-full z-20 mt-1 max-h-52 overflow-y-auto rounded-lg border border-[#eadfd8] bg-white p-1 shadow-lg">
@@ -643,73 +731,11 @@ export default function CustomizedCakes() {
                 </label>
               </div>
             </div>
-
-            <div className="rounded-xl border border-[#f0e6dc] bg-[#fffdf9] p-4">
-              <p className="mb-3 flex items-center gap-2 text-[13px] font-bold text-[#6b4f1d]">
-                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#fff3c8] text-[11px]">2</span>
-                Order Information
-              </p>
-              <div className="space-y-3">
-                <div className="grid grid-cols-2 gap-3">
-                  {['Pickup', 'Delivery'].map((option) => (
-                    <button
-                      key={option}
-                      type="button"
-                      onClick={() => setDeliveryMethod(option)}
-                      className={`rounded-xl border px-3 py-2 text-sm font-semibold ${
-                        deliveryMethod === option
-                          ? 'border-[#e5bd45] bg-[#ffe89a] text-[#6b4f1d]'
-                          : 'border-[#f0d98a] bg-white text-[#6b4f1d] hover:border-[#e5bd45]'
-                      }`}
-                    >
-                      {option}
-                    </button>
-                  ))}
-                </div>
-
-                <label className="block text-[11px] font-semibold text-[#6b4f1d]">
-                  Pickup date <span aria-hidden="true" className="text-red-600">*</span>
-                  <input required value={pickupDate} onChange={(event) => setPickupDate(event.target.value)} type="date" className="mt-1 w-full rounded-lg border border-[#eadfd8] bg-white px-3 py-2.5 text-[13px] text-[#6b4f1d] outline-none transition focus:border-[#e5bd45] focus:ring-2 focus:ring-[#fff1bd]" />
-                </label>
-                <label className="block text-[11px] font-semibold text-[#6b4f1d]">
-                  Pickup time <span aria-hidden="true" className="text-red-600">*</span>
-                  <input required value={pickupTime} onChange={(event) => setPickupTime(event.target.value)} type="time" className="mt-1 w-full rounded-lg border border-[#eadfd8] bg-white px-3 py-2.5 text-[13px] text-[#6b4f1d] outline-none transition focus:border-[#e5bd45] focus:ring-2 focus:ring-[#fff1bd]" />
-                </label>
-
-                {deliveryMethod === 'Delivery' && (
-                  <div className="space-y-3 rounded-lg border border-[#f0e6dc] bg-[#fffaf0] p-3">
-                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                      <label className="text-[11px] font-semibold text-[#6b4f1d]">
-                        Rider service
-                        <select value={deliveryService} onChange={(event) => setDeliveryService(event.target.value)} className="mt-1 w-full rounded-lg border border-[#eadfd8] bg-white px-3 py-2 text-[12px] font-normal text-[#6b4f1d] outline-none focus:border-[#e5bd45]">
-                          <option value="Lalamove">Lalamove</option>
-                          <option value="GrabCar">GrabCar</option>
-                        </select>
-                      </label>
-                      <label className="text-[11px] font-semibold text-[#6b4f1d]">
-                        Rider name <span aria-hidden="true" className="text-red-600">*</span>
-                        <input required value={riderName} onChange={(event) => setRiderName(event.target.value)} placeholder="Enter rider name" className="mt-1 w-full rounded-lg border border-[#eadfd8] bg-white px-3 py-2 text-[12px] font-normal text-[#6b4f1d] outline-none focus:border-[#e5bd45]" />
-                      </label>
-                    </div>
-                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                      <label className="text-[11px] font-semibold text-[#6b4f1d]">
-                        Rider contact <span aria-hidden="true" className="text-red-600">*</span>
-                        <input required value={riderContact} onChange={(event) => setRiderContact(event.target.value)} placeholder="09XX XXX XXXX" className="mt-1 w-full rounded-lg border border-[#eadfd8] bg-white px-3 py-2 text-[12px] font-normal text-[#6b4f1d] outline-none focus:border-[#e5bd45]" />
-                      </label>
-                      <label className="text-[11px] font-semibold text-[#6b4f1d]">
-                        Booking/reference
-                        <input value={riderBookingReference} onChange={(event) => setRiderBookingReference(event.target.value)} placeholder="Optional" className="mt-1 w-full rounded-lg border border-[#eadfd8] bg-white px-3 py-2 text-[12px] font-normal text-[#6b4f1d] outline-none focus:border-[#e5bd45]" />
-                      </label>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
           </div>
 
-          <div className="space-y-4">
-            <div className="rounded-xl border border-[#f0e6dc] bg-[#fffdf9] p-4">
-              <p className="mb-3 flex items-center gap-2 text-[13px] font-bold text-[#6b4f1d]">
+          <div className="flex flex-col gap-2 lg:contents">
+            <div data-custom-card="3" className="rounded-xl border border-[#f0e6dc] bg-[#fffdf9] p-3 lg:order-3 xl:order-3">
+              <p className="mb-3 flex items-center gap-2 text-sm font-bold text-[#6b4f1d]">
                 <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#fff3c8] text-[11px]">3</span>
                 Cake Details
               </p>
@@ -720,10 +746,10 @@ export default function CustomizedCakes() {
                       key={value}
                       type="button"
                       onClick={() => setCakeType(value)}
-                      className={`rounded-xl border px-3 py-2 text-sm font-semibold ${
+                      className={`min-h-11 rounded-xl border px-3 py-2 text-sm font-semibold transition ${
                         cakeType === value
-                          ? 'border-[#e5bd45] bg-[#ffe89a] text-[#6b4f1d]'
-                          : 'border-[#f0d98a] bg-white text-[#6b4f1d] hover:border-[#e5bd45]'
+                          ? 'border-[#c9972d] bg-[#fff1bd] text-[#5f4715] shadow-sm'
+                          : 'border-[#eadfd8] bg-white text-[#5f514a] hover:border-[#d4af37] hover:bg-[#fffaf0]'
                       }`}
                     >
                       {value === 'single' ? 'Single Tier' : 'Two Tier'}
@@ -736,15 +762,15 @@ export default function CustomizedCakes() {
                     <p className="text-xs font-semibold text-[#7b5b3a]">Flavor</p>
                     <div className="grid grid-cols-3 gap-2">
                       {flavorCatalog.map((flavor) => (
-                        <button key={flavor.id} type="button" onClick={() => setFlavorId(String(flavor.id))} className={`rounded-xl border px-2 py-2 text-xs font-semibold ${flavorId === String(flavor.id) ? 'border-[#e5bd45] bg-[#ffe89a] text-[#6b4f1d]' : 'border-[#f0d98a] bg-white text-[#6b4f1d] hover:border-[#e5bd45]'}`}>
+                        <button key={flavor.id} type="button" onClick={() => setFlavorId(String(flavor.id))} aria-pressed={flavorId === String(flavor.id)} className={`min-h-10 rounded-xl border px-2 py-2 text-xs font-semibold transition ${flavorId === String(flavor.id) ? 'border-[#c9972d] bg-[#fff1bd] text-[#5f4715]' : 'border-[#eadfd8] bg-white text-[#5f514a] hover:border-[#d4af37] hover:bg-[#fffaf0]'}`}>
                           {flavor.name}
                         </button>
                       ))}
                     </div>
                     <p className="text-xs font-semibold text-[#7b5b3a]">Size</p>
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="grid grid-cols-3 gap-2">
                       {sizeCatalog.map((size) => (
-                        <button key={size.id} type="button" onClick={() => setSingleSizeId(String(size.id))} className={`rounded-xl border px-3 py-2 text-sm font-semibold ${singleSizeId === String(size.id) ? 'border-[#e5bd45] bg-[#ffe89a] text-[#6b4f1d]' : 'border-[#f0d98a] bg-white text-[#6b4f1d] hover:border-[#e5bd45]'}`}>
+                        <button key={size.id} type="button" onClick={() => setSingleSizeId(String(size.id))} aria-pressed={singleSizeId === String(size.id)} className={`min-h-10 rounded-xl border px-2 py-2 text-xs font-semibold transition ${singleSizeId === String(size.id) ? 'border-[#c9972d] bg-[#fff1bd] text-[#5f4715]' : 'border-[#eadfd8] bg-white text-[#5f514a] hover:border-[#d4af37] hover:bg-[#fffaf0]'}`}>
                           {size.label}
                         </button>
                       ))}
@@ -759,7 +785,8 @@ export default function CustomizedCakes() {
                           key={value}
                           type="button"
                           onClick={() => setTwoTierPreset(value)}
-                          className={`rounded-xl border px-3 py-3 text-left ${twoTierPreset === value ? 'border-[#e5bd45] bg-[#ffe89a] text-[#6b4f1d]' : 'border-[#f0d98a] bg-white text-[#6b4f1d] hover:border-[#e5bd45]'}`}
+                          aria-pressed={twoTierPreset === value}
+                          className={`min-h-16 rounded-xl border px-3 py-3 text-left transition ${twoTierPreset === value ? 'border-[#c9972d] bg-[#fff1bd] text-[#5f4715]' : 'border-[#eadfd8] bg-white text-[#5f514a] hover:border-[#d4af37] hover:bg-[#fffaf0]'}`}
                         >
                           <span className="block text-xs font-bold">{preset.label}</span>
                           <span className="block mt-1 text-[11px] opacity-80">{sizeByCode(preset.top)?.label || preset.top} / {sizeByCode(preset.bottom)?.label || preset.bottom}</span>
@@ -771,7 +798,7 @@ export default function CustomizedCakes() {
                       <p className="mb-2 text-xs font-semibold text-[#7b5b3a]">Flavor for both tiers</p>
                       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                         {flavorCatalog.map((flavor) => (
-                          <button key={flavor.id} type="button" onClick={() => setFlavorId(String(flavor.id))} className={`rounded-xl border px-3 py-2 text-xs font-semibold ${flavorId === String(flavor.id) ? 'border-[#e5bd45] bg-[#ffe89a] text-[#6b4f1d]' : 'border-[#f0d98a] bg-white text-[#6b4f1d] hover:border-[#e5bd45]'}`}>
+                          <button key={flavor.id} type="button" onClick={() => setFlavorId(String(flavor.id))} aria-pressed={flavorId === String(flavor.id)} className={`min-h-10 rounded-xl border px-3 py-2 text-xs font-semibold transition ${flavorId === String(flavor.id) ? 'border-[#c9972d] bg-[#fff1bd] text-[#5f4715]' : 'border-[#eadfd8] bg-white text-[#5f514a] hover:border-[#d4af37] hover:bg-[#fffaf0]'}`}>
                             {flavor.name}
                           </button>
                         ))}
@@ -779,11 +806,11 @@ export default function CustomizedCakes() {
                     </div>
 
                     <div className="grid grid-cols-2 gap-3">
-                      <div className="rounded-xl border border-[#f0d98a] bg-[#fffbea] p-3">
+                      <div className="rounded-xl border border-[#f0e6db] bg-[#fffdf8] p-3">
                         <p className="text-sm font-bold text-[#6b4f1d]">Top Tier</p>
                         <p className="mt-1 text-xs text-black">{sizeByCode(selectedTwoTierPreset.top)?.label || selectedTwoTierPreset.top}</p>
                       </div>
-                      <div className="rounded-xl border border-[#f0d98a] bg-[#fffbea] p-3">
+                      <div className="rounded-xl border border-[#f0e6db] bg-[#fffdf8] p-3">
                         <p className="text-sm font-bold text-[#6b4f1d]">Bottom Tier</p>
                         <p className="mt-1 text-xs text-black">{sizeByCode(selectedTwoTierPreset.bottom)?.label || selectedTwoTierPreset.bottom}</p>
                       </div>
@@ -793,38 +820,51 @@ export default function CustomizedCakes() {
               </div>
             </div>
 
-            <div className="rounded-xl border border-[#f0e6dc] bg-[#fffdf9] p-4">
-              <p className="mb-3 flex items-center gap-2 text-[13px] font-bold text-[#6b4f1d]">
+            <div data-custom-card="4" style={{ marginTop: masonryOffsets[0] }} className="rounded-xl border border-[#f0e6dc] bg-[#fffdf9] p-3 lg:order-4 xl:order-4 xl:self-stretch">
+              <p className="mb-3 flex items-center gap-2 text-sm font-bold text-[#6b4f1d]">
                 <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#fff3c8] text-[11px]">4</span>
                 Customization Details
               </p>
-              <div className="space-y-3">
-                <select value={occasion} onChange={(event) => setOccasion(event.target.value)} className="w-full rounded-xl border border-[#f0d98a] bg-white px-3 py-2 text-[13px] text-[#6b4f1d] focus:border-[#e5bd45] focus:outline-none">
-                  <option>Birthday</option>
-                  <option>Wedding</option>
-                  <option>Anniversary</option>
-                  <option>Graduation</option>
-                  <option>Baby Shower</option>
-                  <option>Other</option>
-                </select>
-                <input value={customTheme} onChange={(event) => setCustomTheme(event.target.value)} placeholder="Theme / Design" className="w-full rounded-xl border border-[#f0d98a] bg-white px-3 py-2 text-[13px] focus:border-[#e5bd45] focus:outline-none" />
-                <input value={cakeColor} onChange={(event) => setCakeColor(event.target.value)} placeholder="Preferred Cake Color(s)" className="w-full rounded-xl border border-[#f0d98a] bg-white px-3 py-2 text-[13px] focus:border-[#e5bd45] focus:outline-none" />
-                <input value={customMessage} onChange={(event) => setCustomMessage(event.target.value)} placeholder="Custom Message on Cake" className="w-full rounded-xl border border-[#f0d98a] bg-white px-3 py-2 text-[13px] focus:border-[#e5bd45] focus:outline-none" />
-                <textarea value={specialInstructions} onChange={(event) => setSpecialInstructions(event.target.value)} placeholder="Special Instructions / Notes" rows={5} className="w-full rounded-xl border border-[#f0d98a] bg-white px-3 py-2 text-[13px] focus:border-[#e5bd45] focus:outline-none" />
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label className="block text-xs font-semibold text-[#6b4f1d]">Occasion
+                  <select value={occasion} onChange={(event) => setOccasion(event.target.value)} className="mt-1.5 min-h-11 w-full rounded-lg border border-[#eadfd8] bg-white px-3 py-2 text-sm text-[#33251e] outline-none focus:border-[#c9972d] focus:ring-2 focus:ring-[#fff1bd]">
+                    <option>Birthday</option>
+                    <option>Wedding</option>
+                    <option>Anniversary</option>
+                    <option>Graduation</option>
+                    <option>Baby Shower</option>
+                    <option>Other</option>
+                  </select>
+                </label>
+                <label className="block text-xs font-semibold text-[#6b4f1d]">Theme / Design <span className="font-normal text-[#9b8c83]">(optional)</span>
+                  <input value={customTheme} onChange={(event) => setCustomTheme(event.target.value)} placeholder="Add a theme or design" className="mt-1.5 min-h-11 w-full rounded-lg border border-[#eadfd8] bg-white px-3 py-2 text-sm font-normal text-[#33251e] outline-none placeholder:text-[#a99a8e] focus:border-[#c9972d] focus:ring-2 focus:ring-[#fff1bd]" />
+                </label>
+                <label className="block text-xs font-semibold text-[#6b4f1d]">Preferred Cake Color <span className="font-normal text-[#9b8c83]">(optional)</span>
+                  <textarea rows={2} value={cakeColor} onChange={(event) => setCakeColor(event.target.value)} placeholder="e.g. blush pink and white" className="mt-1.5 min-h-16 w-full resize-y rounded-lg border border-[#eadfd8] bg-white px-3 py-2 text-sm font-normal text-[#33251e] outline-none placeholder:text-[#a99a8e] focus:border-[#c9972d] focus:ring-2 focus:ring-[#fff1bd]" />
+                </label>
+                <label className="block text-xs font-semibold text-[#6b4f1d]">Cake Message <span className="font-normal text-[#9b8c83]">(optional)</span>
+                  <textarea rows={2} value={customMessage} onChange={(event) => setCustomMessage(event.target.value)} placeholder="Message to write on the cake" className="mt-1.5 min-h-16 w-full resize-y rounded-lg border border-[#eadfd8] bg-white px-3 py-2 text-sm font-normal text-[#33251e] outline-none placeholder:text-[#a99a8e] focus:border-[#c9972d] focus:ring-2 focus:ring-[#fff1bd]" />
+                </label>
+                <label className="block text-xs font-semibold text-[#6b4f1d] sm:col-span-2">Special Instructions <span className="font-normal text-[#9b8c83]">(optional)</span>
+                  <textarea value={specialInstructions} onChange={(event) => setSpecialInstructions(event.target.value)} placeholder="Share any other details" rows={5} className="mt-1.5 min-h-28 w-full resize-y rounded-lg border border-[#eadfd8] bg-white px-3 py-2 text-sm font-normal text-[#33251e] outline-none placeholder:text-[#a99a8e] focus:border-[#c9972d] focus:ring-2 focus:ring-[#fff1bd]" />
+                </label>
               </div>
             </div>
           </div>
 
-          <div className="space-y-4">
-            <div className="rounded-xl border border-[#f0e6dc] bg-[#fffdf9] p-4">
-              <label className="mb-1 block text-[13px] font-bold text-[#6b4f1d]">Reference Images</label>
+          <div className="flex flex-col gap-2 lg:contents">
+            <div data-custom-card="5" style={{ marginTop: masonryOffsets[1] }} className="rounded-xl border border-[#f0e6dc] bg-[#fffdf9] p-3 lg:order-5 xl:order-5 xl:self-stretch">
+              <p className="mb-3 flex items-center gap-2 text-sm font-bold text-[#6b4f1d]">
+                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#fff3c8] text-[11px]">5</span>
+                Reference Images
+              </p>
               <p className="mb-2 text-[11px] text-[#9b8c83]">Add an example or upload up to 5 images.</p>
               <input id="custom-cake-reference-files" type="file" multiple accept="image/*" onChange={handleFiles} disabled={files.length >= MAX_REFERENCE_IMAGES} className="sr-only" />
               <div className="flex flex-wrap items-center gap-2">
                 <label htmlFor="custom-cake-reference-files" className={`inline-flex rounded-lg border border-[#e5bd45] bg-[#ffe89a] px-4 py-2 text-[12px] font-bold text-[#6b4f1d] transition ${files.length >= MAX_REFERENCE_IMAGES ? 'cursor-not-allowed opacity-60' : 'cursor-pointer hover:bg-[#ffedb5]'}`}>
                   {files.length >= MAX_REFERENCE_IMAGES ? '5 Images Selected' : files.length > 0 ? `Add Images (${files.length}/${MAX_REFERENCE_IMAGES})` : 'Choose Images'}
                 </label>
-                {!referenceImage && <div className="w-fit min-w-[180px] rounded-lg border border-dashed border-[#eadfd8] bg-white px-3 py-2 text-xs text-[#9b8060]">No reference selected</div>}
+                {!referenceImage && <div className="grid min-h-28 flex-1 place-items-center rounded-lg border border-dashed border-[#eadfd8] bg-white px-3 py-4 text-center text-xs text-[#9b8060]">No reference selected</div>}
               </div>
 
               {referenceImage && (
@@ -858,16 +898,11 @@ export default function CustomizedCakes() {
                 </div>
               )}
 
-              {!userId && (
-                <button type="button" onClick={() => navigate('/customer/login')} className="mt-3 rounded-xl border border-[#e5bd45] bg-[#ffe89a] px-4 py-2 text-sm font-semibold text-[#6b4f1d] transition hover:bg-[#ffedb5]">
-                  Log in to Send Request
-                </button>
-              )}
             </div>
 
-            <div className="rounded-xl border border-[#f0e6dc] bg-[#fffdf9] p-4">
+            <div data-custom-card="6" style={{ marginTop: masonryOffsets[2] }} className="rounded-xl border border-[#f0e6dc] bg-[#fffdf9] p-3 lg:order-6 xl:order-6 xl:self-stretch">
               <p className="mb-3 flex items-center gap-2 text-[13px] font-bold text-[#6b4f1d]">
-                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#fff3c8] text-[11px]">5</span>
+                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#fff3c8] text-[11px]">6</span>
                 Order Summary
               </p>
 
@@ -889,13 +924,17 @@ export default function CustomizedCakes() {
               </div>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2 pt-1">
+            <div className="flex flex-wrap items-center gap-2 pt-1 lg:order-7 lg:col-span-2 lg:justify-end xl:order-7 xl:col-span-3">
               <button type="button" onClick={() => { setCakeType('single'); setSingleSizeId(sizeCatalog[0] ? String(sizeCatalog[0].id) : ''); setTwoTierPreset('standard'); setFlavorId(flavorCatalog[0] ? String(flavorCatalog[0].id) : ''); setAddons([]); setBudget(''); setFiles([]); setReferenceImage(null); setMessage(''); }} className="rounded-xl border border-[#f0d98a] bg-white px-4 py-2 text-sm font-semibold text-[#6b4f1d] hover:border-[#e5bd45]">
                 Reset
               </button>
-              {userId > 0 && (
+              {userId > 0 ? (
                 <button disabled={loading} type="submit" className="rounded-xl border border-[#e5bd45] bg-[#ffe89a] px-4 py-2 text-sm font-semibold text-[#6b4f1d] transition hover:bg-[#ffedb5] disabled:opacity-50">
                   {loading ? 'Sending...' : 'Send Request'}
+                </button>
+              ) : (
+                <button type="button" onClick={() => navigate('/customer/login')} className="rounded-xl border border-[#e5bd45] bg-[#ffe89a] px-4 py-2 text-sm font-semibold text-[#6b4f1d] transition hover:bg-[#ffedb5]">
+                  Log in to Send Request
                 </button>
               )}
             </div>

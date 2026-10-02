@@ -253,25 +253,25 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
 
   return (
     <>
-    <nav className="sticky top-0 z-[50000] bg-white/90 backdrop-blur-xl border-b border-gray-100 px-6 xl:px-10 py-5">
+    <nav className="sticky top-0 z-[50000] border-b border-gray-100 bg-white/90 px-4 py-3 backdrop-blur-xl sm:px-6 sm:py-5 xl:px-10">
 
       <div className="flex items-center justify-between">
 
         {/* LEFT */}
-        <div className="flex items-center gap-14">
+        <div className="flex items-center gap-2 sm:gap-14">
 
           <Link
             to="/customer"
-            className="flex items-center gap-4"
+            className="flex items-center gap-2 sm:gap-4"
           >
             <img
               src={`${BASE}/uploads/logo.png?v=logo-v2`}
               alt="Logo"
-              className="h-14 w-14 object-contain"
+              className="h-10 w-10 object-contain sm:h-14 sm:w-14"
             />
 
             <div>
-              <h1 className="font-playfair text-[28px] font-bold italic leading-none">
+              <h1 className="font-playfair text-[20px] font-bold italic leading-none sm:text-[28px]">
                 Pastry <span className="text-[#d4af37]">Project</span>
               </h1>
               <p className="text-[8px] uppercase tracking-[0.35em] text-gray-400 mt-1">
@@ -303,12 +303,12 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
         </div>
 
         {/* RIGHT */}
-        <div className="flex items-center gap-6">
+        <div className="flex items-center gap-1 sm:gap-2 lg:gap-6">
 
           {/* SEARCH */}
           <div ref={searchRef} className="relative">
-            <button onClick={() => setOpenSearch(s => !s)} className="w-12 h-12 rounded-full hover:bg-gray-100 flex items-center justify-center">
-              <Search size={20} />
+            <button onClick={() => setOpenSearch(s => !s)} aria-label="Search products" className="flex h-9 w-9 items-center justify-center rounded-full hover:bg-gray-100 sm:h-10 sm:w-10 xl:h-12 xl:w-12">
+              <Search size={18} />
             </button>
             {openSearch && (
               <div className="absolute right-0 top-[65px] w-[320px] bg-white border border-gray-200 rounded-3xl shadow-xl p-4">
@@ -345,7 +345,7 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
             to="/customer/favorites"
             title="Favorites"
             aria-label="View favorites"
-            className="flex h-12 w-12 items-center justify-center rounded-full text-gray-700 transition hover:bg-gray-100"
+            className="flex h-9 w-9 items-center justify-center rounded-full text-gray-700 transition hover:bg-gray-100 sm:h-10 sm:w-10 xl:h-12 xl:w-12"
           >
             <Heart size={20} />
           </Link>
@@ -355,7 +355,7 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
 
             <button
               onClick={handleToggleNotif}
-              className="relative w-12 h-12 rounded-full hover:bg-gray-100 flex items-center justify-center"
+              className="relative flex h-9 w-9 items-center justify-center rounded-full hover:bg-gray-100 sm:h-10 sm:w-10 xl:h-12 xl:w-12"
             >
               <Bell size={20} />
 
@@ -526,7 +526,7 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
           {/* CART */}
           <button
             onClick={onCartClick}
-            className="relative flex h-10 w-10 items-center justify-center rounded-full bg-black text-white"
+            className="relative flex h-9 w-9 items-center justify-center rounded-full bg-black text-white sm:h-10 sm:w-10"
           >
             <ShoppingCart size={17} />
             {cartCount > 0 && (
@@ -541,7 +541,7 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
 
             <button
               onClick={() => setOpenAccount(!openAccount)}
-              className="w-12 h-12 rounded-full bg-gray-100 border border-gray-200 flex items-center justify-center hover:border-[#d4af37] transition-all"
+              className="flex h-9 w-9 items-center justify-center rounded-full border border-gray-200 bg-gray-100 transition-all hover:border-[#d4af37] sm:h-10 sm:w-10 xl:h-12 xl:w-12"
             >
               {accountAvatar ? (
                 <img src={accountAvatar} alt={user?.name || 'Account'} className="h-full w-full rounded-full object-cover" />

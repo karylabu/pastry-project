@@ -183,6 +183,9 @@ class OrderController extends Controller
                     'discount_id_path' => $discountIdPath,
                     'total' => $total,
                     'method' => $request->method,
+                    'delivery_service' => in_array($request->method, ['Delivery', 'Deliver'], true)
+                        ? $request->input('delivery_service')
+                        : null,
                     'payment' => $request->payment,
                     'address' => $request->address ?? '',
                     'phone' => $request->phone,

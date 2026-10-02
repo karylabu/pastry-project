@@ -239,6 +239,7 @@ export default function Orders() {
   const [orders, setOrders]           = useState([]);
   const [user, setUser]               = useState(null);
   const [selectedOrder, setSelectedOrder] = useState(null);
+  const [riderInfoTarget, setRiderInfoTarget] = useState(null);
   const [statusFilter, setStatusFilter] = useState('All');
   const [sortBy, setSortBy]           = useState('newest');
   const [search, setSearch]           = useState('');
@@ -1248,6 +1249,14 @@ export default function Orders() {
                 const customPaymentDetails = order.custom_details && typeof order.custom_details === 'string'
                   ? (() => { try { return JSON.parse(order.custom_details); } catch { return {}; } })()
                   : (order.custom_details || order.custom_cake_details || {});
+                const isDeliveryOrder = [order.method, order.delivery_method, customPaymentDetails.delivery_method]
+                  .some((method) => String(method || '').toLowerCase().includes('delivery'));
+                const riderInformation = {
+                  service: order.delivery_service || order.rider_service || customPaymentDetails.delivery_service || customPaymentDetails.rider_service,
+                  name: order.rider_name || order.delivery_rider_name || order.rider?.name || customPaymentDetails.rider_name || customPaymentDetails.delivery_rider_name,
+                  contact: order.rider_contact || order.rider_phone || order.delivery_rider_contact || order.rider?.contact || customPaymentDetails.rider_contact || customPaymentDetails.rider_phone,
+                  reference: order.rider_booking_reference || order.booking_reference || customPaymentDetails.rider_booking_reference || customPaymentDetails.booking_reference,
+                };
                 const quotedDownpayment = Number(order.downpayment_amount ?? customPaymentDetails.downpayment_amount);
                 const downpaymentPercent = Number(customPaymentDetails.downpayment_percent ?? 50);
                 const customDownpaymentAmount = Number.isFinite(quotedDownpayment)
@@ -1407,13 +1416,25 @@ export default function Orders() {
                         </>
                       )}
                       {isToReceive && (
-                        <button
-                          onClick={() => setReceivedTarget(order)}
-                          disabled={processingId === order.id}
-                          className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-3.5 py-2 text-[12px] font-semibold text-white hover:bg-slate-800 transition-colors disabled:opacity-40"
-                        >
-                          {processingId === order.id ? 'Confirming…' : 'Confirm Receipt'}
-                        </button>
+                        <>
+                          {isDeliveryOrder && (
+                            <button
+                              type="button"
+                              onClick={() => setRiderInfoTarget({ order, riderInformation })}
+                              className="inline-flex items-center gap-1.5 rounded-lg border border-[#e9d8ae] bg-[#fffaf0] px-3 py-2 text-[12px] font-semibold text-[#6b4f1d] transition-colors hover:bg-[#fff1bd]"
+                              aria-label="View delivery rider information"
+                            >
+                              <PackageCheck size={14} /> Rider Info
+                            </button>
+                          )}
+                          <button
+                            onClick={() => setReceivedTarget(order)}
+                            disabled={processingId === order.id}
+                            className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-3.5 py-2 text-[12px] font-semibold text-white hover:bg-slate-800 transition-colors disabled:opacity-40"
+                          >
+                            {processingId === order.id ? 'Confirming…' : 'Confirm Receipt'}
+                          </button>
+                        </>
                       )}
 
                       {isCompleted && (
@@ -1456,6 +1477,55 @@ export default function Orders() {
             onDismiss={() => setCancelTarget(null)}
             isLoading={processingId === cancelTarget?.id}
           />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {riderInfoTarget && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100000] flex items-center justify-center bg-black/40 px-4 py-6 backdrop-blur-sm"
+            onClick={() => setRiderInfoTarget(null)}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="delivery-rider-dialog-title"
+          >
+            <motion.div
+              initial={{ opacity: 0, y: 12, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 12, scale: 0.98 }}
+              onClick={(event) => event.stopPropagation()}
+              className="w-full max-w-md rounded-2xl border border-[#eadfd8] bg-white p-5 shadow-2xl sm:p-6"
+            >
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#9b7810]">Order #{riderInfoTarget.order.order_number ?? riderInfoTarget.order.id}</p>
+                  <h2 id="delivery-rider-dialog-title" className="mt-1 text-lg font-bold text-[#33251e]">Delivery Rider Information</h2>
+                </div>
+                <button type="button" onClick={() => setRiderInfoTarget(null)} className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-[#765d50] transition hover:bg-[#fff4cd]" aria-label="Close rider information"><X size={18} /></button>
+              </div>
+              {Object.values(riderInfoTarget.riderInformation).some(Boolean) ? (
+                <dl className="mt-5 space-y-3">
+                  {[
+                    ['Delivery service', riderInfoTarget.riderInformation.service],
+                    ['Rider name', riderInfoTarget.riderInformation.name],
+                    ['Rider contact', riderInfoTarget.riderInformation.contact],
+                    ['Booking/reference', riderInfoTarget.riderInformation.reference],
+                  ].filter(([, value]) => value).map(([label, value]) => (
+                    <div key={label} className="border-b border-[#f0e6db] pb-2 last:border-0 last:pb-0">
+                      <dt className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#8f8076]">{label}</dt>
+                      <dd className="mt-1 break-words text-sm font-medium text-[#33251e]">{value}</dd>
+                    </div>
+                  ))}
+                </dl>
+              ) : (
+                <p className="mt-5 rounded-xl bg-[#fffaf0] px-4 py-3 text-sm leading-6 text-[#6b4f1d]">Rider information is not available yet. Please check again once a rider has been assigned.</p>
+              )}
+              <button type="button" onClick={() => setRiderInfoTarget(null)} className="mt-5 w-full rounded-xl bg-[#f0b94d] px-4 py-2.5 text-sm font-semibold text-black transition hover:bg-[#e5ae3d]">Close</button>
+            </motion.div>
+          </motion.div>
         )}
       </AnimatePresence>
 

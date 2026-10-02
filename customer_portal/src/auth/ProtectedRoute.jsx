@@ -26,7 +26,19 @@ export default function ProtectedRoute({
   useEffect(() => {
     let cancelled = false;
 
-    const verifyAccess = () => fetch(`${STAFF_BASE}/api_auth_status.php`, { credentials: "include" })
+    const verifyAccessWithToken = () => {
+      let storedUser = {};
+      try {
+        storedUser = JSON.parse(localStorage.getItem("user") || "{}");
+      } catch (error) {
+        storedUser = {};
+      }
+      const token = storedUser.token || localStorage.getItem("auth_token") || "";
+
+      return fetch(`${STAFF_BASE}/api_auth_status.php`, {
+        credentials: "include",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      })
       .then(async (response) => {
         const data = await response.json().catch(() => ({}));
         if (cancelled) return;
@@ -50,29 +62,33 @@ export default function ProtectedRoute({
           }
         } else if (response.status === 403) {
           localStorage.removeItem("user");
+          localStorage.removeItem("auth_token");
           setState("forbidden");
         } else {
           // 401 or any other failure → not authenticated (or expired session).
           localStorage.removeItem("user");
+          localStorage.removeItem("auth_token");
           setState("login");
         }
       })
       .catch(() => {
         if (!cancelled) {
           localStorage.removeItem("user");
+          localStorage.removeItem("auth_token");
           setState("login");
         }
       });
+    };
 
-    verifyAccess();
-    const heartbeat = window.setInterval(verifyAccess, 60000);
+    verifyAccessWithToken();
+    const heartbeat = window.setInterval(verifyAccessWithToken, 60000);
 
     // Re-verify when the page is restored from the back/forward cache so a
     // logged-out user can never see protected content via the Back button.
     const onPageShow = (event) => {
       if (event.persisted) {
         setState("checking");
-        verifyAccess();
+        verifyAccessWithToken();
       }
     };
     window.addEventListener("pageshow", onPageShow);

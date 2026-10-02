@@ -3,8 +3,11 @@
 namespace Tests\Feature;
 
 use App\Models\User;
+use App\Http\Controllers\SalesImportController;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Http\Request;
 use Tests\TestCase;
 
 class SalesImportControllerTest extends TestCase
@@ -15,6 +18,7 @@ class SalesImportControllerTest extends TestCase
 
         Schema::dropIfExists('analytics_sales_history');
         Schema::dropIfExists('analytics_imports');
+        Schema::dropIfExists('sales');
         Schema::dropIfExists('users');
 
         Schema::create('users', function (Blueprint $table) {
@@ -47,6 +51,15 @@ class SalesImportControllerTest extends TestCase
             $table->decimal('units_sold', 10, 2)->default(0);
             $table->decimal('revenue', 10, 2)->default(0);
             $table->dateTime('created_at')->nullable();
+        });
+
+        Schema::create('sales', function (Blueprint $table) {
+            $table->id();
+            $table->string('cake_name');
+            $table->decimal('price', 12, 2);
+            $table->decimal('down_payment', 12, 2);
+            $table->decimal('remaining_balance', 12, 2);
+            $table->date('sale_date');
         });
     }
 
@@ -87,5 +100,29 @@ class SalesImportControllerTest extends TestCase
             ->assertOk()
             ->assertJsonPath('summary.total_sales', 645)
             ->assertJsonFragment(['cake_name' => 'Chocolate Croissant', 'units_sold' => 3, 'price' => 285]);
+    }
+
+    public function test_history_includes_existing_legacy_sales(): void
+    {
+        $admin = User::factory()->createOne(['role' => 'admin']);
+        DB::table('sales')->insert([
+            'cake_name' => 'BENTO - CHARACTER',
+            'price' => 420,
+            'down_payment' => 168,
+            'remaining_balance' => 252,
+            'sale_date' => '2026-10-01',
+        ]);
+
+        $this->actingAs($admin);
+        $response = app(SalesImportController::class)->history(Request::create('/api/sales/import/history', 'GET'));
+        $payload = $response->getData(true);
+
+        $this->assertSame(200, $response->getStatusCode());
+        $this->assertSame(1, $payload['summary']['records']);
+        $this->assertEquals(420, $payload['summary']['total_sales']);
+        $this->assertEquals(168, $payload['summary']['total_down_payments']);
+        $this->assertSame('legacy-1', $payload['sales'][0]['id']);
+        $this->assertSame('BENTO - CHARACTER', $payload['sales'][0]['cake_name']);
+        $this->assertEquals(420, $payload['sales'][0]['price']);
     }
 }

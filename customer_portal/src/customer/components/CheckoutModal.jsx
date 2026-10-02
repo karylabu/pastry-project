@@ -64,6 +64,7 @@ export default function CheckoutModal({
 
   const [checkoutData, setCheckoutData] = useState({
     method: "Deliver",
+    deliveryService: "",
     payment: "QRPh",
     orderType: "Standard",
     address: "",
@@ -482,6 +483,11 @@ export default function CheckoutModal({
       return;
     }
 
+    if (checkoutData.method === "Deliver" && !checkoutData.deliveryService) {
+      alert("Please select Lalamove or GrabCar for delivery.");
+      return;
+    }
+
     if (
       checkoutData.method === 'Deliver' &&
       (!checkoutData.lat || !checkoutData.lng || !isLocationWithinCoverage(checkoutData.lat, checkoutData.lng))
@@ -538,6 +544,7 @@ export default function CheckoutModal({
         })),
 
         method: checkoutData.method,
+        delivery_service: checkoutData.method === "Deliver" ? checkoutData.deliveryService : "",
         payment: checkoutData.payment,
         order_type: checkoutData.orderType || "Standard",
         discount_type: discountType,
@@ -785,6 +792,35 @@ export default function CheckoutModal({
               </div>
 
             </div>
+
+            {checkoutData.method === "Deliver" && (
+              <section className="mb-6 space-y-3" aria-labelledby="delivery-service-heading">
+                <div className="rounded-xl border border-[#e9d8ae] bg-[#fffaf0] px-3.5 py-3 text-sm text-[#6b4f1d]">
+                  <p className="font-semibold">You will book the delivery rider yourself.</p>
+                  <p className="mt-0.5 text-xs leading-5 text-[#8d7a6e]">Pastry Project does not arrange the rider booking.</p>
+                </div>
+                <div>
+                  <p id="delivery-service-heading" className="mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">Choose a delivery service</p>
+                  <div className="grid grid-cols-2 gap-2" role="group" aria-labelledby="delivery-service-heading">
+                    {["Lalamove", "GrabCar"].map((service) => (
+                      <button
+                        key={service}
+                        type="button"
+                        aria-pressed={checkoutData.deliveryService === service}
+                        onClick={() => setCheckoutData((current) => ({ ...current, deliveryService: service }))}
+                        className={`min-h-11 rounded-xl border px-3 py-2.5 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e7c875] ${
+                          checkoutData.deliveryService === service
+                            ? "border-[#c9972d] bg-[#fff1bd] text-[#5f4715] shadow-sm"
+                            : "border-[#eee5db] bg-white text-[#765d50] hover:border-[#e7c875] hover:bg-[#fffaf0]"
+                        }`}
+                      >
+                        {service}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </section>
+            )}
 
             {checkoutData.method === 'Pickup' && (
               <section className="mb-6 overflow-hidden rounded-2xl border border-[#eee5db] bg-[#fffdfa]">

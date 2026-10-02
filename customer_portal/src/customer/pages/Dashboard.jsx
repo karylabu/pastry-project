@@ -660,7 +660,7 @@ export function ChatBubble({ aiMode = false, fullPage = false }) {
           <motion.div
             initial={{ opacity: 0, x: 12 }}
             animate={{ opacity: 1, x: 0 }}
-            className="rounded-full bg-white px-4 py-2 shadow-lg border border-gray-200"
+            className="rounded-full border border-[#f0e6db] bg-white px-4 py-2 shadow-lg"
           >
             <p className="text-sm font-semibold text-gray-800">Chat with us!</p>
           </motion.div>
@@ -675,12 +675,12 @@ export function ChatBubble({ aiMode = false, fullPage = false }) {
               setOpen(o => !o);
               setUnread(0);
             }}
-            className="bg-black text-white w-14 h-14 rounded-full flex items-center justify-center shadow-xl hover:bg-gray-800 transition-colors"
+            className="flex h-14 w-14 items-center justify-center rounded-full bg-[#f0b94d] text-black shadow-xl transition-colors hover:bg-[#e5ae3d]"
           >
             {open ? <X size={20} /> : <MessageCircle size={22} />}
           </button>
           {unread > 0 && !open && (
-              <span className="absolute -top-1 -right-1 bg-white text-black border border-black text-xs w-5 h-5 rounded-full flex items-center justify-center font-bold">
+              <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full border border-[#e9d8ae] bg-white text-xs font-bold text-black">
               {unread}
             </span>
           )}
@@ -696,26 +696,26 @@ export function ChatBubble({ aiMode = false, fullPage = false }) {
             exit={{ opacity: 0, y: 20, scale: 0.95 }}
             transition={{ duration: 0.2 }}
             className={fullPage
-              ? "relative w-full min-h-[calc(100vh-180px)] bg-[#f5f5f5] flex flex-col overflow-hidden"
-              : "fixed bottom-24 right-6 w-[calc(100vw-2rem)] max-w-[460px] sm:w-[460px] bg-[#f5f5f5] rounded-[20px] shadow-2xl z-[60001] flex flex-col overflow-hidden border border-[#d5d5d5]"}
+              ? "relative w-full min-h-[calc(100vh-180px)] bg-[#fffaf3] flex flex-col overflow-hidden"
+              : "fixed bottom-24 right-6 w-[calc(100vw-2rem)] max-w-[460px] sm:w-[460px] bg-[#fffaf3] rounded-[20px] shadow-2xl z-[60001] flex flex-col overflow-hidden border border-[#e9d8ae]"}
             style={fullPage ? undefined : { height: aiMode ? "min(620px, calc(100vh - 7rem))" : "min(500px, calc(100vh - 7rem))" }}
           >
             {/* HEADER */}
-            <div className={fullPage ? "bg-black px-4 py-4 sm:px-8 sm:py-5 flex items-center gap-3 sm:gap-4 border-b border-black text-white" : "bg-black px-5 py-4 flex items-center gap-3 border-b border-black text-white"}>
+            <div className={fullPage ? "bg-[#fffdf8] px-4 py-4 sm:px-8 sm:py-5 flex items-center gap-3 sm:gap-4 border-b border-[#f0e6db] text-black" : "bg-[#fffdf8] px-5 py-4 flex items-center gap-3 border-b border-[#f0e6db] text-black"}>
               {fullPage && (
-                  <button type="button" onClick={() => setShowHistory(value => !value)} title={showHistory ? "Back to chat" : "View chat history"} aria-label={showHistory ? "Back to chat" : "View chat history"} className="w-9 h-9 rounded-full text-gray-500 hover:bg-gray-100 flex items-center justify-center">
+                  <button type="button" onClick={() => setShowHistory(value => !value)} title={showHistory ? "Back to chat" : "View chat history"} aria-label={showHistory ? "Back to chat" : "View chat history"} className="flex h-9 w-9 items-center justify-center rounded-full text-[#80600a] hover:bg-[#fff4cd]">
                   <ArrowLeft size={20} />
                 </button>
               )}
-                  <div className={fullPage ? "w-11 h-11 rounded-2xl bg-white flex items-center justify-center flex-shrink-0" : "w-9 h-9 rounded-full bg-white flex items-center justify-center flex-shrink-0"}>
-                <Headphones size={fullPage ? 20 : 16} className="text-black" />
+                  <div className={fullPage ? "w-11 h-11 rounded-2xl bg-[#fff4cd] flex items-center justify-center flex-shrink-0" : "w-9 h-9 rounded-full bg-[#fff4cd] flex items-center justify-center flex-shrink-0"}>
+                <Headphones size={fullPage ? 20 : 16} className="text-[#80600a]" />
               </div>
               <div className="flex-1">
                 <div className="flex items-center gap-2">
-                  <p className={fullPage ? "text-white font-bold text-lg sm:text-xl" : "text-white font-semibold text-sm"}>{fullPage ? (showHistory ? "Chat History" : "Customer Service") : "Admin Support"}</p>
-                  {fullPage && !showHistory && <span className="hidden rounded-full bg-white px-2 py-1 text-[9px] font-bold uppercase tracking-[0.12em] text-black sm:inline-flex">Online</span>}
+                  <p className={fullPage ? "text-black font-bold text-lg sm:text-xl" : "text-black font-semibold text-sm"}>{fullPage ? (showHistory ? "Chat History" : "Customer Service") : "Admin Support"}</p>
+                  {fullPage && !showHistory && <span className="hidden rounded-full bg-[#fff4cd] px-2 py-1 text-[9px] font-bold uppercase tracking-[0.12em] text-[#80600a] sm:inline-flex">Online</span>}
                 </div>
-                <p className={fullPage ? "text-white/65 text-xs mt-0.5" : "text-white/65 text-xs"}>
+                <p className={fullPage ? "mt-0.5 text-xs text-gray-500" : "text-xs text-gray-500"}>
                   {fullPage ? "We usually reply instantly" : "Admin usually replies promptly"}
                 </p>
               </div>
@@ -736,11 +736,11 @@ export function ChatBubble({ aiMode = false, fullPage = false }) {
                     }}
                     title="New chat"
                     aria-label="New chat"
-                    className="w-10 h-10 rounded-full text-gray-500 hover:bg-gray-100 flex items-center justify-center"
+                    className="flex h-10 w-10 items-center justify-center rounded-full text-[#80600a] hover:bg-[#fff4cd]"
                   >
                     <Plus size={21} />
                   </button>
-                  <button type="button" onClick={() => setShowHistory(true)} title="Chat history" aria-label="Chat history" className="w-10 h-10 rounded-full text-gray-500 hover:bg-gray-100 flex items-center justify-center">
+                  <button type="button" onClick={() => setShowHistory(true)} title="Chat history" aria-label="Chat history" className="flex h-10 w-10 items-center justify-center rounded-full text-[#80600a] hover:bg-[#fff4cd]">
                     <History size={21} />
                   </button>
                 </div>
@@ -752,12 +752,12 @@ export function ChatBubble({ aiMode = false, fullPage = false }) {
                     onClick={() => setShowStoreNumber(value => !value)}
                     title="Show store number"
                     aria-label="Show store number"
-                    className="w-8 h-8 rounded-full text-white/70 hover:bg-white hover:text-black flex items-center justify-center"
+                    className="flex h-8 w-8 items-center justify-center rounded-full text-[#80600a] hover:bg-[#fff4cd] hover:text-black"
                   >
                     <Phone size={16} />
                   </button>
                   {showStoreNumber && (
-                    <span className="text-xs text-white whitespace-nowrap">0938-796-2033</span>
+                    <span className="whitespace-nowrap text-xs text-black">0938-796-2033</span>
                   )}
                 </>
               )}
@@ -765,14 +765,14 @@ export function ChatBubble({ aiMode = false, fullPage = false }) {
 
             <>
               {showHistory && (
-                <div className="flex-1 overflow-y-auto bg-[#f5f5f5] px-5 py-6 sm:px-10">
+                <div className="flex-1 overflow-y-auto bg-[#fffaf3] px-5 py-6 sm:px-10">
                   <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-400">Previous conversations</p>
                   {historyIds.length === 0 ? (
                     <p className="mt-4 text-sm text-gray-400">No previous chats yet.</p>
                   ) : (
                     <div className="mt-3 space-y-2">
                       {historyIds.map((id, index) => (
-                        <button key={id} type="button" onClick={() => { setConversationId(id); setShowHistory(false); }} className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-left text-sm text-gray-700 hover:border-[#e45f32] hover:bg-[#fff7f2]">
+                        <button key={id} type="button" onClick={() => { setConversationId(id); setShowHistory(false); }} className="w-full rounded-xl border border-[#f0e6db] bg-white px-4 py-3 text-left text-sm text-gray-700 hover:border-[#d4af37] hover:bg-[#fffaf0]">
                           Conversation {historyIds.length - index}
                         </button>
                       ))}
@@ -786,17 +786,17 @@ export function ChatBubble({ aiMode = false, fullPage = false }) {
                   const element = event.currentTarget;
                   shouldStickToBottomRef.current = element.scrollHeight - element.scrollTop - element.clientHeight < 24;
                 }}
-                className={showHistory ? "hidden" : "flex-1 min-h-0 overflow-y-auto px-3 py-3 space-y-2.5 bg-[#f5f5f5]"}
+                className={showHistory ? "hidden" : "flex-1 min-h-0 overflow-y-auto px-3 py-3 space-y-2.5 bg-[#fffaf3]"}
               >
                 {messages.length === 0 && (
                   <div className="px-2 pt-5">
                     <p className="text-center text-gray-400 text-xs">No messages yet. Start a conversation.</p>
                     {fullPage && (
-                      <div className="mt-5 rounded-2xl border border-gray-200 bg-white p-4">
+                      <div className="mt-5 rounded-2xl border border-[#f0e6db] bg-white p-4">
                         <p className="text-sm font-semibold text-gray-900">How can we help you today?</p>
                         <div className="mt-3 grid gap-2 sm:grid-cols-3">
                           {["Track my order", "Delivery question", "Payment assistance"].map(topic => (
-                            <button key={topic} type="button" onClick={() => setInput(topic)} className="rounded-xl border border-gray-200 bg-white px-3 py-3 text-left text-sm text-gray-700 hover:border-[#e45f32] hover:bg-[#fff7f2]">
+                            <button key={topic} type="button" onClick={() => setInput(topic)} className="rounded-xl border border-[#f0e6db] bg-white px-3 py-3 text-left text-sm text-gray-700 hover:border-[#d4af37] hover:bg-[#fffaf0]">
                               {topic}
                             </button>
                           ))}
@@ -824,7 +824,7 @@ export function ChatBubble({ aiMode = false, fullPage = false }) {
                       )}
                       <div className={`flex gap-2 ${isCustomer ? "flex-row-reverse" : "flex-row"}`}>
                         <div className={`w-7 h-7 rounded-full flex-shrink-0 flex items-center justify-center text-xs font-bold
-                          ${isCustomer ? "bg-black text-white" : isAi ? "bg-[#e5e5e5] text-black" : "bg-white border border-[#d5d5d5] text-black"}`}>
+                          ${isCustomer ? "bg-[#fff4cd] text-[#80600a]" : isAi ? "bg-[#fff4cd] text-[#80600a]" : "bg-white border border-[#f0e6db] text-black"}`}>
                           {isCustomer ? <User size={12} /> : isAi ? <Bot size={12} /> : "S"}
                         </div>
 
@@ -834,10 +834,10 @@ export function ChatBubble({ aiMode = false, fullPage = false }) {
                           </span>
                               <div className={`px-3 py-2 rounded-2xl text-[13px] leading-relaxed
                             ${isCustomer
-                              ? "bg-black text-white rounded-tr-sm"
+                              ? "bg-[#fff4cd] text-black rounded-tr-sm"
                               : isAi
-                              ? "bg-[#e5e5e5] text-black border border-[#d5d5d5] rounded-tl-sm"
-                              : "bg-white text-black border border-[#d5d5d5] rounded-tl-sm"
+                              ? "bg-white text-black border border-[#f0e6db] rounded-tl-sm"
+                              : "bg-white text-black border border-[#f0e6db] rounded-tl-sm"
                             }`}>
                             {getImageUrl(msg) && (
                               <img
@@ -866,14 +866,14 @@ export function ChatBubble({ aiMode = false, fullPage = false }) {
 
                 {sending && (
                   <div className="flex gap-2 items-center">
-                    <div className="w-7 h-7 rounded-full bg-black flex items-center justify-center">
-                      <Bot size={12} className="text-white" />
+                    <div className="w-7 h-7 rounded-full bg-[#fff4cd] flex items-center justify-center">
+                      <Bot size={12} className="text-[#80600a]" />
                     </div>
-                    <div className="bg-white border border-[#d5d5d5] px-4 py-2 rounded-2xl rounded-tl-sm">
+                    <div className="bg-white border border-[#f0e6db] px-4 py-2 rounded-2xl rounded-tl-sm">
                       <span className="flex gap-1">
-                        <span className="w-1.5 h-1.5 bg-black rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
-                        <span className="w-1.5 h-1.5 bg-black rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
-                        <span className="w-1.5 h-1.5 bg-black rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
+                        <span className="w-1.5 h-1.5 bg-[#d4af37] rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
+                        <span className="w-1.5 h-1.5 bg-[#d4af37] rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
+                        <span className="w-1.5 h-1.5 bg-[#d4af37] rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
                       </span>
                     </div>
                   </div>
@@ -890,7 +890,7 @@ export function ChatBubble({ aiMode = false, fullPage = false }) {
 
               {!showHistory && (
                 <>
-                  <div className="border-t border-[#d5d5d5] bg-white px-3 pt-2.5">
+                  <div className="border-t border-[#f0e6db] bg-white px-3 pt-2.5">
                     <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-gray-400">Quick chats</p>
                     <div className="flex flex-wrap gap-2">
                       {["Hi, I need help", "Where is my order?", "I want to place an order", "Can I customize a cake?", "How can I pay?"].map((suggestion) => (
@@ -899,7 +899,7 @@ export function ChatBubble({ aiMode = false, fullPage = false }) {
                           type="button"
                           onClick={() => sendMessage(suggestion)}
                           disabled={sending}
-                          className="rounded-full border border-gray-200 bg-white px-3 py-1.5 text-[11px] text-gray-600 transition hover:border-black hover:bg-black hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
+                          className="rounded-full border border-[#f0e6db] bg-white px-3 py-1.5 text-[11px] text-gray-600 transition hover:border-[#d4af37] hover:bg-[#fff4cd] hover:text-[#80600a] disabled:cursor-not-allowed disabled:opacity-40"
                         >
                           {suggestion}
                         </button>
@@ -919,7 +919,7 @@ export function ChatBubble({ aiMode = false, fullPage = false }) {
                       onClick={() => imageInputRef.current?.click()}
                       disabled={sending}
                       title="Attach picture"
-                      className="w-9 h-9 rounded-full border border-gray-200 text-gray-600 flex items-center justify-center flex-shrink-0 disabled:opacity-40 hover:border-black hover:text-black transition-colors"
+                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[#f0e6db] text-[#80600a] transition-colors hover:border-[#d4af37] hover:bg-[#fffaf0] disabled:opacity-40"
                     >
                       <Paperclip size={15} />
                     </button>
@@ -929,12 +929,12 @@ export function ChatBubble({ aiMode = false, fullPage = false }) {
                       onKeyDown={handleKeyDown}
                       placeholder="Type your message..."
                       rows={1}
-                      className="flex-1 resize-none border border-[#d5d5d5] rounded-xl bg-white px-3 py-2 text-sm text-black outline-none focus:border-black max-h-20"
+                      className="max-h-20 flex-1 resize-none rounded-xl border border-[#f0e6db] bg-white px-3 py-2 text-sm text-black outline-none focus:border-[#d4af37]"
                     />
                     <button
                       onClick={() => sendMessage()}
                       disabled={(!input.trim() && !selectedImage) || sending}
-                      className="w-9 h-9 rounded-full bg-black text-white flex items-center justify-center flex-shrink-0 disabled:opacity-40 hover:bg-gray-800 transition-colors"
+                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#f0b94d] text-black transition-colors hover:bg-[#e5ae3d] disabled:opacity-40"
                     >
                       <Send size={14} />
                     </button>
@@ -942,7 +942,7 @@ export function ChatBubble({ aiMode = false, fullPage = false }) {
                 </>
               )}
               {!showHistory && selectedImage && (
-                <p className="px-3 pb-2 text-[11px] text-gray-500 bg-white truncate">
+                <p className="truncate bg-white px-3 pb-2 text-[11px] text-gray-500">
                   {selectedImage.name}
                 </p>
               )}

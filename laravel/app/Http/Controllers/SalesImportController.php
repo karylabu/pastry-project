@@ -7,6 +7,7 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 use Smalot\PdfParser\Parser as PdfParser;
 
@@ -179,20 +180,38 @@ class SalesImportController extends Controller
             ->orderByDesc('id')
             ->get(['id', 'product_name', 'sale_date', 'units_sold', 'revenue']);
 
+        $legacyRows = Schema::hasTable('sales')
+            ? DB::table('sales')->orderByDesc('sale_date')->orderByDesc('id')->get([
+                'id', 'cake_name', 'sale_date', 'price', 'down_payment', 'remaining_balance',
+            ])
+            : collect();
+
+        $history = $rows->map(static fn ($row) => [
+            'id' => (string) $row->id,
+            'cake_name' => $row->product_name,
+            'sale_date' => $row->sale_date,
+            'units_sold' => (float) $row->units_sold,
+            'price' => (float) $row->revenue,
+            'down_payment' => 0.0,
+            'remaining_balance' => 0.0,
+        ])->concat($legacyRows->map(static fn ($row) => [
+            'id' => 'legacy-' . $row->id,
+            'cake_name' => $row->cake_name,
+            'sale_date' => $row->sale_date,
+            'units_sold' => 1.0,
+            'price' => (float) $row->price,
+            'down_payment' => (float) $row->down_payment,
+            'remaining_balance' => (float) $row->remaining_balance,
+        ]))->sortByDesc('sale_date')->values();
+
         return response()->json([
             'success' => true,
-            'sales' => $rows->map(static fn ($row) => [
-                'id' => (int) $row->id,
-                'cake_name' => $row->product_name,
-                'sale_date' => $row->sale_date,
-                'units_sold' => (float) $row->units_sold,
-                'price' => (float) $row->revenue,
-            ]),
+            'sales' => $history,
             'summary' => [
-                'records' => $rows->count(),
-                'total_sales' => (float) $rows->sum('revenue'),
-                'total_down_payments' => 0,
-                'total_remaining_balance' => 0,
+                'records' => $history->count(),
+                'total_sales' => $history->sum('price'),
+                'total_down_payments' => $history->sum('down_payment'),
+                'total_remaining_balance' => $history->sum('remaining_balance'),
             ],
         ]);
     }

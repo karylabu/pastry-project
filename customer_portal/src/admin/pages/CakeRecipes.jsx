@@ -326,7 +326,7 @@ export default function CakeRecipes() {
               </div>
               <div className="flex flex-wrap items-end gap-2">
                 <span className="inline-flex items-center gap-1 rounded-full bg-[#fff4cd] px-2.5 py-1 text-[9px] font-semibold text-[#80600a]"><Package size={12} /> Base 6x3</span>
-                <label title="Import recipe from CSV or Excel" className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-[#eadfd8] bg-[#fffdfa] px-2.5 py-2 text-[10px] font-semibold text-[#6f541d] transition hover:border-[#c9a94f] hover:bg-[#fff8e9] hover:ring-1 hover:ring-[#d4af37]/20 focus-within:ring-2 focus-within:ring-[#d4af37]">
+                <label title="Import recipe from CSV or Excel" className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-black bg-black px-2.5 py-2 text-[10px] font-semibold text-white transition hover:bg-black/90 focus-within:ring-2 focus-within:ring-[#d4af37]">
                   <Upload size={13} /> Import
                   <input type="file" accept=".csv,.xlsx,.xls" onChange={importRecipeFile} className="sr-only" />
                 </label>
@@ -348,7 +348,7 @@ export default function CakeRecipes() {
               </div>
 
               {recipeLines.length > 0 ? recipeLines.map((line, index) => (
-                <div key={`${selectedFlavorId}-${index}`} className="grid items-center gap-2 rounded-lg border border-[#eee4de] bg-[#fffdfa] p-2.5 md:grid-cols-[minmax(0,1fr)_130px_90px_38px]">
+                <div key={`${selectedFlavorId}-${index}`} className="grid items-center gap-2 p-2.5 md:grid-cols-[minmax(0,1fr)_130px_90px_38px]">
                   <label className="min-w-0">
                     <span className="mb-1 block text-[9px] font-bold uppercase tracking-[0.14em] text-[#9b8c83] md:hidden">Ingredient</span>
                     <select value={line.ingredient_id} onChange={(event) => selectIngredient(index, event.target.value)} className="w-full rounded-md border border-[#eadfd8] bg-white px-2.5 py-2 text-[11px] text-[#33251e] outline-none transition focus:border-[#d4af37] focus:ring-2 focus:ring-[#d4af37]/20" required>

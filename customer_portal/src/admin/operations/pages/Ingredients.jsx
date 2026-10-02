@@ -569,7 +569,7 @@ export default function Ingredients({
                       : '';
 
                     return (
-                      <tr key={item.id} className={`${rowClass} border-b border-[#f2ebe5] last:border-0 hover:bg-[#fffdf8]`}>
+                      <tr key={item.id} className={`${rowClass} border-b border-[#f2ebe5] last:border-0`}>
                         <td className="px-6 py-3.5 text-[13px] font-semibold text-[#33251e]">
                           <div className="min-w-[190px]">
                             <div className="min-w-0">

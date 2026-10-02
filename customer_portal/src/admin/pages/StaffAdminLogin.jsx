@@ -40,6 +40,7 @@ export default function StaffAdminLogin() {
       const userWithRole = { ...data.user, role: normalizedRole, token: data.token || "" };
       if (normalizedRole === "admin") {
         localStorage.setItem("user", JSON.stringify(userWithRole));
+        localStorage.setItem("auth_token", data.token || "");
         setSuccess("Signed in successfully.");
         navigate("/admin", { replace: true });
       } else {

@@ -394,8 +394,10 @@ export default function Reports() {
     if (range === 'today') cutoff.setHours(0, 0, 0, 0);
     else if (range === 'week') cutoff.setDate(cutoff.getDate() - ((cutoff.getDay() + 6) % 7));
     else if (range === 'month') cutoff.setDate(1);
-    else cutoff.setDate(cutoff.getDate() - Number(range));
-    return combinedOrders.filter(o => o.created_at && new Date(o.created_at) >= cutoff);
+    else cutoff.setDate(cutoff.getDate() - Math.max(1, Number(range)) + 1);
+    const rangeEnd = new Date();
+    rangeEnd.setHours(23, 59, 59, 999);
+    return combinedOrders.filter(o => o.created_at && new Date(o.created_at) >= cutoff && new Date(o.created_at) <= rangeEnd);
   }, [combinedOrders, range, dateFilterStart, dateFilterEnd]);
 
   const completedOrds = useMemo(
@@ -411,9 +413,10 @@ export default function Reports() {
     if (range === 'today') cutoff.setHours(0, 0, 0, 0);
     else if (range === 'week') cutoff.setDate(cutoff.getDate() - ((cutoff.getDay() + 6) % 7));
     else if (range === 'month') cutoff.setDate(1);
-    else cutoff.setDate(cutoff.getDate() - Number(range));
+    else cutoff.setDate(cutoff.getDate() - Math.max(1, Number(range)) + 1);
     const cutoffDate = cutoff.toISOString().slice(0, 10);
-    return historicalSales.filter(sale => sale.sale_date >= cutoffDate);
+    const rangeEndDate = new Date().toISOString().slice(0, 10);
+    return historicalSales.filter(sale => sale.sale_date >= cutoffDate && sale.sale_date <= rangeEndDate);
   }, [historicalSales, range, dateFilterStart, dateFilterEnd]);
   const cancelledOrds = useMemo(
     () => visibleOrders.filter(o => ['cancelled', 'canceled', 'rejected'].includes(normalizeStatus(o.status))),

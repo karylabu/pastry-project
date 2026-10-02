@@ -269,6 +269,14 @@ class CustomerApiController extends Controller
                 ]
             );
 
+            if (session_status() === PHP_SESSION_NONE) {
+                session_start();
+            }
+            $_SESSION['user'] = $userData;
+            $_SESSION['auth_token'] = $token;
+            session(['user' => $userData]);
+            session(['auth_token' => $token]);
+
             return $this->corsResponse([
                 'success' => true,
                 'message' => 'Login successful',
