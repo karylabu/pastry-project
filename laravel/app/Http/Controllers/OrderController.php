@@ -10,6 +10,7 @@ use App\Http\Requests\StoreOrderRequest;
 use App\Services\CustomizedCakeService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
@@ -31,8 +32,29 @@ class OrderController extends Controller
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
         }
 
-        $orders = Order::with(['orderItems', 'customCakeDetails'])
-            ->where('user_id', $user->id)
+        $relations = [];
+        if (Schema::hasTable('order_items')) {
+            $relations[] = 'orderItems';
+        }
+        if (Schema::hasTable('custom_cake_orders')) {
+            $relations[] = 'customCakeDetails';
+        }
+
+        $hasUserId = Schema::hasColumn('orders', 'user_id');
+        $hasEmail = Schema::hasColumn('orders', 'email');
+        $orders = Order::with($relations)
+            ->where(function ($query) use ($user, $hasUserId, $hasEmail) {
+                if ($hasUserId) {
+                    $query->where('user_id', $user->id);
+                }
+                if ($hasEmail) {
+                    $method = $hasUserId ? 'orWhereRaw' : 'whereRaw';
+                    $query->{$method}('LOWER(email) = LOWER(?)', [$user->email]);
+                }
+                if (!$hasUserId && !$hasEmail) {
+                    $query->whereRaw('1 = 0');
+                }
+            })
             ->orderBy('created_at', 'desc')
             ->get();
 
@@ -555,6 +577,32 @@ class OrderController extends Controller
             'success' => true,
             'message' => 'Order cancelled successfully.'
         ]);
+    }
+
+    public function confirmReceived(Request $request, int $id)
+    {
+        $user = $this->getAuthenticatedUser($request);
+        if (!$user) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+
+        try {
+            DB::transaction(function () use ($id, $user) {
+                $order = Order::query()->whereKey($id)->lockForUpdate()->first();
+                if (!$order || (int) $order->user_id !== (int) $user->id) {
+                    throw new RuntimeException('Order not found.');
+                }
+                if ($order->status !== 'Ready for Pickup') {
+                    throw new RuntimeException('Order is not ready to be confirmed.');
+                }
+                $order->update(['status' => 'Completed']);
+            });
+        } catch (\Throwable $exception) {
+            $status = $exception->getMessage() === 'Order not found.' ? 404 : 409;
+            return response()->json(['success' => false, 'message' => $exception->getMessage()], $status);
+        }
+
+        return response()->json(['success' => true]);
     }
 
     /**

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Bell, Building2, Check, Clock3, KeyRound, LogOut, Save, ShieldCheck, UserCircle2 } from "lucide-react";
-import { CUSTOMER_BASE } from "../../services/config";
+import { LARAVEL_BASE } from "../../services/config";
 import { getAuthHeaders } from "../../services/api";
 
 const STORAGE_KEY = "admin_settings";
@@ -86,7 +86,7 @@ export default function Settings() {
     if (!user?.id) return;
     setSavingProfile(true); setError(""); setNotice("");
     try {
-      const response = await fetch(`${CUSTOMER_BASE}/api_update_profile.php`, { method: "POST", credentials: "include", headers: { "Content-Type": "application/json", ...getAuthHeaders() }, body: JSON.stringify({ user_id: user.id, ...profile }) });
+      const response = await fetch(`${LARAVEL_BASE}/api/profile`, { method: "POST", credentials: "include", headers: { "Content-Type": "application/json", ...getAuthHeaders() }, body: JSON.stringify({ ...profile, name: profile.full_name }) });
       const data = await response.json().catch(() => ({}));
       if (!response.ok || !data.success) throw new Error(data.message || "Unable to update profile.");
       const updated = { ...user, name: profile.full_name, email: profile.email, phone: profile.phone };
@@ -101,7 +101,7 @@ export default function Settings() {
     if (password.new_password !== password.confirm_password) { setError("New password and confirmation do not match."); return; }
     setSavingPassword(true); setError(""); setNotice("");
     try {
-      const response = await fetch(`${CUSTOMER_BASE}/api_change_password.php`, { method: "POST", credentials: "include", headers: { "Content-Type": "application/json", ...getAuthHeaders() }, body: JSON.stringify({ user_id: user.id, ...password }) });
+      const response = await fetch(`${LARAVEL_BASE}/api/password/change`, { method: "POST", credentials: "include", headers: { "Content-Type": "application/json", ...getAuthHeaders() }, body: JSON.stringify(password) });
       const data = await response.json().catch(() => ({}));
       if (!response.ok || !data.success) throw new Error(data.message || "Unable to change password.");
       setPassword({ current_password: "", new_password: "", confirm_password: "" }); setNotice("Password changed successfully.");

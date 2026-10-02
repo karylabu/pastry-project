@@ -29,7 +29,7 @@ import { useNavigate } from "react-router-dom";
 
 import ProductModal from "../components/ProductModal";
 import CustomCakeModal from "../components/CustomCakeModal";
-import { CUSTOMER_BASE, ROOT_BASE } from "../../services/config";
+import { CUSTOMER_BASE, LARAVEL_BASE, ROOT_BASE } from "../../services/config";
 import { getAuthHeaders, safeParseJson } from "../../services/api";
 import { subscribeRealtime } from "../../services/realtime";
 
@@ -510,7 +510,7 @@ export function ChatBubble({ aiMode = false, fullPage = false }) {
         conversation_id: conversationId,
         mark_read: open ? "1" : "0",
       });
-      const res  = await fetch(`${CUSTOMER_BASE}/api_chat_fetch.php?${params.toString()}`, {
+      const res  = await fetch(`${CUSTOMER_BASE}/api/customer/chat/messages?${params.toString()}`, {
         credentials: 'include',
         headers: getAuthHeaders(),
       });
@@ -584,7 +584,7 @@ export function ChatBubble({ aiMode = false, fullPage = false }) {
       if (image) formData.append("image", image);
 
       const chatApiBase = CUSTOMER_BASE;
-      const res  = await fetch(`${chatApiBase}/api_chat_send.php`, {
+      const res  = await fetch(`${chatApiBase}/api/customer/chat/messages`, {
         method: "POST",
         credentials: 'include',
         headers: getAuthHeaders(),
@@ -1056,13 +1056,13 @@ export default function Dashboard({ onAddToCart }) {
   const loadFavorites = async () => {
     if (userId > 0) {
       try {
-        const response = await fetch(`${CUSTOMER_BASE}/api_favorites.php`, {
+        const response = await fetch(`${CUSTOMER_BASE}/api/favorites`, {
           credentials: 'include',
           headers: getAuthHeaders(),
         });
         const data = await safeParseJson(response);
-        if (data.status === 'success') {
-          setFavoriteIds(data.favorites || []);
+        if (Array.isArray(data)) {
+          setFavoriteIds(data.map(Number));
           return;
         }
       } catch (err) {
@@ -1079,7 +1079,7 @@ export default function Dashboard({ onAddToCart }) {
   useEffect(() => {
     const fetchProducts = async () => {
       try {
-        const res  = await fetch(`${CUSTOMER_BASE}/api_products.php?action=list`);
+        const res  = await fetch(`${CUSTOMER_BASE}/api/customer/products?action=list`);
         const data = await safeParseJson(res);
         if (Array.isArray(data)) setProducts(data);
       } catch (err) {
@@ -1095,7 +1095,7 @@ export default function Dashboard({ onAddToCart }) {
       }
 
       try {
-        const res = await fetch(`${CUSTOMER_BASE}/api_products.php?action=recommendations`, {
+        const res = await fetch(`${CUSTOMER_BASE}/api/customer/products?action=recommendations`, {
           credentials: 'include',
           headers: getAuthHeaders(),
         });
@@ -1113,7 +1113,7 @@ export default function Dashboard({ onAddToCart }) {
 
     const fetchBestSellers = async () => {
       try {
-        const res = await fetch(`${CUSTOMER_BASE}/api_products.php?action=bestsellers`);
+        const res = await fetch(`${CUSTOMER_BASE}/api/customer/products?action=bestsellers`);
         const data = await safeParseJson(res);
         setBestSellerProducts(Array.isArray(data) ? data : []);
       } catch (err) {
@@ -1129,12 +1129,12 @@ export default function Dashboard({ onAddToCart }) {
       }
 
       try {
-        const res = await fetch(`${CUSTOMER_BASE}/api_get_orders.php`, {
+        const res = await fetch(`${LARAVEL_BASE}/api/orders`, {
           credentials: 'include',
           headers: getAuthHeaders(),
         });
         const data = await safeParseJson(res);
-        const completedOrder = (Array.isArray(data) ? data : [])
+        const completedOrder = (Array.isArray(data?.orders) ? data.orders : [])
           .filter((order) => String(order.status || '').toLowerCase() === 'completed')
           .sort((a, b) => Number(b.id || 0) - Number(a.id || 0))[0] || null;
         setRecentCompletedOrder(completedOrder);

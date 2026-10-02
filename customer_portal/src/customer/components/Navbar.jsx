@@ -64,18 +64,18 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
       setUser(null);
     }
 
-    fetch(`${CUSTOMER_BASE}/api_get_user.php`, {
+    fetch(`${CUSTOMER_BASE}/api/user`, {
       credentials: 'include',
       headers: getAuthHeaders(),
     })
       .then(safeParseJson)
       .then(data => {
-        if (data?.status === 'success' && data.user) {
+        if (data?.id) {
           const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
           setUser({
             ...storedUser,
-            ...data.user,
-            avatar: data.user.avatar || data.user.profile_image || data.user.profile_picture || storedUser.avatar || '',
+            ...data,
+            avatar: data.avatar || data.profile_image || data.profile_picture || storedUser.avatar || '',
           });
         }
       })
@@ -98,7 +98,7 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
       console.log("Stored user:", storedUser);
       
       if (storedUser?.id) {
-        const url = `${CUSTOMER_BASE}/api_get_notifications.php`;
+        const url = `${CUSTOMER_BASE}/api/customer/notifications`;
         console.log("Fetching notifications from:", url);
         
         fetch(url, { credentials: 'include', headers: getAuthHeaders() })
@@ -213,11 +213,10 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
         // Mark each unread notification as read
         await Promise.all(
           unreadNotifs.map(notif =>
-            fetch(`${CUSTOMER_BASE}/api_mark_notif_read.php`, {
+            fetch(`${CUSTOMER_BASE}/api/customer/notifications/${notif.id}/read`, {
               method: 'POST',
               credentials: 'include',
-              headers: { 'Content-Type': 'application/x-www-form-urlencoded', ...getAuthHeaders() },
-              body: `notification_id=${notif.id}`,
+              headers: getAuthHeaders(),
             }).catch(err => console.error('Error marking notification as read:', err))
           )
         );
@@ -381,11 +380,10 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
                         if (unreadNotifs.length === 0) return;
                         Promise.all(
                           unreadNotifs.map((notif) =>
-                            fetch(`${CUSTOMER_BASE}/api_mark_notif_read.php`, {
+                            fetch(`${CUSTOMER_BASE}/api/customer/notifications/${notif.id}/read`, {
                               method: 'POST',
                               credentials: 'include',
-                              headers: { 'Content-Type': 'application/x-www-form-urlencoded', ...getAuthHeaders() },
-                              body: `notification_id=${notif.id}`,
+                              headers: getAuthHeaders(),
                             }).catch(() => {})
                           )
                         ).finally(() => fetchNotifications());

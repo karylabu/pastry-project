@@ -48,6 +48,11 @@ try {
         exit;
     }
 
+    if (strtolower(trim((string) ($user['status'] ?? 'active'))) !== 'active') {
+        echo json_encode(["success" => false, "message" => "This account is deactivated."]);
+        exit;
+    }
+
     $passwordValid = password_verify($password, $user['password']);
 
     if (!$passwordValid) {
@@ -55,7 +60,7 @@ try {
         exit;
     }
 
-    $accountStatus = 'active';
+    $accountStatus = strtolower(trim((string) ($user['status'] ?? 'active')));
 
     session_regenerate_id(true);
     $_SESSION['user'] = [

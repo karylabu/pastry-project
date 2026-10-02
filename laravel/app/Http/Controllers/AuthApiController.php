@@ -2,12 +2,14 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Log;
 
 class AuthApiController extends Controller
 {
@@ -16,11 +18,13 @@ class AuthApiController extends Controller
      */
     public function register(Request $request)
     {
+        $request->merge(['email' => strtolower(trim((string) $request->input('email', '')))]);
         $validator = Validator::make($request->all(), [
             'name' => 'required|string|max:100',
             'email' => 'required|string|email|max:150|unique:users',
             'password' => 'required|string|min:6',
             'phone' => 'nullable|string',
+            'agree_privacy' => 'sometimes|boolean',
         ]);
 
         if ($validator->fails()) {
@@ -37,6 +41,7 @@ class AuthApiController extends Controller
             'password' => Hash::make($request->password),
             'role' => 'customer',
             'phone' => $request->phone,
+            'subscribed_promo' => $request->boolean('agree_privacy'),
         ]);
 
         $token = bin2hex(random_bytes(32));
@@ -70,26 +75,21 @@ class AuthApiController extends Controller
      */
     public function login(Request $request)
     {
-        Log::info('Login attempt', [
-            'email' => $request->email,
-            'ip' => $request->ip(),
-            'all' => $request->all()
-        ]);
+        $email = strtolower(trim((string) $request->input('email', '')));
+        $password = (string) $request->input('password', '');
 
-        $validator = Validator::make($request->all(), [
+        $validator = Validator::make(['email' => $email, 'password' => $password], [
             'email' => 'required|email',
-            'password' => 'required',
+            'password' => 'required|string',
         ]);
 
         if ($validator->fails()) {
-            Log::warning('Login validation failed', $validator->errors()->toArray());
             return response()->json(['success' => false, 'message' => 'Invalid input'], 422);
         }
 
-        $user = User::where('email', $request->email)->first();
+        $user = User::whereRaw('LOWER(email) = ?', [$email])->first();
 
         if (!$user) {
-            Log::warning('Login failed: User not found', ['email' => $request->email]);
             return response()->json([
                 'success' => false,
                 'message' => 'Account not found. Please register first.'
@@ -103,17 +103,26 @@ class AuthApiController extends Controller
             ], 403);
         }
 
-        $passwordValid = Hash::check($request->password, $user->password);
+        if (strtolower(trim((string) ($user->status ?? 'active'))) !== 'active') {
+            return response()->json(['success' => false, 'message' => 'This account is deactivated.'], 403);
+        }
 
-        if (!$passwordValid) {
-            Log::warning('Login failed: Incorrect password', ['email' => $request->email]);
+        $storedPassword = (string) $user->getRawOriginal('password');
+        $passwordValid = Hash::check($password, $storedPassword);
+        $isLegacyPassword = !$passwordValid && hash_equals($storedPassword, $password);
+
+        if (!$passwordValid && !$isLegacyPassword) {
             return response()->json([
                 'success' => false,
                 'message' => 'Incorrect password. Please try again.'
             ], 200); // Using 200 to ensure message delivery
         }
 
-        Log::info('Login successful', ['user_id' => $user->id, 'email' => $user->email]);
+        if ($isLegacyPassword) {
+            DB::table('users')
+                ->where('id', $user->id)
+                ->update(['password' => Hash::make($password)]);
+        }
 
         try {
             $this->ensureSessionsTable();
@@ -161,21 +170,48 @@ class AuthApiController extends Controller
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
         }
 
-        $validator = Validator::make($request->all(), [
+        $data = $request->all();
+        if (!array_key_exists('name', $data) && array_key_exists('full_name', $data)) {
+            $data['name'] = $data['full_name'];
+        }
+        if (!array_key_exists('profile_picture', $data) && array_key_exists('profile_image', $data)) {
+            $data['profile_picture'] = $data['profile_image'];
+        }
+        if (isset($data['email'])) {
+            $data['email'] = strtolower(trim((string) $data['email']));
+        }
+
+        $validator = Validator::make($data, [
             'name' => 'sometimes|string|max:100',
-            'phone' => 'sometimes|string|max:20',
+            'phone' => 'sometimes|nullable|string|max:20',
             'email' => 'sometimes|email|max:150|unique:users,email,' . $user->id,
+            'username' => 'sometimes|nullable|string|max:100',
+            'profile_picture' => 'sometimes|nullable|string|max:2048',
         ]);
 
         if ($validator->fails()) {
             return response()->json(['success' => false, 'errors' => $validator->errors()], 422);
         }
 
-        if ($request->has('name')) $user->name = $request->name;
-        if ($request->has('phone')) $user->phone = $request->phone;
-        if ($request->has('email')) $user->email = $request->email;
-
-        $user->save();
+        $updates = [];
+        foreach (['name', 'phone', 'email'] as $field) {
+            if (array_key_exists($field, $data)) {
+                $updates[$field] = $data[$field];
+            }
+        }
+        if (array_key_exists('username', $data) && Schema::hasColumn('users', 'username')) {
+            $updates['username'] = $data['username'];
+        }
+        $profileColumn = Schema::hasColumn('users', 'profile_picture')
+            ? 'profile_picture'
+            : (Schema::hasColumn('users', 'profile_image') ? 'profile_image' : null);
+        if ($profileColumn && array_key_exists('profile_picture', $data)) {
+            $updates[$profileColumn] = $data['profile_picture'];
+        }
+        if ($updates) {
+            DB::table('users')->where('id', $user->id)->update($updates);
+            $user->refresh();
+        }
 
         return response()->json([
             'success' => true,
@@ -189,9 +225,10 @@ class AuthApiController extends Controller
      */
     public function forgotPassword(Request $request)
     {
-        $email = trim($request->input('email', ''));
-        if (!$email) {
-            return response()->json(['success' => false, 'message' => 'Email is required'], 400);
+        $email = strtolower(trim((string) $request->input('email', '')));
+        $validator = Validator::make(['email' => $email], ['email' => 'required|email|max:255']);
+        if ($validator->fails()) {
+            return response()->json(['success' => false, 'message' => 'Please enter a valid email address.'], 422);
         }
 
         $user = User::where('email', $email)->first();
@@ -233,11 +270,19 @@ class AuthApiController extends Controller
      */
     public function verifyResetCode(Request $request)
     {
-        $email = $request->input('email');
-        $code = $request->input('code');
+        $this->ensurePasswordResetsTable();
+        $email = strtolower(trim((string) $request->input('email', '')));
+        $code = trim((string) $request->input('code', ''));
+        $validator = Validator::make(['email' => $email, 'code' => $code], [
+            'email' => 'required|email|max:255',
+            'code' => 'required|string|size:6',
+        ]);
+        if ($validator->fails()) {
+            return response()->json(['success' => false, 'message' => 'Invalid or expired code'], 422);
+        }
 
         $valid = DB::table('password_resets')
-            ->where('email', $email)
+            ->whereRaw('LOWER(email) = ?', [$email])
             ->where('token', $code)
             ->where('used', 0)
             ->where('expires_at', '>', now())
@@ -251,12 +296,25 @@ class AuthApiController extends Controller
      */
     public function resetPassword(Request $request)
     {
-        $email = $request->input('email');
-        $code = $request->input('code');
-        $newPassword = $request->input('new_password');
+        $this->ensurePasswordResetsTable();
+        $email = strtolower(trim((string) $request->input('email', '')));
+        $code = trim((string) $request->input('code', ''));
+        $newPassword = (string) $request->input('new_password', '');
+        $validator = Validator::make([
+            'email' => $email,
+            'code' => $code,
+            'new_password' => $newPassword,
+        ], [
+            'email' => 'required|email|max:255',
+            'code' => 'required|string|size:6',
+            'new_password' => 'required|string|min:6',
+        ]);
+        if ($validator->fails()) {
+            return response()->json(['success' => false, 'message' => 'Please provide a valid code and password.'], 422);
+        }
 
         $reset = DB::table('password_resets')
-            ->where('email', $email)
+            ->whereRaw('LOWER(email) = ?', [$email])
             ->where('token', $code)
             ->where('used', 0)
             ->where('expires_at', '>', now())
@@ -268,11 +326,104 @@ class AuthApiController extends Controller
 
         $user = User::where('email', $email)->first();
         if ($user) {
-            $user->update(['password' => Hash::make($newPassword)]);
-            DB::table('password_resets')->where('email', $email)->update(['used' => 1]);
+            DB::table('users')->where('id', $user->id)->update(['password' => Hash::make($newPassword)]);
+            DB::table('password_resets')->whereRaw('LOWER(email) = ?', [$email])->update(['used' => 1]);
         }
 
         return response()->json(['success' => true]);
+    }
+
+    public function changePassword(Request $request)
+    {
+        $user = $this->getAuthenticatedUser($request);
+        if (!$user || !in_array(strtolower((string) $user->role), ['customer', 'admin'], true)) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'current_password' => 'required|string',
+            'new_password' => 'required|string|min:6',
+        ]);
+        if ($validator->fails()) {
+            return response()->json(['success' => false, 'message' => 'Please provide a valid current and new password.'], 422);
+        }
+        if (!$this->passwordMatches($user, (string) $request->input('current_password'))) {
+            return response()->json(['success' => false, 'message' => 'Current password is incorrect.'], 422);
+        }
+
+        DB::table('users')->where('id', $user->id)->update([
+            'password' => Hash::make((string) $request->input('new_password')),
+        ]);
+
+        return response()->json(['success' => true, 'message' => 'Password updated successfully.']);
+    }
+
+    public function deleteAccount(Request $request)
+    {
+        $user = $this->getAuthenticatedUser($request);
+        if (!$user || strtolower((string) $user->role) !== 'customer') {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+
+        $password = (string) $request->input('password', '');
+        if ($password === '' || !$this->passwordMatches($user, $password)) {
+            return response()->json(['success' => false, 'message' => 'Password is incorrect.'], 422);
+        }
+
+        DB::transaction(function () use ($user) {
+            if (Schema::hasTable('user_sessions')) {
+                DB::table('user_sessions')->where('user_id', $user->id)->delete();
+            }
+            if (Schema::hasTable('favorites')) {
+                DB::table('favorites')->where('customer_id', $user->id)->delete();
+            }
+            if (Schema::hasTable('orders') && Schema::hasColumn('orders', 'user_id')) {
+                DB::table('orders')->where('user_id', $user->id)->update(['user_id' => null]);
+            }
+            $user->delete();
+        });
+
+        return response()->json(['success' => true, 'message' => 'Account deleted successfully.']);
+    }
+
+    public function sessions(Request $request)
+    {
+        $user = $this->getAuthenticatedUser($request);
+        if (!$user || strtolower((string) $user->role) !== 'customer') {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+        if (!Schema::hasTable('user_sessions')) {
+            return response()->json(['success' => true, 'sessions' => []]);
+        }
+
+        $token = $request->bearerToken() ?: trim((string) $request->header('X-Auth-Token', ''));
+        $sessions = DB::table('user_sessions')
+            ->where('user_id', $user->id)
+            ->orderByDesc('created_at')
+            ->get()
+            ->map(fn ($session) => [
+                'id' => (int) $session->id,
+                'device_name' => $session->device_name ?: 'Unknown device',
+                'ip_address' => $session->ip_address ?: 'Unknown IP',
+                'created_at' => $session->created_at,
+                'expires_at' => $session->expires_at,
+                'current' => $token !== '' && hash_equals((string) $session->token, $token),
+            ]);
+
+        return response()->json(['success' => true, 'sessions' => $sessions]);
+    }
+
+    private function passwordMatches(User $user, string $password): bool
+    {
+        $storedPassword = (string) $user->getRawOriginal('password');
+        try {
+            if (Hash::check($password, $storedPassword)) {
+                return true;
+            }
+        } catch (\Throwable) {
+        }
+
+        return $storedPassword !== '' && hash_equals($storedPassword, $password);
     }
 
     private function ensureSessionsTable()

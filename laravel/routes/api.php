@@ -17,20 +17,39 @@ use App\Http\Controllers\Api\ProductionController;
 use App\Http\Controllers\Api\CustomizedCakeController;
 use App\Http\Controllers\Api\CakeSalesAnalyticsController;
 use App\Http\Controllers\Api\OrderFeedbackController;
+use App\Http\Controllers\FavoriteController;
+use App\Http\Controllers\AddressController;
 use App\Http\Controllers\OrderController;
 use App\Http\Controllers\SalesImportController;
 use App\Http\Controllers\NewsletterController;
 use App\Http\Controllers\CustomerApiController;
 use App\Http\Controllers\StaffApiController;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\AuthApiController;
 
 Route::options('{any}', fn () => response()->noContent())->where('any', '.*');
 
 Route::get('products', [ProductController::class, 'index']);
+Route::match(['get', 'post'], 'customer/products', [CustomerApiController::class, 'products']);
 Route::match(['get', 'options'], 'staff/dashboard', [StaffApiController::class, 'getDashboard']);
+Route::post('login', [AuthApiController::class, 'login']);
+Route::post('register', [AuthApiController::class, 'register']);
+Route::post('profile', [AuthApiController::class, 'updateProfile']);
+Route::post('password/forgot', [AuthApiController::class, 'forgotPassword'])
+    ->middleware(\Illuminate\Routing\Middleware\ThrottleRequests::class . ':5,15');
+Route::post('password/verify', [AuthApiController::class, 'verifyResetCode'])
+    ->middleware(\Illuminate\Routing\Middleware\ThrottleRequests::class . ':10,15');
+Route::post('password/reset', [AuthApiController::class, 'resetPassword'])
+    ->middleware(\Illuminate\Routing\Middleware\ThrottleRequests::class . ':10,15');
+Route::post('password/change', [AuthApiController::class, 'changePassword']);
+Route::post('account/delete', [AuthApiController::class, 'deleteAccount']);
+Route::get('sessions', [AuthApiController::class, 'sessions']);
 Route::post('google-login', [AuthController::class, 'googleLogin']);
 Route::options('google-login', [AuthController::class, 'googleLogin']);
+Route::get('orders', [OrderController::class, 'index']);
 Route::post('orders', [OrderController::class, 'store']);
+Route::post('orders/{orderId}/cancel', [OrderController::class, 'cancel']);
+Route::post('orders/{orderId}/confirm-received', [OrderController::class, 'confirmReceived']);
 Route::post('orders/{orderId}/payment-proof', [OrderController::class, 'submitPaymentProof']);
 Route::post('orders/{orderId}/payment-failure', [OrderController::class, 'markPaymentFailed']);
 Route::post('sales/import-pdf', [SalesImportController::class, 'store']);
@@ -39,6 +58,20 @@ Route::get('sales/import/history', [SalesImportController::class, 'history']);
 Route::post('newsletter/subscribe', [NewsletterController::class, 'subscribe']);
 Route::post('orders', [OrderController::class, 'store']);
 Route::get('user', [CustomerApiController::class, 'user']);
+Route::get('customer/notifications', [CustomerApiController::class, 'notifications']);
+Route::post('customer/notifications/{id}/read', [CustomerApiController::class, 'markNotificationRead']);
+Route::get('customer/chat/messages', [CustomerApiController::class, 'chatFetch']);
+Route::post('customer/chat/messages', [CustomerApiController::class, 'chatSend']);
+Route::post('customer/payments', [CustomerApiController::class, 'createPayment']);
+Route::get('staff/chat/conversations', [CustomerApiController::class, 'chatConversations']);
+Route::get('staff/chat/messages', [CustomerApiController::class, 'chatFetch']);
+Route::post('staff/chat/messages', [CustomerApiController::class, 'chatSend']);
+Route::get('favorites', [FavoriteController::class, 'index']);
+Route::post('favorites/toggle', [FavoriteController::class, 'toggle']);
+Route::get('addresses', [AddressController::class, 'index']);
+Route::post('addresses', [AddressController::class, 'store']);
+Route::put('addresses/{id}', [AddressController::class, 'update']);
+Route::delete('addresses/{id}', [AddressController::class, 'destroy']);
 Route::get('staff/orders/{orderId}/discount-id', [StaffApiController::class, 'viewOrderDiscountId']);
 Route::get('staff/orders/{orderId}/payment-proof', [StaffApiController::class, 'viewOrderPaymentProof']);
 Route::get('admin/analytics/cake-sales', [CakeSalesAnalyticsController::class, 'index']);
@@ -102,5 +135,6 @@ Route::middleware(['api'])->group(function () {
         Route::post('alerts/mark-all-read', [AdminAlertController::class, 'markAllRead']);
         Route::get('promotions', [PromotionController::class, 'index']);
         Route::post('promotions/send', [PromotionController::class, 'send']);
+        Route::post('promotions/{promotion}', [PromotionController::class, 'update']);
     });
 });

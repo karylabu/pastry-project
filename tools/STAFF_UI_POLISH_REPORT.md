@@ -67,4 +67,9 @@ Date: 2026-08-25
 
 - Start a React dev server or serve the generated `customer_portal/build` output to perform real desktop/tablet/mobile screenshots and console checks.
 - Complete browser acceptance testing for role visibility, refresh persistence, recommendation rendering, modal keyboard focus, and live API errors.
-- The dashboard still polls order/chat endpoints; this was left unchanged because it is existing behavior and no measurable duplicate-request defect was established in this pass.
+
+## Real-Time Sync (3.3)
+
+- Order and chat views refresh when they receive server-sent events (SSE); the browser does not rely on periodic polling for these updates.
+- The SSE endpoint checks the database event table every 0.5 seconds and streams new events to connected clients. Connections are reopened periodically, with automatic client reconnection.
+- This is near-real-time synchronization, not immediate delivery or WebSocket-based synchronization. Some unrelated data, such as staff inventory ingredients, still uses 15-second polling.

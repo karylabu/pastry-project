@@ -22,6 +22,10 @@ class LegacyController extends Controller
         $relativePath = ltrim($request->path(), '/');
         $filePath = realpath($this->root . DIRECTORY_SEPARATOR . $relativePath);
 
+        if (!$filePath && preg_match('/^api_[^\/]+\.php$/', $relativePath)) {
+            $filePath = realpath($this->root . DIRECTORY_SEPARATOR . 'customer' . DIRECTORY_SEPARATOR . $relativePath);
+        }
+
         if (!$filePath || !str_starts_with($filePath, $this->root . DIRECTORY_SEPARATOR)) {
             abort(404);
         }
@@ -50,6 +54,16 @@ class LegacyController extends Controller
         ob_start();
         include $filePath;
         $content = ob_get_clean();
+
+        foreach ([
+            'Access-Control-Allow-Origin',
+            'Access-Control-Allow-Credentials',
+            'Access-Control-Allow-Methods',
+            'Access-Control-Allow-Headers',
+            'Vary',
+        ] as $header) {
+            header_remove($header);
+        }
 
         chdir($cwd);
 

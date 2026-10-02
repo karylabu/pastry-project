@@ -114,6 +114,17 @@ Route::any('/staff/api_update_order_status.php', [LegacyController::class, 'rend
 Route::any('/staff/api_chat_fetch_all.php', [LegacyController::class, 'render'])
     ->withoutMiddleware([Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
 
+// Keep unported API files reachable through Laravel while their handlers are migrated.
+Route::any('/api_{endpoint}.php', [LegacyController::class, 'render'])
+    ->where('endpoint', '[A-Za-z0-9_]+')
+    ->withoutMiddleware([Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
+Route::any('/staff/api_{endpoint}.php', [LegacyController::class, 'render'])
+    ->where('endpoint', '[A-Za-z0-9_]+')
+    ->withoutMiddleware([Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
+Route::any('/admin/api/{endpoint}', [LegacyController::class, 'render'])
+    ->where('endpoint', 'api_[A-Za-z0-9_]+\.php')
+    ->withoutMiddleware([Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
+
 // Redirect admin users to the legacy admin products page for the same behavior
 Route::get('/admin-products', function () {
     return redirect('/admin_products.php');

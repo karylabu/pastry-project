@@ -2,12 +2,10 @@ import React, { useState, useEffect } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import ForgotPassword from "./ForgotPassword";
-import { CUSTOMER_BASE, LARAVEL_BASE, ROOT_BASE } from "../../services/config";
+import { LARAVEL_BASE, ROOT_BASE } from "../../services/config";
 import { safeParseJson } from '../../services/api';
 import { signInWithGoogle } from "../../services/firebase";
 
-// ✅ CORRECT
-const BASE = CUSTOMER_BASE;
 const LOGO_URL = "/assets/logo.png";
 const REGISTER_URL = "/customer/register";
 const isCustomerRole = (role) => {
@@ -56,32 +54,15 @@ export default function Login() {
         photoUrl: photoURL || googleUser?.photoURL || "",
       };
 
-      let data = null;
-      let response = null;
+      const response = await fetch(`${LARAVEL_BASE}/api/google-login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ id_token: idToken, ...googlePayload }),
+      });
+      const data = await safeParseJson(response);
 
-      try {
-        response = await fetch(`${CUSTOMER_BASE}/api_google_login.php`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Accept: "application/json" },
-          credentials: "include",
-          body: JSON.stringify(googlePayload),
-        });
-        data = await safeParseJson(response);
-      } catch (directError) {
-        console.warn("Direct Google login failed, trying Laravel route:", directError);
-      }
-
-      if (!data?.success) {
-        response = await fetch(`${LARAVEL_BASE}/api/google-login`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Accept: "application/json" },
-          credentials: "include",
-          body: JSON.stringify({ id_token: idToken, ...googlePayload }),
-        });
-        data = await safeParseJson(response);
-      }
-
-      if (!response || !response.ok || !data?.success) {
+      if (!response.ok || !data?.success) {
         throw new Error(data?.message || "Google sign-in failed.");
       }
 
@@ -111,7 +92,7 @@ export default function Login() {
     setLoading(true);
 
     try {
-      const res  = await fetch(`${BASE}/api_login.php`, {
+      const res  = await fetch(`${LARAVEL_BASE}/api/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",

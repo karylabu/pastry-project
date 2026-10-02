@@ -39,6 +39,8 @@ class AuthController extends Controller
                 $error = 'User not found.';
             } elseif (!in_array(strtolower((string) ($user->role ?? '')), ['customer', 'admin'], true)) {
                 $error = 'This account is not eligible for access.';
+            } elseif (strtolower(trim((string) ($user->status ?? 'active'))) !== 'active') {
+                $error = 'This account is deactivated.';
             } elseif (!Hash::check($password, $user->password)) {
                 $error = 'Incorrect password.';
             } else {
@@ -134,6 +136,9 @@ class AuthController extends Controller
 
         if (!in_array(strtolower((string) ($user->role ?? '')), ['customer', 'admin'], true)) {
             return $this->googleCorsResponse(['success' => false, 'message' => 'This account is not eligible for access.'], 403);
+        }
+        if (strtolower(trim((string) ($user->status ?? 'active'))) !== 'active') {
+            return $this->googleCorsResponse(['success' => false, 'message' => 'This account is deactivated.'], 403);
         }
 
         $token = bin2hex(random_bytes(32));

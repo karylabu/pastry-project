@@ -4,7 +4,6 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use App\Models\User;
 
 class AddressController extends Controller
 {
@@ -22,6 +21,7 @@ class AddressController extends Controller
 
             return response()->json([
                 'success' => true,
+                'status' => 'success',
                 'addresses' => $addresses
             ]);
         } catch (\Exception $e) {
@@ -90,7 +90,7 @@ class AddressController extends Controller
         }
     }
 
-    public function update(Request $request, $id)
+    public function update(Request $request, int $id)
     {
         $user = $this->getAuthenticatedUser($request);
         if (!$user) return response()->json(['success' => false], 401);
@@ -137,7 +137,7 @@ class AddressController extends Controller
         }
     }
 
-    public function destroy(Request $request, $id)
+    public function destroy(Request $request, int $id)
     {
         $user = $this->getAuthenticatedUser($request);
         if (!$user) return response()->json(['success' => false], 401);

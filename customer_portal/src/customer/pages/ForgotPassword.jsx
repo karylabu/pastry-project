@@ -1,10 +1,10 @@
 import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowLeft, Mail, KeyRound, Lock } from "lucide-react";
-import { CUSTOMER_BASE } from "../../services/config";
+import { LARAVEL_BASE } from "../../services/config";
 import { safeParseJson } from '../../services/api';
 
-const BASE = CUSTOMER_BASE;
+const BASE = LARAVEL_BASE;
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const validateEmail = (value) => {
@@ -86,7 +86,7 @@ export default function ForgotPassword({ onBack }) {
     setEmailError("");
     setLoading(true);
     try {
-      const res = await fetch(`${BASE}/api_forgot_password.php`, {
+      const res = await fetch(`${BASE}/api/password/forgot`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email }),
@@ -118,7 +118,7 @@ export default function ForgotPassword({ onBack }) {
     if (code.length !== 6) return setError("Enter the 6-digit code.");
     setLoading(true);
     try {
-      const res = await fetch(`${BASE}/api_verify_reset_password.php`, {
+      const res = await fetch(`${BASE}/api/password/verify`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, code }),
@@ -144,7 +144,7 @@ export default function ForgotPassword({ onBack }) {
     if (newPass !== confirmPass) return setError("Passwords do not match.");
     setLoading(true);
     try {
-      const res = await fetch(`${BASE}/api_reset_password.php`, {
+      const res = await fetch(`${BASE}/api/password/reset`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, code, new_password: newPass }),

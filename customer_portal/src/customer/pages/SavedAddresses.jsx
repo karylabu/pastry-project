@@ -74,7 +74,7 @@ export default function SavedAddresses() {
 
   const fetchAddresses = async () => {
     try {
-      const res = await fetch(`${CUSTOMER_BASE}/api_addresses.php`, {
+      const res = await fetch(`${CUSTOMER_BASE}/api/addresses`, {
         credentials: 'include',
         headers: getAuthHeaders(),
       });
@@ -115,7 +115,7 @@ export default function SavedAddresses() {
 
     setLoading(true);
     try {
-      const res = await fetch(`${CUSTOMER_BASE}/api_addresses.php`, {
+      const res = await fetch(`${CUSTOMER_BASE}/api/addresses`, {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },

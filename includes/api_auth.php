@@ -31,10 +31,11 @@ function apiUser(): ?array
         $conn = @new mysqli('localhost', 'root', '', 'pastry_db');
         if (!$conn->connect_error) {
             $stmt = $conn->prepare(
-                "SELECT u.id, u.name, u.email, u.role
+                     "SELECT u.id, u.name, u.email, u.role, u.status
                  FROM user_sessions s
                  JOIN users u ON u.id = s.user_id
                  WHERE s.token = ? AND (s.expires_at IS NULL OR s.expires_at > NOW())
+                         AND LOWER(COALESCE(u.status, 'active')) = 'active'
                  LIMIT 1"
             );
             if ($stmt) {
@@ -75,10 +76,11 @@ function apiUser(): ?array
     }
 
     $stmt = $conn->prepare(
-        "SELECT u.id, u.name, u.email, u.role
+          "SELECT u.id, u.name, u.email, u.role, u.status
          FROM user_sessions s
          JOIN users u ON u.id = s.user_id
          WHERE s.token = ? AND (s.expires_at IS NULL OR s.expires_at > NOW())
+              AND LOWER(COALESCE(u.status, 'active')) = 'active'
          LIMIT 1"
     );
     if (!$stmt) {

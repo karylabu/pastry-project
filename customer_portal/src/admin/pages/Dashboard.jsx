@@ -293,7 +293,7 @@ export default function Dashboard() {
   }, [analyticsPreset, customStart, customEnd, orders]);
 
   useEffect(() => {
-    fetch(`${CUSTOMER_BASE}/api_products.php?action=list`)
+    fetch(`${CUSTOMER_BASE}/api/customer/products?action=list`)
       .then((res) => res.json())
       .then((data) => {
         if (Array.isArray(data)) {

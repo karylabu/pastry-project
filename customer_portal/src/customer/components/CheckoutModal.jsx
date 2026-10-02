@@ -295,7 +295,7 @@ export default function CheckoutModal({
     setAddressFetchError('');
 
     try {
-      const res = await fetch(`${CUSTOMER_BASE}/api_addresses.php`, {
+      const res = await fetch(`${CUSTOMER_BASE}/api/addresses`, {
         credentials: 'include',
         headers: getAuthHeaders(),
       });
@@ -617,7 +617,7 @@ export default function CheckoutModal({
         paymentSetupStarted = true;
 
         const paymentResponse = await fetch(
-          `${CUSTOMER_BASE}/create_payment.php`,
+          `${CUSTOMER_BASE}/api/customer/payments`,
           {
             method: "POST",
             credentials: "include",

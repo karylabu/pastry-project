@@ -65,6 +65,9 @@ class StaffApiController extends Controller
         if ($role !== 'admin') {
             return $this->corsResponse(['success' => false, 'message' => 'Admin access required.'], 403);
         }
+        if (strtolower(trim((string) ($user->status ?? 'active'))) !== 'active') {
+            return $this->corsResponse(['success' => false, 'message' => 'This account is deactivated.'], 403);
+        }
 
         $passwordValid = Hash::check($password, $user->password);
 

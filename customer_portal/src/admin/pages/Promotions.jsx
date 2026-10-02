@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { CalendarDays, CheckCircle2, ImagePlus, Loader2, Megaphone, Tag, XCircle } from "lucide-react";
+import { CalendarDays, CheckCircle2, ImagePlus, Loader2, Megaphone, Pencil, Tag, XCircle } from "lucide-react";
 import { LARAVEL_BASE } from "../../services/config";
 import { getAuthHeaders } from "../../services/api";
 
@@ -63,6 +63,13 @@ function formatDate(value) {
   });
 }
 
+function toDateTimeLocal(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+}
+
 export default function Promotions() {
   const [user, setUser] = useState(() => getStoredUser());
   const [loading, setLoading] = useState(true);
@@ -73,6 +80,7 @@ export default function Promotions() {
   const [imageFile, setImageFile] = useState(null);
   const [imagePreview, setImagePreview] = useState("");
   const [promotions, setPromotions] = useState([]);
+  const [editingPromotion, setEditingPromotion] = useState(null);
 
   const metrics = useMemo(() => {
     const sent = promotions.filter((item) => item.status === "sent").length;
@@ -136,6 +144,31 @@ export default function Promotions() {
     setImagePreview(file ? URL.createObjectURL(file) : "");
   };
 
+  const handleEditDraft = (promotion) => {
+    setEditingPromotion(promotion);
+    setForm({
+      title: promotion.title || "",
+      message: promotion.description || "",
+      coupon_code: promotion.coupon_code || "",
+      starts_at: toDateTimeLocal(promotion.starts_at),
+      ends_at: toDateTimeLocal(promotion.ends_at),
+    });
+    setImageFile(null);
+    setImagePreview(promotion.image_url || "");
+    setError("");
+    setNotice("");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const handleCancelEdit = () => {
+    setEditingPromotion(null);
+    setForm(emptyForm);
+    setImageFile(null);
+    setImagePreview("");
+    setError("");
+    setNotice("");
+  };
+
   const handleSubmit = async () => {
     if (!user?.id) {
       setError("Please sign in again to manage promotions.");
@@ -161,7 +194,10 @@ export default function Promotions() {
       setError("");
       setNotice("");
 
-      const response = await fetch(`${LARAVEL_BASE}/api/admin/promotions/send?user_id=${user.id}`, {
+      const endpoint = editingPromotion
+        ? `${LARAVEL_BASE}/api/admin/promotions/${editingPromotion.id}`
+        : `${LARAVEL_BASE}/api/admin/promotions/send?user_id=${user.id}`;
+      const response = await fetch(endpoint, {
         method: "POST",
         credentials: "include",
         headers: {
@@ -177,7 +213,8 @@ export default function Promotions() {
         throw new Error(data.message || "Unable to send the promotion.");
       }
 
-      setNotice("Promotion scheduled and sent to subscribed customers successfully.");
+      setNotice(editingPromotion ? "Draft promotion updated successfully." : "Promotion scheduled and sent to subscribed customers successfully.");
+      setEditingPromotion(null);
       setForm(emptyForm);
       setImageFile(null);
       setImagePreview("");
@@ -205,7 +242,7 @@ export default function Promotions() {
           <div className="space-y-4">
             <Panel
               eyebrow="Campaign"
-              title="Send promotion"
+              title={editingPromotion ? "Edit draft promotion" : "Send promotion"}
               action={
                 <div className="inline-flex items-center gap-2 rounded-md border border-[#e9e1d9] bg-[#fffdfa] px-2.5 py-1.5 text-[9px] font-semibold uppercase tracking-[0.14em] text-[#65574d]">
                   <Megaphone size={11} />
@@ -328,6 +365,16 @@ export default function Promotions() {
                 )}
 
                 <div className="mt-5 flex justify-end md:col-span-2">
+                  {editingPromotion && (
+                    <button
+                      type="button"
+                      onClick={handleCancelEdit}
+                      disabled={saving}
+                      className="mr-3 rounded-lg border border-[#e8dfd4] px-4 py-2.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-black/70 hover:bg-[#fffaf0] disabled:opacity-50"
+                    >
+                      Cancel edit
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={handleSubmit}
@@ -335,7 +382,7 @@ export default function Promotions() {
                     className="inline-flex items-center gap-2 rounded-xl bg-black px-4 py-2.5 text-[11px] font-semibold uppercase tracking-[0.2em] text-white transition hover:bg-black/90 disabled:cursor-not-allowed disabled:opacity-65"
                   >
                     {saving ? <Loader2 size={14} className="animate-spin" /> : null}
-                    {saving ? "Sending..." : "Send promotion"}
+                    {saving ? (editingPromotion ? "Saving..." : "Sending...") : (editingPromotion ? "Save draft" : "Send promotion")}
                   </button>
                 </div>
               </div>
@@ -361,9 +408,22 @@ export default function Promotions() {
                             <p className="text-[15px] font-semibold text-black">{promotion.title}</p>
                             <p className="mt-1 text-[12px] text-black/60">{promotion.description}</p>
                           </div>
-                          <span className={`rounded-full px-2 py-1 text-[9px] font-semibold uppercase tracking-[0.15em] ${promotion.status === "sent" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
-                            {promotion.status || "draft"}
-                          </span>
+                          <div className="flex shrink-0 items-center gap-2">
+                            <span className={`rounded-full px-2 py-1 text-[9px] font-semibold uppercase tracking-[0.15em] ${promotion.status === "sent" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
+                              {promotion.status || "draft"}
+                            </span>
+                            {promotion.status === "draft" && (
+                              <button
+                                type="button"
+                                onClick={() => handleEditDraft(promotion)}
+                                title="Edit draft"
+                                aria-label={`Edit draft ${promotion.title}`}
+                                className="rounded-md border border-[#e8dfd4] p-2 text-black/60 hover:border-[#c9a94f] hover:bg-[#fffaf0] hover:text-black"
+                              >
+                                <Pencil size={14} />
+                              </button>
+                            )}
+                          </div>
                         </div>
 
                         {promotion.coupon_code && (

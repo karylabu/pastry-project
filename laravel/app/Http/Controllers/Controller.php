@@ -15,7 +15,7 @@ abstract class Controller
     {
         if (auth()->check()) {
             $user = auth()->user();
-            return $user instanceof User ? $user : null;
+            return $user instanceof User && $this->hasActiveAccount($user) ? $user : null;
         }
 
         $token = $request->bearerToken() ?: trim((string) $request->header('X-Auth-Token', ''));
@@ -35,7 +35,16 @@ abstract class Controller
             return null;
         }
 
-        return User::find($session->user_id);
+        $user = User::find($session->user_id);
+
+        return $user && $this->hasActiveAccount($user) ? $user : null;
+    }
+
+    private function hasActiveAccount(User $user): bool
+    {
+        $status = strtolower(trim((string) $user->status));
+
+        return $status === '' || $status === 'active';
     }
 
     protected function requireRole(Request $request, string $role)

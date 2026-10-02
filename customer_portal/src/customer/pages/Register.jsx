@@ -131,7 +131,7 @@ export default function Register() {
     setLoading(true);
 
     try {
-      const response = await fetch(`${BASE}/api_register.php`, {
+      const response = await fetch(`${LARAVEL_BASE}/api/register`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -172,31 +172,15 @@ export default function Register() {
         photoUrl: photoURL || googleUser?.photoURL || "",
       };
 
-      let data = null;
-      let response = null;
+      const response = await fetch(`${LARAVEL_BASE}/api/google-login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ id_token: idToken, ...googlePayload }),
+      });
+      const data = await safeParseJson(response);
 
-      try {
-        response = await fetch(`${CUSTOMER_BASE}/api_google_login.php`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Accept: "application/json" },
-          body: JSON.stringify(googlePayload),
-        });
-        data = await safeParseJson(response);
-      } catch (directError) {
-        console.warn("Direct Google signup failed, trying Laravel route:", directError);
-      }
-
-      if (!data?.success) {
-        response = await fetch(`${LARAVEL_BASE}/api/google-login`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Accept: "application/json" },
-          credentials: "include",
-          body: JSON.stringify({ id_token: idToken, ...googlePayload }),
-        });
-        data = await safeParseJson(response);
-      }
-
-      if (!response || !response.ok || !data?.success) {
+      if (!response.ok || !data?.success) {
         throw new Error(data?.message || "Google sign-up failed.");
       }
 

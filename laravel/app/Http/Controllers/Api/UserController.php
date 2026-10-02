@@ -6,6 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 
@@ -122,11 +124,12 @@ class UserController extends Controller
             'phone_number' => ['nullable', 'string', 'max:20'],
             'phone' => ['nullable', 'string', 'max:20'],
             'role' => ['required', Rule::in(['admin', 'customer'])],
-            'status' => ['required', Rule::in(['active', 'inactive', 'banned'])],
+            'status' => ['sometimes', Rule::in(['active', 'inactive', 'banned'])],
             'password' => ['required', 'string', 'min:8', 'confirmed'],
         ])->validate();
 
         $validated = $this->normalizeValidatedData($validated);
+        $validated['status'] = $validated['status'] ?? 'active';
 
         if (!empty($validated['password'])) {
             $validated['password'] = Hash::make($validated['password']);
@@ -190,19 +193,50 @@ class UserController extends Controller
         ]);
     }
 
-    /**
-     * Deactivate a user instead of permanently deleting them.
-     */
     public function destroy(User $user)
     {
-        if ($response = $this->authorizeAdmin(request())) return $response;
+        $request = request();
+        if ($response = $this->authorizeAdmin($request)) return $response;
 
-        $user->update(['status' => 'inactive']);
+        $admin = $this->getAuthenticatedUser($request);
+        if ($admin && (int) $admin->id === (int) $user->id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'You cannot delete the account currently signed in.',
+            ], 409);
+        }
+
+        DB::transaction(function () use ($user) {
+            $userId = (int) $user->id;
+
+            if (Schema::hasTable('addresses') && Schema::hasColumn('addresses', 'customer_id')) {
+                DB::table('addresses')->where('customer_id', $userId)->delete();
+            }
+            if (Schema::hasTable('favorites') && Schema::hasColumn('favorites', 'customer_id')) {
+                DB::table('favorites')->where('customer_id', $userId)->delete();
+            }
+            if (Schema::hasTable('orders') && Schema::hasColumn('orders', 'user_id')) {
+                DB::table('orders')->where('user_id', $userId)->update(['user_id' => null]);
+            }
+            if (Schema::hasTable('variance') && Schema::hasColumn('variance', 'recorded_by')) {
+                DB::table('variance')->where('recorded_by', $userId)->update(['recorded_by' => null]);
+            }
+            if (Schema::hasTable('messages') && Schema::hasColumn('messages', 'user_id')) {
+                $updates = ['user_id' => null];
+                if (Schema::hasColumn('messages', 'customer_name')) $updates['customer_name'] = null;
+                if (Schema::hasColumn('messages', 'customer_email')) $updates['customer_email'] = null;
+                DB::table('messages')->where('user_id', $userId)->update($updates);
+            }
+            if (Schema::hasTable('user_sessions')) {
+                DB::table('user_sessions')->where('user_id', $userId)->delete();
+            }
+
+            $user->delete();
+        });
 
         return response()->json([
             'success' => true,
-            'message' => 'User deactivated successfully.',
-            'data' => $user->fresh(),
+            'message' => 'User deleted successfully.',
         ]);
     }
 

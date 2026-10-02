@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Validator;
 use PHPMailer\PHPMailer\PHPMailer;
 use PHPMailer\PHPMailer\Exception;
 use Symfony\Component\Process\Process;
@@ -84,14 +85,41 @@ class CustomerApiController extends Controller
         return $user;
     }
 
+    private function formatChatTimestamp($timestamp): ?string
+    {
+        if ($timestamp === null || $timestamp === '') {
+            return null;
+        }
+
+        return \Illuminate\Support\Carbon::parse((string) $timestamp, config('app.timezone'))->toIso8601String();
+    }
+
     public function products(Request $request)
     {
-        $this->loadLegacyRequirements();
         if ($request->isMethod('options')) {
             return $this->corsResponse(['success' => true]);
         }
 
         $action = $request->query('action', 'list');
+
+        if ($action === 'list' || $action === 'all') {
+            $catalog = app(\App\Services\CustomerProductCatalog::class);
+            return $this->corsResponse($catalog->products($action === 'list'));
+        }
+
+        if ($action === 'bestsellers') {
+            return $this->corsResponse(app(\App\Services\CustomerProductCatalog::class)->bestSellers());
+        }
+
+        if ($action === 'recommendations') {
+            $user = $this->requireCustomer($request);
+            if (!$user instanceof User) {
+                return $user;
+            }
+
+            return $this->corsResponse(app(\App\Services\CustomerProductCatalog::class)
+                ->recommendations((int) $user->id, (string) $user->email));
+        }
 
         if ($action === 'customize' && $request->isMethod('post')) {
             $user = $this->requireCustomer($request);
@@ -186,20 +214,7 @@ class CustomerApiController extends Controller
             }
         }
 
-        $db = getDB();
-        $products = array_values($db['products'] ?? []);
-
-        foreach ($products as &$product) {
-            if (!isset($product['available'])) {
-                $product['available'] = true;
-            }
-            if (!isset($product['stock'])) {
-                $product['stock'] = 0;
-            }
-        }
-        unset($product);
-
-        return $this->corsResponse($products);
+        return $this->corsResponse(['success' => false, 'message' => 'Invalid product action.'], 400);
     }
 
     public function login(Request $request)
@@ -226,6 +241,9 @@ class CustomerApiController extends Controller
 
             if (!in_array(strtolower((string) $user->role), ['customer', 'admin'], true)) {
                 return $this->corsResponse(['success' => false, 'message' => 'This account is not eligible for access.'], 403);
+            }
+            if (strtolower(trim((string) ($user->status ?? 'active'))) !== 'active') {
+                return $this->corsResponse(['success' => false, 'message' => 'This account is deactivated.'], 403);
             }
 
             $passwordValid = password_verify($password, $user->password);
@@ -676,6 +694,9 @@ class CustomerApiController extends Controller
         $userId = $isAdmin ? $requestedUserId : (int) $user->id;
         $role = $isAdmin ? 'admin' : 'customer';
         $conversationId = substr(trim((string) $request->query('conversation_id', '')), 0, 64);
+        $hasConversationId = Schema::hasColumn('messages', 'conversation_id');
+        $hasReplyToId = Schema::hasColumn('messages', 'reply_to_id');
+        $hasImagePath = Schema::hasColumn('messages', 'image_path');
 
         if ($userId <= 0 && $orderId <= 0) {
             return $this->corsResponse(['success' => false, 'messages' => []]);
@@ -691,9 +712,9 @@ class CustomerApiController extends Controller
                 DB::table('messages')->where('order_id', $orderId)->where('sender', 'customer')->update(['is_read' => 1]);
             } else {
                 $readQuery = DB::table('messages')->where('order_id', $orderId)->whereIn('sender', ['admin', 'staff', 'ai']);
-                if ($conversationId && $conversationId !== 'legacy') {
+                if ($hasConversationId && $conversationId && $conversationId !== 'legacy') {
                     $readQuery->where('conversation_id', $conversationId);
-                } elseif ($conversationId === 'legacy') {
+                } elseif ($hasConversationId && $conversationId === 'legacy') {
                     $readQuery->where(function ($query) {
                         $query->whereNull('conversation_id')->orWhere('conversation_id', 'legacy');
                     });
@@ -705,9 +726,9 @@ class CustomerApiController extends Controller
                 DB::table('messages')->where('user_id', $userId)->where('order_id', 0)->where('sender', 'customer')->update(['is_read' => 1]);
             } else {
                 $readQuery = DB::table('messages')->where('user_id', $userId)->where('order_id', 0)->whereIn('sender', ['admin', 'staff', 'ai']);
-                if ($conversationId && $conversationId !== 'legacy') {
+                if ($hasConversationId && $conversationId && $conversationId !== 'legacy') {
                     $readQuery->where('conversation_id', $conversationId);
-                } elseif ($conversationId === 'legacy') {
+                } elseif ($hasConversationId && $conversationId === 'legacy') {
                     $readQuery->where(function ($query) {
                         $query->whereNull('conversation_id')->orWhere('conversation_id', 'legacy');
                     });
@@ -716,25 +737,38 @@ class CustomerApiController extends Controller
             }
         }
 
-        // Fetch messages with reply joins
-        $query = DB::table('messages as m1')
-            ->leftJoin('messages as m2', 'm1.reply_to_id', '=', 'm2.id')
-            ->select(
-                'm1.id',
-                'm1.sender',
-                'm1.message',
-                'm1.is_read',
-                'm1.created_at',
+        $query = DB::table('messages as m1');
+        $selectedColumns = [
+            'm1.id',
+            'm1.sender',
+            'm1.message',
+            'm1.is_read',
+            'm1.created_at',
+        ];
+        if ($hasReplyToId) {
+            $query->leftJoin('messages as m2', 'm1.reply_to_id', '=', 'm2.id');
+            $selectedColumns = array_merge($selectedColumns, [
                 'm1.reply_to_id',
                 'm2.message as reply_to_message',
-                'm2.sender as reply_to_sender'
-            );
+                'm2.sender as reply_to_sender',
+            ]);
+        } else {
+            $selectedColumns = array_merge($selectedColumns, [
+                DB::raw('NULL as reply_to_id'),
+                DB::raw('NULL as reply_to_message'),
+                DB::raw('NULL as reply_to_sender'),
+            ]);
+        }
+        if ($hasImagePath) {
+            $selectedColumns[] = 'm1.image_path';
+        }
+        $query->select($selectedColumns);
 
         if ($orderId > 0) {
             $messageQuery = $query->where('m1.order_id', $orderId);
-            if ($conversationId && $conversationId !== 'legacy') {
+            if ($hasConversationId && $conversationId && $conversationId !== 'legacy') {
                 $messageQuery->where('m1.conversation_id', $conversationId);
-            } elseif ($conversationId === 'legacy') {
+            } elseif ($hasConversationId && $conversationId === 'legacy') {
                 $messageQuery->where(function ($query) {
                     $query->whereNull('m1.conversation_id')->orWhere('m1.conversation_id', 'legacy');
                 });
@@ -747,9 +781,9 @@ class CustomerApiController extends Controller
                       $sq->where('m1.order_id', 0)->orWhereNull('m1.order_id');
                   });
             });
-            if ($conversationId && $conversationId !== 'legacy') {
+            if ($hasConversationId && $conversationId && $conversationId !== 'legacy') {
                 $messageQuery->where('m1.conversation_id', $conversationId);
-            } elseif ($conversationId === 'legacy') {
+            } elseif ($hasConversationId && $conversationId === 'legacy') {
                 $messageQuery->where(function ($query) {
                     $query->whereNull('m1.conversation_id')->orWhere('m1.conversation_id', 'legacy');
                 });
@@ -762,10 +796,95 @@ class CustomerApiController extends Controller
             $msg->id = intval($msg->id);
             $msg->is_read = intval($msg->is_read);
             $msg->reply_to_id = $msg->reply_to_id !== null ? intval($msg->reply_to_id) : null;
+            $msg->created_at = $this->formatChatTimestamp($msg->created_at);
             return $msg;
         });
 
         return $this->corsResponse(['success' => true, 'messages' => $messages]);
+    }
+
+    public function chatConversations(Request $request)
+    {
+        $admin = $this->requireAdmin($request);
+        if (!$admin instanceof User) {
+            return $admin;
+        }
+        if (!Schema::hasTable('messages')) {
+            return $this->corsResponse(['success' => true, 'conversations' => []]);
+        }
+
+        $hasOrderId = Schema::hasColumn('messages', 'order_id');
+        $hasUserId = Schema::hasColumn('messages', 'user_id');
+        $hasCustomerName = Schema::hasColumn('messages', 'customer_name');
+        $hasIsRead = Schema::hasColumn('messages', 'is_read');
+        $hasConversationId = Schema::hasColumn('messages', 'conversation_id');
+        $messages = DB::table('messages')->orderByDesc('created_at')->orderByDesc('id')->limit(1000)->get();
+        $conversations = [];
+
+        foreach ($messages as $message) {
+            $orderId = $hasOrderId ? (int) ($message->order_id ?? 0) : 0;
+            $userId = $hasUserId ? (int) ($message->user_id ?? 0) : 0;
+            if ($orderId <= 0 && $userId <= 0) {
+                continue;
+            }
+
+            $conversationId = $hasConversationId
+                ? trim((string) ($message->conversation_id ?? ''))
+                : '';
+            $key = $orderId > 0
+                ? 'order:' . $orderId
+                : 'user:' . $userId . ':' . ($conversationId !== '' ? $conversationId : 'legacy');
+
+            if (!isset($conversations[$key])) {
+                $customerName = $hasCustomerName && ($message->sender ?? '') === 'customer'
+                    ? trim((string) ($message->customer_name ?? ''))
+                    : '';
+                $orderStatus = 'General Inquiry';
+                $orderLabel = 'General Inquiry';
+
+                if ($orderId > 0 && Schema::hasTable('orders')) {
+                    $orderQuery = DB::table('orders')->where('id', $orderId);
+                    $orderColumns = ['id'];
+                    if (Schema::hasColumn('orders', 'status')) $orderColumns[] = 'status';
+                    if (Schema::hasColumn('orders', 'customer')) $orderColumns[] = 'customer';
+                    if (Schema::hasColumn('orders', 'user_id')) $orderColumns[] = 'user_id';
+                    $order = $orderQuery->first($orderColumns);
+                    if ($order) {
+                        $orderStatus = $order->status ?? 'Unknown';
+                        $customerName = $customerName !== '' ? $customerName : trim((string) ($order->customer ?? ''));
+                        if ($customerName === '' && !empty($order->user_id)) {
+                            $customerName = (string) DB::table('users')->where('id', $order->user_id)->value('name');
+                        }
+                    }
+                    $orderLabel = 'Order #' . $orderId;
+                } elseif ($userId > 0 && Schema::hasTable('users')) {
+                    $customerName = (string) (DB::table('users')->where('id', $userId)->value('name') ?: $customerName);
+                }
+
+                $conversations[$key] = [
+                    'conversation_key' => $key,
+                    'order_id' => $orderId,
+                    'user_id' => $userId,
+                    'conversation_id' => $conversationId !== '' ? $conversationId : 'legacy',
+                    'order_status' => $orderStatus,
+                    'customer_name' => $customerName !== '' ? $customerName : 'Customer',
+                    'order_label' => $orderLabel,
+                    'last_message' => $message->message ?? '',
+                    'last_sender' => $message->sender ?? '',
+                    'last_message_at' => $this->formatChatTimestamp($message->created_at ?? null),
+                    'unread_count' => 0,
+                ];
+            }
+
+            if ($hasIsRead && ($message->sender ?? '') === 'customer' && !(bool) $message->is_read) {
+                $conversations[$key]['unread_count']++;
+            }
+        }
+
+        return $this->corsResponse([
+            'success' => true,
+            'conversations' => array_values($conversations),
+        ]);
     }
 
     public function chatSend(Request $request)
@@ -799,13 +918,32 @@ class CustomerApiController extends Controller
         }
 
         $message = trim($data['message'] ?? '');
+        $imageFile = $request->file('image');
         $sender = $isAdmin ? 'admin' : 'customer';
         $supportMode = $data['support_mode'] ?? 'ai';
         $conversationId = substr(trim($data['conversation_id'] ?? ''), 0, 64) ?: null;
         $replyToId = isset($data['reply_to_id']) && intval($data['reply_to_id']) > 0 ? intval($data['reply_to_id']) : null;
+        $hasConversationId = Schema::hasColumn('messages', 'conversation_id');
+        $hasReplyToId = Schema::hasColumn('messages', 'reply_to_id');
 
-        if (!$message) {
+        if (!$message && !$imageFile) {
             return $this->corsResponse(['success' => false, 'message' => 'Invalid input']);
+        }
+
+        if ($imageFile) {
+            $imageValidator = Validator::make($request->all(), [
+                'image' => 'required|image|mimes:jpeg,jpg,png,gif,webp|max:5120',
+            ]);
+            if ($imageValidator->fails()) {
+                return $this->corsResponse([
+                    'success' => false,
+                    'message' => 'Please attach a supported image up to 5 MB.',
+                    'errors' => $imageValidator->errors(),
+                ], 422);
+            }
+            if (!Schema::hasColumn('messages', 'image_path')) {
+                return $this->corsResponse(['success' => false, 'message' => 'Chat image storage is not available yet.'], 503);
+            }
         }
 
         if ($sender === 'customer' && $orderId <= 0 && preg_match('/\b(?:order\s*(?:#|number|no\.?|id)?\s*)?(\d{1,8})\b/i', $message, $matches)) {
@@ -814,40 +952,91 @@ class CustomerApiController extends Controller
 
         $dbOrderId = ($orderId > 0) ? $orderId : null;
         $dbUserId = ($userId > 0) ? $userId : null;
-
-        $insertedId = 0;
-        try {
-            $insertedId = DB::table('messages')->insertGetId([
-                'order_id' => $dbOrderId,
-                'user_id' => $dbUserId,
-                'sender' => $sender,
-                'message' => $message,
-                'conversation_id' => $conversationId,
-                'reply_to_id' => $replyToId,
-                'created_at' => now(),
-            ]);
-        } catch (\Exception $e) {
-            // Fallback for foreign key constraint errors or missing columns
-            try {
-                $insertedId = DB::table('messages')->insertGetId([
-                    'order_id' => $dbOrderId,
-                    'user_id' => $dbUserId,
-                    'sender' => $sender,
-                    'message' => $message,
-                    'conversation_id' => $conversationId,
-                    'created_at' => now(),
-                ]);
-            } catch (\Exception $e2) {
-                Log::error('ChatSend error: ' . $e2->getMessage());
-                return $this->corsResponse(['success' => false, 'message' => 'Database error'], 500);
+        $customerName = (string) ($user->name ?? '');
+        $customerEmail = (string) ($user->email ?? '');
+        if ($isAdmin) {
+            if ($userId > 0 && Schema::hasTable('users')) {
+                $customer = DB::table('users')->where('id', $userId)->first(['name', 'email']);
+                if ($customer) {
+                    $customerName = (string) ($customer->name ?? '');
+                    $customerEmail = (string) ($customer->email ?? '');
+                }
             }
+            if ($orderId > 0 && Schema::hasTable('orders')) {
+                $orderColumns = [];
+                foreach (['customer', 'email'] as $column) {
+                    if (Schema::hasColumn('orders', $column)) {
+                        $orderColumns[] = $column;
+                    }
+                }
+                if ($orderColumns) {
+                    $orderCustomer = DB::table('orders')->where('id', $orderId)->first($orderColumns);
+                    if ($orderCustomer) {
+                        $customerName = (string) ($orderCustomer->customer ?? $customerName);
+                        $customerEmail = (string) ($orderCustomer->email ?? $customerEmail);
+                    }
+                }
+            }
+        }
+
+        $messageData = [
+            'order_id' => $dbOrderId,
+            'sender' => $sender,
+            'message' => $message,
+        ];
+        if (Schema::hasColumn('messages', 'user_id')) {
+            $messageData['user_id'] = $dbUserId;
+        }
+        if (Schema::hasColumn('messages', 'customer_name')) {
+            $messageData['customer_name'] = $customerName !== '' ? $customerName : null;
+        }
+        if (Schema::hasColumn('messages', 'customer_email')) {
+            $messageData['customer_email'] = $customerEmail !== '' ? $customerEmail : null;
+        }
+        $storedImagePath = null;
+        if ($imageFile) {
+            $uploadDirectory = public_path('uploads/chat');
+            if (!is_dir($uploadDirectory) && !mkdir($uploadDirectory, 0755, true) && !is_dir($uploadDirectory)) {
+                return $this->corsResponse(['success' => false, 'message' => 'Unable to store the chat image.'], 500);
+            }
+
+            $imageName = 'chat_' . bin2hex(random_bytes(16)) . '.' . $imageFile->extension();
+            try {
+                $imageFile->move($uploadDirectory, $imageName);
+            } catch (\Throwable $exception) {
+                Log::error('Chat image storage failed: ' . $exception->getMessage());
+                return $this->corsResponse(['success' => false, 'message' => 'Unable to store the chat image.'], 500);
+            }
+            $storedImagePath = 'uploads/chat/' . $imageName;
+        }
+        if (Schema::hasColumn('messages', 'image_path')) {
+            $messageData['image_path'] = $storedImagePath;
+        }
+        if ($hasConversationId) {
+            $messageData['conversation_id'] = $conversationId;
+        }
+        if ($hasReplyToId) {
+            $messageData['reply_to_id'] = $replyToId;
+        }
+        if (Schema::hasColumn('messages', 'created_at')) {
+            $messageData['created_at'] = now();
+        }
+
+        try {
+            $insertedId = DB::table('messages')->insertGetId($messageData);
+        } catch (\Exception $e) {
+            if ($storedImagePath && is_file(public_path($storedImagePath))) {
+                @unlink(public_path($storedImagePath));
+            }
+            Log::error('ChatSend error: ' . $e->getMessage());
+            return $this->corsResponse(['success' => false, 'message' => 'Database error'], 500);
         }
 
         app(\App\Services\RealtimeEventPublisher::class)->chatUpdated($userId, $orderId, (string) ($conversationId ?? ''));
 
         $aiReply = null;
         $needsStaff = false;
-        if ($sender === 'customer' && $supportMode !== 'staff') {
+        if ($sender === 'customer' && !in_array(strtolower((string) $supportMode), ['staff', 'admin'], true)) {
             $orderContext = 'No order was provided. Answer general questions about products, ordering, delivery, payment, and shop hours.';
             $order = null;
             if ($orderId > 0) {
@@ -869,8 +1058,11 @@ class CustomerApiController extends Controller
                             $generalQuery->where('order_id', 0)->orWhereNull('order_id');
                         })->where('user_id', $userId);
                     }
-                })
-                ->where('conversation_id', $conversationId)
+                });
+            if ($hasConversationId) {
+                $conversationQuery->where('conversation_id', $conversationId);
+            }
+            $conversationQuery
                 ->where('id', '<>', $insertedId)
                 ->orderByDesc('created_at')
                 ->limit(10)
@@ -1138,20 +1330,28 @@ PROMPT;
             }
 
             if ($aiReply) {
-                DB::table('messages')->insert([
-                'order_id' => $dbOrderId,
-                'user_id' => $dbUserId,
-                'sender' => 'ai',
-                'message' => $aiReply,
-                'conversation_id' => $conversationId,
-                'created_at' => now(),
-                ]);
+                $aiMessageData = [
+                    'order_id' => $dbOrderId,
+                    'sender' => 'ai',
+                    'message' => $aiReply,
+                ];
+                if (Schema::hasColumn('messages', 'user_id')) {
+                    $aiMessageData['user_id'] = $dbUserId;
+                }
+                if ($hasConversationId) {
+                    $aiMessageData['conversation_id'] = $conversationId;
+                }
+                if (Schema::hasColumn('messages', 'created_at')) {
+                    $aiMessageData['created_at'] = now();
+                }
+                DB::table('messages')->insert($aiMessageData);
             }
         }
 
         return $this->corsResponse([
             'success' => true,
             'message_id' => $insertedId,
+            'image_path' => $storedImagePath,
             'ai_reply' => $aiReply,
             'needs_staff' => $needsStaff ?? false,
             'order_id' => $dbOrderId
@@ -1389,6 +1589,53 @@ PROMPT;
         }
 
         return $this->corsResponse(['status' => 'error', 'message' => 'Unsupported method'], 405);
+    }
+
+    public function notifications(Request $request)
+    {
+        $user = $this->requireCustomer($request);
+        if (!$user instanceof User) {
+            return $user;
+        }
+        if (!Schema::hasTable('notifications')) {
+            return $this->corsResponse([]);
+        }
+
+        $notifications = DB::table('notifications')
+            ->where('user_id', $user->id)
+            ->orderByDesc('created_at')
+            ->limit(50)
+            ->get(['id', 'user_id', 'title', 'message', 'type', 'is_read', 'action_url', 'created_at'])
+            ->map(fn ($notification) => [
+                'id' => $notification->id,
+                'user_id' => $notification->user_id,
+                'title' => $notification->title,
+                'message' => $notification->message,
+                'type' => $notification->type,
+                'read' => (bool) $notification->is_read,
+                'action_url' => $notification->action_url,
+                'created_at' => $notification->created_at,
+            ]);
+
+        return $this->corsResponse($notifications);
+    }
+
+    public function markNotificationRead(Request $request, int $id)
+    {
+        $user = $this->requireCustomer($request);
+        if (!$user instanceof User) {
+            return $user;
+        }
+        if ($id <= 0 || !Schema::hasTable('notifications')) {
+            return $this->corsResponse(['status' => 'error', 'message' => 'Notification not found.'], 404);
+        }
+
+        DB::table('notifications')
+            ->where('id', $id)
+            ->where('user_id', $user->id)
+            ->update(['is_read' => 1]);
+
+        return $this->corsResponse(['status' => 'success', 'message' => 'Notification marked as read']);
     }
 
     public function user(Request $request)

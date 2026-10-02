@@ -325,7 +325,7 @@ export default function Orders() {
         ? `${CUSTOMER_BASE}/api_get_custom_cakes.php`
         : null;
       const [ordersResponse, customResponse] = await Promise.all([
-        fetch(`${CUSTOMER_BASE}/api_get_orders.php`, {
+        fetch(`${LARAVEL_BASE}/api/orders`, {
           credentials: 'include',
           headers: getAuthHeaders(),
         }),
@@ -338,8 +338,8 @@ export default function Orders() {
       ]);
       const data = await safeParseJson(ordersResponse);
       const customData = customResponse ? await safeParseJson(customResponse) : [];
-      if (Array.isArray(data) || Array.isArray(customData)) {
-        const regularOrders = Array.isArray(data) ? data : [];
+      const regularOrders = Array.isArray(data?.orders) ? data.orders : [];
+      if (Array.isArray(data?.orders) || Array.isArray(customData)) {
         const customOrders = Array.isArray(customData) ? customData.map((order) => ({
           ...order,
           is_customized: 1,
@@ -428,7 +428,7 @@ export default function Orders() {
   useEffect(() => {
     const loadCatalogProducts = async () => {
       try {
-        const res = await fetch(`${CUSTOMER_BASE}/api_products.php?action=list`);
+        const res = await fetch(`${CUSTOMER_BASE}/api/customer/products?action=list`);
         const data = await safeParseJson(res);
         if (Array.isArray(data)) {
           setCatalogProducts(data);
@@ -477,7 +477,7 @@ export default function Orders() {
     setProcessingId(cancelTarget.id);
     setActionError(null);
     try {
-      const res = await fetch(`${CUSTOMER_BASE}/api_cancel_order.php`, {
+      const res = await fetch(`${LARAVEL_BASE}/api/orders/${cancelTarget.id}/cancel`, {
         method: "POST",
         credentials: "include",
         headers: {
@@ -507,7 +507,7 @@ export default function Orders() {
     setProcessingId(receivedTarget.id);
     setActionError(null);
     try {
-      const res = await fetch(`${CUSTOMER_BASE}/api_confirm_received.php`, {
+      const res = await fetch(`${LARAVEL_BASE}/api/orders/${receivedTarget.id}/confirm-received`, {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json", ...getAuthHeaders() },
@@ -557,7 +557,7 @@ export default function Orders() {
     setPayingOrderId(order.id);
     setActionError(null);
     try {
-      const response = await fetch(`${CUSTOMER_BASE}/create_payment.php`, {
+      const response = await fetch(`${CUSTOMER_BASE}/api/customer/payments`, {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json', Accept: 'application/json', ...getAuthHeaders() },

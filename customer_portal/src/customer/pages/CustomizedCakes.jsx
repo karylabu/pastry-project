@@ -174,7 +174,7 @@ export default function CustomizedCakes() {
         setContactNumber(storedUser.phone || storedUser.phone_number || storedUser.contact_number || '');
 
         setAddressesLoading(true);
-        fetch(`${CUSTOMER_BASE}/api_addresses.php`, {
+        fetch(`${CUSTOMER_BASE}/api/addresses`, {
           credentials: 'include',
           headers: { Accept: 'application/json', ...getAuthHeaders() },
         })

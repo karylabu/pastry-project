@@ -19,9 +19,9 @@ import {
   Monitor,
 } from 'lucide-react';
 import { getAuthHeaders, safeParseJson } from '../../services/api';
-import { CUSTOMER_BASE } from '../../services/config';
+import { LARAVEL_BASE } from '../../services/config';
 
-const BASE = CUSTOMER_BASE;
+const BASE = LARAVEL_BASE;
 
 export default function AccountSettings() {
   const [user, setUser] = useState(null);
@@ -81,7 +81,7 @@ export default function AccountSettings() {
   useEffect(() => {
     if (activeSection !== 'security' || !user?.id) return;
 
-    fetch(`${BASE}/api_sessions.php`, { credentials: 'include', headers: getAuthHeaders() })
+    fetch(`${BASE}/api/sessions`, { credentials: 'include', headers: getAuthHeaders() })
       .then(safeParseJson)
       .then((data) => {
         if (data?.success && Array.isArray(data.sessions)) setSessions(data.sessions);
@@ -146,11 +146,11 @@ export default function AccountSettings() {
     setMessage('');
 
     try {
-      const res = await fetch(`${BASE}/api_update_profile.php`, {
+      const res = await fetch(`${BASE}/api/profile`, {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
-        body: JSON.stringify({ user_id: user.id, ...profileForm }),
+        body: JSON.stringify({ ...profileForm, name: profileForm.full_name }),
       });
       const data = await safeParseJson(res);
       if (data.success) {
@@ -193,7 +193,7 @@ export default function AccountSettings() {
     setMessage('');
 
     try {
-      const res = await fetch(`${BASE}/api_change_password.php`, {
+      const res = await fetch(`${BASE}/api/password/change`, {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
@@ -220,11 +220,11 @@ export default function AccountSettings() {
     setMessage('');
 
     try {
-      const res = await fetch(`${BASE}/api_delete_account.php`, {
+      const res = await fetch(`${BASE}/api/account/delete`, {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
-        body: JSON.stringify({ user_id: user.id, password: deletePassword }),
+        body: JSON.stringify({ password: deletePassword }),
       });
       const data = await safeParseJson(res);
       if (data.success) {

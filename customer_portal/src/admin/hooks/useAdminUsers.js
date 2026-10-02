@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ROOT_BASE } from "../../services/config";
+import { LARAVEL_BASE } from "../../services/config";
 import { getAuthHeaders } from "../../services/api";
 
 const buildUsersUrl = ({ search = "", role = "all", page = 1, perPage = 10 }) => {
-  const url = new URL(`${ROOT_BASE}/laravel/public/api/users`);
+  const url = new URL(`${LARAVEL_BASE}/api/users`);
 
   if (search?.trim()) {
     url.searchParams.set("search", search.trim());
@@ -86,11 +86,11 @@ export function useAdminUsers({ search = "", role = "all", page = 1 }) {
     );
 
     try {
-      const response = await fetch(`${ROOT_BASE}/laravel/public/api_users.php`, {
-        method: "POST",
+      const response = await fetch(`${LARAVEL_BASE}/api/users/${userId}`, {
+        method: "PATCH",
         credentials: "include",
         headers: { "Content-Type": "application/json", ...getAuthHeaders() },
-        body: JSON.stringify({ action: "status", user_id: userId, status: nextStatus }),
+        body: JSON.stringify({ status: nextStatus }),
       });
 
       const payload = await response.json().catch(() => ({}));

@@ -28,14 +28,10 @@ const isLocalHost = typeof window !== "undefined" &&
 const useXampp = process.env.NODE_ENV === "development" || isLocalHost;
 
 export const BASE = useXampp ? devBase : prodBase;
-// Use full XAMPP URLs for API calls
-export const CUSTOMER_BASE = process.env.REACT_APP_CUSTOMER_BASE || (
-  useXampp ? `${devBase}/customer` : `${prodBase}`
-);
 export const ROOT_BASE = useXampp ? devBase : prodRootBase;
 export const LARAVEL_BASE = process.env.REACT_APP_LARAVEL_BASE || (
   useXampp ? `${devBase}/laravel/public` : `${prodRootBase}/laravel/public`
 );
-export const STAFF_BASE = process.env.REACT_APP_STAFF_BASE || (
-  useXampp ? `${devBase}/staff` : `${prodBase}/staff`
-);
+// Customer APIs are routed through Laravel; legacy URL routes remain compatibility aliases.
+export const CUSTOMER_BASE = process.env.REACT_APP_CUSTOMER_BASE || LARAVEL_BASE;
+export const STAFF_BASE = process.env.REACT_APP_STAFF_BASE || `${LARAVEL_BASE}/staff`;

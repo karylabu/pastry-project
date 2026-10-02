@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Eye, EyeOff, Lock, Mail, ShieldCheck } from "lucide-react";
-import { CUSTOMER_BASE } from "../../services/config";
+import { LARAVEL_BASE } from "../../services/config";
 
 function normalizeRole(role) {
   return String(role || "").trim().toLowerCase();
@@ -23,7 +23,7 @@ export default function StaffAdminLogin() {
     setLoading(true);
 
     try {
-      const response = await fetch(`${CUSTOMER_BASE}/api_login.php`, {
+      const response = await fetch(`${LARAVEL_BASE}/api/login`, {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },

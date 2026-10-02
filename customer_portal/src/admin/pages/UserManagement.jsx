@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Eye, Loader2, Pencil, Plus, Search, ShieldCheck, Trash2, UserPlus } from "lucide-react";
-import { ROOT_BASE } from "../../services/config";
+import { LARAVEL_BASE } from "../../services/config";
 import { getAuthHeaders } from "../../services/api";
 import { useAdminUsers } from "../hooks/useAdminUsers";
 
@@ -104,7 +104,7 @@ export default function UserManagement() {
     setLoadingViewedUser(true);
     setViewUserError("");
     try {
-      const response = await fetch(`${ROOT_BASE}/laravel/public/api/users/${user.id}`, {
+      const response = await fetch(`${LARAVEL_BASE}/api/users/${user.id}`, {
         credentials: "include",
         headers: { Accept: "application/json", ...getAuthHeaders() },
       });
@@ -215,8 +215,8 @@ export default function UserManagement() {
 
     try {
       const url = selectedUser
-        ? `${ROOT_BASE}/laravel/public/api/users/${selectedUser.id}`
-        : `${ROOT_BASE}/laravel/public/api/users`;
+        ? `${LARAVEL_BASE}/api/users/${selectedUser.id}`
+        : `${LARAVEL_BASE}/api/users`;
       const method = selectedUser ? "PUT" : "POST";
       const bodyPayload = payload;
 
@@ -279,8 +279,8 @@ export default function UserManagement() {
     setConfirmAction({
       type: "delete",
       user,
-      title: "Deactivate account",
-      message: `Deactivate ${user.name || "this account"}? They will no longer be able to sign in, and the account can be reactivated later.`,
+      title: "Permanently delete account",
+      message: `Permanently delete ${user.name || "this account"}? Saved addresses and favorites will be removed. Order history will be retained without a linked account.`,
     });
   };
 
@@ -300,11 +300,10 @@ export default function UserManagement() {
     if (confirmAction.type === "delete") {
       setDeletingUserId(confirmAction.user.id);
       try {
-        const response = await fetch(`${ROOT_BASE}/laravel/public/api_users.php`, {
-          method: "POST",
+        const response = await fetch(`${LARAVEL_BASE}/api/users/${confirmAction.user.id}`, {
+          method: "DELETE",
           credentials: "include",
-          headers: { "Content-Type": "application/json", ...getAuthHeaders() },
-          body: JSON.stringify({ action: "delete", user_id: confirmAction.user.id }),
+          headers: { Accept: "application/json", ...getAuthHeaders() },
         });
 
         const data = await response.json().catch(() => ({}));
@@ -314,7 +313,7 @@ export default function UserManagement() {
           return;
         }
 
-        showNotice("success", "Account deactivated successfully.");
+        showNotice("success", "User deleted successfully.");
         refetch();
       } catch (error) {
         console.error(error);

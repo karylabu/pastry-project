@@ -155,4 +155,72 @@ class PromotionController extends Controller
             ],
         ]);
     }
+
+    public function update(Request $request, Promotion $promotion): JsonResponse
+    {
+        $user = $this->resolveAdminUser($request);
+
+        if (! $user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized promotion request.',
+            ], 403);
+        }
+
+        if ($promotion->status !== 'draft') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Only draft promotions can be edited.',
+            ], 409);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'title' => ['required', 'string', 'max:150'],
+            'message' => ['required', 'string'],
+            'coupon_code' => ['nullable', 'string', 'max:50'],
+            'image_url' => ['nullable', 'string', 'max:255'],
+            'image' => ['nullable', 'file', 'image', 'mimes:jpg,jpeg,png,gif,webp', 'max:5120'],
+            'starts_at' => ['required', 'date'],
+            'ends_at' => ['required', 'date', 'after_or_equal:starts_at'],
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => $validator->errors()->first(),
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        $validated = $validator->validated();
+        $imageUrl = $validated['image_url'] ?? $promotion->image_url;
+
+        if ($request->hasFile('image')) {
+            $image = $request->file('image');
+            $directory = public_path('uploads/promotions');
+
+            if (! is_dir($directory)) {
+                mkdir($directory, 0775, true);
+            }
+
+            $filename = Str::uuid() . '.' . $image->extension();
+            $image->move($directory, $filename);
+            $imageUrl = url('uploads/promotions/' . $filename);
+        }
+
+        $promotion->update([
+            'title' => $validated['title'],
+            'description' => $validated['message'],
+            'coupon_code' => $validated['coupon_code'] ?: null,
+            'image_url' => $imageUrl,
+            'starts_at' => $validated['starts_at'],
+            'ends_at' => $validated['ends_at'],
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Draft promotion updated successfully.',
+            'data' => $promotion->fresh(),
+        ]);
+    }
 }

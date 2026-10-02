@@ -34,6 +34,7 @@ class AdminController extends Controller
                 $user = DB::table('users')->where('email', $email)->first();
 
                 if ($user && strtolower((string) ($user->role ?? '')) === 'admin'
+                    && strtolower(trim((string) ($user->status ?? 'active'))) === 'active'
                     && Hash::check($password, $user->password)) {
                     $role = $user->role;
                     session(['user' => [

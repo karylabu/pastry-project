@@ -44,7 +44,7 @@ export async function safeFetchJson(url, options = {}) {
 export const api = {
   getProducts: async () => {
     try {
-      const response = await fetch(`${BASE_URL}/api_products.php?action=list`);
+      const response = await fetch(`${BASE_URL}/api/customer/products?action=list`);
       return await safeParseJson(response) || [];
     } catch (error) {
       console.error('API Error:', error);

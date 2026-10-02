@@ -59,13 +59,13 @@ export default function Menu({ onAddToCart }) {
   const loadFavorites = async () => {
     if (userId > 0) {
       try {
-        const response = await fetch(`${CUSTOMER_BASE}/api_favorites.php`, {
+        const response = await fetch(`${CUSTOMER_BASE}/api/favorites`, {
           credentials: 'include',
           headers: getAuthHeaders(),
         });
         const data = await safeParseJson(response);
-        if (data.status === 'success') {
-          setFavoriteIds(data.favorites || []);
+        if (Array.isArray(data)) {
+          setFavoriteIds(data.map(Number));
           return;
         }
       } catch (err) {
@@ -82,7 +82,7 @@ export default function Menu({ onAddToCart }) {
   useEffect(() => {
     loadFavorites();
 
-    fetch(`${CUSTOMER_BASE}/api_products.php?action=list`)
+    fetch(`${CUSTOMER_BASE}/api/customer/products?action=list`)
       .then(res => safeParseJson(res))
       .then(data => {
         if (Array.isArray(data)) {
@@ -105,7 +105,7 @@ export default function Menu({ onAddToCart }) {
 
     if (userId > 0) {
       try {
-        await fetch(`${CUSTOMER_BASE}/api_favorites.php`, {
+        await fetch(`${CUSTOMER_BASE}/api/favorites/toggle`, {
           method: 'POST',
           credentials: 'include',
           headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },

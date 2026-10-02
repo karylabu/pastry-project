@@ -28,18 +28,18 @@ export default function Profile() {
       setUser(null);
     }
 
-    fetch(`${CUSTOMER_BASE}/api_get_user.php`, {
+    fetch(`${CUSTOMER_BASE}/api/user`, {
       credentials: 'include',
       headers: getAuthHeaders(),
     })
       .then(safeParseJson)
       .then((data) => {
-        if (data?.status === 'success' && data.user) {
+        if (data?.id) {
           const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
           const syncedUser = {
             ...currentUser,
-            ...data.user,
-            avatar: data.user.avatar || data.user.profile_image || currentUser.avatar || '',
+            ...data,
+            avatar: data.avatar || data.profile_image || data.profile_picture || currentUser.avatar || '',
           };
           setUser(syncedUser);
           localStorage.setItem('user', JSON.stringify(syncedUser));
