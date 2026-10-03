@@ -43,10 +43,6 @@ const HERO_SLIDES = [
     type: "image",
     src: `${ROOT_BASE}/uploads/banner(1).png`,
   },
-  {
-    type: "video",
-    src: `${ROOT_BASE}/uploads/banner(2).mp4`,
-  },
 ];
 
 function Banner({ onShopNow, onCustomizeNow }) {
@@ -60,7 +56,7 @@ function Banner({ onShopNow, onCustomizeNow }) {
 
   // auto-advance every 6s, paused while the video slide is showing
   useEffect(() => {
-    if (!currentSlide || currentSlide.type === "video") return;
+    if (total < 2 || !currentSlide || currentSlide.type === "video") return;
     const t = setTimeout(next, 6000);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps

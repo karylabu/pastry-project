@@ -1470,15 +1470,54 @@ PROMPT;
             'remarks' => $paymentType === 'balance' ? 'Custom cake order remaining balance' : 'Pastry Shop Order',
         ];
 
-        $response = Http::withBasicAuth($secretKey, '')->withHeaders([
-            'accept' => 'application/json',
-            'content-type' => 'application/json',
-        ])->post('https://api.paymongo.com/v1/payment_links', $payload);
+        if (class_exists(\GuzzleHttp\HandlerStack::class)) {
+            $response = Http::withBasicAuth($secretKey, '')->withHeaders([
+                'accept' => 'application/json',
+                'content-type' => 'application/json',
+            ])->post('https://api.paymongo.com/v1/payment_links', $payload);
+            $responsePayload = $response->json() ?? [];
+            $responseStatus = $response->status();
+        } else {
+            $curl = curl_init('https://api.paymongo.com/v1/payment_links');
+            if ($curl === false) {
+                return $this->corsResponse(['error' => 'Unable to initialize the payment gateway request.'], 500);
+            }
 
-        $paymentData = $response->json('data', []);
+            curl_setopt_array($curl, [
+                CURLOPT_POST => true,
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_CONNECTTIMEOUT => 10,
+                CURLOPT_TIMEOUT => 30,
+                CURLOPT_HTTPAUTH => CURLAUTH_BASIC,
+                CURLOPT_USERPWD => $secretKey . ':',
+                CURLOPT_HTTPHEADER => [
+                    'Accept: application/json',
+                    'Content-Type: application/json',
+                ],
+                CURLOPT_POSTFIELDS => json_encode($payload),
+            ]);
+
+            $responseBody = curl_exec($curl);
+            $responseStatus = (int) curl_getinfo($curl, CURLINFO_HTTP_CODE);
+            $curlError = $responseBody === false ? curl_error($curl) : '';
+            curl_close($curl);
+
+            if ($responseBody === false) {
+                Log::error('PayMongo payment-link request failed.', ['order_id' => $orderId, 'error' => $curlError]);
+                return $this->corsResponse(['error' => 'Unable to reach the payment gateway. Please try again.'], 502);
+            }
+
+            $responsePayload = json_decode($responseBody, true);
+            if (!is_array($responsePayload)) {
+                Log::error('PayMongo returned an invalid payment-link response.', ['order_id' => $orderId]);
+                return $this->corsResponse(['error' => 'The payment gateway returned an invalid response. Please try again.'], 502);
+            }
+        }
+
+        $paymentData = $responsePayload['data'] ?? [];
         $paymentUrl = $paymentData['url'] ?? '';
         $paymentReference = $paymentData['id'] ?? '';
-        if ($response->successful() && $paymentUrl !== '' && $paymentReference !== '') {
+        if ($responseStatus >= 200 && $responseStatus < 300 && $paymentUrl !== '' && $paymentReference !== '') {
             DB::table('orders')->where('id', $orderId)->update([
                 'payment_status' => 'pending',
                 'payment_reference' => $paymentReference,
@@ -1487,7 +1526,7 @@ PROMPT;
             app(\App\Services\RealtimeEventPublisher::class)->orderUpdated((int) $user->id, (int) $orderId);
         }
 
-        return response()->json($response->json(), $response->status())
+        return response()->json($responsePayload, $responseStatus)
             ->header('Access-Control-Allow-Origin', '*');
     }
 
@@ -1659,6 +1698,7 @@ PROMPT;
             'email' => $user->email,
             'role' => $user->role,
             'phone' => $user->phone ?? '',
+            'address' => $user->address ?? '',
         ]);
     }
 }

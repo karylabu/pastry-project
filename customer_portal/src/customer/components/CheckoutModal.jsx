@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from "react";
+import React, { useCallback, useState, useEffect, useMemo, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Loader2, SearchX } from "lucide-react";
 import L from "leaflet";
@@ -35,6 +35,28 @@ const PICKUP_LOCATION = {
 const isBerMonth = () => {
   const manilaDate = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Manila' }));
   return manilaDate.getMonth() >= 8;
+};
+
+const formatSavedAddress = (address) => {
+  if (!address) return '';
+  const parts = [];
+  if (address.house_no) parts.push(address.house_no);
+  if (address.street) parts.push(address.street);
+  const locality = [address.barangay, address.city].filter(Boolean).join(', ');
+  if (locality) parts.push(locality);
+  if (address.province) parts.push(address.province);
+  if (address.zip_code) parts.push(address.zip_code);
+  return parts.join(', ');
+};
+
+const safeParseJson = async (response) => {
+  const text = await response.text();
+  if (!text) return null;
+  try {
+    return JSON.parse(text);
+  } catch (err) {
+    throw new Error(`Invalid JSON response: ${err.message} - ${text}`);
+  }
 };
 
 export default function CheckoutModal({
@@ -74,6 +96,7 @@ export default function CheckoutModal({
   });
 
   const [savedAddresses, setSavedAddresses] = useState([]);
+  const [accountProfile, setAccountProfile] = useState(null);
   const [selectedAddressId, setSelectedAddressId] = useState(null);
   const [addressesLoading, setAddressesLoading] = useState(false);
   const [addressFetchError, setAddressFetchError] = useState('');
@@ -227,6 +250,8 @@ export default function CheckoutModal({
         }
       })()
     : {};
+  const savedAccountPhone = String(accountProfile?.phone || accountProfile?.phone_number || accountProfile?.contact_number || savedUser.phone || savedUser.phone_number || savedUser.contact_number || '').trim();
+  const savedAccountAddress = String(accountProfile?.address || accountProfile?.default_address || savedUser.address || savedUser.default_address || '').trim();
   const userId = savedUser.id || 0;
 
   useEffect(() => {
@@ -252,19 +277,10 @@ export default function CheckoutModal({
     };
   }, [isOpen]);
 
-  const formatSavedAddress = (address) => {
-    if (!address) return '';
-    const parts = [];
-    if (address.house_no) parts.push(address.house_no);
-    if (address.street) parts.push(address.street);
-    const locality = [address.barangay, address.city].filter(Boolean).join(', ');
-    if (locality) parts.push(locality);
-    if (address.province) parts.push(address.province);
-    if (address.zip_code) parts.push(address.zip_code);
-    return parts.join(', ');
-  };
-
   const savedPhoneNumbers = [...new Set([
+    accountProfile?.phone,
+    accountProfile?.phone_number,
+    accountProfile?.contact_number,
     savedUser.phone,
     savedUser.phone_number,
     savedUser.contact_number,
@@ -278,19 +294,7 @@ export default function CheckoutModal({
     return !query || `${address.address_label || ''} ${formatSavedAddress(address)}`.toLowerCase().includes(query);
   });
 
-  const safeParseJson = async (response) => {
-    const text = await response.text();
-    if (!text) {
-      return null;
-    }
-    try {
-      return JSON.parse(text);
-    } catch (err) {
-      throw new Error(`Invalid JSON response: ${err.message} - ${text}`);
-    }
-  };
-
-  const loadSavedAddresses = async () => {
+  const loadSavedAddresses = useCallback(async () => {
     if (userId <= 0) return;
     setAddressesLoading(true);
     setAddressFetchError('');
@@ -315,7 +319,24 @@ export default function CheckoutModal({
     } finally {
       setAddressesLoading(false);
     }
-  };
+  }, [userId]);
+
+  const loadAccountProfile = useCallback(async () => {
+    if (userId <= 0) return;
+
+    try {
+      const res = await fetch(`${CUSTOMER_BASE}/api/user`, {
+        credentials: 'include',
+        headers: getAuthHeaders(),
+      });
+      if (!res.ok) return;
+
+      const profile = (await safeParseJson(res)) || {};
+      if (profile.id) setAccountProfile(profile);
+    } catch (err) {
+      console.error('Failed to load account contact info', err);
+    }
+  }, [userId]);
 
   const handleSelectSavedAddress = (address) => {
     resetGeocode();
@@ -346,11 +367,25 @@ export default function CheckoutModal({
     geocodeNow(formattedAddress);
   };
 
-  const applyDefaultSavedAddress = () => {
-    if (savedAddresses.length === 0) return;
-    if (selectedAddressId !== null) return;
+  const applyDefaultSavedAddress = useCallback(() => {
+    if (selectedAddressId !== null) {
+      setCheckoutData((prev) => ({
+        ...prev,
+        phone: prev.phone || savedAccountPhone,
+      }));
+      return;
+    }
+
     const defaultAddress = savedAddresses.find((address) => address.is_default) || savedAddresses[0];
-    if (!defaultAddress) return;
+    if (!defaultAddress) {
+      setCheckoutData((prev) => ({
+        ...prev,
+        address: prev.address || savedAccountAddress,
+        phone: prev.phone || savedAccountPhone,
+      }));
+      if (!checkoutData.address && savedAccountAddress) geocodeNow(savedAccountAddress);
+      return;
+    }
 
     setSelectedAddressId(defaultAddress.address_id);
     const formattedAddress = formatSavedAddress(defaultAddress);
@@ -358,22 +393,23 @@ export default function CheckoutModal({
       ...prev,
       method: 'Deliver',
       address: formattedAddress,
-      phone: prev.phone || defaultAddress.contact_number,
+      phone: prev.phone || savedAccountPhone || defaultAddress.contact_number,
       lat: null,
       lng: null,
     }));
     geocodeNow(formattedAddress);
-  };
+  }, [selectedAddressId, savedAddresses, savedAccountPhone, savedAccountAddress, checkoutData.address, geocodeNow]);
 
   useEffect(() => {
     if (!isOpen) return;
+    loadAccountProfile();
     loadSavedAddresses();
-  }, [isOpen]);
+  }, [isOpen, loadAccountProfile, loadSavedAddresses]);
 
   useEffect(() => {
     if (!isOpen) return;
     applyDefaultSavedAddress();
-  }, [isOpen, savedAddresses]);
+  }, [isOpen, applyDefaultSavedAddress]);
 
   const validatePoint = (lat, lng, address) => {
     const isValid = locationValidation.validateLocation(lat, lng, address);
@@ -927,11 +963,16 @@ export default function CheckoutModal({
 
               {/* PHONE */}
               <div className="relative">
+                <label htmlFor="checkout-phone" className="mb-1 block text-xs font-medium text-gray-600">
+                  Phone Number <span className="text-red-600" aria-hidden="true">*</span>
+                </label>
                 <input
+                  id="checkout-phone"
                   type="tel"
                   autoComplete="tel"
                   placeholder="Phone Number"
                   aria-label="Phone Number"
+                  required
                   aria-expanded={showPhoneSuggestions && matchingPhoneSuggestions.length > 0}
                   className="relative z-[9999] box-border w-full rounded-xl border border-[#e8e1d8] bg-[#fffdfa] p-3 text-sm text-[#33251e] outline-none transition placeholder:text-gray-400 focus:border-[#d4af37] focus:ring-2 focus:ring-[#d4af37]/20 pointer-events-auto"
                   value={checkoutData.phone}
@@ -969,7 +1010,7 @@ export default function CheckoutModal({
                   <div className="space-y-3">
                     <div className="flex items-center justify-between gap-3">
                       <p className="text-xs text-gray-500 uppercase tracking-[0.2em]">
-                        Saved Delivery Address
+                        Saved Delivery Address <span className="text-red-600" aria-hidden="true">*</span>
                       </p>
                       {addressesLoading && (
                         <span className="text-xs text-gray-500">Loading…</span>
@@ -983,10 +1024,12 @@ export default function CheckoutModal({
                   {/* ADDRESS */}
                   <div className="relative">
                     <input
+                      id="checkout-address"
                       type="text"
                       placeholder="Address"
                       autoComplete="street-address"
                       aria-label="Delivery address"
+                      required={checkoutData.method === 'Deliver'}
                       aria-expanded={showAddressSuggestions && matchingAddressSuggestions.length > 0}
                       className="relative z-[9999] w-full rounded-xl border border-[#e8e1d8] bg-[#fffdfa] p-3 pr-9 text-sm text-[#33251e] outline-none transition placeholder:text-gray-400 focus:border-[#d4af37] focus:ring-2 focus:ring-[#d4af37]/20 pointer-events-auto"
                       value={checkoutData.address}

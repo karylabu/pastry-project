@@ -382,7 +382,7 @@ export default function ProductModal({ isOpen, onClose, product, allCakes, onAdd
 
           {/* Size / Variant pill selector */}
           {shouldShowVariantSelector && variantButtons.length > 0 && (
-            <div className="grid w-full grid-cols-3 gap-1.5 rounded-2xl border border-gray-100 bg-white p-1.5">
+            <div className={`grid w-full ${variantButtons.length === 1 ? 'grid-cols-1' : variantButtons.length === 2 ? 'grid-cols-2' : 'grid-cols-3'} gap-1.5 rounded-2xl border border-gray-100 bg-white p-1.5`}>
               {variantButtons.map((v) => {
                 const disabled = v.stock_quantity <= 0;
                 const selected = currentVariant && currentVariant.id === v.id;
