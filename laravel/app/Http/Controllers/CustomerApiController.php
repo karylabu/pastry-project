@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
@@ -228,7 +229,7 @@ class CustomerApiController extends Controller
             Log::info('Login attempt for email: ' . ($data['email'] ?? 'not provided'));
 
             $email = trim($data['email'] ?? '');
-            $password = trim($data['password'] ?? '');
+            $password = (string) ($data['password'] ?? '');
 
             if (!$email || !$password) {
                 return $this->corsResponse(['success' => false, 'message' => 'Please fill all fields.']);
@@ -246,9 +247,21 @@ class CustomerApiController extends Controller
                 return $this->corsResponse(['success' => false, 'message' => 'This account is deactivated.'], 403);
             }
 
-            $passwordValid = password_verify($password, $user->password);
-            if (!$passwordValid) {
+            $storedPassword = (string) $user->password;
+            $isLegacyPassword = hash_equals($storedPassword, $password);
+            $passwordInfo = password_get_info($storedPassword);
+            $passwordValid = !$isLegacyPassword
+                && ($passwordInfo['algoName'] ?? 'unknown') !== 'unknown'
+                && password_verify($password, $storedPassword);
+
+            if (!$passwordValid && !$isLegacyPassword) {
                 return $this->corsResponse(['success' => false, 'message' => 'Incorrect password.']);
+            }
+
+            if ($isLegacyPassword) {
+                DB::table('users')->where('id', $user->id)->update([
+                    'password' => Hash::make($password),
+                ]);
             }
 
             $userData = [
@@ -1699,6 +1712,9 @@ PROMPT;
             'role' => $user->role,
             'phone' => $user->phone ?? '',
             'address' => $user->address ?? '',
+            'profile_image' => $user->profile_picture ?? '',
+            'profile_picture' => $user->profile_picture ?? '',
+            'avatar' => $user->profile_picture ?? '',
         ]);
     }
 }

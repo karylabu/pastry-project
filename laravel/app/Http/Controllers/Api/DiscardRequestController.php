@@ -16,7 +16,7 @@ class DiscardRequestController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
-        if ($response = $this->authorizeAdmin($request)) return $response;
+        if ($response = $this->authorizeOperationalStaff($request)) return $response;
         $status = $request->query('status', 'Pending');
         if (!in_array($status, ['Pending', 'Approved', 'Rejected'], true)) {
             return response()->json(['success' => false, 'message' => 'Invalid status.'], 422);
@@ -53,7 +53,7 @@ class DiscardRequestController extends Controller
 
     public function store(CreateDiscardRequest $request, InventoryService $inventory): JsonResponse
     {
-        if ($response = $this->authorizeAdmin($request)) return $response;
+        if ($response = $this->authorizeOperationalStaff($request)) return $response;
         try {
             $user = $this->getAuthenticatedUser($request);
             $discard = $inventory->createDiscardRequest($request->validated(), (int) $user->id);
@@ -72,7 +72,7 @@ class DiscardRequestController extends Controller
 
     public function approve(ApproveDiscardRequest $request, DiscardRequest $discard, InventoryService $inventory): JsonResponse
     {
-        if ($response = $this->authorizeAdmin($request)) return $response;
+        if ($response = $this->authorizeManager($request)) return $response;
         try {
             $user = $this->getAuthenticatedUser($request);
             $updated = $inventory->approveDiscard((int) $discard->id, (int) $user->id);
@@ -84,7 +84,7 @@ class DiscardRequestController extends Controller
 
     public function reject(RejectDiscardRequest $request, DiscardRequest $discard, InventoryService $inventory): JsonResponse
     {
-        if ($response = $this->authorizeAdmin($request)) return $response;
+        if ($response = $this->authorizeManager($request)) return $response;
         try {
             $user = $this->getAuthenticatedUser($request);
             $updated = $inventory->rejectDiscard((int) $discard->id, (int) $user->id, $request->validated()['rejection_note'] ?? null);
@@ -92,13 +92,5 @@ class DiscardRequestController extends Controller
         } catch (Throwable $exception) {
             return response()->json(['success' => false, 'message' => $exception->getMessage()], 409);
         }
-    }
-
-    private function authorizeAdmin(Request $request): ?JsonResponse
-    {
-        $user = $this->getAuthenticatedUser($request);
-        if (!$user) return response()->json(['success' => false, 'message' => 'Admin authorization required.'], 401);
-        if ($user->role !== 'admin') return response()->json(['success' => false, 'message' => 'Admin authorization required.'], 403);
-        return null;
     }
 }

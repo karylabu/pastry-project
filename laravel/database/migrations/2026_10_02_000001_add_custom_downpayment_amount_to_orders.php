@@ -8,6 +8,10 @@ return new class extends Migration
 {
     public function up(): void
     {
+        if (app()->environment('testing') && ! Schema::hasTable('orders')) {
+            return;
+        }
+
         Schema::table('orders', function (Blueprint $table) {
             $table->decimal('downpayment_amount', 10, 2)->nullable();
         });
@@ -15,6 +19,10 @@ return new class extends Migration
 
     public function down(): void
     {
+        if (! Schema::hasTable('orders')) {
+            return;
+        }
+
         Schema::table('orders', function (Blueprint $table) {
             $table->dropColumn('downpayment_amount');
         });

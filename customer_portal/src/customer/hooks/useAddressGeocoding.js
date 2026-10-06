@@ -133,9 +133,7 @@ export default function useAddressGeocoding({
         if (!Array.isArray(data) || data.length === 0) {
           setStatus(STATUS.NOT_FOUND);
           setResult(null);
-          setErrorMessage(
-            "Address not found. Please try a more specific address or pin it manually."
-          );
+          setErrorMessage("");
           return null;
         }
 

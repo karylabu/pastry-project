@@ -9,7 +9,7 @@
             <h1 style="margin:0; font-size:28px;">Recipes</h1>
             <p style="margin:4px 0 0;color:#666;">Define ingredient recipes for menu items and keep inventory consumption consistent.</p>
         </div>
-        <button class="button" onclick="document.getElementById('recipeModal').classList.add('open')">+ Add / Update Recipe</button>
+        <button class="button" type="button" onclick="openRecipeForm()">+ Add / Update Recipe</button>
     </div>
 </div>
 
@@ -32,14 +32,14 @@
         <p style="color:#666; margin:0;">No recipes defined yet. Use the button above to add ingredient recipes for your products.</p>
     @else
         <div style="display:grid;gap:18px;">
-            @foreach($recipeMap as $productName => $items)
+            @foreach($recipeMap as $recipe)
             <div class="card" style="padding:18px;">
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
                     <div>
-                        <div style="font-size:18px;font-weight:700;">{{ $productName }}</div>
-                        <div style="color:#666;font-size:14px;">{{ count($items) }} ingredient{{ count($items) === 1 ? '' : 's' }}</div>
+                        <div style="font-size:18px;font-weight:700;">{{ $recipe['product_name'] }} · {{ ucfirst($recipe['size_name']) }}</div>
+                        <div style="color:#666;font-size:14px;">{{ count($recipe['items']) }} ingredient{{ count($recipe['items']) === 1 ? '' : 's' }}</div>
                     </div>
-                    <button class="button button-secondary" onclick="openRecipeForm('{{ addslashes($productName) }}')">Edit</button>
+                    <button type="button" class="button button-secondary" onclick="openRecipeForm({{ $recipe['product_id'] }}, {{ $recipe['product_size_id'] }})">Edit</button>
                 </div>
                 <table class="table">
                     <thead>
@@ -50,7 +50,7 @@
                         </tr>
                     </thead>
                     <tbody>
-                        @foreach($items as $item)
+                        @foreach($recipe['items'] as $item)
                         <tr>
                             <td>{{ $item['ingredient_name'] }}</td>
                             <td>{{ number_format($item['qty'], 3) }}</td>
@@ -75,10 +75,19 @@
             <div class="card" style="padding:18px;">
                 <div class="form-group" style="margin-bottom:18px;">
                     <label class="form-label">Product</label>
-                    <select name="product_id" class="form-select" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:10px;" required>
+                    <select id="recipeProduct" name="product_id" class="form-select" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:10px;" onchange="filterRecipeSizes()" required>
                         <option value="">Select a product</option>
                         @foreach($products as $product)
                         <option value="{{ $product['id'] }}">{{ $product['name'] }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div class="form-group" style="margin-bottom:18px;">
+                    <label class="form-label">Size</label>
+                    <select id="recipeProductSize" name="product_size_id" class="form-select" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:10px;" required>
+                        <option value="">Select a product size</option>
+                        @foreach($productSizes as $productSize)
+                        <option value="{{ $productSize['id'] }}" data-product-id="{{ $productSize['product_id'] }}">{{ ucfirst($productSize['size']) }}</option>
                         @endforeach
                     </select>
                 </div>
@@ -111,7 +120,18 @@
 </div>
 
 <script>
-function addIngredientRow() {
+const recipeFormMap = @json($recipeFormMap);
+
+function filterRecipeSizes() {
+    const productId = document.getElementById('recipeProduct').value;
+    const sizeSelect = document.getElementById('recipeProductSize');
+    Array.from(sizeSelect.options).forEach((option) => {
+        option.hidden = Boolean(option.value) && option.dataset.productId !== productId;
+    });
+    if (sizeSelect.selectedOptions[0]?.hidden) sizeSelect.value = '';
+}
+
+function addIngredientRow(ingredientId = '', quantity = '') {
     const container = document.getElementById('ingredientRows');
     const row = document.createElement('div');
     row.style = 'display:grid;grid-template-columns:2fr 1fr auto;gap:10px;align-items:end;margin-bottom:10px;';
@@ -132,6 +152,8 @@ function addIngredientRow() {
         <button type="button" class="button button-secondary" onclick="removeIngredientRow(this)" style="height:40px;">−</button>
     `;
     container.appendChild(row);
+    if (ingredientId !== '') row.querySelector('select').value = String(ingredientId);
+    if (quantity !== '') row.querySelector('input').value = String(quantity);
 }
 
 function removeIngredientRow(button) {
@@ -141,13 +163,20 @@ function removeIngredientRow(button) {
     }
 }
 
-function openRecipeForm(productName) {
-    const select = document.querySelector('select[name="product_id"]');
-    const option = Array.from(select.options).find(o => o.text === productName);
-    if (option) {
-        select.value = option.value;
-        document.getElementById('recipeModal').style.display = 'flex';
-    }
+function openRecipeForm(productId = '', productSizeId = '') {
+    const productSelect = document.getElementById('recipeProduct');
+    const sizeSelect = document.getElementById('recipeProductSize');
+    productSelect.value = String(productId);
+    filterRecipeSizes();
+    sizeSelect.value = String(productSizeId);
+
+    const container = document.getElementById('ingredientRows');
+    container.replaceChildren();
+    const savedRows = productId && productSizeId ? recipeFormMap[`${productId}:${productSizeId}`] || [] : [];
+    if (savedRows.length) savedRows.forEach((row) => addIngredientRow(row.ingredient_id, row.qty));
+    else addIngredientRow();
+
+    document.getElementById('recipeModal').style.display = 'flex';
 }
 </script>
 @endsection

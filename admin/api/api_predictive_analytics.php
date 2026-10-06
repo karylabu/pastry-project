@@ -21,12 +21,13 @@ function getSalesHistory(mysqli $conn): array {
 
     if ($hasOrderItems) {
         $sql = "
-            SELECT o.created_at AS order_date, oi.product, oi.qty
+            SELECT DATE(o.created_at) AS order_date, oi.product, SUM(oi.qty) AS quantity, COUNT(*) AS record_count
             FROM orders o
-            LEFT JOIN order_items oi ON oi.order_id = o.id
-            WHERE o.status IS NULL OR o.status NOT IN ('Cancelled', 'cancelled')
+            INNER JOIN order_items oi ON oi.order_id = o.id
+            WHERE (o.status IS NULL OR o.status NOT IN ('Cancelled', 'cancelled'))
             AND oi.product IS NOT NULL AND TRIM(oi.product) <> ''
-            ORDER BY o.created_at ASC
+            GROUP BY DATE(o.created_at), oi.product
+            ORDER BY order_date ASC, oi.product ASC
         ";
     } else {
         $sql = "
@@ -42,16 +43,18 @@ function getSalesHistory(mysqli $conn): array {
         return $history;
     }
 
+    $dailyHistory = [];
     while ($row = mysqli_fetch_assoc($result)) {
         if ($hasOrderItems) {
             $orderDate = $row['order_date'] ?? '';
             $product = normalizeProductName($row['product'] ?? '');
-            $qty = max(0, (float) ($row['qty'] ?? 0));
+            $qty = max(0, (float) ($row['quantity'] ?? 0));
             if ($orderDate && $product && $qty > 0) {
                 $history[] = [
-                    'date' => date('Y-m-d', strtotime($orderDate)),
+                    'date' => $orderDate,
                     'product' => $product,
                     'quantity' => $qty,
+                    'record_count' => (int) ($row['record_count'] ?? 1),
                 ];
             }
             continue;
@@ -68,13 +71,41 @@ function getSalesHistory(mysqli $conn): array {
             $product = normalizeProductName($item['name'] ?? $item['product'] ?? $item['title'] ?? '');
             $qty = max(0, (float) ($item['qty'] ?? $item['quantity'] ?? 0));
             if ($orderDate && $product && $qty > 0) {
-                $history[] = [
-                    'date' => date('Y-m-d', strtotime($orderDate)),
-                    'product' => $product,
-                    'quantity' => $qty,
-                ];
+                $date = date('Y-m-d', strtotime($orderDate));
+                $key = $date . '|' . strtolower($product);
+                $dailyHistory[$key]['date'] = $date;
+                $dailyHistory[$key]['product'] = $product;
+                $dailyHistory[$key]['quantity'] = ($dailyHistory[$key]['quantity'] ?? 0) + $qty;
+                $dailyHistory[$key]['record_count'] = ($dailyHistory[$key]['record_count'] ?? 0) + 1;
             }
         }
+    }
+    if (!$hasOrderItems && $dailyHistory) {
+        $history = array_values($dailyHistory);
+    }
+
+    $historyTable = mysqli_query($conn, "SHOW TABLES LIKE 'analytics_sales_history'");
+    if ($historyTable && mysqli_num_rows($historyTable) > 0) {
+        $importedResult = mysqli_query($conn, "
+            SELECT history.product_name, history.sale_date, SUM(history.units_sold) AS units_sold, COUNT(*) AS record_count
+            FROM analytics_sales_history AS history
+            INNER JOIN analytics_imports AS imports ON imports.id = history.import_id
+            WHERE imports.status = 'completed' AND history.units_sold > 0
+            GROUP BY history.product_name, history.sale_date
+            ORDER BY history.sale_date ASC, history.product_name ASC
+        ");
+        if ($importedResult) {
+            while ($row = mysqli_fetch_assoc($importedResult)) {
+                $product = normalizeProductName($row['product_name'] ?? '');
+                $date = (string) ($row['sale_date'] ?? '');
+                $quantity = max(0, (float) ($row['units_sold'] ?? 0));
+                if ($date !== '' && $product !== '' && $quantity > 0) {
+                    $history[] = ['date' => $date, 'product' => $product, 'quantity' => $quantity, 'record_count' => (int) $row['record_count']];
+                }
+            }
+            mysqli_free_result($importedResult);
+        }
+        mysqli_free_result($historyTable);
     }
 
     return $history;
@@ -316,7 +347,8 @@ function buildDetailedForecastPayload(array $history, array $products, array $in
     $period = in_array($period, [7, 14, 30], true) ? $period : 7;
     $today = new DateTimeImmutable('today');
     $historyByProduct = [];
-    $allDates = [];
+    $historicalStartDate = null;
+    $historicalEndDate = null;
 
     foreach ($history as $entry) {
         $product = normalizeProductName($entry['product'] ?? '');
@@ -324,25 +356,36 @@ function buildDetailedForecastPayload(array $history, array $products, array $in
         $quantity = max(0, (float) ($entry['quantity'] ?? 0));
         if ($product === '' || $date === '' || $quantity <= 0) continue;
         $historyByProduct[$product][$date] = ($historyByProduct[$product][$date] ?? 0) + $quantity;
-        $allDates[] = $date;
+        $historicalStartDate = $historicalStartDate === null || $date < $historicalStartDate ? $date : $historicalStartDate;
+        $historicalEndDate = $historicalEndDate === null || $date > $historicalEndDate ? $date : $historicalEndDate;
     }
 
-    $latestDate = !empty($allDates) ? new DateTimeImmutable(max($allDates)) : null;
+    $latestDate = $historicalEndDate !== null ? new DateTimeImmutable($historicalEndDate) : null;
     $historicalEnd = $latestDate ?: $today;
-    $historicalStart = !empty($allDates) ? new DateTimeImmutable(min($allDates)) : null;
+    $historicalStart = $historicalStartDate !== null ? new DateTimeImmutable($historicalStartDate) : null;
     $productByName = [];
     foreach ($products as $product) $productByName[strtolower($product['name'])] = $product;
 
     $forecastProducts = [];
     $validation = ['absolute' => [], 'squared' => [], 'percentage' => []];
     $forecastDayTotals = [];
+    $historicalDayTotals = [];
     $ingredientTotals = [];
     $actions = [];
     $risks = [];
 
     foreach ($historyByProduct as $productName => $daily) {
+        $dateKeys = array_keys($daily);
+        $firstDate = new DateTimeImmutable(min($dateKeys));
+        $lastDate = new DateTimeImmutable(max($dateKeys));
+        for ($date = $firstDate; $date <= $lastDate; $date = $date->modify('+1 day')) {
+            $daily[$date->format('Y-m-d')] = $daily[$date->format('Y-m-d')] ?? 0;
+        }
         ksort($daily);
         $values = array_values($daily);
+        foreach ($daily as $date => $quantity) {
+            $historicalDayTotals[$date] = ($historicalDayTotals[$date] ?? 0) + $quantity;
+        }
         $trainingValues = count($values) > 7 ? array_slice($values, 0, -7) : $values;
         $recentValues = array_slice($values, -min(7, count($values)));
         $recentDemand = count($recentValues) ? array_sum($recentValues) / count($recentValues) : 0;
@@ -398,7 +441,7 @@ function buildDetailedForecastPayload(array $history, array $products, array $in
             'trendPercent' => $previousEquivalent > 0 ? round((($totalForecast - $previousEquivalent) / $previousEquivalent) * 100, 2) : null,
             'currentStock' => (float) ($catalogue['stock'] ?? 0), 'recommendedProduction' => $recommendedProduction,
             'recommendedPreorderQuantity' => $recommendedPreorderQuantity,
-            'priority' => $priority, 'ingredients' => $ingredientRows, 'history' => array_values($daily),
+            'priority' => $priority, 'ingredients' => $ingredientRows, 'history' => array_slice(array_values($daily), -7),
         ];
     }
 
@@ -421,9 +464,10 @@ function buildDetailedForecastPayload(array $history, array $products, array $in
 
     return [
         'period' => $period, 'products' => $forecastProducts, 'ingredients' => array_values($risks), 'risks' => $risks, 'actions' => $actions, 'alerts' => [], 'recommendations' => [],
+        'history' => array_map(static fn($date, $demand) => ['date' => $date, 'demand' => round($demand, 2)], array_slice(array_keys($historicalDayTotals), -7), array_slice(array_values($historicalDayTotals), -7)),
         'daily' => array_map(static fn($day, $value) => ['day' => $day, 'date' => $today->modify("+{$day} days")->format('Y-m-d'), 'forecast' => round($value, 2)], array_keys($forecastDayTotals), $forecastDayTotals),
         'summary' => ['totalProjectedDemand' => round($totalForecast, 2), 'highPriorityCount' => count(array_filter($forecastProducts, static fn($item) => $item['priority'] === 'High')), 'recommendationCount' => count($actions), 'trendPercent' => $trendPercent, 'peakDay' => !empty($forecastDayTotals) ? array_search(max($forecastDayTotals), $forecastDayTotals, true) : null],
-        'model' => ['name' => 'Moving average with linear trend', 'mae' => $mae !== null ? round($mae, 2) : null, 'rmse' => $rmse !== null ? round($rmse, 2) : null, 'mape' => $mape !== null ? round($mape, 2) : null, 'records' => count($history), 'training_start' => $historicalStart?->format('Y-m-d'), 'training_end' => $historicalEnd->format('Y-m-d'), 'validation_records' => count($validation['absolute'])],
+        'model' => ['name' => 'Moving average with linear trend', 'mae' => $mae !== null ? round($mae, 2) : null, 'rmse' => $rmse !== null ? round($rmse, 2) : null, 'mape' => $mape !== null ? round($mape, 2) : null, 'records' => array_sum(array_map(static fn($entry) => (int) ($entry['record_count'] ?? 1), $history)), 'training_start' => $historicalStart?->format('Y-m-d'), 'training_end' => $historicalEnd->format('Y-m-d'), 'validation_records' => count($validation['absolute'])],
         'drivers' => ['Historical product demand', 'Recent sales average', 'Linear demand trend'],
         'insights' => array_values(array_filter([ $trendPercent !== null ? 'Expected demand is ' . ($trendPercent >= 0 ? 'increasing' : 'decreasing') . ' by ' . abs($trendPercent) . '% compared with the previous equivalent period.' : null, !empty($forecastProducts) ? $forecastProducts[array_search(max(array_column($forecastProducts, 'totalForecast')), array_column($forecastProducts, 'totalForecast'), true)]['product'] . ' has the highest projected demand.' : null, !empty($risks) && count(array_filter($risks, static fn($item) => $item['riskStatus'] === 'HIGH')) ? 'One or more ingredients may run out based on projected consumption.' : null])),
     ];

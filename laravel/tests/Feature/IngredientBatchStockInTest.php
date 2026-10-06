@@ -6,6 +6,7 @@ use App\Models\Ingredient;
 use App\Models\IngredientBatch;
 use App\Models\Product;
 use App\Models\ProductRecipe;
+use App\Models\ProductSize;
 use App\Models\User;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Database\Schema\Blueprint;
@@ -22,6 +23,7 @@ class IngredientBatchStockInTest extends TestCase
         Schema::dropIfExists('ingredients');
         Schema::dropIfExists('users');
         Schema::dropIfExists('product_recipes');
+        Schema::dropIfExists('product_sizes');
         Schema::dropIfExists('products');
         Schema::dropIfExists('production_batch_allocations');
         Schema::dropIfExists('production_transactions');
@@ -61,9 +63,20 @@ class IngredientBatchStockInTest extends TestCase
             $table->timestamps();
         });
 
+        Schema::create('product_sizes', function (Blueprint $table) {
+            $table->id();
+            $table->unsignedBigInteger('product_id');
+            $table->string('size');
+            $table->decimal('price', 10, 2)->default(0);
+            $table->boolean('available')->default(true);
+            $table->integer('stock_quantity')->default(0);
+            $table->timestamps();
+        });
+
         Schema::create('product_recipes', function (Blueprint $table) {
             $table->id();
             $table->unsignedBigInteger('product_id');
+            $table->unsignedBigInteger('product_size_id')->nullable();
             $table->unsignedBigInteger('ingredient_id');
             $table->decimal('qty', 10, 3);
             $table->boolean('active')->default(true);
@@ -74,7 +87,9 @@ class IngredientBatchStockInTest extends TestCase
         Schema::create('production_transactions', function (Blueprint $table) {
             $table->id();
             $table->unsignedBigInteger('product_id');
+            $table->unsignedBigInteger('product_size_id')->nullable();
             $table->integer('quantity');
+            $table->date('expiry_date')->nullable();
             $table->unsignedBigInteger('user_id')->nullable();
             $table->string('idempotency_key')->nullable()->unique();
             $table->timestamp('created_at')->nullable();
@@ -93,6 +108,7 @@ class IngredientBatchStockInTest extends TestCase
             $table->id();
             $table->unsignedBigInteger('product_id');
             $table->unsignedBigInteger('product_variant_id')->nullable();
+            $table->unsignedBigInteger('product_size_id')->nullable();
             $table->string('movement_type');
             $table->decimal('quantity', 10, 3);
             $table->decimal('previous_stock', 10, 3);
@@ -318,7 +334,7 @@ class IngredientBatchStockInTest extends TestCase
             'batch_number' => 'FLOUR-001',
             'quantity_received' => 12.5,
             'purchase_date' => '2026-09-01',
-            'expiry_date' => '2026-10-01',
+            'expiry_date' => today()->addDays(5)->toDateString(),
             'supplier' => 'Test Supplier',
             'unit_cost' => 45.25,
             'notes' => 'Isolated test fixture',
@@ -449,7 +465,7 @@ class IngredientBatchStockInTest extends TestCase
 
         $this->assertDatabaseHas('discard_requests', ['id' => $created, 'status' => 'Approved']);
         $this->assertDatabaseHas('ingredient_batches', ['id' => $batch->id, 'quantity_remaining' => 5]);
-        $this->assertDatabaseHas('ingredients', ['id' => $ingredient->id, 'stock' => 5]);
+        $this->assertDatabaseHas('ingredients', ['id' => $ingredient->id, 'stock' => 0]);
         $this->assertDatabaseHas('ingredient_movements', ['batch_id' => $batch->id, 'reference_id' => $created, 'action' => 'stock_out']);
         $this->assertDatabaseHas('waste_log', ['ingredient_batch_id' => $batch->id, 'discard_request_id' => $created]);
     }
@@ -546,12 +562,15 @@ class IngredientBatchStockInTest extends TestCase
     {
         $user = $this->createTestUser(['role' => 'manager']);
         $product = Product::create(['name' => 'Cake', 'category' => 'Cakes', 'price' => 100, 'stock' => 0, 'available' => true]);
+        $size = ProductSize::create(['product_id' => $product->id, 'size' => 'Small', 'price' => 100, 'available' => true]);
         $ingredient = Ingredient::create(['name' => 'Sugar', 'unit' => 'kg']);
 
         $this->actingAs($user)->putJson("/api/staff/products/{$product->id}/recipe", [
+            'product_size_id' => $size->id,
             'recipes' => [['ingredient_id' => $ingredient->id, 'qty' => 0]],
         ])->assertUnprocessable();
         $this->actingAs($user)->putJson("/api/staff/products/{$product->id}/recipe", [
+            'product_size_id' => $size->id,
             'recipes' => [
                 ['ingredient_id' => $ingredient->id, 'qty' => 1],
                 ['ingredient_id' => $ingredient->id, 'qty' => 2],
@@ -559,6 +578,7 @@ class IngredientBatchStockInTest extends TestCase
         ])->assertUnprocessable();
 
         $this->actingAs($user)->putJson("/api/staff/products/{$product->id}/recipe", [
+            'product_size_id' => $size->id,
             'recipes' => [['ingredient_id' => $ingredient->id, 'qty' => 0.5]],
         ])->assertOk()->assertJsonPath('recipe.0.qty', 0.5);
     }
@@ -567,14 +587,15 @@ class IngredientBatchStockInTest extends TestCase
     {
         $user = $this->createTestUser(['role' => 'staff']);
         $product = Product::create(['name' => 'Cake', 'category' => 'Cakes', 'price' => 100, 'stock' => 0, 'available' => true]);
+        $size = ProductSize::create(['product_id' => $product->id, 'size' => 'Small', 'price' => 100, 'available' => true]);
         $ingredient = Ingredient::create(['name' => 'Flour', 'unit' => 'kg', 'stock' => 999]);
         IngredientBatch::create(['ingredient_id' => $ingredient->id, 'batch_number' => 'FLOUR-OLD', 'quantity_received' => 10, 'quantity_remaining' => 10, 'expiry_date' => today()->subDay()]);
-        ProductRecipe::create(['product_id' => $product->id, 'ingredient_id' => $ingredient->id, 'qty' => 2, 'active' => true]);
+        ProductRecipe::create(['product_id' => $product->id, 'product_size_id' => $size->id, 'ingredient_id' => $ingredient->id, 'qty' => 2, 'active' => true]);
 
-        $this->actingAs($user)->getJson("/api/staff/production/availability/{$product->id}")
+        $this->actingAs($user)->getJson("/api/staff/production/availability/{$product->id}?product_size_id={$size->id}")
             ->assertOk()->assertJsonPath('is_producible', false);
         $product->update(['available' => false]);
-        $this->actingAs($user)->getJson("/api/staff/production/availability/{$product->id}")
+        $this->actingAs($user)->getJson("/api/staff/production/availability/{$product->id}?product_size_id={$size->id}")
             ->assertJsonPath('availability_reason', 'Product is unavailable');
     }
 
@@ -582,12 +603,19 @@ class IngredientBatchStockInTest extends TestCase
     {
         $user = $this->createTestUser(['role' => 'staff']);
         $product = Product::create(['name' => 'Cake', 'category' => 'Cakes', 'price' => 100, 'stock' => 3, 'available' => true]);
+        $size = ProductSize::create(['product_id' => $product->id, 'size' => 'Small', 'price' => 100, 'available' => true]);
         $ingredient = Ingredient::create(['name' => 'Flour', 'unit' => 'kg', 'stock' => 999]);
         $early = IngredientBatch::create(['ingredient_id' => $ingredient->id, 'batch_number' => 'FLOUR-EARLY', 'quantity_received' => 2, 'quantity_remaining' => 2, 'expiry_date' => today()->addDay()]);
         $late = IngredientBatch::create(['ingredient_id' => $ingredient->id, 'batch_number' => 'FLOUR-LATE', 'quantity_received' => 4, 'quantity_remaining' => 4, 'expiry_date' => today()->addDays(10)]);
-        ProductRecipe::create(['product_id' => $product->id, 'ingredient_id' => $ingredient->id, 'qty' => 3, 'active' => true]);
+        ProductRecipe::create(['product_id' => $product->id, 'product_size_id' => $size->id, 'ingredient_id' => $ingredient->id, 'qty' => 3, 'active' => true]);
 
-        $response = $this->actingAs($user)->postJson('/api/staff/production', ['product_id' => $product->id, 'quantity' => 2, 'idempotency_key' => 'production-test-1']);
+        $response = $this->actingAs($user)->postJson('/api/staff/production', [
+            'product_id' => $product->id,
+            'product_size_id' => $size->id,
+            'quantity' => 2,
+            'expiry_date' => today()->addDays(3)->toDateString(),
+            'idempotency_key' => 'production-test-1',
+        ]);
         $response->assertOk()->assertJsonPath('status', 'success');
         $this->assertDatabaseHas('ingredient_batches', ['id' => $early->id, 'quantity_remaining' => 0]);
         $this->assertDatabaseHas('ingredient_batches', ['id' => $late->id, 'quantity_remaining' => 0]);
@@ -602,10 +630,17 @@ class IngredientBatchStockInTest extends TestCase
     {
         $user = $this->createTestUser(['role' => 'staff']);
         $product = Product::create(['name' => 'Cake', 'category' => 'Cakes', 'price' => 100, 'stock' => 0, 'available' => true]);
+        $size = ProductSize::create(['product_id' => $product->id, 'size' => 'Small', 'price' => 100, 'available' => true]);
         $ingredient = Ingredient::create(['name' => 'Sugar', 'unit' => 'kg']);
         $batch = IngredientBatch::create(['ingredient_id' => $ingredient->id, 'batch_number' => 'SUGAR-PROD', 'quantity_received' => 5, 'quantity_remaining' => 5]);
-        ProductRecipe::create(['product_id' => $product->id, 'ingredient_id' => $ingredient->id, 'qty' => 1, 'active' => true]);
-        $payload = ['product_id' => $product->id, 'quantity' => 1, 'idempotency_key' => 'production-test-2'];
+        ProductRecipe::create(['product_id' => $product->id, 'product_size_id' => $size->id, 'ingredient_id' => $ingredient->id, 'qty' => 1, 'active' => true]);
+        $payload = [
+            'product_id' => $product->id,
+            'product_size_id' => $size->id,
+            'quantity' => 1,
+            'expiry_date' => today()->addDays(3)->toDateString(),
+            'idempotency_key' => 'production-test-2',
+        ];
 
         $this->actingAs($user)->postJson('/api/staff/production', $payload)->assertOk();
         $this->actingAs($user)->postJson('/api/staff/production', $payload)->assertOk()->assertJsonPath('duplicate', true);

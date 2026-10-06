@@ -4,14 +4,13 @@ const origin = typeof window !== "undefined" ? window.location.origin : "";
 export function resolveProjectBase(baseOrigin = origin, suffix = "") {
   const detectedProjectPath = typeof window !== "undefined"
     ? [
-        "/pastry-project",
         "/GitHub/pastry-project",
         "/GitHub/Capstone--Development",
         "/GitHub/Capstone--Development - Copy"
       ].find((path) => window.location.pathname === path || window.location.pathname.startsWith(`${path}/`))
     : null;
 
-  const projectPath = detectedProjectPath || "/pastry-project";
+  const projectPath = detectedProjectPath || "/GitHub/pastry-project";
   const normalizedBase = (baseOrigin || "http://localhost").replace(/\/$/, "");
   const normalizedSuffix = suffix ? `/${suffix.replace(/^\/+|\/+$/g, "")}` : "";
 

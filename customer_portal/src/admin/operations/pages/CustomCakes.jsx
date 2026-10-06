@@ -5,7 +5,6 @@ import { ArrowRight, CalendarDays, CircleCheck, Clock3, CreditCard, Eye, Package
 import { useNavigate } from "react-router-dom";
 
 import { ROOT_BASE, STAFF_BASE, LARAVEL_BASE } from "../../../services/config";
-import { safeParseJson } from "../../../services/api";
 import { subscribeRealtime } from "../../../services/realtime";
 
 const staffFetch = (url, options = {}) => fetch(url, { credentials: "include", ...options });
@@ -404,64 +403,163 @@ export default function CustomCakes() {
     }
   };
 
-  const downloadOrderPdf = (order) => {
+  const downloadOrderPdf = async (order) => {
     const doc = new jsPDF({ unit: "pt", format: "a4" });
     const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
     const margin = 40;
-    let y = 48;
+    const contentWidth = pageWidth - margin * 2;
+    const labelWidth = 145;
+    const valueWidth = contentWidth - labelWidth;
+    let y = 0;
 
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(18);
-    doc.text("Custom Cake Request", margin, y);
-
-    y += 20;
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(10);
-    doc.text(`Order #: ${order.id || "N/A"}`, margin, y);
-    y += 14;
-    doc.text(`Status: ${order.status || "N/A"}`, margin, y);
-    y += 14;
-    doc.text(`Date: ${order.created_at ? new Date(order.created_at).toLocaleString() : "N/A"}`, margin, y);
-    y += 14;
-    doc.text(`Customer: ${order.name || order.phone || order.customer_name || "N/A"}`, margin, y);
-    y += 14;
-    doc.text(`Phone: ${order.phone || "N/A"}`, margin, y);
-    y += 14;
-    doc.text(`Email: ${order.email || "N/A"}`, margin, y);
-    y += 14;
-    doc.text(`Total: ₱${Number(order.total || 0).toLocaleString()}`, margin, y);
-
-    const detailEntries = parseCustomDetails(order);
-    const itemSummary = Array.isArray(order.items)
-      ? order.items.map(item => `${item.name || "Item"} x${item.qty || 1}`).join(", ")
-      : "No items listed";
-
-    y += 20;
-    doc.setFont("helvetica", "bold");
-    doc.text("Requested Items", margin, y);
-    y += 14;
-    doc.setFont("helvetica", "normal");
-    const itemLines = doc.splitTextToSize(itemSummary || "No items listed", pageWidth - margin * 2);
-    doc.text(itemLines, margin, y);
-    y += 16 * Math.max(1, itemLines.length);
-
-    if (detailEntries.length > 0) {
-      doc.setFont("helvetica", "bold");
-      doc.text("Customer Form Details", margin, y);
-      y += 16;
-      doc.setFont("helvetica", "normal");
-      detailEntries.forEach(([label, value]) => {
-        const lines = doc.splitTextToSize(`${label}: ${value}`, pageWidth - margin * 2);
-        doc.text(lines, margin, y);
-        y += 12 * Math.max(1, lines.length);
-        if (y > 760) {
-          doc.addPage();
-          y = 48;
-        }
+    try {
+      const projectPath = new URL(ROOT_BASE, window.location.origin).pathname.replace(/\/$/, "");
+      const logoResponse = await fetch(
+        `${window.location.origin}${projectPath}/uploads/logo.png?v=logo-v2`,
+        { credentials: "include" }
+      );
+      if (!logoResponse.ok) throw new Error(`Could not load the Pastry Project logo (${logoResponse.status}).`);
+      const logoBlob = await logoResponse.blob();
+      const logoData = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = () => reject(new Error("Could not prepare the Pastry Project logo for the PDF."));
+        reader.readAsDataURL(logoBlob);
       });
-    }
 
-    doc.save(`custom-cake-request-${order.id || "order"}.pdf`);
+      const addPageHeader = () => {
+        doc.addImage(logoData, "PNG", (pageWidth - 68) / 2, 30, 68, 68, undefined, "FAST");
+        const nameY = 126;
+        doc.setFont("times", "bolditalic");
+        doc.setFontSize(25);
+        const pastryWidth = doc.getTextWidth("Pastry");
+        const projectWidth = doc.getTextWidth("Project");
+        const brandGap = 5;
+        const brandStart = (pageWidth - pastryWidth - brandGap - projectWidth) / 2;
+        doc.setTextColor(17, 17, 17);
+        doc.text("Pastry", brandStart, nameY);
+        doc.setTextColor(181, 139, 25);
+        doc.text("Project", brandStart + pastryWidth + brandGap, nameY);
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(8);
+        doc.setTextColor(119, 119, 119);
+        doc.text("B A K E D   F R E S H   D A I L Y", pageWidth / 2, nameY + 17, { align: "center" });
+        doc.setTextColor(17, 17, 17);
+      };
+
+      addPageHeader();
+      y = 167;
+
+      const addSectionHeading = (heading) => {
+        if (y + 24 > pageHeight - margin) {
+          doc.addPage();
+          addPageHeader();
+          y = 167;
+        }
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(15);
+        doc.setTextColor(17, 17, 17);
+        doc.text(heading, margin, y);
+        y += 12;
+      };
+
+      const addDetailRow = (label, value) => {
+        const lines = doc.splitTextToSize(String(value), valueWidth - 16);
+        const rowHeight = Math.max(28, lines.length * 13 + 12);
+        if (y + rowHeight > pageHeight - margin) {
+          doc.addPage();
+          addPageHeader();
+          y = 167;
+        }
+        doc.setFillColor(247, 247, 247);
+        doc.setDrawColor(238, 238, 238);
+        doc.rect(margin, y, labelWidth, rowHeight, "FD");
+        doc.rect(margin + labelWidth, y, valueWidth, rowHeight, "D");
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(9);
+        doc.setTextColor(17, 17, 17);
+        doc.text(doc.splitTextToSize(label, labelWidth - 14), margin + 7, y + 16);
+        doc.setFont("helvetica", "normal");
+        doc.text(lines, margin + labelWidth + 8, y + 16);
+        y += rowHeight;
+      };
+
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(18);
+      doc.text(`Receipt - Order #${order.id || "N/A"}`, margin, y);
+      y += 22;
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(13);
+      doc.setTextColor(68, 68, 68);
+      doc.text(`Date: ${order.created_at ? new Date(order.created_at).toLocaleString() : "N/A"}`, margin, y);
+      doc.setTextColor(17, 17, 17);
+      y += 25;
+
+      const detailEntries = parseCustomDetails(order);
+      addSectionHeading("Customization Details");
+      if (detailEntries.length) {
+        detailEntries.forEach(([label, value]) => addDetailRow(label, value));
+      } else {
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(10);
+        doc.text("No customization details were attached to this order.", margin, y + 8);
+        y += 24;
+      }
+
+      y += 18;
+      addSectionHeading("Items");
+      const itemColumnWidths = [contentWidth - 180, 70, 110];
+      const itemRows = Array.isArray(order.items) && order.items.length
+        ? order.items.map((item) => [
+            String(item.name || "Item"),
+            String(item.qty ?? 1),
+            `PHP ${(Number(item.price || 0) * Number(item.qty || 1)).toLocaleString()}`,
+          ])
+        : [["Custom Cake Request", String(detailEntries.find(([label]) => label === "Quantity")?.[1] || 1), "PHP 0"]];
+      itemRows.push(["", "Grand Total", `PHP ${Number(order.total || 0).toLocaleString()}`]);
+      const itemHeaders = ["Item", "Qty", "Total"];
+      let columnX = margin;
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(9);
+      doc.setDrawColor(238, 238, 238);
+      itemHeaders.forEach((heading, index) => {
+        doc.setFillColor(247, 247, 247);
+        doc.rect(columnX, y, itemColumnWidths[index], 28, "FD");
+        doc.setTextColor(17, 17, 17);
+        doc.text(heading, columnX + 8, y + 18);
+        columnX += itemColumnWidths[index];
+      });
+      y += 28;
+
+      itemRows.forEach((row, rowIndex) => {
+        const cellLines = row.map((value, index) => doc.splitTextToSize(value, itemColumnWidths[index] - 16));
+        const rowHeight = Math.max(30, ...cellLines.map((lines) => lines.length * 13 + 12));
+        if (y + rowHeight > pageHeight - margin) {
+          doc.addPage();
+          addPageHeader();
+          y = 167;
+        }
+        columnX = margin;
+        const isTotal = rowIndex === itemRows.length - 1;
+        if (isTotal) doc.setFont("helvetica", "bold");
+        else doc.setFont("helvetica", "normal");
+        doc.setFontSize(9);
+        itemColumnWidths.forEach((width, index) => {
+          doc.setDrawColor(238, 238, 238);
+          doc.rect(columnX, y, width, rowHeight);
+          const alignRight = index === 2 || (isTotal && index === 1);
+          const cellX = alignRight ? columnX + width - 8 : columnX + 8;
+          doc.text(cellLines[index], cellX, y + 18, { align: alignRight ? "right" : "left" });
+          columnX += width;
+        });
+        y += rowHeight;
+      });
+
+      doc.save(`custom-cake-request-${order.id || "order"}.pdf`);
+    } catch (error) {
+      addToast(error.message || "Could not create the custom cake request PDF.", "error");
+    }
   };
 
   const selectedOrderDetailEntries = selectedOrder ? parseCustomDetails(selectedOrder) : [];
@@ -513,22 +611,6 @@ export default function CustomCakes() {
       const data = await response.json().catch(() => ({}));
       if (!response.ok || !data.success) {
         throw new Error(data.message || `Request failed (${response.status})`);
-      }
-
-      const targetOrder = orders.find((order) => Number(order.id) === Number(id));
-      const customizedCakeOrderId = targetOrder?.customized_cake_order_id || targetOrder?.custom_details?.recipe_order_id;
-      if ((status === "Confirmed" || status === "Pending") && customizedCakeOrderId) {
-        fetch(`${LARAVEL_BASE}/api/customized-cakes/consume-inventory`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Accept: "application/json" },
-          credentials: "include",
-          body: JSON.stringify({ customized_cake_order_id: customizedCakeOrderId, order_id: id }),
-        })
-          .then(safeParseJson)
-          .then((consumption) => {
-            if (!consumption?.success && !consumption?.consumed) addToast(`Order #${id} accepted, but inventory was not consumed: ${consumption?.message || "review required"}`, "error");
-          })
-          .catch(() => addToast(`Order #${id} accepted, but inventory consumption needs review.`, "error"));
       }
 
       fetchOrders(true);

@@ -77,6 +77,37 @@ class CakeSalesAnalytics
             }
         }
 
+        if (Schema::hasTable('analytics_sales_history')) {
+            $importedRows = DB::table('analytics_sales_history as history')
+                ->join('analytics_imports as imports', 'imports.id', '=', 'history.import_id')
+                ->where('imports.status', 'completed')
+                ->whereBetween('history.sale_date', [$start, $end])
+                ->groupBy('history.product_name', 'history.sale_date')
+                ->orderBy('history.sale_date')
+                ->selectRaw('history.product_name, history.sale_date, SUM(history.units_sold) AS units_sold, SUM(history.revenue) AS revenue, COUNT(*) AS record_count')
+                ->get();
+
+            foreach ($importedRows as $row) {
+                $product = $productsByName->get($this->nameKey($row->product_name));
+                $quantity = max(0, (float) $row->units_sold);
+                if (!$product || $quantity <= 0) continue;
+
+                $revenue = (float) $row->revenue;
+                $regularSales[] = [
+                    'order_id' => 'import-' . $row->product_name . '-' . $row->sale_date,
+                    'date' => (string) $row->sale_date,
+                    'product_id' => (int) $product->id,
+                    'product' => $product->name,
+                    'category' => $product->category,
+                    'size' => 'Unknown',
+                    'quantity' => $quantity,
+                    'price' => $revenue / $quantity,
+                    'revenue' => $revenue,
+                    'imported_record_count' => (int) $row->record_count,
+                ];
+            }
+        }
+
         $flavors = $this->rankRegularProducts($regularSales, $customSales);
         $sizesBySale = $this->rankDimension($regularSales, $customSales, 'size');
         $designs = $this->rankDimension([], $customSales, 'design');
@@ -205,10 +236,12 @@ class CakeSalesAnalytics
 
     private function summary(array $regular, array $custom): array
     {
+        $regularOrderIds = array_column(array_filter($regular, static fn ($sale) => !isset($sale['imported_record_count'])), 'order_id');
         $saleOrderIds = array_unique(array_merge(
-            array_column($regular, 'order_id'),
+            $regularOrderIds,
             array_column($custom, 'order_id')
         ));
+        $saleRecords = count($saleOrderIds) + $this->importedRecordCount($regular);
         $regularQty = array_sum(array_column($regular, 'quantity'));
         $customQty = array_sum(array_column($custom, 'quantity'));
         $regularRevenue = array_sum(array_column($regular, 'revenue'));
@@ -216,15 +249,27 @@ class CakeSalesAnalytics
         $totalQty = $regularQty + $customQty;
         $totalRevenue = $regularRevenue + $customRevenue;
         return [
-            'total_cake_sales' => count($saleOrderIds),
+            'total_cake_sales' => $saleRecords,
             'cakes_sold' => $totalQty,
             'cake_revenue' => $totalRevenue,
             'regular_cakes_sold' => $regularQty,
             'customized_cakes_sold' => $customQty,
             'regular_revenue' => $regularRevenue,
             'customized_revenue' => $customRevenue,
-            'average_order_value' => count($regular) + count($custom) ? $totalRevenue / (count($regular) + count($custom)) : 0,
+            'average_order_value' => $this->salesRecordCount($regular) + count($custom) ? $totalRevenue / ($this->salesRecordCount($regular) + count($custom)) : 0,
         ];
+    }
+
+    private function importedRecordCount(array $sales): int
+    {
+        return array_sum(array_map(static fn ($sale) => (int) ($sale['imported_record_count'] ?? 0), $sales));
+    }
+
+    private function salesRecordCount(array $sales): int
+    {
+        $importedRecords = $this->importedRecordCount($sales);
+        $liveRecords = count(array_filter($sales, static fn ($sale) => !isset($sale['imported_record_count'])));
+        return $importedRecords + $liveRecords;
     }
 
     private function salesTrend(array $regular, array $custom, string $start, string $end): array
@@ -308,7 +353,8 @@ class CakeSalesAnalytics
         foreach ([['regular', $regular], ['customized', $custom]] as [$type, $sales]) {
             $quantity = array_sum(array_column($sales, 'quantity'));
             $revenue = array_sum(array_column($sales, 'revenue'));
-            $rows[$type] = ['quantity' => $quantity, 'revenue' => $revenue, 'average_order_value' => count($sales) ? $revenue / count($sales) : 0];
+            $recordCount = $type === 'regular' ? $this->salesRecordCount($sales) : count($sales);
+            $rows[$type] = ['quantity' => $quantity, 'revenue' => $revenue, 'average_order_value' => $recordCount ? $revenue / $recordCount : 0];
         }
         $total = $rows['regular']['quantity'] + $rows['customized']['quantity'] ?: 1;
         foreach ($rows as &$row) $row['percentage'] = round(($row['quantity'] / $total) * 100, 2);
@@ -526,6 +572,24 @@ class CakeSalesAnalytics
         elseif ($preset === 'this_week') [$start, $end] = [$today->copy()->startOfWeek(), $today];
         elseif ($preset === 'this_month') [$start, $end] = [$today->copy()->startOfMonth(), $today];
         elseif ($preset === 'this_year') [$start, $end] = [$today->copy()->startOfYear(), $today];
+        elseif ($preset === 'all') {
+            $firstDates = [];
+            $orderDate = DB::table('orders')->min('created_at');
+            if ($orderDate) $firstDates[] = substr((string) $orderDate, 0, 10);
+            if (Schema::hasTable('analytics_sales_history') && Schema::hasTable('analytics_imports')) {
+                $importDate = DB::table('analytics_sales_history as history')
+                    ->join('analytics_imports as imports', 'imports.id', '=', 'history.import_id')
+                    ->where('imports.status', 'completed')
+                    ->min('history.sale_date');
+                if ($importDate) $firstDates[] = substr((string) $importDate, 0, 10);
+            }
+            if (Schema::hasTable('sales')) {
+                $legacySalesDate = DB::table('sales')->min('sale_date');
+                if ($legacySalesDate) $firstDates[] = substr((string) $legacySalesDate, 0, 10);
+            }
+            $start = $firstDates ? min($firstDates) : $today;
+            $end = $today;
+        }
         else [$start, $end] = [$filters['start_date'] ?? $today->copy()->subDays(29), $filters['end_date'] ?? $today];
         $start = $start instanceof \DateTimeInterface ? $start->format('Y-m-d') : (string) $start;
         $end = $end instanceof \DateTimeInterface ? $end->format('Y-m-d') : (string) $end;

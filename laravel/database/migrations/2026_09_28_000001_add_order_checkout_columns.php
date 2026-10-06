@@ -8,6 +8,10 @@ return new class extends Migration
 {
     public function up(): void
     {
+        if (app()->environment('testing') && (! Schema::hasTable('orders') || ! Schema::hasTable('order_items'))) {
+            return;
+        }
+
         Schema::table('orders', function (Blueprint $table) {
             $table->string('order_type', 64)->default('Standard');
             $table->boolean('is_customized')->default(false);
@@ -20,6 +24,10 @@ return new class extends Migration
 
     public function down(): void
     {
+        if (! Schema::hasTable('orders') || ! Schema::hasTable('order_items')) {
+            return;
+        }
+
         Schema::table('order_items', function (Blueprint $table) {
             $table->dropColumn('product_size_id');
         });

@@ -207,6 +207,16 @@ class CustomizedCakeRecipeServiceTest extends TestCase
         }
     }
 
+    public function test_custom_cake_flavor_catalog_includes_carrot(): void
+    {
+        $this->getJson('/api/customized-cakes/flavors')
+            ->assertOk()
+            ->assertJsonFragment([
+                'name' => 'Carrot',
+                'slug' => 'carrot',
+            ]);
+    }
+
     public function test_single_tier_calculates_recipe_by_multiplier(): void
     {
         $flavor = DB::table('cake_flavors')->where('slug', 'moist-chocolate')->first();

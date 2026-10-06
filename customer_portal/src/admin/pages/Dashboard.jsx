@@ -221,8 +221,6 @@ export default function Dashboard() {
   const [analyticsError, setAnalyticsError] = useState(false);
   const [analyticsPreset, setAnalyticsPreset] = useState("last_7_days");
   const [trendMetric, setTrendMetric] = useState("revenue");
-  const [customStart, setCustomStart] = useState("");
-  const [customEnd, setCustomEnd] = useState("");
 
   const normalizeOrders = (items = [], source) =>
     (Array.isArray(items) ? items : []).map((order) => ({
@@ -265,13 +263,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     const params = new URLSearchParams();
-    if (analyticsPreset === "custom") {
-      if (!customStart || !customEnd) return;
-      params.set("start_date", customStart);
-      params.set("end_date", customEnd);
-    } else {
-      params.set("preset", analyticsPreset);
-    }
+    params.set("preset", analyticsPreset);
     let token = "";
     try { token = JSON.parse(localStorage.getItem("user") || "null")?.token || ""; } catch { token = ""; }
     setAnalyticsLoading(true);
@@ -290,7 +282,7 @@ export default function Dashboard() {
         setAnalyticsError(true);
       })
       .finally(() => setAnalyticsLoading(false));
-  }, [analyticsPreset, customStart, customEnd, orders]);
+  }, [analyticsPreset, orders]);
 
   useEffect(() => {
     fetch(`${CUSTOMER_BASE}/api/customer/products?action=list`)
@@ -411,7 +403,9 @@ export default function Dashboard() {
 
   const analyticsSummary = analytics?.summary || {};
   const reviewAnalytics = analytics?.reviewAnalytics || {};
-  const trendRows = analytics?.salesTrend?.daily || [];
+  const trendRows = analyticsPreset === "all"
+    ? analytics?.salesTrend?.monthly || []
+    : analytics?.salesTrend?.daily || [];
   const regularVsCustomized = analytics?.cakeTypeBreakdown || analytics?.regularVsCustomized || {};
   const lowStockIngredients = analytics?.ingredientAnalytics?.low_stock || [];
   const mostUsedIngredients = analytics?.ingredientAnalytics?.most_used || [];
@@ -463,18 +457,11 @@ export default function Dashboard() {
                 <p className="ml-[25px] text-[10px] text-[#9b8c83]">Track your cake sales performance and revenue trends.</p>
               </div>
               <div className="flex flex-wrap items-center gap-2">
-                {[['last_7_days', '7 Days'], ['last_30_days', '30 Days'], ['this_month', 'This Month'], ['custom', 'Custom']].map(([value, label]) => (
+                {[['last_7_days', '7 Days'], ['last_30_days', '30 Days'], ['this_year', 'This Year'], ['all', 'All']].map(([value, label]) => (
                   <button key={value} type="button" onClick={() => setAnalyticsPreset(value)} className={`rounded-full border px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.12em] transition-colors ${analyticsPreset === value ? 'border-[#33251e] bg-[#33251e] text-white' : 'border-[#eadfd8] bg-white text-[#765d50] hover:bg-[#fff8df]'}`}>{label}</button>
                 ))}
               </div>
             </div>
-
-            {analyticsPreset === "custom" && (
-              <div className="flex flex-wrap gap-2 rounded-xl border border-[#eadfd8] bg-white p-3">
-                <input type="date" value={customStart} onChange={(event) => setCustomStart(event.target.value)} className="rounded-lg border border-[#eadfd8] px-3 py-2 text-xs text-[#5f514a]" />
-                <input type="date" value={customEnd} onChange={(event) => setCustomEnd(event.target.value)} className="rounded-lg border border-[#eadfd8] px-3 py-2 text-xs text-[#5f514a]" />
-              </div>
-            )}
 
             {analyticsLoading ? <div className="rounded-xl border border-[#eadfd8] bg-white px-6 py-7 text-center text-[13px] text-[#9b8c83]">Loading cake sales analytics...</div> : analyticsError ? <div className="rounded-xl border border-[#efd8d4] bg-[#fff0f0] px-6 py-7 text-center text-[13px] text-[#8d5357]">Unable to load cake sales analytics.</div> : (
               <>

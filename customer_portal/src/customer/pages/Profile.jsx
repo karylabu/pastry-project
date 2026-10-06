@@ -19,6 +19,7 @@ import { getAuthHeaders, safeParseJson } from '../../services/api';
 
 export default function Profile() {
   const [user, setUser] = useState(null);
+  const [failedAvatarUrl, setFailedAvatarUrl] = useState('');
 
   useEffect(() => {
     try {
@@ -39,7 +40,7 @@ export default function Profile() {
           const syncedUser = {
             ...currentUser,
             ...data,
-            avatar: data.avatar || data.profile_image || data.profile_picture || currentUser.avatar || '',
+            avatar: currentUser.avatar || data.avatar || data.profile_image || data.profile_picture || '',
           };
           setUser(syncedUser);
           localStorage.setItem('user', JSON.stringify(syncedUser));
@@ -52,6 +53,7 @@ export default function Profile() {
 
   const fullName = user?.name || 'Not available';
   const firstName = fullName.split(' ')[0];
+  const avatarUrl = user?.avatar || user?.profile_image || user?.profile_picture || '';
 
   const defaultAddress = user?.address || user?.default_address || 'Not set';
   const addressParts = (defaultAddress || '').split(',').map((p) => p.trim()).filter(Boolean);
@@ -84,8 +86,13 @@ export default function Profile() {
           <div className="absolute -right-12 -top-16 h-44 w-44 rounded-full border-[18px] border-[#e7c878]/45" />
           <div className="relative flex flex-col gap-5 sm:flex-row sm:items-center">
           <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-[22px] bg-white ring-2 ring-[#e7c878] shadow-sm">
-            {user?.avatar ? (
-              <img src={user.avatar} alt={fullName} className="w-full h-full object-cover" />
+            {avatarUrl && failedAvatarUrl !== avatarUrl ? (
+              <img
+                src={avatarUrl}
+                alt={fullName}
+                className="w-full h-full object-cover"
+                onError={() => setFailedAvatarUrl(avatarUrl)}
+              />
             ) : (
               <span className="text-2xl font-semibold text-[#8b5e34]">
                 {firstName?.[0]?.toUpperCase() || 'U'}

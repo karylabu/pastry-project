@@ -3,9 +3,12 @@
 namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Jobs\ProcessSalesCsvImport;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
@@ -41,6 +44,172 @@ use Smalot\PdfParser\Parser as PdfParser;
 class SalesImportController extends Controller
 {
     private const MAX_FILE_KB = 15 * 1024; // 15MB
+    private const MAX_CSV_KB = 50 * 1024; // 50MB
+    private const HISTORY_PAGE_SIZE = 50;
+
+    public function storeCsv(Request $request)
+    {
+        $user = $this->requireRole($request, 'admin');
+        if (!$user instanceof User) {
+            return $user;
+        }
+
+        try {
+            $request->validate([
+                'file' => ['required', 'file', 'mimes:csv,txt', 'max:' . self::MAX_CSV_KB],
+                'retry_failed' => ['nullable', 'boolean'],
+                'sales_type' => ['nullable', 'in:customized_cake,finished_product,other'],
+            ]);
+        } catch (ValidationException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->validator->errors()->first() ?: 'Invalid CSV upload.',
+            ], 422);
+        }
+
+        $file = $request->file('file');
+        $sourceHash = hash_file('sha256', $file->getRealPath());
+        if ($sourceHash === false) {
+            return response()->json(['success' => false, 'message' => 'Unable to verify the uploaded CSV.'], 422);
+        }
+
+        $existing = DB::table('analytics_imports')->where('source_hash', $sourceHash)->first();
+        $salesType = (string) $request->input('sales_type', 'other');
+        $retryImportId = null;
+        if ($existing) {
+            if ($existing->status === 'failed' && $request->boolean('retry_failed')) {
+                $retryImportId = (int) $existing->id;
+            } elseif ($existing->status === 'completed' && $existing->sales_type !== $salesType) {
+                $retryImportId = (int) $existing->id;
+            } else {
+                return response()->json([
+                    'success' => false,
+                    'duplicate' => true,
+                    'import_id' => (int) $existing->id,
+                    'status' => $existing->status,
+                    'message' => $existing->status === 'failed'
+                        ? 'This CSV import failed previously. Upload it again to retry processing.'
+                        : 'This exact CSV has already been imported or is being processed.',
+                ], 409);
+            }
+        }
+
+        $storedPath = $file->storeAs('sales-imports', Str::uuid() . '.csv', 'local');
+        if ($storedPath === false) {
+            return response()->json(['success' => false, 'message' => 'Unable to store the uploaded CSV.'], 500);
+        }
+
+        try {
+            if ($retryImportId !== null) {
+                $updated = DB::table('analytics_imports')
+                    ->where('id', $retryImportId)
+                    ->whereIn('status', ['failed', 'completed'])
+                    ->update([
+                        'file_name' => basename($file->getClientOriginalName()),
+                        'status' => 'queued',
+                        'rows_received' => 0,
+                        'rows_processed' => 0,
+                        'error_message' => null,
+                        'uploaded_at' => now(),
+                        'sales_type' => $salesType,
+                    ]);
+                if (!$updated) {
+                    Storage::disk('local')->delete($storedPath);
+                    return response()->json([
+                        'success' => false,
+                        'duplicate' => true,
+                        'import_id' => $retryImportId,
+                        'status' => 'processing',
+                        'message' => 'This CSV is already being retried.',
+                    ], 409);
+                }
+                $importId = $retryImportId;
+            } else {
+                $importId = (int) DB::table('analytics_imports')->insertGetId([
+                    'file_name' => basename($file->getClientOriginalName()),
+                    'source_name' => 'POS CSV',
+                    'sales_type' => $salesType,
+                    'uploaded_at' => now(),
+                    'status' => 'queued',
+                    'rows_received' => 0,
+                    'rows_processed' => 0,
+                    'source_hash' => $sourceHash,
+                ]);
+            }
+
+            ProcessSalesCsvImport::dispatch($importId, $storedPath)->onConnection('database');
+        } catch (\Illuminate\Database\QueryException $exception) {
+            Storage::disk('local')->delete($storedPath);
+            $existing = DB::table('analytics_imports')->where('source_hash', $sourceHash)->first();
+            if ($existing && (!isset($importId) || (int) $existing->id !== $importId)) {
+                return response()->json([
+                    'success' => false,
+                    'duplicate' => true,
+                    'import_id' => (int) $existing->id,
+                    'status' => $existing->status,
+                    'message' => 'This exact CSV has already been imported or is being processed.',
+                ], 409);
+            }
+            if (isset($importId)) {
+                DB::table('analytics_imports')->where('id', $importId)->update([
+                    'status' => 'failed',
+                    'error_message' => 'The import could not be queued. Please try again.',
+                ]);
+            }
+            throw $exception;
+        } catch (\Throwable $exception) {
+            Storage::disk('local')->delete($storedPath);
+            if (isset($importId)) {
+                DB::table('analytics_imports')->where('id', $importId)->update([
+                    'status' => 'failed',
+                    'error_message' => 'The import could not be queued. Please try again.',
+                ]);
+            }
+            throw $exception;
+        }
+
+        return response()->json([
+            'success' => true,
+            'import_id' => $importId,
+            'status' => 'queued',
+            'message' => 'CSV uploaded and queued for processing.',
+        ], 202);
+    }
+
+    public function importStatus(Request $request, int $importId)
+    {
+        $user = $this->requireRole($request, 'admin');
+        if (!$user instanceof User) {
+            return $user;
+        }
+
+        $import = DB::table('analytics_imports')
+            ->where('id', $importId)
+            ->first(['id', 'status', 'rows_received', 'rows_processed', 'error_message', 'sales_type']);
+        if (!$import) {
+            return response()->json(['success' => false, 'message' => 'Import not found.'], 404);
+        }
+
+        $totals = DB::table('analytics_sales_history')
+            ->where('import_id', $importId)
+            ->selectRaw('COALESCE(SUM(units_sold), 0) AS items_sold, COALESCE(SUM(revenue), 0) AS revenue')
+            ->first();
+
+        return response()->json([
+            'success' => true,
+            'import' => [
+                'id' => (int) $import->id,
+                'status' => $import->status,
+                'rows_received' => (int) $import->rows_received,
+                'rows_processed' => (int) $import->rows_processed,
+                'rows_skipped' => max(0, (int) $import->rows_received - (int) $import->rows_processed),
+                'sales_type' => $import->sales_type,
+                'items_sold' => (float) $totals->items_sold,
+                'revenue' => (float) $totals->revenue,
+                'message' => $import->error_message,
+            ],
+        ]);
+    }
 
     /**
      * Ordered list of regex patterns tried against each line of extracted
@@ -68,6 +237,7 @@ class SalesImportController extends Controller
         try {
             $request->validate([
                 'file' => ['required', 'file', 'mimes:pdf', 'max:' . self::MAX_FILE_KB],
+                'sales_type' => ['nullable', 'in:customized_cake,finished_product,other'],
             ]);
         } catch (ValidationException $e) {
             return response()->json([
@@ -98,6 +268,20 @@ class SalesImportController extends Controller
             ], 422);
         }
 
+        $sourceHash = hash_file('sha256', $tmpPath);
+        if ($sourceHash === false) {
+            return response()->json(['success' => false, 'message' => 'Unable to verify the uploaded sales report.'], 422);
+        }
+        $duplicateImport = DB::table('analytics_imports')->where('source_hash', $sourceHash)->first();
+        if ($duplicateImport) {
+            return response()->json([
+                'success' => false,
+                'duplicate' => true,
+                'import_id' => (int) $duplicateImport->id,
+                'message' => 'This exact sales report has already been imported.',
+            ], 409);
+        }
+
         [$rows, $warnings] = $this->parseLines($text);
 
         if (empty($rows)) {
@@ -121,7 +305,9 @@ class SalesImportController extends Controller
             $dedupedRows,
             $file->getClientOriginalName(),
             'POS PDF',
-            count($rows) + count($warnings)
+            count($rows) + count($warnings),
+            $sourceHash,
+            (string) $request->input('sales_type', 'other')
         );
 
         return response()->json([
@@ -143,6 +329,7 @@ class SalesImportController extends Controller
 
         $validated = $request->validate([
             'file_name' => ['required', 'string', 'max:255'],
+            'sales_type' => ['nullable', 'in:customized_cake,finished_product,other'],
             'rows' => ['required', 'array', 'min:1', 'max:5000'],
             'rows.*.name' => ['required', 'string', 'max:255'],
             'rows.*.quantity' => ['required', 'numeric', 'min:0.01'],
@@ -156,7 +343,17 @@ class SalesImportController extends Controller
             'total' => round((float) $row['total'], 2),
             'sale_date' => $row['sale_date'] ?? now()->toDateString(),
         ], $validated['rows']);
-        $importId = $this->persistRows($rows, $validated['file_name'], 'POS CSV', count($rows));
+        $sourceHash = hash('sha256', json_encode($rows, JSON_THROW_ON_ERROR));
+        $duplicateImport = DB::table('analytics_imports')->where('source_hash', $sourceHash)->first();
+        if ($duplicateImport) {
+            return response()->json([
+                'success' => false,
+                'duplicate' => true,
+                'import_id' => (int) $duplicateImport->id,
+                'message' => 'These exact sales rows have already been imported.',
+            ], 409);
+        }
+        $importId = $this->persistRows($rows, $validated['file_name'], 'POS CSV', count($rows), $sourceHash, (string) ($validated['sales_type'] ?? 'other'));
 
         return response()->json([
             'success' => true,
@@ -174,60 +371,87 @@ class SalesImportController extends Controller
             return $user;
         }
 
-        $rows = DB::table('analytics_sales_history')
-            ->whereNotNull('import_id')
+        $validated = $request->validate([
+            'start_date' => ['nullable', 'date_format:Y-m-d'],
+            'end_date' => ['nullable', 'date_format:Y-m-d'],
+            'search' => ['nullable', 'string', 'max:255'],
+            'source' => ['nullable', 'in:imported,legacy'],
+            'sales_type' => ['nullable', 'in:customized_cake,finished_product,other'],
+            'page' => ['nullable', 'integer', 'min:1'],
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
+        ]);
+        $pageSize = (int) ($validated['per_page'] ?? self::HISTORY_PAGE_SIZE);
+
+        $importedRows = DB::table('analytics_sales_history as history')
+            ->join('analytics_imports as imports', 'imports.id', '=', 'history.import_id')
+            ->where('imports.status', 'completed')
+            ->selectRaw("history.id AS id, history.product_name AS cake_name, history.sale_date, history.units_sold, history.revenue AS price, imports.sales_type, 0 AS down_payment, 0 AS remaining_balance, 'imported' AS source");
+        $historyRows = $importedRows;
+
+        if (Schema::hasTable('sales')) {
+            $legacyRows = DB::table('sales')
+                ->selectRaw("id AS id, cake_name, sale_date, 1 AS units_sold, price, 'other' AS sales_type, down_payment, remaining_balance, 'legacy' AS source");
+            $historyRows = $importedRows->unionAll($legacyRows);
+        }
+
+        $filteredRows = DB::query()->fromSub($historyRows, 'sales_history');
+        if (!empty($validated['source'])) $filteredRows->where('source', $validated['source']);
+        if (!empty($validated['sales_type'])) $filteredRows->where('sales_type', $validated['sales_type']);
+        if (!empty($validated['start_date'])) $filteredRows->where('sale_date', '>=', $validated['start_date']);
+        if (!empty($validated['end_date'])) $filteredRows->where('sale_date', '<=', $validated['end_date']);
+        if (!empty($validated['search'])) $filteredRows->where('cake_name', 'like', '%' . $validated['search'] . '%');
+
+        $summary = (clone $filteredRows)
+            ->selectRaw('COUNT(*) AS records, COALESCE(SUM(price), 0) AS total_sales, COALESCE(SUM(down_payment), 0) AS total_down_payments, COALESCE(SUM(remaining_balance), 0) AS total_remaining_balance')
+            ->first();
+        $history = (clone $filteredRows)
             ->orderByDesc('sale_date')
             ->orderByDesc('id')
-            ->get(['id', 'product_name', 'sale_date', 'units_sold', 'revenue']);
-
-        $legacyRows = Schema::hasTable('sales')
-            ? DB::table('sales')->orderByDesc('sale_date')->orderByDesc('id')->get([
-                'id', 'cake_name', 'sale_date', 'price', 'down_payment', 'remaining_balance',
-            ])
-            : collect();
-
-        $history = $rows->map(static fn ($row) => [
-            'id' => (string) $row->id,
-            'cake_name' => $row->product_name,
-            'sale_date' => $row->sale_date,
-            'units_sold' => (float) $row->units_sold,
-            'price' => (float) $row->revenue,
-            'down_payment' => 0.0,
-            'remaining_balance' => 0.0,
-        ])->concat($legacyRows->map(static fn ($row) => [
-            'id' => 'legacy-' . $row->id,
+            ->paginate($pageSize);
+        $sales = array_map(static fn ($row) => [
+            'id' => $row->source === 'legacy' ? 'legacy-' . $row->id : (string) $row->id,
             'cake_name' => $row->cake_name,
             'sale_date' => $row->sale_date,
-            'units_sold' => 1.0,
+            'units_sold' => (float) $row->units_sold,
             'price' => (float) $row->price,
             'down_payment' => (float) $row->down_payment,
             'remaining_balance' => (float) $row->remaining_balance,
-        ]))->sortByDesc('sale_date')->values();
+            'source' => $row->source,
+            'sales_type' => $row->sales_type,
+        ], $history->items());
 
         return response()->json([
             'success' => true,
-            'sales' => $history,
+            'sales' => $sales,
+            'pagination' => [
+                'current_page' => $history->currentPage(),
+                'per_page' => $history->perPage(),
+                'total' => $history->total(),
+                'last_page' => $history->lastPage(),
+            ],
             'summary' => [
-                'records' => $history->count(),
-                'total_sales' => $history->sum('price'),
-                'total_down_payments' => $history->sum('down_payment'),
-                'total_remaining_balance' => $history->sum('remaining_balance'),
+                'records' => (int) $summary->records,
+                'total_sales' => (float) $summary->total_sales,
+                'total_down_payments' => (float) $summary->total_down_payments,
+                'total_remaining_balance' => (float) $summary->total_remaining_balance,
             ],
         ]);
     }
 
-    private function persistRows(array $rows, string $fileName, string $sourceName, int $rowsReceived): int
+    private function persistRows(array $rows, string $fileName, string $sourceName, int $rowsReceived, ?string $sourceHash = null, string $salesType = 'other'): int
     {
         $now = now();
 
-        return DB::transaction(function () use ($rows, $fileName, $sourceName, $rowsReceived, $now): int {
+        return DB::transaction(function () use ($rows, $fileName, $sourceName, $rowsReceived, $now, $sourceHash, $salesType): int {
             $importId = (int) DB::table('analytics_imports')->insertGetId([
                 'file_name' => basename($fileName),
                 'source_name' => $sourceName,
+                'sales_type' => $salesType,
                 'uploaded_at' => $now,
                 'status' => 'completed',
                 'rows_received' => $rowsReceived,
                 'rows_processed' => count($rows),
+                'source_hash' => $sourceHash,
             ]);
 
             $historyRows = array_map(static fn (array $row) => [

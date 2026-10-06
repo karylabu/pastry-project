@@ -184,7 +184,11 @@ export default function Register() {
         throw new Error(data?.message || "Google sign-up failed.");
       }
 
-      localStorage.setItem("user", JSON.stringify({ ...data.user, token: data.token || '' }));
+      localStorage.setItem("user", JSON.stringify({
+        ...data.user,
+        token: data.token || '',
+        avatar: photoURL || googleUser?.photoURL || data.user.avatar || data.user.profile_picture || data.user.profile_image || '',
+      }));
       navigate("/customer", { replace: true });
     } catch (error) {
       setError(error?.code === "auth/popup-closed-by-user" ? "Google sign-up was cancelled." : (error.message || "Google sign-up failed."));

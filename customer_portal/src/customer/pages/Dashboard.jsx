@@ -384,37 +384,59 @@ function RecommendationCard({ product, onSelect }) {
   );
 }
 
-const CUSTOMER_TESTIMONIALS = [
-  { name: 'Alyssa D.', initials: 'AD', quote: 'The cake was so good! Fresh, beautiful, and exactly what I ordered. Will definitely order again!' },
-  { name: 'Mark T.', initials: 'MT', quote: 'Super easy to customize and the design was perfect for my daughter\'s birthday!' },
-  { name: 'Camille S.', initials: 'CS', quote: 'Their cakes are always fresh and delicious! Highly recommended!' },
-  { name: 'Jamie R.', initials: 'JR', quote: 'The details were lovely and the whole ordering experience was smooth.' },
-  { name: 'Nica P.', initials: 'NP', quote: 'Beautiful cake, generous portions, and it arrived right on time.' },
-  { name: 'Daniel C.', initials: 'DC', quote: 'The flavor was amazing. Pastry Project is now our family favorite.' },
-];
-
 function TestimonialsSection() {
+  const [reviews, setReviews] = useState([]);
+  const [averageRating, setAverageRating] = useState(0);
+  const [totalReviews, setTotalReviews] = useState(0);
   const [slide, setSlide] = useState(0);
-  const visibleTestimonials = CUSTOMER_TESTIMONIALS.slice(slide, slide + 3);
-  const maxSlide = CUSTOMER_TESTIMONIALS.length - 3;
+  const maxSlide = Math.max(0, Math.ceil(reviews.length / 3) - 1);
+  const visibleReviews = reviews.slice(slide * 3, slide * 3 + 3);
+
+  useEffect(() => {
+    let isCurrent = true;
+
+    fetch(`${LARAVEL_BASE}/api/reviews?limit=12`)
+      .then(async (response) => {
+        const data = await safeParseJson(response);
+        if (!response.ok || !data?.success) {
+          throw new Error(data?.message || 'Could not load customer reviews.');
+        }
+        if (isCurrent) {
+          setReviews(Array.isArray(data.reviews) ? data.reviews : []);
+          setAverageRating(Number(data.average_rating) || 0);
+          setTotalReviews(Number(data.total_reviews) || 0);
+        }
+      })
+      .catch((error) => {
+        console.error('Could not load customer reviews:', error);
+      });
+
+    return () => {
+      isCurrent = false;
+    };
+  }, []);
 
   return (
     <section className="relative overflow-hidden bg-[#fffaf0] px-4 py-10 sm:px-8 md:px-12">
       <div className="mx-auto max-w-[1100px]">
-        <div className="text-center"><p className="text-[9px] font-black uppercase tracking-[0.3em] text-[#9b7b3d]">Customer love</p><h2 className="mt-1 font-serif text-2xl text-[#3c2925] md:text-3xl">Real People, Real Sweet Moments</h2><p className="mt-1 text-xs text-[#765f5d]">See what our customers are saying!</p></div>
+        <div className="text-center"><p className="text-[9px] font-black uppercase tracking-[0.3em] text-[#9b7b3d]">Customer reviews</p><h2 className="mt-1 font-serif text-2xl text-[#3c2925] md:text-3xl">Rated by Our Customers</h2><p className="mt-1 text-xs text-[#765f5d]">{totalReviews > 0 ? `${averageRating.toFixed(1)} out of 5 · ${totalReviews} customer ${totalReviews === 1 ? 'rating' : 'ratings'}` : 'No customer ratings yet.'}</p></div>
         <div className="relative mt-7 grid gap-4 md:grid-cols-3">
-          {visibleTestimonials.map((testimonial) => (
-            <article key={testimonial.name} className="rounded-xl border border-[#eadfd8] bg-white px-5 py-5 text-center shadow-[0_6px_16px_rgba(91,64,39,0.08)]">
-              <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-[#f5eee5] text-xs font-black text-[#7c654f]">{testimonial.initials}</div>
-              <p className="mt-4 min-h-[72px] text-[11px] leading-5 text-[#413734]">“{testimonial.quote}”</p>
-              <p className="mt-3 text-[11px] font-bold text-[#765d50]">- {testimonial.name}</p>
-              <div className="mt-2 flex justify-center gap-0.5 text-[#e8b52e]" aria-label="5 out of 5 stars">{[1, 2, 3, 4, 5].map((star) => <Star key={star} size={14} fill="currentColor" strokeWidth={1.4} />)}</div>
+          {visibleReviews.map((review) => (
+            <article key={review.id} className="rounded-xl border border-[#eadfd8] bg-white px-5 py-5 text-center shadow-[0_6px_16px_rgba(91,64,39,0.08)]">
+              <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-[#f5eee5] text-xs font-black text-[#7c654f]">{String(review.customer_name || 'Customer').split(/\s+/).map((part) => part[0]).join('').slice(0, 2).toUpperCase()}</div>
+              <p className="mt-4 min-h-[72px] text-[11px] leading-5 text-[#413734]">{review.comment?.trim() ? `“${review.comment.trim()}”` : 'Customer rating for their order.'}</p>
+              <p className="mt-3 text-[11px] font-bold text-[#765d50]">- {review.customer_name || 'Customer'}</p>
+              <div className="mt-2 flex justify-center gap-0.5 text-[#e8b52e]" aria-label={`${review.rating} out of 5 stars`}>{[1, 2, 3, 4, 5].map((star) => <Star key={star} size={14} fill={star <= Number(review.rating) ? 'currentColor' : 'none'} strokeWidth={1.4} />)}</div>
             </article>
           ))}
-          <button type="button" aria-label="Previous testimonials" disabled={slide === 0} onClick={() => setSlide((current) => Math.max(0, current - 1))} className="absolute -left-4 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full border border-[#eadfd8] bg-white text-[#765d50] shadow-sm disabled:opacity-40 md:-left-10"><ChevronLeft size={17} /></button>
-          <button type="button" aria-label="Next testimonials" disabled={slide === maxSlide} onClick={() => setSlide((current) => Math.min(maxSlide, current + 1))} className="absolute -right-4 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full border border-[#eadfd8] bg-white text-[#765d50] shadow-sm disabled:opacity-40 md:-right-10"><ChevronRight size={17} /></button>
+          {reviews.length > 3 && (
+            <>
+              <button type="button" aria-label="Previous reviews" disabled={slide === 0} onClick={() => setSlide((current) => Math.max(0, current - 1))} className="absolute -left-4 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full border border-[#eadfd8] bg-white text-[#765d50] shadow-sm disabled:opacity-40 md:-left-10"><ChevronLeft size={17} /></button>
+              <button type="button" aria-label="Next reviews" disabled={slide === maxSlide} onClick={() => setSlide((current) => Math.min(maxSlide, current + 1))} className="absolute -right-4 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full border border-[#eadfd8] bg-white text-[#765d50] shadow-sm disabled:opacity-40 md:-right-10"><ChevronRight size={17} /></button>
+            </>
+          )}
         </div>
-        <div className="mt-5 flex justify-center gap-1.5" aria-label="Testimonial pages">{Array.from({ length: maxSlide + 1 }, (_, index) => <button key={index} type="button" aria-label={`Show testimonial page ${index + 1}`} onClick={() => setSlide(index)} className={`h-1.5 rounded-full transition-all ${slide === index ? 'w-5 bg-[#8d6a2e]' : 'w-1.5 bg-[#eadfca]'}`} />)}</div>
+        {reviews.length > 3 && <div className="mt-5 flex justify-center gap-1.5" aria-label="Review pages">{Array.from({ length: maxSlide + 1 }, (_, index) => <button key={index} type="button" aria-label={`Show review page ${index + 1}`} onClick={() => setSlide(index)} className={`h-1.5 rounded-full transition-all ${slide === index ? 'w-5 bg-[#8d6a2e]' : 'w-1.5 bg-[#eadfca]'}`} />)}</div>}
       </div>
     </section>
   );

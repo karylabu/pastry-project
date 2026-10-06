@@ -28,7 +28,7 @@ class IngredientController extends Controller
      */
     public function store(Request $request): JsonResponse
     {
-        if ($response = $this->authorizeAdmin($request)) {
+        if ($response = $this->authorizeOperationalStaff($request)) {
             return $response;
         }
 
@@ -95,7 +95,7 @@ class IngredientController extends Controller
      */
     public function update(Request $request, Ingredient $ingredient): JsonResponse
     {
-        if ($response = $this->authorizeAdmin($request)) {
+        if ($response = $this->authorizeOperationalStaff($request)) {
             return $response;
         }
 
@@ -103,14 +103,19 @@ class IngredientController extends Controller
             'name' => 'required|string|max:255|unique:ingredients,name,' . $ingredient->id,
             'unit' => 'required|string|max:50',
             'threshold' => 'required|numeric|min:0',
+            'unit_cost' => 'sometimes|required|numeric|min:0',
         ]);
 
         try {
-            $ingredient->update([
+            $updates = [
                 'name' => $validated['name'],
                 'unit' => $validated['unit'],
                 'threshold' => (float) $validated['threshold'],
-            ]);
+            ];
+            if (array_key_exists('unit_cost', $validated)) {
+                $updates['unit_cost'] = (float) $validated['unit_cost'];
+            }
+            $ingredient->update($updates);
 
             return response()->json([
                 'success' => true,
@@ -120,6 +125,7 @@ class IngredientController extends Controller
                     'name' => $ingredient->name,
                     'unit' => $ingredient->unit,
                     'stock' => (float) $ingredient->stock,
+                    'unit_cost' => (float) $ingredient->unit_cost,
                     'threshold' => (float) $ingredient->threshold,
                     'expiry' => $ingredient->expiry?->format('Y-m-d'),
                     'updated_at' => $ingredient->updated_at->toIso8601String(),
@@ -138,7 +144,7 @@ class IngredientController extends Controller
      */
     public function destroy(Request $request, Ingredient $ingredient): JsonResponse
     {
-        if ($response = $this->authorizeAdmin($request)) {
+        if ($response = $this->authorizeOperationalStaff($request)) {
             return $response;
         }
 
@@ -169,7 +175,7 @@ class IngredientController extends Controller
      */
     public function adjustStock(Request $request, Ingredient $ingredient): JsonResponse
     {
-        if ($response = $this->authorizeAdmin($request)) {
+        if ($response = $this->authorizeOperationalStaff($request)) {
             return $response;
         }
 
@@ -330,7 +336,7 @@ class IngredientController extends Controller
      */
     public function syncFromRecipes(Request $request): JsonResponse
     {
-        if ($response = $this->authorizeAdmin($request)) {
+        if ($response = $this->authorizeOperationalStaff($request)) {
             return $response;
         }
 
@@ -369,20 +375,4 @@ class IngredientController extends Controller
         }
     }
 
-    /**
-    * Authorize the admin role.
-     */
-    private function authorizeAdmin(Request $request): ?JsonResponse
-    {
-        $user = $this->getAuthenticatedUser($request);
-        if (!$user) {
-            return response()->json(['success' => false, 'message' => 'Admin authorization required.'], 401);
-        }
-
-        if ($user->role !== 'admin') {
-            return response()->json(['success' => false, 'message' => 'Admin authorization required.'], 403);
-        }
-
-        return null;
-    }
 }

@@ -1,10 +1,13 @@
+import { useState } from "react";
 import AdminNavbar from "../components/AdminNavbar";
 import AdminChatBubble from "../components/AdminChatBubble";
 
 export default function AdminLayout({ children }) {
+  const [sidebarOpen, setSidebarOpen] = useState(() => window.matchMedia("(min-width: 1024px)").matches);
+
   return (
-    <div className="admin-shell min-h-screen bg-[#fbfaf5] font-['DM_Sans'] text-[#33251e]">
-      <AdminNavbar />
+    <div className={`admin-shell min-h-screen bg-[#fbfaf5] font-['DM_Sans'] text-[#33251e] ${sidebarOpen ? "admin-sidebar-open" : "admin-sidebar-closed"}`}>
+      <AdminNavbar onSidebarChange={setSidebarOpen} />
       <main className="admin-page-surface min-h-screen bg-[#fbfaf5]">
         {children}
       </main>
@@ -17,6 +20,10 @@ export default function AdminLayout({ children }) {
           --admin-card-accent: #c9a94f;
           --admin-card-shadow: 0 3px 12px rgba(60, 42, 28, 0.035);
           --admin-card-hover-shadow: 0 10px 24px rgba(60, 42, 28, 0.15);
+        }
+
+        .admin-sidebar-closed .admin-page-surface [class~="lg:pl-[260px]"] {
+          padding-left: 0 !important;
         }
 
         .admin-shell button:is(

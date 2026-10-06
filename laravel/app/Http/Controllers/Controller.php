@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -65,6 +66,34 @@ abstract class Controller
         }
 
         return $user;
+    }
+
+    protected function authorizeOperationalStaff(Request $request): ?JsonResponse
+    {
+        $user = $this->getAuthenticatedUser($request);
+        if (!$user) {
+            return response()->json(['success' => false, 'message' => 'Authentication required.'], 401);
+        }
+
+        if (!in_array(strtolower((string) $user->role), ['admin', 'manager', 'staff'], true)) {
+            return response()->json(['success' => false, 'message' => 'Staff authorization required.'], 403);
+        }
+
+        return null;
+    }
+
+    protected function authorizeManager(Request $request): ?JsonResponse
+    {
+        $user = $this->getAuthenticatedUser($request);
+        if (!$user) {
+            return response()->json(['success' => false, 'message' => 'Authentication required.'], 401);
+        }
+
+        if (!in_array(strtolower((string) $user->role), ['admin', 'manager'], true)) {
+            return response()->json(['success' => false, 'message' => 'Manager authorization required.'], 403);
+        }
+
+        return null;
     }
 
     protected function revokeCurrentToken(Request $request): void

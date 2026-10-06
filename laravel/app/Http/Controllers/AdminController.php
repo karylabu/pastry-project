@@ -352,16 +352,20 @@ class AdminController extends Controller
         }
 
         $products = DB::table('products')->orderBy('name')->get()->map(fn($item) => (array) $item)->toArray();
+        $productSizes = DB::table('product_sizes')->orderBy('product_id')->orderBy('size')->get()->map(fn($item) => (array) $item)->toArray();
         $ingredients = DB::table('ingredients')->orderBy('name')->get()->map(fn($item) => (array) $item)->toArray();
 
         $recipeRows = DB::table('product_recipes')
             ->join('products', 'product_recipes.product_id', '=', 'products.id')
             ->join('ingredients', 'product_recipes.ingredient_id', '=', 'ingredients.id')
+            ->leftJoin('product_sizes', 'product_recipes.product_size_id', '=', 'product_sizes.id')
             ->select(
                 'product_recipes.product_id',
+                'product_recipes.product_size_id',
                 'product_recipes.ingredient_id',
                 'product_recipes.qty',
                 'products.name as product_name',
+                'product_sizes.size as size_name',
                 'ingredients.name as ingredient_name',
                 'ingredients.unit as ingredient_unit'
             )
@@ -373,10 +377,27 @@ class AdminController extends Controller
 
         $recipeMap = [];
         foreach ($recipeRows as $row) {
-            $recipeMap[$row['product_name']][] = $row;
+            $key = $row['product_id'] . ':' . ($row['product_size_id'] ?? '');
+            if (!isset($recipeMap[$key])) {
+                $recipeMap[$key] = [
+                    'product_id' => (int) $row['product_id'],
+                    'product_size_id' => (int) $row['product_size_id'],
+                    'product_name' => $row['product_name'],
+                    'size_name' => $row['size_name'],
+                    'items' => [],
+                ];
+            }
+            $recipeMap[$key]['items'][] = $row;
+        }
+        $recipeFormMap = [];
+        foreach ($recipeMap as $key => $recipe) {
+            $recipeFormMap[$key] = array_map(static fn ($item) => [
+                'ingredient_id' => (int) $item['ingredient_id'],
+                'qty' => (float) $item['qty'],
+            ], $recipe['items']);
         }
 
-        return view('staff.recipes', compact('products', 'ingredients', 'recipeMap'));
+        return view('staff.recipes', compact('products', 'productSizes', 'ingredients', 'recipeMap', 'recipeFormMap'));
     }
 
     public function saveRecipe(Request $request)
@@ -391,6 +412,7 @@ class AdminController extends Controller
 
         $validated = $request->validate([
             'product_id' => 'required|integer|exists:products,id',
+            'product_size_id' => 'required|integer|exists:product_sizes,id',
             'ingredient_id' => 'array',
             'ingredient_id.*' => 'nullable|integer|exists:ingredients,id',
             'qty' => 'array',
@@ -398,11 +420,15 @@ class AdminController extends Controller
         ]);
 
         $productId = (int) $validated['product_id'];
+        $productSizeId = (int) $validated['product_size_id'];
+        if (!DB::table('product_sizes')->where('id', $productSizeId)->where('product_id', $productId)->exists()) {
+            return back()->withErrors(['product_size_id' => 'Choose a size that belongs to the selected product.'])->withInput();
+        }
         $ingredientIds = $request->input('ingredient_id', []);
         $qtys = $request->input('qty', []);
 
-        DB::transaction(function () use ($productId, $ingredientIds, $qtys) {
-            DB::table('product_recipes')->where('product_id', $productId)->delete();
+        DB::transaction(function () use ($productId, $productSizeId, $ingredientIds, $qtys) {
+            DB::table('product_recipes')->where('product_id', $productId)->where('product_size_id', $productSizeId)->delete();
 
             foreach ($ingredientIds as $index => $ingredientId) {
                 $ingredientId = (int) $ingredientId;
@@ -414,6 +440,7 @@ class AdminController extends Controller
 
                 DB::table('product_recipes')->insert([
                     'product_id' => $productId,
+                    'product_size_id' => $productSizeId,
                     'ingredient_id' => $ingredientId,
                     'qty' => $qty,
                     'created_at' => now(),

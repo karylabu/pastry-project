@@ -95,10 +95,15 @@ class CustomizedCakeService
                 throw new RuntimeException('Invalid size');
             }
 
-            $recipe = CakeRecipe::query()->where('flavor_id', $flavorId)->where('active', true)->first();
+            $recipe = CakeRecipe::query()->with('baseSize')->where('flavor_id', $flavorId)->where('active', true)->first();
             if (!$recipe) {
                 throw new RuntimeException("Missing recipe for {$flavor->name}");
             }
+            $baseSizeMultiplier = (float) ($recipe->baseSize?->multiplier ?? 0);
+            if ($baseSizeMultiplier <= 0) {
+                throw new RuntimeException("Recipe base size is invalid for {$flavor->name}");
+            }
+            $sizeScale = (float) $size->multiplier / $baseSizeMultiplier;
 
             foreach ($recipe->ingredients()->with('ingredient')->get() as $ingredientLine) {
                 $ingredient = $ingredientLine->ingredient;
@@ -109,7 +114,7 @@ class CustomizedCakeService
                 $key = (int) $ingredient->id;
                 $recipeUnit = (string) $ingredientLine->unit;
                 $inventoryUnit = (string) $ingredient->unit;
-                $quantity = (float) $ingredientLine->quantity * (float) $size->multiplier;
+                $quantity = (float) $ingredientLine->quantity * $sizeScale;
                 $unitCompatible = $this->unitsAreCompatible($recipeUnit, $inventoryUnit);
                 if ($unitCompatible) {
                     $quantity = $this->convertQuantity($quantity, $recipeUnit, $inventoryUnit);

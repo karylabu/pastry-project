@@ -111,6 +111,16 @@ class AuthController extends Controller
         $email = strtolower(trim($firebaseUser['email'] ?? ''));
         $name = trim($firebaseUser['displayName'] ?? '') ?: 'Google User';
         $profilePicture = trim($firebaseUser['photoUrl'] ?? '');
+        if ($profilePicture === '') {
+            $requestedPhotoUrl = trim((string) $request->input('photoUrl', ''));
+            $photoHost = strtolower((string) parse_url($requestedPhotoUrl, PHP_URL_HOST));
+            if (
+                filter_var($requestedPhotoUrl, FILTER_VALIDATE_URL)
+                && ($photoHost === 'googleusercontent.com' || str_ends_with($photoHost, '.googleusercontent.com'))
+            ) {
+                $profilePicture = $requestedPhotoUrl;
+            }
+        }
 
         if (!$email || empty($firebaseUser['emailVerified'])) {
             return $this->googleCorsResponse(['success' => false, 'message' => 'A verified Google email is required.'], 422);
@@ -129,7 +139,7 @@ class AuthController extends Controller
             ]);
 
             $user = DB::table('users')->where('email', $email)->first();
-        } elseif (!$user->profile_picture && $profilePicture) {
+        } elseif ($profilePicture && $user->profile_picture !== $profilePicture) {
             DB::table('users')->where('id', $user->id)->update(['profile_picture' => $profilePicture]);
             $user->profile_picture = $profilePicture;
         }
@@ -193,6 +203,8 @@ class AuthController extends Controller
         $candidatePaths = [
             env('PHP_CACERT_PATH'),
             env('FIREBASE_CA_BUNDLE'),
+            ini_get('curl.cainfo'),
+            ini_get('openssl.cafile'),
             'C:\\xampp\\php\\extras\\ssl\\cacert.pem',
             'C:\\Users\\Jerickson Abistado\\cacert.pem',
         ];

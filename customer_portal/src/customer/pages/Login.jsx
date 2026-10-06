@@ -73,7 +73,7 @@ export default function Login() {
       const googleAccount = {
         ...data.user,
         token: data.token || '',
-        avatar: data.user.avatar || data.user.profile_picture || data.user.profile_image || googleUser?.photoURL || photoURL || '',
+        avatar: photoURL || googleUser?.photoURL || data.user.avatar || data.user.profile_picture || data.user.profile_image || '',
       };
       localStorage.setItem("user", JSON.stringify(googleAccount));
       setJustLoggedUser(googleAccount);

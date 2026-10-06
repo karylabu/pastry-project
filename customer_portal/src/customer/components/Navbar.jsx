@@ -75,7 +75,7 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
           setUser({
             ...storedUser,
             ...data,
-            avatar: data.avatar || data.profile_image || data.profile_picture || storedUser.avatar || '',
+            avatar: storedUser.avatar || data.avatar || data.profile_image || data.profile_picture || '',
           });
         }
       })
@@ -202,29 +202,10 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
   /* =========================
      HANDLE TOGGLE NOTIFICATIONS
   ========================= */
-  const handleToggleNotif = async () => {
-    setOpenNotif(!openNotif);
-
-    if (!openNotif) {
-      // Mark all unread notifications as read in backend
-      const unreadNotifs = notifications.filter(n => !n.read);
-      
-      if (unreadNotifs.length > 0) {
-        // Mark each unread notification as read
-        await Promise.all(
-          unreadNotifs.map(notif =>
-            fetch(`${CUSTOMER_BASE}/api/customer/notifications/${notif.id}/read`, {
-              method: 'POST',
-              credentials: 'include',
-              headers: getAuthHeaders(),
-            }).catch(err => console.error('Error marking notification as read:', err))
-          )
-        );
-
-        // Refresh notifications from database to ensure sync
-        fetchNotifications();
-      }
-    }
+  const handleToggleNotif = () => {
+    const willOpen = !openNotif;
+    setOpenNotif(willOpen);
+    if (willOpen) fetchNotifications();
   };
 
   /* =========================
@@ -244,6 +225,7 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
   }`;
 
   const accountAvatar = user?.avatar || user?.profile_image || user?.profile_picture || '';
+  const [failedAccountAvatarUrl, setFailedAccountAvatarUrl] = useState('');
   const accountInitials = (user?.name || user?.full_name || 'U')
     .split(' ')
     .slice(0, 2)
@@ -354,7 +336,10 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
           <div ref={notifRef} className="relative">
 
             <button
+              type="button"
               onClick={handleToggleNotif}
+              aria-label={`Notifications${unreadCount ? `, ${unreadCount} unread` : ''}`}
+              aria-expanded={openNotif}
               className="relative flex h-9 w-9 items-center justify-center rounded-full hover:bg-gray-100 sm:h-10 sm:w-10 xl:h-12 xl:w-12"
             >
               <Bell size={20} />
@@ -543,8 +528,13 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
               onClick={() => setOpenAccount(!openAccount)}
               className="flex h-9 w-9 items-center justify-center rounded-full border border-gray-200 bg-gray-100 transition-all hover:border-[#d4af37] sm:h-10 sm:w-10 xl:h-12 xl:w-12"
             >
-              {accountAvatar ? (
-                <img src={accountAvatar} alt={user?.name || 'Account'} className="h-full w-full rounded-full object-cover" />
+              {accountAvatar && failedAccountAvatarUrl !== accountAvatar ? (
+                <img
+                  src={accountAvatar}
+                  alt={user?.name || 'Account'}
+                  className="h-full w-full rounded-full object-cover"
+                  onError={() => setFailedAccountAvatarUrl(accountAvatar)}
+                />
               ) : user ? (
                 <span className="text-sm font-bold text-[#8b5e34]">{accountInitials}</span>
               ) : (

@@ -165,6 +165,7 @@ export default function Ingredients({
     setHistoryEntries([]);
     setBatches([]);
     if (type === 'batch_add') {
+      setIngredientSearch(ingredient?.name || '');
       setBatchForm({ ingredient_id: ingredient?.id ? String(ingredient.id) : '', quantity: '', batch_number: '', purchase_date: new Date().toISOString().slice(0, 10), expiry_date: '', supplier: '', unit_cost: '', notes: '' });
     }
     if (type === 'history' && ingredient) fetchHistory(ingredient.id);
@@ -184,10 +185,14 @@ export default function Ingredients({
 
   const submitAddStock = async () => {
     const quantity = Number(batchForm.quantity);
-    if (!batchForm.ingredient_id || quantity <= 0 || !batchForm.batch_number.trim()) { alert('Ingredient, batch number, and a positive quantity are required.'); return; }
+    const exactIngredient = ingredients.find((ingredient) => ingredient.name.trim().toLowerCase() === ingredientSearch.trim().toLowerCase());
+    const ingredientId = batchForm.ingredient_id || (exactIngredient ? String(exactIngredient.id) : '');
+    if (!ingredientId) { alert('Choose an ingredient from the matching results, or enter its exact name.'); return; }
+    if (!Number.isFinite(quantity) || quantity <= 0) { alert('Enter a quantity greater than zero.'); return; }
+    if (!batchForm.batch_number.trim()) { alert('Enter a batch or lot number.'); return; }
     setBatchSubmitting(true);
     try {
-      const res = await laravelStaffFetch(`${LARAVEL_BASE}/api/staff/inventory/batches`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...batchForm, quantity_received: quantity }) });
+      const res = await laravelStaffFetch(`${LARAVEL_BASE}/api/staff/inventory/batches`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...batchForm, ingredient_id: ingredientId, quantity_received: quantity }) });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.success) throw new Error(data.message || 'Unable to add stock. Please try again.');
       await loadIngredients(); closeModal();
@@ -296,10 +301,16 @@ export default function Ingredients({
       alert('Threshold must be greater than zero.');
       return;
     }
+    const unitCost = Number(modalUnitCost || 0);
+    if (!Number.isFinite(unitCost) || unitCost < 0) {
+      alert('Unit price must be zero or greater.');
+      return;
+    }
     const payload = {
       name: modalName,
       unit: modalUnit,
       threshold: thresholdValue,
+      unit_cost: unitCost,
     };
     try {
       const res = await laravelStaffFetch(`${LARAVEL_BASE}/api/staff/ingredients/${encodeURIComponent(modalIngredient.id)}`, {
@@ -536,6 +547,7 @@ export default function Ingredients({
         )}
 
         <div className="overflow-hidden rounded-xl border border-[#eee4de] bg-white shadow-[0_5px_18px_rgba(91,64,39,0.04)]">
+          <p className="border-b border-[#f0e7e0] bg-[#fffaf0] px-5 py-3 text-[11px] text-[#74675f]">Reference prices are estimates per listed unit. Batch stock value and waste cost use each batch’s recorded purchase cost; replace estimates with actual supplier prices when available.</p>
           {loading ? (
             <div className="p-8 text-[13px] text-[#74675f]">Loading ingredients...</div>
           ) : filteredIngredients.length === 0 ? (
@@ -547,6 +559,7 @@ export default function Ingredients({
                   <tr className="border-b border-[#f0e7e0] bg-[#fbf7f2] text-[10px] uppercase tracking-[0.16em] text-[#9b8c83]">
                     <th className="px-6 py-3 font-semibold">Ingredient</th>
                     <th className="px-4 py-3 font-semibold">Unit</th>
+                    <th className="px-4 py-3 font-semibold">Price / Unit</th>
                     <th className="px-4 py-3 font-semibold">Stock</th>
                     <th className="px-4 py-3 font-semibold">Stock Value</th>
                     <th className="px-4 py-3 font-semibold">Threshold</th>
@@ -594,6 +607,7 @@ export default function Ingredients({
                           </div>
                         </td>
                         <td className="px-4 py-4 text-[13px] text-[#6a5a50]">{item.unit}</td>
+                        <td className="px-4 py-4 text-[13px] font-medium text-[#6a5a50]">₱{Number(item.unit_cost || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} / {item.unit}</td>
                         <td className={`px-4 py-4 text-[13px] font-semibold ${low || isExpired ? 'text-[#9b7810]' : 'text-[#33251e]'}`}>{item.usable_stock ?? 0}</td>
                         <td className="px-4 py-4 text-[13px] font-semibold text-[#33251e]">₱{Number(item.stock_value || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                         <td className="px-4 py-4 text-[12px] text-[#74675f]">{item.threshold}</td>
@@ -610,7 +624,7 @@ export default function Ingredients({
                         </td>
                         <td className="px-6 py-4">
                           <div className="flex items-center gap-2">
-                            {Number(item.usable_stock) > 0 && Number(item.pending_discard_count) === 0 && <button onClick={() => openModal('edit', item)} className="rounded-md bg-[#33251e] px-2.5 py-1.5 text-[10px] font-semibold text-white hover:bg-[#5b4540]">Edit</button>}
+                            <button onClick={() => openModal('edit', item)} className="rounded-md bg-[#33251e] px-2.5 py-1.5 text-[10px] font-semibold text-white hover:bg-[#5b4540]">Edit</button>
                             {Number(item.expired_batch_count) > 0 && Number(item.pending_discard_count) === 0 && <button onClick={() => openModal('history', item)} className="rounded-md border border-[#eadfca] bg-[#fff4cd] px-2.5 py-1.5 text-[10px] font-semibold text-[#80600a]">Discard expired</button>}
                             <button onClick={() => openModal('history', item)} className="rounded-md border border-[#eee4de] bg-white px-2.5 py-1.5 text-[10px] font-semibold text-[#6a5a50] hover:bg-[#fff8df]">History</button>
                           </div>
@@ -686,8 +700,8 @@ export default function Ingredients({
                 {modalType === 'batch_add' && (
                   <div className="mt-2 grid gap-2">
                     <label className="text-xs text-gray-600">Ingredient</label>
-                    <input value={ingredientSearch} onChange={(e) => { setIngredientSearch(e.target.value); setBatchForm({ ...batchForm, ingredient_id: '' }); }} placeholder="Type ingredient name..." autoComplete="off" className="w-full rounded-xl border px-2 py-2 text-xs" />
-                    {ingredientSearch && !batchForm.ingredient_id && <div className="max-h-40 overflow-y-auto rounded-xl border bg-white">{ingredients.filter((item) => item.name.toLowerCase().includes(ingredientSearch.toLowerCase())).map((item) => <button type="button" key={item.id} onClick={() => { setIngredientSearch(item.name); setBatchForm({ ...batchForm, ingredient_id: String(item.id) }); }} className="block w-full px-3 py-2 text-left text-xs hover:bg-black/5">{item.name} ({item.unit})</button>)}</div>}
+                    <input value={ingredientSearch} onChange={(e) => { const value = e.target.value; const exactMatch = ingredients.find((item) => item.name.trim().toLowerCase() === value.trim().toLowerCase()); setIngredientSearch(value); setBatchForm((current) => ({ ...current, ingredient_id: exactMatch ? String(exactMatch.id) : '' })); }} placeholder="Type ingredient name and select a match" autoComplete="off" className="w-full rounded-xl border px-2 py-2 text-xs" />
+                    {ingredientSearch && !batchForm.ingredient_id && <div className="max-h-40 overflow-y-auto rounded-xl border bg-white">{ingredients.filter((item) => item.name.toLowerCase().includes(ingredientSearch.toLowerCase())).map((item) => <button type="button" key={item.id} onClick={() => { setIngredientSearch(item.name); setBatchForm((current) => ({ ...current, ingredient_id: String(item.id) })); }} className="block w-full px-3 py-2 text-left text-xs hover:bg-black/5">{item.name} ({item.unit})</button>)}</div>}
                     <label className="text-xs text-gray-600">Quantity</label><input type="number" min="0.001" step="0.001" value={batchForm.quantity} onChange={(e) => setBatchForm({ ...batchForm, quantity: e.target.value })} className="rounded-xl border px-2 py-2 text-xs" />
                     <label className="text-xs text-gray-600">Batch / Lot Number</label><input value={batchForm.batch_number} onChange={(e) => setBatchForm({ ...batchForm, batch_number: e.target.value })} className="rounded-xl border px-2 py-2 text-xs" />
                     <div className="grid grid-cols-2 gap-2"><div><label className="text-xs text-gray-600">Purchase Date</label><input type="date" value={batchForm.purchase_date} onChange={(e) => setBatchForm({ ...batchForm, purchase_date: e.target.value })} className="w-full rounded-xl border px-2 py-2 text-xs" /></div><div><label className="text-xs text-gray-600">Expiry Date *</label><input required type="date" value={batchForm.expiry_date} onChange={(e) => setBatchForm({ ...batchForm, expiry_date: e.target.value })} className="w-full rounded-xl border px-2 py-2 text-xs" /></div></div>
@@ -714,8 +728,9 @@ export default function Ingredients({
                         <input type="number" min="0" value={modalThreshold} onChange={(e) => setModalThreshold(e.target.value)} className="rounded-xl border px-2 py-1 text-xs" />
                       </div>
                     </div>
-                    <label className="text-xs text-gray-600">Unit Price</label>
+                    <label className="text-xs text-gray-600">Estimated Unit Price (₱ per {modalUnit || 'unit'})</label>
                     <input type="number" min="0" step="0.01" value={modalUnitCost} onChange={(e) => setModalUnitCost(e.target.value)} className="rounded-xl border px-2 py-1 text-xs" />
+                    <p className="text-[11px] text-gray-500">Reference estimate only. Update with your supplier’s actual price; new stock batches can use their own purchase cost.</p>
                     {thresholdValue <= 0 && (
                       <p className="text-xs text-red-600">Threshold must be greater than 0 to enable alerts and avoid silent low-stock conditions.</p>
                     )}
@@ -747,6 +762,9 @@ export default function Ingredients({
                         <input type="number" min="0" value={modalThreshold} onChange={(e) => setModalThreshold(e.target.value)} className="rounded-xl border px-2 py-1 text-xs" />
                       </div>
                     </div>
+                    <label className="text-xs text-gray-600">Reference Unit Price (₱ per {modalUnit || 'unit'})</label>
+                    <input type="number" min="0" step="0.01" value={modalUnitCost} onChange={(e) => setModalUnitCost(e.target.value)} className="rounded-xl border px-2 py-1 text-xs" />
+                    <p className="text-[11px] text-gray-500">Used as the default price for new batches. Existing batches keep their recorded costs.</p>
                     {thresholdValue <= 0 && (
                       <p className="text-xs text-red-600">Threshold must be greater than 0 to enable alerts and avoid silent low-stock conditions.</p>
                     )}

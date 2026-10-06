@@ -5,7 +5,6 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { CUSTOMER_BASE, LARAVEL_BASE } from '../../services/config';
 import { getAuthHeaders } from '../../services/api';
-import { identifyDiscountIdType } from '../utils/discountIdOcr';
 import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
 import markerIcon from "leaflet/dist/images/marker-icon.png";
 import markerShadow from "leaflet/dist/images/marker-shadow.png";
@@ -25,6 +24,18 @@ L.Icon.Default.mergeOptions({
 const SHOP_OPEN_MINUTES = 8 * 60;
 const SHOP_CLOSE_MINUTES = 20 * 60;
 const SHOP_HOURS_LABEL = '8:00 AM to 8:00 PM';
+const FULFILLMENT_TIME_SLOTS = Array.from({ length: 23 }, (_, index) => {
+  const totalMinutes = 8 * 60 + index * 30;
+  const hour = Math.floor(totalMinutes / 60);
+  const minute = totalMinutes % 60;
+  const period = hour < 12 ? 'AM' : 'PM';
+  const displayHour = hour % 12 || 12;
+
+  return {
+    value: `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`,
+    label: `${displayHour}:${String(minute).padStart(2, '0')} ${period}`,
+  };
+});
 const PICKUP_LOCATION = {
   name: 'Pastry Project Bakeshop & Cafe',
   lat: 14.0753416,
@@ -72,11 +83,8 @@ export default function CheckoutModal({
   const [discountType, setDiscountType] = useState('none');
   const [discountIdFile, setDiscountIdFile] = useState(null);
   const [discountIdPreview, setDiscountIdPreview] = useState('');
-  const [discountIdScan, setDiscountIdScan] = useState({ state: 'idle', message: '' });
   const modalScrollRef = useRef(null);
   const addressInputRef = useRef(null);
-  const discountIdScanRunRef = useRef(0);
-  const discountOcrWorkerRef = useRef(null);
 
   const refreshShopStatus = () => {
     const now = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Manila' }));
@@ -87,6 +95,7 @@ export default function CheckoutModal({
   const [checkoutData, setCheckoutData] = useState({
     method: "Deliver",
     deliveryService: "",
+    deliveryTime: "",
     payment: "QRPh",
     orderType: "Standard",
     address: "",
@@ -114,65 +123,6 @@ export default function CheckoutModal({
     setDiscountIdPreview(previewUrl);
     return () => URL.revokeObjectURL(previewUrl);
   }, [discountIdFile]);
-
-  useEffect(() => () => {
-    discountIdScanRunRef.current += 1;
-    if (discountOcrWorkerRef.current) {
-      void discountOcrWorkerRef.current.terminate();
-      discountOcrWorkerRef.current = null;
-    }
-  }, []);
-
-  const scanDiscountId = async (file, expectedType) => {
-    const runId = ++discountIdScanRunRef.current;
-    setDiscountIdScan({ state: 'scanning', message: 'Checking ID text in your browser...' });
-
-    const previousWorker = discountOcrWorkerRef.current;
-    discountOcrWorkerRef.current = null;
-    if (previousWorker) await previousWorker.terminate();
-
-    let worker;
-    try {
-      const { createWorker } = await import('tesseract.js');
-      worker = await createWorker('eng');
-      if (runId !== discountIdScanRunRef.current) {
-        await worker.terminate();
-        worker = null;
-        return;
-      }
-      discountOcrWorkerRef.current = worker;
-
-      const { data: { text } } = await worker.recognize(file);
-      if (runId !== discountIdScanRunRef.current) return;
-
-      const detectedType = identifyDiscountIdType(text);
-      if (detectedType === expectedType) {
-        setDiscountIdScan({
-          state: 'match',
-          message: `Possible ${expectedType === 'pwd' ? 'PWD' : 'Senior Citizen'} ID text found. Admin will still verify the image.`,
-        });
-      } else if (detectedType && detectedType !== 'ambiguous') {
-        setDiscountIdScan({
-          state: 'mismatch',
-          message: `The text looks like a ${detectedType === 'pwd' ? 'PWD' : 'Senior Citizen'} ID. Choose the matching discount or upload the correct ID.`,
-        });
-      } else {
-        setDiscountIdScan({
-          state: 'unreadable',
-          message: 'Could not identify the ID type from this photo. Upload a clearer, well-lit image.',
-        });
-      }
-    } catch {
-      if (runId === discountIdScanRunRef.current) {
-        setDiscountIdScan({ state: 'error', message: 'ID text scan failed. Try again with a clearer photo.' });
-      }
-    } finally {
-      if (worker && discountOcrWorkerRef.current === worker) {
-        discountOcrWorkerRef.current = null;
-        await worker.terminate();
-      }
-    }
-  };
 
   useEffect(() => {
     if (!isOpen || checkoutData.method !== 'Pickup' || !pickupMapElementRef.current) return undefined;
@@ -481,7 +431,9 @@ export default function CheckoutModal({
   );
 
   const rushFee = checkoutData.orderType === "Urgent" ? 100 : 0;
-  const discountAmount = discountType === 'none' ? 0 : Number((subtotal * 0.2).toFixed(2));
+  const discountAmount = discountType === 'none' || !discountIdFile
+    ? 0
+    : Number((subtotal * 0.05).toFixed(2));
   const taxAmount = 0;
 
   const total = subtotal + rushFee + taxAmount - discountAmount;
@@ -532,10 +484,8 @@ export default function CheckoutModal({
       return;
     }
 
-    if (discountType !== 'none' && (!discountIdFile || discountIdScan.state !== 'match')) {
-      alert(discountIdScan.state === 'scanning'
-        ? 'Wait for the ID text scan to finish.'
-        : 'Upload a clearer ID photo and wait for a matching ID type before applying this discount.');
+    if (discountType !== 'none' && !discountIdFile) {
+      alert('Upload a photo of the Senior Citizen or PWD ID to apply the discount.');
       return;
     }
 
@@ -581,6 +531,7 @@ export default function CheckoutModal({
 
         method: checkoutData.method,
         delivery_service: checkoutData.method === "Deliver" ? checkoutData.deliveryService : "",
+        delivery_time: checkoutData.deliveryTime,
         payment: checkoutData.payment,
         order_type: checkoutData.orderType || "Standard",
         discount_type: discountType,
@@ -791,6 +742,144 @@ export default function CheckoutModal({
               <p className="mt-1 text-sm text-[#8d7a6e]">Choose how you want to receive and pay for your order.</p>
             </div>
 
+            {/* CONTACT INFO */}
+            <div className="mb-6 space-y-3 relative z-50 pointer-events-auto">
+              <p className="text-xs text-gray-500 uppercase tracking-[0.2em]">
+                Contact Info
+              </p>
+
+              <div className="relative">
+                <label htmlFor="checkout-phone" className="mb-1 block text-xs font-medium text-gray-600">
+                  Phone Number <span className="text-red-600" aria-hidden="true">*</span>
+                </label>
+                <input
+                  id="checkout-phone"
+                  type="tel"
+                  autoComplete="tel"
+                  placeholder="Phone Number"
+                  aria-label="Phone Number"
+                  required
+                  aria-expanded={showPhoneSuggestions && matchingPhoneSuggestions.length > 0}
+                  className="relative z-[9999] box-border w-full rounded-xl border border-[#e8e1d8] bg-[#fffdfa] p-3 text-sm text-[#33251e] outline-none transition placeholder:text-gray-400 focus:border-[#d4af37] focus:ring-2 focus:ring-[#d4af37]/20 pointer-events-auto"
+                  value={checkoutData.phone}
+                  onFocus={() => setShowPhoneSuggestions(true)}
+                  onBlur={() => setShowPhoneSuggestions(false)}
+                  onChange={(e) =>
+                    setCheckoutData((prev) => ({
+                      ...prev,
+                      phone: e.target.value,
+                    }))
+                  }
+                />
+                {showPhoneSuggestions && matchingPhoneSuggestions.length > 0 && (
+                  <div className="absolute left-0 right-0 top-full z-[10000] mt-1 overflow-hidden rounded-xl border border-[#eadfca] bg-white py-1 shadow-lg">
+                    {matchingPhoneSuggestions.map((phone) => (
+                      <button
+                        key={phone}
+                        type="button"
+                        onMouseDown={(event) => event.preventDefault()}
+                        onClick={() => {
+                          setCheckoutData((prev) => ({ ...prev, phone }));
+                          setShowPhoneSuggestions(false);
+                        }}
+                        className="block w-full px-3 py-2 text-left text-sm text-[#493a30] transition hover:bg-[#fff8df]"
+                      >
+                        {phone}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {checkoutData.method === "Deliver" && (
+                <>
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="text-xs text-gray-500 uppercase tracking-[0.2em]">
+                        Saved Delivery Address <span className="text-red-600" aria-hidden="true">*</span>
+                      </p>
+                      {addressesLoading && (
+                        <span className="text-xs text-gray-500">Loading…</span>
+                      )}
+                    </div>
+                    {addressFetchError && (
+                      <p className="text-xs text-red-700">{addressFetchError}</p>
+                    )}
+                  </div>
+
+                  <div className="relative">
+                    <input
+                      id="checkout-address"
+                      type="text"
+                      placeholder="Address"
+                      autoComplete="street-address"
+                      aria-label="Delivery address"
+                      required
+                      aria-expanded={showAddressSuggestions && matchingAddressSuggestions.length > 0}
+                      className="relative z-[9999] w-full rounded-xl border border-[#e8e1d8] bg-[#fffdfa] p-3 pr-9 text-sm text-[#33251e] outline-none transition placeholder:text-gray-400 focus:border-[#d4af37] focus:ring-2 focus:ring-[#d4af37]/20 pointer-events-auto"
+                      value={checkoutData.address}
+                      onClick={(e) => e.currentTarget.focus()}
+                      onFocus={() => setShowAddressSuggestions(true)}
+                      onBlur={() => {
+                        setShowAddressSuggestions(false);
+                        geocodeNow();
+                      }}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        setSelectedAddressId(null);
+                        setCheckoutData((prev) => ({
+                          ...prev,
+                          address: value,
+                        }));
+                        setGeocodeSearchTerm(value);
+                        setShowAddressSuggestions(true);
+                      }}
+                    />
+                    {isGeocoding && (
+                      <Loader2
+                        size={16}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-gray-400 z-[9999]"
+                      />
+                    )}
+                    {showAddressSuggestions && matchingAddressSuggestions.length > 0 && (
+                      <div className="absolute left-0 right-0 top-full z-[10000] mt-1 max-h-56 overflow-y-auto rounded-xl border border-[#eadfca] bg-white py-1 shadow-lg">
+                        {matchingAddressSuggestions.map((address) => (
+                          <button
+                            key={address.address_id}
+                            type="button"
+                            onMouseDown={(event) => event.preventDefault()}
+                            onClick={() => handleSelectSavedAddress(address)}
+                            className="block w-full px-3 py-2 text-left transition hover:bg-[#fff8df]"
+                          >
+                            <span className="block text-xs font-semibold text-[#493a30]">
+                              {address.address_label || 'Saved address'}
+                              {address.is_default ? ' · Default' : ''}
+                            </span>
+                            <span className="mt-0.5 block truncate text-[11px] text-[#8d7a6e]">
+                              {formatSavedAddress(address)}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {geocodeErrorMessage && !isGeocoding && (
+                    <div className="flex items-start gap-2 rounded-2xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                      <SearchX size={16} className="mt-0.5 shrink-0" />
+                      <span>{geocodeErrorMessage}</span>
+                    </div>
+                  )}
+
+                  {locationError && (
+                    <div className="rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700 mt-2">
+                      {locationError}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+
             {/* METHOD */}
             <div className="mb-6 space-y-2">
 
@@ -829,6 +918,24 @@ export default function CheckoutModal({
 
             </div>
 
+            <div className="mb-6">
+              <label htmlFor="checkout-fulfillment-time" className="mb-1 block text-xs font-medium text-gray-600">
+                {checkoutData.method === "Pickup" ? "Pickup time" : "Delivery time"} <span className="text-red-600" aria-hidden="true">*</span>
+              </label>
+              <select
+                id="checkout-fulfillment-time"
+                required
+                value={checkoutData.deliveryTime}
+                onChange={(event) => setCheckoutData((current) => ({ ...current, deliveryTime: event.target.value }))}
+                className="w-full rounded-xl border border-[#e8e1d8] bg-[#fffdfa] p-3 text-sm text-[#33251e] outline-none transition focus:border-[#d4af37] focus:ring-2 focus:ring-[#d4af37]/20"
+              >
+                <option value="" disabled>Select a time</option>
+                {FULFILLMENT_TIME_SLOTS.map((slot) => (
+                  <option key={slot.value} value={slot.value}>{slot.label}</option>
+                ))}
+              </select>
+            </div>
+
             {checkoutData.method === "Deliver" && (
               <section className="mb-6 space-y-3" aria-labelledby="delivery-service-heading">
                 <div className="rounded-xl border border-[#e9d8ae] bg-[#fffaf0] px-3.5 py-3 text-sm text-[#6b4f1d]">
@@ -854,25 +961,6 @@ export default function CheckoutModal({
                       </button>
                     ))}
                   </div>
-                </div>
-              </section>
-            )}
-
-            {checkoutData.method === 'Pickup' && (
-              <section className="mb-6 overflow-hidden rounded-2xl border border-[#eee5db] bg-[#fffdfa]">
-                <div className="grid sm:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
-                  <div className="flex flex-col justify-center border-b border-[#eee5db] px-4 py-4 sm:border-b-0 sm:border-r">
-                    <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#a77b26]">Pickup Location</p>
-                    <h3 className="mt-1.5 text-base font-bold leading-tight text-[#33251e]">{PICKUP_LOCATION.name}</h3>
-                    <p className="mt-2 text-xs leading-5 text-[#6f6258]">{PICKUP_LOCATION.address}</p>
-                    <p className="mt-3 inline-flex w-fit rounded-full bg-[#fff4c7] px-2.5 py-1 text-[10px] font-semibold text-[#8d6a2e]">Pickup point</p>
-                  </div>
-                  <div
-                    ref={pickupMapElementRef}
-                    aria-label="Fixed pickup location map"
-                    className="w-full bg-[#f5f1e9]"
-                    style={{ height: 240, minHeight: 240 }}
-                  />
                 </div>
               </section>
             )}
@@ -954,149 +1042,24 @@ export default function CheckoutModal({
               )}
             </div>
 
-            {/* CONTACT INFO */}
-            <div className="space-y-3 relative z-50 pointer-events-auto">
-
-              <p className="text-xs text-gray-500 uppercase tracking-[0.2em]">
-                Contact Info
-              </p>
-
-              {/* PHONE */}
-              <div className="relative">
-                <label htmlFor="checkout-phone" className="mb-1 block text-xs font-medium text-gray-600">
-                  Phone Number <span className="text-red-600" aria-hidden="true">*</span>
-                </label>
-                <input
-                  id="checkout-phone"
-                  type="tel"
-                  autoComplete="tel"
-                  placeholder="Phone Number"
-                  aria-label="Phone Number"
-                  required
-                  aria-expanded={showPhoneSuggestions && matchingPhoneSuggestions.length > 0}
-                  className="relative z-[9999] box-border w-full rounded-xl border border-[#e8e1d8] bg-[#fffdfa] p-3 text-sm text-[#33251e] outline-none transition placeholder:text-gray-400 focus:border-[#d4af37] focus:ring-2 focus:ring-[#d4af37]/20 pointer-events-auto"
-                  value={checkoutData.phone}
-                  onFocus={() => setShowPhoneSuggestions(true)}
-                  onBlur={() => setShowPhoneSuggestions(false)}
-                  onChange={(e) =>
-                    setCheckoutData((prev) => ({
-                      ...prev,
-                      phone: e.target.value,
-                    }))
-                  }
-                />
-                {showPhoneSuggestions && matchingPhoneSuggestions.length > 0 && (
-                  <div className="absolute left-0 right-0 top-full z-[10000] mt-1 overflow-hidden rounded-xl border border-[#eadfca] bg-white py-1 shadow-lg">
-                    {matchingPhoneSuggestions.map((phone) => (
-                      <button
-                        key={phone}
-                        type="button"
-                        onMouseDown={(event) => event.preventDefault()}
-                        onClick={() => {
-                          setCheckoutData((prev) => ({ ...prev, phone }));
-                          setShowPhoneSuggestions(false);
-                        }}
-                        className="block w-full px-3 py-2 text-left text-sm text-[#493a30] transition hover:bg-[#fff8df]"
-                      >
-                        {phone}
-                      </button>
-                    ))}
+            {checkoutData.method === 'Pickup' && (
+              <section className="mb-6 overflow-hidden rounded-2xl border border-[#eee5db] bg-[#fffdfa]">
+                <div className="grid sm:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
+                  <div className="flex flex-col justify-center border-b border-[#eee5db] px-4 py-4 sm:border-b-0 sm:border-r">
+                    <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#a77b26]">Pickup Location</p>
+                    <h3 className="mt-1.5 text-base font-bold leading-tight text-[#33251e]">{PICKUP_LOCATION.name}</h3>
+                    <p className="mt-2 text-xs leading-5 text-[#6f6258]">{PICKUP_LOCATION.address}</p>
+                    <p className="mt-3 inline-flex w-fit rounded-full bg-[#fff4c7] px-2.5 py-1 text-[10px] font-semibold text-[#8d6a2e]">Pickup point</p>
                   </div>
-                )}
-              </div>
-
-              {checkoutData.method === "Deliver" && (
-                <>
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between gap-3">
-                      <p className="text-xs text-gray-500 uppercase tracking-[0.2em]">
-                        Saved Delivery Address <span className="text-red-600" aria-hidden="true">*</span>
-                      </p>
-                      {addressesLoading && (
-                        <span className="text-xs text-gray-500">Loading…</span>
-                      )}
-                    </div>
-                    {addressFetchError && (
-                      <p className="text-xs text-red-700">{addressFetchError}</p>
-                    )}
-                  </div>
-
-                  {/* ADDRESS */}
-                  <div className="relative">
-                    <input
-                      id="checkout-address"
-                      type="text"
-                      placeholder="Address"
-                      autoComplete="street-address"
-                      aria-label="Delivery address"
-                      required={checkoutData.method === 'Deliver'}
-                      aria-expanded={showAddressSuggestions && matchingAddressSuggestions.length > 0}
-                      className="relative z-[9999] w-full rounded-xl border border-[#e8e1d8] bg-[#fffdfa] p-3 pr-9 text-sm text-[#33251e] outline-none transition placeholder:text-gray-400 focus:border-[#d4af37] focus:ring-2 focus:ring-[#d4af37]/20 pointer-events-auto"
-                      value={checkoutData.address}
-                      onClick={(e) => e.currentTarget.focus()}
-                      onFocus={() => setShowAddressSuggestions(true)}
-                      onBlur={() => {
-                        setShowAddressSuggestions(false);
-                        geocodeNow();
-                      }}
-                      onChange={(e) => {
-                        const value = e.target.value;
-                        setSelectedAddressId(null);
-                        setCheckoutData((prev) => ({
-                          ...prev,
-                          address: value,
-                        }));
-                        // Debounced geocode: finds the pin as the user types.
-                        setGeocodeSearchTerm(value);
-                        setShowAddressSuggestions(true);
-                      }}
-                    />
-                    {isGeocoding && (
-                      <Loader2
-                        size={16}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-gray-400 z-[9999]"
-                      />
-                    )}
-                    {showAddressSuggestions && matchingAddressSuggestions.length > 0 && (
-                      <div className="absolute left-0 right-0 top-full z-[10000] mt-1 max-h-56 overflow-y-auto rounded-xl border border-[#eadfca] bg-white py-1 shadow-lg">
-                        {matchingAddressSuggestions.map((address) => (
-                          <button
-                            key={address.address_id}
-                            type="button"
-                            onMouseDown={(event) => event.preventDefault()}
-                            onClick={() => handleSelectSavedAddress(address)}
-                            className="block w-full px-3 py-2 text-left transition hover:bg-[#fff8df]"
-                          >
-                            <span className="block text-xs font-semibold text-[#493a30]">
-                              {address.address_label || 'Saved address'}
-                              {address.is_default ? ' · Default' : ''}
-                            </span>
-                            <span className="mt-0.5 block truncate text-[11px] text-[#8d7a6e]">
-                              {formatSavedAddress(address)}
-                            </span>
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  {geocodeErrorMessage && !isGeocoding && (
-                    <div className="flex items-start gap-2 rounded-2xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-                      <SearchX size={16} className="mt-0.5 shrink-0" />
-                      <span>{geocodeErrorMessage}</span>
-                    </div>
-                  )}
-
-                  {locationError && (
-                    <div className="rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700 mt-2">
-                      {locationError}
-                    </div>
-                  )}
-
-                </>
-              )}
-
-            </div>
+                  <div
+                    ref={pickupMapElementRef}
+                    aria-label="Fixed pickup location map"
+                    className="w-full bg-[#f5f1e9]"
+                    style={{ height: 240, minHeight: 240 }}
+                  />
+                </div>
+              </section>
+            )}
 
           </div>
 
@@ -1199,22 +1162,18 @@ export default function CheckoutModal({
                     setDiscountType(nextType);
                     if (nextType === 'none') {
                       setDiscountIdFile(null);
-                      setDiscountIdScan({ state: 'idle', message: '' });
-                      discountIdScanRunRef.current += 1;
-                    } else if (discountIdFile) {
-                      scanDiscountId(discountIdFile, nextType);
                     }
                   }}
                   className="w-full rounded-lg border border-[#e8e1d8] bg-[#fffdfa] p-2.5 text-sm text-[#33251e] outline-none focus:border-[#d4af37] focus:ring-2 focus:ring-[#d4af37]/20"
                 >
-                  <option value="none">No discount</option>
-                  <option value="senior_citizen">Senior Citizen - 20%</option>
-                  <option value="pwd">PWD - 20%</option>
+                  <option value="none">Regular</option>
+                  <option value="senior_citizen">Senior Citizen - 5%</option>
+                  <option value="pwd">PWD - 5%</option>
                 </select>
                 {discountType !== 'none' && (
                   <div className="space-y-2">
                     <label htmlFor="discount-id-image" className="block text-xs leading-relaxed text-[#765d50]">
-                      Upload a clear photo of the valid ID. Required for this discount; only authorized admin can view it.
+                      Upload a clear photo of the valid ID. The 5% discount applies automatically after upload; only authorized admin can view it.
                     </label>
                     <input
                       id="discount-id-image"
@@ -1230,12 +1189,9 @@ export default function CheckoutModal({
                           alert('Choose a JPG, PNG, or WEBP image no larger than 5 MB.');
                           event.target.value = '';
                           setDiscountIdFile(null);
-                          setDiscountIdScan({ state: 'idle', message: '' });
                           return;
                         }
                         setDiscountIdFile(file);
-                        if (file) scanDiscountId(file, discountType);
-                        else setDiscountIdScan({ state: 'idle', message: '' });
                       }}
                       className="block w-full text-xs text-[#765d50] file:mr-3 file:rounded-lg file:border-0 file:bg-[#fff0c2] file:px-3 file:py-2 file:text-xs file:font-semibold file:text-[#6f5523]"
                     />
@@ -1245,11 +1201,6 @@ export default function CheckoutModal({
                         alt="Preview of uploaded discount ID"
                         className="max-h-48 w-full rounded-lg border border-[#e8e1d8] bg-white object-contain"
                       />
-                    )}
-                    {discountIdScan.message && (
-                      <p className={`text-xs ${discountIdScan.state === 'match' ? 'text-green-700' : discountIdScan.state === 'scanning' ? 'text-[#765d50]' : 'text-amber-800'}`}>
-                        {discountIdScan.message}
-                      </p>
                     )}
                   </div>
                 )}
@@ -1264,7 +1215,7 @@ export default function CheckoutModal({
 
               {discountAmount > 0 && (
                 <div className="flex justify-between text-sm text-green-700">
-                  <span>{discountType === 'pwd' ? 'PWD discount (20%)' : 'Senior Citizen discount (20%)'}</span>
+                  <span>{discountType === 'pwd' ? 'PWD discount (5%)' : 'Senior Citizen discount (5%)'}</span>
                   <span>-₱{discountAmount.toFixed(2)}</span>
                 </div>
               )}

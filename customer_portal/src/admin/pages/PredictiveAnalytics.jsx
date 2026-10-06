@@ -2,6 +2,8 @@ import React, { useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
   Calculator,
+  ChevronLeft,
+  ChevronRight,
   FileText,
   Package2,
   TrendingUp,
@@ -256,6 +258,39 @@ function CoverageBars({ products }) {
   );
 }
 
+function ListPagination({ page, pageCount, total, onPageChange, label }) {
+  return (
+    <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-black/10 pt-4">
+      <span className="text-xs text-black/55">
+        Showing {total ? (page - 1) * 5 + 1 : 0}-{Math.min(page * 5, total)} of {total} {label}
+      </span>
+      <div className="flex items-center gap-2">
+        <span className="mr-1 text-xs text-black/55">Page {page} of {pageCount}</span>
+        <button
+          type="button"
+          onClick={() => onPageChange((current) => Math.max(1, current - 1))}
+          disabled={page <= 1}
+          aria-label={`Previous ${label} page`}
+          className="inline-flex h-9 items-center gap-1 rounded-lg border border-black/10 bg-white px-3 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          <ChevronLeft size={15} />
+          Previous
+        </button>
+        <button
+          type="button"
+          onClick={() => onPageChange((current) => Math.min(pageCount, current + 1))}
+          disabled={page >= pageCount}
+          aria-label={`Next ${label} page`}
+          className="inline-flex h-9 items-center gap-1 rounded-lg border border-black/10 bg-white px-3 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          Next
+          <ChevronRight size={15} />
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function PredictiveAnalytics() {
   const [forecast, setForecast] = useState({ products: [], summary: { totalProjectedDemand: 0, highPriorityCount: 0, recommendationCount: 0 }, recommendations: [], alerts: [] });
   const [statusMessage, setStatusMessage] = useState("Loading live sales and inventory data...");
@@ -264,6 +299,10 @@ export default function PredictiveAnalytics() {
   const [period, setPeriod] = useState(7);
   const [productFilter, setProductFilter] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
+  const [salesPage, setSalesPage] = useState(1);
+  const [preparationPage, setPreparationPage] = useState(1);
+  const [actionsPage, setActionsPage] = useState(1);
+  const [coveragePage, setCoveragePage] = useState(1);
 
   const loadForecast = async (options = {}) => {
     setIsWorking(true);
@@ -307,11 +346,52 @@ export default function PredictiveAnalytics() {
   const filteredProducts = useMemo(() => forecast.products.filter((product) =>
     (!productFilter || product.product === productFilter) && (!categoryFilter || product.category === categoryFilter)
   ), [forecast.products, productFilter, categoryFilter]);
-  const chartHistory = useMemo(() => {
-    const rows = forecast.products.flatMap((product) => product.history || []);
-    return rows.length ? rows.slice(-7) : [];
-  }, [forecast.products]);
+  const sortedFilteredProducts = useMemo(() => [...filteredProducts].sort((a, b) =>
+    Number(b.totalForecast || 0) - Number(a.totalForecast || 0) || a.product.localeCompare(b.product)
+  ), [filteredProducts]);
+  const salesPageCount = Math.max(1, Math.ceil(sortedFilteredProducts.length / 5));
+  const paginatedProducts = sortedFilteredProducts.slice((salesPage - 1) * 5, salesPage * 5);
+  const preparationProducts = useMemo(() => filteredProducts
+    .filter((product) => Number(product.recommendedPreorderQuantity) > 0)
+    .sort((a, b) =>
+      Number(b.recommendedPreorderQuantity || 0) - Number(a.recommendedPreorderQuantity || 0)
+      || Number(b.totalForecast || 0) - Number(a.totalForecast || 0)
+      || a.product.localeCompare(b.product)
+    ), [filteredProducts]);
+  const sortedActions = useMemo(() => [...(forecast.actions || [])].sort((a, b) => {
+    const priorityRank = { high: 0, medium: 1, low: 2 };
+    const priorityDifference = (priorityRank[String(a.priority || "").toLowerCase()] ?? 3)
+      - (priorityRank[String(b.priority || "").toLowerCase()] ?? 3);
+    return priorityDifference
+      || String(a.product || "").localeCompare(String(b.product || ""))
+      || String(a.message || "").localeCompare(String(b.message || ""));
+  }), [forecast.actions]);
+  const sortedCoverageProducts = useMemo(() => [...forecast.products].sort((a, b) =>
+    Number(a.coverageRatio || 0) - Number(b.coverageRatio || 0)
+    || a.product.localeCompare(b.product)
+  ), [forecast.products]);
+  const preparationPageCount = Math.max(1, Math.ceil(preparationProducts.length / 5));
+  const actionsPageCount = Math.max(1, Math.ceil(sortedActions.length / 5));
+  const coveragePageCount = Math.max(1, Math.ceil(sortedCoverageProducts.length / 5));
+  const paginatedPreparationProducts = preparationProducts.slice((preparationPage - 1) * 5, preparationPage * 5);
+  const paginatedActions = sortedActions.slice((actionsPage - 1) * 5, actionsPage * 5);
+  const paginatedCoverageProducts = sortedCoverageProducts.slice((coveragePage - 1) * 5, coveragePage * 5);
+  const chartHistory = useMemo(() => (forecast.history || []).map((row) => Number(row.demand || 0)), [forecast.history]);
   const chartForecast = useMemo(() => (forecast.daily || []).map((row) => Number(row.forecast || 0)), [forecast.daily]);
+
+  useEffect(() => {
+    setSalesPage(1);
+    setPreparationPage(1);
+  }, [categoryFilter, period, productFilter, forecast.products]);
+
+  useEffect(() => {
+    setSalesPage((page) => Math.min(page, salesPageCount));
+  }, [salesPageCount]);
+
+  useEffect(() => {
+    setActionsPage(1);
+    setCoveragePage(1);
+  }, [forecast.actions, forecast.products]);
 
   const handleFileUpload = async (event) => {
     const file = event.target.files?.[0];
@@ -476,25 +556,141 @@ export default function PredictiveAnalytics() {
           <div className="mb-6 rounded-[24px] border border-black/10 bg-white p-5 shadow-sm">
             <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
               <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.25em] text-black/50">Product Demand Forecast</p>
-                <h2 className="text-lg font-semibold text-black">Product-level outlook</h2>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.25em] text-black/50">Estimated Sales</p>
+                <h2 className="text-lg font-semibold text-black">How many items might we sell?</h2>
+                <p className="mt-1 max-w-2xl text-sm leading-6 text-black/60">
+                  This estimate uses past sales to help you prepare products. It is a guide, not a guaranteed number.
+                </p>
               </div>
               <div className="flex flex-wrap gap-2">
-                <select value={productFilter} onChange={(event) => setProductFilter(event.target.value)} className="rounded-xl border border-black/10 px-3 py-2 text-xs"><option value="">All products</option>{forecast.products.map((product) => <option key={product.product} value={product.product}>{product.product}</option>)}</select>
-                <select value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)} className="rounded-xl border border-black/10 px-3 py-2 text-xs"><option value="">All categories</option>{[...new Set(forecast.products.map((product) => product.category))].map((category) => <option key={category} value={category}>{category}</option>)}</select>
+                <select aria-label="Filter by product" value={productFilter} onChange={(event) => setProductFilter(event.target.value)} className="rounded-xl border border-black/10 px-3 py-2 text-xs"><option value="">All products</option>{forecast.products.map((product) => <option key={product.product} value={product.product}>{product.product}</option>)}</select>
+                <select aria-label="Filter by category" value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)} className="rounded-xl border border-black/10 px-3 py-2 text-xs"><option value="">All categories</option>{[...new Set(forecast.products.map((product) => product.category))].map((category) => <option key={category} value={category}>{category}</option>)}</select>
               </div>
             </div>
-            <div className="overflow-x-auto"><table className="min-w-[1020px] text-left text-sm"><thead><tr className="border-b border-black/10 text-[10px] uppercase tracking-[0.16em] text-black/50"><th className="py-3 pr-4">Product</th><th className="py-3 pr-4">Recent</th>{Array.from({ length: period }, (_, index) => <th key={index} className="py-3 pr-4">D+{index + 1}</th>)}<th className="py-3 pr-4">Total</th><th className="py-3 pr-4">Pre-order Qty</th><th className="py-3">Priority</th></tr></thead><tbody>{filteredProducts.length ? filteredProducts.map((product) => <tr key={product.product} className="border-b border-black/10 last:border-0 hover:bg-[#fafaf8]"><td className="py-3 pr-4 font-semibold text-black">{product.product}</td><td className="py-3 pr-4 text-black/70">{product.recentDemand}</td>{product.forecast.map((value, index) => <td key={index} className="py-3 pr-4 text-black/70">{value}</td>)}<td className="py-3 pr-4 font-semibold">{product.totalForecast}</td><td className="py-3 pr-4 font-semibold">{product.recommendedPreorderQuantity ?? 0}</td><td className="py-3"><span className="rounded-full bg-[#f7f2e8] px-2.5 py-1 text-[10px] font-semibold">{product.priority}</span></td></tr>) : <tr><td colSpan={period + 5} className="py-6 text-center text-sm text-black/50">No product forecast data is available.</td></tr>}</tbody></table></div>
+            <div className="overflow-x-auto">
+              <table className="min-w-[1020px] text-left text-sm">
+                <thead>
+                  <tr className="border-b border-black/10 text-[10px] uppercase tracking-[0.16em] text-black/50">
+                    <th className="py-3 pr-4">Product</th>
+                    <th className="py-3 pr-4">Recent daily sales</th>
+                    {Array.from({ length: period }, (_, index) => (
+                      <th key={index} className="py-3 pr-4">
+                        {index === 0 ? "Tomorrow" : `In ${index + 1} days`}
+                      </th>
+                    ))}
+                    <th className="py-3 pr-4">Estimated total</th>
+                    <th className="py-3 pr-4">Extra to prepare</th>
+                    <th className="py-3">Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredProducts.length ? paginatedProducts.map((product) => (
+                    <tr key={product.product} className="border-b border-black/10 last:border-0 hover:bg-[#fafaf8]">
+                      <td className="py-3 pr-4 font-semibold text-black">{product.product}</td>
+                      <td className="py-3 pr-4 text-black/70">{product.recentDemand}</td>
+                      {product.forecast.map((value, index) => (
+                        <td key={index} className="py-3 pr-4 text-black/70">{value}</td>
+                      ))}
+                      <td className="py-3 pr-4 font-semibold">{product.totalForecast}</td>
+                      <td className="py-3 pr-4 font-semibold">{product.recommendedPreorderQuantity ?? 0}</td>
+                      <td className="py-3">
+                        <span className="rounded-full bg-[#f7f2e8] px-2.5 py-1 text-[10px] font-semibold">
+                          {({ High: "Prepare first", Medium: "Plan ahead", Low: "Stock is enough" })[product.priority] || product.priority}
+                        </span>
+                      </td>
+                    </tr>
+                  )) : (
+                    <tr>
+                      <td colSpan={period + 5} className="py-6 text-center text-sm text-black/50">
+                        There is not enough sales data to estimate product demand yet.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+            <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-black/10 pt-4">
+              <span className="text-xs text-black/55">
+                Showing {sortedFilteredProducts.length ? (salesPage - 1) * 5 + 1 : 0}-
+                {Math.min(salesPage * 5, sortedFilteredProducts.length)} of {sortedFilteredProducts.length} products
+              </span>
+              <div className="flex items-center gap-2">
+                <span className="mr-1 text-xs text-black/55">Page {salesPage} of {salesPageCount}</span>
+                <button
+                  type="button"
+                  onClick={() => setSalesPage((page) => Math.max(1, page - 1))}
+                  disabled={salesPage <= 1}
+                  aria-label="Previous estimated sales page"
+                  className="inline-flex h-9 items-center gap-1 rounded-lg border border-black/10 bg-white px-3 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  <ChevronLeft size={15} />
+                  Previous
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSalesPage((page) => Math.min(salesPageCount, page + 1))}
+                  disabled={salesPage >= salesPageCount}
+                  aria-label="Next estimated sales page"
+                  className="inline-flex h-9 items-center gap-1 rounded-lg border border-black/10 bg-white px-3 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  Next
+                  <ChevronRight size={15} />
+                </button>
+              </div>
+            </div>
           </div>
 
           <div className="mb-6 grid gap-4 xl:grid-cols-2">
-            <div className="rounded-[24px] border border-black/10 bg-white p-5 shadow-sm"><p className="text-[11px] font-semibold uppercase tracking-[0.25em] text-black/50">Pre-order Planning</p><h2 className="mb-4 text-lg font-semibold text-black">Suggested pre-order quantities</h2><div className="space-y-2">{filteredProducts.filter((product) => product.recommendedPreorderQuantity > 0).length ? filteredProducts.filter((product) => product.recommendedPreorderQuantity > 0).map((product) => <div key={product.product} className="flex items-center justify-between border-b border-black/10 py-3 text-sm"><span className="font-semibold">{product.product}</span><span>{product.recommendedPreorderQuantity} units <b className="ml-2 text-black/50">{product.priority}</b></span></div>) : <p className="text-sm text-black/50">Current stock covers the projected demand.</p>}</div></div>
+            <div className="rounded-[24px] border border-black/10 bg-white p-5 shadow-sm">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.25em] text-black/50">Preparation Guide</p>
+              <h2 className="mb-1 text-lg font-semibold text-black">Products that may need more stock</h2>
+              <p className="mb-4 text-sm text-black/60">The suggested amount is the estimated demand not covered by current stock.</p>
+              <div className="space-y-2">
+                {preparationProducts.length ? paginatedPreparationProducts.map((product) => (
+                  <div key={product.product} className="flex items-center justify-between border-b border-black/10 py-3 text-sm">
+                    <span className="font-semibold">{product.product}</span>
+                    <span>
+                      {product.recommendedPreorderQuantity} items
+                      <b className="ml-2 text-black/50">{({ High: "Prepare first", Medium: "Plan ahead", Low: "Stock is enough" })[product.priority] || product.priority}</b>
+                    </span>
+                  </div>
+                )) : (
+                  <p className="text-sm text-black/50">Current stock appears to be enough for the estimated demand.</p>
+                )}
+              </div>
+              <ListPagination
+                page={preparationPage}
+                pageCount={preparationPageCount}
+                total={preparationProducts.length}
+                onPageChange={setPreparationPage}
+                label="products"
+              />
+            </div>
             <div className="rounded-[24px] border border-black/10 bg-white p-5 shadow-sm"><p className="text-[11px] font-semibold uppercase tracking-[0.25em] text-black/50">Top Forecasted Products</p><h2 className="mb-4 text-lg font-semibold text-black">Highest projected demand</h2><div className="space-y-3">{[...forecast.products].sort((a, b) => b.totalForecast - a.totalForecast).slice(0, 5).map((product) => <div key={product.product}><div className="mb-1 flex justify-between text-xs"><span>{product.product}</span><b>{product.totalForecast}</b></div><div className="h-2 rounded-full bg-slate-100"><div className="h-2 rounded-full bg-[#D4AF37] transition-[width] duration-500" style={{ width: `${Math.min(100, product.totalForecast / Math.max(...forecast.products.map((item) => item.totalForecast), 1) * 100)}%` }} /></div></div>)}</div></div>
           </div>
 
           <div className="mb-6 grid gap-4 xl:grid-cols-2">
             <div className="rounded-[24px] border border-black/10 bg-white p-5 shadow-sm"><p className="text-[11px] font-semibold uppercase tracking-[0.25em] text-black/50">Ingredient Demand Forecast</p><h2 className="mb-4 text-lg font-semibold text-black">Recipe-based consumption and risk</h2><div className="overflow-x-auto"><table className="min-w-[680px] text-left text-sm"><thead><tr className="border-b border-black/10 text-[10px] uppercase tracking-[0.16em] text-black/50"><th className="py-3">Ingredient</th><th className="py-3">Stock</th><th className="py-3">Consumption</th><th className="py-3">Remaining</th><th className="py-3">Risk</th></tr></thead><tbody>{forecast.ingredients?.length ? forecast.ingredients.map((item) => <tr key={item.ingredient} className="border-b border-black/10 last:border-0 hover:bg-[#fafaf8]"><td className="py-3 font-semibold">{item.ingredient}</td><td className="py-3">{item.currentStock} {item.unit}</td><td className="py-3">{item.forecastConsumption} {item.unit}</td><td className="py-3">{item.projectedRemaining} {item.unit}</td><td className="py-3"><span className="rounded-full bg-[#f7f2e8] px-2 py-1 text-[10px] font-semibold">{item.riskStatus}</span></td></tr>) : <tr><td colSpan={5} className="py-5 text-black/50">No recipe-linked ingredient demand is available.</td></tr>}</tbody></table></div></div>
-            <div className="rounded-[24px] border border-black/10 bg-white p-5 shadow-sm"><p className="text-[11px] font-semibold uppercase tracking-[0.25em] text-black/50">Recommended Actions</p><h2 className="mb-4 text-lg font-semibold text-black">Next operational steps</h2><div className="space-y-2">{forecast.actions?.length ? forecast.actions.map((action, index) => <div key={`${action.type}-${action.product}-${index}`} className="rounded-2xl border border-black/10 bg-[#fffdf8] p-3 text-sm text-black/70">{action.message}</div>) : <p className="text-sm text-black/50">No action is required from the current forecast.</p>}</div></div>
+            <div className="rounded-[24px] border border-black/10 bg-white p-5 shadow-sm">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.25em] text-black/50">Recommended Actions</p>
+              <h2 className="mb-4 text-lg font-semibold text-black">Next operational steps</h2>
+              <div className="space-y-2">
+                {sortedActions.length ? paginatedActions.map((action, index) => (
+                  <div key={`${action.type}-${action.product}-${index}`} className="rounded-2xl border border-black/10 bg-[#fffdf8] p-3 text-sm text-black/70">
+                    {action.message}
+                  </div>
+                )) : (
+                  <p className="text-sm text-black/50">No action is required from the current forecast.</p>
+                )}
+              </div>
+              <ListPagination
+                page={actionsPage}
+                pageCount={actionsPageCount}
+                total={sortedActions.length}
+                onPageChange={setActionsPage}
+                label="actions"
+              />
+            </div>
           </div>
 
           <div className="mb-6 grid gap-4 xl:grid-cols-2">
@@ -556,7 +752,16 @@ export default function PredictiveAnalytics() {
                 <TrendingUp size={18} className="text-[#D4AF37]" />
               </div>
               {forecast.products?.length ? (
-                <CoverageBars products={forecast.products} />
+                <>
+                  <CoverageBars products={paginatedCoverageProducts} />
+                  <ListPagination
+                    page={coveragePage}
+                    pageCount={coveragePageCount}
+                    total={sortedCoverageProducts.length}
+                    onPageChange={setCoveragePage}
+                    label="products"
+                  />
+                </>
               ) : (
                 <div className="rounded-2xl border border-dashed border-black/10 p-3 text-sm text-black/60">Coverage data will appear once forecasts are generated.</div>
               )}

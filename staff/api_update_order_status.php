@@ -33,6 +33,8 @@ function sendJson(bool $success, string $message, array $extra = []): void {
     exit();
 }
 
+class OrderPreparationException extends RuntimeException {}
+
 function getSessionUserId(): int {
     if (session_status() !== PHP_SESSION_ACTIVE) {
         @session_start();
@@ -185,16 +187,20 @@ function loadOrderItemsFromJson(string $itemsJson): array {
         }
 
         $qty = max(1, intval($item['qty'] ?? $item['quantity'] ?? 1));
-        $productId = intval($item['id'] ?? 0);
+        $productId = intval($item['product_id'] ?? $item['id'] ?? 0);
+        $productSizeId = intval($item['product_size_id'] ?? 0);
+        $variant = trim((string) ($item['variant'] ?? ''));
         $productName = trim((string) ($item['name'] ?? $item['product'] ?? ''));
         if ($productId === 0 && $productName === '') {
             continue;
         }
 
-        $key = $productId > 0 ? "pid:{$productId}" : 'name:' . mb_strtolower($productName);
+        $key = ($productId > 0 ? "pid:{$productId}" : 'name:' . mb_strtolower($productName)) . "|size:{$productSizeId}|variant:" . mb_strtolower($variant);
         if (!isset($lines[$key])) {
             $lines[$key] = [
                 'product_id' => $productId,
+                'product_size_id' => $productSizeId,
+                'variant' => $variant,
                 'product_name' => $productName,
                 'qty' => 0,
             ];
@@ -209,20 +215,24 @@ function loadOrderItemsFromJson(string $itemsJson): array {
 function loadLegacyOrderItems(mysqli $conn, int $orderId): array {
     $items = [];
     $orderId = intval($orderId);
-    $result = $conn->query("SELECT product_id, product, qty FROM order_items WHERE order_id = {$orderId}");
+    $result = $conn->query("SELECT product_id, product_size_id, variant, product, qty FROM order_items WHERE order_id = {$orderId}");
     if ($result) {
         while ($row = $result->fetch_assoc()) {
             $productName = trim((string) ($row['product'] ?? ''));
             $productId = (int) ($row['product_id'] ?? 0);
+            $productSizeId = (int) ($row['product_size_id'] ?? 0);
+            $variant = trim((string) ($row['variant'] ?? ''));
             $qty = max(1, intval($row['qty'] ?? 1));
             if ($productName === '') {
                 continue;
             }
 
-            $key = $productId > 0 ? "pid:{$productId}" : 'name:' . mb_strtolower($productName);
+            $key = ($productId > 0 ? "pid:{$productId}" : 'name:' . mb_strtolower($productName)) . "|size:{$productSizeId}|variant:" . mb_strtolower($variant);
             if (!isset($items[$key])) {
                 $items[$key] = [
                     'product_id' => $productId,
+                    'product_size_id' => $productSizeId,
+                    'variant' => $variant,
                     'product_name' => $productName,
                     'qty' => 0,
                 ];
@@ -237,7 +247,7 @@ function loadLegacyOrderItems(mysqli $conn, int $orderId): array {
 
 function resolveProduct(mysqli $conn, int $productId, string $productName): ?array {
     if ($productId > 0) {
-        $stmt = $conn->prepare("SELECT id, name, stock FROM products WHERE id = ? LIMIT 1 FOR UPDATE");
+        $stmt = $conn->prepare("SELECT id, name, category, stock FROM products WHERE id = ? LIMIT 1 FOR UPDATE");
         if ($stmt) {
             $stmt->bind_param('i', $productId);
             $stmt->execute();
@@ -252,7 +262,7 @@ function resolveProduct(mysqli $conn, int $productId, string $productName): ?arr
 
     if ($productName !== '') {
         $lowerName = mb_strtolower($productName);
-        $stmt = $conn->prepare("SELECT id, name, stock FROM products WHERE LOWER(name) = ? LIMIT 1 FOR UPDATE");
+        $stmt = $conn->prepare("SELECT id, name, category, stock FROM products WHERE LOWER(name) = ? LIMIT 1 FOR UPDATE");
         if ($stmt) {
             $stmt->bind_param('s', $lowerName);
             $stmt->execute();
@@ -292,13 +302,370 @@ function collectInventoryPlan(mysqli $conn, array $orderLines): array {
             'name' => $productName,
             'qty' => ($plan['products'][$productId]['qty'] ?? 0) + $qty,
         ];
-
     }
 
     return [
         'success' => true,
         'plan' => $plan,
     ];
+}
+
+function collectOrderIngredientRequirements(mysqli $conn, array $orderLines): array {
+        $requirements = [];
+        $sizeColumn = $conn->query("SHOW COLUMNS FROM product_recipes LIKE 'product_size_id'");
+        $hasRecipeSizes = $sizeColumn && $sizeColumn->num_rows > 0;
+
+        foreach ($orderLines as $line) {
+            $product = resolveProduct($conn, (int) ($line['product_id'] ?? 0), trim((string) ($line['product_name'] ?? '')));
+            if (!$product) {
+                throw new OrderPreparationException('Order contains an unknown product.');
+            }
+
+            $productId = (int) $product['id'];
+            $productSizeId = (int) ($line['product_size_id'] ?? 0);
+            if ($productSizeId <= 0 && trim((string) ($line['variant'] ?? '')) !== '') {
+                $sizeStmt = $conn->prepare('SELECT id FROM product_sizes WHERE product_id = ? AND LOWER(size) = LOWER(?) LIMIT 1');
+                if (!$sizeStmt) {
+                    throw new OrderPreparationException('Unable to resolve the ordered cake size.');
+                }
+                $variant = trim((string) $line['variant']);
+                $sizeStmt->bind_param('is', $productId, $variant);
+                $sizeStmt->execute();
+                $productSizeId = (int) ($sizeStmt->get_result()->fetch_assoc()['id'] ?? 0);
+                $sizeStmt->close();
+            }
+            $quantity = max(1, (int) ($line['qty'] ?? 1));
+            $sql = 'SELECT pr.ingredient_id, pr.qty, i.name, i.unit FROM product_recipes pr INNER JOIN ingredients i ON i.id = pr.ingredient_id WHERE pr.product_id = ? AND pr.active = 1';
+            if ($hasRecipeSizes) {
+                $sql .= $productSizeId > 0 ? ' AND pr.product_size_id = ?' : ' AND pr.product_size_id IS NULL';
+            }
+            $stmt = $conn->prepare($sql);
+            if (!$stmt) {
+                throw new OrderPreparationException('Unable to load product ingredient recipes.');
+            }
+            if ($hasRecipeSizes && $productSizeId > 0) {
+                $stmt->bind_param('ii', $productId, $productSizeId);
+            } else {
+                $stmt->bind_param('i', $productId);
+            }
+            if (!$stmt->execute()) {
+                $stmt->close();
+                throw new OrderPreparationException('Unable to load product ingredient recipes.');
+            }
+            $result = $stmt->get_result();
+            $recipeCount = 0;
+            while ($recipe = $result->fetch_assoc()) {
+                $recipeCount++;
+                $ingredientId = (int) $recipe['ingredient_id'];
+                $key = (string) $ingredientId;
+                if (!isset($requirements[$key])) {
+                    $requirements[$key] = [
+                        'ingredient_id' => $ingredientId,
+                        'name' => (string) $recipe['name'],
+                        'unit' => (string) $recipe['unit'],
+                        'quantity' => 0.0,
+                    ];
+                }
+                $requirements[$key]['quantity'] += (float) $recipe['qty'] * $quantity;
+            }
+            $stmt->close();
+
+            if ($recipeCount === 0 && stripos((string) ($product['category'] ?? ''), 'cake') !== false) {
+                throw new OrderPreparationException("No active ingredient recipe is configured for {$product['name']}. Add its recipe before preparing this order.");
+            }
+        }
+
+        return array_values($requirements);
+    }
+
+function collectCustomCakeIngredientRequirements(mysqli $conn, int $orderId): array {
+    $tiers = [];
+    $customTiersTable = $conn->query("SHOW TABLES LIKE 'customized_cake_tiers'");
+    $customizedOrdersTable = $conn->query("SHOW TABLES LIKE 'customized_cake_orders'");
+
+    if ($customTiersTable && $customTiersTable->num_rows > 0 && $customizedOrdersTable && $customizedOrdersTable->num_rows > 0) {
+        $stmt = $conn->prepare('SELECT tier.flavor_id, size.multiplier FROM customized_cake_orders AS custom_order INNER JOIN customized_cake_tiers AS tier ON tier.customized_cake_order_id = custom_order.id INNER JOIN cake_sizes AS size ON size.id = tier.size_id WHERE custom_order.order_id = ? ORDER BY tier.tier_number');
+        $stmt->bind_param('i', $orderId);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        while ($tier = $result->fetch_assoc()) {
+            $tiers[] = ['flavor_id' => (int) $tier['flavor_id'], 'size_multiplier' => (float) $tier['multiplier'], 'quantity' => 1];
+        }
+        $stmt->close();
+    } else {
+        $customOrdersTable = $conn->query("SHOW TABLES LIKE 'custom_cake_orders'");
+        if (!$customOrdersTable || $customOrdersTable->num_rows === 0) {
+            throw new OrderPreparationException('Custom cake recipe details are unavailable.');
+        }
+
+        $stmt = $conn->prepare('SELECT flavor, cake_size, quantity FROM custom_cake_orders WHERE order_id = ?');
+        $stmt->bind_param('i', $orderId);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        while ($customOrder = $result->fetch_assoc()) {
+            $flavorNames = array_values(array_filter(array_map('trim', explode(',', (string) ($customOrder['flavor'] ?? '')))));
+            $sizeLabels = array_values(array_filter(array_map('trim', preg_split('/\s*\/\s*/', (string) ($customOrder['cake_size'] ?? '')) ?: [])));
+            if (!$flavorNames || !$sizeLabels) {
+                throw new OrderPreparationException('Custom cake flavor is missing; ingredients were not deducted.');
+            }
+            if (count($flavorNames) === 1 && count($sizeLabels) > 1) {
+                $flavorNames = array_fill(0, count($sizeLabels), $flavorNames[0]);
+            }
+            if (count($flavorNames) !== count($sizeLabels)) {
+                throw new OrderPreparationException('Custom cake tier flavor and size details do not match.');
+            }
+
+            $sizeResult = $conn->query('SELECT code, label, multiplier FROM cake_sizes WHERE active = 1');
+            $availableSizes = [];
+            if ($sizeResult) {
+                while ($size = $sizeResult->fetch_assoc()) {
+                    $availableSizes[] = $size;
+                }
+                $sizeResult->free();
+            }
+
+            foreach ($sizeLabels as $index => $sizeLabel) {
+                $flavorName = $flavorNames[$index];
+                $flavorStmt = $conn->prepare('SELECT id FROM cake_flavors WHERE active = 1 AND LOWER(name) = LOWER(?) LIMIT 1');
+                $flavorStmt->bind_param('s', $flavorName);
+                $flavorStmt->execute();
+                $flavorId = (int) ($flavorStmt->get_result()->fetch_assoc()['id'] ?? 0);
+                $flavorStmt->close();
+                if ($flavorId <= 0) {
+                    throw new OrderPreparationException("No active recipe flavor matches {$flavorName}.");
+                }
+
+                $sizeInput = strtolower(preg_replace('/[^a-z0-9]/', '', $sizeLabel));
+                $sizeMultiplier = null;
+                foreach ($availableSizes as $size) {
+                    $code = strtolower(preg_replace('/[^a-z0-9]/', '', (string) $size['code']));
+                    $label = strtolower(preg_replace('/[^a-z0-9]/', '', (string) $size['label']));
+                    if ($sizeInput === $code || $sizeInput === $label) {
+                        $sizeMultiplier = (float) $size['multiplier'];
+                        break;
+                    }
+                }
+                if ($sizeMultiplier === null) {
+                    throw new OrderPreparationException("No cake size recipe matches {$sizeLabel}.");
+                }
+                $tiers[] = [
+                    'flavor_id' => $flavorId,
+                    'size_multiplier' => $sizeMultiplier,
+                    'quantity' => max(1, (int) ($customOrder['quantity'] ?? 1)),
+                ];
+            }
+        }
+        $stmt->close();
+    }
+
+    if (!$tiers) {
+        throw new OrderPreparationException('Custom cake recipe details are unavailable.');
+    }
+
+    $requirements = [];
+    foreach ($tiers as $tier) {
+        $recipeStmt = $conn->prepare('SELECT recipe.id, base_size.multiplier AS base_multiplier FROM cake_recipes AS recipe INNER JOIN cake_sizes AS base_size ON base_size.id = recipe.base_size_id WHERE recipe.flavor_id = ? AND recipe.active = 1 ORDER BY recipe.id LIMIT 1');
+        $recipeStmt->bind_param('i', $tier['flavor_id']);
+        $recipeStmt->execute();
+        $baseRecipe = $recipeStmt->get_result()->fetch_assoc();
+        $recipeStmt->close();
+        if (!$baseRecipe || (float) $baseRecipe['base_multiplier'] <= 0) {
+            throw new OrderPreparationException('No active custom cake recipe was found.');
+        }
+        $recipeId = (int) $baseRecipe['id'];
+        $quantityScale = (float) $tier['size_multiplier'] / (float) $baseRecipe['base_multiplier'] * max(1, (int) ($tier['quantity'] ?? 1));
+        $stmt = $conn->prepare('SELECT recipe_ingredient.ingredient_id, recipe_ingredient.quantity, recipe_ingredient.unit AS recipe_unit, ingredient.name, ingredient.unit AS inventory_unit FROM cake_recipe_ingredients AS recipe_ingredient INNER JOIN ingredients AS ingredient ON ingredient.id = recipe_ingredient.ingredient_id WHERE recipe_ingredient.recipe_id = ? ORDER BY recipe_ingredient.id');
+        $stmt->bind_param('i', $recipeId);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $lineCount = 0;
+        while ($line = $result->fetch_assoc()) {
+            $lineCount++;
+            $fromUnit = strtolower(trim((string) $line['recipe_unit']));
+            $toUnit = strtolower(trim((string) $line['inventory_unit']));
+            $conversions = ['kg' => ['g' => 1000], 'g' => ['kg' => 0.001], 'l' => ['ml' => 1000], 'ml' => ['l' => 0.001]];
+            if ($fromUnit !== $toUnit && isset($conversions[$fromUnit][$toUnit])) {
+                $conversion = $conversions[$fromUnit][$toUnit];
+            } elseif ($fromUnit === $toUnit || $fromUnit === '' || $toUnit === '') {
+                $conversion = 1;
+            } else {
+                throw new OrderPreparationException("Recipe unit {$fromUnit} does not match inventory unit {$toUnit} for {$line['name']}.");
+            }
+
+            $ingredientId = (int) $line['ingredient_id'];
+            $key = (string) $ingredientId;
+            if (!isset($requirements[$key])) {
+                $requirements[$key] = [
+                    'ingredient_id' => $ingredientId,
+                    'name' => (string) $line['name'],
+                    'unit' => (string) $line['inventory_unit'],
+                    'quantity' => 0.0,
+                ];
+            }
+            $requirements[$key]['quantity'] += (float) $line['quantity'] * $conversion * $quantityScale;
+        }
+        $stmt->close();
+        if ($lineCount === 0) {
+            throw new OrderPreparationException('No ingredients are configured for a custom cake recipe.');
+        }
+    }
+
+    return array_values($requirements);
+}
+
+function orderIngredientsAlreadyDeducted(mysqli $conn, int $orderId): bool {
+    $customConsumptionTable = $conn->query("SHOW TABLES LIKE 'customized_cake_inventory_consumptions'");
+    if ($customConsumptionTable && $customConsumptionTable->num_rows > 0) {
+        $customStmt = $conn->prepare("SELECT COUNT(*) AS total FROM customized_cake_inventory_consumptions WHERE order_id = ? AND status = 'consumed'");
+        $customStmt->bind_param('i', $orderId);
+        $customStmt->execute();
+        $customAlreadyDeducted = (int) ($customStmt->get_result()->fetch_assoc()['total'] ?? 0) > 0;
+        $customStmt->close();
+        if ($customAlreadyDeducted) {
+            return true;
+        }
+    }
+
+    $stmt = $conn->prepare("SELECT COUNT(*) AS total FROM ingredient_movements WHERE reference_type = 'order' AND reference_id = ? AND action = 'stock_out'");
+    if (!$stmt) {
+        throw new OrderPreparationException('Unable to verify previous ingredient deductions.');
+    }
+    $stmt->bind_param('i', $orderId);
+    $stmt->execute();
+    $alreadyDeducted = (int) ($stmt->get_result()->fetch_assoc()['total'] ?? 0) > 0;
+    $stmt->close();
+    return $alreadyDeducted;
+}
+
+function insertOrderIngredientMovement(mysqli $conn, int $ingredientId, ?int $batchId, float $quantity, string $note, int $userId, int $orderId, float $previousStock, float $newStock): bool {
+    $stmt = $conn->prepare("INSERT INTO ingredient_movements (ingredient_id, batch_id, action, qty, note, user_id, reference_type, reference_id, previous_stock, new_stock) VALUES (?, ?, 'stock_out', ?, ?, ?, 'order', ?, ?, ?)");
+    if (!$stmt) {
+        return false;
+    }
+    $stmt->bind_param('iidsiidd', $ingredientId, $batchId, $quantity, $note, $userId, $orderId, $previousStock, $newStock);
+    $success = $stmt->execute();
+    $stmt->close();
+    return $success;
+}
+
+function deductOrderIngredients(mysqli $conn, int $orderId, array $requirements, int $userId): void {
+        if (!$requirements) {
+            return;
+        }
+
+        $hasBatchTable = $conn->query("SHOW TABLES LIKE 'ingredient_batches'")->num_rows > 0;
+        $hasDiscardTable = $conn->query("SHOW TABLES LIKE 'discard_requests'")->num_rows > 0;
+        $usableBatchFilter = 'ingredient_id = ? AND quantity_remaining > 0 AND (expiry_date IS NULL OR expiry_date >= CURDATE())';
+        if ($hasDiscardTable) {
+            $usableBatchFilter .= " AND NOT EXISTS (SELECT 1 FROM discard_requests dr WHERE dr.ingredient_batch_id = ingredient_batches.id AND dr.status = 'Pending')";
+        }
+
+        $plans = [];
+        foreach ($requirements as $requirement) {
+            $ingredientId = (int) $requirement['ingredient_id'];
+            $required = (float) $requirement['quantity'];
+            if ($required <= 0) {
+                continue;
+            }
+
+            $ingredientStmt = $conn->prepare('SELECT id, name, stock FROM ingredients WHERE id = ? LIMIT 1 FOR UPDATE');
+            if (!$ingredientStmt) {
+                throw new OrderPreparationException('Unable to lock ingredient inventory.');
+            }
+            $ingredientStmt->bind_param('i', $ingredientId);
+            $ingredientStmt->execute();
+            $ingredient = $ingredientStmt->get_result()->fetch_assoc();
+            $ingredientStmt->close();
+            if (!$ingredient) {
+                throw new OrderPreparationException("Ingredient {$requirement['name']} no longer exists.");
+            }
+
+            $batches = [];
+            $hasIngredientBatches = false;
+            if ($hasBatchTable) {
+                $countStmt = $conn->prepare('SELECT COUNT(*) AS total FROM ingredient_batches WHERE ingredient_id = ?');
+                $countStmt->bind_param('i', $ingredientId);
+                $countStmt->execute();
+                $hasIngredientBatches = (int) ($countStmt->get_result()->fetch_assoc()['total'] ?? 0) > 0;
+                $countStmt->close();
+            }
+
+            if ($hasIngredientBatches) {
+                $batchSql = "SELECT id, quantity_remaining FROM ingredient_batches WHERE {$usableBatchFilter} ORDER BY expiry_date IS NULL, expiry_date, id FOR UPDATE";
+                $batchStmt = $conn->prepare($batchSql);
+                $batchStmt->bind_param('i', $ingredientId);
+                $batchStmt->execute();
+                $batchResult = $batchStmt->get_result();
+                while ($batch = $batchResult->fetch_assoc()) {
+                    $batches[] = ['id' => (int) $batch['id'], 'remaining' => (float) $batch['quantity_remaining']];
+                }
+                $batchStmt->close();
+
+                $available = array_sum(array_column($batches, 'remaining'));
+                if ($available + 0.000001 < $required) {
+                    throw new OrderPreparationException("Insufficient usable stock for {$ingredient['name']}. Required: {$required}; available: {$available}.");
+                }
+
+                $remaining = $required;
+                $allocations = [];
+                foreach ($batches as $batch) {
+                    if ($remaining <= 0.000001) break;
+                    $consumed = min($remaining, $batch['remaining']);
+                    $allocations[] = ['batch_id' => $batch['id'], 'quantity' => $consumed];
+                    $remaining -= $consumed;
+                }
+                $plans[] = ['ingredient' => $ingredient, 'required' => $required, 'allocations' => $allocations];
+            } else {
+                $available = (float) $ingredient['stock'];
+                if ($available + 0.000001 < $required) {
+                    throw new OrderPreparationException("Insufficient stock for {$ingredient['name']}. Required: {$required}; available: {$available}.");
+                }
+                $plans[] = ['ingredient' => $ingredient, 'required' => $required, 'allocations' => []];
+            }
+        }
+
+        foreach ($plans as $plan) {
+            $ingredient = $plan['ingredient'];
+            $ingredientId = (int) $ingredient['id'];
+            $before = (float) $ingredient['stock'];
+            if ($plan['allocations']) {
+                foreach ($plan['allocations'] as $allocation) {
+                    $consumed = (float) $allocation['quantity'];
+                    $batchId = (int) $allocation['batch_id'];
+                    $updateBatch = $conn->prepare('UPDATE ingredient_batches SET quantity_remaining = quantity_remaining - ?, updated_at = NOW() WHERE id = ? AND quantity_remaining >= ?');
+                    $updateBatch->bind_param('did', $consumed, $batchId, $consumed);
+                    if (!$updateBatch->execute() || $updateBatch->affected_rows !== 1) {
+                        $updateBatch->close();
+                        throw new OrderPreparationException("Failed to deduct batch stock for {$ingredient['name']}.");
+                    }
+                    $updateBatch->close();
+
+                    $stockStmt = $conn->prepare("SELECT COALESCE(SUM(ib.quantity_remaining), 0) AS stock FROM ingredient_batches ib WHERE ib.ingredient_id = ? AND ib.quantity_remaining > 0 AND (ib.expiry_date IS NULL OR ib.expiry_date >= CURDATE())" . ($hasDiscardTable ? " AND NOT EXISTS (SELECT 1 FROM discard_requests dr WHERE dr.ingredient_batch_id = ib.id AND dr.status = 'Pending')" : ''));
+                    $stockStmt->bind_param('i', $ingredientId);
+                    $stockStmt->execute();
+                    $after = (float) ($stockStmt->get_result()->fetch_assoc()['stock'] ?? 0);
+                    $stockStmt->close();
+                    $syncStmt = $conn->prepare('UPDATE ingredients SET stock = ?, updated_at = NOW() WHERE id = ?');
+                    $syncStmt->bind_param('di', $after, $ingredientId);
+                    if (!$syncStmt->execute() || !insertOrderIngredientMovement($conn, $ingredientId, $batchId, $consumed, "Order #{$orderId} ingredient consumption", $userId, $orderId, $before, $after)) {
+                        $syncStmt->close();
+                        throw new OrderPreparationException("Failed to record ingredient consumption for {$ingredient['name']}.");
+                    }
+                    $syncStmt->close();
+                    $before = $after;
+                }
+            } else {
+                $required = (float) $plan['required'];
+                $after = $before - $required;
+                $updateIngredient = $conn->prepare('UPDATE ingredients SET stock = ?, updated_at = NOW() WHERE id = ? AND stock >= ?');
+                $updateIngredient->bind_param('did', $after, $ingredientId, $required);
+                if (!$updateIngredient->execute() || $updateIngredient->affected_rows !== 1 || !insertOrderIngredientMovement($conn, $ingredientId, null, $required, "Order #{$orderId} ingredient consumption", $userId, $orderId, $before, $after)) {
+                    $updateIngredient->close();
+                    throw new OrderPreparationException("Failed to record ingredient consumption for {$ingredient['name']}.");
+                }
+                $updateIngredient->close();
+            }
+        }
 }
 
 function applyInventoryPlan(mysqli $conn, int $orderId, string $status, array $plan, int $userId): array {
@@ -420,10 +787,17 @@ if (empty($data) && !empty($_POST)) {
 
 $id = isset($data['id']) ? intval($data['id']) : 0;
 $status = isset($data['status']) ? trim($data['status']) : "";
+$pickupOutcome = trim((string) ($data['pickup_outcome'] ?? ''));
 
 $allowedStatuses = ['Awaiting Payment', 'Awaiting Balance Payment', 'Pending', 'Confirmed', 'Preparing', 'Ready for Pickup', 'Completed', 'Cancelled'];
 if (!$id || !in_array($status, $allowedStatuses, true)) {
     sendJson(false, "Invalid input");
+}
+if ($pickupOutcome !== '' && !in_array($pickupOutcome, ['picked_up', 'not_picked_up'], true)) {
+    sendJson(false, 'Invalid pickup outcome.');
+}
+if (($pickupOutcome === 'picked_up' && $status !== 'Completed') || ($pickupOutcome === 'not_picked_up' && $status !== 'Ready for Pickup')) {
+    sendJson(false, 'Pickup outcome does not match the requested order status.');
 }
 
 /* =========================
@@ -431,7 +805,7 @@ if (!$id || !in_array($status, $allowedStatuses, true)) {
 ========================= */
 try {
     $conn->begin_transaction();
-    $orderStmt = $conn->prepare("SELECT status, items, total, downpayment_amount, user_id, email, phone, payment, payment_status, payment_proof_path FROM orders WHERE id = ? LIMIT 1 FOR UPDATE");
+    $orderStmt = $conn->prepare("SELECT status, items, total, downpayment_amount, user_id, email, phone, payment, payment_status, payment_proof_path, delivery_date, pickup_outcome FROM orders WHERE id = ? LIMIT 1 FOR UPDATE");
     if (!$orderStmt) {
         throw new Exception("Order lookup failed");
     }
@@ -446,6 +820,51 @@ try {
     }
 
     $oldStatus = trim((string) ($orderRow['status'] ?? 'Pending'));
+    if ($pickupOutcome !== '') {
+        if ($oldStatus !== 'Ready for Pickup') {
+            throw new Exception('Pickup can only be recorded for an order that is Ready for Pickup.');
+        }
+
+        $scheduledDate = trim((string) ($orderRow['delivery_date'] ?? ''));
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $scheduledDate) || $scheduledDate === '0000-00-00') {
+            $customTable = $conn->query("SHOW TABLES LIKE 'custom_cake_orders'");
+            if ($customTable && $customTable->num_rows > 0) {
+                $scheduleStmt = $conn->prepare('SELECT delivery_date, notes FROM custom_cake_orders WHERE order_id = ? LIMIT 1');
+                if ($scheduleStmt) {
+                    $scheduleStmt->bind_param('i', $id);
+                    $scheduleStmt->execute();
+                    $customSchedule = $scheduleStmt->get_result()->fetch_assoc() ?: [];
+                    $scheduleStmt->close();
+                    $scheduledDate = trim((string) ($customSchedule['delivery_date'] ?? ''));
+                    if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $scheduledDate) || $scheduledDate === '0000-00-00') {
+                        $customDetails = json_decode((string) ($customSchedule['notes'] ?? ''), true);
+                        $scheduledDate = is_array($customDetails) ? trim((string) ($customDetails['pickup_date'] ?? '')) : '';
+                    }
+                }
+            }
+        }
+        if ($scheduledDate !== date('Y-m-d')) {
+            throw new Exception('Pickup outcome can only be recorded on the scheduled date.');
+        }
+
+        if ($pickupOutcome === 'not_picked_up') {
+            $pickupStmt = $conn->prepare("UPDATE orders SET pickup_outcome = 'not_picked_up', pickup_outcome_at = NOW() WHERE id = ?");
+            if (!$pickupStmt) {
+                throw new Exception('Unable to record pickup outcome.');
+            }
+            $pickupStmt->bind_param('i', $id);
+            if (!$pickupStmt->execute()) {
+                $pickupStmt->close();
+                throw new Exception('Unable to record pickup outcome.');
+            }
+            $pickupStmt->close();
+            $conn->commit();
+            publishRealtimeEvent($conn, 'order.updated', (int) ($orderRow['user_id'] ?? 0), $id);
+            $conn->close();
+            sendJson(true, 'Order marked as not picked up.', ['id' => $id, 'status' => $oldStatus, 'pickup_outcome' => 'not_picked_up']);
+        }
+    }
+
     $isGcashOrder = strtolower(trim((string) ($orderRow['payment'] ?? ''))) === 'gcash';
     $paymentStatus = strtolower(trim((string) ($orderRow['payment_status'] ?? 'pending')));
     if ($isGcashOrder && $status === 'Preparing' && !in_array($paymentStatus, ['paid', 'proof_submitted'], true)) {
@@ -576,6 +995,17 @@ try {
         }
     }
 
+    if (shouldDeductInventory($oldStatus, $status) && !orderIngredientsAlreadyDeducted($conn, $id)) {
+        $ingredientOrderLines = loadOrderItemsFromJson($itemsJson);
+        if (!$ingredientOrderLines) {
+            $ingredientOrderLines = loadLegacyOrderItems($conn, $id);
+        }
+        $ingredientRequirements = $isCustomCakeOrder
+            ? collectCustomCakeIngredientRequirements($conn, $id)
+            : collectOrderIngredientRequirements($conn, $ingredientOrderLines);
+        deductOrderIngredients($conn, $id, $ingredientRequirements, $currentUserId);
+    }
+
     if ($status === 'Cancelled' && $oldStatus !== 'Cancelled') {
         $movementStmt = $conn->prepare("SELECT product_id, quantity FROM product_inventory_movements WHERE movement_type = 'Order' AND reference_type = 'order' AND reference_id = ? FOR UPDATE");
         $movementStmt->bind_param('i', $id);
@@ -635,6 +1065,19 @@ try {
         throw new Exception("Update failed");
     }
     $stmt->close();
+
+    if ($pickupOutcome === 'picked_up') {
+        $pickupStmt = $conn->prepare("UPDATE orders SET pickup_outcome = 'picked_up', pickup_outcome_at = NOW() WHERE id = ?");
+        if (!$pickupStmt) {
+            throw new Exception('Unable to record pickup outcome.');
+        }
+        $pickupStmt->bind_param('i', $id);
+        if (!$pickupStmt->execute()) {
+            $pickupStmt->close();
+            throw new Exception('Unable to record pickup outcome.');
+        }
+        $pickupStmt->close();
+    }
 
     if ($status === 'Completed' && $oldStatus !== 'Completed') {
         awardLoyaltyPoints($conn, $loyaltyUserId, $id, floatval($orderRow['total'] ?? 0));
@@ -778,6 +1221,7 @@ try {
     sendJson(true, "Order updated", [
         "id" => $id,
         "status" => $status,
+        "pickup_outcome" => $pickupOutcome !== '' ? $pickupOutcome : ($orderRow['pickup_outcome'] ?? null),
         "sms_sent" => $smsResult['sent'],
         "sms_error" => $smsResult['error']
     ]);
@@ -786,6 +1230,6 @@ try {
         $conn->close();
     }
     error_log('api_update_order_status fatal: ' . $e->getMessage());
-    sendJson(false, "Unexpected server error");
+    sendJson(false, $e instanceof OrderPreparationException ? $e->getMessage() : "Unexpected server error");
 }
 ?>

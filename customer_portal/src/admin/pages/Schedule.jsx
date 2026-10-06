@@ -2,8 +2,13 @@ import React, { useEffect, useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight, ArrowLeft, X, CalendarDays } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { STAFF_BASE } from "../../services/config";
+import { getAuthHeaders } from "../../services/api";
 
-const staffFetch = (url) => fetch(url, { credentials: "include" });
+const staffFetch = (url, options = {}) => fetch(url, {
+  credentials: "include",
+  ...options,
+  headers: { ...getAuthHeaders(), ...(options.headers || {}) },
+});
 const ACCEPTED_ORDER_STATUSES = new Set(["confirmed", "preparing", "ready for pickup", "completed"]);
 
 function getDateKey(date) {
@@ -84,6 +89,8 @@ export default function Schedule() {
   const [month, setMonth] = useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1));
   const [loading, setLoading] = useState(true);
   const [todayKey, setTodayKey] = useState(() => getDateKey(new Date()));
+  const [pickupSubmitting, setPickupSubmitting] = useState(false);
+  const [pickupActionError, setPickupActionError] = useState("");
 
   useEffect(() => {
     const timer = window.setInterval(() => setTodayKey(getDateKey(new Date())), 60000);
@@ -98,7 +105,11 @@ export default function Schedule() {
       .finally(() => setLoading(false));
   }, []);
 
-  const acceptedOrders = useMemo(() => orders.filter(isAcceptedOrder), [orders]);
+  const acceptedOrders = useMemo(() => orders.filter((order) => {
+    if (!isAcceptedOrder(order)) return false;
+    const scheduledDate = getSchedule(order).date;
+    return scheduledDate && scheduledDate >= todayKey;
+  }), [orders, todayKey]);
   const upcomingOrders = useMemo(() => acceptedOrders
     .filter((order) => {
       const daysUntil = getDaysUntil(getSchedule(order).date, todayKey);
@@ -131,6 +142,35 @@ export default function Schedule() {
       bookedDays: new Set(scheduledOrders.map(({ schedule }) => schedule.date)).size,
     };
   }, [month, acceptedOrders]);
+
+  const updatePickupOutcome = async (outcome) => {
+    if (!selectedOrder) return;
+    setPickupSubmitting(true);
+    setPickupActionError("");
+    const status = outcome === "picked_up" ? "Completed" : "Ready for Pickup";
+
+    try {
+      const response = await staffFetch(`${STAFF_BASE}/api_update_order_status.php`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: selectedOrder.id, status, pickup_outcome: outcome }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !data.success) throw new Error(data.message || "Unable to save pickup outcome.");
+
+      const updatedOrder = { ...selectedOrder, status: data.status, pickup_outcome: data.pickup_outcome };
+      setSelectedOrder(updatedOrder);
+      setOrders((current) => current.map((order) => Number(order.id) === Number(updatedOrder.id) ? { ...order, ...updatedOrder } : order));
+      setSelectedDay((current) => current ? {
+        ...current,
+        orders: current.orders.map((order) => Number(order.id) === Number(updatedOrder.id) ? { ...order, ...updatedOrder } : order),
+      } : current);
+    } catch (error) {
+      setPickupActionError(error.message || "Unable to save pickup outcome.");
+    } finally {
+      setPickupSubmitting(false);
+    }
+  };
 
   const todayDate = new Date(`${todayKey}T00:00:00`);
   const todayLabel = todayDate.toLocaleDateString([], { weekday: "long", month: "long", day: "numeric", year: "numeric" });
@@ -339,6 +379,22 @@ export default function Schedule() {
                     </dl>
                   ) : <p className="mt-2 text-black/50">No cake details provided.</p>}
                 </div>
+                {schedule.date === todayKey && selectedOrder.status === "Ready for Pickup" && (
+                  <div className="rounded-lg border border-[#e9e1d9] bg-[#faf7f2] p-4">
+                    <h3 className="font-semibold text-black">Customer pickup</h3>
+                    <p className="mt-1 text-xs text-black/55">Record whether the customer collected this order today.</p>
+                    {selectedOrder.pickup_outcome && <p className="mt-2 text-xs font-semibold text-[#80600d]">Current result: {selectedOrder.pickup_outcome === "picked_up" ? "Picked up" : "Not picked up"}</p>}
+                    {pickupActionError && <p role="alert" className="mt-2 text-xs font-medium text-red-700">{pickupActionError}</p>}
+                    <div className="mt-3 grid grid-cols-2 gap-2">
+                      <button type="button" onClick={() => updatePickupOutcome("picked_up")} disabled={pickupSubmitting || selectedOrder.pickup_outcome === "picked_up"} className="h-10 rounded-md bg-[#33251e] px-3 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50">
+                        {pickupSubmitting ? "Saving..." : "Picked up"}
+                      </button>
+                      <button type="button" onClick={() => updatePickupOutcome("not_picked_up")} disabled={pickupSubmitting || selectedOrder.pickup_outcome === "not_picked_up"} className="h-10 rounded-md border border-[#e8dfd4] bg-white px-3 text-xs font-semibold text-[#65574d] disabled:cursor-not-allowed disabled:opacity-50">
+                        {pickupSubmitting ? "Saving..." : "Not picked up"}
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             </section>
           </div>

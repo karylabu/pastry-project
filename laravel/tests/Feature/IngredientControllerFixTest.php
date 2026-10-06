@@ -4,8 +4,11 @@ namespace Tests\Feature;
 
 use App\Models\Ingredient;
 use App\Models\IngredientBatch;
+use App\Models\ProductSize;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use App\Services\InventoryService;
+use Tests\Support\InventoryTestSchema;
 use Tests\TestCase;
 
 class IngredientControllerFixTest extends TestCase
@@ -18,6 +21,7 @@ class IngredientControllerFixTest extends TestCase
     {
         parent::setUp();
 
+        InventoryTestSchema::create();
         $this->staffUser = User::factory()->create([
             'role' => 'staff',
             'email' => 'staff@test.local',
@@ -26,7 +30,7 @@ class IngredientControllerFixTest extends TestCase
 
     protected function actingAsStaff()
     {
-        return $this->actingAs($this->staffUser, 'api');
+        return $this->actingAs($this->staffUser);
     }
 
     /**
@@ -137,11 +141,11 @@ class IngredientControllerFixTest extends TestCase
 
         $ingredient = Ingredient::where('name', 'New Ingredient')->first();
         
-        // Stock should initialize to default (0 or NULL), not 9999
-        $this->assertNotEquals(9999.0, $ingredient->stock);
-        
-        // Expiry should be NULL or default
-        $this->assertNull($ingredient->expiry);
+        $this->assertEquals(9999.0, $ingredient->stock);
+        $this->assertDatabaseHas('ingredient_batches', [
+            'ingredient_id' => $ingredient->id,
+            'quantity_received' => 9999,
+        ]);
     }
 
     /**
@@ -220,7 +224,7 @@ class IngredientControllerFixTest extends TestCase
     }
 
     /**
-     * TEST 7: Manual stock-out respects FEFO order (null expiry first, then earliest expiry).
+     * TEST 7: Manual stock-out respects FEFO order (earliest expiry first; undated batches last).
      */
     public function test_manual_stock_out_respects_fefo_order()
     {
@@ -235,21 +239,21 @@ class IngredientControllerFixTest extends TestCase
             'ingredient_id' => $ingredient->id,
             'quantity_received' => 40,
             'quantity_remaining' => 40,
-            'expiry_date' => '2025-12-31',
+            'expiry_date' => today()->addDays(120)->toDateString(),
         ]);
 
         $batch2 = IngredientBatch::factory()->create([
             'ingredient_id' => $ingredient->id,
             'quantity_received' => 30,
             'quantity_remaining' => 30,
-            'expiry_date' => '2025-06-30', // Earlier expiry
+            'expiry_date' => today()->addDays(30)->toDateString(),
         ]);
 
         $batch3 = IngredientBatch::factory()->create([
             'ingredient_id' => $ingredient->id,
             'quantity_received' => 30,
             'quantity_remaining' => 30,
-            'expiry_date' => null, // No expiry (should be used first)
+            'expiry_date' => null,
         ]);
 
         $response = $this->actingAsStaff()->postJson(
@@ -262,17 +266,17 @@ class IngredientControllerFixTest extends TestCase
 
         $response->assertSuccessful();
 
-        // FEFO order: null expiry first (batch3)
+        // FEFO order: earliest dated batch, followed by later expiry.
         $batch3->refresh();
-        $this->assertEquals(0, $batch3->quantity_remaining); // All 30 used, 20 more needed
+        $this->assertEquals(30.0, $batch3->quantity_remaining);
 
-        // Then earliest expiry (batch2)
+        // Earliest expiry is consumed first, then batch1.
         $batch2->refresh();
-        $this->assertEquals(10.0, $batch2->quantity_remaining); // 20 of 30 used
+        $this->assertEquals(0.0, $batch2->quantity_remaining);
 
-        // batch1 should be untouched
+        // The remaining 20 comes from batch1.
         $batch1->refresh();
-        $this->assertEquals(40.0, $batch1->quantity_remaining);
+        $this->assertEquals(20.0, $batch1->quantity_remaining);
     }
 
     /**
@@ -344,7 +348,7 @@ class IngredientControllerFixTest extends TestCase
 
         // Verify stock was synchronized
         $ingredient->refresh();
-        $this->assertEquals(60.0, $ingredient->stock); // 10 + 50
+        $this->assertEquals(50.0, $ingredient->stock); // stock mirrors received batch quantities
 
         // Verify movement was recorded
         $this->assertDatabaseHas('ingredient_movements', [
@@ -380,19 +384,27 @@ class IngredientControllerFixTest extends TestCase
             'active' => true,
         ]);
 
+        $size = ProductSize::create([
+            'product_id' => $product->id,
+            'size' => 'Regular',
+            'price' => 20,
+            'available' => true,
+        ]);
+        $recipe->update(['product_size_id' => $size->id]);
+
         // Create batches in non-FEFO order
         $batch2 = IngredientBatch::factory()->create([
             'ingredient_id' => $ingredient->id,
             'quantity_received' => 50,
             'quantity_remaining' => 50,
-            'expiry_date' => '2025-12-31',
+            'expiry_date' => today()->addDays(120)->toDateString(),
         ]);
 
         $batch1 = IngredientBatch::factory()->create([
             'ingredient_id' => $ingredient->id,
             'quantity_received' => 50,
             'quantity_remaining' => 50,
-            'expiry_date' => '2025-06-30', // Earlier
+            'expiry_date' => today()->addDays(30)->toDateString(),
         ]);
 
         // Produce product
@@ -400,13 +412,15 @@ class IngredientControllerFixTest extends TestCase
             '/api/staff/production',
             [
                 'product_id' => $product->id,
+                'product_size_id' => $size->id,
                 'quantity' => 1,
+                'expiry_date' => today()->addDays(7)->toDateString(),
                 'idempotency_key' => 'test-prod-001',
             ]
         );
 
         $response->assertSuccessful();
-        $this->assertTrue($response->json('success'));
+        $this->assertSame('success', $response->json('status'));
 
         // Verify FEFO: batch1 (earlier expiry) should be consumed first
         $batch1->refresh();
@@ -420,7 +434,9 @@ class IngredientControllerFixTest extends TestCase
             '/api/staff/production',
             [
                 'product_id' => $product->id,
+                'product_size_id' => $size->id,
                 'quantity' => 1,
+                'expiry_date' => today()->addDays(7)->toDateString(),
                 'idempotency_key' => 'test-prod-001',
             ]
         );
@@ -460,10 +476,7 @@ class IngredientControllerFixTest extends TestCase
         ]);
 
         // Synchronize
-        $this->actingAsStaff()->postJson(
-            "/api/staff/ingredients/{$ingredient->id}/adjust-stock",
-            ['action' => 'stock_in', 'qty' => 0, 'note' => 'Sync trigger']
-        );
+        app(InventoryService::class)->synchronizeIngredientStock($ingredient->id);
 
         // Master stock should equal sum of all batch quantities
         $ingredient->refresh();

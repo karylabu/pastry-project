@@ -57,3 +57,25 @@ If you discover a security vulnerability within Laravel, please send an e-mail t
 ## License
 
 The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+
+## Sales CSV imports
+
+CSV sales reports are stored privately and processed by the database queue in batches of 1,000 rows. Exact file retries are rejected by a SHA-256 fingerprint. Each file is limited to 50 MB and 250,000 data rows; split larger reports before uploading. The import status endpoint reports queued/processing/completed/failed state and row progress.
+
+Run migrations, configure `QUEUE_CONNECTION=database`, and keep a queue worker running:
+
+```powershell
+php artisan migrate --force
+php artisan queue:work database --queue=default --timeout=900 --tries=3
+```
+
+The database queue's `retry_after` must remain higher than the worker timeout (the application default is 1,200 seconds). Configure PHP's `upload_max_filesize` and `post_max_size` to at least 50 MB. The queue worker must use the same database and local storage volume as the web application. In production, supervise the worker so it restarts after failures and deployments.
+
+## Production deployment checklist
+
+- Configure the production `.env` with `APP_ENV=production`, `APP_DEBUG=false`, the HTTPS `APP_URL`, a generated `APP_KEY`, and the production database credentials. Do not deploy a development `.env` or commit it.
+- Set `QUEUE_CONNECTION=database` and `CORS_ALLOWED_ORIGINS` to the exact frontend origin(s), comma-separated, when the frontend is hosted on a different origin. Keep credentials enabled; do not use `*` for credentialed CORS.
+- Build the customer portal with `REACT_APP_LARAVEL_BASE` set to the public Laravel API base URL if it differs from the default same-origin `/laravel/public` path. Frontend `REACT_APP_*` values are embedded at build time and must not contain secrets.
+- Point the web server's document root at the project entry point or configure the root `.htaccess` rewrite rules for the chosen project path. The Laravel `public` directory should not be exposed as a separate public document root unless the frontend URLs are configured to match it.
+- Load the application's existing core database schema before running Laravel migrations; most legacy business tables are managed outside Laravel's migration history. Back up the database before migrating.
+- Run `php artisan config:cache` after setting production environment values, then restart the application and its supervised queue worker. Confirm the worker can read the same private storage volume used by web requests.

@@ -10,7 +10,6 @@ const defaultPreferences = {
   shopPhone: "",
   shopAddress: "",
   openingHours: "08:00 - 20:00",
-  deliveryFee: "0",
   minimumOrder: "0",
   preparationTime: "30",
   lowStockThreshold: "5",
@@ -185,7 +184,6 @@ export default function Settings() {
 
             <Section icon={Clock3} eyebrow="Operations" title="Order and inventory rules" className="h-full xl:col-span-2">
               <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                <Field label="Delivery fee" type="number" value={preferences.deliveryFee} onChange={(e) => updatePreference("deliveryFee", e.target.value)} />
                 <Field label="Minimum order" type="number" value={preferences.minimumOrder} onChange={(e) => updatePreference("minimumOrder", e.target.value)} />
                 <Field label="Prep. minutes" type="number" value={preferences.preparationTime} onChange={(e) => updatePreference("preparationTime", e.target.value)} />
                 <Field label="Low-stock threshold" type="number" value={preferences.lowStockThreshold} onChange={(e) => updatePreference("lowStockThreshold", e.target.value)} />

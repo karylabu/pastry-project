@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\AdminNotification;
 use App\Models\CakeFlavor;
 use App\Models\CakeSize;
 use App\Models\CakeRecipe;
@@ -386,6 +387,20 @@ class CustomizedCakeController extends Controller
                     'type' => 'Info',
                     'action_url' => '/customer/orders',
                     'is_read' => 0,
+                    'created_at' => now(),
+                ]);
+            }
+            if ($linkedOrderId) {
+                AdminNotification::notifyRoles(['admin'], [
+                    'type' => 'custom_cake_order',
+                    'title' => "New custom cake request #{$linkedOrderId}",
+                    'message' => "{$user->name} submitted a custom cake request.",
+                    'data' => [
+                        'order_id' => (int) $linkedOrderId,
+                        'customized_cake_order_id' => (int) $customizedCakeOrderId,
+                    ],
+                    'action_url' => '/admin/custom-cakes',
+                    'is_read' => false,
                     'created_at' => now(),
                 ]);
             }

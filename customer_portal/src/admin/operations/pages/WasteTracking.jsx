@@ -68,11 +68,12 @@ function formatPeso(value) {
 
 // Enriches an API log entry with catalogue display metadata.
 function enrich(entry, catalogue) {
-  const meta = catalogue.find((c) => c.name === entry.item) || { unit: "kg", unitCost: 0, type: "Raw Material" };
+  const type = entry.type || 'Raw Material';
+  const defaultUnit = type === 'Finished Product' ? 'pcs' : 'kg';
+  const meta = catalogue.find((c) => c.name === entry.item) || { unit: defaultUnit, unitCost: 0, type };
   const unitCost = entry.unit_cost ?? meta.unitCost;
   const cost = entry.cost ?? entry.qty * unitCost;
-  const type = entry.type ?? meta.type;
-  return { ...entry, unit: meta.unit, type, unitCost, cost };
+  return { ...entry, unit: entry.unit || meta.unit, type, unitCost, cost };
 }
 
 /* ------------------------------------------------------------------ */
@@ -83,7 +84,7 @@ export default function WasteTracking() {
   const [entries, setEntries] = useState([]);
   const [catalogue, setCatalogue] = useState([]);
   const [completedOrders, setCompletedOrders] = useState([]);
-  const [range, setRange] = useState("weekly"); // daily | weekly | monthly
+  const [range, setRange] = useState("all"); // all | daily | weekly | monthly
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState({
     item: "",
@@ -148,6 +149,7 @@ export default function WasteTracking() {
   );
 
   const periodStart = useMemo(() => {
+    if (range === 'all') return new Date(0);
     const start = new Date();
     start.setHours(0, 0, 0, 0);
     if (range === 'weekly') {
@@ -158,7 +160,7 @@ export default function WasteTracking() {
     return start;
   }, [range]);
 
-  const periodLabel = range === 'daily' ? 'today' : range === 'weekly' ? 'this week' : 'this month';
+  const periodLabel = range === 'all' ? 'all time' : range === 'daily' ? 'today' : range === 'weekly' ? 'this week' : 'this month';
 
   const periodEntries = useMemo(
     () => enrichedEntries.filter((entry) => {
@@ -340,6 +342,7 @@ export default function WasteTracking() {
                   aria-label="Waste reporting period"
                   className="h-10 appearance-none rounded-md border border-[#e8dfd4] bg-white pl-3 pr-9 text-[12px] font-semibold text-[#33251e] outline-none focus:border-[#b89646] focus:ring-2 focus:ring-[#d4af37]/15"
                 >
+                  <option value="all">All Time</option>
                   <option value="daily">Daily</option>
                   <option value="weekly">Weekly</option>
                   <option value="monthly">Monthly</option>
@@ -365,7 +368,8 @@ export default function WasteTracking() {
             <div className="rounded-lg border border-t-[3px] bg-white p-4" style={{ borderColor: C.border, borderTopColor: C.red }}>
               <div className="flex items-center justify-between gap-2"><p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-black/55">Total financial loss</p><DollarSign size={16} className="text-[#b55f52]" /></div>
               <p className="mt-3 text-[24px] font-bold leading-none text-black">{formatPeso(totalFinancialLoss)}</p>
-              <p className="mt-2 text-[10px] text-black/55">Quantity lost × unit cost · {periodLabel}</p>
+              <p className="mt-2 text-[10px] text-black/55">Quantity lost × estimated / recorded unit cost · {periodLabel}</p>
+              <p className="mt-1 text-[10px] text-[#8a6208]">Reference prices are estimates; use supplier purchase costs for exact loss values.</p>
             </div>
             <div className="rounded-lg border border-t-[3px] bg-white p-4" style={{ borderColor: C.border, borderTopColor: C.amber }}>
               <div className="flex items-center justify-between gap-2"><p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-black/55">Highest waste contributor</p><TrendingUp size={16} className="text-[#c87954]" /></div>

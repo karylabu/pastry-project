@@ -15,16 +15,17 @@ class WasteLogController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
-        if ($response = $this->authorizeAdmin($request)) return $response;
+        if ($response = $this->authorizeOperationalStaff($request)) return $response;
 
         $entries = WasteLog::query()->with(['ingredient:id,name,unit', 'batch:id,batch_number'])
-            ->where('item_type', 'Raw Material')->orderByDesc('datetime')->get()
+            ->orderByDesc('datetime')->get()
             ->map(fn (WasteLog $waste) => [
                 'id' => (int) $waste->id, 'datetime' => $waste->datetime,
                 'item' => $waste->item, 'qty' => (float) $waste->qty,
                 'unit_cost' => (float) $waste->unit_cost,
                 'cost' => round((float) $waste->qty * (float) $waste->unit_cost, 2),
                 'type' => $waste->item_type, 'reason' => $waste->reason,
+                'unit' => $waste->ingredient?->unit ?? ($waste->item_type === 'Finished Product' ? 'pcs' : 'kg'),
                 'ingredient_id' => $waste->ingredient_id, 'ingredient_batch_id' => $waste->ingredient_batch_id,
             ]);
 
@@ -33,7 +34,7 @@ class WasteLogController extends Controller
 
     public function catalogue(Request $request, InventoryService $inventory): JsonResponse
     {
-        if ($response = $this->authorizeAdmin($request)) return $response;
+        if ($response = $this->authorizeOperationalStaff($request)) return $response;
         $items = Ingredient::query()->with('batches.discardRequests')->orderBy('name')->get()->map(function (Ingredient $ingredient) use ($inventory) {
             return $ingredient->batches->map(fn ($batch) => [
                 'id' => (int) $ingredient->id,
@@ -54,7 +55,7 @@ class WasteLogController extends Controller
 
     public function store(CreateWasteRequest $request, InventoryService $inventory): JsonResponse
     {
-        if ($response = $this->authorizeAdmin($request)) return $response;
+        if ($response = $this->authorizeOperationalStaff($request)) return $response;
         try {
             $user = $this->getAuthenticatedUser($request);
             $waste = $inventory->recordWaste($request->validated(), (int) $user->id);
@@ -67,13 +68,5 @@ class WasteLogController extends Controller
         } catch (Throwable $exception) {
             return response()->json(['success' => false, 'message' => $exception->getMessage()], 409);
         }
-    }
-
-    private function authorizeAdmin(Request $request): ?JsonResponse
-    {
-        $user = $this->getAuthenticatedUser($request);
-        if (!$user) return response()->json(['success' => false, 'message' => 'Admin authorization required.'], 401);
-        if ($user->role !== 'admin') return response()->json(['success' => false, 'message' => 'Admin authorization required.'], 403);
-        return null;
     }
 }

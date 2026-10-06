@@ -1,4 +1,4 @@
-import { getAuth, GoogleAuthProvider, signInWithPopup } from "firebase/auth";
+import { getAdditionalUserInfo, getAuth, GoogleAuthProvider, signInWithPopup } from "firebase/auth";
 import { initializeApp } from "firebase/app";
 
 const firebaseConfig = {
@@ -12,17 +12,44 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const provider = new GoogleAuthProvider();
+provider.addScope("profile");
 provider.setCustomParameters({ prompt: "select_account" });
 
 export async function signInWithGoogle() {
   const result = await signInWithPopup(auth, provider);
   const idToken = await result.user.getIdToken();
+  const googleProvider = result.user.providerData.find(({ providerId }) => providerId === "google.com");
+  const additionalProfile = getAdditionalUserInfo(result)?.profile;
+  const googleCredential = GoogleAuthProvider.credentialFromResult(result);
+  let googleProfilePhoto = "";
+
+  if (googleCredential?.accessToken) {
+    try {
+      const profileResponse = await fetch("https://www.googleapis.com/oauth2/v2/userinfo", {
+        headers: { Authorization: `Bearer ${googleCredential.accessToken}` },
+      });
+      if (profileResponse.ok) {
+        const profile = await profileResponse.json();
+        googleProfilePhoto = typeof profile.picture === "string" ? profile.picture : "";
+      } else {
+        console.warn("Google profile photo lookup failed:", profileResponse.status);
+      }
+    } catch (error) {
+      console.warn("Google profile photo lookup failed:", error);
+    }
+  }
+
+  const photoURL =
+    googleProfilePhoto ||
+    result.user.photoURL ||
+    googleProvider?.photoURL ||
+    (typeof additionalProfile?.picture === "string" ? additionalProfile.picture : "");
 
   return {
     idToken,
     user: result.user,
     email: result.user.email || "",
     name: result.user.displayName || "Google User",
-    photoURL: result.user.photoURL || "",
+    photoURL,
   };
 }

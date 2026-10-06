@@ -1,5 +1,4 @@
 import React, { useCallback, useRef, useState } from 'react';
-import Papa from 'papaparse';
 import { motion, AnimatePresence } from 'framer-motion';
 import { UploadCloud, FileSpreadsheet, FileText, CheckCircle2, AlertCircle, X, Download, Loader2 } from 'lucide-react';
 import { LARAVEL_BASE } from '../../../services/config';
@@ -33,107 +32,6 @@ function authHeaders(extraHeaders = {}) {
   };
 }
 
-/* ─────────────────────────────────────────
-   CSV COLUMN MAPPING
-   ─────────────────────────────────────────
-   Accepts a handful of common header spellings so a
-   non-technical staff member's export doesn't break the
-   import just because they used "Product" instead of
-   "item_name". First matching alias wins.
-───────────────────────────────────────── */
-const COLUMN_ALIASES = {
-  name:     ['item_name', 'product_name', 'product', 'item', 'name'],
-  quantity: ['quantity', 'qty', 'units', 'units_sold'],
-  price:    ['price', 'unit_price', 'unit_cost'],
-  total:    ['total_amount', 'total', 'amount', 'line_total', 'gross_amount'],
-};
-
-const REQUIRED_GROUPS = [
-  ['name'],
-  // Either an explicit total column, OR both quantity + price so we can derive it.
-];
-
-function normalizeHeader(h) {
-  return String(h || '').trim().toLowerCase().replace(/\s+/g, '_');
-}
-
-function buildHeaderIndex(headers) {
-  const normalized = headers.map(normalizeHeader);
-  const index = {};
-  Object.entries(COLUMN_ALIASES).forEach(([field, aliases]) => {
-    const pos = normalized.findIndex(h => aliases.includes(h));
-    if (pos !== -1) index[field] = headers[pos];
-  });
-  return index;
-}
-
-function toNumber(val) {
-  if (val === null || val === undefined || val === '') return NaN;
-  const cleaned = String(val).replace(/[₱,\s]/g, '');
-  const n = Number(cleaned);
-  return n;
-}
-
-/**
- * Parses a papaparse result into clean sales rows.
- * Returns { rows, skipped, duplicates, errors } — never throws.
- * Malformed / incomplete rows are dropped, not fatal.
- */
-function extractSalesRows(data, headers) {
-  const colIndex = buildHeaderIndex(headers);
-  const missingRequired = REQUIRED_GROUPS.flat().filter(f => !colIndex[f]);
-  const hasTotal = !!colIndex.total;
-  const hasQtyPrice = !!colIndex.quantity && !!colIndex.price;
-
-  if (missingRequired.length || (!hasTotal && !hasQtyPrice)) {
-    return {
-      rows: [],
-      skipped: data.length,
-      duplicates: 0,
-      errors: [
-        `CSV is missing required columns. Found headers: ${headers.join(', ') || '(none)'}. ` +
-        `Need at least a product name column, plus either a total-amount column or both quantity and price columns.`,
-      ],
-    };
-  }
-
-  const seen = new Set();
-  const rows = [];
-  let skipped = 0;
-  let duplicates = 0;
-
-  data.forEach((raw) => {
-    const name = String(raw[colIndex.name] || '').trim();
-    const qty = colIndex.quantity ? toNumber(raw[colIndex.quantity]) : NaN;
-    const price = colIndex.price ? toNumber(raw[colIndex.price]) : NaN;
-    let total = colIndex.total ? toNumber(raw[colIndex.total]) : NaN;
-
-    if (!name) { skipped++; return; }
-
-    // Derive whichever figure is missing.
-    const validQty = Number.isFinite(qty) && qty > 0 ? qty : null;
-    if (!Number.isFinite(total) && validQty && Number.isFinite(price)) {
-      total = validQty * price;
-    }
-    const finalQty = validQty || (Number.isFinite(total) && Number.isFinite(price) && price > 0
-      ? Math.round(total / price)
-      : (Number.isFinite(total) ? 1 : null)); // fall back to "1 line item" if qty truly unknown
-
-    if (!Number.isFinite(total) || total < 0 || !finalQty) {
-      skipped++;
-      return;
-    }
-
-    const dedupeKey = `${name.toLowerCase()}|${finalQty}|${total.toFixed(2)}`;
-    if (seen.has(dedupeKey)) { duplicates++; return; }
-    seen.add(dedupeKey);
-
-    rows.push({ name, quantity: finalQty, total: Number(total.toFixed(2)) });
-  });
-
-  return { rows, skipped, duplicates, errors: [] };
-}
-
 const ACCEPTED_EXTENSIONS = ['.csv', '.pdf'];
 
 function validateFile(file) {
@@ -141,17 +39,18 @@ function validateFile(file) {
   if (!ACCEPTED_EXTENSIONS.includes(ext)) {
     return `"${file.name}" isn't a supported file type. Please upload a .csv or .pdf file.`;
   }
-  if (file.size > 15 * 1024 * 1024) {
-    return `"${file.name}" is larger than 15MB. Please split large reports into smaller files.`;
+  const maxSize = ext === '.csv' ? 50 : 15;
+  if (file.size > maxSize * 1024 * 1024) {
+    return `"${file.name}" is larger than ${maxSize}MB. Please split large reports into smaller files.`;
   }
   return null;
 }
 
 function downloadCsvTemplate() {
-  const headers = ['item_name', 'quantity', 'price', 'total_amount'];
+  const headers = ['sale_date', 'item_name', 'quantity', 'price', 'total_amount'];
   const sample = [
-    ['Chocolate Croissant', '12', '95', '1140'],
-    ['Sourdough Loaf', '6', '180', '1080'],
+    ['2026-09-01', 'Chocolate Croissant', '12', '95', '1140'],
+    ['2026-09-02', 'Sourdough Loaf', '6', '180', '1080'],
   ];
   const csv = [headers, ...sample].map(r => r.join(',')).join('\n');
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
@@ -168,26 +67,20 @@ function downloadCsvTemplate() {
 /* ─────────────────────────────────────────
    MAIN COMPONENT
    ─────────────────────────────────────────
-   Usage from Reports.jsx:
-
-     <SalesImportDropzone
-       onImportComplete={({ itemsSold, revenue, rows }) => {
-         setImportedRevenue(r => r + revenue);
-         setImportedItems(i => i + itemsSold);
-       }}
-     />
-
-   The component deliberately does NOT touch Reports.jsx's
-   own `orders`-derived totals — it reports a delta upward
-   via onImportComplete so the parent decides how imported
-   figures combine with live order data (e.g. a separate
-   "Imported Sales" card, or merged into the same KPI).
+   CSV files are uploaded unchanged and processed by the server queue.
+   PDF parsing remains synchronous.
 ───────────────────────────────────────── */
 export default function SalesImportDropzone({ onImportComplete, compact = false }) {
   const [isDragging, setIsDragging] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [salesType, setSalesType] = useState('other');
   const [toast, setToast] = useState(null); // { type: 'success' | 'error', message }
   const inputRef = useRef(null);
+  const salesTypeRef = useRef('other');
+  const chooseSalesType = (type) => {
+    salesTypeRef.current = type;
+    setSalesType(type);
+  };
 
   const showToast = useCallback((type, message) => {
     setToast({ type, message });
@@ -195,67 +88,82 @@ export default function SalesImportDropzone({ onImportComplete, compact = false 
     showToast._t = window.setTimeout(() => setToast(null), 6000);
   }, []);
 
-  const handleCsvFile = useCallback((file) => {
-    Papa.parse(file, {
-      header: true,
-      skipEmptyLines: true,
-      complete: async (result) => {
-        const headers = result.meta?.fields || [];
-        const { rows, skipped, duplicates, errors } = extractSalesRows(result.data, headers);
+  const handleCsvFile = useCallback(async (file) => {
+    try {
+      const uploadCsv = async (retryFailed = false) => {
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('sales_type', salesTypeRef.current);
+        if (retryFailed) formData.append('retry_failed', '1');
+        const response = await fetch(`${LARAVEL_BASE}/api/sales/import-csv`, {
+          method: 'POST',
+          credentials: 'include',
+          headers: authHeaders(),
+          body: formData,
+        });
+        return { response, payload: await response.json().catch(() => ({})) };
+      };
+      let { response, payload } = await uploadCsv();
+      if (response.status === 409 && payload.status === 'failed') {
+        ({ response, payload } = await uploadCsv(true));
+      }
+      if (!response.ok || !payload.success) {
+        throw new Error(payload.message || 'Unable to queue the CSV import.');
+      }
 
-        if (errors.length) {
-          setIsProcessing(false);
-          showToast('error', errors[0]);
-          return;
+      setToast({ type: 'success', message: `${file.name} uploaded; waiting for background processing...` });
+      let status = payload.status;
+      let result;
+      if (status === 'completed') {
+        const statusResponse = await fetch(`${LARAVEL_BASE}/api/sales/import/${payload.import_id}/status`, {
+          credentials: 'include',
+          headers: authHeaders(),
+        });
+        const statusPayload = await statusResponse.json().catch(() => ({}));
+        if (!statusResponse.ok || !statusPayload.success) {
+          throw new Error(statusPayload.message || 'Unable to check the existing import.');
         }
-        if (rows.length === 0) {
-          setIsProcessing(false);
-          showToast('error', 'No valid sales rows found in that CSV. Check the column headers against the template.');
-          return;
+        result = statusPayload.import;
+      }
+      for (let attempt = 0; attempt < 900 && status !== 'completed' && status !== 'failed'; attempt++) {
+        await new Promise((resolve) => window.setTimeout(resolve, 1000));
+        const statusResponse = await fetch(`${LARAVEL_BASE}/api/sales/import/${payload.import_id}/status`, {
+          credentials: 'include',
+          headers: authHeaders(),
+        });
+        const statusPayload = await statusResponse.json().catch(() => ({}));
+        if (!statusResponse.ok || !statusPayload.success) {
+          throw new Error(statusPayload.message || 'Unable to check CSV import progress.');
         }
+        result = statusPayload.import;
+        status = result.status;
+        if (status === 'processing') {
+          setToast({ type: 'success', message: `Importing ${file.name}: ${result.rows_processed.toLocaleString()} rows processed...` });
+        }
+      }
 
-        const itemsSold = rows.reduce((s, r) => s + r.quantity, 0);
-        const revenue = rows.reduce((s, r) => s + r.total, 0);
+      if (status !== 'completed') {
+        throw new Error(result?.message || (status === 'failed'
+          ? 'CSV import failed. Check the file format and try again.'
+          : 'CSV import is still processing. Check the import history again shortly.'));
+      }
 
-        try {
-          const res = await fetch(`${LARAVEL_BASE}/api/sales/import`, {
-            method: 'POST',
-            credentials: 'include',
-            headers: authHeaders({ 'Content-Type': 'application/json' }),
-            body: JSON.stringify({ file_name: file.name, rows }),
-          });
-          const payload = await res.json().catch(() => ({}));
-          if (!res.ok || !payload.success) {
-            throw new Error(payload.message || 'Unable to save imported sales.');
-          }
-        } catch (err) {
-          setIsProcessing(false);
-          showToast('error', err.message || 'Unable to save imported sales.');
-          return;
-        }
-
-        setIsProcessing(false);
-        let message = `Successfully imported ${itemsSold} items, adding ₱${revenue.toLocaleString(undefined, { maximumFractionDigits: 2 })} to total revenue.`;
-        if (skipped || duplicates) {
-          const notes = [];
-          if (skipped) notes.push(`${skipped} row${skipped === 1 ? '' : 's'} skipped (incomplete)`);
-          if (duplicates) notes.push(`${duplicates} duplicate${duplicates === 1 ? '' : 's'} ignored`);
-          message += ` (${notes.join(', ')}.)`;
-        }
-        showToast('success', message);
-        onImportComplete?.({ itemsSold, revenue, rows, source: 'csv' });
-      },
-      error: (err) => {
-        setIsProcessing(false);
-        showToast('error', `Couldn't read that CSV: ${err.message}`);
-      },
-    });
+      const itemsSold = Number(result.items_sold || 0);
+      const revenue = Number(result.revenue || 0);
+      setIsProcessing(false);
+      showToast('success', `Imported ${result.rows_processed.toLocaleString()} of ${result.rows_received.toLocaleString()} rows: ${itemsSold.toLocaleString()} items and ₱${revenue.toLocaleString(undefined, { maximumFractionDigits: 2 })} revenue.`);
+      onImportComplete?.({ itemsSold, revenue, source: 'csv', importId: payload.import_id, salesType: result.sales_type });
+    } catch (error) {
+      setIsProcessing(false);
+      showToast('error', error.message || 'Unable to import the CSV.');
+    }
   }, [onImportComplete, showToast]);
 
   const handlePdfFile = useCallback(async (file) => {
     try {
       const formData = new FormData();
       formData.append('file', file);
+      formData.append('sales_type', salesTypeRef.current);
 
       const res = await fetch(`${LARAVEL_BASE}/api/sales/import-pdf`, {
         method: 'POST',
@@ -281,7 +189,7 @@ export default function SalesImportDropzone({ onImportComplete, compact = false 
         message += ` (${warnings.length} line${warnings.length === 1 ? '' : 's'} could not be parsed and were skipped.)`;
       }
       showToast('success', message);
-      onImportComplete?.({ itemsSold, revenue, rows, source: 'pdf' });
+      onImportComplete?.({ itemsSold, revenue, rows, source: 'pdf', salesType: salesTypeRef.current });
     } catch (err) {
       setIsProcessing(false);
       showToast('error', `Couldn't reach the import service: ${err.message}`);
@@ -316,16 +224,23 @@ export default function SalesImportDropzone({ onImportComplete, compact = false 
 
   if (compact) {
     return (
-      <div className="flex flex-col gap-1.5">
+      <div className="flex flex-wrap gap-2">
         <input ref={inputRef} type="file" accept=".csv,.pdf" className="hidden" onChange={onInputChange} />
-        <button type="button" onClick={() => inputRef.current?.click()} disabled={isProcessing} className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-md border border-black/15 bg-white px-3 text-[11px] font-semibold text-black transition hover:bg-[#fff4cd] disabled:cursor-wait disabled:opacity-60">
+        <button type="button" onClick={() => { chooseSalesType('customized_cake'); inputRef.current?.click(); }} disabled={isProcessing} className="inline-flex h-10 min-w-[150px] flex-1 items-center justify-center gap-2 rounded-md bg-black px-3 text-[11px] font-semibold text-white transition hover:bg-black/85 disabled:cursor-wait disabled:opacity-60">
           {isProcessing ? <Loader2 size={14} className="animate-spin" /> : <UploadCloud size={14} />}
-          {isProcessing ? 'Importing report...' : 'Import sales report'}
+          {isProcessing ? 'Importing report...' : 'Import Customized Cake Sales'}
         </button>
-        <button type="button" onClick={downloadCsvTemplate} className="h-8 w-full rounded-md border border-[#d4af37]/50 bg-[#fff4cd] px-3 text-[10px] font-semibold text-black transition hover:bg-[#d4af37]">Download CSV template</button>
+        <button type="button" onClick={() => { chooseSalesType('finished_product'); inputRef.current?.click(); }} disabled={isProcessing} className="inline-flex h-10 min-w-[150px] flex-1 items-center justify-center gap-2 rounded-md bg-black px-3 text-[11px] font-semibold text-white transition hover:bg-black/85 disabled:cursor-wait disabled:opacity-60">
+          {isProcessing ? <Loader2 size={14} className="animate-spin" /> : <UploadCloud size={14} />}
+          {isProcessing ? 'Importing report...' : 'Import Finished Product Sales'}
+        </button>
+        <button type="button" onClick={downloadCsvTemplate} className="inline-flex h-10 min-w-[150px] flex-1 items-center justify-center gap-2 rounded-md bg-black px-3 text-[11px] font-semibold text-white transition hover:bg-black/85">
+          <Download size={14} />
+          Download CSV template
+        </button>
         <AnimatePresence>
           {toast && (
-            <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} className="flex items-start gap-2 rounded-md px-3 py-2 text-[10px]" style={{ background: toast.type === 'success' ? C.emeraldSoft : C.redSoft, color: '#000000' }}>
+            <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} className="flex basis-full items-start gap-2 rounded-md px-3 py-2 text-[10px]" style={{ background: toast.type === 'success' ? C.emeraldSoft : C.redSoft, color: '#000000' }}>
               {toast.type === 'success' ? <CheckCircle2 size={14} className="mt-0.5 shrink-0" /> : <AlertCircle size={14} className="mt-0.5 shrink-0" />}
               <span className="flex-1">{toast.message}</span>
               <button type="button" onClick={() => setToast(null)} aria-label="Dismiss import message"><X size={13} /></button>
@@ -341,7 +256,7 @@ export default function SalesImportDropzone({ onImportComplete, compact = false 
       <div className="flex items-center justify-between mb-4">
         <div>
           <h3 className="text-base font-bold" style={{ color: C.ink }}>Import External Sales Report</h3>
-          <p className="text-xs mt-0.5" style={{ color: C.sub }}>Upload a CSV or PDF report to add its sales into today's totals.</p>
+          <p className="text-xs mt-0.5" style={{ color: C.sub }}>Upload a CSV or PDF report to add dated sales to shared reports and forecasts.</p>
         </div>
         <button
           onClick={downloadCsvTemplate}
@@ -350,6 +265,18 @@ export default function SalesImportDropzone({ onImportComplete, compact = false 
           <Download size={13} />
           Download CSV template
         </button>
+      </div>
+
+      <div className="mb-3 flex flex-wrap gap-2" role="group" aria-label="Sales type for import">
+        {[
+          ['customized_cake', 'Customized Cake Sales'],
+          ['finished_product', 'Finished Product Sales'],
+          ['other', 'Other Sales'],
+        ].map(([value, label]) => (
+          <button key={value} type="button" onClick={() => chooseSalesType(value)} aria-pressed={salesType === value} className={`rounded-md border px-3 py-2 text-[11px] font-semibold transition ${salesType === value ? 'border-black bg-black text-white' : 'border-black/15 bg-white text-black hover:bg-black/5'}`}>
+            {label}
+          </button>
+        ))}
       </div>
 
       <div

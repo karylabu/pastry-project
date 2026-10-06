@@ -4,9 +4,14 @@ import { AlertTriangle, Clock3, PackageCheck, RefreshCw, Search, ShoppingBag, X 
 
 /* STAFF NAVBAR */
 import { STAFF_BASE, LARAVEL_BASE } from "../../../services/config";
+import { getAuthHeaders } from "../../../services/api";
 import { subscribeRealtime } from "../../../services/realtime";
 
-const staffFetch = (url, options = {}) => fetch(url, { credentials: "include", ...options });
+const staffFetch = (url, options = {}) => fetch(url, {
+  credentials: "include",
+  ...options,
+  headers: { ...getAuthHeaders(), ...(options.headers || {}) },
+});
 const laravelStaffFetch = (url, options = {}) => {
   let token = '';
   try { token = JSON.parse(localStorage.getItem('user') || 'null')?.token || ''; } catch (_) { /* no-op */ }
@@ -592,7 +597,7 @@ export default function Orders() {
                       {['gcash', 'qrph'].includes(String(order.payment || '').toLowerCase()) && <div className="mt-3 rounded-md border border-amber-200 bg-amber-50/70 p-3"><p className="text-[9px] font-semibold uppercase tracking-[0.14em] text-amber-800">QRPh payment · {String(order.payment_status || "pending").replaceAll("_", " ")}</p>{order.has_payment_proof && paymentProofPreviews[order.id] ? <img src={paymentProofPreviews[order.id]} alt={`Payment proof for order ${order.id}`} className="mt-2 max-h-64 w-full rounded border border-black/10 bg-white object-contain" /> : order.has_payment_proof ? <button type="button" onClick={() => viewPaymentProof(order.id)} disabled={paymentProofLoading === order.id} className="mt-2 rounded-md bg-black px-3 py-2 text-[10px] font-semibold text-white disabled:opacity-60">{paymentProofLoading === order.id ? "Loading proof..." : "View payment proof"}</button> : <p className="mt-1 text-[10px] text-amber-900">Waiting for customer payment proof.</p>}</div>}
                       {order.discount_type && order.discount_type !== "none" && (
                         <div className="mt-3 rounded-md border border-[#e8dfd4] bg-white p-3">
-                          <p className="text-[9px] font-semibold uppercase tracking-[0.14em] text-[#8f8076]">{order.discount_type === "pwd" ? "PWD" : "Senior Citizen"} discount · 20%</p>
+                          <p className="text-[9px] font-semibold uppercase tracking-[0.14em] text-[#8f8076]">{order.discount_type === "pwd" ? "PWD" : "Senior Citizen"} discount · 5%</p>
                           <p className="mt-1">₱{Number(order.discount || 0).toFixed(2)}</p>
                           {order.has_discount_id && discountIdPreviews[order.id] ? (
                             <img src={discountIdPreviews[order.id]} alt={`Discount ID for order ${order.id}`} className="mt-2 max-h-64 w-full rounded border border-black/10 bg-white object-contain" />
@@ -692,7 +697,7 @@ export default function Orders() {
                                 <div className="mt-4 rounded-xl border border-black/10 bg-white p-3">
                                   <p className="text-[9px] uppercase tracking-[0.2em] text-black/50">Discount proof</p>
                                   <p className="mt-1 font-semibold text-black">
-                                    {order.discount_type === 'pwd' ? 'PWD' : 'Senior Citizen'} · 20% (₱{Number(order.discount || 0).toFixed(2)})
+                                    {order.discount_type === 'pwd' ? 'PWD' : 'Senior Citizen'} · 5% (₱{Number(order.discount || 0).toFixed(2)})
                                   </p>
                                   {order.has_discount_id && discountIdPreviews[order.id] ? (
                                     <img

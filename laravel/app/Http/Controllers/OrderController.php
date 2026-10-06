@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\CustomCakeOrder;
+use App\Models\AdminNotification;
 use App\Models\Product;
 use App\Http\Requests\StoreOrderRequest;
 use App\Services\CustomizedCakeService;
@@ -159,7 +160,7 @@ class OrderController extends Controller
                 $rushFee = ($request->order_type ?? 'Standard') === 'Urgent' ? 100.0 : 0.0;
                 $discountType = $request->input('discount_type', 'none');
                 $discountAmount = in_array($discountType, ['senior_citizen', 'pwd'], true)
-                    ? round($subtotal * 0.20, 2)
+                    ? round($subtotal * 0.05, 2)
                     : 0.0;
                 if ($discountAmount > 0) {
                     $discountIdPath = $request->file('discount_id_image')->store('discount-ids', 'local');
@@ -186,6 +187,7 @@ class OrderController extends Controller
                     'delivery_service' => in_array($request->method, ['Delivery', 'Deliver'], true)
                         ? $request->input('delivery_service')
                         : null,
+                    'delivery_time' => $request->input('delivery_time'),
                     'payment' => $request->payment,
                     'address' => $request->address ?? '',
                     'phone' => $request->phone,
@@ -222,17 +224,27 @@ class OrderController extends Controller
 
                 app(\App\Services\RealtimeEventPublisher::class)->orderUpdated((int) $user->id, (int) $order->id);
 
-                if (!$requiresQrPayment) {
-                    DB::table('notifications')->insert([
-                        'user_id' => $user->id,
-                        'title' => '🧾 Order Placed',
-                        'message' => "Your order #{$order->id} has been placed successfully and is now pending.",
-                        'type' => 'Success',
-                        'is_read' => 0,
-                        'action_url' => '/customer/orders',
-                        'created_at' => now(),
-                    ]);
-                }
+                AdminNotification::notifyRoles(['admin'], [
+                    'type' => 'order_received',
+                    'title' => "New cake order #{$order->id}",
+                    'message' => "{$user->name} placed a customer order.",
+                    'data' => ['order_id' => (int) $order->id, 'status' => $initialStatus],
+                    'action_url' => '/admin/orders',
+                    'is_read' => false,
+                    'created_at' => now(),
+                ]);
+
+                DB::table('notifications')->insert([
+                    'user_id' => $user->id,
+                    'title' => 'Order Placed',
+                    'message' => $requiresQrPayment
+                        ? "Your order #{$order->id} has been placed and is awaiting payment."
+                        : "Your order #{$order->id} has been placed successfully and is now pending.",
+                    'type' => 'Success',
+                    'is_read' => 0,
+                    'action_url' => '/customer/orders',
+                    'created_at' => now(),
+                ]);
 
                 return response()->json([
                     'success' => true,

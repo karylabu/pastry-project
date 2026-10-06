@@ -61,6 +61,19 @@ class OrderFeedbackControllerTest extends TestCase
             ->assertJsonPath('reviews.0.rating', 5);
     }
 
+    public function test_public_reviews_endpoint_returns_real_ratings_without_private_customer_data(): void
+    {
+        $this->getJson('/api/reviews')
+            ->assertOk()
+            ->assertJsonPath('total_reviews', 1)
+            ->assertJsonPath('average_rating', 5)
+            ->assertJsonPath('reviews.0.customer_name', 'Test C.')
+            ->assertJsonPath('reviews.0.rating', 5)
+            ->assertJsonPath('reviews.0.comment', 'Excellent cake.')
+            ->assertJsonMissingPath('reviews.0.customer_email')
+            ->assertJsonMissingPath('reviews.0.order_id');
+    }
+
     public function test_non_admin_cannot_view_reviews(): void
     {
         $customer = new User();

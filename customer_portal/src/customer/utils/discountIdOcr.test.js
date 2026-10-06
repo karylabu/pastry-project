@@ -3,6 +3,8 @@ import { identifyDiscountIdType } from './discountIdOcr';
 describe('discount ID text screening', () => {
   test('recognizes Senior Citizen markers', () => {
     expect(identifyDiscountIdType('OFFICE OF SENIOR CITIZENS AFFAIRS OSCA')).toBe('senior_citizen');
+    expect(identifyDiscountIdType('OFFICE OF SENIOR CITIZENS AFFAIRS')).toBe('senior_citizen');
+    expect(identifyDiscountIdType('SENIOR CITIZEN')).toBe('senior_citizen');
     expect(identifyDiscountIdType('Republic Act 9994')).toBe('senior_citizen');
   });
 

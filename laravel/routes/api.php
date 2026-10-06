@@ -30,6 +30,7 @@ use App\Http\Controllers\AuthApiController;
 Route::options('{any}', fn () => response()->noContent())->where('any', '.*');
 
 Route::get('products', [ProductController::class, 'index']);
+Route::get('reviews', [OrderFeedbackController::class, 'publicIndex']);
 Route::match(['get', 'post'], 'customer/products', [CustomerApiController::class, 'products']);
 Route::match(['get', 'options'], 'staff/dashboard', [StaffApiController::class, 'getDashboard']);
 Route::post('login', [AuthApiController::class, 'login']);
@@ -53,8 +54,10 @@ Route::post('orders/{orderId}/confirm-received', [OrderController::class, 'confi
 Route::post('orders/{orderId}/payment-proof', [OrderController::class, 'submitPaymentProof']);
 Route::post('orders/{orderId}/payment-failure', [OrderController::class, 'markPaymentFailed']);
 Route::post('sales/import-pdf', [SalesImportController::class, 'store']);
+Route::post('sales/import-csv', [SalesImportController::class, 'storeCsv']);
 Route::post('sales/import', [SalesImportController::class, 'storeRows']);
 Route::get('sales/import/history', [SalesImportController::class, 'history']);
+Route::get('sales/import/{importId}/status', [SalesImportController::class, 'importStatus']);
 Route::post('newsletter/subscribe', [NewsletterController::class, 'subscribe']);
 Route::post('orders', [OrderController::class, 'store']);
 Route::get('user', [CustomerApiController::class, 'user']);

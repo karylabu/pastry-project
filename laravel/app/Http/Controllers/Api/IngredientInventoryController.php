@@ -12,7 +12,7 @@ class IngredientInventoryController extends Controller
 {
     public function index(Request $request, InventoryService $inventory): JsonResponse
     {
-        if ($response = $this->authorizeAdmin($request)) {
+        if ($response = $this->authorizeOperationalStaff($request)) {
             return $response;
         }
 
@@ -24,7 +24,7 @@ class IngredientInventoryController extends Controller
 
     public function batches(Request $request, Ingredient $ingredient, InventoryService $inventory): JsonResponse
     {
-        if ($response = $this->authorizeAdmin($request)) {
+        if ($response = $this->authorizeOperationalStaff($request)) {
             return $response;
         }
 
@@ -41,7 +41,7 @@ class IngredientInventoryController extends Controller
 
     public function allBatches(Request $request, InventoryService $inventory): JsonResponse
     {
-        if ($response = $this->authorizeAdmin($request)) {
+        if ($response = $this->authorizeOperationalStaff($request)) {
             return $response;
         }
 
@@ -54,19 +54,5 @@ class IngredientInventoryController extends Controller
             'success' => true,
             'batches' => $inventory->getAllIngredientBatches($ingredientId),
         ]);
-    }
-
-    private function authorizeAdmin(Request $request): ?JsonResponse
-    {
-        $user = $this->getAuthenticatedUser($request);
-        if (!$user) {
-            return response()->json(['success' => false, 'message' => 'Admin authorization required.'], 401);
-        }
-
-        if ($user->role !== 'admin') {
-            return response()->json(['success' => false, 'message' => 'Admin authorization required.'], 403);
-        }
-
-        return null;
     }
 }

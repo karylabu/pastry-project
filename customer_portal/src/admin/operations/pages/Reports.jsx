@@ -250,6 +250,27 @@ function ExpiryTag({ expiry }) {
   );
 }
 
+const REPORT_ROWS_PER_PAGE = 10;
+const REVENUE_DAYS_PER_PAGE = 5;
+
+function PaginationControls({ totalItems, page, pageSize = REPORT_ROWS_PER_PAGE, onPageChange }) {
+  const pageCount = Math.max(1, Math.ceil(totalItems / pageSize));
+  if (pageCount <= 1) return null;
+  const firstItem = (page - 1) * pageSize + 1;
+  const lastItem = Math.min(page * pageSize, totalItems);
+
+  return (
+    <div className="flex items-center justify-between gap-3 border-t border-black/10 px-4 py-3 text-xs text-black/60">
+      <span>Showing {firstItem}-{lastItem} of {totalItems}</span>
+      <div className="flex items-center gap-2">
+        <button type="button" onClick={() => onPageChange(page - 1)} disabled={page <= 1} className="rounded-md border border-black/15 px-2.5 py-1.5 font-semibold text-black disabled:cursor-not-allowed disabled:opacity-40">Previous</button>
+        <span aria-live="polite">Page {page} of {pageCount}</span>
+        <button type="button" onClick={() => onPageChange(page + 1)} disabled={page >= pageCount} className="rounded-md border border-black/15 px-2.5 py-1.5 font-semibold text-black disabled:cursor-not-allowed disabled:opacity-40">Next</button>
+      </div>
+    </div>
+  );
+}
+
 /* ─────────────────────────────────────────
    MAIN REPORTS PAGE
 ───────────────────────────────────────── */
@@ -265,6 +286,10 @@ export default function Reports() {
   const [leaderTab,     setLeaderTab]     = useState('top');
   const [expandedRow,   setExpandedRow]   = useState(null);
   const [productPerformanceExpanded, setProductPerformanceExpanded] = useState(false);
+  const [productPerformancePage, setProductPerformancePage] = useState(1);
+  const [salesPage, setSalesPage] = useState(1);
+  const [revenueDayPage, setRevenueDayPage] = useState(1);
+  const [ingredientsPage, setIngredientsPage] = useState(1);
   const [checked,       setChecked]       = useState({});
   const [analytics, setAnalytics] = useState(null);
   const [analyticsError, setAnalyticsError] = useState('');
@@ -276,24 +301,15 @@ export default function Reports() {
   const [orderRefreshKey, setOrderRefreshKey] = useState(0);
   const [historicalSales, setHistoricalSales] = useState([]);
   const [historicalSalesSummary, setHistoricalSalesSummary] = useState({ total_sales: 0, total_down_payments: 0, total_remaining_balance: 0, records: 0 });
-
-  const loadHistoricalSales = () => {
-    laravelStaffFetch(`${LARAVEL_BASE}/api/sales/import/history`)
-      .then(response => response.json())
-      .then(data => {
-        if (data.success) {
-          setHistoricalSales(Array.isArray(data.sales) ? data.sales : []);
-          setHistoricalSalesSummary(data.summary || {});
-        }
-      })
-      .catch(() => {
-        setHistoricalSales([]);
-        setHistoricalSalesSummary({ total_sales: 0, total_down_payments: 0, total_remaining_balance: 0, records: 0 });
-      });
-  };
+  const [historicalSalesError, setHistoricalSalesError] = useState('');
 
   const refreshAnalyticsAfterImport = () => {
-    loadHistoricalSales();
+    setSalesPage(1);
+    setRange('all');
+    setInterval('all');
+    setDateFilterStart('');
+    setDateFilterEnd('');
+    setAnalyticsCategory('');
     setAnalyticsRefreshKey((current) => current + 1);
   };
 
@@ -330,8 +346,57 @@ export default function Reports() {
       setIngredientsRaw(Array.isArray(ingRes?.ingredients) ? ingRes.ingredients : []);
       setLoading(false);
     });
-    loadHistoricalSales();
   }, [orderRefreshKey]);
+
+  useEffect(() => {
+    const params = new URLSearchParams({ page: String(salesPage), per_page: String(REPORT_ROWS_PER_PAGE) });
+    if (dateFilterStart && dateFilterEnd) {
+      params.set('start_date', dateFilterStart);
+      params.set('end_date', dateFilterEnd);
+    } else if (range === 'all') {
+      params.set('end_date', new Date().toISOString().slice(0, 10));
+    } else {
+      const start = new Date();
+      if (range === 'today') {
+        // keep today's date
+      } else if (range === 'week') {
+        start.setDate(start.getDate() - ((start.getDay() + 6) % 7));
+      } else if (range === 'month') {
+        start.setDate(1);
+      } else if (range !== 'all') {
+        start.setDate(start.getDate() - Math.max(1, Number(range)) + 1);
+      }
+      params.set('start_date', start.toISOString().slice(0, 10));
+      params.set('end_date', new Date().toISOString().slice(0, 10));
+    }
+
+    let isCurrentRequest = true;
+    laravelStaffFetch(`${LARAVEL_BASE}/api/sales/import/history?${params.toString()}`)
+      .then(async (response) => {
+        const data = await response.json();
+        if (!response.ok || !data.success) throw new Error(data.message || 'Unable to load imported sales history.');
+        if (!isCurrentRequest) return;
+        setHistoricalSales(Array.isArray(data.sales) ? data.sales : []);
+        setHistoricalSalesSummary(data.summary || { total_sales: 0, total_down_payments: 0, total_remaining_balance: 0, records: 0 });
+        setHistoricalSalesError('');
+      })
+      .catch((error) => {
+        if (!isCurrentRequest) return;
+        setHistoricalSales([]);
+        setHistoricalSalesSummary({ total_sales: 0, total_down_payments: 0, total_remaining_balance: 0, records: 0 });
+        setHistoricalSalesError(error.message || 'Unable to load imported sales history.');
+      });
+
+    return () => { isCurrentRequest = false; };
+  }, [range, dateFilterStart, dateFilterEnd, salesPage, analyticsRefreshKey]);
+
+  useEffect(() => {
+    setSalesPage(1);
+  }, [range, dateFilterStart, dateFilterEnd]);
+
+  useEffect(() => {
+    setRevenueDayPage(1);
+  }, [analytics, range, dateFilterStart, dateFilterEnd]);
 
   useEffect(() => subscribeRealtime((event) => {
     if (event.type !== 'order.updated') return;
@@ -344,6 +409,9 @@ export default function Reports() {
     if (dateFilterStart && dateFilterEnd) {
       params.set('start_date', dateFilterStart);
       params.set('end_date', dateFilterEnd);
+    } else if (range === 'all') {
+      params.set('all', '1');
+      params.set('end_date', new Date().toISOString().slice(0, 10));
     } else {
       const start = new Date();
       if (range === 'today') {
@@ -354,8 +422,6 @@ export default function Reports() {
         start.setDate(1);
       } else if (range !== 'all') {
         start.setDate(start.getDate() - Math.max(1, Number(range)) + 1);
-      } else {
-        start.setDate(start.getDate() - 3650);
       }
       params.set('start_date', start.toISOString().slice(0, 10));
       params.set('end_date', new Date().toISOString().slice(0, 10));
@@ -395,6 +461,7 @@ export default function Reports() {
     else if (range === 'week') cutoff.setDate(cutoff.getDate() - ((cutoff.getDay() + 6) % 7));
     else if (range === 'month') cutoff.setDate(1);
     else cutoff.setDate(cutoff.getDate() - Math.max(1, Number(range)) + 1);
+    cutoff.setHours(0, 0, 0, 0);
     const rangeEnd = new Date();
     rangeEnd.setHours(23, 59, 59, 999);
     return combinedOrders.filter(o => o.created_at && new Date(o.created_at) >= cutoff && new Date(o.created_at) <= rangeEnd);
@@ -404,29 +471,16 @@ export default function Reports() {
     () => visibleOrders.filter(o => normalizeStatus(o.status) === 'completed'),
     [visibleOrders]
   );
-  const historicalVisibleSales = useMemo(() => {
-    if (dateFilterStart && dateFilterEnd) {
-      return historicalSales.filter(sale => sale.sale_date >= dateFilterStart && sale.sale_date <= dateFilterEnd);
-    }
-    if (range === 'all') return historicalSales;
-    const cutoff = new Date();
-    if (range === 'today') cutoff.setHours(0, 0, 0, 0);
-    else if (range === 'week') cutoff.setDate(cutoff.getDate() - ((cutoff.getDay() + 6) % 7));
-    else if (range === 'month') cutoff.setDate(1);
-    else cutoff.setDate(cutoff.getDate() - Math.max(1, Number(range)) + 1);
-    const cutoffDate = cutoff.toISOString().slice(0, 10);
-    const rangeEndDate = new Date().toISOString().slice(0, 10);
-    return historicalSales.filter(sale => sale.sale_date >= cutoffDate && sale.sale_date <= rangeEndDate);
-  }, [historicalSales, range, dateFilterStart, dateFilterEnd]);
+  const historicalVisibleSales = historicalSales;
   const cancelledOrds = useMemo(
     () => visibleOrders.filter(o => ['cancelled', 'canceled', 'rejected'].includes(normalizeStatus(o.status))),
     [visibleOrders]
   );
 
   /* ── BA-01: Total Revenue & AOV ── */
-  const totalRevenue = useMemo(() => completedOrds.reduce((s, o) => s + Number(o.total || 0), 0) + historicalVisibleSales.reduce((s, sale) => s + Number(sale.price || 0), 0), [completedOrds, historicalVisibleSales]);
-  const avgOrderValue = useMemo(() => (completedOrds.length + historicalVisibleSales.length) ? totalRevenue / (completedOrds.length + historicalVisibleSales.length) : 0, [totalRevenue, completedOrds, historicalVisibleSales]);
-  const totalOrdersProcessed = useMemo(() => completedOrds.length + historicalVisibleSales.length, [completedOrds, historicalVisibleSales]);
+  const totalRevenue = useMemo(() => completedOrds.reduce((s, o) => s + Number(o.total || 0), 0) + Number(historicalSalesSummary.total_sales || 0), [completedOrds, historicalSalesSummary]);
+  const avgOrderValue = useMemo(() => (completedOrds.length + Number(historicalSalesSummary.records || 0)) ? totalRevenue / (completedOrds.length + Number(historicalSalesSummary.records || 0)) : 0, [totalRevenue, completedOrds, historicalSalesSummary]);
+  const totalOrdersProcessed = useMemo(() => completedOrds.length + Number(historicalSalesSummary.records || 0), [completedOrds, historicalSalesSummary]);
   const orderFulfillmentText = `${totalOrdersProcessed} completed · ${cancelledOrds.length} cancelled`;
 
   const prevPeriod = useMemo(() => {
@@ -452,6 +506,24 @@ export default function Reports() {
     () => ingredients.filter(i => i.status === 'Critical Reorder').length,
     [ingredients]
   );
+  const productPerformanceRows = analytics?.product_performance || [];
+  const productPerformancePageCount = Math.max(1, Math.ceil(productPerformanceRows.length / REPORT_ROWS_PER_PAGE));
+  const visibleProductPerformancePage = Math.min(productPerformancePage, productPerformancePageCount);
+  const visibleProductPerformance = productPerformanceExpanded
+    ? productPerformanceRows.slice((visibleProductPerformancePage - 1) * REPORT_ROWS_PER_PAGE, visibleProductPerformancePage * REPORT_ROWS_PER_PAGE)
+    : productPerformanceRows.slice(0, 5);
+  const salesPageCount = Math.max(
+    1,
+    Math.ceil(completedOrds.length / REPORT_ROWS_PER_PAGE),
+    Math.ceil(Number(historicalSalesSummary.records || 0) / REPORT_ROWS_PER_PAGE)
+  );
+  const visibleSalesPage = Math.min(salesPage, salesPageCount);
+  const salesPageStart = (visibleSalesPage - 1) * REPORT_ROWS_PER_PAGE;
+  const salesOrdersOnPage = completedOrds.slice(salesPageStart, salesPageStart + REPORT_ROWS_PER_PAGE);
+  const historicalSalesOnPage = historicalVisibleSales;
+  const ingredientsPageCount = Math.max(1, Math.ceil(ingredients.length / REPORT_ROWS_PER_PAGE));
+  const visibleIngredientsPage = Math.min(ingredientsPage, ingredientsPageCount);
+  const ingredientsOnPage = ingredients.slice((visibleIngredientsPage - 1) * REPORT_ROWS_PER_PAGE, visibleIngredientsPage * REPORT_ROWS_PER_PAGE);
 
   /* ── BA-04: Peak traffic heatmap (day x hour) ── */
   const heatmapMatrix = useMemo(() => {
@@ -501,6 +573,12 @@ export default function Reports() {
   if (!cakeCategories.some((category) => String(category).toLowerCase() === 'customized cakes')) {
     cakeCategories.push('Customized Cakes');
   }
+  if (!cakeCategories.some((category) => String(category).toLowerCase() === 'finished products')) {
+    cakeCategories.push('Finished Products');
+  }
+  if (!cakeCategories.some((category) => String(category).toLowerCase() === 'imported sales')) {
+    cakeCategories.push('Imported Sales');
+  }
 
   const allProductSales = useMemo(() => {
     return products.map(p => ({
@@ -518,6 +596,13 @@ export default function Reports() {
     : [], [analytics]);
   const leaderList = leaderTab === 'top' ? topSellers : bottomSellers;
   const leaderMax = Math.max(...topSellers.map(p => p.qty), 1);
+  const revenueByDay = [...(analytics?.sales?.daily || [])].sort((a, b) => String(b.date).localeCompare(String(a.date)));
+  const revenueDayPageCount = Math.max(1, Math.ceil(revenueByDay.length / REVENUE_DAYS_PER_PAGE));
+  const visibleRevenueDayPage = Math.min(revenueDayPage, revenueDayPageCount);
+  const revenueDaysOnPage = revenueByDay.slice(
+    (visibleRevenueDayPage - 1) * REVENUE_DAYS_PER_PAGE,
+    visibleRevenueDayPage * REVENUE_DAYS_PER_PAGE
+  );
 
   const intervalBuckets = useMemo(() => {
     const buckets = {};
@@ -529,6 +614,8 @@ export default function Reports() {
         key = d.toISOString().slice(0, 10);
       } else if (interval === 'monthly') {
         key = d.toLocaleString('default', { month: 'short', year: 'numeric' });
+      } else if (interval === 'all') {
+        key = 'All time';
       } else {
         const year = d.getFullYear();
         const firstJan = new Date(year, 0, 1);
@@ -694,12 +781,12 @@ export default function Reports() {
               <h1 className="text-[26px] font-bold leading-tight text-black sm:text-[30px]">Sales Reports</h1>
               <p className="mt-1.5 text-[13px] text-black/60">Revenue, demand, inventory movement, and procurement.</p>
             </div>
-            <div className="flex w-full flex-col gap-2 sm:w-[220px]">
+            <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-start">
               <SalesImportDropzone compact onImportComplete={refreshAnalyticsAfterImport} />
               <button
                 type="button"
                 onClick={exportReport}
-                className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-black px-4 text-[12px] font-semibold text-white transition hover:bg-black/85"
+                className="inline-flex h-10 min-w-[150px] flex-1 items-center justify-center gap-2 rounded-md bg-black px-3 text-[11px] font-semibold text-white transition hover:bg-black/85"
               >
                 <Download size={15} />
                 Download PDF Report
@@ -707,7 +794,7 @@ export default function Reports() {
             </div>
           </div>
 
-          <div className="mb-5 grid grid-cols-1 gap-2.5 sm:grid-cols-2 xl:grid-cols-6">
+          <div className="mb-5 grid grid-cols-1 gap-2.5 sm:grid-cols-2 xl:grid-cols-4">
             <StatCard
               title="Total Revenue" icon={DollarSign} color={C.violet} soft={C.violetSoft}
               value={analytics ? peso(analytics.summary.revenue) : '—'}
@@ -728,34 +815,31 @@ export default function Reports() {
               value={`${fmt(totalOrdersProcessed)} / ${fmt(cancelledOrds.length)}`}
               sub={orderFulfillmentText}
             />
-            <StatCard
-              title="Down Payments" icon={DollarSign} color="#68815d" soft="#eef5e9"
-              value={peso(historicalVisibleSales.reduce((sum, sale) => sum + Number(sale.down_payment || 0), 0))}
-              sub="Imported customized cakes"
-            />
-            <StatCard
-              title="Remaining Balance" icon={Wallet} color="#c9a94f" soft="#fff4cd"
-              value={peso(historicalVisibleSales.reduce((sum, sale) => sum + Number(sale.remaining_balance || 0), 0))}
-              sub="Imported customized cakes"
-            />
           </div>
 
           <div className="mb-5 rounded-lg border border-[#e9e1d9] bg-white p-3 shadow-[0_3px_12px_rgba(60,42,28,0.035)] sm:p-4">
-            <div className="grid gap-4 lg:grid-cols-[0.8fr_1.2fr_1.2fr]">
+            <div className="grid gap-4 lg:grid-cols-2">
             <div className="min-w-0">
               <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-black/60">Interval</p>
-              <div className="mt-2 grid grid-cols-3 gap-1 rounded-md bg-[#f7f4ef] p-1">
-                {['daily', 'weekly', 'monthly'].map((key) => (
+              <div className="mt-[27px] grid h-10 grid-cols-4 gap-1 rounded-md bg-[#f7f4ef] p-1">
+                {['daily', 'weekly', 'monthly', 'all'].map((key) => (
                   <button
                     key={key}
-                    onClick={() => setInterval(key)}
+                    onClick={() => {
+                      setInterval(key);
+                      if (key === 'all') {
+                        setRange('all');
+                        setDateFilterStart('');
+                        setDateFilterEnd('');
+                      }
+                    }}
                     className="rounded px-2 py-2 text-[10px] font-semibold capitalize transition sm:text-[11px]"
                     style={{
-                      background: interval === key ? C.ink : 'transparent',
-                      color: interval === key ? '#fff' : C.ink,
+                      background: interval === key && (key !== 'all' || (!dateFilterStart && !dateFilterEnd)) ? C.ink : 'transparent',
+                      color: interval === key && (key !== 'all' || (!dateFilterStart && !dateFilterEnd)) ? '#fff' : C.ink,
                     }}
                   >
-                    {key}
+                    {key === 'all' ? 'All' : key}
                   </button>
                 ))}
               </div>
@@ -779,28 +863,6 @@ export default function Reports() {
                   className="mt-1 h-10 w-full rounded-md border border-black/15 bg-white px-3 text-[12px] text-black outline-none focus:border-[#d4af37] focus:ring-2 focus:ring-[#d4af37]/15"
                   />
                 </label>
-              </div>
-            </div>
-            <div className="min-w-0">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-black/60">Quick timeframe</p>
-              <div className="mt-2 grid grid-cols-2 gap-1.5 sm:grid-cols-4 lg:grid-cols-2">
-                {[['today', 'Today'], ['week', 'This Week'], ['month', 'This Month'], ['all', 'All']].map(([val, label]) => (
-                  <button
-                    key={val}
-                    onClick={() => {
-                      setRange(val);
-                      setDateFilterStart('');
-                      setDateFilterEnd('');
-                    }}
-                    className="rounded-md px-2.5 py-2 text-[10px] font-semibold transition sm:text-[11px]"
-                    style={{
-                      background: range === val && !dateFilterStart && !dateFilterEnd ? C.ink : '#ffffff',
-                      color: range === val && !dateFilterStart && !dateFilterEnd ? '#fff' : C.ink,
-                    }}
-                  >
-                    {label}
-                  </button>
-                ))}
               </div>
             </div>
             </div>
@@ -858,7 +920,22 @@ export default function Reports() {
               <div className="mb-4 grid gap-3 xl:grid-cols-2">
                 <div className="rounded-2xl border bg-white p-4" style={{ borderColor: C.border }}>
                   <h3 className="mb-4 text-base font-bold" style={{ color: C.ink }}>Revenue by Day</h3>
-                  {!analytics?.has_data?.sales ? <p className="text-sm text-black/50">No sales recorded for this period.</p> : <div className="space-y-2">{analytics.sales.daily.map((row) => <div key={row.date} className="flex justify-between border-b border-black/10 py-2 text-sm"><span>{row.date}</span><strong>{peso(row.revenue)} · {row.orders} orders</strong></div>)}</div>}
+                  {analytics?.summary?.imported_revenue_by_type && (
+                    <div className="mb-3 grid gap-2 sm:grid-cols-3">
+                      {[
+                        ['Customized Cake Sales', analytics.summary.imported_revenue_by_type.customized_cake],
+                        ['Finished Product Sales', analytics.summary.imported_revenue_by_type.finished_product],
+                        ['Other Imported Sales', analytics.summary.imported_revenue_by_type.other],
+                      ].map(([label, amount]) => (
+                        <div key={label} className="rounded-md bg-[#fffaf0] px-3 py-2">
+                          <p className="text-[10px] text-black/55">{label}</p>
+                          <p className="text-sm font-bold text-black">{peso(Number(amount || 0))}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {!analytics?.has_data?.sales ? <p className="text-sm text-black/50">No sales recorded for this period.</p> : <div className="space-y-2">{revenueDaysOnPage.map((row) => <div key={row.date} className="flex justify-between border-b border-black/10 py-2 text-sm"><span>{row.date}</span><strong>{peso(row.revenue)} · {row.orders} orders</strong></div>)}</div>}
+                  {analytics?.has_data?.sales && <PaginationControls totalItems={revenueByDay.length} page={visibleRevenueDayPage} pageSize={REVENUE_DAYS_PER_PAGE} onPageChange={setRevenueDayPage} />}
                 </div>
                 <div className="rounded-2xl border bg-white p-4" style={{ borderColor: C.border }}>
                   <h3 className="mb-4 text-base font-bold" style={{ color: C.ink }}>Production by Product</h3>
@@ -870,12 +947,22 @@ export default function Reports() {
                 </div>
                 <div className="rounded-2xl border bg-white p-4" style={{ borderColor: C.border }}>
                   <h3 className="mb-4 text-base font-bold" style={{ color: C.ink }}>Waste Analytics</h3>
-                  {!analytics?.has_data?.waste ? <p className="text-sm text-black/50">No waste recorded for this period.</p> : <><div className="mb-3 grid grid-cols-3 gap-2 text-sm"><span>Qty <strong>{fmt(analytics.summary.waste_quantity)}</strong></span><span>Cost <strong>{peso(analytics.summary.waste_cost)}</strong></span><span>Cost Rate <strong>{analytics.summary.waste_rate == null ? "Not available" : `${analytics.summary.waste_rate.toFixed(2)}%`}</strong></span></div><div className="space-y-2">{analytics.waste.by_reason.map((row) => <div key={row.reason} className="flex justify-between border-b border-black/10 py-2 text-sm"><span>{row.reason}</span><strong>{peso(row.cost)}</strong></div>)}</div></>}
+                  <p className="mb-3 text-[11px] text-black/50">Waste value uses the recorded cost per inventory unit. Reference prices are estimates until replaced with supplier costs.</p>
+                  {!analytics?.has_data?.waste ? <><p className="text-sm text-black/50">No waste recorded for this period.</p>{analytics?.waste?.recent_outside_period?.length > 0 && <div className="mt-4 border-t border-black/10 pt-3"><p className="mb-2 text-xs font-semibold text-black/60">Recent saved records outside this date range</p><div className="space-y-2">{analytics.waste.recent_outside_period.map((row) => <div key={row.id} className="flex items-start justify-between gap-3 border-b border-black/10 py-2 text-sm last:border-0"><div><p className="font-medium text-black/80">{row.item_name}</p><p className="text-xs text-black/50">{row.datetime} · {row.reason || "Unspecified"}</p></div><div className="shrink-0 text-right"><p className="font-semibold">{fmt(row.qty)} · {peso(Number(row.qty) * Number(row.unit_cost))}</p><p className="text-xs text-black/50">{row.item_type || "Waste"}</p></div></div>)}</div><p className="mt-2 text-[11px] text-black/50">These records are not included in the totals above. Choose All in the date range to include them.</p></div>}</> : <><div className="mb-3 grid grid-cols-3 gap-2 text-sm"><span>Qty <strong>{fmt(analytics.summary.waste_quantity)}</strong></span><span>Cost <strong>{peso(analytics.summary.waste_cost)}</strong></span><span>Cost Rate <strong>{analytics.summary.waste_rate == null ? "Not available" : `${analytics.summary.waste_rate.toFixed(2)}%`}</strong></span></div><div className="space-y-2">{analytics.waste.by_reason.map((row) => <div key={row.reason} className="flex justify-between border-b border-black/10 py-2 text-sm"><span>{row.reason}</span><strong>{peso(row.cost)}</strong></div>)}</div></>}
                 </div>
                 <div className="rounded-2xl border bg-white p-4" style={{ borderColor: C.border }}>
                   <h3 className="mb-1 text-base font-bold" style={{ color: C.ink }}>Seasonal Waste</h3>
                   <p className="mb-3 text-[11px] text-black/50">Philippine cool-dry, hot-dry, and rainy seasons</p>
+                  {analytics?.waste?.seasonal_outside_period && <p className="mb-2 rounded-md bg-[#fff8e2] px-3 py-2 text-[11px] text-[#80600a]">Showing historical waste records outside the selected date range. These are not included in the current-period totals.</p>}
                   {analytics?.waste?.by_season?.length ? <div className="space-y-2">{analytics.waste.by_season.map((row) => <div key={`${row.year}-${row.season}`} className="grid grid-cols-[minmax(0,1fr)_auto] gap-3 border-b border-black/10 py-2 text-sm"><div><p className="font-semibold">{row.season}</p><p className="text-[11px] text-black/50">{row.year} · {fmt(row.records)} records · {fmt(row.quantity)} wasted</p></div><strong>{peso(row.cost)}</strong></div>)}</div> : <p className="text-sm text-black/50">No seasonal waste records for this period.</p>}
+                </div>
+                <div className="rounded-2xl border bg-white p-5" style={{ borderColor: C.border }}>
+                  <div className="mb-4">
+                    <h3 className="text-base font-bold" style={{ color: C.ink }}>High Sales with Frequent Stock Shortages</h3>
+                    <p className="mt-1 text-xs text-black/50">Flags products at or above average sales with at least {analytics?.diagnostics?.frequent_stockout_threshold ?? 2} low-stock events in the selected period.</p>
+                    {analytics?.diagnostics?.high_sales_stockout_risk_outside_period && <p className="mt-2 rounded-md bg-[#fff8e2] px-3 py-2 text-[11px] text-[#80600a]">No matching products were found for the selected period. Showing historical matches from outside that date range; current stock is shown for reference.</p>}
+                  </div>
+                  {analytics?.diagnostics?.high_sales_stockout_risk?.length ? <div className="overflow-x-auto"><table className="w-full min-w-[560px] text-left text-sm"><thead className="bg-[#fff4cd] text-[10px] uppercase tracking-[0.14em] text-black"><tr><th className="px-4 py-3">Product</th><th className="px-4 py-3">Units Sold</th><th className="px-4 py-3">Low-stock Events</th><th className="px-4 py-3">Current Stock</th></tr></thead><tbody>{analytics.diagnostics.high_sales_stockout_risk.map((row) => <tr key={row.product_id} className="border-t border-black/10"><td className="px-4 py-3 font-semibold">{row.product}</td><td className="px-4 py-3">{fmt(row.sold)}</td><td className="px-4 py-3 font-semibold text-amber-800">{fmt(row.low_stock_events)}</td><td className="px-4 py-3">{fmt(row.current_stock)}</td></tr>)}</tbody></table></div> : <p className="rounded-md bg-[#f7f4ef] px-4 py-6 text-center text-sm text-black/55">No products meet both the sales and shortage thresholds for this period.</p>}
                 </div>
               </div>
 
@@ -895,15 +982,8 @@ export default function Reports() {
                     {productPerformanceExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
                   </button>
                 </div>
-                  <table className="w-full min-w-[680px] text-left text-sm"><thead className="bg-[#fff4cd] text-[10px] uppercase tracking-[0.14em] text-black"><tr><th className="px-6 py-3">Product</th><th className="px-4 py-3">Sold</th><th className="px-4 py-3">Produced</th><th className="px-4 py-3">Waste</th><th className="px-4 py-3">Current Stock</th></tr></thead><tbody>{analytics?.product_performance?.length ? (productPerformanceExpanded ? analytics.product_performance : analytics.product_performance.slice(0, 5)).map((row) => <tr key={row.product_id} className="border-t border-black/10"><td className="px-6 py-3 font-semibold">{row.product}</td><td className="px-4 py-3">{fmt(row.sold)}</td><td className="px-4 py-3">{fmt(row.produced)}</td><td className="px-4 py-3">{fmt(row.waste)}</td><td className="px-4 py-3">{fmt(row.current_stock)}</td></tr>) : <tr><td colSpan={5} className="px-6 py-8 text-center text-black/50">No product performance data for this period.</td></tr>}</tbody></table>
-              </div>
-
-              <div className="mb-8 overflow-x-auto rounded-2xl border bg-white p-5" style={{ borderColor: C.border }}>
-                <div className="mb-4">
-                  <h3 className="text-base font-bold" style={{ color: C.ink }}>High Sales with Frequent Stock Shortages</h3>
-                  <p className="mt-1 text-xs text-black/50">Flags products at or above average sales with at least {analytics?.diagnostics?.frequent_stockout_threshold ?? 2} low-stock events in the selected period.</p>
-                </div>
-                {analytics?.diagnostics?.high_sales_stockout_risk?.length ? <table className="w-full min-w-[560px] text-left text-sm"><thead className="bg-[#fff4cd] text-[10px] uppercase tracking-[0.14em] text-black"><tr><th className="px-4 py-3">Product</th><th className="px-4 py-3">Units Sold</th><th className="px-4 py-3">Low-stock Events</th><th className="px-4 py-3">Current Stock</th></tr></thead><tbody>{analytics.diagnostics.high_sales_stockout_risk.map((row) => <tr key={row.product_id} className="border-t border-black/10"><td className="px-4 py-3 font-semibold">{row.product}</td><td className="px-4 py-3">{fmt(row.sold)}</td><td className="px-4 py-3 font-semibold text-amber-800">{fmt(row.low_stock_events)}</td><td className="px-4 py-3">{fmt(row.current_stock)}</td></tr>)}</tbody></table> : <p className="rounded-md bg-[#f7f4ef] px-4 py-6 text-center text-sm text-black/55">No products meet both the sales and shortage thresholds for this period.</p>}
+                  <table className="w-full min-w-[680px] text-left text-sm"><thead className="bg-[#fff4cd] text-[10px] uppercase tracking-[0.14em] text-black"><tr><th className="px-6 py-3">Product</th><th className="px-4 py-3">Sold</th><th className="px-4 py-3">Produced</th><th className="px-4 py-3">Waste</th><th className="px-4 py-3">Current Stock</th></tr></thead><tbody>{productPerformanceRows.length ? visibleProductPerformance.map((row) => <tr key={row.product_id} className="border-t border-black/10"><td className="px-6 py-3 font-semibold">{row.product}</td><td className="px-4 py-3">{fmt(row.sold)}</td><td className="px-4 py-3">{fmt(row.produced)}</td><td className="px-4 py-3">{fmt(row.waste)}</td><td className="px-4 py-3">{fmt(row.current_stock)}</td></tr>) : <tr><td colSpan={5} className="px-6 py-8 text-center text-black/50">No product performance data for this period.</td></tr>}</tbody></table>
+                {productPerformanceExpanded && <PaginationControls totalItems={productPerformanceRows.length} page={visibleProductPerformancePage} onPageChange={setProductPerformancePage} />}
               </div>
 
               {/* ── WIDGET A: HEATMAP + ORDER TYPE ── */}
@@ -979,8 +1059,9 @@ export default function Reports() {
                     <h3 className="text-base font-bold" style={{ color: C.ink }}>Sales Transactions</h3>
                     <p className="mt-1 text-xs text-black/50">Detailed sales records for the selected period or custom date range.</p>
                   </div>
-                  <span className="text-[11px] text-black/55">{completedOrds.length + historicalVisibleSales.length} sales shown</span>
+                  <span className="text-[11px] text-black/55">{completedOrds.length + Number(historicalSalesSummary.records || 0)} sales in period</span>
                 </div>
+                {historicalSalesError && <p className="mb-3 rounded-md bg-red-50 px-3 py-2 text-xs text-red-800" role="alert">{historicalSalesError}</p>}
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm border-separate border-spacing-y-1">
                     <thead>
@@ -997,7 +1078,7 @@ export default function Reports() {
                       {completedOrds.length === 0 && historicalVisibleSales.length === 0 ? (
                         <tr><td colSpan={6} className="px-4 py-10 text-center text-black/50">No completed orders match the selected filters.</td></tr>
                       ) : <>
-                        {completedOrds.map((o) => {
+                        {salesOrdersOnPage.map((o) => {
                         const itemsText = Array.isArray(o.items) && o.items.length
                           ? o.items.map(item => `${Number(item.qty || 0)}x ${item.name || 'Item'}`).join(', ')
                           : '—';
@@ -1027,12 +1108,12 @@ export default function Reports() {
                           </tr>
                         );
                         })}
-                        {historicalVisibleSales.map((sale) => (
+                        {historicalSalesOnPage.map((sale) => (
                           <tr key={`historical-${sale.id}`} className="border-b bg-white" style={{ borderColor: C.border }}>
                             <td className="px-4 py-4 text-[13px] text-black/70">{sale.sale_date}</td>
                             <td className="px-4 py-4 font-semibold text-black">Historical</td>
                             <td className="max-w-[300px] truncate px-4 py-4 text-[13px] text-black/70">{sale.cake_name}</td>
-                            <td className="px-4 py-4"><span className="inline-flex rounded-md bg-[#fff4cd] px-2.5 py-1 text-[10px] font-semibold text-[#80600a]">Customized Cake</span></td>
+                            <td className="px-4 py-4"><span className="inline-flex rounded-md bg-[#fff4cd] px-2.5 py-1 text-[10px] font-semibold text-[#80600a]">{sale.source === 'legacy' ? 'Legacy sale' : sale.sales_type === 'customized_cake' ? 'Customized cake' : sale.sales_type === 'finished_product' ? 'Finished product' : 'Other imported sale'}</span></td>
                             <td className="px-4 py-4 text-right font-semibold text-black">{peso(sale.price)}</td>
                             <td className="px-4 py-4"><span className="inline-flex rounded-md bg-[#fff4cd] px-2.5 py-1 text-[10px] font-semibold text-black">Imported</span></td>
                           </tr>
@@ -1041,6 +1122,7 @@ export default function Reports() {
                     </tbody>
                   </table>
                 </div>
+                <PaginationControls totalItems={Math.max(completedOrds.length, Number(historicalSalesSummary.records || 0))} page={visibleSalesPage} onPageChange={setSalesPage} />
               </div>
 
               {/* ── OPERATIONAL MATRIX (BA-02, BA-03, BA-05) ── */}
@@ -1070,7 +1152,7 @@ export default function Reports() {
                     <tbody>
                       {ingredients.length === 0 ? (
                         <tr><td colSpan={8} className="py-10 text-center text-black/50">No ingredients found.</td></tr>
-                      ) : ingredients.map(ing => (
+                      ) : ingredientsOnPage.map(ing => (
                         <React.Fragment key={ing.id}>
                           <tr className="border-b last:border-0 hover:bg-[#fffaf0]" style={{ borderColor: C.border }}>
                             <td className="px-5 py-4">
@@ -1119,6 +1201,7 @@ export default function Reports() {
                     </tbody>
                   </table>
                 </div>
+                <PaginationControls totalItems={ingredients.length} page={visibleIngredientsPage} onPageChange={setIngredientsPage} />
               </div>
             </>
           )}

@@ -13,13 +13,10 @@ class IngredientBatchController extends Controller
 {
     public function store(ReceiveIngredientBatchRequest $request, InventoryService $inventory): JsonResponse
     {
+        if ($response = $this->authorizeOperationalStaff($request)) {
+            return $response;
+        }
         $user = $this->getAuthenticatedUser($request);
-        if (!$user) {
-            return response()->json(['success' => false, 'message' => 'Admin authorization required.'], 401);
-        }
-        if ($user->role !== 'admin') {
-            return response()->json(['success' => false, 'message' => 'Admin authorization required.'], 403);
-        }
 
         try {
             $batch = $inventory->receiveBatch(

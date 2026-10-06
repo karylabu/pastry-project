@@ -2,7 +2,8 @@ import React, { useEffect, useMemo, useState } from "react";
 import { jsPDF } from "jspdf";
 import { AnimatePresence, motion } from "framer-motion";
 import { Archive, Ban, CheckCircle2, CircleDollarSign, Download, Eye, Search, X } from "lucide-react";
-import { STAFF_BASE } from "../../../services/config";
+import { LARAVEL_BASE, STAFF_BASE } from "../../../services/config";
+import { getAuthHeaders } from "../../../services/api";
 
 const staffFetch = (url, options = {}) => fetch(url, { credentials: "include", ...options });
 
@@ -12,24 +13,100 @@ export default function OrderHistory() {
   const [query, setQuery] = useState("");
   const [orderTypeFilter, setOrderTypeFilter] = useState("All");
   const [statusFilter, setStatusFilter] = useState("All");
-  const [timeRange, setTimeRange] = useState("This Month");
+  const [timeRange, setTimeRange] = useState("All");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [selectedOrder, setSelectedOrder] = useState(null);
+  const [loadError, setLoadError] = useState("");
+  const [importedSales, setImportedSales] = useState([]);
+  const [importHistorySummary, setImportHistorySummary] = useState({ records: 0, total_sales: 0 });
+  const [importHistoryPage, setImportHistoryPage] = useState(1);
+  const [importHistoryPagination, setImportHistoryPagination] = useState({ current_page: 1, last_page: 1, total: 0 });
+  const [importHistoryLoading, setImportHistoryLoading] = useState(false);
+  const [importHistoryError, setImportHistoryError] = useState("");
 
   useEffect(() => {
     staffFetch(`${STAFF_BASE}/api_orders.php`)
-      .then((res) => res.json())
-      .then((data) => {
-        if (Array.isArray(data)) {
-          setOrders(data.filter((order) => ["Completed", "Cancelled", "Ready for Pickup"].includes(order.status)));
-        } else {
-          setOrders([]);
-        }
+      .then(async (response) => {
+        if (!response.ok) throw new Error("Unable to load order history.");
+        return response.json();
       })
-      .catch(() => setOrders([]))
+      .then((data) => setOrders(Array.isArray(data)
+        ? data.filter((order) => ["Completed", "Cancelled", "Ready for Pickup"].includes(order.status))
+        : []))
+      .catch((error) => {
+        setOrders([]);
+        setLoadError(error.message || "Unable to load order history.");
+      })
       .finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => {
+    const params = new URLSearchParams({ page: String(importHistoryPage), per_page: "50" });
+    params.set("source", "imported");
+    if (query.trim()) params.set("search", query.trim());
+
+    const today = new Date();
+    const formatDate = (date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+    if (timeRange === "Custom" && startDate && endDate) {
+      params.set("start_date", startDate);
+      params.set("end_date", endDate);
+    } else if (["Today", "This Week", "This Month"].includes(timeRange)) {
+      const rangeStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+      if (timeRange === "This Week") rangeStart.setDate(rangeStart.getDate() - rangeStart.getDay());
+      else if (timeRange === "This Month") rangeStart.setDate(1);
+      else if (timeRange === "Today") { /* start of today */ }
+      params.set("start_date", formatDate(rangeStart));
+      params.set("end_date", formatDate(today));
+    }
+
+    let isCurrentRequest = true;
+    setImportHistoryLoading(true);
+    setImportHistoryError("");
+    fetch(`${LARAVEL_BASE}/api/sales/import/history?${params.toString()}`, {
+      credentials: "include",
+      headers: { Accept: "application/json", ...getAuthHeaders() },
+    }).then(async (response) => {
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || !payload.success) {
+        throw new Error(payload.message || "Unable to load imported sales history.");
+      }
+      if (!isCurrentRequest) return;
+      const rows = Array.isArray(payload.sales) ? payload.sales : [];
+      setImportedSales(rows
+        .filter((sale) => sale.source === "imported")
+        .map((sale) => {
+          const quantity = Number(sale.units_sold) || 0;
+          const total = Number(sale.price) || 0;
+          return {
+            id: `import-${sale.id}`,
+            isImportedSales: true,
+            status: "Imported",
+            order_type: "Imported Sales",
+            customer: "Imported sales",
+            name: sale.cake_name,
+            total,
+            subtotal: total,
+            created_at: `${sale.sale_date}T12:00:00`,
+            items: [{ name: sale.cake_name, qty: quantity, price: quantity > 0 ? total / quantity : total }],
+          };
+        }));
+      setImportHistoryPagination(payload.pagination || { current_page: 1, last_page: 1, total: rows.length });
+      setImportHistorySummary(payload.summary || { records: 0, total_sales: 0 });
+    }).catch((error) => {
+      if (!isCurrentRequest) return;
+      setImportedSales([]);
+      setImportHistoryError(error.message || "Unable to load imported sales history.");
+    }).finally(() => {
+      if (isCurrentRequest) setImportHistoryLoading(false);
+    });
+
+    return () => { isCurrentRequest = false; };
+  }, [query, timeRange, startDate, endDate, importHistoryPage]);
+
+  useEffect(() => {
+    setImportHistoryPage(1);
+  }, [query, timeRange, startDate, endDate, orderTypeFilter, statusFilter]);
 
   const filteredOrders = useMemo(() => {
     const term = query.trim().toLowerCase();
@@ -57,21 +134,24 @@ export default function OrderHistory() {
       return true;
     };
 
-    return orders.filter((order) => {
-      const searchableValues = [order.id, order.customer, order.name, order.phone];
+    return [...orders, ...importedSales].filter((order) => {
+      const searchableValues = [order.id, order.customer, order.name, order.phone, ...(order.items || []).map((item) => item.name)];
       const matchesQuery = !term || searchableValues.some((value) => String(value || "").toLowerCase().includes(term));
-      const matchesType = orderTypeFilter === "All" || order.order_type === orderTypeFilter || (orderTypeFilter === "Standard Pre-order" && (!order.order_type || order.order_type === "Standard")) || (orderTypeFilter === "Urgent Rush Order" && order.order_type === "Urgent");
+      const matchesType = orderTypeFilter === "All" || (orderTypeFilter === "Imported Sales" ? order.isImportedSales : order.order_type === orderTypeFilter || (orderTypeFilter === "Standard Pre-order" && (!order.order_type || order.order_type === "Standard")) || (orderTypeFilter === "Urgent Rush Order" && order.order_type === "Urgent"));
       const matchesStatus = statusFilter === "All" || order.status === statusFilter;
       const matchesDate = matchesTimeRange(order.completed_at || order.updated_at || order.created_at);
       return matchesQuery && matchesType && matchesStatus && matchesDate;
     });
-  }, [orders, query, orderTypeFilter, statusFilter, timeRange, startDate, endDate]);
+  }, [orders, importedSales, query, orderTypeFilter, statusFilter, timeRange, startDate, endDate]);
 
   const summaryMetrics = useMemo(() => {
     const completedCount = filteredOrders.filter((order) => order.status === "Completed").length;
     const cancelledCount = filteredOrders.filter((order) => order.status === "Cancelled").length;
-    const totalRevenue = filteredOrders.reduce((sum, order) => sum + Number(order.total || 0), 0);
-    const cancellationRate = filteredOrders.length > 0 ? (cancelledCount / filteredOrders.length) * 100 : 0;
+    const liveOrderRevenue = filteredOrders.filter((order) => !order.isImportedSales).reduce((sum, order) => sum + Number(order.total || 0), 0);
+    const includeImportedSales = orderTypeFilter === "All" || orderTypeFilter === "Imported Sales";
+    const totalRevenue = liveOrderRevenue + (includeImportedSales ? Number(importHistorySummary.total_sales || 0) : 0);
+    const realOrderCount = filteredOrders.filter((order) => !order.isImportedSales).length;
+    const cancellationRate = realOrderCount > 0 ? (cancelledCount / realOrderCount) * 100 : 0;
 
     return {
       completedCount,
@@ -79,9 +159,10 @@ export default function OrderHistory() {
       cancelledCount,
       cancellationRate,
     };
-  }, [filteredOrders]);
+  }, [filteredOrders, importHistorySummary, orderTypeFilter]);
 
   const getOrderTypeMeta = (order) => {
+    if (order?.isImportedSales) return { label: "Imported Sales", isCustomCake: false, isUrgent: false };
     const normalizedOrderType = String(order?.order_type || order?.type || "").toLowerCase();
     const isCustomCake = Boolean(order?.is_customized || order?.custom_details || normalizedOrderType === "custom" || normalizedOrderType === "custom cake" || normalizedOrderType === "customized");
     const isUrgent = normalizedOrderType.includes("urgent") || normalizedOrderType.includes("rush") || order?.order_type === "Urgent";
@@ -202,8 +283,6 @@ export default function OrderHistory() {
     doc.setFont("helvetica", "normal");
     doc.text(`Subtotal: ${formatPdfCurrency(order.subtotal || 0)}`, margin, y);
     y += 12;
-    doc.text(`Delivery Fee: ${formatPdfCurrency(order.delivery_fee || 0)}`, margin, y);
-    y += 12;
     const discount = Number(order.discount || 0);
     doc.text(`Discount: ${formatPdfCurrency(discount)}`, margin, y);
     y += 12;
@@ -237,7 +316,7 @@ export default function OrderHistory() {
           <div>
             <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.24em] text-[#92701e]">Order management</p>
             <h1 className="text-[26px] font-bold leading-tight text-[#33251e] sm:text-[30px]">Order History</h1>
-            <p className="mt-1.5 text-[13px] text-[#74675f]">Completed, cancelled, and received orders.</p>
+            <p className="mt-1.5 text-[13px] text-[#74675f]">Completed, cancelled, received orders, and imported sales history.</p>
           </div>
           <div className="inline-flex items-center gap-2 text-[11px] font-medium text-[#74675f]">
             <Archive size={15} className="text-[#92701e]" />
@@ -266,28 +345,30 @@ export default function OrderHistory() {
           <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-[minmax(240px,1.4fr)_minmax(170px,1fr)_minmax(170px,1fr)]">
             <label className="relative block">
               <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#9b8c83]" aria-hidden="true" />
-              <input type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search order, customer, or phone" aria-label="Search order history" className="h-10 w-full rounded-md border border-[#e8dfd4] bg-[#fffdfa] pl-9 pr-9 text-[12px] text-[#33251e] outline-none transition placeholder:text-[#a99a8e] focus:border-[#b89646] focus:ring-2 focus:ring-[#d4af37]/15" />
+              <input type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search order, product, customer, or phone" aria-label="Search order history" className="h-10 w-full rounded-md border border-[#e8dfd4] bg-[#fffdfa] pl-9 pr-9 text-[12px] text-[#33251e] outline-none transition placeholder:text-[#a99a8e] focus:border-[#b89646] focus:ring-2 focus:ring-[#d4af37]/15" />
               {query && <button type="button" onClick={() => setQuery("")} aria-label="Clear search" className="absolute right-3 top-1/2 -translate-y-1/2 text-[#8f8076] hover:text-[#33251e]"><X size={14} /></button>}
             </label>
             <select value={orderTypeFilter} onChange={(e) => setOrderTypeFilter(e.target.value)} aria-label="Filter by order type" className="h-10 rounded-md border border-[#e8dfd4] bg-white px-3 text-[12px] text-[#33251e] outline-none focus:border-[#b89646] focus:ring-2 focus:ring-[#d4af37]/15">
               <option value="All">All order types</option>
               <option value="Standard Pre-order">Standard pre-order</option>
               <option value="Urgent Rush Order">Urgent rush order</option>
+              <option value="Imported Sales">Imported sales</option>
             </select>
             <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} aria-label="Filter by status" className="h-10 rounded-md border border-[#e8dfd4] bg-white px-3 text-[12px] text-[#33251e] outline-none focus:border-[#b89646] focus:ring-2 focus:ring-[#d4af37]/15">
               <option value="All">All statuses</option>
               <option value="Completed">Completed</option>
               <option value="Cancelled">Cancelled</option>
               <option value="Ready for Pickup">Ready for Pickup</option>
+              <option value="Imported">Imported</option>
             </select>
           </div>
           <div className="mt-3 flex flex-col gap-2 border-t border-[#f0e9e2] pt-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="grid flex-1 grid-cols-2 gap-2 sm:grid-cols-4" role="group" aria-label="Filter by time range">
-              {["Today", "This Week", "This Month", "Custom"].map((option) => (
+            <div className="grid flex-1 grid-cols-2 gap-2 sm:grid-cols-5" role="group" aria-label="Filter by time range">
+              {["All", "Today", "This Week", "This Month", "Custom"].map((option) => (
                 <button key={option} type="button" onClick={() => setTimeRange(option)} aria-pressed={timeRange === option} className={`w-full rounded-md border px-3 py-2 text-[11px] font-medium transition ${timeRange === option ? "border-[#33251e] bg-[#33251e] text-white" : "border-transparent bg-[#f7f4ef] text-[#65574d] hover:bg-[#fffaf0]"}`}>{option}</button>
               ))}
             </div>
-            <p className="text-[10px] text-[#8f8076]">{filteredOrders.length} matching {filteredOrders.length === 1 ? "order" : "orders"}</p>
+            <p className="text-[10px] text-[#8f8076]">{(orderTypeFilter === "All" || orderTypeFilter === "Imported Sales") && (statusFilter === "All" || statusFilter === "Imported") ? importHistorySummary.records : 0} imported sales · {filteredOrders.filter((order) => !order.isImportedSales).length} orders in view</p>
           </div>
           {timeRange === "Custom" && (
             <div className="mt-3 flex flex-col gap-2 border-t border-[#f0e9e2] pt-3 sm:flex-row">
@@ -297,6 +378,8 @@ export default function OrderHistory() {
           )}
         </div>
 
+        {loadError && <div className="mb-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-[12px] text-red-800" role="alert">{loadError}</div>}
+        {importHistoryError && <div className="mb-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-[12px] text-red-800" role="alert">{importHistoryError}</div>}
         {loading ? (
           <div className="rounded-lg border border-[#e9e1d9] bg-white px-4 py-8 text-[12px] text-[#74675f]" role="status">Loading order history...</div>
         ) : filteredOrders.length === 0 ? (
@@ -311,16 +394,16 @@ export default function OrderHistory() {
             {filteredOrders.map((order) => {
               const { label: orderTypeLabel, isCustomCake, isUrgent } = getOrderTypeMeta(order);
               const fulfillmentDate = order.completed_at || order.updated_at || order.created_at;
-              const statusStyle = order.status === "Cancelled" ? "bg-[#fff0eb] text-[#9a5947]" : order.status === "Ready for Pickup" ? "bg-[#fff4cd] text-[#80600a]" : "bg-[#edf5eb] text-[#4f7654]";
+              const statusStyle = order.isImportedSales ? "bg-[#fff4cd] text-[#80600a]" : order.status === "Cancelled" ? "bg-[#fff0eb] text-[#9a5947]" : order.status === "Ready for Pickup" ? "bg-[#fff4cd] text-[#80600a]" : "bg-[#edf5eb] text-[#4f7654]";
               const orderTypeStyle = isCustomCake ? "bg-[#f3edf9] text-[#705b83]" : isUrgent ? "bg-[#fff0eb] text-[#9a5947]" : "bg-[#f7f4ef] text-[#65574d]";
 
               return (
                 <article key={`mobile-${order.id}`} className="rounded-lg border border-[#e9e1d9] bg-white p-3.5 shadow-[0_3px_12px_rgba(60,42,28,0.035)]">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <p className="text-[12px] font-bold text-[#33251e]">Order #{order.id}</p>
+                      <p className="text-[12px] font-bold text-[#33251e]">{order.isImportedSales ? "Imported sale" : `Order #${order.id}`}</p>
                       <p className="mt-1 truncate text-[13px] font-semibold text-[#33251e]">{order.customer || order.name || "—"}</p>
-                      <p className="text-[10px] text-[#8f8076]">{order.phone || "No phone"}</p>
+                      <p className="text-[10px] text-[#8f8076]">{order.isImportedSales ? `${order.items?.[0]?.qty || 0} units · ${order.items?.[0]?.name || ""}` : order.phone || "No phone"}</p>
                     </div>
                     <p className="shrink-0 text-[14px] font-bold text-[#33251e]">{formatCurrency(order.total)}</p>
                   </div>
@@ -331,7 +414,7 @@ export default function OrderHistory() {
                   </div>
                   <div className="mt-3 flex items-center justify-between gap-3 border-t border-[#f0e9e2] pt-3">
                     <p className="text-[10px] text-[#8f8076]">{fulfillmentDate ? new Date(fulfillmentDate).toLocaleString([], { dateStyle: "medium", timeStyle: "short" }) : "Date unavailable"}</p>
-                    <button type="button" onClick={() => setSelectedOrder(order)} className="inline-flex items-center gap-1.5 rounded-md bg-black px-3 py-2 text-[10px] font-semibold text-white"><Eye size={13} /> View receipt</button>
+                    {order.isImportedSales ? <span className="text-[10px] font-semibold text-[#80600a]">CSV sales record</span> : <button type="button" onClick={() => setSelectedOrder(order)} className="inline-flex items-center gap-1.5 rounded-md bg-black px-3 py-2 text-[10px] font-semibold text-white"><Eye size={13} /> View receipt</button>}
                   </div>
                 </article>
               );
@@ -366,12 +449,12 @@ export default function OrderHistory() {
                       : isUrgent
                       ? "bg-red-50 text-red-700 border border-red-200"
                       : "bg-blue-50 text-blue-700 border border-blue-200";
-                    const statusLabel = order.status === "Ready for Pickup" ? "Ready for Pickup" : order.status === "Cancelled" ? "Cancelled by Customer" : "Completed";
+                    const statusLabel = order.isImportedSales ? "Imported" : order.status === "Ready for Pickup" ? "Ready for Pickup" : order.status === "Cancelled" ? "Cancelled by Customer" : "Completed";
                     const fulfillmentDate = order.completed_at || order.updated_at || order.created_at;
 
                     return (
                       <tr key={order.id} className="border-b border-[#f0e9e2] last:border-0 transition-colors hover:bg-[#fffaf0]">
-                        <td className="px-4 py-3 text-[12px] font-semibold text-[#33251e]">#{order.id}</td>
+                        <td className="px-4 py-3 text-[12px] font-semibold text-[#33251e]">{order.isImportedSales ? "Imported sale" : `#${order.id}`}</td>
                         <td className="px-3 py-3 text-[12px] text-[#74675f]">
                           <div className="font-semibold text-[#33251e]">{order.customer || order.name || "—"}</div>
                           <div className="text-[10px] text-[#8f8076]">{order.phone || "—"}</div>
@@ -391,13 +474,13 @@ export default function OrderHistory() {
                         </td>
                         <td className="px-4 py-3 text-[11px] text-[#74675f]">{statusLabel}</td>
                         <td className="px-3 py-3">
-                          <button
+                          {order.isImportedSales ? <span className="text-[10px] font-semibold text-[#80600a]">Sales record</span> : <button
                             type="button"
                             onClick={() => setSelectedOrder(order)}
                             className="inline-flex items-center gap-1.5 rounded-md border border-black/10 bg-black px-3 py-2 text-[10px] font-semibold text-white transition hover:bg-black/90"
                           >
                             <Eye size={13} /> View
-                          </button>
+                          </button>}
                         </td>
                       </tr>
                     );
@@ -408,6 +491,15 @@ export default function OrderHistory() {
           )}
           </div>
           </>
+        )}
+        {(orderTypeFilter === "All" || orderTypeFilter === "Imported Sales") && (statusFilter === "All" || statusFilter === "Imported") && importHistoryPagination.last_page > 1 && (
+          <div className="mt-4 flex items-center justify-between rounded-lg border border-[#e9e1d9] bg-white px-4 py-3 text-[11px] text-[#74675f]">
+            <span>{importHistoryLoading ? "Loading imported sales..." : `Imported sales page ${importHistoryPagination.current_page} of ${importHistoryPagination.last_page} · ${importHistoryPagination.total} records`}</span>
+            <div className="flex gap-2">
+              <button type="button" disabled={importHistoryLoading || importHistoryPage <= 1} onClick={() => setImportHistoryPage((page) => Math.max(1, page - 1))} className="rounded-md border border-[#e8dfd4] px-3 py-2 disabled:opacity-40">Previous sales</button>
+              <button type="button" disabled={importHistoryLoading || importHistoryPage >= importHistoryPagination.last_page} onClick={() => setImportHistoryPage((page) => Math.min(importHistoryPagination.last_page, page + 1))} className="rounded-md border border-[#e8dfd4] px-3 py-2 disabled:opacity-40">Next sales</button>
+            </div>
+          </div>
         )}
         </div>
       </div>
@@ -503,10 +595,6 @@ export default function OrderHistory() {
                   <div className="flex items-center justify-between">
                     <span>Subtotal</span>
                     <span>{formatCurrency(selectedOrder.subtotal || 0)}</span>
-                  </div>
-                  <div className="mt-1 flex items-center justify-between">
-                    <span>Delivery / Fee</span>
-                    <span>{formatCurrency(selectedOrder.delivery_fee || 0)}</span>
                   </div>
                   <div className="mt-3 flex items-center justify-between border-t border-black/10 pt-2 text-[15px] font-semibold text-black">
                     <span>Total</span>

@@ -7,7 +7,7 @@ export function identifyDiscountIdType(text) {
     .replace(/\s+/g, ' ')
     .trim();
 
-  const seniorCitizen = /\bSENIOR\s+CITIZEN\b|\bOSCA\b|\bRA\s*9994\b|\bREPUBLIC\s+ACT\s+9994\b/.test(normalized);
+  const seniorCitizen = /\bSENIOR\s+CITIZENS?\b|\bOSCA\b|\bRA\s*9994\b|\bREPUBLIC\s+ACT\s+9994\b/.test(normalized);
   const pwd = /\bPWD\b|\bPERSONS?\s+WITH\s+DISABILIT(?:Y|IES)\b|\bNCDA\b|\bRA\s*(?:7277|10754)\b|\bREPUBLIC\s+ACT\s+(?:7277|10754)\b/.test(normalized);
 
   if (seniorCitizen && pwd) return 'ambiguous';

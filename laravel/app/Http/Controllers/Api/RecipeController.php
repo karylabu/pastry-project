@@ -14,7 +14,7 @@ class RecipeController extends Controller
 {
     public function show(Request $request, Product $product, RecipeService $recipes): JsonResponse
     {
-        if ($response = $this->authorizeAdmin($request)) return $response;
+        if ($response = $this->authorizeOperationalStaff($request)) return $response;
         $sizeId = $request->filled('product_size_id') ? $request->integer('product_size_id') : null;
         return response()->json([
             'success' => true,
@@ -26,7 +26,7 @@ class RecipeController extends Controller
 
     public function update(SaveProductRecipeRequest $request, Product $product, RecipeService $recipes): JsonResponse
     {
-        if ($response = $this->authorizeAdmin($request)) return $response;
+        if ($response = $this->authorizeOperationalStaff($request)) return $response;
         try {
             $validated = $request->validated();
             return response()->json([
@@ -38,13 +38,5 @@ class RecipeController extends Controller
         } catch (Throwable $exception) {
             return response()->json(['success' => false, 'message' => $exception->getMessage()], 409);
         }
-    }
-
-    private function authorizeAdmin(Request $request): ?JsonResponse
-    {
-        $user = $this->getAuthenticatedUser($request);
-        if (!$user) return response()->json(['success' => false, 'message' => 'Admin authorization required.'], 401);
-        if ($user->role !== 'admin') return response()->json(['success' => false, 'message' => 'Admin authorization required.'], 403);
-        return null;
     }
 }

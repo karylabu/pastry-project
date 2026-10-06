@@ -6,6 +6,7 @@ use App\Models\Ingredient;
 use App\Models\IngredientBatch;
 use App\Models\IngredientMovement;
 use App\Models\DiscardRequest;
+use App\Models\User;
 use App\Models\WasteLog;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
@@ -144,7 +145,12 @@ class InventoryService
             ]);
             $this->synchronizeIngredientStock((int) $batch->ingredient_id);
 
-            if ($isExpired && $discard->reason === 'Expired') {
+            $requesterRole = strtolower((string) User::query()->whereKey($userId)->value('role'));
+            if (
+                $isExpired
+                && $discard->reason === 'Expired'
+                && in_array($requesterRole, ['admin', 'manager'], true)
+            ) {
                 return $this->approveDiscard((int) $discard->id, $userId);
             }
 
@@ -297,7 +303,7 @@ class InventoryService
     public function getIngredientsWithBatchStock()
     {
         return Ingredient::query()
-            ->select(['id', 'name', 'unit', 'stock', 'threshold', 'created_at', 'updated_at'])
+            ->select(['id', 'name', 'unit', 'unit_cost', 'stock', 'threshold', 'created_at', 'updated_at'])
             ->where('name', 'not like', '[DEV]%')
             ->with('batches.discardRequests')
             ->orderBy('name')

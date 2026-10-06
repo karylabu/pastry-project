@@ -14,7 +14,7 @@ class ProductionController extends Controller
 {
     public function availability(Request $request, Product $product, ProductionService $production): JsonResponse
     {
-        if ($response = $this->authorizeAdmin($request)) return $response;
+        if ($response = $this->authorizeOperationalStaff($request)) return $response;
         $sizeId = $request->integer('product_size_id');
         if ($sizeId <= 0) return response()->json(['is_producible' => false, 'availability_reason' => 'Select a cake size first.'], 422);
         $availability = $production->checkAvailability($product, $sizeId);
@@ -23,7 +23,7 @@ class ProductionController extends Controller
 
     public function store(ProduceProductRequest $request, ProductionService $production): JsonResponse
     {
-        if ($response = $this->authorizeAdmin($request)) return $response;
+        if ($response = $this->authorizeOperationalStaff($request)) return $response;
         try {
             $user = $this->getAuthenticatedUser($request);
             $product = Product::query()->findOrFail($request->integer('product_id'));
@@ -39,13 +39,5 @@ class ProductionController extends Controller
         } catch (Throwable $exception) {
             return response()->json(['status' => 'error', 'message' => $exception->getMessage() ?: 'Unable to produce finished goods.'], 409);
         }
-    }
-
-    private function authorizeAdmin(Request $request): ?JsonResponse
-    {
-        $user = $this->getAuthenticatedUser($request);
-        if (!$user) return response()->json(['status' => 'error', 'message' => 'Admin authorization required.'], 401);
-        if ($user->role !== 'admin') return response()->json(['status' => 'error', 'message' => 'Admin authorization required.'], 403);
-        return null;
     }
 }

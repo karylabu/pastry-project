@@ -84,10 +84,10 @@ function getStoredUser() {
   }
 }
 
-export default function AdminNavbar() {
+export default function AdminNavbar({ onSidebarChange }) {
   const location = useLocation();
   const navigate = useNavigate();
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(() => window.matchMedia("(min-width: 1024px)").matches);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [notificationsOpen, setNotificationsOpen] = useState(false);
@@ -96,6 +96,7 @@ export default function AdminNavbar() {
   const [notificationsLoading, setNotificationsLoading] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState(() => getStoredUser());
+  const [currentDateTime, setCurrentDateTime] = useState(() => new Date());
   const searchRef = useRef(null);
   const notificationsRef = useRef(null);
   const accountRef = useRef(null);
@@ -104,6 +105,22 @@ export default function AdminNavbar() {
     const syncUser = () => setCurrentUser(getStoredUser());
     window.addEventListener("storage", syncUser);
     return () => window.removeEventListener("storage", syncUser);
+  }, []);
+
+  useEffect(() => {
+    onSidebarChange?.(sidebarOpen);
+  }, [onSidebarChange, sidebarOpen]);
+
+  useEffect(() => {
+    const timerId = window.setInterval(() => setCurrentDateTime(new Date()), 1000);
+    return () => window.clearInterval(timerId);
+  }, []);
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia("(min-width: 1024px)");
+    const handleBreakpointChange = (event) => setSidebarOpen(event.matches);
+    mediaQuery.addEventListener("change", handleBreakpointChange);
+    return () => mediaQuery.removeEventListener("change", handleBreakpointChange);
   }, []);
 
   useEffect(() => {
@@ -188,6 +205,10 @@ export default function AdminNavbar() {
     navigate(`/admin/products${query ? `?search=${encodeURIComponent(query)}` : ""}`);
   };
 
+  const closeSidebarAfterNavigation = () => {
+    if (!window.matchMedia("(min-width: 1024px)").matches) setSidebarOpen(false);
+  };
+
   const handleLogout = async () => {
     if (!window.confirm("Are you sure you want to log out?")) return;
 
@@ -208,16 +229,16 @@ export default function AdminNavbar() {
 
   return (
     <>
-      <aside className={`fixed top-0 left-0 z-[10000] flex h-full w-[260px] flex-col border-r border-[#eadfd8] bg-[#fffdfa] shadow-sm transition-transform duration-300 ease-out ${sidebarOpen ? "translate-x-0" : "-translate-x-full"} lg:translate-x-0`}>
+      <aside id="admin-sidebar" className={`fixed top-0 left-0 z-[10000] flex h-full w-[260px] flex-col border-r border-[#eadfd8] bg-[#fffdfa] shadow-sm transition-transform duration-300 ease-out ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}`}>
         <div className="flex shrink-0 items-center justify-between border-b border-[#f0e7e0] px-6 py-6">
-          <Link to="/admin/dashboard" className="flex items-center gap-3" onClick={() => setSidebarOpen(false)}>
+          <Link to="/admin/dashboard" className="flex items-center gap-3" onClick={closeSidebarAfterNavigation}>
             <img src={`${BASE}/uploads/logo.png`} className="h-9 w-9 object-contain" alt="Pastry Project logo" />
             <div>
               <h1 className="text-[15px] font-bold italic leading-none text-black">Pastry <span className="text-[#a57c38]">Project</span></h1>
               <p className="mt-1.5 text-[8px] uppercase tracking-[0.3em] text-[#9b8c83]">Admin Panel</p>
             </div>
           </Link>
-          <button type="button" onClick={() => setSidebarOpen(false)} className="text-[#765d50] hover:text-[#33251e] lg:hidden" aria-label="Close menu">
+          <button type="button" onClick={() => setSidebarOpen(false)} className="flex h-9 w-9 items-center justify-center rounded-lg text-[#765d50] transition hover:bg-[#fff8df] hover:text-[#33251e]" aria-label="Close admin navigation" title="Hide menu">
             <X size={18} />
           </button>
         </div>
@@ -234,7 +255,7 @@ export default function AdminNavbar() {
                     <Link
                       key={item.path}
                       to={item.path}
-                      onClick={() => setSidebarOpen(false)}
+                      onClick={closeSidebarAfterNavigation}
                       aria-current={active ? "page" : undefined}
                       className={`relative flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-[12px] transition-colors ${active ? "bg-[#fff4cd] font-semibold text-[#33251e]" : "text-[#5f514a] hover:bg-[#fff8df] hover:text-[#33251e]"}`}
                     >
@@ -257,12 +278,29 @@ export default function AdminNavbar() {
       </aside>
 
       {sidebarOpen && <button type="button" aria-label="Close admin navigation" onClick={() => setSidebarOpen(false)} className="fixed inset-0 z-[9999] bg-black/30 lg:hidden" />}
-      <header className="fixed left-0 right-0 top-0 z-[9998] flex h-[72px] items-center justify-between border-b border-[#eadfd8] bg-[#fbfaf5]/95 px-4 backdrop-blur-xl sm:px-6 lg:left-[260px] lg:px-8">
+      <header className={`fixed right-0 top-0 z-[9998] flex h-[72px] items-center justify-between border-b border-[#eadfd8] bg-[#fbfaf5]/95 px-4 backdrop-blur-xl transition-[left] duration-300 ease-out sm:px-6 lg:px-8 ${sidebarOpen ? "left-0 lg:left-[260px]" : "left-0 lg:left-0"}`}>
         <div className="flex min-w-0 items-center gap-3">
-          <button type="button" onClick={() => setSidebarOpen(true)} aria-label="Open admin navigation" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-[#765d50] transition hover:bg-[#fff8df] lg:hidden">
-            <MenuIcon size={19} />
+          <button
+            type="button"
+            onClick={() => setSidebarOpen((open) => !open)}
+            aria-label={sidebarOpen ? "Hide admin navigation" : "Show admin navigation"}
+            aria-controls="admin-sidebar"
+            aria-expanded={sidebarOpen}
+            title={sidebarOpen ? "Hide menu" : "Show menu"}
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-[#765d50] transition hover:bg-[#fff8df] hover:text-[#33251e]"
+          >
+            <MenuIcon size={20} />
           </button>
-        </div>
+            <time
+              dateTime={currentDateTime.toISOString()}
+              className="hidden text-[12px] font-semibold leading-5 text-black sm:block sm:text-[13px]"
+              aria-label="Current date and time"
+            >
+              {currentDateTime.toLocaleDateString([], { weekday: "short", month: "short", day: "numeric", year: "numeric" })}
+              <span className="mx-2 text-black/40" aria-hidden="true">·</span>
+              {currentDateTime.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+            </time>
+          </div>
 
         <div className="flex shrink-0 items-center gap-1 sm:gap-2">
           <div ref={searchRef} className="relative">

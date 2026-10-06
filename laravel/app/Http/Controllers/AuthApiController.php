@@ -108,8 +108,10 @@ class AuthApiController extends Controller
         }
 
         $storedPassword = (string) $user->getRawOriginal('password');
-        $passwordValid = Hash::check($password, $storedPassword);
-        $isLegacyPassword = !$passwordValid && hash_equals($storedPassword, $password);
+        $isLegacyPassword = hash_equals($storedPassword, $password);
+        $passwordValid = !$isLegacyPassword
+            && (Hash::info($storedPassword)['algoName'] ?? 'unknown') !== 'unknown'
+            && Hash::check($password, $storedPassword);
 
         if (!$passwordValid && !$isLegacyPassword) {
             return response()->json([

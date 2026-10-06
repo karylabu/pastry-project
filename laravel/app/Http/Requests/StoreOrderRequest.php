@@ -35,6 +35,7 @@ class StoreOrderRequest extends FormRequest
             'items.*.image' => 'sometimes|string|nullable',
             'method' => 'required|string|in:Delivery,Deliver,Pickup',
             'delivery_service' => 'nullable|string|in:Lalamove,GrabCar',
+            'delivery_time' => 'nullable|date_format:H:i',
             'payment' => 'required|string',
             'address' => 'required_if:method,Delivery,Deliver|string|nullable',
             'phone' => 'required|string',
