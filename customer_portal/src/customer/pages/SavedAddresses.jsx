@@ -200,39 +200,39 @@ export default function SavedAddresses() {
   };
 
   return (
-    <PageShell background="bg-[#fffaf3]" padding="px-4 py-6 sm:px-6 sm:py-8 md:px-8 md:py-9" innerClassName="space-y-6">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+    <PageShell background="bg-[#fffaf3]" padding="px-3 py-4 sm:px-6 sm:py-8 md:px-8 md:py-9" innerClassName="space-y-4 sm:space-y-6">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between sm:gap-4">
           <div>
-            <p className="text-[10px] font-black uppercase tracking-[0.3em] text-[#c59a36]">Delivery Details</p>
-            <h1 className="mt-2 text-2xl font-bold tracking-tight text-[#4a2b20] sm:text-[30px]">Saved Addresses</h1>
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-[#8b6b55]">Save your usual delivery locations for a faster, smoother checkout.</p>
+            <p className="text-[9px] font-black uppercase tracking-[0.26em] text-[#c59a36] sm:text-[10px] sm:tracking-[0.3em]">Delivery Details</p>
+            <h1 className="mt-1.5 text-xl font-bold tracking-tight text-[#4a2b20] sm:mt-2 sm:text-[30px]">Saved Addresses</h1>
+            <p className="mt-1.5 max-w-2xl text-xs leading-5 text-[#8b6b55] sm:mt-2 sm:text-sm sm:leading-6">Save your usual delivery locations for a faster, smoother checkout.</p>
           </div>
-          <div className="flex items-center gap-2 rounded-xl border border-[#eadfbf] bg-[#fffaf0] px-3 py-2 text-xs font-semibold text-[#8b681d]">
+          <div className="flex items-center gap-2 self-start rounded-lg border border-[#eadfbf] bg-[#fffaf0] px-2.5 py-1.5 text-[10px] font-semibold text-[#8b681d] sm:rounded-xl sm:px-3 sm:py-2 sm:text-xs">
             <MapPin size={15} />
             Delivery-ready locations
           </div>
         </div>
 
-        <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_390px]">
-          <section ref={formSectionRef} className="space-y-7 rounded-[24px] border border-[#ead8c5] bg-white p-5 shadow-[0_12px_35px_rgba(126,82,35,0.06)] sm:p-7">
-            <div className="flex items-start justify-between gap-4 border-b border-stone-100 pb-5">
+        <div className="grid items-start gap-4 sm:gap-6 lg:grid-cols-[minmax(0,1fr)_390px]">
+          <section ref={formSectionRef} className="space-y-5 rounded-2xl border border-[#ead8c5] bg-white p-4 shadow-[0_12px_35px_rgba(126,82,35,0.06)] sm:space-y-7 sm:rounded-[24px] sm:p-7">
+            <div className="flex items-start justify-between gap-3 border-b border-stone-100 pb-4 sm:gap-4 sm:pb-5">
               <div>
                 <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#c59a36]">Address book</p>
-                <h2 className="mt-1 text-lg font-bold text-slate-900">{form.address_id ? 'Edit address' : 'Add a new address'}</h2>
+                <h2 className="mt-1 text-base font-bold text-slate-900 sm:text-lg">{form.address_id ? 'Edit address' : 'Add a new address'}</h2>
               </div>
-              <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#f7edcf] text-[#a77b16]"><Home size={17} /></span>
+              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#f7edcf] text-[#a77b16] sm:h-9 sm:w-9 sm:rounded-xl"><Home size={16} /></span>
             </div>
             <div>
               <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">Address label</p>
-              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              <div className="mt-3 grid grid-cols-2 gap-2 sm:mt-4 sm:gap-3">
                 {LABELS.map((label) => (
                   <button
                     type="button"
                     key={label}
                     onClick={() => handleChange('address_label', label)}
-                    className={`flex items-center gap-3 rounded-2xl border px-4 py-3 text-left text-sm font-semibold transition ${form.address_label === label ? 'border-[#e7b866] bg-[#fff1d8] text-[#4a2b20] shadow-sm' : 'border-stone-200 bg-[#fffaf3] text-slate-700 hover:border-[#d4af37]'}`}
+                    className={`flex items-center gap-2 rounded-xl border px-2.5 py-2.5 text-left text-xs font-semibold transition sm:gap-3 sm:rounded-2xl sm:px-4 sm:py-3 sm:text-sm ${form.address_label === label ? 'border-[#e7b866] bg-[#fff1d8] text-[#4a2b20] shadow-sm' : 'border-stone-200 bg-[#fffaf3] text-slate-700 hover:border-[#d4af37]'}`}
                   >
-                    <span className={`flex h-8 w-8 items-center justify-center rounded-xl ${form.address_label === label ? 'bg-[#f1cf72] text-[#4a2b20]' : 'bg-white text-[#a77b16]'}`}>
+                    <span className={`flex h-7 w-7 items-center justify-center rounded-lg sm:h-8 sm:w-8 sm:rounded-xl ${form.address_label === label ? 'bg-[#f1cf72] text-[#4a2b20]' : 'bg-white text-[#a77b16]'}`}>
                       {React.createElement(LABEL_ICONS[label], { size: 16 })}
                     </span>
                     <span className="flex-1">{label}</span>
@@ -242,77 +242,77 @@ export default function SavedAddresses() {
               </div>
             </div>
 
-            <div className="space-y-4">
+            <div className="space-y-3 sm:space-y-4">
               <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">Recipient information</p>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <label className="block text-sm text-gray-700">
+              <div className="grid grid-cols-2 gap-2.5 sm:gap-4">
+                <label className="block text-xs text-gray-700 sm:text-sm">
                   <span className="font-semibold">Full Name</span>
                   <input
                     value={form.recipient_name}
                     onChange={(e) => handleChange('recipient_name', e.target.value)}
                     placeholder="Recipient name"
-                    className="mt-2 w-full rounded-xl border border-[#ead8c5] bg-white px-4 py-3.5 text-sm text-[#4a2b20] outline-none focus:border-[#d4af37] focus:ring-2 focus:ring-[#f1cf72]/30"
+                    className="mt-1.5 w-full rounded-xl border border-[#ead8c5] bg-white px-3 py-3 text-sm text-[#4a2b20] outline-none focus:border-[#d4af37] focus:ring-2 focus:ring-[#f1cf72]/30 sm:mt-2 sm:px-4 sm:py-3.5"
                   />
                 </label>
-                <label className="block text-sm text-gray-700">
+                <label className="block text-xs text-gray-700 sm:text-sm">
                   <span className="font-semibold">Contact Number</span>
                   <input
                     value={form.contact_number}
                     onChange={(e) => handleChange('contact_number', e.target.value)}
                     placeholder="09XXXXXXXXX"
                     type="tel"
-                    className="mt-2 w-full rounded-xl border border-[#ead8c5] bg-white px-4 py-3.5 text-sm text-[#4a2b20] outline-none focus:border-[#d4af37] focus:ring-2 focus:ring-[#f1cf72]/30"
+                    className="mt-1.5 w-full rounded-xl border border-[#ead8c5] bg-white px-3 py-3 text-sm text-[#4a2b20] outline-none focus:border-[#d4af37] focus:ring-2 focus:ring-[#f1cf72]/30 sm:mt-2 sm:px-4 sm:py-3.5"
                   />
                 </label>
               </div>
             </div>
 
-            <div className="space-y-4">
+            <div className="space-y-3 sm:space-y-4">
               <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">Address details</p>
-              <div className="grid gap-4">
-                <label className="block text-sm text-gray-700">
+              <div className="grid grid-cols-2 gap-2.5 sm:gap-4">
+                <label className="block text-xs text-gray-700 sm:text-sm">
                   <span className="font-semibold">House/Building Number</span>
                   <input
                     value={form.house_no}
                     onChange={(e) => handleChange('house_no', e.target.value)}
                     placeholder="House/Building number"
-                    className="mt-2 w-full rounded-xl border border-[#ead8c5] bg-white px-4 py-3.5 text-sm text-[#4a2b20] outline-none focus:border-[#d4af37] focus:ring-2 focus:ring-[#f1cf72]/30"
+                    className="mt-1.5 w-full rounded-xl border border-[#ead8c5] bg-white px-3 py-3 text-sm text-[#4a2b20] outline-none focus:border-[#d4af37] focus:ring-2 focus:ring-[#f1cf72]/30 sm:mt-2 sm:px-4 sm:py-3.5"
                   />
                 </label>
-                <label className="block text-sm text-gray-700">
+                <label className="block text-xs text-gray-700 sm:text-sm">
                   <span className="font-semibold">Street Name</span>
                   <input
                     value={form.street}
                     onChange={(e) => handleChange('street', e.target.value)}
                     placeholder="Street name"
-                    className="mt-2 w-full rounded-xl border border-[#ead8c5] bg-white px-4 py-3.5 text-sm text-[#4a2b20] outline-none focus:border-[#d4af37] focus:ring-2 focus:ring-[#f1cf72]/30"
+                    className="mt-1.5 w-full rounded-xl border border-[#ead8c5] bg-white px-3 py-3 text-sm text-[#4a2b20] outline-none focus:border-[#d4af37] focus:ring-2 focus:ring-[#f1cf72]/30 sm:mt-2 sm:px-4 sm:py-3.5"
                   />
                 </label>
-                <label className="block text-sm text-gray-700">
+                <label className="block text-xs text-gray-700 sm:text-sm">
                   <span className="font-semibold">Barangay</span>
                   <input
                     value={form.barangay}
                     onChange={(e) => handleChange('barangay', e.target.value)}
                     placeholder="Barangay"
-                    className="mt-2 w-full rounded-xl border border-[#ead8c5] bg-white px-4 py-3.5 text-sm text-[#4a2b20] outline-none focus:border-[#d4af37] focus:ring-2 focus:ring-[#f1cf72]/30"
+                    className="mt-1.5 w-full rounded-xl border border-[#ead8c5] bg-white px-3 py-3 text-sm text-[#4a2b20] outline-none focus:border-[#d4af37] focus:ring-2 focus:ring-[#f1cf72]/30 sm:mt-2 sm:px-4 sm:py-3.5"
                   />
                 </label>
-                <label className="block text-sm text-gray-700">
+                <label className="block text-xs text-gray-700 sm:text-sm">
                   <span className="font-semibold">City/Municipality</span>
                   <input
                     value={form.city}
                     onChange={(e) => handleChange('city', e.target.value)}
                     placeholder="City or municipality"
-                    className="mt-2 w-full rounded-xl border border-[#ead8c5] bg-white px-4 py-3.5 text-sm text-[#4a2b20] outline-none focus:border-[#d4af37] focus:ring-2 focus:ring-[#f1cf72]/30"
+                    className="mt-1.5 w-full rounded-xl border border-[#ead8c5] bg-white px-3 py-3 text-sm text-[#4a2b20] outline-none focus:border-[#d4af37] focus:ring-2 focus:ring-[#f1cf72]/30 sm:mt-2 sm:px-4 sm:py-3.5"
                   />
                 </label>
-                <label className="block text-sm text-gray-700">
+                <label className="block text-xs text-gray-700 sm:text-sm">
                   <span className="font-semibold">Province</span>
                   <input
                     value={form.province}
                     onChange={(e) => handleChange('province', e.target.value)}
                     placeholder="Province"
-                    className="mt-2 w-full rounded-[18px] border border-gray-200 bg-white px-4 py-3 text-sm outline-none focus:border-black"
+                    className="mt-1.5 w-full rounded-xl border border-gray-200 bg-white px-3 py-3 text-sm outline-none focus:border-black sm:mt-2 sm:rounded-[18px] sm:px-4"
                   />
                 </label>
                 <label className="block text-sm text-gray-700">
@@ -321,21 +321,21 @@ export default function SavedAddresses() {
                     value={form.zip_code}
                     onChange={(e) => handleChange('zip_code', e.target.value)}
                     placeholder="ZIP / Postal code"
-                    className="mt-2 w-full rounded-[18px] border border-gray-200 bg-white px-4 py-3 text-sm outline-none focus:border-black"
+                    className="mt-1.5 w-full rounded-xl border border-gray-200 bg-white px-3 py-3 text-sm outline-none focus:border-black sm:mt-2 sm:rounded-[18px] sm:px-4"
                   />
                 </label>
               </div>
             </div>
 
-            <div className="space-y-4">
+            <div className="space-y-3 sm:space-y-4">
               <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">Additional information</p>
-              <label className="block text-sm text-gray-700">
+              <label className="block text-xs text-gray-700 sm:text-sm">
                 <span className="font-semibold">Landmark (optional)</span>
                 <input
                   value={form.landmark}
                   onChange={(e) => handleChange('landmark', e.target.value)}
                   placeholder="Landmark"
-                  className="mt-2 w-full rounded-[18px] border border-gray-200 bg-white px-4 py-3 text-sm outline-none focus:border-black"
+                  className="mt-1.5 w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-black sm:mt-2 sm:rounded-[18px] sm:px-4 sm:py-3"
                 />
               </label>
               <label className="block text-sm text-gray-700">
@@ -344,13 +344,13 @@ export default function SavedAddresses() {
                   value={form.delivery_instructions}
                   onChange={(e) => handleChange('delivery_instructions', e.target.value)}
                   placeholder="Leave at the guardhouse or call upon arrival"
-                  rows={4}
-                  className="mt-2 w-full rounded-[18px] border border-gray-200 bg-white px-4 py-3 text-sm outline-none focus:border-black"
+                  rows={3}
+                  className="mt-1.5 w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-black sm:mt-2 sm:rounded-[18px] sm:px-4 sm:py-3"
                 />
               </label>
             </div>
 
-            <label className="flex items-center gap-3 rounded-2xl border border-[#eadfbf] bg-[#fffaf0] px-4 py-3 text-sm text-slate-700">
+            <label className="flex items-center gap-2.5 rounded-xl border border-[#eadfbf] bg-[#fffaf0] px-3 py-2.5 text-xs text-slate-700 sm:gap-3 sm:rounded-2xl sm:px-4 sm:py-3 sm:text-sm">
               <input
                 type="checkbox"
                 checked={form.is_default}
@@ -367,7 +367,7 @@ export default function SavedAddresses() {
               type="submit"
               onClick={handleSubmit}
               disabled={loading}
-              className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#e7b866] px-6 py-3.5 text-sm font-bold uppercase tracking-[0.16em] text-[#4a2b20] transition hover:bg-[#f1cf72] disabled:opacity-60"
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#e7b866] px-5 py-3 text-xs font-bold uppercase tracking-[0.14em] text-[#4a2b20] transition hover:bg-[#f1cf72] disabled:opacity-60 sm:px-6 sm:py-3.5 sm:text-sm sm:tracking-[0.16em]"
             >
               <Save size={15} />
               {loading ? 'Saving…' : form.address_id ? 'Update Address' : 'Save Address'}
@@ -375,7 +375,7 @@ export default function SavedAddresses() {
           </section>
 
           <aside className="space-y-4 lg:sticky lg:top-24">
-            <div className="rounded-[24px] border border-[#ead8c5] bg-white p-5 shadow-[0_12px_35px_rgba(126,82,35,0.06)] sm:p-6">
+            <div className="rounded-2xl border border-[#ead8c5] bg-white p-4 shadow-[0_12px_35px_rgba(126,82,35,0.06)] sm:rounded-[24px] sm:p-6">
               <div className="mb-4 flex items-center justify-between">
                 <div>
                   <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#c59a36]">Your locations</p>
@@ -386,13 +386,13 @@ export default function SavedAddresses() {
               {addresses.length === 0 ? (
                 <div className="rounded-2xl border border-dashed border-stone-300 bg-[#fafaf9] p-5 text-center">
                   <MapPin size={22} className="mx-auto text-[#c59a36]" />
-                  <p className="mt-2 text-sm font-semibold text-slate-800">No saved addresses yet</p>
-                  <p className="mt-1 text-xs leading-5 text-slate-500">Add one using the form to speed up checkout.</p>
+                  <p className="mt-1.5 text-xs font-semibold text-slate-800 sm:mt-2 sm:text-sm">No saved addresses yet</p>
+                  <p className="mt-1 text-[11px] leading-4 text-slate-500 sm:text-xs sm:leading-5">Add one using the form to speed up checkout.</p>
                 </div>
               ) : (
                 <div className="space-y-4">
                   {addresses.map((addressItem) => (
-                    <div key={addressItem.address_id} className="rounded-2xl border border-[#ead8c5] bg-[#fffaf3] p-4 transition hover:border-[#d4af37]">
+                    <div key={addressItem.address_id} className="rounded-xl border border-[#ead8c5] bg-[#fffaf3] p-3 transition hover:border-[#d4af37] sm:rounded-2xl sm:p-4">
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex min-w-0 items-start gap-2.5">
                           <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-[#f7edcf] text-[#a77b16]"><MapPin size={15} /></span>
@@ -405,7 +405,7 @@ export default function SavedAddresses() {
                           <span className="shrink-0 rounded-full bg-[#f1cf72] px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.14em] text-[#4a2b20]">Default</span>
                         )}
                       </div>
-                      <p className="mt-4 text-[13px] leading-5 text-slate-700">
+                      <p className="mt-3 text-xs leading-5 text-slate-700 sm:mt-4 sm:text-[13px]">
                         {addressItem.house_no ? `${addressItem.house_no}, ` : ''}
                         {addressItem.street}, {addressItem.barangay}, {addressItem.city}, {addressItem.province}
                         {addressItem.zip_code ? `, ${addressItem.zip_code}` : ''}

@@ -72,6 +72,12 @@ export default function CustomerApp() {
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [showGuestPrompt, setShowGuestPrompt] = useState(false);
 
+  useEffect(() => {
+    setIsCartOpen(false);
+    setIsCheckoutOpen(false);
+    setShowGuestPrompt(false);
+  }, [location.pathname]);
+
   const isGuest = () => {
     try {
       const storedUser = JSON.parse(localStorage.getItem('user') || 'null');

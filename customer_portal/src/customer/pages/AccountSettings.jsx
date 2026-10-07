@@ -249,7 +249,7 @@ export default function AccountSettings() {
         value={value}
         onChange={onChange}
         placeholder={placeholder}
-        className="mt-2 w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3.5 text-base text-gray-900 placeholder-gray-400 outline-none focus:border-[#d4af37] focus:ring-2 focus:ring-[#f1cf72]/30"
+        className="mt-2 w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-3 text-sm text-gray-900 placeholder-gray-400 outline-none focus:border-[#d4af37] focus:ring-2 focus:ring-[#f1cf72]/30 sm:px-4 sm:py-3.5 sm:text-base"
       />
     </label>
   );
@@ -270,28 +270,28 @@ export default function AccountSettings() {
   };
 
   const renderProfileSection = () => (
-    <section className="rounded-2xl border border-gray-200 bg-white p-7 md:p-8">
-      <div className="flex items-center gap-4">
-        <div className="flex h-16 w-16 items-center justify-center rounded-full bg-yellow-50 text-xl font-black text-yellow-600">
+    <section className="rounded-2xl border border-gray-200 bg-white p-4 sm:p-6 md:p-8">
+      <div className="flex items-center gap-3 sm:gap-4">
+        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-yellow-50 text-lg font-black text-yellow-600 sm:h-16 sm:w-16 sm:text-xl">
           {profileForm.profile_picture ? <img src={profileForm.profile_picture} alt="Profile" className="h-full w-full rounded-full object-cover" /> : initials}
         </div>
         <div>
-          <h2 className="text-xl font-bold text-gray-900">Edit Profile</h2>
+          <h2 className="text-lg font-bold text-gray-900 sm:text-xl">Edit Profile</h2>
           <p className="text-sm text-gray-600">Keep your personal details up to date.</p>
         </div>
       </div>
 
-      <form onSubmit={handleProfileSave} className="mt-6 space-y-4">
-        <div className="grid gap-5 md:grid-cols-2">
+      <form onSubmit={handleProfileSave} className="mt-4 space-y-3 sm:mt-6 sm:space-y-4">
+        <div className="grid gap-3 md:grid-cols-2 sm:gap-5">
           {renderField('Full Name', profileForm.full_name, (e) => setProfileForm({ ...profileForm, full_name: e.target.value }), 'text', 'Enter full name')}
           {renderField('Username', profileForm.username, (e) => setProfileForm({ ...profileForm, username: e.target.value }), 'text', 'Enter username')}
         </div>
-        <div className="grid gap-5 md:grid-cols-2">
+        <div className="grid gap-3 md:grid-cols-2 sm:gap-5">
           {renderField('Email Address', profileForm.email, (e) => setProfileForm({ ...profileForm, email: e.target.value }), 'email', 'Enter email address')}
           {renderField('Phone Number', profileForm.phone, (e) => setProfileForm({ ...profileForm, phone: e.target.value }), 'tel', 'Enter phone number')}
         </div>
         {renderField('Profile Picture (optional)', profileForm.profile_picture, (e) => setProfileForm({ ...profileForm, profile_picture: e.target.value }), 'text', 'Paste image URL here')}
-        <button type="submit" disabled={saving} className="rounded-full bg-[#e7b866] px-6 py-3.5 text-base font-bold text-[#4a2b20] transition hover:bg-[#f1cf72] disabled:opacity-50">
+        <button type="submit" disabled={saving} className="rounded-full bg-[#e7b866] px-5 py-3 text-sm font-bold text-[#4a2b20] transition hover:bg-[#f1cf72] disabled:opacity-50 sm:px-6 sm:py-3.5 sm:text-base">
           {saving ? 'Saving...' : 'Save Profile'}
         </button>
       </form>
@@ -316,7 +316,7 @@ export default function AccountSettings() {
           <button
             type="button"
             onClick={() => setPasswordFormOpen((open) => !open)}
-            className="flex w-full items-center justify-between px-5 py-4 text-left"
+            className="flex w-full items-center justify-between px-3 py-3 text-left sm:px-5 sm:py-4"
           >
             <span className="flex items-center gap-3">
               <span className="rounded-full bg-gray-100 p-2 text-gray-600"><KeyRound size={16} /></span>
@@ -327,29 +327,29 @@ export default function AccountSettings() {
 
           {passwordFormOpen && (
             <div className="px-5 pb-5">
-              <form onSubmit={handlePasswordChange} className="space-y-4 pt-1">
+              <form onSubmit={handlePasswordChange} className="space-y-3 pt-1 sm:space-y-4">
                 <label className="block">
                   <span className="text-xs uppercase tracking-[0.16em] text-gray-600 font-bold">Current Password</span>
-                  <div className="mt-2 flex items-center rounded-xl border border-gray-200 bg-gray-50 px-4 py-3.5">
-                    <input type={showPassword ? 'text' : 'password'} value={passwordForm.current_password} onChange={(e) => setPasswordForm({ ...passwordForm, current_password: e.target.value })} className="w-full bg-transparent text-base text-gray-900 outline-none" />
+                  <div className="mt-2 flex items-center rounded-xl border border-gray-200 bg-gray-50 px-3 py-3 sm:px-4 sm:py-3.5">
+                    <input type={showPassword ? 'text' : 'password'} value={passwordForm.current_password} onChange={(e) => setPasswordForm({ ...passwordForm, current_password: e.target.value })} className="w-full bg-transparent text-sm text-gray-900 outline-none sm:text-base" />
                     <button type="button" onClick={() => setShowPassword(!showPassword)} className="ml-2 text-gray-400">{showPassword ? <EyeOff size={16} /> : <Eye size={16} />}</button>
                   </div>
                 </label>
                 <label className="block">
                   <span className="text-xs uppercase tracking-[0.16em] text-gray-600 font-bold">New Password</span>
-                  <div className="mt-2 flex items-center rounded-xl border border-gray-200 bg-gray-50 px-4 py-3.5">
-                    <input type={showNewPassword ? 'text' : 'password'} value={passwordForm.new_password} onChange={(e) => setPasswordForm({ ...passwordForm, new_password: e.target.value })} className="w-full bg-transparent text-base text-gray-900 outline-none" />
+                  <div className="mt-2 flex items-center rounded-xl border border-gray-200 bg-gray-50 px-3 py-3 sm:px-4 sm:py-3.5">
+                    <input type={showNewPassword ? 'text' : 'password'} value={passwordForm.new_password} onChange={(e) => setPasswordForm({ ...passwordForm, new_password: e.target.value })} className="w-full bg-transparent text-sm text-gray-900 outline-none sm:text-base" />
                     <button type="button" onClick={() => setShowNewPassword(!showNewPassword)} className="ml-2 text-gray-400">{showNewPassword ? <EyeOff size={16} /> : <Eye size={16} />}</button>
                   </div>
                 </label>
                 <label className="block">
                   <span className="text-xs uppercase tracking-[0.16em] text-gray-600 font-bold">Confirm New Password</span>
-                  <div className={`mt-2 flex items-center rounded-xl border px-4 py-3 ${
+                  <div className={`mt-2 flex items-center rounded-xl border px-3 py-3 sm:px-4 ${
                     passwordForm.new_password && passwordForm.confirm_password && passwordForm.new_password !== passwordForm.confirm_password
                       ? 'border-red-300 bg-red-50'
                       : 'border-gray-200 bg-gray-50'
                   }`}>
-                    <input type={showConfirmPassword ? 'text' : 'password'} value={passwordForm.confirm_password} onChange={(e) => setPasswordForm({ ...passwordForm, confirm_password: e.target.value })} className="w-full bg-transparent text-base text-gray-900 outline-none" />
+                    <input type={showConfirmPassword ? 'text' : 'password'} value={passwordForm.confirm_password} onChange={(e) => setPasswordForm({ ...passwordForm, confirm_password: e.target.value })} className="w-full bg-transparent text-sm text-gray-900 outline-none sm:text-base" />
                     <button type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)} className="ml-2 text-gray-400">{showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}</button>
                   </div>
                   {passwordForm.new_password && passwordForm.confirm_password && passwordForm.new_password !== passwordForm.confirm_password && (
@@ -357,7 +357,7 @@ export default function AccountSettings() {
                   )}
                 </label>
 
-                <button type="submit" disabled={saving} className="rounded-full bg-[#e7b866] px-6 py-3.5 text-base font-bold text-[#4a2b20] transition hover:bg-[#f1cf72] disabled:opacity-50">
+                <button type="submit" disabled={saving} className="rounded-full bg-[#e7b866] px-5 py-3 text-sm font-bold text-[#4a2b20] transition hover:bg-[#f1cf72] disabled:opacity-50 sm:px-6 sm:py-3.5 sm:text-base">
                   {saving ? 'Updating...' : 'Save Password'}
                 </button>
               </form>
@@ -389,10 +389,10 @@ export default function AccountSettings() {
             onClick={() => setSessionsOpen((open) => !open)}
             className="flex w-full items-center justify-between px-5 py-4 text-left"
           >
-            <span className="flex items-center gap-3">
-              <span className="rounded-full bg-[#fff1d8] p-2 text-[#a06a2c]"><Monitor size={16} /></span>
+            <span className="flex min-w-0 items-center gap-2.5 sm:gap-3">
+              <span className="shrink-0 rounded-full bg-[#fff1d8] p-1.5 text-[#a06a2c] sm:p-2"><Monitor size={15} /></span>
               <span>
-                <span className="block text-[15px] font-semibold text-gray-900">Where you&apos;re logged in</span>
+              <span className="block text-sm font-semibold text-gray-900 sm:text-[15px]">Where you&apos;re logged in</span>
                 <span className="block text-xs text-gray-500">View the devices using your account.</span>
               </span>
             </span>
@@ -400,17 +400,17 @@ export default function AccountSettings() {
           </button>
 
           {sessionsOpen && (sessions.length === 0 ? (
-            <div className="px-5 py-4 text-sm text-gray-500">No active device sessions found.</div>
+            <div className="px-3 py-3 text-xs text-gray-500 sm:px-5 sm:py-4 sm:text-sm">No active device sessions found.</div>
           ) : sessions.map((session) => (
-            <div key={session.id} className="flex items-center justify-between gap-4 px-5 py-4">
-              <span className="flex min-w-0 items-center gap-3">
-                <span className="rounded-full bg-[#fff1d8] p-2 text-[#a06a2c]"><Monitor size={16} /></span>
+            <div key={session.id} className="flex items-center justify-between gap-2 px-3 py-3 sm:gap-4 sm:px-5 sm:py-4">
+              <span className="flex min-w-0 items-center gap-2 sm:gap-3">
+                <span className="shrink-0 rounded-full bg-[#fff1d8] p-1.5 text-[#a06a2c] sm:p-2"><Monitor size={15} /></span>
                 <span className="min-w-0">
-                  <span className="block truncate text-[15px] font-semibold text-gray-900">{session.device_name}</span>
-                  <span className="block truncate text-xs text-gray-500">{session.ip_address} · Signed in {session.created_at}</span>
+                  <span className="block truncate text-sm font-semibold text-gray-900 sm:text-[15px]">{session.device_name}</span>
+                  <span className="block truncate text-[11px] text-gray-500 sm:text-xs">{session.ip_address} · Signed in {session.created_at}</span>
                 </span>
               </span>
-              <span className={`shrink-0 text-[10px] font-bold uppercase tracking-[0.12em] ${session.current ? 'text-[#a06a2c]' : 'text-gray-400'}`}>
+              <span className={`shrink-0 text-[9px] font-bold uppercase tracking-[0.08em] sm:text-[10px] sm:tracking-[0.12em] ${session.current ? 'text-[#a06a2c]' : 'text-gray-400'}`}>
                 {session.current ? 'This device' : 'Active'}
               </span>
             </div>
@@ -418,11 +418,11 @@ export default function AccountSettings() {
           <button
             type="button"
             onClick={handleLogoutAllDevices}
-            className="flex w-full items-center justify-between px-5 py-4 text-left"
+            className="flex w-full items-center justify-between px-3 py-3 text-left sm:px-5 sm:py-4"
           >
-            <span className="flex items-center gap-3">
-              <span className="rounded-full bg-gray-100 p-2 text-gray-600"><LogOut size={16} /></span>
-              <span className="text-[15px] font-semibold text-gray-900">Logout from all devices</span>
+            <span className="flex items-center gap-2 sm:gap-3">
+              <span className="rounded-full bg-gray-100 p-1.5 text-gray-600 sm:p-2"><LogOut size={15} /></span>
+              <span className="text-sm font-semibold text-gray-900 sm:text-[15px]">Logout from all devices</span>
             </span>
             <ChevronRight size={18} className="text-gray-400" />
           </button>
@@ -433,32 +433,32 @@ export default function AccountSettings() {
   );
 
   const renderPrivacySection = () => (
-    <section className="rounded-2xl border border-gray-200 bg-white p-7 md:p-8">
+    <section className="rounded-2xl border border-gray-200 bg-white p-4 sm:p-6 md:p-8">
       <div className="flex items-center gap-3">
-        <div className="rounded-2xl bg-[#fff1d8] p-4 text-[#a06a2c]"><UserCircle2 size={24} /></div>
+        <div className="rounded-2xl bg-[#fff1d8] p-3 text-[#a06a2c] sm:p-4"><UserCircle2 size={22} /></div>
         <div>
-          <h3 className="text-2xl font-bold text-gray-900">Privacy and Account</h3>
+          <h3 className="text-xl font-bold text-gray-900 sm:text-2xl">Privacy and Account</h3>
           <p className="mt-1 text-base text-gray-600">Download your data or remove your account.</p>
         </div>
       </div>
 
-      <div className="mt-8 space-y-4">
-        <button onClick={handleDownloadData} className="flex w-full items-center justify-between rounded-xl border border-gray-200 px-5 py-4 text-left text-base font-semibold text-gray-700 hover:border-[#e7b866] hover:text-[#a06a2c]">
+      <div className="mt-5 space-y-3 sm:mt-8 sm:space-y-4">
+        <button onClick={handleDownloadData} className="flex w-full items-center justify-between rounded-xl border border-gray-200 px-3 py-3 text-left text-sm font-semibold text-gray-700 hover:border-[#e7b866] hover:text-[#a06a2c] sm:px-5 sm:py-4 sm:text-base">
           <span className="flex items-center gap-3"><Download size={19} /> Download My Data</span>
           <span className="text-xs uppercase tracking-[0.15em] text-gray-500">Optional</span>
         </button>
-        <button onClick={handleLogoutAllDevices} className="flex w-full items-center justify-between rounded-xl border border-gray-200 px-5 py-4 text-left text-base font-semibold text-gray-700 hover:border-red-600 hover:text-red-600">
+        <button onClick={handleLogoutAllDevices} className="flex w-full items-center justify-between rounded-xl border border-gray-200 px-3 py-3 text-left text-sm font-semibold text-gray-700 hover:border-red-600 hover:text-red-600 sm:px-5 sm:py-4 sm:text-base">
           <span className="flex items-center gap-3"><LogOut size={19} /> Logout from All Devices</span>
           <span className="text-xs uppercase tracking-[0.15em] text-gray-500">Optional</span>
         </button>
-        <button onClick={() => setShowDeleteConfirm(true)} className="flex w-full items-center justify-between rounded-xl border border-red-200 bg-red-50 px-5 py-4 text-left text-base font-semibold text-red-600">
+        <button onClick={() => setShowDeleteConfirm(true)} className="flex w-full items-center justify-between rounded-xl border border-red-200 bg-red-50 px-3 py-3 text-left text-sm font-semibold text-red-600 sm:px-5 sm:py-4 sm:text-base">
           <span className="flex items-center gap-3"><Trash2 size={19} /> Delete Account</span>
           <span className="text-xs uppercase tracking-[0.15em] text-red-500">Confirm</span>
         </button>
-        <Link to="/customer/privacy-policy" className="flex w-full items-center justify-between rounded-xl border border-gray-200 px-5 py-4 text-left text-base font-semibold text-gray-700 hover:border-[#e7b866] hover:text-[#a06a2c]">
+        <Link to="/customer/privacy-policy" className="flex w-full items-center justify-between rounded-xl border border-gray-200 px-3 py-3 text-left text-sm font-semibold text-gray-700 hover:border-[#e7b866] hover:text-[#a06a2c] sm:px-5 sm:py-4 sm:text-base">
           <span>Privacy Policy</span>
         </Link>
-        <Link to="/customer/terms" className="flex w-full items-center justify-between rounded-xl border border-gray-200 px-5 py-4 text-left text-base font-semibold text-gray-700 hover:border-[#e7b866] hover:text-[#a06a2c]">
+        <Link to="/customer/terms" className="flex w-full items-center justify-between rounded-xl border border-gray-200 px-3 py-3 text-left text-sm font-semibold text-gray-700 hover:border-[#e7b866] hover:text-[#a06a2c] sm:px-5 sm:py-4 sm:text-base">
           <span>Terms & Conditions</span>
         </Link>
       </div>
@@ -522,9 +522,9 @@ export default function AccountSettings() {
             <div className="rounded-2xl border border-gray-200 bg-white p-8 text-sm text-gray-600">Loading your account...</div>
           ) : activeSection === 'overview' ? (
             <>
-              <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-[0_10px_28px_rgba(126,82,35,0.05)] md:p-8">
-                <h2 className="text-[26px] font-bold text-gray-900">Find the setting you need</h2>
-                <div className="mt-3 flex items-center gap-3 rounded-full border border-[#ead8c5] bg-[#fffaf3] px-4 py-3">
+              <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-[0_10px_28px_rgba(126,82,35,0.05)] sm:p-6 md:p-8">
+                <h2 className="text-xl font-bold text-gray-900 sm:text-[26px]">Find the setting you need</h2>
+                <div className="mt-3 flex items-center gap-3 rounded-full border border-[#ead8c5] bg-[#fffaf3] px-3 py-2.5 sm:px-4 sm:py-3">
                   <Search size={18} className="text-gray-400" />
                   <input
                     value={searchQuery}
@@ -536,11 +536,11 @@ export default function AccountSettings() {
               </div>
 
               <div>
-                <h3 className="mb-5 text-2xl font-bold text-gray-900">Most visited settings</h3>
+                <h3 className="mb-3 text-xl font-bold text-gray-900 sm:mb-5 sm:text-2xl">Most visited settings</h3>
                 {filteredSections.length === 0 ? (
                   <p className="text-sm text-gray-500">No settings match "{searchQuery}".</p>
                 ) : (
-                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  <div className="grid gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3">
                     {filteredSections.map((item) => (
                       <button
                         key={item.key}
@@ -548,11 +548,11 @@ export default function AccountSettings() {
                           setActiveSection(item.key);
                           setMessage('');
                         }}
-                        className="rounded-2xl border border-gray-200 bg-white p-6 text-left transition hover:border-[#e7b866]"
+                        className="rounded-2xl border border-gray-200 bg-white p-4 text-left transition hover:border-[#e7b866] sm:p-6"
                       >
-                        <div className={`inline-flex rounded-full p-3 ${item.accent}`}>{item.icon}</div>
-                        <h4 className="mt-4 text-lg font-bold text-gray-900">{item.title}</h4>
-                        <p className="mt-1.5 text-[15px] leading-6 text-gray-600">{item.description}</p>
+                        <div className={`inline-flex rounded-full p-2.5 sm:p-3 ${item.accent}`}>{item.icon}</div>
+                        <h4 className="mt-3 text-base font-bold text-gray-900 sm:mt-4 sm:text-lg">{item.title}</h4>
+                        <p className="mt-1.5 text-sm leading-5 text-gray-600 sm:text-[15px] sm:leading-6">{item.description}</p>
                       </button>
                     ))}
                   </div>

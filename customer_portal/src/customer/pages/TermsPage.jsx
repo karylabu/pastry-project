@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+﻿import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ROOT_BASE } from "../../services/config";
 
@@ -182,7 +182,7 @@ export default function TermsPage() {
 
           <div className="terms-scroll w-full max-w-4xl">
             <p className="terms-heading font-semibold uppercase tracking-[0.35em] text-[#d4af37]">Terms &amp; Conditions</p>
-            <h1 className="mt-2 font-black tracking-tight">Terms and Conditions</h1>
+            <h1 className="mt-2 font-black tracking-tight">Terms &amp; Conditions</h1>
             <p className="mt-1 text-[10px] font-medium text-gray-600">Last Updated: August 29, 2026</p>
 
             <div className="terms-content-wrap mt-3 space-y-3">

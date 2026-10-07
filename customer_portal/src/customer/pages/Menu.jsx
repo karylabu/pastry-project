@@ -225,11 +225,11 @@ export default function Menu({ onAddToCart }) {
 
         {/* FILTER CONTROLS */}
         <div className="mb-5 flex w-full justify-end px-1 py-1">
-          <div className="flex flex-wrap items-center justify-end gap-2">
+          <div className="flex flex-nowrap items-center justify-end gap-1 sm:gap-2">
               <button
                 type="button"
                 onClick={() => setShowOnlyAvailable(false)}
-                className={`rounded-full border px-3.5 py-2 text-[10px] font-black uppercase tracking-[0.14em] transition ${
+                className={`rounded-full border px-1.5 py-1.5 text-[9px] font-black uppercase tracking-[0.08em] transition sm:px-3.5 sm:py-2 sm:text-[10px] sm:tracking-[0.14em] ${
                   !showOnlyAvailable ? 'border-[#e7c875] bg-[#fff8df] text-[#8d6a2e]' : 'border-[#eadfd8] bg-transparent text-[#765d50] hover:border-[#e7c875] hover:bg-[#fff8df] hover:text-[#8d6a2e]'
                 }`}
               >
@@ -238,15 +238,15 @@ export default function Menu({ onAddToCart }) {
               <button
                 type="button"
                 onClick={() => setShowOnlyAvailable(true)}
-                className={`rounded-full border px-3.5 py-2 text-[10px] font-black uppercase tracking-[0.14em] transition ${
+                className={`rounded-full border px-1.5 py-1.5 text-[9px] font-black uppercase tracking-[0.08em] transition sm:px-3.5 sm:py-2 sm:text-[10px] sm:tracking-[0.14em] ${
                   showOnlyAvailable ? 'border-[#e7c875] bg-[#fff8df] text-[#8d6a2e]' : 'border-[#eadfd8] bg-transparent text-[#765d50] hover:border-[#e7c875] hover:bg-[#fff8df] hover:text-[#8d6a2e]'
                 }`}
               >
                 Available now
               </button>
-              <label className="flex items-center gap-2 rounded-full border border-[#eadfd8] bg-transparent px-3.5 py-2 text-[10px] font-black uppercase tracking-[0.14em] text-[#765d50]">
+              <label className="flex shrink-0 items-center gap-1 rounded-full border border-[#eadfd8] bg-transparent px-1.5 py-1.5 text-[9px] font-black uppercase tracking-[0.08em] text-[#765d50] sm:gap-2 sm:px-3.5 sm:py-2 sm:text-[10px] sm:tracking-[0.14em]">
                 <span>Sort</span>
-                <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className="bg-transparent font-semibold uppercase outline-none text-slate-700">
+                <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className="max-w-[88px] bg-transparent text-[9px] font-semibold uppercase outline-none text-slate-700 sm:max-w-none sm:text-[10px]">
                   <option value="recommended">Recommended</option>
                   <option value="price-asc">Price ↑</option>
                   <option value="price-desc">Price ↓</option>

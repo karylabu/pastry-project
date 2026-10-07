@@ -1,13 +1,14 @@
 import React, { useState } from 'react';
-import { ArrowLeft, ChevronRight } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import PageShell from '../components/PageShell';
 import { ROOT_BASE } from '../../services/config';
 
-export default function DesignGallery({ category, folder, description, backPath = '/customer/customized-cakes', zoomItems = [], lowerItems = [], extraLowerItems = [], imagePositions = {} }) {
+export default function DesignGallery({ category, folder, backPath = '/customer/customized-cakes', zoomItems = [], lowerItems = [], extraLowerItems = [], imagePositions = {} }) {
   const navigate = useNavigate();
   const [previewImage, setPreviewImage] = useState(null);
   const [selectedReferenceId, setSelectedReferenceId] = useState(null);
+  const displayCategory = category.replace(/\s+designs$/i, '');
   const images = Array.from({ length: 10 }, (_, index) => ({
     id: `${folder}-${index + 1}`,
     url: `${ROOT_BASE}/uploads/${folder}(${index + 1}).jpg${folder === 'wedding' && index === 0 ? '?v=wedding-1-updated' : '?v=' + folder + '-updated'}`,
@@ -36,7 +37,7 @@ export default function DesignGallery({ category, folder, description, backPath 
     }
     setSelectedReferenceId(image.id);
     setPreviewImage(null);
-    navigate('/customer/customized-cakes');
+    navigate('/customer/customized-cakes', { state: { scrollToRequestForm: true } });
   };
 
   React.useEffect(() => {
@@ -59,19 +60,8 @@ export default function DesignGallery({ category, folder, description, backPath 
         <ArrowLeft size={15} /> Back to customize
       </button>
 
-      <section className="mb-6 rounded-2xl border border-[#eadfd8] bg-white px-5 py-6 shadow-[0_8px_22px_rgba(91,64,39,0.05)] sm:px-8">
-        <p className="text-[9px] font-black uppercase tracking-[0.28em] text-[#9b7b3d]">{category} collection</p>
-        <div className="mt-1 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
-          <div>
-            <h1 className="font-serif text-3xl font-bold leading-tight text-[#33251e]">{category} Cakes</h1>
-            <p className="mt-1 max-w-xl text-xs leading-5 text-[#9b8c83]">{description}</p>
-          </div>
-          <button type="button" onClick={() => navigate('/customer/customized-cakes')} className="inline-flex w-fit items-center gap-2 rounded-full bg-[#fff8df] px-4 py-2 text-[10px] font-bold text-[#8d6a2e] transition hover:bg-[#ffeeb0]">Customize a cake <ChevronRight size={13} /></button>
-        </div>
-      </section>
-
       <section>
-        <div className="mb-4 flex items-end justify-between px-1"><div><p className="text-[9px] font-black uppercase tracking-[0.28em] text-[#9b7b3d]">Made for special moments</p><h2 className="mt-1 font-serif text-2xl font-bold text-[#33251e]">{category} Designs</h2></div><span className="text-[10px] font-semibold text-[#9b8c83]">{images.length} designs</span></div>
+        <div className="mb-4 flex items-end justify-between px-1"><div><p className="text-[9px] font-black uppercase tracking-[0.28em] text-[#9b7b3d]">Made for special moments</p><h2 className="mt-1 font-serif text-2xl font-bold text-[#33251e]">{displayCategory} Designs</h2></div><span className="text-[10px] font-semibold text-[#9b8c83]">{images.length} designs</span></div>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
           {images.map((image) => (
             <article key={image.id} className="group overflow-hidden rounded-xl border border-[#eadfd8] bg-white shadow-[0_6px_16px_rgba(91,64,39,0.06)] transition hover:-translate-y-0.5 hover:border-[#e7c875] hover:shadow-[0_10px_20px_rgba(91,64,39,0.1)]">

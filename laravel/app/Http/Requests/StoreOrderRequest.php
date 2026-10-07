@@ -45,6 +45,7 @@ class StoreOrderRequest extends FormRequest
             'is_customized' => 'nullable|boolean',
             'discount_type' => 'nullable|in:none,senior_citizen,pwd',
             'discount_id_image' => 'exclude_unless:discount_type,senior_citizen,pwd|required|image|mimes:jpeg,jpg,png,webp|max:5120',
+            'reward_code' => 'nullable|string|max:32',
         ];
     }
 }

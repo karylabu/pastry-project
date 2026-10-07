@@ -6,7 +6,12 @@ import { LARAVEL_BASE, ROOT_BASE } from "../../services/config";
 import { safeParseJson } from '../../services/api';
 import { signInWithGoogle } from "../../services/firebase";
 
-const LOGO_URL = "/assets/logo.png";
+const ASSET_BASE = process.env.NODE_ENV === "production"
+  ? `${ROOT_BASE}/customer_portal/build/assets`
+  : "/assets";
+const LOGO_URL = process.env.NODE_ENV === "production"
+  ? `${ROOT_BASE}/uploads/logo.png`
+  : `${ASSET_BASE}/logo.png`;
 const REGISTER_URL = "/customer/register";
 const isCustomerRole = (role) => {
   const normalizedRole = String(role || '').trim().toLowerCase();
@@ -147,8 +152,10 @@ export default function Login() {
 
         .brand-script { font-family: 'Pacifico', cursive; }
         .pastry-login { background: #fcfbf8; }
-        .pastry-login .login-banner { position: absolute; z-index: 0; top: 0; left: 0; height: calc(100% - 105px); width: auto; max-width: none; object-fit: contain; object-position: left top; }
+        .pastry-login .login-banner { display: none; position: absolute; z-index: 0; top: 0; left: 0; height: calc(100% - 105px); width: auto; max-width: none; object-fit: contain; object-position: left top; }
         .pastry-login .brand-icon-overlay { display: none; }
+        .pastry-login .hero-panel { display: none; }
+        .pastry-login .mobile-login-art { display: none; }
 
         /* Background Blobs */
         .blob-yellow-top { position: absolute; top: -190px; left: -160px; width: 390px; height: 390px; border-radius: 50%; background: #f4bd2f; z-index: 0; opacity: .95; }
@@ -205,16 +212,77 @@ export default function Login() {
         }
         .btn-secondary:hover { background: #F9FAFB; }
         .pastry-login .blob-yellow-top, .pastry-login .blob-black-left, .pastry-login .blob-yellow-bottom, .pastry-login .bg-icon { display: none; }
-        .pastry-login .hero-panel { visibility: hidden; }
         .pastry-login .login-card { position: relative; }
-        @media (max-width: 767px) { .pastry-login { background-size: auto 48%; background-position: left top; } .pastry-login .login-banner { display: none; } .pastry-login .brand-icon-overlay { top: 22px; left: 22px; width: 44px; height: 44px; } }
+        @media (min-width: 1024px) {
+          .pastry-login .login-banner { display: block; }
+        }
+        @media (max-width: 1023px) {
+          .pastry-login .login-banner { display: none; }
+          .pastry-login .hero-panel { display: flex; padding: 14px 8px 8px; }
+          .pastry-login .hero-panel > .mb-6:first-child { justify-content: center; margin-bottom: 20px; }
+          .pastry-login .hero-panel > .mb-6:first-child img { display: none; }
+          .pastry-login .hero-panel > .mb-6:first-child > div { text-align: center; }
+          .pastry-login .hero-panel > .mb-6:first-child h1 { font-size: 30px; }
+          .pastry-login .hero-panel > .mb-6:first-child p { font-size: 8px; }
+          .pastry-login .hero-panel > .mb-6:nth-child(2) { margin-bottom: 16px; }
+          .pastry-login .hero-panel > .mb-6:nth-child(2) h2 { font-size: 36px; }
+          .pastry-login .hero-panel > .mb-6:nth-child(2) p { font-size: 15px; line-height: 1.55; }
+          .pastry-login .login-cake-section { display: none; }
+          .pastry-login .login-card { padding: 18px 20px; border-radius: 20px; }
+          .pastry-login .login-card > .mb-4:first-child { text-align: left; }
+          .pastry-login .login-card > .mb-4:first-child h2 { font-size: 28px; }
+          .pastry-login .mobile-login-art { display: block; width: 100%; height: clamp(180px, 42vw, 230px); object-fit: cover; object-position: left bottom; }
+          .pastry-login .login-footer-links, .pastry-login .login-footer-social { display: none; }
+          .pastry-login .login-footer { display: flex; justify-content: center; border-top: 0; padding: 10px 0 16px; }
+          .pastry-login .login-footer-brand { justify-content: center; gap: 8px; }
+          .pastry-login .login-footer-brand img { width: 30px; height: 30px; }
+          .pastry-login .login-footer-brand p { font-size: 11px; }
+          @media (max-width: 1023px) {
+            .pastry-login { max-width: 522px; margin: 0 auto; border-right: 1px solid #e5e7eb; border-left: 1px solid #e5e7eb; }
+            .pastry-login > .relative.z-10 { padding: 0; }
+            .pastry-login main { flex: 0 0 auto; gap: 0; padding: 0; }
+            .pastry-login .hero-panel {
+              position: relative;
+              padding: 18px 32px 14px;
+              background-color: #fcfbf8;
+              background-image: radial-gradient(circle at 0 0, #ffc236 0 84px, transparent 85px), url("${ASSET_BASE}/login-mobile-texture.jpg");
+              background-size: 100% 100%, 100% 100%;
+              background-position: top left, top right;
+              background-repeat: no-repeat;
+            }
+            .pastry-login .hero-panel > .mb-6:first-child { margin-top: 12px; margin-bottom: 38px; }
+            .pastry-login .hero-panel > .mb-6:first-child h1 { font-size: 26px; }
+            .pastry-login main > div:not(.hero-panel) { padding: 0 23px; }
+            .pastry-login .login-card { padding: 14px 30px 24px; border-radius: 20px; }
+            .pastry-login .login-card > .mb-4:first-child { margin-bottom: 12px; }
+            .pastry-login .login-card form.space-y-4 > :not([hidden]) ~ :not([hidden]) { margin-top: 12px; }
+            .pastry-login .login-card form.space-y-4 > :not([hidden]) ~ div.space-y-2:nth-child(2) { margin-top: 14px; }
+            .pastry-login .login-card form .space-y-2 > :not([hidden]) ~ :not([hidden]) { margin-top: 3px; }
+            .pastry-login .login-input { height: 46px; }
+            .pastry-login .btn-primary, .pastry-login .btn-secondary { height: 44px; }
+            .pastry-login .btn-primary { background: #ffbf2f; }
+            .pastry-login .login-card form > .flex.items-center.gap-4.py-2 { padding-top: 4px; padding-bottom: 4px; }
+            .pastry-login .login-card form.space-y-4 > :not([hidden]) ~ :not([hidden]).flex.items-center.gap-4.py-2 { margin-top: 24px; }
+            .pastry-login .login-card form.space-y-4 > :not([hidden]) ~ :not([hidden]).btn-secondary { margin-top: 0; }
+            .pastry-login .login-card form + p { margin-top: 25px; }
+            .pastry-login .login-card a.mt-4 { margin-top: 14px; }
+            .pastry-login .mobile-login-art { width: 100%; height: clamp(160px, 35.5vw, 185px); margin-top: 19px; object-fit: cover; object-position: center; }
+            .pastry-login .login-footer { padding-bottom: 19px; }
+          }
+          @media (max-width: 399px) {
+            .pastry-login .hero-panel { padding-right: 20px; padding-left: 20px; }
+            .pastry-login .hero-panel > .mb-6:first-child { margin-bottom: 30px; }
+            .pastry-login .hero-panel > .mb-6:nth-child(2) h2 { font-size: 32px; }
+            .pastry-login main > div:not(.hero-panel) { padding-right: 14px; padding-left: 14px; }
+            .pastry-login .login-card { padding-right: 18px; padding-left: 18px; }
+          }
       `}</style>
 
       {/* Background Decorations */}
       <div className="blob-yellow-top" />
       <div className="blob-black-left" />
       <div className="blob-yellow-bottom" />
-      <img className="login-banner" src={`${ROOT_BASE}/uploads/login.jpg?v=login-v1`} alt="" aria-hidden="true" />
+      <img className="login-banner" src={`${ASSET_BASE}/login-bg.jpg`} alt="" aria-hidden="true" />
       <img className="brand-icon-overlay" src={LOGO_URL} alt="Pastry Project logo" />
 
       <div className="bg-icon icon-croissant">🥐</div>
@@ -224,13 +292,13 @@ export default function Login() {
       <div className="bg-icon icon-cupcake">🧁</div>
       <div className="bg-icon icon-branch">🌿</div>
 
-      <div className="relative z-10 flex h-screen w-full flex-col overflow-hidden px-5 md:px-0">
+      <div className="relative z-10 flex min-h-screen w-full flex-col overflow-visible px-4 py-2 sm:px-5 lg:h-screen lg:overflow-hidden lg:px-0 lg:py-0">
 
         {/* Main Content Area */}
-        <main className="flex flex-1 flex-col py-2 lg:flex-row lg:items-center lg:justify-between lg:gap-0 lg:py-0">
+        <main className="flex flex-1 flex-col gap-4 py-2 lg:flex-row lg:items-center lg:justify-between lg:gap-0 lg:py-0">
 
           {/* Left Side: Hero */}
-          <div className="hero-panel hidden w-full flex-1 flex-col justify-center py-3 lg:flex lg:w-[53%] lg:py-0 lg:pl-[5.9vw]">
+          <div className="hero-panel flex w-full flex-none flex-col justify-center py-3 lg:w-[53%] lg:flex-1 lg:py-0 lg:pl-[5.9vw]">
             {/* Header / Logo */}
             <div className="mb-6 flex items-center gap-1">
               <img src={LOGO_URL} alt="Logo" className="h-14 w-14 object-contain" />
@@ -244,22 +312,22 @@ export default function Login() {
 
             {/* Hero Headlines */}
             <div className="mb-6">
-              <h2 className="text-[40px] font-extrabold leading-[1.05] text-[#171717] xl:text-[52px]">
+              <h2 className="text-[32px] font-extrabold leading-[1.05] text-[#171717] sm:text-[40px] xl:text-[52px]">
                 Bakery made <br />
                 <span className="text-[#F0B94D]">simple & sweet.</span>
               </h2>
-              <p className="mt-4 max-w-md text-base leading-6 text-[#171717] opacity-80 xl:text-lg">
+              <p className="mt-3 max-w-md text-sm leading-5 text-[#171717] opacity-80 sm:mt-4 sm:text-base sm:leading-6 xl:text-lg">
                 Manage your orders, inventory, and sales<br />effortlessly. All in one place.
               </p>
             </div>
 
             {/* Cake Image Section */}
-            <div className="relative mt-2 max-w-lg">
-              <div className="absolute -left-8 bottom-0 h-[220px] w-[220px] rounded-full bg-[#171717] xl:h-[300px] xl:w-[300px]" />
+            <div className="login-cake-section relative mt-2 max-w-lg">
+              <div className="absolute -left-5 bottom-0 h-40 w-40 rounded-full bg-[#171717] sm:-left-8 sm:h-[220px] sm:w-[220px] xl:h-[300px] xl:w-[300px]" />
               <img
-                src="/assets/customize/customize_1.jpg"
+                src={`${ASSET_BASE}/customize/customize_1.jpg`}
                 alt="Pastry Project Cake"
-                className="relative z-10 h-[220px] w-[340px] rounded-[28px] object-cover shadow-2xl xl:h-[290px] xl:w-[440px]"
+                className="relative z-10 h-44 w-full max-w-[340px] rounded-[24px] object-cover shadow-2xl sm:h-[220px] sm:rounded-[28px] sm:w-[340px] xl:h-[290px] xl:w-[440px]"
               />
             </div>
           </div>
@@ -397,23 +465,25 @@ export default function Login() {
           </div>
         </main>
 
+        <img className="mobile-login-art" src={`${ASSET_BASE}/login-mobile-cake.jpg`} alt="" aria-hidden="true" />
+
         {/* Footer */}
-        <footer className="grid grid-cols-1 gap-3 border-t border-gray-100 py-3 md:grid-cols-[1fr_auto_1fr] md:items-center md:py-4">
-          <div className="flex items-center justify-center gap-4 md:justify-start">
+        <footer className="login-footer grid grid-cols-1 gap-3 border-t border-gray-100 py-3 md:grid-cols-[1fr_auto_1fr] md:items-center md:py-4">
+          <div className="login-footer-brand flex items-center justify-center gap-4 md:justify-start">
             <img src={LOGO_URL} alt="Logo" className="h-10 w-10 opacity-80" />
             <p className="text-sm text-gray-500">
               © 2024 Pastry Project. All rights reserved.
             </p>
           </div>
 
-          <div className="flex flex-wrap justify-center gap-4 md:gap-8">
+          <div className="login-footer-links flex flex-wrap justify-center gap-4 md:gap-8">
             <Link to="/customer/about-us" className="text-sm font-semibold text-gray-600 hover:text-[#F0B94D]">About Us</Link>
-            <Link to="/customer/terms" className="text-sm font-semibold text-gray-600 hover:text-[#F0B94D]">Terms</Link>
+            <Link to="/customer/terms" className="text-sm font-semibold text-gray-600 hover:text-[#F0B94D]">Terms &amp; Conditions</Link>
             <Link to="/customer/privacy-policy" className="text-sm font-semibold text-gray-600 hover:text-[#F0B94D]">Privacy Policy</Link>
             <Link to="/customer/chat-support" className="text-sm font-semibold text-gray-600 hover:text-[#F0B94D]">Help</Link>
           </div>
 
-          <div className="flex items-center justify-center gap-4 md:justify-end">
+          <div className="login-footer-social flex items-center justify-center gap-4 md:justify-end">
             <span className="text-sm font-semibold text-gray-600">Follow us</span>
             <div className="flex items-center gap-3">
               <a href="https://www.facebook.com/pastryproject.bc" target="_blank" rel="noreferrer" aria-label="Follow Pastry Project on Facebook" title="Facebook" className="text-gray-500 transition hover:text-[#1877F2]"><FacebookIcon /></a>

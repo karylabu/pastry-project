@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import PageShell from '../components/PageShell';
 import { CUSTOMER_BASE, LARAVEL_BASE, ROOT_BASE } from '../../services/config';
 import { getAuthHeaders, safeParseJson } from '../../services/api';
@@ -38,9 +38,22 @@ const getLocalDateString = (date = new Date()) => {
 const readCustomCakeDraft = () => {
   if (typeof window === 'undefined') return null;
   try {
-    return JSON.parse(window.sessionStorage.getItem(CUSTOM_CAKE_DRAFT_KEY) || 'null');
+    const storedUser = JSON.parse(window.localStorage.getItem('user') || 'null');
+    const draftKey = `${CUSTOM_CAKE_DRAFT_KEY}:${storedUser?.id || 'guest'}`;
+    const draft = JSON.parse(window.sessionStorage.getItem(draftKey) || 'null');
+    window.sessionStorage.removeItem(CUSTOM_CAKE_DRAFT_KEY);
+    return draft;
   } catch (error) {
     console.warn('Could not restore custom cake form details:', error);
+    return null;
+  }
+};
+
+const readStoredUser = () => {
+  if (typeof window === 'undefined') return null;
+  try {
+    return JSON.parse(window.localStorage.getItem('user') || 'null');
+  } catch {
     return null;
   }
 };
@@ -70,11 +83,13 @@ const fallbackCakeFlavors = [
 
 export default function CustomizedCakes() {
   const navigate = useNavigate();
+  const location = useLocation();
   const referenceStorageKey = 'customCakeReferenceImages';
+  const [storedUser] = useState(readStoredUser);
   const [formDraft] = useState(readCustomCakeDraft);
-  const [name, setName] = useState(() => formDraft?.name || '');
-  const [email, setEmail] = useState(() => formDraft?.email || '');
-  const [contactNumber, setContactNumber] = useState(() => formDraft?.contactNumber || '');
+  const [name, setName] = useState(() => storedUser?.name || storedUser?.full_name || '');
+  const [email, setEmail] = useState(() => storedUser?.email || '');
+  const [contactNumber, setContactNumber] = useState(() => storedUser?.phone || storedUser?.phone_number || storedUser?.contact_number || '');
   const [pickupDate, setPickupDate] = useState(() => formDraft?.pickupDate || '');
   const [pickupTime, setPickupTime] = useState(() => formDraft?.pickupTime || '');
   const [deliveryMethod, setDeliveryMethod] = useState(() => formDraft?.deliveryMethod || 'Pickup');
@@ -108,14 +123,25 @@ export default function CustomizedCakes() {
   const [showSavedAddressSuggestions, setShowSavedAddressSuggestions] = useState(false);
   const [flavorCatalog, setFlavorCatalog] = useState([]);
   const [sizeCatalog, setSizeCatalog] = useState([]);
-  const [masonryOffsets, setMasonryOffsets] = useState([0, 0, 0]);
+
+  useEffect(() => {
+    if (!location.state?.scrollToRequestForm) return undefined;
+
+    const timer = window.setTimeout(() => {
+      document.getElementById('custom-cake-request-form')?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start',
+      });
+      navigate(location.pathname, { replace: true, state: null });
+    }, 200);
+
+    return () => window.clearTimeout(timer);
+  }, [location.pathname, location.state, navigate]);
 
   useEffect(() => {
     try {
-      window.sessionStorage.setItem(CUSTOM_CAKE_DRAFT_KEY, JSON.stringify({
-        name,
-        email,
-        contactNumber,
+      const draftKey = `${CUSTOM_CAKE_DRAFT_KEY}:${storedUser?.id || 'guest'}`;
+      window.sessionStorage.setItem(draftKey, JSON.stringify({
         pickupDate,
         pickupTime,
         deliveryMethod,
@@ -142,44 +168,12 @@ export default function CustomizedCakes() {
       console.warn('Could not save custom cake form details:', error);
     }
   }, [
-    name, email, contactNumber, pickupDate, pickupTime, deliveryMethod,
+    storedUser?.id, pickupDate, pickupTime, deliveryMethod,
     deliveryService, deliveryAddress, cakeType, singleSizeId, twoTierPreset,
     flavorId, occasion, customOccasion, cakeStyle, packaging, customTheme,
     cakeColor, customMessage, specialInstructions, addons, cupcakeQuantity,
     budget, quantity,
   ]);
-
-  useEffect(() => {
-    const form = document.getElementById('custom-cake-request-form');
-    if (!form) return undefined;
-
-    const breakpoint = window.matchMedia('(min-width: 1280px)');
-    const firstRowCards = [1, 2, 3].map((step) => form.querySelector(`[data-custom-card="${step}"]`));
-    if (firstRowCards.some((card) => !card)) return undefined;
-
-    const updateOffsets = () => {
-      const nextOffsets = breakpoint.matches
-        ? firstRowCards.map((card) => Math.min(0, Math.round(card.getBoundingClientRect().height - Math.max(...firstRowCards.map((rowCard) => rowCard.getBoundingClientRect().height)))))
-        : [0, 0, 0];
-
-      setMasonryOffsets((currentOffsets) => (
-        currentOffsets.every((offset, index) => offset === nextOffsets[index]) ? currentOffsets : nextOffsets
-      ));
-    };
-
-    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(updateOffsets);
-    firstRowCards.forEach((card) => observer?.observe(card));
-    window.addEventListener('resize', updateOffsets);
-    breakpoint.addEventListener('change', updateOffsets);
-    const frame = window.requestAnimationFrame(updateOffsets);
-
-    return () => {
-      observer?.disconnect();
-      window.cancelAnimationFrame(frame);
-      window.removeEventListener('resize', updateOffsets);
-      breakpoint.removeEventListener('change', updateOffsets);
-    };
-  }, []);
 
   useEffect(() => {
     const previews = files.map((file) => ({
@@ -270,14 +264,8 @@ export default function CustomizedCakes() {
     let isActive = true;
 
     try {
-      const storedUser = JSON.parse(localStorage.getItem('user') || 'null');
       if (storedUser?.id) {
         setUserId(Number(storedUser.id));
-        if (!formDraft) {
-          setName((current) => current || storedUser.name || storedUser.full_name || '');
-          setEmail((current) => current || storedUser.email || '');
-          setContactNumber((current) => current || storedUser.phone || storedUser.phone_number || storedUser.contact_number || '');
-        }
 
         setAddressesLoading(true);
         fetch(`${CUSTOMER_BASE}/api/addresses`, {
@@ -307,11 +295,9 @@ export default function CustomizedCakes() {
       .then((profile) => {
         if (!isActive || !profile?.id) return;
         setUserId(Number(profile.id));
-        if (!formDraft) {
-          setName((current) => current || profile.name || profile.full_name || '');
-          setEmail((current) => current || profile.email || '');
-          setContactNumber((current) => current || profile.phone || profile.phone_number || profile.contact_number || '');
-        }
+        setName(profile.name || profile.full_name || '');
+        setEmail(profile.email || '');
+        setContactNumber(profile.phone || profile.phone_number || profile.contact_number || '');
       })
       .catch((error) => console.warn('Could not load the saved customer profile:', error));
 
@@ -456,7 +442,7 @@ export default function CustomizedCakes() {
         email,
         phone: contactNumber,
         delivery_method: deliveryMethod,
-        delivery_address: deliveryAddress,
+        delivery_address: deliveryMethod === 'Delivery' ? deliveryAddress : '',
         delivery_service: deliveryMethod === 'Delivery' ? deliveryService : '',
         pickup_date: pickupDate,
         pickup_time: pickupTime,
@@ -526,7 +512,7 @@ export default function CustomizedCakes() {
       fd.append('pickup_date', pickupDate);
       fd.append('pickup_time', pickupTime);
       fd.append('delivery_method', deliveryMethod);
-      fd.append('delivery_address', deliveryAddress);
+      fd.append('delivery_address', deliveryMethod === 'Delivery' ? deliveryAddress : '');
       fd.append('delivery_service', deliveryMethod === 'Delivery' ? deliveryService : '');
       fd.append('user_id', String(userId || 0));
       fd.append('cake_type', cakeType);
@@ -585,11 +571,17 @@ export default function CustomizedCakes() {
   return (
     <PageShell background="bg-[#fffaf3]" padding="px-4 md:px-7 lg:px-10 py-4" innerClassName="max-w-[1180px]">
       <section className="relative mb-4 min-h-[230px] overflow-hidden rounded-[18px] border border-[#eadfd8] bg-[#fffaf0] shadow-[0_8px_22px_rgba(91,64,39,0.05)] sm:min-h-[260px]">
-        <div className="absolute inset-y-0 right-0 w-full sm:w-[56%]">
-          <img src="/assets/customize/customize_1.jpg" alt="Floral custom cake" className="h-full w-full object-cover opacity-90" />
+        <div className="absolute inset-y-0 right-0 w-[58%] sm:w-[56%]">
+          <img
+            src={process.env.NODE_ENV === 'production'
+              ? `${ROOT_BASE}/customer_portal/build/assets/customize/customize_1.jpg`
+              : '/assets/customize/customize_1.jpg'}
+            alt="Floral custom cake"
+            className="h-full w-full object-cover opacity-90"
+          />
           <div className="absolute inset-0 bg-gradient-to-r from-[#fffaf0] via-[#fffaf0]/80 to-transparent" />
         </div>
-        <div className="relative z-10 flex min-h-[230px] max-w-[430px] flex-col justify-center px-6 py-8 sm:min-h-[260px] sm:px-8">
+        <div className="relative z-10 flex min-h-[230px] max-w-[430px] flex-col justify-center px-5 py-8 sm:min-h-[260px] sm:px-8">
           <p className="text-[9px] font-black uppercase tracking-[0.28em] text-[#9b7b3d]">Customize</p>
           <h1 className="mt-2 font-serif text-3xl font-bold leading-[0.98] tracking-tight text-[#33251e] sm:text-4xl">
             Customize Your <span className="text-[#c9972d]">Dream Cake</span>
@@ -607,7 +599,7 @@ export default function CustomizedCakes() {
         </div>
       </section>
 
-      <div className="mb-5 grid grid-cols-2 gap-2 rounded-[18px] border border-[#eadfd8] bg-white p-2 shadow-[0_5px_18px_rgba(91,64,39,0.04)] sm:grid-cols-3 md:grid-cols-6 md:gap-3">
+      <div aria-label="Cake design categories" className="mb-5 grid grid-cols-6 gap-1 rounded-[18px] border border-[#eadfd8] bg-white p-1.5 shadow-[0_5px_18px_rgba(91,64,39,0.04)] md:gap-3 md:p-2">
         {[
           ['Birthday', CakeSlice, '/customer/birthday-designs'],
           ['Cutesy', Sparkles, '/customer/cutesy-designs'],
@@ -620,10 +612,10 @@ export default function CustomizedCakes() {
             key={label}
             type="button"
             onClick={() => navigate(path)}
-            className="flex min-w-0 flex-col items-center justify-center gap-2 rounded-xl border border-[#eee4de] bg-white px-2 py-3 text-center text-[#5f514a] transition hover:-translate-y-0.5 hover:border-[#e7c875] hover:bg-[#fff8df] hover:text-[#8d6a2e]"
+            className="flex min-h-[56px] min-w-0 flex-col items-center justify-center gap-1 rounded-xl border border-[#eee4de] bg-white px-0.5 py-1.5 text-center text-[#5f514a] transition hover:-translate-y-0.5 hover:border-[#e7c875] hover:bg-[#fff8df] hover:text-[#8d6a2e] md:min-h-[68px] md:gap-2 md:px-2 md:py-3"
           >
-            <Icon size={18} strokeWidth={1.6} className="shrink-0" />
-            <span className="w-full text-[10px] font-semibold leading-tight break-words">{label}</span>
+            <Icon size={18} strokeWidth={1.6} className="h-3.5 w-3.5 shrink-0 md:h-[18px] md:w-[18px]" />
+            <span className="w-full break-words text-[8px] font-semibold leading-tight md:text-[10px]">{label}</span>
           </button>
         ))}
       </div>
@@ -638,12 +630,12 @@ export default function CustomizedCakes() {
             View All <span className="ml-1">→</span>
           </button>
         </div>
-        <div className="grid w-full grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+        <div className="grid w-full grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-6">
           {sampleImages.map((item, index) => {
             const isWedding = item.label === 'Wedding';
 
             return (
-              <article key={index} className="group relative h-52 overflow-hidden rounded-[14px] border border-[#eadfd8] bg-[#f8eee8] shadow-[0_6px_16px_rgba(91,64,39,0.06)]">
+              <article key={index} className="group relative aspect-[3/4] min-h-[180px] overflow-hidden rounded-[14px] border border-[#eadfd8] bg-[#f8eee8] shadow-[0_6px_16px_rgba(91,64,39,0.06)] lg:aspect-auto lg:h-52">
                 <img
                   src={item.src}
                   alt={item.label}
@@ -680,20 +672,21 @@ export default function CustomizedCakes() {
       <form
         id="custom-cake-request-form"
         onSubmit={handleSubmit}
-        className="rounded-[14px] border border-[#eadfd8] bg-white p-3 shadow-[0_8px_22px_rgba(91,64,39,0.05)] sm:p-4"
+        className="rounded-2xl border border-[#eadfd8] bg-[#fffdf9] p-4 shadow-[0_8px_22px_rgba(91,64,39,0.05)] sm:rounded-3xl sm:p-6"
       >
-        <div className="mb-3 border-b border-[#f0e6dc] pb-2">
+        <div className="mb-4 border-b border-[#f0e6dc] pb-3 sm:mb-5">
           <div>
             <p className="text-[9px] font-black uppercase tracking-[0.24em] text-[#9b7b3d]">Your custom order</p>
             <h2 className="mt-1 font-serif text-xl font-bold text-[#33251e] sm:text-2xl">Cake Customization Details</h2>
-            <p className="mt-1 text-xs text-[#8d7a6e]"><span className="font-bold text-red-600">*</span> Required information</p>
+            <p className="mt-1 text-xs leading-relaxed text-[#8d7a6e]">Tell us about your cake and how you would like to receive it.</p>
+            <p className="mt-1 text-[11px] text-[#8d7a6e]"><span className="font-bold text-red-600">*</span> Required information</p>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 items-start gap-2 lg:grid-cols-2 xl:grid-cols-[1.05fr_1.05fr_0.9fr]">
-          <div className="flex flex-col gap-2 lg:contents">
-            <div data-custom-card="1" className="rounded-xl border border-[#f0e6dc] bg-[#fffdf9] p-3 lg:order-1 xl:order-1">
-              <p className="mb-3 flex items-center gap-2 text-sm font-bold text-[#6b4f1d]">
+        <div className="grid grid-cols-1 gap-3 lg:grid-cols-2 lg:items-start lg:gap-4">
+          <div className="contents lg:flex lg:flex-col lg:gap-3">
+            <div data-custom-card="1" style={{ order: 1 }} className="rounded-2xl border border-[#eee4de] bg-white p-4 shadow-[0_3px_12px_rgba(91,64,39,0.04)] sm:p-5">
+              <p className="mb-4 flex items-center gap-2 border-b border-[#f3ece6] pb-3 text-sm font-bold text-[#6b4f1d]">
                 <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#fff3c8] text-[11px]">1</span>
                 Customer Information
               </p>
@@ -713,8 +706,8 @@ export default function CustomizedCakes() {
               </div>
             </div>
 
-            <div data-custom-card="2" className="rounded-xl border border-[#f0e6dc] bg-[#fffdf9] p-3 lg:order-2 xl:order-2">
-              <p className="mb-3 flex items-center gap-2 text-sm font-bold text-[#6b4f1d]">
+            <div data-custom-card="2" style={{ order: 2 }} className="rounded-2xl border border-[#eee4de] bg-white p-4 shadow-[0_3px_12px_rgba(91,64,39,0.04)] sm:p-5">
+              <p className="mb-4 flex items-center gap-2 border-b border-[#f3ece6] pb-3 text-sm font-bold text-[#6b4f1d]">
                 <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#fff3c8] text-[11px]">2</span>
                 Order Information
               </p>
@@ -742,7 +735,7 @@ export default function CustomizedCakes() {
 
                 {deliveryMethod === 'Delivery' && (
                   <div className="space-y-3 sm:col-span-2">
-                    <div className="rounded-xl border border-[#e9d8ae] bg-[#fffaf0] px-3.5 py-3 text-sm text-[#6b4f1d]">
+                    <div className="text-sm text-[#6b4f1d]">
                       <p className="font-semibold">You will book the delivery rider yourself.</p>
                       <p className="mt-0.5 text-xs leading-5 text-[#8d7a6e]">Choose a service and arrange the booking directly.</p>
                     </div>
@@ -776,8 +769,9 @@ export default function CustomizedCakes() {
                     {FULFILLMENT_TIME_SLOTS.map((slot) => <option key={slot.value} value={slot.value}>{slot.label}</option>)}
                   </select>
                 </label>
-                <label className="block text-xs font-semibold text-[#6b4f1d] sm:col-span-2">
-                  {deliveryMethod === 'Delivery' ? 'Delivery Address' : 'Address'} <span aria-hidden="true" className="text-red-600">*</span>
+                {deliveryMethod === 'Delivery' && (
+                  <label className="block text-xs font-semibold text-[#6b4f1d] sm:col-span-2">
+                  Delivery Address <span aria-hidden="true" className="text-red-600">*</span>
                   {addressesLoading && <span className="ml-1 font-normal text-[#8d7a6e]">Loading saved suggestions...</span>}
                   <div className="relative mt-1.5">
                     <textarea
@@ -817,14 +811,13 @@ export default function CustomizedCakes() {
                       </div>
                     )}
                   </div>
-                </label>
+                  </label>
+                )}
               </div>
             </div>
-          </div>
 
-          <div className="flex flex-col gap-2 lg:contents">
-            <div data-custom-card="3" className="rounded-xl border border-[#f0e6dc] bg-[#fffdf9] p-3 lg:order-3 xl:order-3">
-              <p className="mb-3 flex items-center gap-2 text-sm font-bold text-[#6b4f1d]">
+            <div data-custom-card="3" style={{ order: 3 }} className="rounded-2xl border border-[#eee4de] bg-white p-4 shadow-[0_3px_12px_rgba(91,64,39,0.04)] sm:p-5">
+              <p className="mb-4 flex items-center gap-2 border-b border-[#f3ece6] pb-3 text-sm font-bold text-[#6b4f1d]">
                 <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#fff3c8] text-[11px]">3</span>
                 Cake Details
               </p>
@@ -894,110 +887,14 @@ export default function CustomizedCakes() {
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="rounded-xl border border-[#f0e6db] bg-[#fffdf8] p-3">
-                        <p className="text-sm font-bold text-[#6b4f1d]">Top Tier</p>
-                        <p className="mt-1 text-xs text-black">{sizeByCode(selectedTwoTierPreset.top)?.label || selectedTwoTierPreset.top}</p>
-                      </div>
-                      <div className="rounded-xl border border-[#f0e6db] bg-[#fffdf8] p-3">
-                        <p className="text-sm font-bold text-[#6b4f1d]">Bottom Tier</p>
-                        <p className="mt-1 text-xs text-black">{sizeByCode(selectedTwoTierPreset.bottom)?.label || selectedTwoTierPreset.bottom}</p>
-                      </div>
-                    </div>
                   </>
                 )}
               </div>
             </div>
 
-            <div data-custom-card="4" style={{ marginTop: masonryOffsets[0] }} className="rounded-xl border border-[#f0e6dc] bg-[#fffdf9] p-3 lg:order-4 xl:order-4">
-              <p className="mb-3 flex items-center gap-2 text-sm font-bold text-[#6b4f1d]">
+            <div data-custom-card="4" style={{ order: 4 }} className="rounded-2xl border border-[#eee4de] bg-white p-4 shadow-[0_3px_12px_rgba(91,64,39,0.04)] sm:p-5">
+              <p className="mb-4 flex items-center gap-2 border-b border-[#f3ece6] pb-3 text-sm font-bold text-[#6b4f1d]">
                 <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#fff3c8] text-[11px]">4</span>
-                Customization Details
-              </p>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div className="block text-xs font-semibold text-[#6b4f1d]">
-                  <label htmlFor="custom-cake-occasion">Occasion</label>
-                  <select id="custom-cake-occasion" value={occasion} onChange={(event) => setOccasion(event.target.value)} className="mt-1.5 min-h-11 w-full rounded-lg border border-[#eadfd8] bg-white px-3 py-2 text-sm text-[#33251e] outline-none focus:border-[#c9972d] focus:ring-2 focus:ring-[#fff1bd]">
-                    <option>Birthday</option>
-                    <option>Wedding</option>
-                    <option>Anniversary</option>
-                    <option>Graduation</option>
-                    <option>Baby Shower</option>
-                    <option value="Other">Other</option>
-                  </select>
-                  {occasion === 'Other' && (
-                    <input
-                      aria-label="Other occasion"
-                      required
-                      value={customOccasion}
-                      onChange={(event) => setCustomOccasion(event.target.value)}
-                      placeholder="Type the occasion"
-                      className="mt-2 min-h-11 w-full rounded-lg border border-[#eadfd8] bg-white px-3 py-2 text-sm font-normal text-[#33251e] outline-none placeholder:text-[#a99a8e] focus:border-[#c9972d] focus:ring-2 focus:ring-[#fff1bd]"
-                    />
-                  )}
-                </div>
-                <div className="space-y-3">
-                  <label className="block text-xs font-semibold text-[#6b4f1d]">
-                    Cake Style <span className="font-normal text-[#9b8c83]">(optional)</span>
-                    <select value={cakeStyle} onChange={(event) => setCakeStyle(event.target.value)} className="mt-1.5 min-h-11 w-full rounded-lg border border-[#eadfd8] bg-white px-3 py-2 text-sm font-normal text-[#33251e] outline-none focus:border-[#c9972d] focus:ring-2 focus:ring-[#fff1bd]">
-                      <option value="">Choose a style</option>
-                      <option value="Bento">Bento</option>
-                      <option value="Vintage">Vintage</option>
-                      <option value="Floral">Floral</option>
-                      <option value="Character / themed">Character / themed</option>
-                      <option value="Minimalist">Minimalist</option>
-                      <option value="Other">Other</option>
-                    </select>
-                  </label>
-                  <label className="block text-xs font-semibold text-[#6b4f1d]">
-                    Packaging <span className="font-normal text-[#9b8c83]">(optional)</span>
-                    <select value={packaging} onChange={(event) => setPackaging(event.target.value)} className="mt-1.5 min-h-11 w-full rounded-lg border border-[#eadfd8] bg-white px-3 py-2 text-sm font-normal text-[#33251e] outline-none focus:border-[#c9972d] focus:ring-2 focus:ring-[#fff1bd]">
-                      <option value="Standard">Standard</option>
-                      <option value="Clamshell">Clamshell box</option>
-                      <option value="Acetate box">Acetate box</option>
-                    </select>
-                  </label>
-                </div>
-                <label className="block text-xs font-semibold text-[#6b4f1d] sm:col-span-2">
-                  Specific Design or Theme <span className="font-normal text-[#9b8c83]">(optional)</span>
-                  <input value={customTheme} onChange={(event) => setCustomTheme(event.target.value)} placeholder="e.g. Kuromi, daisy flowers, or a name" className="mt-1.5 min-h-11 w-full rounded-lg border border-[#eadfd8] bg-white px-3 py-2 text-sm font-normal text-[#33251e] outline-none placeholder:text-[#a99a8e] focus:border-[#c9972d] focus:ring-2 focus:ring-[#fff1bd]" />
-                </label>
-                <label className="block text-xs font-semibold text-[#6b4f1d]">Preferred Cake Color <span className="font-normal text-[#9b8c83]">(optional)</span>
-                  <textarea rows={2} value={cakeColor} onChange={(event) => setCakeColor(event.target.value)} placeholder="e.g. blush pink and white" className="mt-1.5 min-h-16 w-full resize-y rounded-lg border border-[#eadfd8] bg-white px-3 py-2 text-sm font-normal text-[#33251e] outline-none placeholder:text-[#a99a8e] focus:border-[#c9972d] focus:ring-2 focus:ring-[#fff1bd]" />
-                </label>
-                <label className="block text-xs font-semibold text-[#6b4f1d]">Cake Message <span className="font-normal text-[#9b8c83]">(optional)</span>
-                  <textarea rows={2} value={customMessage} onChange={(event) => setCustomMessage(event.target.value)} placeholder="Message to write on the cake" className="mt-1.5 min-h-16 w-full resize-y rounded-lg border border-[#eadfd8] bg-white px-3 py-2 text-sm font-normal text-[#33251e] outline-none placeholder:text-[#a99a8e] focus:border-[#c9972d] focus:ring-2 focus:ring-[#fff1bd]" />
-                </label>
-                <label className="block text-xs font-semibold text-[#6b4f1d] sm:col-span-2">Special Instructions <span className="font-normal text-[#9b8c83]">(optional)</span>
-                  <textarea value={specialInstructions} onChange={(event) => setSpecialInstructions(event.target.value)} placeholder="Share any other details" rows={5} className="mt-1.5 min-h-28 w-full resize-y rounded-lg border border-[#eadfd8] bg-white px-3 py-2 text-sm font-normal text-[#33251e] outline-none placeholder:text-[#a99a8e] focus:border-[#c9972d] focus:ring-2 focus:ring-[#fff1bd]" />
-                </label>
-                <fieldset className="sm:col-span-2">
-                  <legend className="mb-2 text-xs font-semibold text-[#6b4f1d]">Add-ons <span className="font-normal text-[#9b8c83]">(optional)</span></legend>
-                  <div className="grid gap-2 sm:grid-cols-2">
-                    <label className="flex min-h-11 items-center gap-2 rounded-lg border border-[#eadfd8] bg-white px-3 py-2 text-sm text-[#33251e]">
-                      <input type="checkbox" checked={addons.includes('Cake topper')} onChange={() => handleAddonChange('Cake topper')} className="accent-[#c9972d]" />
-                      Cake topper
-                    </label>
-                    <label className="flex min-h-11 items-center gap-2 rounded-lg border border-[#eadfd8] bg-white px-3 py-2 text-sm text-[#33251e]">
-                      <input type="checkbox" checked={addons.includes('Cupcakes')} onChange={() => handleAddonChange('Cupcakes')} className="accent-[#c9972d]" />
-                      Cupcakes
-                    </label>
-                  </div>
-                  {addons.includes('Cupcakes') && (
-                    <label className="mt-2 block text-xs font-semibold text-[#6b4f1d]">
-                      Number of cupcakes
-                      <input type="number" min={1} max={100} value={cupcakeQuantity} onChange={(event) => setCupcakeQuantity(Math.min(100, Math.max(1, Number(event.target.value) || 1)))} className="mt-1.5 min-h-11 w-full rounded-lg border border-[#eadfd8] bg-white px-3 py-2 text-sm font-normal text-[#33251e] outline-none focus:border-[#c9972d] focus:ring-2 focus:ring-[#fff1bd] sm:max-w-40" />
-                    </label>
-                  )}
-                </fieldset>
-              </div>
-            </div>
-          </div>
-
-          <div className="flex flex-col gap-2 lg:contents">
-            <div data-custom-card="5" style={{ marginTop: masonryOffsets[1] }} className="rounded-xl border border-[#f0e6dc] bg-[#fffdf9] p-3 lg:order-5 xl:order-5">
-              <p className="mb-3 flex items-center gap-2 text-sm font-bold text-[#6b4f1d]">
-                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#fff3c8] text-[11px]">5</span>
                 Reference Images
               </p>
               <p className="mb-2 text-[11px] text-[#9b8c83]">Add an example or upload up to 5 images.</p>
@@ -1039,15 +936,100 @@ export default function CustomizedCakes() {
                   </div>
                 </div>
               )}
-
             </div>
 
-            <div data-custom-card="6" style={{ marginTop: masonryOffsets[2] }} className="rounded-xl border border-[#f0e6dc] bg-[#fffdf9] p-3 lg:order-6 xl:order-6">
-              <p className="mb-3 flex items-center gap-2 text-[13px] font-bold text-[#6b4f1d]">
-                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#fff3c8] text-[11px]">6</span>
+          </div>
+          <div className="contents lg:flex lg:flex-col lg:gap-3">
+            <section data-custom-card="7" style={{ order: 7 }} className="rounded-2xl border border-[#eee4de] bg-white p-4 shadow-[0_3px_12px_rgba(91,64,39,0.04)] sm:p-5">
+              <p className="mb-4 flex items-center gap-2 border-b border-[#f3ece6] pb-3 text-sm font-bold text-[#6b4f1d]">
+                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#fff3c8] text-[11px]">7</span>
+                Add-ons <span className="font-normal text-[#9b8c83]">(optional)</span>
+              </p>
+              <fieldset>
+                <legend className="mb-2 text-xs font-semibold text-[#6b4f1d]">Choose add-ons</legend>
+                <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-1">
+                  <label className="flex min-h-11 items-center gap-2 rounded-lg border border-[#eadfd8] bg-white px-3 py-2 text-sm text-[#33251e]">
+                    <input type="checkbox" checked={addons.includes('Cake topper')} onChange={() => handleAddonChange('Cake topper')} className="accent-[#c9972d]" />
+                    Cake topper
+                  </label>
+                  <label className="flex min-h-11 items-center gap-2 rounded-lg border border-[#eadfd8] bg-white px-3 py-2 text-sm text-[#33251e]">
+                    <input type="checkbox" checked={addons.includes('Cupcakes')} onChange={() => handleAddonChange('Cupcakes')} className="accent-[#c9972d]" />
+                    Cupcakes
+                  </label>
+                </div>
+                {addons.includes('Cupcakes') && (
+                  <label className="mt-2 block text-xs font-semibold text-[#6b4f1d]">
+                    Number of cupcakes
+                    <input type="number" min={1} max={100} value={cupcakeQuantity} onChange={(event) => setCupcakeQuantity(Math.min(100, Math.max(1, Number(event.target.value) || 1)))} className="mt-1.5 min-h-11 w-full rounded-lg border border-[#eadfd8] bg-white px-3 py-2 text-sm font-normal text-[#33251e] outline-none focus:border-[#c9972d] focus:ring-2 focus:ring-[#fff1bd] sm:max-w-40" />
+                  </label>
+                )}
+              </fieldset>
+            </section>
+            <div data-custom-card="5" style={{ order: 5 }} className="rounded-2xl border border-[#eee4de] bg-white p-4 shadow-[0_3px_12px_rgba(91,64,39,0.04)] sm:p-5">
+              <p className="mb-4 flex items-center gap-2 border-b border-[#f3ece6] pb-3 text-sm font-bold text-[#6b4f1d]">
+                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#fff3c8] text-[11px]">5</span>
+                Customization Details
+              </p>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="block text-xs font-semibold text-[#6b4f1d]">
+                  <label htmlFor="custom-cake-occasion">Occasion</label>
+                  <select id="custom-cake-occasion" value={occasion} onChange={(event) => setOccasion(event.target.value)} className="mt-1.5 min-h-11 w-full rounded-lg border border-[#eadfd8] bg-white px-3 py-2 text-sm text-[#33251e] outline-none focus:border-[#c9972d] focus:ring-2 focus:ring-[#fff1bd]">
+                    <option>Birthday</option>
+                    <option>Wedding</option>
+                    <option>Anniversary</option>
+                    <option>Graduation</option>
+                    <option>Baby Shower</option>
+                    <option value="Other">Other</option>
+                  </select>
+                  {occasion === 'Other' && (
+                    <input
+                      aria-label="Other occasion"
+                      required
+                      value={customOccasion}
+                      onChange={(event) => setCustomOccasion(event.target.value)}
+                      placeholder="Type the occasion"
+                      className="mt-2 min-h-11 w-full rounded-lg border border-[#eadfd8] bg-white px-3 py-2 text-sm font-normal text-[#33251e] outline-none placeholder:text-[#a99a8e] focus:border-[#c9972d] focus:ring-2 focus:ring-[#fff1bd]"
+                    />
+                  )}
+                </div>
+                <label className="block text-xs font-semibold text-[#6b4f1d]">
+                  Cake Style <span className="font-normal text-[#9b8c83]">(optional)</span>
+                  <select value={cakeStyle} onChange={(event) => setCakeStyle(event.target.value)} className="mt-1.5 min-h-11 w-full rounded-lg border border-[#eadfd8] bg-white px-3 py-2 text-sm font-normal text-[#33251e] outline-none focus:border-[#c9972d] focus:ring-2 focus:ring-[#fff1bd]">
+                    <option value="">Choose a style</option>
+                    <option value="Bento">Bento</option>
+                    <option value="Vintage">Vintage</option>
+                    <option value="Floral">Floral</option>
+                    <option value="Character / themed">Character / themed</option>
+                    <option value="Minimalist">Minimalist</option>
+                    <option value="Other">Other</option>
+                  </select>
+                </label>
+                <label className="block h-full min-h-[90px] text-xs font-semibold text-[#6b4f1d] sm:col-start-2 sm:row-start-3">
+                  Packaging <span className="font-normal text-[#9b8c83]">(optional)</span>
+                  <select value={packaging} onChange={(event) => setPackaging(event.target.value)} className="mt-1.5 h-16 w-full rounded-lg border border-[#eadfd8] bg-white px-3 py-2 text-sm font-normal text-[#33251e] outline-none focus:border-[#c9972d] focus:ring-2 focus:ring-[#fff1bd]">
+                    <option value="Standard">Standard</option>
+                    <option value="Clamshell">Clamshell box</option>
+                    <option value="Acetate box">Acetate box</option>
+                  </select>
+                </label>
+                <label className="block h-full min-h-[90px] text-xs font-semibold text-[#6b4f1d]">Preferred Cake Color <span className="font-normal text-[#9b8c83]">(optional)</span>
+                  <textarea rows={2} value={cakeColor} onChange={(event) => setCakeColor(event.target.value)} placeholder="e.g. blush pink and white" className="mt-1.5 min-h-16 w-full resize-y rounded-lg border border-[#eadfd8] bg-white px-3 py-2 text-sm font-normal text-[#33251e] outline-none placeholder:text-[#a99a8e] focus:border-[#c9972d] focus:ring-2 focus:ring-[#fff1bd]" />
+                </label>
+                <label className="block h-full min-h-[90px] text-xs font-semibold text-[#6b4f1d] sm:col-start-1 sm:row-start-3">Cake Message <span className="font-normal text-[#9b8c83]">(optional)</span>
+                  <textarea rows={2} value={customMessage} onChange={(event) => setCustomMessage(event.target.value)} placeholder="Message to write on the cake" className="mt-1.5 min-h-16 w-full resize-y rounded-lg border border-[#eadfd8] bg-white px-3 py-2 text-sm font-normal text-[#33251e] outline-none placeholder:text-[#a99a8e] focus:border-[#c9972d] focus:ring-2 focus:ring-[#fff1bd]" />
+                </label>
+                <label className="block h-full min-h-[90px] text-xs font-semibold text-[#6b4f1d]">
+                  Specific Design or Theme <span className="font-normal text-[#9b8c83]">(optional)</span>
+                  <input value={customTheme} onChange={(event) => setCustomTheme(event.target.value)} placeholder="e.g. Kuromi, daisy flowers, or a name" className="mt-1.5 h-16 w-full rounded-lg border border-[#eadfd8] bg-white px-3 py-2 text-sm font-normal text-[#33251e] outline-none placeholder:text-[#a99a8e] focus:border-[#c9972d] focus:ring-2 focus:ring-[#fff1bd]" />
+                </label>
+              </div>
+            </div>
+
+            <div data-custom-card="8" style={{ order: 8 }} className="rounded-2xl border border-[#eee4de] bg-white p-4 shadow-[0_3px_12px_rgba(91,64,39,0.04)] sm:p-5">
+              <p className="mb-4 flex items-center gap-2 border-b border-[#f3ece6] pb-3 text-sm font-bold text-[#6b4f1d]">
+                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#fff3c8] text-[11px]">8</span>
                 Order Summary
               </p>
-
               <div className="space-y-3">
                 <div>
                   <label className="mb-1 block text-xs font-semibold text-[#6b4f1d]" htmlFor="custom-cake-budget">Your Budget (₱)</label>
@@ -1065,24 +1047,36 @@ export default function CustomizedCakes() {
                   <p className="mt-2 text-[11px] leading-relaxed text-[#8d7a6e]">Final price will be confirmed after we review your design and add-ons.</p>
                 </div>
               </div>
+              {message && (
+                <div className="mt-3 text-right text-[13px] text-[#7b5b3a]" role="status" aria-live="polite">
+                  {message}
+                </div>
+              )}
+              <div className="mt-4 flex justify-end gap-2 border-t border-[#f3ece6] pt-3">
+                <button type="button" onClick={() => { setCakeType('single'); setSingleSizeId(sizeCatalog[0] ? String(sizeCatalog[0].id) : ''); setTwoTierPreset('standard'); setFlavorId(flavorCatalog[0] ? String(flavorCatalog[0].id) : ''); setCakeStyle(''); setPackaging('Standard'); setAddons([]); setCupcakeQuantity(12); setBudget(''); setFiles([]); setReferenceImage(null); setMessage(''); }} className="rounded-xl border border-[#f0d98a] bg-white px-4 py-2 text-sm font-semibold text-[#6b4f1d] hover:border-[#e5bd45]">
+                  Reset
+                </button>
+                {userId > 0 ? (
+                  <button disabled={loading} type="submit" className="rounded-xl border border-[#e5bd45] bg-[#ffe89a] px-4 py-2 text-sm font-semibold text-[#6b4f1d] transition hover:bg-[#ffedb5] disabled:opacity-50">
+                    {loading ? 'Sending...' : 'Send Request'}
+                  </button>
+                ) : (
+                  <button type="button" onClick={() => navigate('/customer/login')} className="rounded-xl border border-[#e5bd45] bg-[#ffe89a] px-4 py-2 text-sm font-semibold text-[#6b4f1d] transition hover:bg-[#ffedb5]">
+                    Log in to Send Request
+                  </button>
+                )}
+              </div>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2 pt-1 lg:order-7 lg:col-span-2 xl:order-7 xl:col-span-3">
-              {message && <div className="min-w-[min(100%,20rem)] flex-1 text-[13px] text-[#7b5b3a]" role="status" aria-live="polite">{message}</div>}
-              <button type="button" onClick={() => { setCakeType('single'); setSingleSizeId(sizeCatalog[0] ? String(sizeCatalog[0].id) : ''); setTwoTierPreset('standard'); setFlavorId(flavorCatalog[0] ? String(flavorCatalog[0].id) : ''); setCakeStyle(''); setPackaging('Standard'); setAddons([]); setCupcakeQuantity(12); setBudget(''); setFiles([]); setReferenceImage(null); setMessage(''); }} className="rounded-xl border border-[#f0d98a] bg-white px-4 py-2 text-sm font-semibold text-[#6b4f1d] hover:border-[#e5bd45]">
-                Reset
-              </button>
-              {userId > 0 ? (
-                <button disabled={loading} type="submit" className="rounded-xl border border-[#e5bd45] bg-[#ffe89a] px-4 py-2 text-sm font-semibold text-[#6b4f1d] transition hover:bg-[#ffedb5] disabled:opacity-50">
-                  {loading ? 'Sending...' : 'Send Request'}
-                </button>
-              ) : (
-                <button type="button" onClick={() => navigate('/customer/login')} className="rounded-xl border border-[#e5bd45] bg-[#ffe89a] px-4 py-2 text-sm font-semibold text-[#6b4f1d] transition hover:bg-[#ffedb5]">
-                  Log in to Send Request
-                </button>
-              )}
-            </div>
+            <section data-custom-card="6" style={{ order: 6 }} className="rounded-2xl border border-[#eee4de] bg-white p-4 shadow-[0_3px_12px_rgba(91,64,39,0.04)] sm:p-5">
+              <p className="mb-4 flex items-center gap-2 border-b border-[#f3ece6] pb-3 text-sm font-bold text-[#6b4f1d]">
+                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#fff3c8] text-[11px]">6</span>
+                Special Instructions <span className="font-normal text-[#9b8c83]">(optional)</span>
+              </p>
+              <textarea aria-label="Special Instructions" value={specialInstructions} onChange={(event) => setSpecialInstructions(event.target.value)} placeholder="Share any other details" rows={5} className="min-h-28 w-full resize-y rounded-lg border border-[#eadfd8] bg-white px-3 py-2 text-sm font-normal text-[#33251e] outline-none placeholder:text-[#a99a8e] focus:border-[#c9972d] focus:ring-2 focus:ring-[#fff1bd]" />
+            </section>
           </div>
+
         </div>
       </form>
 

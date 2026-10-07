@@ -81,6 +81,7 @@ export default function CheckoutModal({
   const [locationError, setLocationError] = useState('');
   const [shopOpen, setShopOpen] = useState(true);
   const [discountType, setDiscountType] = useState('none');
+  const [rewardCodeInput, setRewardCodeInput] = useState('');
   const [discountIdFile, setDiscountIdFile] = useState(null);
   const [discountIdPreview, setDiscountIdPreview] = useState('');
   const modalScrollRef = useRef(null);
@@ -214,17 +215,6 @@ export default function CheckoutModal({
     if (isOpen && modalScrollRef.current) {
       modalScrollRef.current.scrollTop = 0;
     }
-  }, [isOpen]);
-
-  useEffect(() => {
-    if (!isOpen) return undefined;
-
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-
-    return () => {
-      document.body.style.overflow = previousOverflow;
-    };
   }, [isOpen]);
 
   const savedPhoneNumbers = [...new Set([
@@ -431,9 +421,14 @@ export default function CheckoutModal({
   );
 
   const rushFee = checkoutData.orderType === "Urgent" ? 100 : 0;
-  const discountAmount = discountType === 'none' || !discountIdFile
+  const rewardCode = rewardCodeInput.trim().toUpperCase();
+  const seniorDiscountAmount = discountType === 'none' || !discountIdFile
     ? 0
     : Number((subtotal * 0.05).toFixed(2));
+  const rewardDiscountAmount = discountType === 'none' && rewardCode
+    ? Number(Math.min(subtotal * 0.05, 100).toFixed(2))
+    : 0;
+  const discountAmount = seniorDiscountAmount || rewardDiscountAmount;
   const taxAmount = 0;
 
   const total = subtotal + rushFee + taxAmount - discountAmount;
@@ -489,6 +484,11 @@ export default function CheckoutModal({
       return;
     }
 
+    if (discountType !== 'none' && rewardCode) {
+      alert('A reward code cannot be combined with a Senior Citizen or PWD discount.');
+      return;
+    }
+
     setLoading(true);
     let paymentOrderId = null;
     let paymentSetupStarted = false;
@@ -508,15 +508,6 @@ export default function CheckoutModal({
     };
 
     try {
-
-      const savedUser = (() => {
-        try {
-          return JSON.parse(localStorage.getItem("user") || "{}") || {};
-        } catch {
-          return {};
-        }
-      })();
-
       const payload = {
         items: groupedItems.map((item) => ({
           product_id: item.product_id,
@@ -535,6 +526,7 @@ export default function CheckoutModal({
         payment: checkoutData.payment,
         order_type: checkoutData.orderType || "Standard",
         discount_type: discountType,
+        reward_code: rewardCode,
         address: checkoutData.address,
         phone: checkoutData.phone,
 
@@ -602,6 +594,7 @@ export default function CheckoutModal({
         return;
       }
       paymentOrderId = result.order_id;
+      setRewardCodeInput('');
 
       /* =========================
          PAYMONGO FLOW
@@ -1206,6 +1199,32 @@ export default function CheckoutModal({
                 )}
               </div>
 
+              <div className="space-y-2 rounded-xl border border-[#eee5db] bg-white p-3">
+                <label htmlFor="checkout-reward-code" className="block text-xs font-semibold text-[#765d50]">
+                  Pastry Project reward code
+                </label>
+                <input
+                  id="checkout-reward-code"
+                  type="text"
+                  value={rewardCodeInput}
+                  onChange={(event) => setRewardCodeInput(event.target.value.toUpperCase())}
+                  maxLength={32}
+                  autoCapitalize="characters"
+                  autoComplete="off"
+                  spellCheck={false}
+                  placeholder="PPR-XXXXXXXX"
+                  className="w-full rounded-lg border border-[#e8e1d8] bg-[#fffdfa] p-2.5 text-sm uppercase text-[#33251e] outline-none placeholder:normal-case placeholder:text-gray-400 focus:border-[#d4af37] focus:ring-2 focus:ring-[#d4af37]/20"
+                />
+                <p className="text-[11px] leading-4 text-[#8d7a6e]">
+                  Redeem 5% off your subtotal, up to ₱100. Reward codes cannot be combined with Senior Citizen or PWD discounts.
+                </p>
+                {discountType !== 'none' && rewardCode && (
+                  <p role="alert" className="text-xs font-medium text-red-700">
+                    Select Regular or clear the reward code to use your Senior Citizen / PWD discount.
+                  </p>
+                )}
+              </div>
+
               {rushFee > 0 && (
                 <div className="flex justify-between text-sm text-[#b45309]">
                   <span>Rush priority fee</span>
@@ -1215,7 +1234,7 @@ export default function CheckoutModal({
 
               {discountAmount > 0 && (
                 <div className="flex justify-between text-sm text-green-700">
-                  <span>{discountType === 'pwd' ? 'PWD discount (5%)' : 'Senior Citizen discount (5%)'}</span>
+                  <span>{rewardDiscountAmount > 0 ? 'Rewards discount (5%)' : discountType === 'pwd' ? 'PWD discount (5%)' : 'Senior Citizen discount (5%)'}</span>
                   <span>-₱{discountAmount.toFixed(2)}</span>
                 </div>
               )}

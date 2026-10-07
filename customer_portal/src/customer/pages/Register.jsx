@@ -1,12 +1,16 @@
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { CUSTOMER_BASE, LARAVEL_BASE } from "../../services/config";
+import { CUSTOMER_BASE, LARAVEL_BASE, ROOT_BASE } from "../../services/config";
 import { safeParseJson } from '../../services/api';
 import { signInWithGoogle } from "../../services/firebase";
 
-const BASE = CUSTOMER_BASE;
-const LOGO_URL = "/assets/logo.png";
+const ASSET_BASE = process.env.NODE_ENV === "production"
+  ? `${ROOT_BASE}/customer_portal/build/assets`
+  : "/assets";
+const LOGO_URL = process.env.NODE_ENV === "production"
+  ? `${ROOT_BASE}/uploads/logo.png`
+  : `${ASSET_BASE}/logo.png`;
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const phoneRegex = /^\+?[0-9\s-]{7,15}$/;
 
@@ -204,7 +208,7 @@ export default function Register() {
 
         .brand-script { font-family: 'Pacifico', cursive; }
         .pastry-register { background: #fcfbf8; }
-        .pastry-register .register-banner { position: absolute; z-index: 0; top: 0; left: 0; height: calc(100% - 105px); width: auto; max-width: none; object-fit: contain; object-position: left top; }
+        .pastry-register .register-banner { display: none; position: absolute; z-index: 0; top: 0; left: 0; height: calc(100% - 105px); width: auto; max-width: none; object-fit: contain; object-position: left top; }
         .pastry-register .hero-panel { visibility: hidden; }
 
         .pastry-register .login-card {
@@ -249,12 +253,55 @@ export default function Register() {
         }
         .pastry-register .btn-secondary:hover { background: #F9FAFB; }
 
-        @media (max-width: 767px) {
-          .pastry-register .register-banner { display: none; }
+        @media (min-width: 1024px) {
+          .pastry-register .register-banner { display: block; }
+        }
+
+        @media (max-width: 1023px) {
+          .pastry-register {
+            max-width: 522px;
+            margin: 0 auto;
+            border-right: 1px solid #e5e7eb;
+            border-left: 1px solid #e5e7eb;
+          }
+          .pastry-register .hero-panel {
+            display: flex;
+            visibility: visible;
+            padding: 18px 32px 14px;
+            background-color: #fcfbf8;
+            background-image: radial-gradient(circle at 0 0, #ffc236 0 84px, transparent 85px), url("${ASSET_BASE}/login-mobile-texture.jpg");
+            background-size: 100% 100%, 100% 100%;
+            background-position: top left, top right;
+            background-repeat: no-repeat;
+          }
+          .pastry-register .hero-panel > .mb-6:first-child { justify-content: center; margin-top: 12px; margin-bottom: 0; }
+          .pastry-register .hero-panel > .mb-6:first-child img { display: none; }
+          .pastry-register .hero-panel > .mb-6:first-child > div { text-align: center; }
+          .pastry-register .hero-panel > .mb-6:first-child h1 { font-size: 26px; }
+          .pastry-register .hero-panel > .mb-6:first-child p { font-size: 8px; }
+          .pastry-register .hero-panel > div:nth-child(2) { display: none; }
+          .pastry-register .hero-panel > .mb-6:nth-child(2) h2 { font-size: 32px; }
+          .pastry-register .hero-panel > .mb-6:nth-child(2) p { font-size: 14px; line-height: 1.5; }
+          .pastry-register main { flex: 0 0 auto; gap: 0; padding: 0; }
+          .pastry-register main > div:not(.hero-panel) { padding: 0 23px 20px; }
+          .pastry-register .login-card { border-radius: 20px; }
+          .pastry-register .register-input { height: 46px; }
+          .pastry-register .btn-primary, .pastry-register .btn-secondary { height: 44px; }
+          .pastry-register .mobile-register-art { display: block; width: 100%; height: clamp(160px, 35.5vw, 185px); object-fit: cover; object-position: center; }
+          .pastry-register footer { justify-content: center; border-top: 0; padding: 10px 0 19px; }
+          .pastry-register footer > div:nth-child(2) { display: none; }
+          .pastry-register footer img { width: 30px; height: 30px; }
+          .pastry-register footer p { font-size: 11px; }
+        }
+
+        @media (max-width: 399px) {
+          .pastry-register .hero-panel { padding-right: 20px; padding-left: 20px; }
+          .pastry-register main > div:not(.hero-panel) { padding-right: 14px; padding-left: 14px; }
+          .pastry-register .login-card { padding-right: 18px; padding-left: 18px; }
         }
       `}</style>
 
-      <img className="register-banner" src={`${BASE}/../uploads/login.jpg?v=login-v1`} alt="" aria-hidden="true" />
+      <img className="register-banner" src={`${ASSET_BASE}/login-bg.jpg`} alt="" aria-hidden="true" />
 
       <div className="relative z-10 flex min-h-screen w-full flex-col">
         <main className="flex flex-1 flex-col py-4 lg:flex-row lg:items-center lg:justify-between lg:gap-0 lg:py-0">
@@ -405,7 +452,7 @@ export default function Register() {
                     <span>
                       I agree to the
                       <Link to="/customer/terms" className="ml-1 font-semibold text-[#171717] underline decoration-[#F0B94D] decoration-2 underline-offset-2 hover:text-black">
-                        Terms
+                        Terms &amp; Conditions
                       </Link>
                       .
                     </span>
@@ -425,9 +472,9 @@ export default function Register() {
                     />
                     <span>
                       I agree to the
-                      <a href="/privacy.html" target="_blank" rel="noopener noreferrer" className="ml-1 font-semibold text-[#171717] underline decoration-[#F0B94D] decoration-2 underline-offset-2 hover:text-black">
+                      <Link to="/customer/privacy-policy" className="ml-1 font-semibold text-[#171717] underline decoration-[#F0B94D] decoration-2 underline-offset-2 hover:text-black">
                         Privacy Policy
-                      </a>
+                      </Link>
                       .
                     </span>
                   </label>
@@ -467,6 +514,8 @@ export default function Register() {
           </div>
         </main>
 
+        <img className="mobile-register-art hidden" src={`${ASSET_BASE}/login-mobile-cake.jpg`} alt="" aria-hidden="true" />
+
         <footer className="relative z-10 flex flex-col items-center justify-between border-t border-gray-200 bg-white/70 px-5 py-3 md:flex-row md:px-8">
           <div className="flex items-center gap-3">
             <img src={LOGO_URL} alt="Logo" className="h-9 w-9 opacity-80" />
@@ -474,7 +523,7 @@ export default function Register() {
           </div>
           <div className="my-2 flex flex-wrap justify-center gap-4 md:my-0 md:gap-6">
             <Link to="/customer/about-us" className="text-sm font-semibold text-gray-600 hover:text-[#F0B94D]">About Us</Link>
-            <Link to="/customer/terms" className="text-sm font-semibold text-gray-600 hover:text-[#F0B94D]">Terms</Link>
+            <Link to="/customer/terms" className="text-sm font-semibold text-gray-600 hover:text-[#F0B94D]">Terms &amp; Conditions</Link>
             <Link to="/customer/privacy-policy" className="text-sm font-semibold text-gray-600 hover:text-[#F0B94D]">Privacy Policy</Link>
             <Link to="/customer/chat-support" className="text-sm font-semibold text-gray-600 hover:text-[#F0B94D]">Help</Link>
           </div>

@@ -151,10 +151,10 @@ function SecondaryBanner({ onOrderNow }) {
 
   return (
     <section className="mb-4 mt-2 overflow-hidden rounded-xl border border-[#eadfd8] bg-white shadow-[0_5px_18px_rgba(91,64,39,0.05)]">
-      <div className="relative h-[200px] w-full overflow-hidden sm:h-[240px] md:h-[290px] lg:h-[340px]">
+      <div className="relative aspect-[5/2] w-full overflow-hidden md:aspect-auto md:h-[290px] lg:h-[340px]">
         {secondaryBanner.type === "video" ? (
           <video
-            className="h-full w-full object-cover scale-[1.08]"
+            className="h-full w-full object-contain md:scale-[1.08] md:object-cover"
             src={secondaryBanner.src}
             autoPlay
             muted
@@ -165,15 +165,15 @@ function SecondaryBanner({ onOrderNow }) {
           <img
             src={secondaryBanner.src}
             alt="Pastry Project banner"
-            className="h-full w-full object-cover scale-[1.08]"
+            className="h-full w-full object-contain md:scale-[1.08] md:object-cover"
           />
         )}
         <button
           type="button"
           onClick={onOrderNow}
-          className="absolute left-[50%] top-[70%] z-10 inline-flex -translate-y-1/2 items-center gap-3 rounded-full bg-[#73785c] px-5 py-2.5 font-serif text-sm font-medium text-white shadow-sm transition hover:bg-[#5f654a] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2"
+          className="absolute right-[3%] top-[86%] z-10 inline-flex -translate-y-1/2 items-center gap-1 rounded-full bg-[#73785c] px-2.5 py-1 font-serif text-[10px] font-medium text-white shadow-sm transition hover:bg-[#5f654a] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 sm:left-[50%] sm:right-auto sm:top-[70%] sm:-translate-x-1/2 sm:gap-3 sm:px-5 sm:py-2.5 sm:text-sm md:bottom-[6%] md:left-auto md:right-[3%] md:top-auto md:translate-x-0 md:translate-y-0"
         >
-          Order Now <ArrowRight size={15} strokeWidth={1.8} />
+          Order Now <ArrowRight size={12} className="sm:h-[15px] sm:w-[15px]" strokeWidth={1.8} />
         </button>
       </div>
     </section>
@@ -420,13 +420,13 @@ function TestimonialsSection() {
     <section className="relative overflow-hidden bg-[#fffaf0] px-4 py-10 sm:px-8 md:px-12">
       <div className="mx-auto max-w-[1100px]">
         <div className="text-center"><p className="text-[9px] font-black uppercase tracking-[0.3em] text-[#9b7b3d]">Customer reviews</p><h2 className="mt-1 font-serif text-2xl text-[#3c2925] md:text-3xl">Rated by Our Customers</h2><p className="mt-1 text-xs text-[#765f5d]">{totalReviews > 0 ? `${averageRating.toFixed(1)} out of 5 · ${totalReviews} customer ${totalReviews === 1 ? 'rating' : 'ratings'}` : 'No customer ratings yet.'}</p></div>
-        <div className="relative mt-7 grid gap-4 md:grid-cols-3">
+        <div className="relative mt-7 grid grid-cols-3 gap-2 md:gap-4">
           {visibleReviews.map((review) => (
-            <article key={review.id} className="rounded-xl border border-[#eadfd8] bg-white px-5 py-5 text-center shadow-[0_6px_16px_rgba(91,64,39,0.08)]">
-              <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-[#f5eee5] text-xs font-black text-[#7c654f]">{String(review.customer_name || 'Customer').split(/\s+/).map((part) => part[0]).join('').slice(0, 2).toUpperCase()}</div>
-              <p className="mt-4 min-h-[72px] text-[11px] leading-5 text-[#413734]">{review.comment?.trim() ? `“${review.comment.trim()}”` : 'Customer rating for their order.'}</p>
-              <p className="mt-3 text-[11px] font-bold text-[#765d50]">- {review.customer_name || 'Customer'}</p>
-              <div className="mt-2 flex justify-center gap-0.5 text-[#e8b52e]" aria-label={`${review.rating} out of 5 stars`}>{[1, 2, 3, 4, 5].map((star) => <Star key={star} size={14} fill={star <= Number(review.rating) ? 'currentColor' : 'none'} strokeWidth={1.4} />)}</div>
+            <article key={review.id} className="min-w-0 rounded-xl border border-[#eadfd8] bg-white px-2 py-3 text-center shadow-[0_6px_16px_rgba(91,64,39,0.08)] md:px-5 md:py-5">
+              <div className="mx-auto flex h-8 w-8 items-center justify-center rounded-full bg-[#f5eee5] text-[10px] font-black text-[#7c654f] md:h-11 md:w-11 md:text-xs">{String(review.customer_name || 'Customer').split(/\s+/).map((part) => part[0]).join('').slice(0, 2).toUpperCase()}</div>
+              <p className="mt-3 min-h-[80px] break-words text-[10px] leading-4 text-[#413734] md:mt-4 md:min-h-[72px] md:text-[11px] md:leading-5">{review.comment?.trim() ? `“${review.comment.trim()}”` : 'Customer rating for their order.'}</p>
+              <p className="mt-3 break-words text-[10px] font-bold leading-tight text-[#765d50] md:text-[11px]">- {review.customer_name || 'Customer'}</p>
+              <div className="mt-2 flex justify-center gap-0.5 text-[#e8b52e]" aria-label={`${review.rating} out of 5 stars`}>{[1, 2, 3, 4, 5].map((star) => <Star key={star} className="h-3 w-3 md:h-[14px] md:w-[14px]" fill={star <= Number(review.rating) ? 'currentColor' : 'none'} strokeWidth={1.4} />)}</div>
             </article>
           ))}
           {reviews.length > 3 && (
@@ -673,14 +673,14 @@ export function ChatBubble({ aiMode = false, fullPage = false }) {
   return (
     <>
       {/* FLOAT BUTTON */}
-      {!fullPage && <div className="fixed bottom-6 right-6 z-[60000] flex items-center gap-3">
+      {!fullPage && <div className="fixed bottom-6 right-6 z-[60000] flex items-end">
         {!open && (
           <motion.div
             initial={{ opacity: 0, x: 12 }}
             animate={{ opacity: 1, x: 0 }}
-            className="rounded-full border border-[#f0e6db] bg-white px-4 py-2 shadow-lg"
+            className="absolute bottom-full right-0 mb-2 whitespace-nowrap rounded-2xl rounded-br-md border border-[#f0e6db] bg-white px-3 py-2 shadow-lg"
           >
-            <p className="text-sm font-semibold text-gray-800">Chat with us!</p>
+            <p className="text-xs font-semibold text-gray-800">Chat with us!</p>
           </motion.div>
         )}
         <div className="relative">
@@ -1209,7 +1209,7 @@ export default function Dashboard({ onAddToCart }) {
       />
 
       <main className="mx-auto max-w-[1380px] px-4 py-5 md:px-7 lg:px-10">
-        <div className="mb-3 grid grid-cols-2 gap-2 px-1 py-1 sm:grid-cols-3 md:grid-cols-6 md:gap-3">
+        <div className="mb-3 grid grid-cols-6 gap-1 px-0 py-1 md:gap-3 md:px-1">
           {[
             ['Birthday', CakeSlice, '/customer/birthday-designs'],
             ['Cutesy', Sparkles, '/customer/cutesy-designs'],
@@ -1222,18 +1222,18 @@ export default function Dashboard({ onAddToCart }) {
               key={label}
               type="button"
               onClick={() => navigate(path)}
-              className="flex min-w-0 flex-col items-center justify-center gap-2 rounded-xl border border-[#eee4de] bg-white px-2 py-3 text-center text-[#5f514a] transition hover:-translate-y-0.5 hover:border-[#e7c875] hover:bg-[#fff8df] hover:text-[#8d6a2e]"
+              className="flex min-w-0 flex-col items-center justify-center gap-1.5 rounded-lg border border-[#eee4de] bg-white px-0.5 py-2 text-center text-[#5f514a] transition hover:-translate-y-0.5 hover:border-[#e7c875] hover:bg-[#fff8df] hover:text-[#8d6a2e] md:gap-2 md:rounded-xl md:px-2 md:py-3"
             >
-              <Icon size={22} strokeWidth={1.6} className="shrink-0" />
-              <span className="w-full text-[10px] font-semibold leading-tight break-words">{label}</span>
+              <Icon size={18} strokeWidth={1.6} className="shrink-0 md:h-[22px] md:w-[22px]" />
+              <span className="w-full break-words text-[8px] font-semibold leading-tight md:text-[10px]">{label}</span>
             </button>
           ))}
         </div>
 
         <SecondaryBanner onOrderNow={() => navigate("/customer/customized-cakes")} />
 
-        <div className="grid gap-4 lg:grid-cols-[minmax(0,2.1fr)_minmax(300px,0.88fr)]">
-          <div className="min-w-0">
+        <div className="grid gap-3 lg:gap-4 lg:grid-cols-[minmax(0,2.1fr)_minmax(300px,0.88fr)]">
+          <div className="order-2 min-w-0 lg:order-1">
             <section className="mb-4 overflow-hidden rounded-xl border border-[#eadfd8] bg-white shadow-[0_5px_18px_rgba(91,64,39,0.05)]">
               <div className="flex items-center justify-between border-b border-[#f0e7e0] px-4 py-3 sm:px-5">
                 <div><p className="text-[9px] font-black uppercase tracking-[0.28em] text-[#b17876]">Featured cakes</p><h2 className="mt-0.5 font-serif text-xl text-[#33251e] md:text-2xl">Our Best Sellers</h2></div>
@@ -1250,7 +1250,7 @@ export default function Dashboard({ onAddToCart }) {
             </section>
           </div>
 
-          <aside className="space-y-4">
+          <aside className="order-1 space-y-4 lg:order-2">
             <section className="rounded-xl border border-[#eadfd8] bg-white p-4 shadow-[0_5px_18px_rgba(91,64,39,0.04)]">
               <div className="flex items-center justify-between gap-3">
                 <div className="flex min-w-0 items-center gap-3">
@@ -1267,7 +1267,7 @@ export default function Dashboard({ onAddToCart }) {
               <div className="flex items-start justify-between text-center text-[10px] text-[#665b55]"><div className="flex flex-col items-center gap-2"><span className="flex h-10 w-10 items-center justify-center rounded-full border-2 border-[#e7c875] bg-[#fff8e9] text-[#a57c38]"><ClipboardList size={18} /></span><span className="font-semibold">Pending</span><small className="text-[9px] text-[#9b8c83]">Order received</small></div><span className="mt-5 h-px flex-1 bg-[#efd8d4]" /><div className="flex flex-col items-center gap-2"><span className="flex h-10 w-10 items-center justify-center rounded-full border border-[#eadfd8] bg-[#fffaf7] text-[#8e7b70]"><Gift size={18} /></span><span className="font-semibold">Processing</span><small className="text-[9px] text-[#9b8c83]">Baking your cake</small></div><span className="mt-5 h-px flex-1 bg-[#efd8d4]" /><div className="flex flex-col items-center gap-2"><span className="flex h-10 w-10 items-center justify-center rounded-full border border-[#eadfd8] bg-[#fffaf7] text-[#8e7b70]"><ChevronRight size={18} /></span><span className="font-semibold">Delivery</span><small className="text-[9px] text-[#9b8c83]">Almost there!</small></div></div>
             </section>
 
-            <section className="rounded-xl border border-[#eadfd8] bg-white p-4 shadow-[0_5px_18px_rgba(91,64,39,0.04)]"><p className="mb-3 text-[10px] font-black uppercase tracking-[0.22em] text-[#5d4a42]">Quick Actions</p><div className="grid grid-cols-2 gap-2"><button type="button" onClick={() => setIsCustomCakeOpen(true)} className="flex items-center gap-2 rounded-lg bg-[#fff0f0] px-3 py-3 text-left text-[10px] font-bold text-[#5b4540]"><Gift size={18} className="text-[#c36b77]" />Customize Cake</button><button type="button" onClick={() => navigate('/customer/orders')} className="flex items-center gap-2 rounded-lg bg-[#fff8e9] px-3 py-3 text-left text-[10px] font-bold text-[#5b4540]"><ClipboardList size={18} className="text-[#a57c38]" />View Orders</button><button type="button" onClick={() => navigate('/customer/profile')} className="flex items-center gap-2 rounded-lg bg-[#f7f2fb] px-3 py-3 text-left text-[10px] font-bold text-[#5b4540]"><User size={18} className="text-[#87699a]" />My Profile</button><button type="button" onClick={() => navigate('/customer/chat-support')} className="flex items-center gap-2 rounded-lg bg-[#eef7f4] px-3 py-3 text-left text-[10px] font-bold text-[#5b4540]"><MessageCircle size={18} className="text-[#668e83]" />Chat Support</button></div></section>
+            <section className="rounded-xl border border-[#eadfd8] bg-white p-4 shadow-[0_5px_18px_rgba(91,64,39,0.04)]"><p className="mb-3 text-[10px] font-black uppercase tracking-[0.22em] text-[#5d4a42]">Quick Actions</p><div className="grid grid-cols-2 gap-2"><button type="button" onClick={() => navigate('/customer/customized-cakes')} className="flex items-center gap-2 rounded-lg bg-[#fff0f0] px-3 py-3 text-left text-[10px] font-bold text-[#5b4540]"><Gift size={18} className="text-[#c36b77]" />Customize Cake</button><button type="button" onClick={() => navigate('/customer/orders')} className="flex items-center gap-2 rounded-lg bg-[#fff8e9] px-3 py-3 text-left text-[10px] font-bold text-[#5b4540]"><ClipboardList size={18} className="text-[#a57c38]" />View Orders</button><button type="button" onClick={() => navigate('/customer/profile')} className="flex items-center gap-2 rounded-lg bg-[#f7f2fb] px-3 py-3 text-left text-[10px] font-bold text-[#5b4540]"><User size={18} className="text-[#87699a]" />My Profile</button><button type="button" onClick={() => navigate('/customer/chat-support')} className="flex items-center gap-2 rounded-lg bg-[#eef7f4] px-3 py-3 text-left text-[10px] font-bold text-[#5b4540]"><MessageCircle size={18} className="text-[#668e83]" />Help Center</button></div></section>
 
             <section className="relative min-h-[132px] overflow-hidden rounded-xl border border-[#eadfd8] bg-white p-3 text-[#3c2925] shadow-[0_5px_18px_rgba(91,64,39,0.04)]"><div className="absolute -right-7 -top-7 h-28 w-28 rounded-full border-[12px] border-[#f3e3b0]" /><div className="relative z-10 max-w-[220px]"><p className="text-[9px] font-black uppercase tracking-[0.24em] text-[#a57c38]">Special Offer</p><h2 className="mt-1 font-serif text-3xl leading-none">10% OFF</h2><p className="mt-1 text-xs leading-5 text-[#765f3d]">on your next order. Treat yourself to something freshly baked.</p><button type="button" onClick={() => navigate('/customer/menu')} className="mt-2 inline-flex items-center gap-1 rounded-full bg-[#33251e] px-4 py-1.5 text-[10px] font-bold text-white">Shop Now <ChevronRight size={12} /></button></div></section>
           </aside>

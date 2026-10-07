@@ -52,31 +52,86 @@ export default function PrivacyPage() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-[#fffaf3] text-[#1a1a1a]">
-      <header className="border-b border-[#f0e7cb] bg-[#fffdf9] backdrop-blur-sm">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-5 py-4 sm:px-6 lg:px-10">
+    <div className="privacy-page min-h-screen bg-[#fffaf3] text-[#1a1a1a]">
+      <style>{`
+        .privacy-page h1 {
+          font-size: 1.6rem !important;
+          line-height: 1.2 !important;
+        }
+
+        .privacy-page h2 {
+          font-size: 0.88rem !important;
+          line-height: 1.35 !important;
+          margin-bottom: 0.1rem !important;
+        }
+
+        .privacy-page p,
+        .privacy-page li {
+          font-size: 0.82rem !important;
+          line-height: 1.5 !important;
+          margin-top: 0.14rem !important;
+          margin-bottom: 0.14rem !important;
+        }
+
+        .privacy-page ul {
+          margin-top: 0.14rem !important;
+          margin-bottom: 0.14rem !important;
+          padding-left: 1rem !important;
+        }
+
+        .privacy-page li {
+          margin-top: 0.08rem !important;
+        }
+
+        .privacy-page section {
+          scroll-margin-top: 6rem;
+          margin-top: 0.12rem !important;
+          margin-bottom: 0.12rem !important;
+        }
+
+        .privacy-page .privacy-sidebar-item {
+          font-size: 0.76rem !important;
+          line-height: 1.3 !important;
+          padding: 0.24rem 0.55rem !important;
+          white-space: nowrap;
+        }
+
+        .privacy-page .privacy-heading {
+          letter-spacing: 0.24em !important;
+          font-size: 0.72rem !important;
+          font-weight: 800 !important;
+        }
+
+        .privacy-page .privacy-sidebar {
+          width: 20rem;
+          max-width: 100%;
+          flex-shrink: 0;
+        }
+      `}</style>
+      <header className="sticky top-0 z-50 border-b border-[#f0e7cb] bg-[#fffdf9] backdrop-blur-sm">
+        <div className="mx-auto flex max-w-[95rem] items-center justify-between px-3 py-3 sm:px-4 lg:px-5">
           <div className="flex items-center gap-3">
             <button
               type="button"
               onClick={() => navigate(-1)}
-              className="inline-flex items-center gap-2 rounded-full border border-[#d4af37]/40 bg-[#fffaf0] px-3 py-1.5 text-xs font-bold uppercase tracking-[0.14em] text-[#171717] transition hover:border-[#d4af37] hover:bg-[#fdf3d7]"
+              className="inline-flex items-center gap-2 rounded-full border border-[#d4af37]/40 bg-[#fffaf0] px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-[#171717] transition hover:border-[#d4af37] hover:bg-[#fdf3d7]"
             >
               ← Back
             </button>
             <div className="flex items-center gap-3">
-              <img src={`${ROOT_BASE}/uploads/logo.png?v=logo-v2`} alt="Pastry Project logo" className="h-10 w-10 rounded-none bg-transparent object-contain" />
-              <p className="text-lg font-black tracking-tight text-[#171717] sm:text-xl">Pastry Project</p>
+              <img src={`${ROOT_BASE}/uploads/logo.png?v=logo-v2`} alt="Pastry Project logo" className="h-9 w-9 rounded-none bg-transparent object-contain" />
+              <p className="text-base font-black tracking-tight text-[#171717] sm:text-lg">Pastry Project</p>
             </div>
           </div>
         </div>
       </header>
 
-      <div className="mx-auto max-w-7xl px-5 py-8 sm:px-6 lg:px-10">
-        <div className="flex flex-col gap-8 lg:flex-row lg:items-start">
-          <aside className="w-full lg:w-[22rem] lg:self-start">
-            <div className="rounded-2xl border border-[#d4af37]/35 bg-white/80 p-4 shadow-sm backdrop-blur-sm">
-              <p className="text-xs font-bold uppercase tracking-[0.25em] text-[#b18a23]">Sections</p>
-              <nav className="mt-3 space-y-2 pr-1">
+      <div className="mx-auto max-w-[95rem] px-3 py-4 sm:px-4 lg:px-5">
+        <div className="flex flex-col gap-4 lg:grid lg:grid-cols-[20rem_minmax(0,1fr)] lg:items-start">
+          <aside className="privacy-sidebar w-full lg:sticky lg:top-20 lg:w-[20rem] lg:self-start lg:justify-self-start">
+            <div className="rounded-xl border border-[#d4af37]/35 bg-white/80 p-2 shadow-sm backdrop-blur-sm">
+              <p className="privacy-heading mb-2 font-bold uppercase tracking-[0.25em] text-[#b18a23]">Sections</p>
+              <nav className="space-y-0.5 pr-1">
                 {sections.map((section, index) => {
                   const isActive = activeSection === index;
 
@@ -85,7 +140,7 @@ export default function PrivacyPage() {
                       key={section}
                       href={`#section-${index + 1}`}
                       onClick={() => setActiveSection(index)}
-                      className={`block rounded-xl border px-2 py-1.5 text-sm transition ${
+                      className={`privacy-sidebar-item block rounded-full border transition ${
                         isActive
                           ? "border-[#d4af37]/60 bg-[#fffaf0] font-semibold text-[#171717] shadow-sm"
                           : "border-transparent text-gray-700 hover:border-[#d4af37]/40 hover:bg-[#fffaf0] hover:text-[#171717]"
@@ -101,11 +156,11 @@ export default function PrivacyPage() {
           </aside>
 
           <div className="w-full max-w-4xl">
-            <p className="text-sm font-semibold uppercase tracking-[0.35em] text-[#d4af37]">Privacy Policy</p>
-            <h1 className="mt-4 text-3xl font-black tracking-tight sm:text-4xl">Privacy Policy</h1>
-            <p className="mt-3 text-sm font-medium text-gray-600">Last Updated: August 29, 2026</p>
+            <p className="privacy-heading font-semibold uppercase tracking-[0.35em] text-[#d4af37]">Privacy Policy</p>
+            <h1 className="mt-2 font-black tracking-tight">Privacy Policy</h1>
+            <p className="mt-1 text-[10px] font-medium text-gray-600">Last Updated: August 29, 2026</p>
 
-            <div className="mt-8 space-y-8">
+            <div className="mt-3 space-y-3">
           <section>
             <h2 className="text-xl font-bold text-[#171717]">Overview</h2>
             <p className="mt-3 text-base leading-8 text-gray-700">

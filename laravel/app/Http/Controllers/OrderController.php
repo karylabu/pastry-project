@@ -184,13 +184,56 @@ class OrderController extends Controller
                 $deliveryFee = 0.0;
                 $rushFee = ($request->order_type ?? 'Standard') === 'Urgent' ? 100.0 : 0.0;
                 $discountType = $request->input('discount_type', 'none');
+                $rewardCode = strtoupper(trim((string) $request->input('reward_code', '')));
+                $orderDiscountType = $discountType;
                 $discountAmount = in_array($discountType, ['senior_citizen', 'pwd'], true)
                     ? round($subtotal * 0.05, 2)
                     : 0.0;
+                $rewardTransactionId = null;
+
+                if ($rewardCode !== '') {
+                    if ($discountType !== 'none') {
+                        return response()->json([
+                            'success' => false,
+                            'message' => 'A reward code cannot be combined with a Senior Citizen or PWD discount.',
+                        ], 422);
+                    }
+
+                    if (!Schema::hasTable('loyalty_transactions')) {
+                        return response()->json([
+                            'success' => false,
+                            'message' => 'This reward code is invalid or has already been used.',
+                        ], 422);
+                    }
+
+                    $rewardTransaction = DB::table('loyalty_transactions')
+                        ->where('user_id', $user->id)
+                        ->where('type', 'redeem')
+                        ->where('points', -1000)
+                        ->where('discount_percent', 5)
+                        ->where('reward_code', $rewardCode)
+                        ->whereNull('order_id')
+                        ->lockForUpdate()
+                        ->first();
+
+                    if (!$rewardTransaction) {
+                        return response()->json([
+                            'success' => false,
+                            'message' => 'This reward code is invalid or has already been used.',
+                        ], 422);
+                    }
+
+                    $rewardTransactionId = (int) $rewardTransaction->id;
+                    $discountAmount = round(min($subtotal * 0.05, (float) $rewardTransaction->max_discount_amount), 2);
+                    $orderDiscountType = 'reward_5_percent';
+                }
+
                 if ($discountAmount > 0) {
-                    $discountIdPath = $request->file('discount_id_image')->store('discount-ids', 'local');
-                    if (!$discountIdPath) {
-                        throw new RuntimeException('Unable to securely save the discount ID image.');
+                    if (in_array($discountType, ['senior_citizen', 'pwd'], true)) {
+                        $discountIdPath = $request->file('discount_id_image')->store('discount-ids', 'local');
+                        if (!$discountIdPath) {
+                            throw new RuntimeException('Unable to securely save the discount ID image.');
+                        }
                     }
                 }
                 $total = $subtotal - $discountAmount + $rushFee;
@@ -204,7 +247,7 @@ class OrderController extends Controller
                     'items' => $canonicalItems,
                     'subtotal' => $subtotal,
                     'delivery_fee' => $deliveryFee,
-                    'discount_type' => $discountType,
+                    'discount_type' => $orderDiscountType,
                     'discount' => $discountAmount,
                     'discount_id_path' => $discountIdPath,
                     'total' => $total,
@@ -224,6 +267,17 @@ class OrderController extends Controller
                     'is_customized' => $request->is_customized ?? false,
                     'created_at' => now(),
                 ]);
+
+                if ($rewardTransactionId !== null) {
+                    $claimedReward = DB::table('loyalty_transactions')
+                        ->where('id', $rewardTransactionId)
+                        ->whereNull('order_id')
+                        ->update(['order_id' => $order->id]);
+
+                    if ($claimedReward !== 1) {
+                        throw new RuntimeException('The reward code is no longer available.');
+                    }
+                }
 
                 // Automatically save phone number to user profile if not already set
                 if (empty($user->phone)) {
@@ -278,7 +332,7 @@ class OrderController extends Controller
                     'status' => $initialStatus,
                     'subtotal' => $subtotal,
                     'delivery_fee' => $deliveryFee,
-                    'discount_type' => $discountType,
+                    'discount_type' => $orderDiscountType,
                     'discount' => $discountAmount,
                     'total' => $total,
                     'order' => $order->load('orderItems'),
