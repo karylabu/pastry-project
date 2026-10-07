@@ -6,6 +6,24 @@ import { getAuthHeaders, safeParseJson } from '../../services/api';
 import { subscribeRealtime } from '../../services/realtime';
 import { CUSTOMER_BASE, LARAVEL_BASE, ROOT_BASE } from "../../services/config";
 
+const resolveCustomCakeImageUrl = (source) => {
+  if (!source) return null;
+  const value = String(source).trim();
+  if (/^https?:\/\//i.test(value)) return value;
+
+  const relativePath = value
+    .replace(/^\/+/, '')
+    .replace(/^(?:laravel\/public\/)?customer\//, '');
+  if (/^uploads\/custom_cake\//i.test(relativePath)) {
+    return `${LARAVEL_BASE}/customer/${relativePath}`;
+  }
+  if (/^uploads\/customized-cakes\//i.test(relativePath)) {
+    return `${LARAVEL_BASE}/${relativePath}`;
+  }
+
+  return `${ROOT_BASE}/${relativePath}`;
+};
+
 // ── Cancel Confirmation Dialog ───────────────────────────────────────────────
 function CancelDialog({ order, onConfirm, onDismiss, isLoading }) {
   return (
@@ -785,11 +803,12 @@ export default function Orders() {
       ? new Date(order.created_at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })
       : 'No date available';
     const totalValue = Number(order.total || 0);
-    const rawCustomDetails = order?.custom_details && typeof order.custom_details === 'string'
+    const customDetailsSource = order?.custom_details || order?.custom_cake_details || {};
+    const rawCustomDetails = typeof customDetailsSource === 'string'
       ? (() => {
-          try { return JSON.parse(order.custom_details); } catch { return {}; }
+          try { return JSON.parse(customDetailsSource) || {}; } catch { return {}; }
         })()
-      : (order?.custom_details || {});
+      : customDetailsSource;
 
     const formatCustomValue = (value) => {
       if (Array.isArray(value)) {
@@ -858,12 +877,7 @@ export default function Orders() {
       const source = typeof reference === 'string'
         ? reference
         : reference?.url || reference?.src || reference?.path || reference?.image;
-      if (!source) return null;
-      if (/^https?:\/\//i.test(source)) return source;
-      const relativePath = String(source).replace(/^\/+/, '');
-      return relativePath.startsWith('uploads/customized-cakes/')
-        ? `${LARAVEL_BASE}/${relativePath}`
-        : `${ROOT_BASE}/${relativePath}`;
+      return resolveCustomCakeImageUrl(source);
     }).filter(Boolean);
 
     return (
@@ -1087,7 +1101,9 @@ export default function Orders() {
 
   const getProductThumbnail = (order, item) => {
     const orderType = String(order?.type || '').toLowerCase();
-    const isCustomizedOrder = order?.is_customized || orderType.includes('custom');
+    const isCustomizedOrder = order?.is_customized
+      || orderType.includes('custom')
+      || Boolean(order?.custom_details || order?.custom_cake_details);
     if (isCustomizedOrder) {
       let details = order?.custom_details || order?.custom_cake_details || {};
       if (typeof details === 'string') {
@@ -1114,13 +1130,8 @@ export default function Orders() {
         ? reference
         : reference?.url || reference?.src || reference?.path || reference?.image;
       if (source) {
-        if (/^https?:\/\//i.test(source)) return source;
-        const legacyProjectPath = source.match(/^\/(?:GitHub\/)?pastry-project\/(.*)$/);
-        const relativePath = legacyProjectPath ? legacyProjectPath[1] : source.replace(/^\/+/, '');
-        if (relativePath.startsWith('uploads/customized-cakes/')) {
-          return `${LARAVEL_BASE}/${relativePath}`;
-        }
-        return `${ROOT_BASE}/${relativePath}`;
+        const legacyProjectPath = String(source).match(/^\/(?:GitHub\/)?pastry-project\/(.*)$/);
+        return resolveCustomCakeImageUrl(legacyProjectPath ? legacyProjectPath[1] : source);
       }
       return '/assets/customize/customized_2.jpg';
     }
