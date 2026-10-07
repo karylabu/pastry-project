@@ -46,6 +46,8 @@ jobs:
 
       - name: Build customer portal
         working-directory: customer_portal
+        env:
+          CI: "false"
         run: npm run build
 
       - name: Configure SSH
