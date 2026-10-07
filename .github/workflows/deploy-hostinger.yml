@@ -58,6 +58,18 @@ jobs:
           : "${SSH_USERNAME:?Missing HOSTINGER_SSH_USERNAME secret}"
           : "${SSH_PRIVATE_KEY:?Missing HOSTINGER_SSH_PRIVATE_KEY secret}"
           : "${SSH_KNOWN_HOSTS:?Missing HOSTINGER_SSH_KNOWN_HOSTS secret}"
+          case "$SSH_HOST" in
+            *[!A-Za-z0-9.-]*)
+              echo "HOSTINGER_SSH_HOST must contain only a hostname or IP address."
+              exit 1
+              ;;
+          esac
+          case "$SSH_PORT" in
+            *[!0-9]*)
+              echo "HOSTINGER_SSH_PORT must contain digits only."
+              exit 1
+              ;;
+          esac
           install -m 700 -d ~/.ssh
           printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
