@@ -909,7 +909,7 @@ export default function CustomizedCakes() {
               </div>
             </div>
 
-            <div data-custom-card="4" style={{ marginTop: masonryOffsets[0] }} className="rounded-xl border border-[#f0e6dc] bg-[#fffdf9] p-3 lg:order-4 xl:order-4 xl:self-stretch">
+            <div data-custom-card="4" style={{ marginTop: masonryOffsets[0] }} className="rounded-xl border border-[#f0e6dc] bg-[#fffdf9] p-3 lg:order-4 xl:order-4">
               <p className="mb-3 flex items-center gap-2 text-sm font-bold text-[#6b4f1d]">
                 <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#fff3c8] text-[11px]">4</span>
                 Customization Details
@@ -936,26 +936,28 @@ export default function CustomizedCakes() {
                     />
                   )}
                 </div>
-                <label className="block text-xs font-semibold text-[#6b4f1d]">
-                  Cake Style <span className="font-normal text-[#9b8c83]">(optional)</span>
-                  <select value={cakeStyle} onChange={(event) => setCakeStyle(event.target.value)} className="mt-1.5 min-h-11 w-full rounded-lg border border-[#eadfd8] bg-white px-3 py-2 text-sm font-normal text-[#33251e] outline-none focus:border-[#c9972d] focus:ring-2 focus:ring-[#fff1bd]">
-                    <option value="">Choose a style</option>
-                    <option value="Bento">Bento</option>
-                    <option value="Vintage">Vintage</option>
-                    <option value="Floral">Floral</option>
-                    <option value="Character / themed">Character / themed</option>
-                    <option value="Minimalist">Minimalist</option>
-                    <option value="Other">Other</option>
-                  </select>
-                </label>
-                <label className="block text-xs font-semibold text-[#6b4f1d]">
-                  Packaging <span className="font-normal text-[#9b8c83]">(optional)</span>
-                  <select value={packaging} onChange={(event) => setPackaging(event.target.value)} className="mt-1.5 min-h-11 w-full rounded-lg border border-[#eadfd8] bg-white px-3 py-2 text-sm font-normal text-[#33251e] outline-none focus:border-[#c9972d] focus:ring-2 focus:ring-[#fff1bd]">
-                    <option value="Standard">Standard</option>
-                    <option value="Clamshell">Clamshell box</option>
-                    <option value="Acetate box">Acetate box</option>
-                  </select>
-                </label>
+                <div className="space-y-3">
+                  <label className="block text-xs font-semibold text-[#6b4f1d]">
+                    Cake Style <span className="font-normal text-[#9b8c83]">(optional)</span>
+                    <select value={cakeStyle} onChange={(event) => setCakeStyle(event.target.value)} className="mt-1.5 min-h-11 w-full rounded-lg border border-[#eadfd8] bg-white px-3 py-2 text-sm font-normal text-[#33251e] outline-none focus:border-[#c9972d] focus:ring-2 focus:ring-[#fff1bd]">
+                      <option value="">Choose a style</option>
+                      <option value="Bento">Bento</option>
+                      <option value="Vintage">Vintage</option>
+                      <option value="Floral">Floral</option>
+                      <option value="Character / themed">Character / themed</option>
+                      <option value="Minimalist">Minimalist</option>
+                      <option value="Other">Other</option>
+                    </select>
+                  </label>
+                  <label className="block text-xs font-semibold text-[#6b4f1d]">
+                    Packaging <span className="font-normal text-[#9b8c83]">(optional)</span>
+                    <select value={packaging} onChange={(event) => setPackaging(event.target.value)} className="mt-1.5 min-h-11 w-full rounded-lg border border-[#eadfd8] bg-white px-3 py-2 text-sm font-normal text-[#33251e] outline-none focus:border-[#c9972d] focus:ring-2 focus:ring-[#fff1bd]">
+                      <option value="Standard">Standard</option>
+                      <option value="Clamshell">Clamshell box</option>
+                      <option value="Acetate box">Acetate box</option>
+                    </select>
+                  </label>
+                </div>
                 <label className="block text-xs font-semibold text-[#6b4f1d] sm:col-span-2">
                   Specific Design or Theme <span className="font-normal text-[#9b8c83]">(optional)</span>
                   <input value={customTheme} onChange={(event) => setCustomTheme(event.target.value)} placeholder="e.g. Kuromi, daisy flowers, or a name" className="mt-1.5 min-h-11 w-full rounded-lg border border-[#eadfd8] bg-white px-3 py-2 text-sm font-normal text-[#33251e] outline-none placeholder:text-[#a99a8e] focus:border-[#c9972d] focus:ring-2 focus:ring-[#fff1bd]" />
@@ -993,7 +995,7 @@ export default function CustomizedCakes() {
           </div>
 
           <div className="flex flex-col gap-2 lg:contents">
-            <div data-custom-card="5" style={{ marginTop: masonryOffsets[1] }} className="rounded-xl border border-[#f0e6dc] bg-[#fffdf9] p-3 lg:order-5 xl:order-5 xl:self-stretch">
+            <div data-custom-card="5" style={{ marginTop: masonryOffsets[1] }} className="rounded-xl border border-[#f0e6dc] bg-[#fffdf9] p-3 lg:order-5 xl:order-5">
               <p className="mb-3 flex items-center gap-2 text-sm font-bold text-[#6b4f1d]">
                 <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#fff3c8] text-[11px]">5</span>
                 Reference Images
@@ -1040,7 +1042,7 @@ export default function CustomizedCakes() {
 
             </div>
 
-            <div data-custom-card="6" style={{ marginTop: masonryOffsets[2] }} className="rounded-xl border border-[#f0e6dc] bg-[#fffdf9] p-3 lg:order-6 xl:order-6 xl:self-stretch">
+            <div data-custom-card="6" style={{ marginTop: masonryOffsets[2] }} className="rounded-xl border border-[#f0e6dc] bg-[#fffdf9] p-3 lg:order-6 xl:order-6">
               <p className="mb-3 flex items-center gap-2 text-[13px] font-bold text-[#6b4f1d]">
                 <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#fff3c8] text-[11px]">6</span>
                 Order Summary
