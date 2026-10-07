@@ -312,7 +312,7 @@ class CustomizedCakeController extends Controller
             $customizedCakeOrderId = DB::transaction(function () use ($cakeType, $tiers, $payload, $uploadedImages, $user) {
                 $orderId = !empty($payload['order_id']) ? (int) $payload['order_id'] : null;
                 if (!$orderId && Schema::hasTable('orders')) {
-                    $orderId = DB::table('orders')->insertGetId([
+                    $orderAttributes = [
                         'items' => json_encode([[
                             'name' => 'Customized Cake',
                             'qty' => 1,
@@ -333,7 +333,14 @@ class CustomizedCakeController extends Controller
                         'user_id' => $user->id,
                         'status' => 'Pending',
                         'created_at' => now(),
-                    ]);
+                    ];
+                    if (Schema::hasColumn('orders', 'order_type')) {
+                        $orderAttributes['order_type'] = 'Customized';
+                    }
+                    if (Schema::hasColumn('orders', 'is_customized')) {
+                        $orderAttributes['is_customized'] = true;
+                    }
+                    $orderId = DB::table('orders')->insertGetId($orderAttributes);
                     if (Schema::hasTable('order_items')) {
                         DB::table('order_items')->insert([
                             'order_id' => $orderId,

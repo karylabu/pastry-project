@@ -59,6 +59,31 @@ class OrderController extends Controller
             ->orderBy('created_at', 'desc')
             ->get();
 
+        if (Schema::hasTable('customized_cake_orders') && $orders->isNotEmpty()) {
+            $customCakeOrders = DB::table('customized_cake_orders')
+                ->whereIn('order_id', $orders->pluck('id'))
+                ->get(['order_id', 'notes', 'inspo_images'])
+                ->keyBy('order_id');
+
+            foreach ($orders as $order) {
+                $customCakeOrder = $customCakeOrders->get($order->id);
+                if (!$customCakeOrder) {
+                    continue;
+                }
+
+                $details = json_decode((string) $customCakeOrder->notes, true);
+                $details = is_array($details) ? $details : [];
+                $images = json_decode((string) $customCakeOrder->inspo_images, true);
+                $details['inspo_images'] = is_array($images) ? $images : [];
+                if (empty($details['reference_image']) && !empty($details['inspo_images'])) {
+                    $details['reference_image'] = $details['inspo_images'][0];
+                }
+
+                $order->setAttribute('custom_details', $details);
+                $order->setAttribute('is_customized', true);
+            }
+        }
+
         return response()->json([
             'success' => true,
             'orders' => $orders

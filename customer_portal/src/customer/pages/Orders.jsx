@@ -860,7 +860,10 @@ export default function Orders() {
         : reference?.url || reference?.src || reference?.path || reference?.image;
       if (!source) return null;
       if (/^https?:\/\//i.test(source)) return source;
-      return `${ROOT_BASE}/${String(source).replace(/^\/+/, '')}`;
+      const relativePath = String(source).replace(/^\/+/, '');
+      return relativePath.startsWith('uploads/customized-cakes/')
+        ? `${LARAVEL_BASE}/${relativePath}`
+        : `${ROOT_BASE}/${relativePath}`;
     }).filter(Boolean);
 
     return (
@@ -1114,6 +1117,9 @@ export default function Orders() {
         if (/^https?:\/\//i.test(source)) return source;
         const legacyProjectPath = source.match(/^\/(?:GitHub\/)?pastry-project\/(.*)$/);
         const relativePath = legacyProjectPath ? legacyProjectPath[1] : source.replace(/^\/+/, '');
+        if (relativePath.startsWith('uploads/customized-cakes/')) {
+          return `${LARAVEL_BASE}/${relativePath}`;
+        }
         return `${ROOT_BASE}/${relativePath}`;
       }
       return '/assets/customize/customized_2.jpg';

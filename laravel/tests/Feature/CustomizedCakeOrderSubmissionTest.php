@@ -38,6 +38,8 @@ class CustomizedCakeOrderSubmissionTest extends TestCase
             $table->unsignedBigInteger('user_id')->nullable();
             $table->string('status');
             $table->timestamp('created_at')->nullable();
+            $table->string('order_type')->default('Standard');
+            $table->boolean('is_customized')->default(false);
         });
         Schema::create('order_items', function ($table) {
             $table->id();
@@ -128,6 +130,12 @@ class CustomizedCakeOrderSubmissionTest extends TestCase
                 'cake_type' => 'single',
                 'tiers' => [['flavor_id' => 1, 'size_id' => 1]],
                 'notes' => '{"occasion":"Birthday"}',
+                'reference_image' => json_encode([
+                    'type' => 'example',
+                    'id' => 'holiday-2',
+                    'url' => 'https://pastryproject.shop/uploads/holiday(2).jpg',
+                    'name' => 'Holiday Cake 2',
+                ]),
             ])
             ->assertOk()
             ->assertJsonPath('success', true);
@@ -137,10 +145,20 @@ class CustomizedCakeOrderSubmissionTest extends TestCase
             'cake_type' => 'single',
             'status' => 'pending',
         ]);
+        $this->assertDatabaseHas('orders', [
+            'id' => 1,
+            'order_type' => 'Customized',
+            'is_customized' => true,
+        ]);
         $this->assertDatabaseHas('notifications', [
             'user_id' => 2,
             'type' => 'custom_cake_order',
             'title' => 'New custom cake request #1',
         ]);
+
+        $this->getJson('/api/orders')
+            ->assertOk()
+            ->assertJsonPath('orders.0.custom_details.reference_image.url', 'https://pastryproject.shop/uploads/holiday(2).jpg')
+            ->assertJsonPath('orders.0.is_customized', true);
     }
 }
