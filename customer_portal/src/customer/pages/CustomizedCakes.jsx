@@ -560,8 +560,7 @@ export default function CustomizedCakes() {
 
       const data = await safeParseJson(res);
       if (!res.ok) {
-        const text = await res.text();
-        throw new Error(text || `Server returned ${res.status}`);
+        throw new Error(data?.message || `Server returned ${res.status}`);
       }
 
       if (data && data.success) {

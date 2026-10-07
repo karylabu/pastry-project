@@ -123,6 +123,15 @@ class CustomerSavedDataApiTest extends TestCase
             ->assertJsonCount(1, 'addresses');
     }
 
+    public function test_addresses_accept_the_authenticated_laravel_session(): void
+    {
+        $this->withSession(['auth_token' => 'test-customer-token'])
+            ->getJson('/api/addresses')
+            ->assertOk()
+            ->assertJsonPath('status', 'success')
+            ->assertJsonCount(0, 'addresses');
+    }
+
     public function test_customer_notifications_are_scoped_and_can_be_marked_read(): void
     {
         $notificationId = DB::table('notifications')->insertGetId([

@@ -17,6 +17,7 @@ class Kernel extends HttpKernel
         ],
         'api' => [
             \App\Http\Middleware\Cors::class,
+            \Illuminate\Session\Middleware\StartSession::class,
             \Illuminate\Routing\Middleware\SubstituteBindings::class,
         ],
     ];

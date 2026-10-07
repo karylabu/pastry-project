@@ -1,0 +1,112 @@
+name: Deploy pastry project to Hostinger
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "customer_portal/**"
+      - "laravel/**"
+      - ".htaccess"
+      - ".github/workflows/deploy-hostinger.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hostinger-deploy
+  cancel-in-progress: false
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    env:
+      SSH_HOST: ${{ secrets.HOSTINGER_SSH_HOST }}
+      SSH_PORT: ${{ secrets.HOSTINGER_SSH_PORT }}
+      SSH_USERNAME: ${{ secrets.HOSTINGER_SSH_USERNAME }}
+      SSH_PRIVATE_KEY: ${{ secrets.HOSTINGER_SSH_PRIVATE_KEY }}
+      SSH_KNOWN_HOSTS: ${{ secrets.HOSTINGER_SSH_KNOWN_HOSTS }}
+      REMOTE_ROOT: domains/pastryproject.shop/public_html
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: customer_portal/package-lock.json
+
+      - name: Install dependencies
+        working-directory: customer_portal
+        run: npm ci
+
+      - name: Build customer portal
+        working-directory: customer_portal
+        run: npm run build
+
+      - name: Configure SSH
+        run: |
+          set -eu
+          : "${SSH_HOST:?Missing HOSTINGER_SSH_HOST secret}"
+          : "${SSH_PORT:?Missing HOSTINGER_SSH_PORT secret}"
+          : "${SSH_USERNAME:?Missing HOSTINGER_SSH_USERNAME secret}"
+          : "${SSH_PRIVATE_KEY:?Missing HOSTINGER_SSH_PRIVATE_KEY secret}"
+          : "${SSH_KNOWN_HOSTS:?Missing HOSTINGER_SSH_KNOWN_HOSTS secret}"
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+
+      - name: Verify Hostinger deployment tools
+        run: |
+          set -eu
+          ssh -i ~/.ssh/id_ed25519 -p "$SSH_PORT" -o IdentitiesOnly=yes "$SSH_USERNAME@$SSH_HOST" \
+            "command -v rsync && command -v composer && command -v php"
+
+      - name: Deploy Laravel application
+        run: |
+          set -eu
+          ssh -i ~/.ssh/id_ed25519 -p "$SSH_PORT" -o IdentitiesOnly=yes "$SSH_USERNAME@$SSH_HOST" \
+            "mkdir -p '$REMOTE_ROOT/laravel'"
+          rsync -az \
+            --exclude='.env' \
+            --exclude='.env.*' \
+            --exclude='vendor/' \
+            --exclude='storage/' \
+            --exclude='bootstrap/cache/' \
+            --exclude='tests/' \
+            --exclude='.github/' \
+            --exclude='node_modules/' \
+            --exclude='public/uploads/' \
+            --exclude='public/storage' \
+            -e "ssh -i ~/.ssh/id_ed25519 -p $SSH_PORT -o IdentitiesOnly=yes" \
+            laravel/ \
+            "$SSH_USERNAME@$SSH_HOST:$REMOTE_ROOT/laravel/"
+
+      - name: Deploy React production build
+        run: |
+          set -eu
+          ssh -i ~/.ssh/id_ed25519 -p "$SSH_PORT" -o IdentitiesOnly=yes "$SSH_USERNAME@$SSH_HOST" \
+            "mkdir -p '$REMOTE_ROOT/customer_portal/build'"
+          rsync -az --delete \
+            -e "ssh -i ~/.ssh/id_ed25519 -p $SSH_PORT -o IdentitiesOnly=yes" \
+            customer_portal/build/ \
+            "$SSH_USERNAME@$SSH_HOST:$REMOTE_ROOT/customer_portal/build/"
+
+      - name: Deploy root rewrite rules
+        run: |
+          set -eu
+          scp -i ~/.ssh/id_ed25519 -P "$SSH_PORT" -o IdentitiesOnly=yes \
+            .htaccess \
+            "$SSH_USERNAME@$SSH_HOST:$REMOTE_ROOT/.htaccess"
+
+      - name: Install Laravel dependencies and refresh config cache
+        run: |
+          set -eu
+          ssh -i ~/.ssh/id_ed25519 -p "$SSH_PORT" -o IdentitiesOnly=yes "$SSH_USERNAME@$SSH_HOST" \
+            "cd '$REMOTE_ROOT/laravel' && composer install --no-dev --prefer-dist --optimize-autoloader --no-interaction && php artisan config:cache"

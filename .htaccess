@@ -1,23 +1,33 @@
-# Rewrite rules for Laravel + API endpoints
+# React UI with Laravel API and legacy PHP endpoints.
 <IfModule mod_rewrite.c>
     RewriteEngine On
 
-    # IMPORTANT: These must come FIRST so Laravel rewriting does not override them
-    RewriteRule ^(customer|staff)(/.*)?$ - [L]
+    # Laravel handles requests under its public path.
     RewriteRule ^laravel/public/ - [L]
 
-    # If the requested file or directory exists, serve it directly
+    # Keep private PHP dependencies and includes inaccessible.
+    RewriteRule ^(includes|vendor)(/|$) - [F,L]
+
+    # Keep legacy PHP endpoints and staff APIs on their existing handlers.
+    RewriteRule ^(customer|staff)/.*\.php$ - [L]
+    RewriteRule ^(staff|admin)/api(/.*)?$ - [L]
+
+    # The React build emits root-relative asset URLs.
+    RewriteRule ^static/(.*)$ customer_portal/build/static/$1 [L]
+    RewriteRule ^(favicon\.ico|logo192\.png|logo512\.png|manifest\.json|robots\.txt|privacy\.html|terms\.html)$ customer_portal/build/$1 [L]
+
+    # React owns the site root and its client-side routes.
+    RewriteRule ^$ customer_portal/build/index.html [L]
+    RewriteRule ^(customer|admin|staff)/?$ customer_portal/build/index.html [L]
+
+    # Serve existing project files and legacy pages as-is.
     RewriteCond %{REQUEST_FILENAME} -f [OR]
     RewriteCond %{REQUEST_FILENAME} -d
     RewriteRule .* - [L]
 
-    # Otherwise rewrite to Laravel's front controller
-    RewriteRule ^ laravel/public/index.php [L]
-</IfModule>
+    # React client-side routes, except existing legacy files handled above.
+    RewriteRule ^(customer|admin|staff)(/.*)?$ customer_portal/build/index.html [L]
 
-# Deny direct access to includes and vendor folders for safety
-<IfModule mod_authz_core.c>
-    <FilesMatch "^includes/|^vendor/">
-        Require all denied
-    </FilesMatch>
+    # Other application routes go through Laravel.
+    RewriteRule ^ laravel/public/index.php [L]
 </IfModule>

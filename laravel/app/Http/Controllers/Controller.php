@@ -19,7 +19,9 @@ abstract class Controller
             return $user instanceof User && $this->hasActiveAccount($user) ? $user : null;
         }
 
-        $token = $request->bearerToken() ?: trim((string) $request->header('X-Auth-Token', ''));
+        $token = $request->bearerToken()
+            ?: trim((string) $request->header('X-Auth-Token', ''))
+            ?: trim((string) session('auth_token', ''));
         if ($token === '') {
             return null;
         }

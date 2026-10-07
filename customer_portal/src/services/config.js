@@ -28,7 +28,7 @@ function normalizeLocalProjectBase(baseUrl = "") {
 const xamppWithProject = resolveProjectBase("http://localhost");
 const configuredDevBase = process.env.REACT_APP_API_BASE || "";
 const devBase = normalizeLocalProjectBase(configuredDevBase || xamppWithProject);
-const homepage = process.env.PUBLIC_URL || "/pastry-project/customer";
+const homepage = process.env.PUBLIC_URL || "";
 const prodBase = `${origin}${homepage}`.replace(/\/$/, "");
 const prodRootBase = `${origin}${homepage.replace(/\/customer$/, "")}`.replace(/\/$/, "");
 const isLocalHost = typeof window !== "undefined" &&

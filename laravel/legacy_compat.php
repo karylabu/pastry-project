@@ -9,55 +9,92 @@ if (!function_exists('legacy_get_pdo')) {
             return $pdo;
         }
 
-        $host = '127.0.0.1';
-        $port = 3306;
-        $database = '';
-        $user = 'root';
-        $pass = '';
-        $charset = 'utf8mb4';
+        $app = function_exists('app') ? app() : null;
 
-        $connected = false;
-        $options = [
-            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-            PDO::ATTR_EMULATE_PREPARES => false,
-        ];
+        if (!$app || !$app->bound('db')) {
+            $autoload = __DIR__ . '/vendor/autoload.php';
+            $bootstrap = __DIR__ . '/bootstrap/app.php';
 
-        if (function_exists('config')) {
-            try {
-                $conn = config('database.connections.' . config('database.default'));
+            if (is_file($autoload) && is_file($bootstrap)) {
+                require_once $autoload;
 
-                $host = $conn['host'] ?? $host;
-                $port = $conn['port'] ?? $port;
-                $database = $conn['database'] ?? $database;
-                $user = $conn['username'] ?? $user;
-                $pass = $conn['password'] ?? $pass;
-                $charset = $conn['charset'] ?? $charset;
-
-                $dsn = "mysql:host={$host};port={$port};dbname={$database};charset={$charset}";
-                $pdo = new PDO($dsn, $user, $pass, $options);
-                return $pdo;
-            } catch (\Throwable $e) {
-                // fall through to legacy config fallback
+                $app = require $bootstrap;
+                $app->make(\Illuminate\Contracts\Console\Kernel::class)->bootstrap();
             }
+        }
+
+        if ($app && $app->bound('db')) {
+            try {
+                $pdo = $app->make('db')->connection()->getPdo();
+                if ($pdo instanceof PDO) {
+                    return $pdo;
+                }
+            } catch (\Throwable $e) {
+                // Try the explicit Laravel environment settings before reporting a connection failure.
+            }
+        }
+
+        $autoload = __DIR__ . '/vendor/autoload.php';
+        if (is_file($autoload)) {
+            require_once $autoload;
+        }
+
+        $dotenvSettings = class_exists(\Dotenv\Dotenv::class)
+            ? \Dotenv\Dotenv::createArrayBacked(__DIR__)->safeLoad()
+            : [];
+
+        $getSetting = static function (string $key, $default = null) use ($dotenvSettings) {
+            if (array_key_exists($key, $dotenvSettings)) {
+                return $dotenvSettings[$key];
+            }
+
+            return $_ENV[$key] ?? $_SERVER[$key] ?? (($value = getenv($key)) !== false ? $value : $default);
+        };
+
+        $host = $getSetting('DB_HOST');
+        $port = $getSetting('DB_PORT', 3306);
+        $database = $getSetting('DB_DATABASE');
+        $user = $getSetting('DB_USERNAME');
+        $pass = $getSetting('DB_PASSWORD', '');
+        $charset = $getSetting('DB_CHARSET', 'utf8mb4');
+
+        if (!empty($host) && !empty($database) && $user !== null) {
+            $dsn = "mysql:host={$host};port={$port};dbname={$database};charset={$charset}";
+            $pdo = new PDO($dsn, $user, $pass, [
+                PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+                PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+                PDO::ATTR_EMULATE_PREPARES => false,
+            ]);
+            return $pdo;
         }
 
         $legacyDb = __DIR__ . '/../includes/db.php';
         if (file_exists($legacyDb)) {
+            $host = null;
+            $port = 3306;
+            $database = null;
+            $user = null;
+            $pass = null;
+            $password = null;
+            $charset = 'utf8mb4';
+
             include $legacyDb;
 
             if (!empty($host) && !empty($database)) {
-                $dsn2 = "mysql:host={$host};dbname={$database};charset={$charset}";
-                try {
-                    $pdo = new PDO($dsn2, $user ?? ($GLOBALS['user'] ?? ''), $pass ?? ($GLOBALS['password'] ?? ''), $options);
-                    return $pdo;
-                } catch (\PDOException $e2) {
-                    // fall through to final exception
-                }
+                $legacyPassword = $pass !== null && $pass !== ''
+                    ? $pass
+                    : ($password ?? ($GLOBALS['password'] ?? ''));
+                $dsn = "mysql:host={$host};port={$port};dbname={$database};charset={$charset}";
+                $pdo = new PDO($dsn, $user ?? ($GLOBALS['user'] ?? ''), $legacyPassword, [
+                    PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+                    PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+                    PDO::ATTR_EMULATE_PREPARES => false,
+                ]);
+                return $pdo;
             }
         }
 
-        throw new \PDOException('Unable to create legacy PDO connection: missing config or legacy DB settings.');
+        throw new \PDOException('Unable to create legacy PDO connection: DB_HOST, DB_DATABASE, and DB_USERNAME are missing from Laravel config, the environment, and legacy DB settings.');
     }
 }
 
