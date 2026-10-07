@@ -49,32 +49,34 @@ export default function Footer() {
   };
 
   return (
-    <footer className="bg-[#1a1a1a] font-['DM_Sans'] pt-8 pb-0">
+    <footer className="bg-[#1a1a1a] font-['DM_Sans'] pt-4 pb-0 md:pt-8">
       <div className="max-w-7xl mx-auto px-5">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-5 mb-5">
+        <div className="grid grid-cols-2 gap-x-3 gap-y-3 mb-3 md:mb-5 md:grid-cols-4 md:gap-5">
 
           {/* LOGO */}
-          <div className="flex flex-col items-start">
-            <div className="w-10 h-10 rounded-full border border-[#d4af37]/50 flex items-center justify-center mb-2">
-              <Cake size={19} className="text-[#d4af37]" />
+          <div className="flex min-w-0 items-center gap-2 md:flex-col md:items-start md:gap-0">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-[#d4af37]/50 md:mb-2 md:h-10 md:w-10">
+              <Cake size={16} className="text-[#d4af37] md:h-[19px] md:w-[19px]" />
             </div>
-            <p className="text-[10px] uppercase tracking-[0.3em] text-gray-500 mb-2">
-              Est. 2017
-            </p>
-            <h3 className="text-white text-lg font-black tracking-tight leading-none mb-1">
-              PASTRY PROJECT
-            </h3>
-            <p className="text-gray-400 text-sm tracking-wide">
-              Bakeshop &amp; Café
-            </p>
+            <div className="min-w-0">
+              <p className="mb-1 text-[8px] uppercase tracking-[0.2em] text-gray-500 md:mb-2 md:text-[10px] md:tracking-[0.3em]">
+                Est. 2017
+              </p>
+              <h3 className="mb-1 text-[11px] font-black leading-none tracking-tight text-white md:text-lg">
+                PASTRY PROJECT
+              </h3>
+              <p className="text-[9px] tracking-wide text-gray-400 md:text-sm">
+                Bakeshop &amp; Café
+              </p>
+            </div>
           </div>
 
           {/* INFORMATION */}
-          <div>
-            <p className="text-[#d4af37] text-[10px] font-black uppercase tracking-[0.2em] mb-3">
+          <div className="min-w-0">
+            <p className="mb-1.5 text-[#d4af37] text-[9px] font-black uppercase tracking-[0.15em] md:mb-3 md:text-[10px] md:tracking-[0.2em]">
               Information
             </p>
-            <ul className="space-y-2 text-xs text-gray-300">
+            <ul className="flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-gray-300 md:flex-col md:gap-0 md:space-y-2 md:text-xs">
               <li>
                 <Link to="/customer/about-us" onClick={() => window.scrollTo(0, 0)} className="hover:text-white transition">
                   About Us
@@ -94,20 +96,20 @@ export default function Footer() {
           </div>
 
           {/* GET IN TOUCH */}
-          <div>
-            <p className="text-[#d4af37] text-[10px] font-black uppercase tracking-[0.2em] mb-3">
+          <div className="min-w-0">
+            <p className="mb-1.5 text-[#d4af37] text-[9px] font-black uppercase tracking-[0.15em] md:mb-3 md:text-[10px] md:tracking-[0.2em]">
               Get in Touch
             </p>
-            <ul className="space-y-2 text-xs text-gray-300">
-              <li className="flex items-center gap-2">
+            <ul className="space-y-1 text-[9px] text-gray-300 md:space-y-2 md:text-xs">
+              <li className="flex items-center gap-1.5 md:gap-2">
                 <Phone size={13} className="text-[#d4af37]" />
                 0938-796-2033
               </li>
-              <li className="flex items-center gap-2">
-                <Mail size={13} className="text-[#d4af37]" />
-                pastryproject.bc@gmail.com
+              <li className="flex min-w-0 items-start gap-1.5 md:gap-2">
+                <Mail size={13} className="mt-0.5 shrink-0 text-[#d4af37]" />
+                <span className="break-all md:break-normal">pastryproject.bc@gmail.com</span>
               </li>
-              <li className="flex items-center gap-2">
+              <li className="hidden items-center gap-2 md:flex">
                 <HelpCircle size={13} className="text-[#d4af37]" />
                 Help Center
               </li>
@@ -115,26 +117,26 @@ export default function Footer() {
           </div>
 
           {/* NEWSLETTER */}
-          <div>
-            <p className="text-[#d4af37] text-[10px] font-black uppercase tracking-[0.2em] mb-3">
+          <div className="min-w-0">
+            <p className="mb-1.5 text-[#d4af37] text-[9px] font-black uppercase tracking-[0.12em] md:mb-3 md:text-[10px] md:tracking-[0.2em]">
               Newsletter Sign-Up
             </p>
-            <p className="text-gray-400 text-xs mb-3 leading-relaxed">
+            <p className="mb-3 hidden text-xs leading-relaxed text-gray-400 md:block">
               Subscribe to receive updates on new flavors and special offers.
             </p>
-            <form onSubmit={handleSubscribe} className="flex items-center bg-white rounded-full overflow-hidden pl-3 pr-1 py-0.5">
+            <form onSubmit={handleSubscribe} className="flex min-w-0 items-center overflow-hidden rounded-full bg-white py-0.5 pl-2 pr-0.5 md:pl-3 md:pr-1">
               <input
                 type="email"
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="Your email address"
-                className="flex-1 text-xs text-black outline-none bg-transparent py-1.5"
+                className="w-0 min-w-0 flex-1 bg-transparent py-1 text-[9px] text-black outline-none md:py-1.5 md:text-xs"
               />
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="bg-[#d4af37] text-black text-[9px] font-black uppercase tracking-[0.16em] px-2.5 py-1.5 rounded-full hover:bg-black hover:text-white transition whitespace-nowrap disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-1 disabled:pointer-events-none"
+                className="flex shrink-0 items-center justify-center gap-1 whitespace-nowrap rounded-full bg-[#d4af37] px-2 py-1 text-[8px] font-black uppercase tracking-[0.08em] text-black transition hover:bg-black hover:text-white disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-70 md:px-2.5 md:py-1.5 md:text-[9px] md:tracking-[0.16em]"
               >
                 {isSubmitting ? (
                   <>
@@ -155,11 +157,11 @@ export default function Footer() {
         </div>
 
         {/* BOTTOM BAR */}
-        <div className="border-t border-white/10 pt-3 pb-4 flex flex-col md:flex-row items-center justify-between gap-2">
-          <p className="text-gray-500 text-[10px] tracking-wide">
+        <div className="flex items-center justify-center gap-2 border-t border-white/10 py-2 md:flex-row md:justify-between md:gap-2 md:pt-3 md:pb-4">
+          <p className="text-center text-[8px] tracking-wide text-gray-500 md:text-left md:text-[10px]">
             © {new Date().getFullYear()} Pastry Project Bakeshop &amp; Café. All rights reserved.
           </p>
-          <p className="text-gray-500 text-[10px] tracking-wide">
+          <p className="hidden text-[10px] tracking-wide text-gray-500 md:block">
             Baked fresh, made with love.
           </p>
         </div>
