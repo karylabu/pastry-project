@@ -515,6 +515,9 @@ export default function CustomizedCakes() {
         window.sessionStorage.removeItem(referenceStorageKey);
         return;
       }
+      if (![404, 405].includes(laravelRes.status)) {
+        throw new Error(laravelData?.message || `Server returned ${laravelRes.status}`);
+      }
 
       const fd = new FormData();
       fd.append('name', name);

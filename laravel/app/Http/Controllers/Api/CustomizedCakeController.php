@@ -257,7 +257,7 @@ class CustomizedCakeController extends Controller
             ->pluck('id');
 
         foreach ($tiers as $tier) {
-            if (!$activeSizes->has((int) ($tier['size_id'] ?? 0)) || !$activeFlavors->has((int) ($tier['flavor_id'] ?? 0))) {
+            if (!$activeSizes->has((int) ($tier['size_id'] ?? 0)) || !$activeFlavors->contains((int) ($tier['flavor_id'] ?? 0))) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Each tier must use an active flavor and size.',
