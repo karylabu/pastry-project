@@ -50,6 +50,18 @@ jobs:
           CI: "false"
         run: npm run build
 
+      - name: Set up PHP for Laravel dependencies
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.3"
+          extensions: bcmath, ctype, curl, fileinfo, json, mbstring, openssl, pdo_mysql, tokenizer, xml
+          tools: composer:v2
+          coverage: none
+
+      - name: Install Laravel production dependencies
+        working-directory: laravel
+        run: composer install --no-dev --prefer-dist --optimize-autoloader --no-interaction
+
       - name: Configure SSH
         run: |
           set -eu
@@ -94,7 +106,6 @@ jobs:
           rsync -az \
             --exclude='.env' \
             --exclude='.env.*' \
-            --exclude='vendor/' \
             --exclude='storage/' \
             --exclude='bootstrap/cache/' \
             --exclude='tests/' \
@@ -127,4 +138,4 @@ jobs:
         run: |
           set -eu
           ssh -i ~/.ssh/id_ed25519 -p "$SSH_PORT" -o IdentitiesOnly=yes -o BatchMode=yes "$SSH_USERNAME@$SSH_HOST" \
-            "cd '$REMOTE_ROOT/laravel' && composer install --no-dev --prefer-dist --optimize-autoloader --no-interaction && php artisan config:cache"
+            "cd '$REMOTE_ROOT/laravel' && php artisan package:discover --ansi && php artisan config:cache"
