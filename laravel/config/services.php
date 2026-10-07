@@ -42,8 +42,8 @@ return [
     ],
 
     'firebase' => [
-        'project_id' => env('FIREBASE_PROJECT_ID', 'capstone--development'),
-        'api_key' => env('FIREBASE_API_KEY') ?: 'AIzaSyBDD0ypZvw3xPgRUTxEB49sz3tR_L8InII',
+        'project_id' => env('FIREBASE_PROJECT_ID', 'pastry-project-e864e'),
+        'api_key' => env('FIREBASE_API_KEY') ?: 'AIzaSyDgvJQtM-TmhYb8i1N2TutXYmekSVhRAeg',
     ],
 
 ];

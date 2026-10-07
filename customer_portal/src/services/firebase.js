@@ -2,11 +2,12 @@ import { getAdditionalUserInfo, getAuth, GoogleAuthProvider, signInWithPopup } f
 import { initializeApp } from "firebase/app";
 
 const firebaseConfig = {
-  apiKey: process.env.REACT_APP_FIREBASE_API_KEY || "AIzaSyBDD0ypZvw3xPgRUTxEB49sz3tR_L8InII",
-  authDomain: process.env.REACT_APP_FIREBASE_AUTH_DOMAIN || "capstone--development.firebaseapp.com",
-  projectId: process.env.REACT_APP_FIREBASE_PROJECT_ID || "capstone--development",
-  storageBucket: process.env.REACT_APP_FIREBASE_STORAGE_BUCKET || "capstone--development.firebasestorage.app",
-  appId: process.env.REACT_APP_FIREBASE_APP_ID,
+  apiKey: process.env.REACT_APP_FIREBASE_API_KEY || "AIzaSyDgvJQtM-TmhYb8i1N2TutXYmekSVhRAeg",
+  authDomain: process.env.REACT_APP_FIREBASE_AUTH_DOMAIN || "pastry-project-e864e.firebaseapp.com",
+  projectId: process.env.REACT_APP_FIREBASE_PROJECT_ID || "pastry-project-e864e",
+  storageBucket: process.env.REACT_APP_FIREBASE_STORAGE_BUCKET || "pastry-project-e864e.firebasestorage.app",
+  messagingSenderId: process.env.REACT_APP_FIREBASE_MESSAGING_SENDER_ID || "373071733489",
+  appId: process.env.REACT_APP_FIREBASE_APP_ID || "1:373071733489:web:e3d78eebb63faf349c7f50",
 };
 
 const app = initializeApp(firebaseConfig);

@@ -79,14 +79,18 @@ class AuthController extends Controller
 
         try {
             $curl = curl_init('https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=' . config('services.firebase.api_key'));
-            curl_setopt_array($curl, [
+            $curlOptions = [
                 CURLOPT_RETURNTRANSFER => true,
                 CURLOPT_POST => true,
                 CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
                 CURLOPT_POSTFIELDS => json_encode(['idToken' => $idToken]),
-                CURLOPT_CAINFO => $this->firebaseCaPath(),
                 CURLOPT_TIMEOUT => 15,
-            ]);
+            ];
+            $caPath = $this->firebaseCaPath();
+            if ($caPath !== null) {
+                $curlOptions[CURLOPT_CAINFO] = $caPath;
+            }
+            curl_setopt_array($curl, $curlOptions);
             $firebaseBody = curl_exec($curl);
             $curlError = curl_error($curl);
             $firebaseStatus = (int) curl_getinfo($curl, CURLINFO_HTTP_CODE);
@@ -99,7 +103,7 @@ class AuthController extends Controller
             error_log('Firebase Google login verification error: ' . $e->getMessage());
             return $this->googleCorsResponse([
                 'success' => false,
-                'message' => 'Firebase verification could not run because the PHP CA bundle is missing or invalid. Please configure XAMPP PHP with a valid cacert.pem and restart Apache.',
+                'message' => 'Google sign-in verification failed on the server. Please check the PHP cURL and SSL configuration.',
             ], 500);
         }
 
@@ -198,7 +202,7 @@ class AuthController extends Controller
         throw new \RuntimeException('No valid cacert.pem CA bundle was found for PHP cURL. Configure C:\\xampp\\php\\php.ini with curl.cainfo and openssl.cafile, then restart Apache.');
     }
 
-    private function firebaseCaPath(): string
+    private function firebaseCaPath(): ?string
     {
         $candidatePaths = [
             env('PHP_CACERT_PATH'),
@@ -207,6 +211,9 @@ class AuthController extends Controller
             ini_get('openssl.cafile'),
             'C:\\xampp\\php\\extras\\ssl\\cacert.pem',
             'C:\\Users\\Jerickson Abistado\\cacert.pem',
+            '/etc/ssl/certs/ca-certificates.crt',
+            '/etc/pki/tls/certs/ca-bundle.crt',
+            '/etc/ssl/cert.pem',
         ];
 
         foreach ($candidatePaths as $path) {
@@ -215,7 +222,7 @@ class AuthController extends Controller
             }
         }
 
-        throw new \RuntimeException('No readable CA bundle was found for Firebase verification.');
+        return null;
     }
 
     private function googleCorsResponse(array $payload, int $status = 200)
