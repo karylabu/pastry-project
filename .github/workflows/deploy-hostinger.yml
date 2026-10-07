@@ -134,8 +134,8 @@ jobs:
             .htaccess \
             "$SSH_USERNAME@$SSH_HOST:$REMOTE_ROOT/.htaccess"
 
-      - name: Install Laravel dependencies and refresh config cache
+      - name: Install custom cake tables and refresh config cache
         run: |
           set -eu
           ssh -i ~/.ssh/id_ed25519 -p "$SSH_PORT" -o IdentitiesOnly=yes -o BatchMode=yes "$SSH_USERNAME@$SSH_HOST" \
-            "cd '$REMOTE_ROOT/laravel' && php artisan package:discover --ansi && php artisan config:cache"
+            "cd '$REMOTE_ROOT/laravel' && php artisan migrate --path=database/migrations/2026_10_07_000002_create_customized_cake_order_tables.php --force && php artisan package:discover --ansi && php artisan config:cache"
