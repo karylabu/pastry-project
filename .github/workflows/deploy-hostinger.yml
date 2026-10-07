@@ -71,21 +71,22 @@ jobs:
               ;;
           esac
           install -m 700 -d ~/.ssh
-          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
+          printf '%s' "$SSH_PRIVATE_KEY" | tr -d '\r' > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
           printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
           chmod 600 ~/.ssh/known_hosts
+          ssh-keygen -y -f ~/.ssh/id_ed25519 >/dev/null
 
       - name: Verify Hostinger deployment tools
         run: |
           set -eu
-          ssh -i ~/.ssh/id_ed25519 -p "$SSH_PORT" -o IdentitiesOnly=yes "$SSH_USERNAME@$SSH_HOST" \
+          ssh -i ~/.ssh/id_ed25519 -p "$SSH_PORT" -o IdentitiesOnly=yes -o BatchMode=yes "$SSH_USERNAME@$SSH_HOST" \
             "command -v rsync && command -v composer && command -v php"
 
       - name: Deploy Laravel application
         run: |
           set -eu
-          ssh -i ~/.ssh/id_ed25519 -p "$SSH_PORT" -o IdentitiesOnly=yes "$SSH_USERNAME@$SSH_HOST" \
+          ssh -i ~/.ssh/id_ed25519 -p "$SSH_PORT" -o IdentitiesOnly=yes -o BatchMode=yes "$SSH_USERNAME@$SSH_HOST" \
             "mkdir -p '$REMOTE_ROOT/laravel'"
           rsync -az \
             --exclude='.env' \
@@ -98,29 +99,29 @@ jobs:
             --exclude='node_modules/' \
             --exclude='public/uploads/' \
             --exclude='public/storage' \
-            -e "ssh -i ~/.ssh/id_ed25519 -p $SSH_PORT -o IdentitiesOnly=yes" \
+            -e "ssh -i ~/.ssh/id_ed25519 -p $SSH_PORT -o IdentitiesOnly=yes -o BatchMode=yes" \
             laravel/ \
             "$SSH_USERNAME@$SSH_HOST:$REMOTE_ROOT/laravel/"
 
       - name: Deploy React production build
         run: |
           set -eu
-          ssh -i ~/.ssh/id_ed25519 -p "$SSH_PORT" -o IdentitiesOnly=yes "$SSH_USERNAME@$SSH_HOST" \
+          ssh -i ~/.ssh/id_ed25519 -p "$SSH_PORT" -o IdentitiesOnly=yes -o BatchMode=yes "$SSH_USERNAME@$SSH_HOST" \
             "mkdir -p '$REMOTE_ROOT/customer_portal/build'"
           rsync -az --delete \
-            -e "ssh -i ~/.ssh/id_ed25519 -p $SSH_PORT -o IdentitiesOnly=yes" \
+            -e "ssh -i ~/.ssh/id_ed25519 -p $SSH_PORT -o IdentitiesOnly=yes -o BatchMode=yes" \
             customer_portal/build/ \
             "$SSH_USERNAME@$SSH_HOST:$REMOTE_ROOT/customer_portal/build/"
 
       - name: Deploy root rewrite rules
         run: |
           set -eu
-          scp -i ~/.ssh/id_ed25519 -P "$SSH_PORT" -o IdentitiesOnly=yes \
+          scp -i ~/.ssh/id_ed25519 -P "$SSH_PORT" -o IdentitiesOnly=yes -o BatchMode=yes \
             .htaccess \
             "$SSH_USERNAME@$SSH_HOST:$REMOTE_ROOT/.htaccess"
 
       - name: Install Laravel dependencies and refresh config cache
         run: |
           set -eu
-          ssh -i ~/.ssh/id_ed25519 -p "$SSH_PORT" -o IdentitiesOnly=yes "$SSH_USERNAME@$SSH_HOST" \
+          ssh -i ~/.ssh/id_ed25519 -p "$SSH_PORT" -o IdentitiesOnly=yes -o BatchMode=yes "$SSH_USERNAME@$SSH_HOST" \
             "cd '$REMOTE_ROOT/laravel' && composer install --no-dev --prefer-dist --optimize-autoloader --no-interaction && php artisan config:cache"
