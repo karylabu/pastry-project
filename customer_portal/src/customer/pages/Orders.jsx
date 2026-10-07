@@ -5,24 +5,11 @@ import PageShell from '../components/PageShell';
 import { getAuthHeaders, safeParseJson } from '../../services/api';
 import { subscribeRealtime } from '../../services/realtime';
 import { CUSTOMER_BASE, LARAVEL_BASE, ROOT_BASE } from "../../services/config";
-
-const resolveCustomCakeImageUrl = (source) => {
-  if (!source) return null;
-  const value = String(source).trim();
-  if (/^https?:\/\//i.test(value)) return value;
-
-  const relativePath = value
-    .replace(/^\/+/, '')
-    .replace(/^(?:laravel\/public\/)?customer\//, '');
-  if (/^uploads\/custom_cake\//i.test(relativePath)) {
-    return `${LARAVEL_BASE}/customer/${relativePath}`;
-  }
-  if (/^uploads\/customized-cakes\//i.test(relativePath)) {
-    return `${LARAVEL_BASE}/${relativePath}`;
-  }
-
-  return `${ROOT_BASE}/${relativePath}`;
-};
+import {
+  getCustomCakeDetails,
+  getCustomCakeReferenceSources,
+  resolveCustomCakeImageUrl,
+} from './customCakeImages';
 
 // ── Cancel Confirmation Dialog ───────────────────────────────────────────────
 function CancelDialog({ order, onConfirm, onDismiss, isLoading }) {
@@ -803,12 +790,7 @@ export default function Orders() {
       ? new Date(order.created_at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })
       : 'No date available';
     const totalValue = Number(order.total || 0);
-    const customDetailsSource = order?.custom_details || order?.custom_cake_details || {};
-    const rawCustomDetails = typeof customDetailsSource === 'string'
-      ? (() => {
-          try { return JSON.parse(customDetailsSource) || {}; } catch { return {}; }
-        })()
-      : customDetailsSource;
+    const rawCustomDetails = getCustomCakeDetails(order);
 
     const formatCustomValue = (value) => {
       if (Array.isArray(value)) {
@@ -858,26 +840,11 @@ export default function Orders() {
       ['Details', formatCustomValue(rawCustomDetails.details)],
     ].filter(([, value]) => value);
 
-    const customReferenceImages = [
-      rawCustomDetails.reference_image,
-      rawCustomDetails.reference_images,
-      rawCustomDetails.inspo_images,
-    ].flatMap((value) => {
-      if (!value) return [];
-      if (typeof value === 'string') {
-        try {
-          const parsed = JSON.parse(value);
-          return Array.isArray(parsed) ? parsed : [parsed];
-        } catch {
-          return [value];
-        }
-      }
-      return Array.isArray(value) ? value : [value];
-    }).map((reference) => {
+    const customReferenceImages = getCustomCakeReferenceSources(order, rawCustomDetails).map((reference) => {
       const source = typeof reference === 'string'
         ? reference
         : reference?.url || reference?.src || reference?.path || reference?.image;
-      return resolveCustomCakeImageUrl(source);
+      return resolveCustomCakeImageUrl(source, LARAVEL_BASE, ROOT_BASE);
     }).filter(Boolean);
 
     return (
@@ -1105,34 +1072,11 @@ export default function Orders() {
       || orderType.includes('custom')
       || Boolean(order?.custom_details || order?.custom_cake_details);
     if (isCustomizedOrder) {
-      let details = order?.custom_details || order?.custom_cake_details || {};
-      if (typeof details === 'string') {
-        try { details = JSON.parse(details) || {}; } catch { details = {}; }
-      }
-      const references = [
-        details.reference_image,
-        details.reference_images,
-        details.inspo_images,
-        order?.reference_image,
-        order?.inspo_images,
-      ].flatMap((value) => {
-        if (!value) return [];
-        if (typeof value === 'string') {
-          try {
-            const parsed = JSON.parse(value);
-            return Array.isArray(parsed) ? parsed : [parsed];
-          } catch { return [value]; }
-        }
-        return Array.isArray(value) ? value : [value];
-      });
-      const reference = references.find(Boolean);
+      const reference = getCustomCakeReferenceSources(order)[0];
       const source = typeof reference === 'string'
         ? reference
         : reference?.url || reference?.src || reference?.path || reference?.image;
-      if (source) {
-        const legacyProjectPath = String(source).match(/^\/(?:GitHub\/)?pastry-project\/(.*)$/);
-        return resolveCustomCakeImageUrl(legacyProjectPath ? legacyProjectPath[1] : source);
-      }
+      if (source) return resolveCustomCakeImageUrl(source, LARAVEL_BASE, ROOT_BASE);
       return '/assets/customize/customized_2.jpg';
     }
 
