@@ -8,6 +8,7 @@ import { CUSTOMER_BASE, LARAVEL_BASE, ROOT_BASE } from "../../services/config";
 import {
   getCustomCakeDetails,
   getCustomCakeReferenceSources,
+  isCustomCakeOrder,
   resolveCustomCakeImageUrl,
 } from './customCakeImages';
 
@@ -1067,11 +1068,7 @@ export default function Orders() {
   };
 
   const getProductThumbnail = (order, item) => {
-    const orderType = String(order?.type || '').toLowerCase();
-    const isCustomizedOrder = order?.is_customized
-      || orderType.includes('custom')
-      || Boolean(order?.custom_details || order?.custom_cake_details);
-    if (isCustomizedOrder) {
+    if (isCustomCakeOrder(order)) {
       const reference = getCustomCakeReferenceSources(order)[0];
       const source = typeof reference === 'string'
         ? reference

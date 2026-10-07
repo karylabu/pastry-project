@@ -50,6 +50,16 @@ export const getCustomCakeReferenceSources = (order, details = getCustomCakeDeta
   });
 };
 
+export const isCustomCakeOrder = (order) => {
+  if (order?.is_customized) return true;
+
+  const orderType = String(order?.order_type || order?.type || '').toLowerCase();
+  if (orderType.includes('custom')) return true;
+
+  return (Array.isArray(order?.items) ? order.items : [])
+    .some((item) => String(item?.name || item?.product || '').toLowerCase().includes('custom'));
+};
+
 export const resolveCustomCakeImageUrl = (source, laravelBase, rootBase) => {
   if (!source) return null;
   const value = String(source).trim();

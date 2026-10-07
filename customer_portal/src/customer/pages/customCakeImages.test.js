@@ -1,6 +1,7 @@
 import {
   getCustomCakeDetails,
   getCustomCakeReferenceSources,
+  isCustomCakeOrder,
   resolveCustomCakeImageUrl,
 } from './customCakeImages';
 
@@ -39,5 +40,17 @@ describe('custom cake order images', () => {
       'https://pastryproject.shop/laravel/public',
       'https://pastryproject.shop',
     )).toBe('https://pastryproject.shop/laravel/public/uploads/customized-cakes/cake.jpg');
+  });
+
+  it('keeps ordinary product orders on the regular product thumbnail path', () => {
+    expect(isCustomCakeOrder({
+      custom_details: { notes: 'Regular product details' },
+      items: [{ name: 'Chocolate Caramel Cake', image: 'cake3.png' }],
+    })).toBe(false);
+  });
+
+  it('identifies customized orders from their flag or custom item name', () => {
+    expect(isCustomCakeOrder({ is_customized: true })).toBe(true);
+    expect(isCustomCakeOrder({ items: [{ name: 'Custom Cake Request' }] })).toBe(true);
   });
 });
