@@ -426,7 +426,7 @@ function TestimonialsSection() {
               <div className="mx-auto flex h-8 w-8 items-center justify-center rounded-full bg-[#f5eee5] text-[10px] font-black text-[#7c654f] md:h-11 md:w-11 md:text-xs">{String(review.customer_name || 'Customer').split(/\s+/).map((part) => part[0]).join('').slice(0, 2).toUpperCase()}</div>
               <p className="mt-3 min-h-[80px] break-words text-[10px] leading-4 text-[#413734] md:mt-4 md:min-h-[72px] md:text-[11px] md:leading-5">{review.comment?.trim() ? `“${review.comment.trim()}”` : 'Customer rating for their order.'}</p>
               <p className="mt-3 break-words text-[10px] font-bold leading-tight text-[#765d50] md:text-[11px]">- {review.customer_name || 'Customer'}</p>
-              <div className="mt-2 flex justify-center gap-0.5 text-[#e8b52e]" aria-label={`${review.rating} out of 5 stars`}>{[1, 2, 3, 4, 5].map((star) => <Star key={star} className="h-3 w-3 md:h-[14px] md:w-[14px]" fill={star <= Number(review.rating) ? 'currentColor' : 'none'} strokeWidth={1.4} />)}</div>
+              <div data-customer-review-stars className="mt-2 flex justify-center gap-0.5 text-[#e8b52e]" aria-label={`${review.rating} out of 5 stars`}>{[1, 2, 3, 4, 5].map((star) => <Star key={star} className="h-3 w-3 md:h-[14px] md:w-[14px]" fill={star <= Number(review.rating) ? 'currentColor' : 'none'} strokeWidth={1.4} />)}</div>
             </article>
           ))}
           {reviews.length > 3 && (

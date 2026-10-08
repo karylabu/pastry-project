@@ -95,11 +95,23 @@ export default function CustomerApp() {
     const reviews = document.querySelector('#customer-reviews');
     if (!reviews) return undefined;
 
-    const observer = new IntersectionObserver(([entry]) => {
-      setDashboardReviewsPassed(entry.boundingClientRect.bottom <= 0);
-    });
-    observer.observe(reviews);
-    return () => observer.disconnect();
+    let starsObserver;
+    const observeReviewStars = () => {
+      const reviewStars = reviews.querySelector('[data-customer-review-stars]');
+      if (!reviewStars || starsObserver) return;
+      starsObserver = new IntersectionObserver(([entry]) => {
+        setDashboardReviewsPassed(entry.boundingClientRect.bottom <= 0);
+      });
+      starsObserver.observe(reviewStars);
+    };
+    const mutationObserver = new MutationObserver(observeReviewStars);
+    mutationObserver.observe(reviews, { childList: true, subtree: true });
+    observeReviewStars();
+
+    return () => {
+      mutationObserver.disconnect();
+      starsObserver?.disconnect();
+    };
   }, [location.pathname]);
 
   useEffect(() => {
