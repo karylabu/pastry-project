@@ -82,8 +82,8 @@ export default function CustomerApp() {
   }, [location.pathname]);
 
   useEffect(() => {
-    const handlePaymentReturn = async (isBackNavigation) => {
-      if (!isBackNavigation || paymentReturnInProgress.current) return;
+    const handlePaymentReturn = async () => {
+      if (paymentReturnInProgress.current) return;
 
       let pendingCheckout;
       try {
@@ -121,6 +121,7 @@ export default function CustomerApp() {
 
         if (response.ok && result.payment_status === 'failed') {
           window.sessionStorage.removeItem(PENDING_PAYMONGO_CHECKOUT_KEY);
+          window.dispatchEvent(new Event('ordersUpdated'));
           setIsCheckoutOpen(false);
           if (Array.isArray(pendingCheckout.cartItems)) {
             setCartItems(pendingCheckout.cartItems);
@@ -133,6 +134,7 @@ export default function CustomerApp() {
 
         if (response.ok && result.payment_status === 'paid') {
           window.sessionStorage.removeItem(PENDING_PAYMONGO_CHECKOUT_KEY);
+          window.dispatchEvent(new Event('ordersUpdated'));
           setIsCheckoutOpen(false);
           setToastMessage('Payment completed');
           setShowToast(true);
@@ -160,18 +162,22 @@ export default function CustomerApp() {
       }
     };
 
-    const onPageShow = (event) => {
-      const navigationType = window.performance
-        ?.getEntriesByType?.('navigation')?.[0]?.type;
-      void handlePaymentReturn(Boolean(event.persisted) || navigationType === 'back_forward');
+    const onPageShow = () => void handlePaymentReturn();
+    const onFocus = () => void handlePaymentReturn();
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') void handlePaymentReturn();
     };
 
     window.addEventListener('pageshow', onPageShow);
-    const navigationType = window.performance
-      ?.getEntriesByType?.('navigation')?.[0]?.type;
-    void handlePaymentReturn(navigationType === 'back_forward');
+    window.addEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    void handlePaymentReturn();
 
-    return () => window.removeEventListener('pageshow', onPageShow);
+    return () => {
+      window.removeEventListener('pageshow', onPageShow);
+      window.removeEventListener('focus', onFocus);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+    };
   }, [setCartItems]);
 
   const isGuest = () => {
