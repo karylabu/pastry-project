@@ -138,7 +138,6 @@ export default function Profile() {
               <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#c59a36]">Delivery</p>
               <h2 className="mt-1 text-base font-bold text-slate-900">Address</h2>
             </div>
-            <Link to="/customer/saved-addresses" className="text-xs font-bold text-slate-500 transition hover:text-slate-900">Manage</Link>
           </div>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <Field icon={MapPinned} label="Default Address" value={defaultAddress} wide />
@@ -159,7 +158,6 @@ export default function Profile() {
           <QuickLink to="/customer/orders" icon={ShoppingBag} title="My Orders" description="Track recent purchases" />
           <QuickLink to="/customer/customized-cakes" icon={Cake} title="Custom Cakes" description="View cake requests" />
           <QuickLink to="/customer/favorites" icon={Heart} title="Favorites" description="See saved products" />
-          <QuickLink to="/customer/saved-addresses" icon={MapPinned} title="Saved Addresses" description="Manage delivery locations" />
           <QuickLink to="/customer/account-settings" icon={Settings} title="Account Settings" description="Update preferences" />
         </div>
       </section>

@@ -602,13 +602,6 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
                     Favorites
                   </Link>
                   <Link
-                    to="/customer/saved-addresses"
-                    onClick={() => setOpenAccount(false)}
-                    className={accountLinkClass('/customer/saved-addresses')}
-                  >
-                    Saved Addresses
-                  </Link>
-                  <Link
                     to="/customer/account-settings"
                     onClick={() => setOpenAccount(false)}
                     className={accountLinkClass('/customer/account-settings')}

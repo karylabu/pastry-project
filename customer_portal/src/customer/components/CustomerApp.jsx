@@ -25,7 +25,6 @@ import FloralDesigns from '../pages/FloralDesigns';
 import Profile from '../pages/Profile';
 import Rewards from '../pages/Rewards';
 import Favorites from '../pages/Favorites';
-import SavedAddresses from '../pages/SavedAddresses';
 import AccountSettings from '../pages/AccountSettings';
 import ChatSupport from '../pages/ChatSupport';
 
@@ -228,7 +227,7 @@ export default function CustomerApp() {
         <Route path="profile" element={<Profile />} />
         <Route path="rewards" element={<Rewards />} />
         <Route path="favorites" element={<Favorites />} />
-        <Route path="saved-addresses" element={<SavedAddresses />} />
+        <Route path="saved-addresses" element={<Navigate to="/customer/profile" replace />} />
         <Route path="account-settings" element={<AccountSettings />} />
         <Route path="chat-support" element={<ChatSupport />} />
         <Route path="careers" element={<CareersPage />} />
