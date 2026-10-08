@@ -279,7 +279,7 @@ export default function AdminNavbar({ onSidebarChange }) {
 
       {sidebarOpen && <button type="button" aria-label="Close admin navigation" onClick={() => setSidebarOpen(false)} className="fixed inset-0 z-[9999] bg-black/30 lg:hidden" />}
       <header className={`fixed right-0 top-0 z-[9998] flex h-[72px] items-center justify-between border-b border-[#eadfd8] bg-[#fbfaf5]/95 px-4 backdrop-blur-xl transition-[left] duration-300 ease-out sm:px-6 lg:px-8 ${sidebarOpen ? "left-0 lg:left-[260px]" : "left-0 lg:left-0"}`}>
-        <div className="flex min-w-0 items-center gap-3">
+        <div className="flex min-w-0 items-center gap-2 sm:gap-3">
           <button
             type="button"
             onClick={() => setSidebarOpen((open) => !open)}
@@ -293,12 +293,22 @@ export default function AdminNavbar({ onSidebarChange }) {
           </button>
             <time
               dateTime={currentDateTime.toISOString()}
-              className="hidden text-[12px] font-semibold leading-5 text-black sm:block sm:text-[13px]"
+              className="min-w-0 whitespace-nowrap text-[10px] font-semibold leading-5 text-black sm:text-[13px]"
               aria-label="Current date and time"
             >
-              {currentDateTime.toLocaleDateString("en-PH", { weekday: "short", month: "short", day: "numeric", year: "numeric", timeZone: "Asia/Manila" })}
-              <span className="mx-2 text-black/40" aria-hidden="true">·</span>
-              {currentDateTime.toLocaleTimeString("en-PH", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: true, timeZone: "Asia/Manila" })}
+              <span className="sm:hidden">
+                {currentDateTime.toLocaleDateString("en-PH", { month: "short", day: "numeric", timeZone: "Asia/Manila" })}
+              </span>
+              <span className="hidden sm:inline">
+                {currentDateTime.toLocaleDateString("en-PH", { weekday: "short", month: "short", day: "numeric", year: "numeric", timeZone: "Asia/Manila" })}
+              </span>
+              <span className="mx-1 text-black/40 sm:mx-2" aria-hidden="true">·</span>
+              <span className="sm:hidden">
+                {currentDateTime.toLocaleTimeString("en-PH", { hour: "2-digit", minute: "2-digit", hour12: true, timeZone: "Asia/Manila" })}
+              </span>
+              <span className="hidden sm:inline">
+                {currentDateTime.toLocaleTimeString("en-PH", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: true, timeZone: "Asia/Manila" })}
+              </span>
               <span className="ml-1 text-[10px] font-medium text-black/50">PHT</span>
             </time>
           </div>
