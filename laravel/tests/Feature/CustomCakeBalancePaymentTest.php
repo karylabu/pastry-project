@@ -221,6 +221,15 @@ class CustomCakeBalancePaymentTest extends TestCase
             'created_at' => now(),
             'updated_at' => now(),
         ]);
+        \Illuminate\Support\Facades\DB::table('notifications')->insert([
+            'user_id' => 9,
+            'title' => 'Order Placed',
+            'message' => 'Your order #28 has been placed and is awaiting payment.',
+            'type' => 'Success',
+            'is_read' => 0,
+            'action_url' => '/customer/orders',
+            'created_at' => now(),
+        ]);
         Http::fake([
             'https://api.paymongo.com/v1/payment_links/link_paid_test/payments' => Http::response([
                 'data' => [['id' => 'pay_paid_test', 'status' => 'paid']],
@@ -245,6 +254,10 @@ class CustomCakeBalancePaymentTest extends TestCase
             'user_id' => 9,
             'title' => 'Order Placed',
             'message' => 'Your order #28 has been placed successfully and is now pending.',
+        ]);
+        $this->assertDatabaseMissing('notifications', [
+            'user_id' => 9,
+            'message' => 'Your order #28 has been placed and is awaiting payment.',
         ]);
     }
 
@@ -317,6 +330,16 @@ class CustomCakeBalancePaymentTest extends TestCase
                 'created_at' => now(),
                 'updated_at' => now(),
             ],
+            [
+                'id' => 34,
+                'user_id' => 9,
+                'status' => 'Awaiting Payment',
+                'total' => 850,
+                'payment' => 'QRPh',
+                'payment_status' => 'pending',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
         ]);
         \Illuminate\Support\Facades\DB::table('notifications')->insert([
             [
@@ -332,6 +355,15 @@ class CustomCakeBalancePaymentTest extends TestCase
                 'user_id' => 9,
                 'title' => 'Order Placed',
                 'message' => 'Your order #33 has been placed successfully and is now pending.',
+                'type' => 'Success',
+                'is_read' => 0,
+                'action_url' => '/customer/orders',
+                'created_at' => now(),
+            ],
+            [
+                'user_id' => 9,
+                'title' => 'Order Placed',
+                'message' => 'Your order #34 has been placed and is awaiting payment.',
                 'type' => 'Success',
                 'is_read' => 0,
                 'action_url' => '/customer/orders',

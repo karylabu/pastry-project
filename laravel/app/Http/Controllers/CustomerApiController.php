@@ -501,11 +501,13 @@ class CustomerApiController extends Controller
             ]);
         }
 
-        if ($userId && !$requiresQrPayment) {
+        if ($userId) {
             DB::table('notifications')->insert([
                 'user_id' => $userId,
                 'title' => '🧾 Order Placed',
-                'message' => "Your order #$orderId has been placed successfully and is now pending.",
+                'message' => $requiresQrPayment
+                    ? "Your order #$orderId has been placed and is awaiting payment."
+                    : "Your order #$orderId has been placed successfully and is now pending.",
                 'type' => 'Success',
                 'is_read' => 0,
                 'action_url' => '/customer/orders',
@@ -1685,7 +1687,10 @@ PROMPT;
             $failedOrderIds = DB::table('orders')
                 ->where('user_id', $user->id)
                 ->whereIn('id', $failedOrderIds)
-                ->whereRaw("LOWER(payment_status) = 'failed'")
+                ->where(function ($query) {
+                    $query->whereRaw("LOWER(COALESCE(payment_status, '')) = 'failed'")
+                        ->orWhereRaw("LOWER(COALESCE(status, '')) = 'awaiting payment'");
+                })
                 ->pluck('id')
                 ->map(fn ($id) => (int) $id)
                 ->all();
