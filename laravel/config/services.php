@@ -41,6 +41,10 @@ return [
         'redirect' => env('GOOGLE_REDIRECT_URI'),
     ],
 
+    'paymongo' => [
+        'secret' => env('PAYMONGO_SECRET'),
+    ],
+
     'firebase' => [
         'project_id' => env('FIREBASE_PROJECT_ID', 'pastry-project-e864e'),
         'api_key' => env('FIREBASE_API_KEY') ?: 'AIzaSyDgvJQtM-TmhYb8i1N2TutXYmekSVhRAeg',

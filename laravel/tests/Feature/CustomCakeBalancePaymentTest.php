@@ -33,8 +33,7 @@ class CustomCakeBalancePaymentTest extends TestCase
             $table->text('notes')->nullable();
         });
 
-        putenv('PAYMONGO_SECRET=sk_test_balance_flow');
-        $_ENV['PAYMONGO_SECRET'] = 'sk_test_balance_flow';
+        config(['services.paymongo.secret' => 'sk_test_balance_flow']);
         Http::fake([
             'https://api.paymongo.com/v1/payment_links' => Http::response([
                 'data' => ['id' => 'plink_balance_test', 'url' => 'https://checkout.example.test/balance'],
@@ -46,8 +45,7 @@ class CustomCakeBalancePaymentTest extends TestCase
     {
         Schema::dropIfExists('custom_cake_orders');
         Schema::dropIfExists('orders');
-        putenv('PAYMONGO_SECRET');
-        unset($_ENV['PAYMONGO_SECRET']);
+        config(['services.paymongo.secret' => null]);
 
         parent::tearDown();
     }

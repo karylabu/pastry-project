@@ -1466,7 +1466,7 @@ PROMPT;
             }
         }
 
-        $secretKey = env('PAYMONGO_SECRET');
+        $secretKey = config('services.paymongo.secret');
         if (!$secretKey) {
             return $this->corsResponse(['error' => 'Payment gateway secret is not configured. Please set PAYMONGO_SECRET.'], 500);
         }
