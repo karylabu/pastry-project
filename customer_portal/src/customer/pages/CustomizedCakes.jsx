@@ -7,6 +7,7 @@ import { buildCustomizedCakeSubmissionPayload, buildTierSelections } from './cus
 import {
   Baby,
   CakeSlice,
+  CalendarDays,
   Flower2,
   Gift,
   Heart,
@@ -33,6 +34,12 @@ const getLocalDateString = (date = new Date()) => {
   const month = String(date.getMonth() + 1).padStart(2, '0');
   const day = String(date.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
+};
+
+const formatDateForDisplay = (dateString) => {
+  if (!dateString) return 'MM/DD/YY';
+  const [year, month, day] = dateString.split('-');
+  return `${month}/${day}/${year.slice(-2)}`;
 };
 
 const readCustomCakeDraft = () => {
@@ -760,7 +767,21 @@ export default function CustomizedCakes() {
 
                 <label className="block min-w-0 text-xs font-semibold text-[#6b4f1d]">
                   {deliveryMethod === 'Delivery' ? 'Delivery date' : 'Pickup date'} <span aria-hidden="true" className="text-red-600">*</span>
-                  <input required min={getLocalDateString()} value={pickupDate} onChange={(event) => setPickupDate(event.target.value)} type="date" className="mt-1.5 block box-border min-h-11 w-full min-w-0 max-w-full rounded-lg border border-[#eadfd8] bg-white px-3 py-2.5 text-sm text-[#33251e] outline-none transition focus:border-[#c9972d] focus:ring-2 focus:ring-[#fff1bd]" />
+                  <span className="relative mt-1.5 flex h-11 min-w-0 w-full max-w-full items-center rounded-lg border border-[#eadfd8] bg-white px-3 text-sm text-[#33251e] transition focus-within:border-[#c9972d] focus-within:ring-2 focus-within:ring-[#fff1bd]">
+                    <span aria-hidden="true" className={pickupDate ? 'text-[#33251e]' : 'text-[#a99a8e]'}>
+                      {formatDateForDisplay(pickupDate)}
+                    </span>
+                    <CalendarDays aria-hidden="true" size={16} className="ml-auto shrink-0 text-[#8d7a6e]" />
+                    <input
+                      required
+                      min={getLocalDateString()}
+                      value={pickupDate}
+                      onChange={(event) => setPickupDate(event.target.value)}
+                      type="date"
+                      aria-label={deliveryMethod === 'Delivery' ? 'Delivery date' : 'Pickup date'}
+                      className="absolute inset-0 z-10 h-full w-full cursor-pointer opacity-0"
+                    />
+                  </span>
                 </label>
                 <label className="block min-w-0 text-xs font-semibold text-[#6b4f1d]">
                   {deliveryMethod === 'Delivery' ? 'Delivery time' : 'Pickup time'} <span aria-hidden="true" className="text-red-600">*</span>
