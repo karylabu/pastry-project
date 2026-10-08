@@ -316,9 +316,6 @@ export default function Login() {
                 Bakery made <br />
                 <span className="text-[#F0B94D]">simple & sweet.</span>
               </h2>
-              <p className="mt-3 max-w-md text-sm leading-5 text-[#171717] opacity-80 sm:mt-4 sm:text-base sm:leading-6 xl:text-lg">
-                Manage your orders, inventory, and sales<br />effortlessly. All in one place.
-              </p>
             </div>
 
             {/* Cake Image Section */}

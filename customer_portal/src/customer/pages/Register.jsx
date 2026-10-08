@@ -320,7 +320,6 @@ export default function Register() {
               <div className="rounded-[24px] border border-[#f2d181] bg-[#fffaf0] px-5 py-4 shadow-sm">
                 <p className="text-xs font-bold uppercase tracking-[0.25em] text-[#A8354A]">Fresh start</p>
                 <h2 className="mt-2 text-3xl font-extrabold leading-tight text-[#171717]">Create your account</h2>
-                <p className="mt-2 text-sm text-[#171717]/70">Enjoy personalized orders, saved favorites, and fast checkout for your favorite pastries.</p>
               </div>
             </div>
           </div>
