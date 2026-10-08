@@ -716,6 +716,7 @@ class CustomerApiController extends Controller
         $requestedUserId = intval($request->query('user_id', $request->query('customer_id', 0)));
         $userId = $isAdmin ? $requestedUserId : (int) $user->id;
         $role = $isAdmin ? 'admin' : 'customer';
+        $markRead = filter_var($request->query('mark_read', false), FILTER_VALIDATE_BOOLEAN);
         $conversationId = substr(trim((string) $request->query('conversation_id', '')), 0, 64);
         $hasConversationId = Schema::hasColumn('messages', 'conversation_id');
         $hasReplyToId = Schema::hasColumn('messages', 'reply_to_id');
@@ -747,8 +748,13 @@ class CustomerApiController extends Controller
         } else {
             if ($role === 'admin') {
                 DB::table('messages')->where('user_id', $userId)->where('order_id', 0)->where('sender', 'customer')->update(['is_read' => 1]);
-            } else {
-                $readQuery = DB::table('messages')->where('user_id', $userId)->where('order_id', 0)->whereIn('sender', ['admin', 'staff', 'ai']);
+            } elseif ($markRead) {
+                $readQuery = DB::table('messages')
+                    ->where('user_id', $userId)
+                    ->where(function ($query) {
+                        $query->where('order_id', 0)->orWhereNull('order_id');
+                    })
+                    ->whereIn('sender', ['admin', 'staff', 'ai']);
                 if ($hasConversationId && $conversationId && $conversationId !== 'legacy') {
                     $readQuery->where('conversation_id', $conversationId);
                 } elseif ($hasConversationId && $conversationId === 'legacy') {

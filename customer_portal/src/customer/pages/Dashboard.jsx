@@ -479,6 +479,7 @@ export function ChatBubble({ aiMode = false, fullPage = false }) {
   const bottomRef                 = useRef(null);
   const messagesContainerRef      = useRef(null);
   const shouldStickToBottomRef    = useRef(true);
+  const openRef                   = useRef(fullPage && hasCustomerAccount);
   const pollRef                   = useRef(null);
   const imageInputRef             = useRef(null);
 
@@ -526,7 +527,7 @@ export function ChatBubble({ aiMode = false, fullPage = false }) {
       const params = new URLSearchParams({
         order_id: "0",
         conversation_id: conversationId,
-        mark_read: open ? "1" : "0",
+        mark_read: openRef.current ? "1" : "0",
       });
       const res  = await fetch(`${CUSTOMER_BASE}/api/customer/chat/messages?${params.toString()}`, {
         credentials: 'include',
@@ -551,7 +552,9 @@ export function ChatBubble({ aiMode = false, fullPage = false }) {
         ));
       });
       setChatError("");
-      if (!open) {
+      if (openRef.current) {
+        setUnread(0);
+      } else {
         const newStaff = fetchedMessages.filter(message => (
           ["admin", "staff"].includes(String(message.sender).toLowerCase()) &&
           Number(message.is_read) === 0
@@ -690,8 +693,10 @@ export function ChatBubble({ aiMode = false, fullPage = false }) {
                 setShowAccountPrompt(true);
                 return;
               }
-              setOpen(o => !o);
-              setUnread(0);
+              const nextOpen = !openRef.current;
+              openRef.current = nextOpen;
+              setOpen(nextOpen);
+              if (nextOpen) setUnread(0);
             }}
             className="flex h-14 w-14 items-center justify-center rounded-full bg-[#f0b94d] text-black shadow-xl transition-colors hover:bg-[#e5ae3d]"
           >

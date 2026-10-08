@@ -186,6 +186,33 @@ class CustomerChatApiTest extends TestCase
             ->assertJsonPath('conversations.0.customer_name', 'Test Customer');
     }
 
+    public function test_customer_chat_popup_marks_null_order_messages_read_only_when_opened(): void
+    {
+        DB::table('messages')->insert([
+            'order_id' => null,
+            'user_id' => 7,
+            'sender' => 'staff',
+            'message' => 'We can help with your order.',
+            'is_read' => 0,
+        ]);
+
+        $headers = ['Authorization' => '******'];
+
+        $this->withHeaders($headers)
+            ->getJson('/api/customer/chat/messages?order_id=0&mark_read=0')
+            ->assertOk()
+            ->assertJsonPath('messages.0.is_read', 0);
+
+        $this->assertDatabaseHas('messages', ['user_id' => 7, 'is_read' => 0]);
+
+        $this->withHeaders($headers)
+            ->getJson('/api/customer/chat/messages?order_id=0&mark_read=1')
+            ->assertOk()
+            ->assertJsonPath('messages.0.is_read', 1);
+
+        $this->assertDatabaseHas('messages', ['user_id' => 7, 'is_read' => 1]);
+    }
+
     public function test_customer_can_send_an_image_without_text(): void
     {
         $response = $this->withHeaders([
