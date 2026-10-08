@@ -3,12 +3,12 @@
   "name": "Pastry Project",
   "icons": [
     {
-      "src": "logo192.png",
+      "src": "pastry-project-icon-192.png",
       "sizes": "192x192",
       "type": "image/png"
     },
     {
-      "src": "logo512.png",
+      "src": "pastry-project-icon-512.png",
       "type": "image/png",
       "sizes": "512x512"
     }
