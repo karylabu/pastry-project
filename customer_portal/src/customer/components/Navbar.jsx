@@ -56,6 +56,7 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
   const navigate = useNavigate();
 
   const [notifications, setNotifications] = useState([]);
+  const [notificationError, setNotificationError] = useState("");
   const [openNotif, setOpenNotif] = useState(false);
   const [openSearch, setOpenSearch] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -113,37 +114,26 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
      FETCH NOTIFICATIONS
   ========================= */
   const fetchNotifications = () => {
-    try {
-      const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
-      console.log("Stored user:", storedUser);
-      
-      if (storedUser?.id) {
-        const url = `${CUSTOMER_BASE}/api/customer/notifications`;
-        console.log("Fetching notifications from:", url);
-        
-        fetch(url, { credentials: 'include', headers: getAuthHeaders() })
-          .then(safeParseJson)
-          .then(data => {
-            console.log("Notifications data:", data);
-            if (Array.isArray(data)) {
-              setNotifications(data);
-            } else {
-              console.warn("Data is not an array:", data);
-              setNotifications([]);
-            }
-          })
-          .catch(err => {
-            console.error("Error fetching notifications:", err);
-            setNotifications([]);
-          });
-      } else {
-        console.log("No user_id in localStorage");
+    fetch(`${CUSTOMER_BASE}/api/customer/notifications`, {
+      credentials: 'include',
+      headers: getAuthHeaders(),
+    })
+      .then(async (response) => {
+        const data = await safeParseJson(response);
+        if (!response.ok) {
+          throw new Error(data?.message || `Unable to load notifications (${response.status}).`);
+        }
+        if (!Array.isArray(data)) {
+          throw new Error(data?.message || "The notifications response was invalid.");
+        }
+        setNotifications(data);
+        setNotificationError("");
+      })
+      .catch((err) => {
+        console.error("Error fetching notifications:", err);
         setNotifications([]);
-      }
-    } catch (err) {
-      console.error("Error in fetchNotifications:", err);
-      setNotifications([]);
-    }
+        setNotificationError(err.message || "Unable to load notifications.");
+      });
   };
 
   useEffect(() => {
@@ -416,7 +406,7 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
                 <div className="p-3">
                   {filteredNotifications.length === 0 ? (
                     <div className="rounded-[18px] border border-dashed border-gray-200 bg-gray-50 p-5 text-center text-sm text-gray-500">
-                      No notifications in this view.
+                      {notificationError || "No notifications in this view."}
                     </div>
                   ) : (
                     filteredNotifications.map((n) => {
