@@ -760,7 +760,7 @@ export default function CustomizedCakes() {
 
                 <label className="block min-w-0 text-xs font-semibold text-[#6b4f1d]">
                   {deliveryMethod === 'Delivery' ? 'Delivery date' : 'Pickup date'} <span aria-hidden="true" className="text-red-600">*</span>
-                  <input required min={getLocalDateString()} value={pickupDate} onChange={(event) => setPickupDate(event.target.value)} type="date" className="mt-1.5 block box-border min-h-11 w-full min-w-0 max-w-full appearance-none rounded-lg border border-[#eadfd8] bg-white px-3 py-2.5 text-sm text-[#33251e] outline-none transition focus:border-[#c9972d] focus:ring-2 focus:ring-[#fff1bd]" />
+                  <input required min={getLocalDateString()} value={pickupDate} onChange={(event) => setPickupDate(event.target.value)} type="date" className="mt-1.5 block box-border min-h-11 w-full min-w-0 max-w-full rounded-lg border border-[#eadfd8] bg-white px-3 py-2.5 text-sm text-[#33251e] outline-none transition focus:border-[#c9972d] focus:ring-2 focus:ring-[#fff1bd]" />
                 </label>
                 <label className="block min-w-0 text-xs font-semibold text-[#6b4f1d]">
                   {deliveryMethod === 'Delivery' ? 'Delivery time' : 'Pickup time'} <span aria-hidden="true" className="text-red-600">*</span>
