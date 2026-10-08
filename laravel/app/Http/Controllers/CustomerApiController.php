@@ -1764,7 +1764,7 @@ PROMPT;
                 preg_match('/\border\s+#(\d+)\b/i', (string) $notification->message, $matches);
                 return str_contains(strtolower((string) $notification->title), 'order placed')
                     && in_array((int) ($matches[1] ?? 0), $failedOrderIds, true);
-            });
+            })->values();
         }
 
         $notifications = $notifications

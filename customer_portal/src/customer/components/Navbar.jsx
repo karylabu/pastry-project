@@ -124,12 +124,12 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
           .then(safeParseJson)
           .then(data => {
             console.log("Notifications data:", data);
-            if (Array.isArray(data)) {
-              setNotifications(data);
-            } else {
-              console.warn("Data is not an array:", data);
-              setNotifications([]);
-            }
+            const notificationList = Array.isArray(data)
+              ? data
+              : data && typeof data === 'object'
+                ? Object.values(data).filter((item) => item && typeof item === 'object' && item.id)
+                : [];
+            setNotifications(notificationList);
           })
           .catch(err => {
             console.error("Error fetching notifications:", err);

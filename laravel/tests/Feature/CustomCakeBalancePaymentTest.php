@@ -375,11 +375,14 @@ class CustomCakeBalancePaymentTest extends TestCase
         $customer->id = 9;
         $customer->role = 'customer';
 
-        $this->actingAs($customer)
+        $response = $this->actingAs($customer)
             ->getJson('/api/customer/notifications')
             ->assertOk()
-            ->assertJsonCount(1)
             ->assertJsonPath('0.message', 'Your order #33 has been placed successfully and is now pending.');
+
+        $decodedNotifications = json_decode($response->getContent());
+        $this->assertIsArray($decodedNotifications);
+        $this->assertCount(1, $decodedNotifications);
     }
 
     public function test_customer_notifications_backfill_missing_notice_for_pending_order(): void
