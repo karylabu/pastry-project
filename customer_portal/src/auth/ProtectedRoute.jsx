@@ -1,14 +1,14 @@
 import React, { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
-import { STAFF_BASE } from "../services/config";
+import { LARAVEL_BASE } from "../services/config";
 
 const DEFAULT_ALLOWED_ROLES = ["admin"];
 
 /**
  * Reusable route guard.
  *
- * Verifies the session server-side (PHP session cookie / DB-backed token via
- * api_auth_status.php) before rendering children. Never trusts localStorage.
+ * Verifies the session server-side using Laravel's database-backed token
+ * before rendering children. Never trusts localStorage.
  *
  * Props:
  *  - allowedRoles: roles permitted to view this route (default: admin)
@@ -35,7 +35,7 @@ export default function ProtectedRoute({
       }
       const token = storedUser.token || localStorage.getItem("auth_token") || "";
 
-      return fetch(`${STAFF_BASE}/api_auth_status.php`, {
+      return fetch(`${LARAVEL_BASE}/api/auth/status`, {
         credentials: "include",
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       })

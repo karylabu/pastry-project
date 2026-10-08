@@ -90,6 +90,30 @@ class CustomerAuthApiTest extends TestCase
         $this->assertDatabaseMissing('user_sessions', ['user_id' => 8]);
     }
 
+    public function test_auth_status_verifies_an_active_admin_session_token(): void
+    {
+        DB::table('users')->insert([
+            'id' => 9,
+            'name' => 'Test Admin',
+            'email' => 'admin@example.com',
+            'password' => Hash::make('admin-password'),
+            'role' => 'admin',
+            'status' => 'active',
+        ]);
+        DB::table('user_sessions')->insert([
+            'user_id' => 9,
+            'token' => 'test-admin-token',
+            'expires_at' => now()->addHour(),
+        ]);
+
+        $this->withHeader('Authorization', '******')
+            ->getJson('/api/auth/status')
+            ->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('user.id', 9)
+            ->assertJsonPath('user.role', 'admin');
+    }
+
     public function test_registration_creates_a_customer_and_session_token(): void
     {
         $this->postJson('/api/register', [

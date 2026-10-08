@@ -35,6 +35,7 @@ Route::get('reviews', [OrderFeedbackController::class, 'publicIndex']);
 Route::match(['get', 'post'], 'customer/products', [CustomerApiController::class, 'products']);
 Route::match(['get', 'options'], 'staff/dashboard', [StaffApiController::class, 'getDashboard']);
 Route::post('login', [AuthApiController::class, 'login']);
+Route::get('auth/status', [AuthApiController::class, 'status']);
 Route::post('register', [AuthApiController::class, 'register']);
 Route::post('profile', [AuthApiController::class, 'updateProfile']);
 Route::post('password/forgot', [AuthApiController::class, 'forgotPassword'])

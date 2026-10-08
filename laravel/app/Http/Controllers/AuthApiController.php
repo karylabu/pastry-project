@@ -13,6 +13,27 @@ use Illuminate\Support\Facades\Log;
 
 class AuthApiController extends Controller
 {
+    public function status(Request $request)
+    {
+        $user = $this->getAuthenticatedUser($request);
+        if (!$user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Authentication required.',
+            ], 401);
+        }
+
+        return response()->json([
+            'success' => true,
+            'user' => [
+                'id' => (int) $user->id,
+                'name' => $user->name,
+                'email' => $user->email,
+                'role' => $user->role,
+            ],
+        ]);
+    }
+
     /**
      * Register a new user.
      */
