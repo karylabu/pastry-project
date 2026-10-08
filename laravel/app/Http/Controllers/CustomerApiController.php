@@ -1663,6 +1663,39 @@ PROMPT;
             return $this->corsResponse([]);
         }
 
+        $ordersMissingPlacementNotice = DB::table('orders')
+            ->where('user_id', $user->id)
+            ->whereIn('status', ['Pending', 'Confirmed', 'Preparing', 'Awaiting Balance Payment', 'Ready for Pickup', 'Completed'])
+            ->where(function ($query) {
+                $query->whereNull('payment_status')
+                    ->orWhereRaw("LOWER(payment_status) <> 'failed'");
+            })
+            ->orderByDesc('created_at')
+            ->limit(50)
+            ->get(['id', 'created_at']);
+
+        foreach ($ordersMissingPlacementNotice as $order) {
+            $message = "Your order #{$order->id} has been placed%";
+            $noticeExists = DB::table('notifications')
+                ->where('user_id', $user->id)
+                ->where('title', 'Order Placed')
+                ->where('action_url', '/customer/orders')
+                ->where('message', 'like', $message)
+                ->exists();
+
+            if (!$noticeExists) {
+                DB::table('notifications')->insert([
+                    'user_id' => $user->id,
+                    'title' => 'Order Placed',
+                    'message' => "Your order #{$order->id} has been placed successfully and is now pending.",
+                    'type' => 'Success',
+                    'is_read' => 0,
+                    'action_url' => '/customer/orders',
+                    'created_at' => $order->created_at ?? now(),
+                ]);
+            }
+        }
+
         $notifications = DB::table('notifications')
             ->where('user_id', $user->id)
             ->orderByDesc('created_at')

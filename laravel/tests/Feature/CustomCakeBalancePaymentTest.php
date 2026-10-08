@@ -382,4 +382,35 @@ class CustomCakeBalancePaymentTest extends TestCase
             ->assertJsonPath('0.message', 'Your order #33 has been placed successfully and is now pending.');
     }
 
+    public function test_customer_notifications_backfill_missing_notice_for_pending_order(): void
+    {
+        \Illuminate\Support\Facades\DB::table('orders')->insert([
+            'id' => 35,
+            'user_id' => 9,
+            'status' => 'Pending',
+            'total' => 490,
+            'payment' => 'Counter',
+            'payment_status' => 'pending',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $customer = new User();
+        $customer->id = 9;
+        $customer->role = 'customer';
+
+        $this->actingAs($customer)
+            ->getJson('/api/customer/notifications')
+            ->assertOk()
+            ->assertJsonCount(1)
+            ->assertJsonPath('0.title', 'Order Placed')
+            ->assertJsonPath('0.message', 'Your order #35 has been placed successfully and is now pending.');
+
+        $this->assertDatabaseHas('notifications', [
+            'user_id' => 9,
+            'title' => 'Order Placed',
+            'message' => 'Your order #35 has been placed successfully and is now pending.',
+        ]);
+    }
+
 }
