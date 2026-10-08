@@ -14,7 +14,7 @@
 
     # The React build emits root-relative asset URLs.
     RewriteRule ^static/(.*)$ customer_portal/build/static/$1 [L]
-    RewriteRule ^(favicon\.ico|pastry-project-favicon\.png|pastry-project-favicon-v2\.png|pastry-project-icon-192\.png|pastry-project-icon-512\.png|logo192\.png|logo512\.png|manifest\.json|robots\.txt|privacy\.html|terms\.html)$ customer_portal/build/$1 [L]
+    RewriteRule ^(favicon\.ico|pastry-project-favicon\.png|pastry-project-favicon-v2\.png|pastry-project-favicon-v3\.png|pastry-project-icon-192\.png|pastry-project-icon-512\.png|pastry-project-icon-v3-192\.png|pastry-project-icon-v3-512\.png|logo192\.png|logo512\.png|manifest\.json|robots\.txt|privacy\.html|terms\.html)$ customer_portal/build/$1 [L]
 
     # React owns the site root and its client-side routes.
     RewriteRule ^$ customer_portal/build/index.html [L]
