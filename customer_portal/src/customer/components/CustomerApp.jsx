@@ -73,7 +73,7 @@ export default function CustomerApp() {
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [showGuestPrompt, setShowGuestPrompt] = useState(false);
-  const [dashboardFooterApproaching, setDashboardFooterApproaching] = useState(false);
+  const [floatingFooterApproaching, setFloatingFooterApproaching] = useState(false);
   const paymentReturnInProgress = useRef(false);
 
   useEffect(() => {
@@ -83,20 +83,19 @@ export default function CustomerApp() {
   }, [location.pathname]);
 
   useEffect(() => {
-    const isDashboard = ['/','/customer','/customer/home'].includes(
-      (location.pathname || '/').replace(/\/+$/, '') || '/'
-    );
-    if (!isDashboard) {
-      setDashboardFooterApproaching(false);
+    const pathname = (location.pathname || '/').replace(/\/+$/, '') || '/';
+    const hasFloatingCart = ['/','/home','/menu','/customized-cakes','/customer','/customer/home','/customer/menu','/customer/customized-cakes'].includes(pathname);
+    if (!hasFloatingCart) {
+      setFloatingFooterApproaching(false);
       return undefined;
     }
 
-    setDashboardFooterApproaching(false);
+    setFloatingFooterApproaching(false);
     const footer = document.querySelector('footer');
     if (!footer) return undefined;
 
     const updateFooterBoundary = () => {
-      setDashboardFooterApproaching(
+      setFloatingFooterApproaching(
         footer.getBoundingClientRect().top <= window.innerHeight + 80
       );
     };
@@ -324,7 +323,7 @@ export default function CustomerApp() {
     !isCheckoutOpen &&
     !['/rewards', '/orders', '/profile', '/checkout', '/customer/rewards', '/customer/orders', '/customer/profile', '/customer/checkout'].includes(normalizedPath) &&
     ['/','/home','/menu','/customized-cakes','/customer','/customer/home','/customer/menu','/customer/customized-cakes'].includes(normalizedPath);
-  const hideDashboardFloaters = dashboardFooterApproaching &&
+  const hideDashboardFloaters = floatingFooterApproaching &&
     ['/','/customer','/customer/home'].includes(normalizedPath);
 
   let storedRole = '';
@@ -371,7 +370,7 @@ export default function CustomerApp() {
       </Routes>
 
       {/* BOTTOM CART SUMMARY */}
-      {showFloatingCart && !hideDashboardFloaters && cartQuantity > 0 && (
+      {showFloatingCart && !floatingFooterApproaching && cartQuantity > 0 && (
         <motion.div
           initial={{ y: 100, x: 0, opacity: 0 }}
           animate={{ y: 0, x: 0, opacity: 1 }}
