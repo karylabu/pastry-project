@@ -806,6 +806,18 @@ class OrderController extends Controller
                     throw new RuntimeException('Only pending orders can be cancelled.');
                 }
                 $order->update(['status' => 'Cancelled']);
+
+                if (Schema::hasTable('notifications')) {
+                    DB::table('notifications')->insert([
+                        'user_id' => $user->id,
+                        'title' => 'Order Cancelled',
+                        'message' => "Your order #{$order->id} has been cancelled.",
+                        'type' => 'Warning',
+                        'is_read' => 0,
+                        'action_url' => '/customer/orders',
+                        'created_at' => now(),
+                    ]);
+                }
             });
         } catch (\Throwable $exception) {
             $status = $exception->getMessage() === 'Order not found.' ? 404 : 400;
@@ -835,6 +847,18 @@ class OrderController extends Controller
                     throw new RuntimeException('Order is not ready to be confirmed.');
                 }
                 $order->update(['status' => 'Completed']);
+
+                if (Schema::hasTable('notifications')) {
+                    DB::table('notifications')->insert([
+                        'user_id' => $user->id,
+                        'title' => 'Order Completed',
+                        'message' => "Your order #{$order->id} has been marked as completed.",
+                        'type' => 'Success',
+                        'is_read' => 0,
+                        'action_url' => '/customer/orders',
+                        'created_at' => now(),
+                    ]);
+                }
             });
         } catch (\Throwable $exception) {
             $status = $exception->getMessage() === 'Order not found.' ? 404 : 409;
@@ -862,8 +886,9 @@ class OrderController extends Controller
             return response()->json(['success' => false, 'errors' => $validator->errors()], 422);
         }
 
+        $previousStatus = null;
         try {
-            $order = DB::transaction(function () use ($id, $request, $user) {
+            $order = DB::transaction(function () use ($id, $request, $user, &$previousStatus) {
                 $order = Order::query()->whereKey($id)->lockForUpdate()->first();
                 if (!$order) {
                     throw new RuntimeException('Order not found.');
@@ -871,6 +896,7 @@ class OrderController extends Controller
 
                 $oldStatus = $order->status;
                 $newStatus = $request->status;
+                $previousStatus = $oldStatus;
                 if ($oldStatus !== 'Confirmed' && $newStatus === 'Confirmed') {
                     $this->deductOrderProductStock($order, (int) $user->id);
                 } elseif ($oldStatus === 'Confirmed' && $newStatus === 'Cancelled') {
@@ -879,20 +905,18 @@ class OrderController extends Controller
 
                 $order->update(['status' => $newStatus]);
 
-                $type = 'order';
-                if (strtolower($newStatus) === 'completed') $type = 'order_completed';
-                if (strtolower($newStatus) === 'cancelled') $type = 'order_cancelled';
-                if (strtolower($newStatus) === 'ready for pickup') $type = 'order_received';
-
-                DB::table('notifications')->insert([
-                    'user_id' => $order->user_id,
-                    'title' => '📦 Order Update',
-                    'message' => "Your order #{$order->id} status has been updated to {$newStatus}.",
-                    'type' => $type,
-                    'is_read' => 0,
-                    'action_url' => '/customer/orders',
-                    'created_at' => now(),
-                ]);
+                if ($oldStatus !== $newStatus && Schema::hasTable('notifications')) {
+                    $type = strtolower($newStatus) === 'cancelled' ? 'Warning' : 'Success';
+                    DB::table('notifications')->insert([
+                        'user_id' => $order->user_id,
+                        'title' => "Order {$newStatus}",
+                        'message' => "Your order #{$order->id} status has been updated to {$newStatus}.",
+                        'type' => $type,
+                        'is_read' => 0,
+                        'action_url' => '/customer/orders',
+                        'created_at' => now(),
+                    ]);
+                }
 
                 return $order->fresh();
             });
@@ -902,7 +926,7 @@ class OrderController extends Controller
         }
 
         $order = $order->fresh();
-        $oldStatus = (string) $order->status;
+        $oldStatus = (string) ($previousStatus ?? $order->status);
         $newStatus = (string) $request->status;
 
         if (in_array(strtolower($newStatus), ['confirmed', 'approved', 'preparing'], true)) {
@@ -933,23 +957,6 @@ class OrderController extends Controller
         if (strtolower($newStatus) === 'ready for pickup') {
             $this->sendSmsNotification($order, $newStatus);
         }
-
-        $type = 'order';
-        if (strtolower($newStatus) == 'completed') $type = 'order_completed';
-        if (strtolower($newStatus) == 'cancelled') $type = 'order_cancelled';
-        if (strtolower($newStatus) == 'ready for pickup') {
-            $type = 'order_received';
-        }
-
-        DB::table('notifications')->insert([
-            'user_id' => $order->user_id,
-            'title' => '📦 Order Update',
-            'message' => "Your order #{$order->id} status has been updated to {$newStatus}.",
-            'type' => $type,
-            'is_read' => 0,
-            'action_url' => '/customer/orders',
-            'created_at' => now(),
-        ]);
 
         return response()->json([
             'success' => true,

@@ -21,10 +21,29 @@ import { getAuthHeaders, safeParseJson } from '../../services/api';
 const getNotificationCategory = (notification) => {
   const type = notification.type || 'account';
   const title = String(notification.title || '').toLowerCase();
+  const message = String(notification.message || '').toLowerCase();
   const actionUrl = String(notification.action_url || '');
+  const orderText = `${title} ${message}`;
 
-  if (type === 'Success' && title.includes('order placed') && actionUrl.startsWith('/customer/orders')) {
-    return 'order_pending';
+  if (actionUrl.startsWith('/customer/orders') && (/\border\b/.test(orderText) || /custom cake/.test(orderText))) {
+    if (/order placed|has been placed/.test(orderText)) return 'order_placed';
+    const statusChange = orderText.match(/\b(?:to|now|is)\s+(awaiting balance payment|ready for pickup|pending|confirmed|preparing|completed|cancelled|canceled)\b/);
+    const newStatus = statusChange?.[1];
+    if (newStatus === 'awaiting balance payment') return 'order_balance_due';
+    if (newStatus === 'ready for pickup') return 'order_ready';
+    if (newStatus === 'pending') return 'order_pending';
+    if (newStatus === 'confirmed') return 'order_confirmed';
+    if (newStatus === 'preparing') return 'order_preparing';
+    if (newStatus === 'completed') return 'order_completed';
+    if (newStatus === 'cancelled' || newStatus === 'canceled') return 'order_cancelled';
+    if (/cancelled|canceled/.test(orderText)) return 'order_cancelled';
+    if (/awaiting balance payment|balance due/.test(orderText)) return 'order_balance_due';
+    if (/ready for pickup|order ready/.test(orderText)) return 'order_ready';
+    if (/completed/.test(orderText)) return 'order_completed';
+    if (/preparing|being prepared/.test(orderText)) return 'order_preparing';
+    if (/confirmed|accepted/.test(orderText)) return 'order_confirmed';
+    if (/\bpending\b/.test(orderText)) return 'order_pending';
+    return 'order_update';
   }
 
   return type;
@@ -97,7 +116,7 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
       const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
       console.log("Stored user:", storedUser);
       
-      if (storedUser?.id) {
+      if (storedUser?.id || storedUser?.token || localStorage.getItem('auth_token')) {
         const url = `${CUSTOMER_BASE}/api/customer/notifications`;
         console.log("Fetching notifications from:", url);
         
@@ -164,7 +183,9 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
 
   const filteredNotifications = useMemo(() => {
     if (notifFilter === "All") return notifications;
-    if (notifFilter === "Active Orders") return notifications.filter((n) => ["order_pending", "order_ready", "order_urgent"].includes(getNotificationCategory(n)) || (n.type === "Success" && n.action_url?.includes("/customer/orders")));
+    if (notifFilter === "Active Orders") return notifications.filter((n) =>
+      getNotificationCategory(n).startsWith('order_')
+    );
     if (notifFilter === "Reminders & Warnings") return notifications.filter((n) => ["order_expired", "stockout"].includes(n.type) || (n.type === "Warning" && n.action_url?.includes("/customer/orders")));
     if (notifFilter === "Account Updates") return notifications.filter((n) =>
       ["account", "profile"].includes(n.type) ||
@@ -405,8 +426,16 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
                       const isCustomCakeNotice = String(n.title || "").toLowerCase().includes("custom cake");
                       const getIcon = () => {
                         switch (type) {
+                          case "order_placed":
                           case "order_pending":
+                          case "order_confirmed":
+                          case "order_preparing":
+                          case "order_balance_due":
+                          case "order_completed":
+                          case "order_update":
                             return <ClipboardList className="h-4 w-4 text-blue-600" />;
+                          case "order_cancelled":
+                            return <AlertTriangle className="h-4 w-4 text-amber-700" />;
                           case "order_urgent":
                             return <Croissant className="h-4 w-4 text-orange-600" />;
                           case "order_ready":
@@ -425,7 +454,7 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
                       };
 
                       const getBadge = () => {
-                        if (isCustomCakeNotice) {
+                        if (!type.startsWith('order_') && isCustomCakeNotice) {
                           const noticeTitle = String(n.title || "").toLowerCase();
                           const declined = type === "Warning" || noticeTitle.includes("declined");
                           const completed = noticeTitle.includes("completed");
@@ -440,12 +469,26 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
                           return <span className={`rounded-full px-2.5 py-1 text-[10px] font-semibold ${declined ? "bg-amber-50 text-amber-700" : "bg-emerald-50 text-emerald-700"}`}>{label}</span>;
                         }
                         switch (type) {
+                          case "order_placed":
+                            return <span className="rounded-full bg-blue-50 px-2.5 py-1 text-[10px] font-semibold text-blue-700">Order Placed</span>;
                           case "order_pending":
                             return <span className="rounded-full bg-blue-50 px-2.5 py-1 text-[10px] font-semibold text-blue-700">Standard Pre-order</span>;
+                          case "order_confirmed":
+                            return <span className="rounded-full bg-blue-50 px-2.5 py-1 text-[10px] font-semibold text-blue-700">Accepted</span>;
+                          case "order_preparing":
+                            return <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-semibold text-slate-700">Preparing</span>;
+                          case "order_balance_due":
+                            return <span className="rounded-full bg-amber-50 px-2.5 py-1 text-[10px] font-semibold text-amber-700">Awaiting Balance Payment</span>;
                           case "order_urgent":
                             return <span className="rounded-full bg-red-600 px-2.5 py-1 text-[10px] font-semibold text-white animate-pulse">Urgent Rush Order</span>;
                           case "order_ready":
                             return <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-semibold text-emerald-700">Ready for Pickup</span>;
+                          case "order_completed":
+                            return <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-semibold text-emerald-700">Completed</span>;
+                          case "order_cancelled":
+                            return <span className="rounded-full bg-amber-50 px-2.5 py-1 text-[10px] font-semibold text-amber-700">Cancelled</span>;
+                          case "order_update":
+                            return <span className="rounded-full bg-blue-50 px-2.5 py-1 text-[10px] font-semibold text-blue-700">Order Update</span>;
                           case "stockout":
                             return <span className="rounded-full bg-gray-100 px-2.5 py-1 text-[10px] font-semibold text-gray-700">Cancelled — Stockout</span>;
                           case "order_expired":
@@ -469,7 +512,7 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
                           className={`mb-2 cursor-pointer rounded-[20px] border p-3 transition hover:bg-gray-50 ${isUnread ? 'border-[#d4af37]/30 bg-[#fffdf7]' : 'border-gray-200 bg-white'}`}
                         >
                           <div className="flex items-start gap-3">
-                            <div className={`mt-0.5 flex h-9 w-9 items-center justify-center rounded-2xl ${type === 'order_pending' ? 'bg-blue-50' : type === 'order_urgent' ? 'bg-orange-50' : type === 'order_ready' ? 'bg-emerald-50' : type === 'stockout' || type === 'order_expired' ? 'bg-amber-50' : 'bg-gray-100'}`}>
+                            <div className={`mt-0.5 flex h-9 w-9 items-center justify-center rounded-2xl ${type === 'order_pending' || type === 'order_placed' || type === 'order_confirmed' || type === 'order_preparing' ? 'bg-blue-50' : type === 'order_urgent' ? 'bg-orange-50' : type === 'order_ready' || type === 'order_completed' ? 'bg-emerald-50' : type === 'order_cancelled' || type === 'order_balance_due' || type === 'stockout' || type === 'order_expired' ? 'bg-amber-50' : 'bg-gray-100'}`}>
                               {getIcon()}
                             </div>
                             <div className="min-w-0 flex-1">

@@ -609,10 +609,23 @@ class CustomerApiController extends Controller
             return $this->corsResponse(['success' => false, 'message' => 'Only pending orders can be cancelled.']);
         }
 
-        DB::table('orders')
+        DB::transaction(function () use ($orderId, $user) {
+            DB::table('orders')
             ->where('id', $orderId)
             ->where('user_id', $user->id)
             ->update(['status' => 'Cancelled']);
+            if (Schema::hasTable('notifications')) {
+                DB::table('notifications')->insert([
+                    'user_id' => $user->id,
+                    'title' => 'Order Cancelled',
+                    'message' => "Your order #{$orderId} has been cancelled.",
+                    'type' => 'Warning',
+                    'is_read' => 0,
+                    'action_url' => '/customer/orders',
+                    'created_at' => now(),
+                ]);
+            }
+        });
         app(\App\Services\RealtimeEventPublisher::class)->orderUpdated((int) $user->id, $orderId);
         return $this->corsResponse(['success' => true]);
     }
@@ -646,10 +659,23 @@ class CustomerApiController extends Controller
             return $this->corsResponse(['success' => false, 'message' => 'Order is not ready to be confirmed.']);
         }
 
-        DB::table('orders')
+        DB::transaction(function () use ($orderId, $user) {
+            DB::table('orders')
             ->where('id', $orderId)
             ->where('user_id', $user->id)
             ->update(['status' => 'Completed']);
+            if (Schema::hasTable('notifications')) {
+                DB::table('notifications')->insert([
+                    'user_id' => $user->id,
+                    'title' => 'Order Completed',
+                    'message' => "Your order #{$orderId} has been marked as completed.",
+                    'type' => 'Success',
+                    'is_read' => 0,
+                    'action_url' => '/customer/orders',
+                    'created_at' => now(),
+                ]);
+            }
+        });
         app(\App\Services\RealtimeEventPublisher::class)->orderUpdated((int) $user->id, $orderId);
         return $this->corsResponse(['success' => true]);
     }
@@ -1736,7 +1762,8 @@ PROMPT;
 
             $notifications = $notifications->reject(function ($notification) use ($failedOrderIds) {
                 preg_match('/\border\s+#(\d+)\b/i', (string) $notification->message, $matches);
-                return in_array((int) ($matches[1] ?? 0), $failedOrderIds, true);
+                return str_contains(strtolower((string) $notification->title), 'order placed')
+                    && in_array((int) ($matches[1] ?? 0), $failedOrderIds, true);
             });
         }
 

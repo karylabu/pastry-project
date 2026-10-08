@@ -1170,6 +1170,11 @@ try {
                     }
                 } else {
                     switch ($status) {
+                        case 'Pending':
+                            $notifType = 'Info';
+                            $notifTitle = 'Order pending';
+                            $notifMessage = 'Your order is now pending.';
+                            break;
                         case 'Preparing':
                             $notifType = 'Success';
                             $notifTitle = 'Order being prepared';
@@ -1179,6 +1184,11 @@ try {
                             $notifType = 'Success';
                             $notifTitle = 'Order confirmed';
                             $notifMessage = 'Your order has been confirmed and is awaiting preparation.';
+                            break;
+                        case 'Awaiting Balance Payment':
+                            $notifType = 'Info';
+                            $notifTitle = 'Order balance due';
+                            $notifMessage = 'Please pay the remaining balance for your order before pickup.';
                             break;
                         case 'Ready for Pickup':
                             $notifType = 'Success';
