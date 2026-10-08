@@ -690,7 +690,7 @@ export default function CustomizedCakes() {
                 <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#fff3c8] text-[11px]">1</span>
                 Customer Information
               </p>
-              <div className="grid gap-3 sm:grid-cols-2">
+              <div className="grid min-w-0 gap-3 sm:grid-cols-2">
                 <label className="block text-xs font-semibold text-[#6b4f1d]">
                   Full Name <span aria-hidden="true" className="text-red-600">*</span>
                   <input required value={name} onChange={(event) => setName(event.target.value)} placeholder="Enter full name" className="mt-1.5 min-h-11 w-full rounded-lg border border-[#eadfd8] bg-white px-3 py-2.5 text-sm font-normal text-[#33251e] outline-none transition placeholder:text-[#a99a8e] focus:border-[#c9972d] focus:ring-2 focus:ring-[#fff1bd]" />
@@ -711,7 +711,7 @@ export default function CustomizedCakes() {
                 <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#fff3c8] text-[11px]">2</span>
                 Order Information
               </p>
-              <div className="grid gap-3 sm:grid-cols-2">
+              <div className="grid min-w-0 gap-3 md:grid-cols-2">
                 <div className="grid grid-cols-2 gap-2 sm:col-span-2">
                   {['Pickup', 'Delivery'].map((option) => (
                     <button
@@ -758,13 +758,13 @@ export default function CustomizedCakes() {
                   </div>
                 )}
 
-                <label className="block text-xs font-semibold text-[#6b4f1d]">
+                <label className="block min-w-0 text-xs font-semibold text-[#6b4f1d]">
                   {deliveryMethod === 'Delivery' ? 'Delivery date' : 'Pickup date'} <span aria-hidden="true" className="text-red-600">*</span>
-                  <input required min={getLocalDateString()} value={pickupDate} onChange={(event) => setPickupDate(event.target.value)} type="date" className="mt-1.5 min-h-11 w-full rounded-lg border border-[#eadfd8] bg-white px-3 py-2.5 text-sm text-[#33251e] outline-none transition focus:border-[#c9972d] focus:ring-2 focus:ring-[#fff1bd]" />
+                  <input required min={getLocalDateString()} value={pickupDate} onChange={(event) => setPickupDate(event.target.value)} type="date" className="mt-1.5 box-border min-h-11 w-full min-w-0 max-w-full rounded-lg border border-[#eadfd8] bg-white px-3 py-2.5 text-sm text-[#33251e] outline-none transition focus:border-[#c9972d] focus:ring-2 focus:ring-[#fff1bd]" />
                 </label>
-                <label className="block text-xs font-semibold text-[#6b4f1d]">
+                <label className="block min-w-0 text-xs font-semibold text-[#6b4f1d]">
                   {deliveryMethod === 'Delivery' ? 'Delivery time' : 'Pickup time'} <span aria-hidden="true" className="text-red-600">*</span>
-                  <select required value={pickupTime} onChange={(event) => setPickupTime(event.target.value)} className="mt-1.5 min-h-11 w-full rounded-lg border border-[#eadfd8] bg-white px-3 py-2.5 text-sm text-[#33251e] outline-none transition focus:border-[#c9972d] focus:ring-2 focus:ring-[#fff1bd]">
+                  <select required value={pickupTime} onChange={(event) => setPickupTime(event.target.value)} className="mt-1.5 box-border min-h-11 w-full min-w-0 max-w-full rounded-lg border border-[#eadfd8] bg-white px-3 py-2.5 text-sm text-[#33251e] outline-none transition focus:border-[#c9972d] focus:ring-2 focus:ring-[#fff1bd]">
                     <option value="" disabled>Select a {deliveryMethod === 'Delivery' ? 'delivery' : 'pickup'} time</option>
                     {FULFILLMENT_TIME_SLOTS.map((slot) => <option key={slot.value} value={slot.value}>{slot.label}</option>)}
                   </select>
