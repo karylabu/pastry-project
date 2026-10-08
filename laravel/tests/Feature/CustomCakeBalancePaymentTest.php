@@ -26,11 +26,13 @@ class CustomCakeBalancePaymentTest extends TestCase
             $table->string('payment_link')->nullable();
             $table->boolean('is_customized')->default(true);
             $table->string('order_type')->default('Customized');
+            $table->timestamps();
         });
         Schema::create('custom_cake_orders', function ($table) {
             $table->id();
             $table->unsignedBigInteger('order_id');
             $table->text('notes')->nullable();
+            $table->text('inspo_images')->nullable();
         });
 
         config(['services.paymongo.secret' => 'sk_test_balance_flow']);
@@ -140,4 +142,117 @@ class CustomCakeBalancePaymentTest extends TestCase
         $this->assertDatabaseHas('orders', ['id' => 26, 'downpayment_amount' => 1250]);
         Http::assertSent(fn (ClientRequest $request) => $request['amount'] === 75000);
     }
+
+    public function test_returning_from_an_unpaid_paymongo_link_marks_payment_failed(): void
+    {
+        \Illuminate\Support\Facades\DB::table('orders')->insert([
+            'id' => 27,
+            'user_id' => 9,
+            'status' => 'Awaiting Payment',
+            'total' => 850,
+            'payment' => 'QRPh',
+            'payment_status' => 'pending',
+            'payment_reference' => 'link_unpaid_test',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        Http::fake([
+            'https://api.paymongo.com/v1/payment_links/link_unpaid_test/payments' => Http::response(['data' => []], 200),
+            'https://api.paymongo.com/v1/payment_links/link_unpaid_test' => Http::response([
+                'data' => ['id' => 'link_unpaid_test', 'status' => 'archived'],
+            ], 200),
+        ]);
+
+        $customer = new User();
+        $customer->id = 9;
+        $customer->role = 'customer';
+
+        $this->actingAs($customer)
+            ->postJson('/api/orders/27/payment-failure')
+            ->assertOk()
+            ->assertJsonPath('payment_status', 'failed');
+
+        $this->assertDatabaseHas('orders', [
+            'id' => 27,
+            'status' => 'Cancelled',
+            'payment_status' => 'failed',
+        ]);
+        Http::assertSent(fn (ClientRequest $request) =>
+            $request->method() === 'PATCH'
+            && $request->url() === 'https://api.paymongo.com/v1/payment_links/link_unpaid_test'
+            && $request['archive'] === true
+        );
+    }
+
+    public function test_returning_from_paymongo_does_not_fail_a_paid_link(): void
+    {
+        \Illuminate\Support\Facades\DB::table('orders')->insert([
+            'id' => 28,
+            'user_id' => 9,
+            'status' => 'Awaiting Payment',
+            'total' => 850,
+            'payment' => 'QRPh',
+            'payment_status' => 'pending',
+            'payment_reference' => 'link_paid_test',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        Http::fake([
+            'https://api.paymongo.com/v1/payment_links/link_paid_test/payments' => Http::response([
+                'data' => [['id' => 'pay_paid_test', 'status' => 'paid']],
+            ], 200),
+        ]);
+
+        $customer = new User();
+        $customer->id = 9;
+        $customer->role = 'customer';
+
+        $this->actingAs($customer)
+            ->postJson('/api/orders/28/payment-failure')
+            ->assertOk()
+            ->assertJsonPath('payment_status', 'paid');
+
+        $this->assertDatabaseHas('orders', [
+            'id' => 28,
+            'status' => 'Pending',
+            'payment_status' => 'paid',
+        ]);
+    }
+
+    public function test_failed_payment_is_not_included_in_customer_orders(): void
+    {
+        \Illuminate\Support\Facades\DB::table('orders')->insert([
+            [
+                'id' => 29,
+                'user_id' => 9,
+                'status' => 'Cancelled',
+                'total' => 850,
+                'payment' => 'QRPh',
+                'payment_status' => 'failed',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+            [
+                'id' => 30,
+                'user_id' => 9,
+                'status' => 'Pending',
+                'total' => 850,
+                'payment' => 'COD',
+                'payment_status' => 'pending',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+        ]);
+
+        $customer = new User();
+        $customer->id = 9;
+        $customer->role = 'customer';
+
+        $this->actingAs($customer)
+            ->getJson('/api/orders')
+            ->assertOk()
+            ->assertJsonCount(1, 'orders')
+            ->assertJsonPath('orders.0.id', 30);
+    }
+
 }

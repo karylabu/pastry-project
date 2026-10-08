@@ -42,6 +42,7 @@ const PICKUP_LOCATION = {
   lng: 121.1377943,
   address: '30 Bagumbayan Road, Tanauan, Calabarzon 4232',
 };
+const PENDING_PAYMONGO_CHECKOUT_KEY = 'pendingPaymongoCheckout';
 
 const isBerMonth = () => {
   const manilaDate = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Manila' }));
@@ -658,6 +659,16 @@ export default function CheckoutModal({
         }
 
         paymentLinkReady = true;
+
+        try {
+          window.sessionStorage.setItem(PENDING_PAYMONGO_CHECKOUT_KEY, JSON.stringify({
+            orderId: result.order_id,
+            cartItems,
+            startedAt: Date.now(),
+          }));
+        } catch (storageError) {
+          console.error('Could not save the pending PayMongo checkout state:', storageError);
+        }
 
         // FIX: Clear cart AFTER we have a valid checkout URL, right before redirect.
         // Previously the cart was cleared before the URL check, so a missing URL

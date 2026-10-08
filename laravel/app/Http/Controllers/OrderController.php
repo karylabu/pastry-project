@@ -11,6 +11,7 @@ use App\Http\Requests\StoreOrderRequest;
 use App\Services\CustomizedCakeService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Log;
@@ -55,6 +56,10 @@ class OrderController extends Controller
                 if (!$hasUserId && !$hasEmail) {
                     $query->whereRaw('1 = 0');
                 }
+            })
+            ->where(function ($query) {
+                $query->whereNull('payment_status')
+                    ->orWhereRaw("LOWER(payment_status) <> 'failed'");
             })
             ->orderBy('created_at', 'desc')
             ->get();
@@ -417,36 +422,137 @@ class OrderController extends Controller
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
         }
 
+        $order = Order::query()->whereKey($orderId)->where('user_id', $user->id)->first();
+        if (!$order) {
+            return response()->json(['success' => false, 'message' => 'Order not found.'], 404);
+        }
+        if (!in_array(strtolower((string) $order->payment), ['gcash', 'qrph'], true) || $order->status !== 'Awaiting Payment') {
+            return response()->json(['success' => false, 'message' => 'Order is no longer awaiting payment setup.'], 409);
+        }
+        if (in_array(strtolower((string) $order->payment_status), ['paid', 'proof_submitted'], true)) {
+            return response()->json(['success' => false, 'message' => 'Payment has already been submitted.'], 409);
+        }
+
+        $paymentReference = trim((string) $order->payment_reference);
+        $paymentState = 'unpaid';
+        if ($paymentReference !== '') {
+            $secretKey = config('services.paymongo.secret');
+            if (!$secretKey) {
+                return response()->json(['success' => false, 'message' => 'Payment status cannot be verified right now.'], 503);
+            }
+
+            try {
+                $paymentState = $this->getPayMongoPaymentState($secretKey, $paymentReference);
+                if ($paymentState === 'unpaid') {
+                    $archiveResponse = Http::withBasicAuth($secretKey, '')
+                        ->acceptJson()
+                        ->timeout(15)
+                        ->patch('https://api.paymongo.com/v1/payment_links/' . rawurlencode($paymentReference), [
+                            'archive' => true,
+                        ]);
+
+                    if (!$archiveResponse->successful()) {
+                        Log::warning('PayMongo payment link could not be archived.', [
+                            'order_id' => $orderId,
+                            'http_status' => $archiveResponse->status(),
+                        ]);
+
+                        return response()->json(['success' => false, 'message' => 'Payment status cannot be verified right now.'], 502);
+                    }
+
+                    $paymentState = $this->getPayMongoPaymentState($secretKey, $paymentReference);
+                }
+            } catch (\Throwable $exception) {
+                Log::error('PayMongo payment status lookup failed.', [
+                    'order_id' => $orderId,
+                    'exception' => get_class($exception),
+                ]);
+
+                return response()->json(['success' => false, 'message' => 'Payment status cannot be verified right now.'], 502);
+            }
+
+            if ($paymentState === 'unverified') {
+                return response()->json(['success' => false, 'message' => 'Payment status cannot be verified right now.'], 502);
+            }
+            if ($paymentState === 'processing') {
+                return response()->json([
+                    'success' => false,
+                    'payment_status' => 'processing',
+                    'message' => 'Payment is still processing. Please check your orders again shortly.',
+                ], 409);
+            }
+        }
+
         try {
-            $updated = DB::transaction(function () use ($orderId, $user) {
-                $order = Order::query()->whereKey($orderId)->lockForUpdate()->first();
-                if (!$order || (int) $order->user_id !== (int) $user->id) {
+            $updated = DB::transaction(function () use ($orderId, $user, $paymentState) {
+                $lockedOrder = Order::query()->whereKey($orderId)->lockForUpdate()->first();
+                if (!$lockedOrder || (int) $lockedOrder->user_id !== (int) $user->id) {
                     return response()->json(['success' => false, 'message' => 'Order not found.'], 404);
                 }
-                if (!in_array(strtolower((string) $order->payment), ['gcash', 'qrph'], true) || $order->status !== 'Awaiting Payment') {
-                    return response()->json(['success' => false, 'message' => 'Order is no longer awaiting payment setup.'], 409);
-                }
-                if (in_array(strtolower((string) $order->payment_status), ['paid', 'proof_submitted'], true)) {
-                    return response()->json(['success' => false, 'message' => 'Payment has already been submitted.'], 409);
+                if (!in_array(strtolower((string) $lockedOrder->payment), ['gcash', 'qrph'], true)
+                    || $lockedOrder->status !== 'Awaiting Payment'
+                    || in_array(strtolower((string) $lockedOrder->payment_status), ['paid', 'proof_submitted'], true)) {
+                    return response()->json(['success' => false, 'message' => 'Order payment status has changed.'], 409);
                 }
 
-                $order->update([
+                if ($paymentState === 'paid') {
+                    $lockedOrder->update([
+                        'status' => 'Pending',
+                        'payment_status' => 'paid',
+                    ]);
+
+                    return response()->json(['success' => true, 'payment_status' => 'paid']);
+                }
+
+                $lockedOrder->update([
                     'status' => 'Cancelled',
                     'payment_status' => 'failed',
                 ]);
 
-                return true;
+                return response()->json(['success' => true, 'payment_status' => 'failed']);
             });
-
-            if ($updated instanceof \Illuminate\Http\JsonResponse) {
-                return $updated;
-            }
         } catch (\Throwable $exception) {
-            Log::error('Payment setup failure update failed: ' . $exception->getMessage());
+            Log::error('Payment failure status update failed.', [
+                'order_id' => $orderId,
+                'exception' => get_class($exception),
+            ]);
+
             return response()->json(['success' => false, 'message' => 'Unable to update payment status.'], 500);
         }
 
-        return response()->json(['success' => true, 'payment_status' => 'failed']);
+        return $updated;
+    }
+
+    private function getPayMongoPaymentState(string $secretKey, string $paymentReference): string
+    {
+        $response = Http::withBasicAuth($secretKey, '')
+            ->acceptJson()
+            ->timeout(15)
+            ->get('https://api.paymongo.com/v1/payment_links/' . rawurlencode($paymentReference) . '/payments');
+
+        if (!$response->successful() || !is_array($response->json('data'))) {
+            Log::warning('PayMongo payment status could not be verified.', [
+                'http_status' => $response->status(),
+            ]);
+
+            return 'unverified';
+        }
+
+        $payments = $response->json('data');
+        $hasSuccessfulPayment = collect($payments)->contains(function ($payment) {
+            $status = strtolower((string) ($payment['status'] ?? $payment['attributes']['status'] ?? ''));
+            return in_array($status, ['paid', 'succeeded'], true);
+        });
+        if ($hasSuccessfulPayment) {
+            return 'paid';
+        }
+
+        $hasUnresolvedPayment = collect($payments)->contains(function ($payment) {
+            $status = strtolower((string) ($payment['status'] ?? $payment['attributes']['status'] ?? ''));
+            return !in_array($status, ['failed', 'cancelled', 'canceled', 'expired'], true);
+        });
+
+        return $hasUnresolvedPayment ? 'processing' : 'unpaid';
     }
 
     private function resolveLegacyProductPrice(Product $product, string $variant): ?float

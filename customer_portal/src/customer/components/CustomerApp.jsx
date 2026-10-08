@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Navigate, Routes, Route, Link, useLocation } from 'react-router-dom';
 
-import { CheckCircle, ChevronRight, ShoppingBag } from 'lucide-react';
+import { CheckCircle, ChevronRight, ShoppingBag, X } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 
 import Navbar from './Navbar';
@@ -30,7 +30,10 @@ import ChatSupport from '../pages/ChatSupport';
 
 import CartModal from './CartModal';
 import CheckoutModal from './CheckoutModal';
+import { getAuthHeaders } from '../../services/api';
+import { LARAVEL_BASE } from '../../services/config';
 
+const PENDING_PAYMONGO_CHECKOUT_KEY = 'pendingPaymongoCheckout';
 
 function GuestAccountPrompt({ onClose }) {
   return (
@@ -70,12 +73,106 @@ export default function CustomerApp() {
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [showGuestPrompt, setShowGuestPrompt] = useState(false);
+  const paymentReturnInProgress = useRef(false);
 
   useEffect(() => {
     setIsCartOpen(false);
     setIsCheckoutOpen(false);
     setShowGuestPrompt(false);
   }, [location.pathname]);
+
+  useEffect(() => {
+    const handlePaymentReturn = async (isBackNavigation) => {
+      if (!isBackNavigation || paymentReturnInProgress.current) return;
+
+      let pendingCheckout;
+      try {
+        pendingCheckout = JSON.parse(window.sessionStorage.getItem(PENDING_PAYMONGO_CHECKOUT_KEY) || 'null');
+      } catch (error) {
+        console.error('Could not read the pending PayMongo checkout state:', error);
+        window.sessionStorage.removeItem(PENDING_PAYMONGO_CHECKOUT_KEY);
+        return;
+      }
+
+      if (!pendingCheckout?.orderId) return;
+      if (Date.now() - Number(pendingCheckout.startedAt || 0) > 24 * 60 * 60 * 1000) {
+        window.sessionStorage.removeItem(PENDING_PAYMONGO_CHECKOUT_KEY);
+        return;
+      }
+
+      paymentReturnInProgress.current = true;
+      try {
+        const response = await fetch(
+          `${LARAVEL_BASE}/api/orders/${encodeURIComponent(pendingCheckout.orderId)}/payment-failure`,
+          {
+            method: 'POST',
+            credentials: 'include',
+            headers: { Accept: 'application/json', ...getAuthHeaders() },
+            keepalive: true,
+          }
+        );
+        const responseText = await response.text();
+        let result;
+        try {
+          result = responseText ? JSON.parse(responseText) : {};
+        } catch (error) {
+          throw new Error(`Invalid payment status response: ${error.message}`);
+        }
+
+        if (response.ok && result.payment_status === 'failed') {
+          window.sessionStorage.removeItem(PENDING_PAYMONGO_CHECKOUT_KEY);
+          setIsCheckoutOpen(false);
+          if (Array.isArray(pendingCheckout.cartItems)) {
+            setCartItems(pendingCheckout.cartItems);
+          }
+          setToastMessage('Failed Payment');
+          setShowToast(true);
+          window.setTimeout(() => setShowToast(false), 4000);
+          return;
+        }
+
+        if (response.ok && result.payment_status === 'paid') {
+          window.sessionStorage.removeItem(PENDING_PAYMONGO_CHECKOUT_KEY);
+          setIsCheckoutOpen(false);
+          setToastMessage('Payment completed');
+          setShowToast(true);
+          window.setTimeout(() => setShowToast(false), 4000);
+          return;
+        }
+
+        if (response.status === 409 && result.payment_status === 'processing') {
+          setIsCheckoutOpen(false);
+          setToastMessage('Payment is still processing');
+          setShowToast(true);
+          window.setTimeout(() => setShowToast(false), 4000);
+          paymentReturnInProgress.current = false;
+          return;
+        }
+
+        throw new Error(result.message || `Could not verify payment status (${response.status}).`);
+      } catch (error) {
+        console.error('Could not confirm PayMongo checkout status:', error);
+        setIsCheckoutOpen(false);
+        setToastMessage('Payment status could not be verified');
+        setShowToast(true);
+        window.setTimeout(() => setShowToast(false), 4000);
+        paymentReturnInProgress.current = false;
+      }
+    };
+
+    const onPageShow = (event) => {
+      const navigationType = window.performance
+        ?.getEntriesByType?.('navigation')?.[0]?.type;
+      void handlePaymentReturn(Boolean(event.persisted) || navigationType === 'back_forward');
+    };
+
+    window.addEventListener('pageshow', onPageShow);
+    const navigationType = window.performance
+      ?.getEntriesByType?.('navigation')?.[0]?.type;
+    void handlePaymentReturn(navigationType === 'back_forward');
+
+    return () => window.removeEventListener('pageshow', onPageShow);
+  }, [setCartItems]);
 
   const isGuest = () => {
     try {
@@ -305,14 +402,24 @@ export default function CustomerApp() {
             transition={{ duration: 0.25 }}
             className="fixed bottom-24 left-4 z-[999999] sm:left-6"
           >
-            <div className="bg-white border border-green-500 rounded-2xl px-5 py-4 shadow-2xl flex items-center gap-3">
-              <div className="w-7 h-7 rounded-full bg-green-500 flex items-center justify-center text-white">
-                <CheckCircle size={14} />
+            <div className={`bg-white border ${toastMessage === 'Failed Payment' ? 'border-red-500' : 'border-green-500'} rounded-2xl px-5 py-4 shadow-2xl flex items-center gap-3`}>
+              <div className={`w-7 h-7 rounded-full ${toastMessage === 'Failed Payment' ? 'bg-red-500' : 'bg-green-500'} flex items-center justify-center text-white`}>
+                {toastMessage === 'Failed Payment' ? <X size={14} /> : <CheckCircle size={14} />}
               </div>
               <div>
                 <p className="text-[12px] text-black">{toastMessage}</p>
                 <p className="text-[9px] uppercase tracking-[0.25em] text-gray-400 mt-1">
-                  {toastMessage === 'Added to cart' ? 'Item successfully added' : 'Order will appear in notifications'}
+                  {toastMessage === 'Added to cart'
+                    ? 'Item successfully added'
+                    : toastMessage === 'Failed Payment'
+                    ? 'Unpaid checkout was cancelled'
+                    : toastMessage === 'Payment completed'
+                    ? 'Your order is being processed'
+                    : toastMessage === 'Payment is still processing'
+                    ? 'Please check your orders again shortly'
+                    : toastMessage === 'Payment status could not be verified'
+                    ? 'Please check your orders before retrying'
+                    : 'Order will appear in notifications'}
                 </p>
               </div>
             </div>
