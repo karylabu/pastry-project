@@ -9,10 +9,7 @@ import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
 import markerIcon from "leaflet/dist/images/marker-icon.png";
 import markerShadow from "leaflet/dist/images/marker-shadow.png";
 
-import useLocationValidation from '../hooks/useLocationValidation';
 import useAddressGeocoding from '../hooks/useAddressGeocoding';
-import OutOfCoverageModal from '../components/OutOfCoverageModal';
-import { isLocationWithinCoverage, TANAUAN_CITY_BOUNDS } from '../utils/locationBoundaryUtils';
 
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
@@ -79,14 +76,13 @@ export default function CheckoutModal({
   onOrderPlaced,
 }) {
   const [loading, setLoading] = useState(false);
-  const [locationError, setLocationError] = useState('');
+  const [fieldErrors, setFieldErrors] = useState({});
   const [shopOpen, setShopOpen] = useState(true);
   const [discountType, setDiscountType] = useState('none');
   const [rewardCodeInput, setRewardCodeInput] = useState('');
   const [discountIdFile, setDiscountIdFile] = useState(null);
   const [discountIdPreview, setDiscountIdPreview] = useState('');
   const modalScrollRef = useRef(null);
-  const addressInputRef = useRef(null);
 
   const refreshShopStatus = () => {
     const now = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Manila' }));
@@ -174,12 +170,8 @@ export default function CheckoutModal({
     };
   }, [isOpen]);
 
-  // Location boundary validation (hook must live inside the component)
-  const locationValidation = useLocationValidation();
-
-  // Address-search-to-pin geocoding. Biased toward Tanauan so local street
-  // and barangay names resolve accurately, but not hard-restricted, so we
-  // can still detect (and reject) addresses outside the delivery area.
+  // Geocoding is only used to populate optional coordinates; it never limits
+  // which delivery addresses customers can enter.
   const {
     setSearchTerm: setGeocodeSearchTerm,
     geocodeNow,
@@ -187,7 +179,7 @@ export default function CheckoutModal({
     isSearching: isGeocoding,
     errorMessage: geocodeErrorMessage,
     reset: resetGeocode,
-  } = useAddressGeocoding({ biasBounds: TANAUAN_CITY_BOUNDS, debounceMs: 700 });
+  } = useAddressGeocoding({ countryCodes: '', debounceMs: 700 });
 
   useEffect(() => {
     if (!isOpen) resetGeocode();
@@ -282,6 +274,7 @@ export default function CheckoutModal({
   const handleSelectSavedAddress = (address) => {
     resetGeocode();
     setShowAddressSuggestions(false);
+    setFieldErrors((prev) => ({ ...prev, address: '' }));
 
     if (!address) {
       setSelectedAddressId(null);
@@ -352,34 +345,7 @@ export default function CheckoutModal({
     applyDefaultSavedAddress();
   }, [isOpen, applyDefaultSavedAddress]);
 
-  const validatePoint = (lat, lng, address) => {
-    const isValid = locationValidation.validateLocation(lat, lng, address);
-
-    setLocationError(
-      isValid ? '' : 'Delivery location must be within Tanauan city.'
-    );
-
-    return isValid;
-  };
-
-  const handleEditAddress = () => {
-    locationValidation.clearValidation();
-    setLocationError('');
-    addressInputRef.current?.focus();
-  };
-
-  const applyResolvedLocation = (lat, lng, address) => {
-    const isValid = validatePoint(lat, lng, address);
-
-    if (!isValid) {
-      setCheckoutData((prev) => ({
-        ...prev,
-        lat: null,
-        lng: null,
-      }));
-      return;
-    }
-
+  const applyResolvedLocation = (lat, lng) => {
     setCheckoutData((prev) => ({
       ...prev,
       lat,
@@ -389,7 +355,7 @@ export default function CheckoutModal({
 
   useEffect(() => {
     if (!geocodeResult) return;
-    applyResolvedLocation(geocodeResult.lat, geocodeResult.lon, checkoutData.address);
+    applyResolvedLocation(geocodeResult.lat, geocodeResult.lon);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [geocodeResult]);
 
@@ -457,31 +423,26 @@ export default function CheckoutModal({
       return;
     }
 
-    if (!checkoutData.phone) {
-      alert("Please enter your phone number.");
-      return;
-    }
-
-    if (!checkoutData.address && checkoutData.method === "Deliver") {
-      alert("Please enter your delivery address.");
-      return;
-    }
-
-    if (checkoutData.method === "Deliver" && !checkoutData.deliveryService) {
-      alert("Please select Lalamove or GrabCar for delivery.");
-      return;
-    }
-
-    if (
-      checkoutData.method === 'Deliver' &&
-      (!checkoutData.lat || !checkoutData.lng || !isLocationWithinCoverage(checkoutData.lat, checkoutData.lng))
-    ) {
-      alert('Delivery is only available within Tanauan city. Please move the pin or enter a Tanauan address.');
-      return;
-    }
-
-    if (discountType !== 'none' && !discountIdFile) {
-      alert('Upload a photo of the Senior Citizen or PWD ID to apply the discount.');
+    const missingFields = {
+      phone: checkoutData.phone.trim() ? '' : 'Fill up this field',
+      address: checkoutData.method !== 'Deliver' || checkoutData.address.trim() ? '' : 'Fill up this field',
+      deliveryTime: checkoutData.deliveryTime ? '' : 'Fill up this field',
+      deliveryService: checkoutData.method !== 'Deliver' || checkoutData.deliveryService ? '' : 'Fill up this field',
+      discountId: discountType === 'none' || discountIdFile ? '' : 'Fill up this field',
+    };
+    setFieldErrors(missingFields);
+    const firstMissingField = Object.keys(missingFields).find((field) => missingFields[field]);
+    if (firstMissingField) {
+      const fieldIds = {
+        phone: 'checkout-phone',
+        address: 'checkout-address',
+        deliveryTime: 'checkout-fulfillment-time',
+        deliveryService: 'checkout-delivery-service',
+        discountId: 'discount-id-image',
+      };
+      const field = document.getElementById(fieldIds[firstMissingField]);
+      field?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      field?.focus();
       return;
     }
 
@@ -763,18 +724,20 @@ export default function CheckoutModal({
                   placeholder="Phone Number"
                   aria-label="Phone Number"
                   required
+                  aria-invalid={Boolean(fieldErrors.phone)}
                   aria-expanded={showPhoneSuggestions && matchingPhoneSuggestions.length > 0}
-                  className="relative z-[9999] box-border w-full rounded-xl border border-[#e8e1d8] bg-[#fffdfa] p-3 text-sm text-[#33251e] outline-none transition placeholder:text-gray-400 focus:border-[#d4af37] focus:ring-2 focus:ring-[#d4af37]/20 pointer-events-auto"
+                  className={`relative z-[9999] box-border w-full rounded-xl border ${fieldErrors.phone ? 'border-red-500' : 'border-[#e8e1d8]'} bg-[#fffdfa] p-3 text-sm text-[#33251e] outline-none transition placeholder:text-gray-400 focus:border-[#d4af37] focus:ring-2 focus:ring-[#d4af37]/20 pointer-events-auto`}
                   value={checkoutData.phone}
                   onFocus={() => setShowPhoneSuggestions(true)}
                   onBlur={() => setShowPhoneSuggestions(false)}
-                  onChange={(e) =>
-                    setCheckoutData((prev) => ({
-                      ...prev,
-                      phone: e.target.value,
-                    }))
-                  }
+                  onChange={(e) => {
+                    setFieldErrors((prev) => ({ ...prev, phone: '' }));
+                    setCheckoutData((prev) => ({ ...prev, phone: e.target.value }));
+                  }}
                 />
+                {fieldErrors.phone && (
+                  <p role="alert" className="mt-1 text-xs font-medium text-red-600">{fieldErrors.phone}</p>
+                )}
                 {showPhoneSuggestions && matchingPhoneSuggestions.length > 0 && (
                   <div className="absolute left-0 right-0 top-full z-[10000] mt-1 overflow-hidden rounded-xl border border-[#eadfca] bg-white py-1 shadow-lg">
                     {matchingPhoneSuggestions.map((phone) => (
@@ -800,7 +763,7 @@ export default function CheckoutModal({
                   <div className="space-y-3">
                     <div className="flex items-center justify-between gap-3">
                       <p className="text-xs text-gray-500 uppercase tracking-[0.2em]">
-                        Saved Delivery Address <span className="text-red-600" aria-hidden="true">*</span>
+                        Delivery Address <span className="text-red-600" aria-hidden="true">*</span>
                       </p>
                       {addressesLoading && (
                         <span className="text-xs text-gray-500">Loading…</span>
@@ -819,8 +782,9 @@ export default function CheckoutModal({
                       autoComplete="street-address"
                       aria-label="Delivery address"
                       required
+                      aria-invalid={Boolean(fieldErrors.address)}
                       aria-expanded={showAddressSuggestions && matchingAddressSuggestions.length > 0}
-                      className="relative z-[9999] w-full rounded-xl border border-[#e8e1d8] bg-[#fffdfa] p-3 pr-9 text-sm text-[#33251e] outline-none transition placeholder:text-gray-400 focus:border-[#d4af37] focus:ring-2 focus:ring-[#d4af37]/20 pointer-events-auto"
+                      className={`relative z-[9999] w-full rounded-xl border ${fieldErrors.address ? 'border-red-500' : 'border-[#e8e1d8]'} bg-[#fffdfa] p-3 pr-9 text-sm text-[#33251e] outline-none transition placeholder:text-gray-400 focus:border-[#d4af37] focus:ring-2 focus:ring-[#d4af37]/20 pointer-events-auto`}
                       value={checkoutData.address}
                       onClick={(e) => e.currentTarget.focus()}
                       onFocus={() => setShowAddressSuggestions(true)}
@@ -831,14 +795,20 @@ export default function CheckoutModal({
                       onChange={(e) => {
                         const value = e.target.value;
                         setSelectedAddressId(null);
+                        setFieldErrors((prev) => ({ ...prev, address: '' }));
                         setCheckoutData((prev) => ({
                           ...prev,
                           address: value,
+                          lat: null,
+                          lng: null,
                         }));
                         setGeocodeSearchTerm(value);
                         setShowAddressSuggestions(true);
                       }}
                     />
+                    {fieldErrors.address && (
+                      <p role="alert" className="mt-1 text-xs font-medium text-red-600">{fieldErrors.address}</p>
+                    )}
                     {isGeocoding && (
                       <Loader2
                         size={16}
@@ -871,15 +841,10 @@ export default function CheckoutModal({
                   {geocodeErrorMessage && !isGeocoding && (
                     <div className="flex items-start gap-2 rounded-2xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm text-amber-800">
                       <SearchX size={16} className="mt-0.5 shrink-0" />
-                      <span>{geocodeErrorMessage}</span>
+                      <span>Address lookup is unavailable right now. You can still use the address you entered.</span>
                     </div>
                   )}
 
-                  {locationError && (
-                    <div className="rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700 mt-2">
-                      {locationError}
-                    </div>
-                  )}
                 </>
               )}
             </div>
@@ -929,15 +894,22 @@ export default function CheckoutModal({
               <select
                 id="checkout-fulfillment-time"
                 required
+                aria-invalid={Boolean(fieldErrors.deliveryTime)}
                 value={checkoutData.deliveryTime}
-                onChange={(event) => setCheckoutData((current) => ({ ...current, deliveryTime: event.target.value }))}
-                className="w-full rounded-xl border border-[#e8e1d8] bg-[#fffdfa] p-3 text-sm text-[#33251e] outline-none transition focus:border-[#d4af37] focus:ring-2 focus:ring-[#d4af37]/20"
+                onChange={(event) => {
+                  setFieldErrors((prev) => ({ ...prev, deliveryTime: '' }));
+                  setCheckoutData((current) => ({ ...current, deliveryTime: event.target.value }));
+                }}
+                className={`w-full rounded-xl border ${fieldErrors.deliveryTime ? 'border-red-500' : 'border-[#e8e1d8]'} bg-[#fffdfa] p-3 text-sm text-[#33251e] outline-none transition focus:border-[#d4af37] focus:ring-2 focus:ring-[#d4af37]/20`}
               >
                 <option value="" disabled>Select a time</option>
                 {FULFILLMENT_TIME_SLOTS.map((slot) => (
                   <option key={slot.value} value={slot.value}>{slot.label}</option>
                 ))}
               </select>
+              {fieldErrors.deliveryTime && (
+                <p role="alert" className="mt-1 text-xs font-medium text-red-600">{fieldErrors.deliveryTime}</p>
+              )}
             </div>
 
             {checkoutData.method === "Deliver" && (
@@ -948,13 +920,16 @@ export default function CheckoutModal({
                 </div>
                 <div>
                   <p id="delivery-service-heading" className="mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">Choose a delivery service</p>
-                  <div className="grid grid-cols-2 gap-2" role="group" aria-labelledby="delivery-service-heading">
+                  <div id="checkout-delivery-service" tabIndex={-1} className="grid grid-cols-2 gap-2 rounded-lg" role="group" aria-labelledby="delivery-service-heading" aria-invalid={Boolean(fieldErrors.deliveryService)}>
                     {["Lalamove", "GrabCar"].map((service) => (
                       <button
                         key={service}
                         type="button"
                         aria-pressed={checkoutData.deliveryService === service}
-                        onClick={() => setCheckoutData((current) => ({ ...current, deliveryService: service }))}
+                        onClick={() => {
+                          setFieldErrors((prev) => ({ ...prev, deliveryService: '' }));
+                          setCheckoutData((current) => ({ ...current, deliveryService: service }));
+                        }}
                         className={`min-h-11 rounded-xl border px-3 py-2.5 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e7c875] ${
                           checkoutData.deliveryService === service
                             ? "border-[#c9972d] bg-[#fff1bd] text-[#5f4715] shadow-sm"
@@ -965,6 +940,9 @@ export default function CheckoutModal({
                       </button>
                     ))}
                   </div>
+                  {fieldErrors.deliveryService && (
+                    <p role="alert" className="mt-1 text-xs font-medium text-red-600">{fieldErrors.deliveryService}</p>
+                  )}
                 </div>
               </section>
             )}
@@ -1185,6 +1163,7 @@ export default function CheckoutModal({
                       accept="image/jpeg,image/png,image/webp"
                       capture="environment"
                       required
+                      aria-invalid={Boolean(fieldErrors.discountId)}
                       onChange={(event) => {
                         const file = event.target.files?.[0] || null;
                         event.target.value = '';
@@ -1196,9 +1175,13 @@ export default function CheckoutModal({
                           return;
                         }
                         setDiscountIdFile(file);
+                        setFieldErrors((prev) => ({ ...prev, discountId: file ? '' : prev.discountId }));
                       }}
                       className="block w-full text-xs text-[#765d50] file:mr-3 file:rounded-lg file:border-0 file:bg-[#fff0c2] file:px-3 file:py-2 file:text-xs file:font-semibold file:text-[#6f5523]"
                     />
+                    {fieldErrors.discountId && (
+                      <p role="alert" className="text-xs font-medium text-red-600">{fieldErrors.discountId}</p>
+                    )}
                     {discountIdPreview && (
                       <img
                         src={discountIdPreview}
@@ -1279,15 +1262,6 @@ export default function CheckoutModal({
         </motion.div>
 
       </motion.div>
-
-      {/* OUT OF COVERAGE MODAL */}
-      <OutOfCoverageModal
-        isOpen={locationValidation.showOutOfCoverageModal}
-        errorMessage={locationValidation.errorMessage}
-        distanceFromCenter={locationValidation.validationState?.distanceFromCenter}
-        onClose={locationValidation.clearValidation}
-        onEditAddress={handleEditAddress}
-      />
 
     </AnimatePresence>
   );
