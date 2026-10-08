@@ -282,7 +282,7 @@ export default function Login() {
       <div className="blob-yellow-top" />
       <div className="blob-black-left" />
       <div className="blob-yellow-bottom" />
-      <img className="login-banner" src={`${ASSET_BASE}/login-bg.jpg`} alt="" aria-hidden="true" />
+      <img className="login-banner" src={`${ASSET_BASE}/login.png`} alt="" aria-hidden="true" />
       <img className="brand-icon-overlay" src={LOGO_URL} alt="Pastry Project logo" />
 
       <div className="bg-icon icon-croissant">🥐</div>

@@ -301,7 +301,7 @@ export default function Register() {
         }
       `}</style>
 
-      <img className="register-banner" src={`${ASSET_BASE}/login-bg.jpg`} alt="" aria-hidden="true" />
+      <img className="register-banner" src={`${ASSET_BASE}/login.png`} alt="" aria-hidden="true" />
 
       <div className="relative z-10 flex min-h-screen w-full flex-col">
         <main className="flex flex-1 flex-col py-4 lg:flex-row lg:items-center lg:justify-between lg:gap-0 lg:py-0">
