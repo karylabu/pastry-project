@@ -19,9 +19,9 @@ L.Icon.Default.mergeOptions({
 });
 
 const SHOP_OPEN_MINUTES = 8 * 60;
-const SHOP_CLOSE_MINUTES = 20 * 60;
-const SHOP_HOURS_LABEL = '8:00 AM to 8:00 PM';
-const FULFILLMENT_TIME_SLOTS = Array.from({ length: 23 }, (_, index) => {
+const SHOP_CLOSE_MINUTES = 22 * 60;
+const SHOP_HOURS_LABEL = '8:00 AM to 10:00 PM';
+const FULFILLMENT_TIME_SLOTS = Array.from({ length: 29 }, (_, index) => {
   const totalMinutes = 8 * 60 + index * 30;
   const hour = Math.floor(totalMinutes / 60);
   const minute = totalMinutes % 60;

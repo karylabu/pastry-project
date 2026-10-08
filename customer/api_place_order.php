@@ -18,11 +18,11 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 
 $shopNow = new DateTime('now', new DateTimeZone('Asia/Manila'));
 $shopMinutes = ((int) $shopNow->format('G') * 60) + (int) $shopNow->format('i');
-if ($shopMinutes < 480 || $shopMinutes >= 1200) {
+if ($shopMinutes < 480 || $shopMinutes >= 1320) {
     http_response_code(403);
     echo json_encode([
         'status' => 'error',
-        'message' => 'The shop is closed. Checkout is available from 8:00 AM to 8:00 PM.',
+        'message' => 'The shop is closed. Checkout is available from 8:00 AM to 10:00 PM.',
     ]);
     exit;
 }

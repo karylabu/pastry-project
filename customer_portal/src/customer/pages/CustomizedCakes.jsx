@@ -16,7 +16,7 @@ import {
 
 const MAX_REFERENCE_IMAGES = 5;
 const CUSTOM_CAKE_DRAFT_KEY = 'customCakeRequestDraft';
-const FULFILLMENT_TIME_SLOTS = Array.from({ length: 23 }, (_, index) => {
+const FULFILLMENT_TIME_SLOTS = Array.from({ length: 29 }, (_, index) => {
   const totalMinutes = 8 * 60 + index * 30;
   const hour = Math.floor(totalMinutes / 60);
   const minute = totalMinutes % 60;
