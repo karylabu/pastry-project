@@ -73,12 +73,33 @@ export default function CustomerApp() {
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [showGuestPrompt, setShowGuestPrompt] = useState(false);
+  const [dashboardReviewsPassed, setDashboardReviewsPassed] = useState(false);
   const paymentReturnInProgress = useRef(false);
 
   useEffect(() => {
     setIsCartOpen(false);
     setIsCheckoutOpen(false);
     setShowGuestPrompt(false);
+  }, [location.pathname]);
+
+  useEffect(() => {
+    const isDashboard = ['/','/customer','/customer/home'].includes(
+      (location.pathname || '/').replace(/\/+$/, '') || '/'
+    );
+    if (!isDashboard || !('IntersectionObserver' in window)) {
+      setDashboardReviewsPassed(false);
+      return undefined;
+    }
+
+    setDashboardReviewsPassed(false);
+    const reviews = document.querySelector('#customer-reviews');
+    if (!reviews) return undefined;
+
+    const observer = new IntersectionObserver(([entry]) => {
+      setDashboardReviewsPassed(entry.boundingClientRect.bottom <= 0);
+    });
+    observer.observe(reviews);
+    return () => observer.disconnect();
   }, [location.pathname]);
 
   useEffect(() => {
@@ -295,6 +316,8 @@ export default function CustomerApp() {
     !isCheckoutOpen &&
     !['/rewards', '/orders', '/profile', '/checkout', '/customer/rewards', '/customer/orders', '/customer/profile', '/customer/checkout'].includes(normalizedPath) &&
     ['/','/home','/menu','/customized-cakes','/customer','/customer/home','/customer/menu','/customer/customized-cakes'].includes(normalizedPath);
+  const hideDashboardFloaters = dashboardReviewsPassed &&
+    ['/','/customer','/customer/home'].includes(normalizedPath);
 
   let storedRole = '';
   try {
@@ -317,7 +340,7 @@ export default function CustomerApp() {
 
       {/* ROUTES */}
       <Routes>
-        <Route index element={<Dashboard onAddToCart={addToCart} />} />
+        <Route index element={<Dashboard onAddToCart={addToCart} hideFloating={hideDashboardFloaters} />} />
         <Route path="menu" element={<Menu onAddToCart={addToCart} />} />
         <Route path="orders" element={<Orders />} />
         <Route path="customized-cakes" element={<CustomizedCakes />} />
@@ -340,7 +363,7 @@ export default function CustomerApp() {
       </Routes>
 
       {/* BOTTOM CART SUMMARY */}
-      {showFloatingCart && cartQuantity > 0 && (
+      {showFloatingCart && !hideDashboardFloaters && cartQuantity > 0 && (
         <motion.div
           initial={{ y: 100, x: 0, opacity: 0 }}
           animate={{ y: 0, x: 0, opacity: 1 }}

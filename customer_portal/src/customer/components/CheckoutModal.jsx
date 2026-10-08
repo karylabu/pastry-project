@@ -19,9 +19,9 @@ L.Icon.Default.mergeOptions({
 });
 
 const SHOP_OPEN_MINUTES = 8 * 60;
-const SHOP_CLOSE_MINUTES = 22 * 60;
-const SHOP_HOURS_LABEL = '8:00 AM to 10:00 PM';
-const FULFILLMENT_TIME_SLOTS = Array.from({ length: 29 }, (_, index) => {
+const SHOP_CLOSE_MINUTES = 20 * 60;
+const SHOP_HOURS_LABEL = '8:00 AM to 8:00 PM';
+const FULFILLMENT_TIME_SLOTS = Array.from({ length: 25 }, (_, index) => {
   const totalMinutes = 8 * 60 + index * 30;
   const hour = Math.floor(totalMinutes / 60);
   const minute = totalMinutes % 60;
@@ -704,13 +704,13 @@ export default function CheckoutModal({
             onClick={onClose}
             type="button"
             aria-label="Close checkout"
-            className="absolute right-4 top-4 z-50 flex h-9 w-9 items-center justify-center rounded-full border border-[#eee5db] bg-white text-gray-500 shadow-sm transition hover:border-[#e7c875] hover:bg-[#fff8df] hover:text-[#8d6a2e]"
+            className="absolute right-2 top-2 z-[10001] flex h-11 w-11 touch-manipulation items-center justify-center rounded-full border border-[#eee5db] bg-white text-gray-500 shadow-sm transition hover:border-[#e7c875] hover:bg-[#fff8df] hover:text-[#8d6a2e] sm:right-4 sm:top-4"
           >
             <X size={18} />
           </button>
 
           {/* LEFT SIDE */}
-          <div className="relative z-50 min-w-0 flex-1 p-5 pb-8 pointer-events-auto sm:p-7 md:min-h-0 md:overflow-y-auto md:overscroll-contain md:p-8 md:pb-10">
+          <div className="relative min-w-0 flex-1 p-5 pb-8 pointer-events-auto sm:p-7 md:min-h-0 md:overflow-y-auto md:overscroll-contain md:p-8 md:pb-10">
 
             <div className="mb-6 border-b border-[#eee5db] pb-4 pr-10">
               <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#a77b26]">Checkout</p>
@@ -719,7 +719,7 @@ export default function CheckoutModal({
             </div>
 
             {/* CONTACT INFO */}
-            <div className="mb-6 space-y-3 relative z-50 pointer-events-auto">
+            <div className="relative z-10 mb-6 space-y-3 pointer-events-auto">
               <p className="text-xs text-gray-500 uppercase tracking-[0.2em]">
                 Contact Info
               </p>

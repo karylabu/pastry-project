@@ -417,7 +417,7 @@ function TestimonialsSection() {
   }, []);
 
   return (
-    <section className="relative overflow-hidden bg-[#fffaf0] px-4 py-10 sm:px-8 md:px-12">
+    <section id="customer-reviews" className="relative overflow-hidden bg-[#fffaf0] px-4 py-10 sm:px-8 md:px-12">
       <div className="mx-auto max-w-[1100px]">
         <div className="text-center"><p className="text-[9px] font-black uppercase tracking-[0.3em] text-[#9b7b3d]">Customer reviews</p><h2 className="mt-1 font-serif text-2xl text-[#3c2925] md:text-3xl">Rated by Our Customers</h2><p className="mt-1 text-xs text-[#765f5d]">{totalReviews > 0 ? `${averageRating.toFixed(1)} out of 5 · ${totalReviews} customer ${totalReviews === 1 ? 'rating' : 'ratings'}` : 'No customer ratings yet.'}</p></div>
         <div className="relative mt-7 grid grid-cols-3 gap-2 md:gap-4">
@@ -445,7 +445,7 @@ function TestimonialsSection() {
 /* =========================
    CHAT BUBBLE COMPONENT
 ========================= */
-export function ChatBubble({ aiMode = false, fullPage = false }) {
+export function ChatBubble({ aiMode = false, fullPage = false, hideFloating = false }) {
   const hasCustomerAccount = typeof window !== 'undefined'
     ? (() => {
         try {
@@ -676,7 +676,7 @@ export function ChatBubble({ aiMode = false, fullPage = false }) {
   return (
     <>
       {/* FLOAT BUTTON */}
-      {!fullPage && <div className="fixed bottom-6 right-6 z-[60000] flex items-end">
+      {!fullPage && !hideFloating && <div className="fixed bottom-6 right-6 z-[60000] flex items-end">
         {!open && (
           <motion.div
             initial={{ opacity: 0, x: 12 }}
@@ -712,7 +712,7 @@ export function ChatBubble({ aiMode = false, fullPage = false }) {
 
       {/* CHAT PANEL */}
       <AnimatePresence>
-        {open && (
+        {open && !hideFloating && (
           <motion.div
             initial={{ opacity: 0, y: 20, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -1048,7 +1048,7 @@ export function buildMustTryList(products = []) {
 /* =========================
    MAIN DASHBOARD
 ========================= */
-export default function Dashboard({ onAddToCart }) {
+export default function Dashboard({ onAddToCart, hideFloating = false }) {
   const navigate = useNavigate();
   const savedUser = typeof window !== 'undefined'
     ? (() => {
@@ -1284,7 +1284,7 @@ export default function Dashboard({ onAddToCart }) {
       <TestimonialsSection />
 
       {/* STAFF-CUSTOMER CHAT */}
-      <ChatBubble />
+      <ChatBubble hideFloating={hideFloating} />
 
       {/* MODALS */}
       <ProductModal

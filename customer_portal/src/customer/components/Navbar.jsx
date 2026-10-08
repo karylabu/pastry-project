@@ -363,11 +363,12 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
               aria-expanded={openNotif}
               className="relative flex h-9 w-9 items-center justify-center rounded-full hover:bg-gray-100 sm:h-10 sm:w-10 xl:h-12 xl:w-12"
             >
-              <Bell size={16} className="sm:h-5 sm:w-5" />
-
-              {unreadCount > 0 && (
-                <span className="absolute -top-2 -right-2 bg-red-500 w-3 h-3 rounded-full"></span>
-              )}
+              <span className="relative inline-flex">
+                <Bell size={16} className="sm:h-5 sm:w-5" />
+                {unreadCount > 0 && (
+                  <span className="absolute -right-0.5 top-0 h-2 w-2 rounded-full bg-red-500" />
+                )}
+              </span>
 
             </button>
 
