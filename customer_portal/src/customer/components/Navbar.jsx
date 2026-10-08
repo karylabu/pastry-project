@@ -26,7 +26,19 @@ const getNotificationCategory = (notification) => {
   const orderText = `${title} ${message}`;
   const isOrderNotification = actionUrl.startsWith('/customer/orders')
     && (orderText.includes('order') || orderText.includes('custom cake'));
+  const changedStatus = orderText.match(/\bto\s+(pending|confirmed|preparing|awaiting balance payment|ready for pickup|completed|cancelled)\b/);
 
+  if (isOrderNotification && changedStatus) {
+    return {
+      pending: 'order_pending',
+      confirmed: 'order_confirmed',
+      preparing: 'order_preparing',
+      'awaiting balance payment': 'order_balance_due',
+      'ready for pickup': 'order_ready',
+      completed: 'order_completed',
+      cancelled: 'order_cancelled',
+    }[changedStatus[1]];
+  }
   if (isOrderNotification && title.includes('order placed')) {
     return 'order_pending';
   }
@@ -419,6 +431,11 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
                             return <ClipboardList className="h-4 w-4 text-blue-600" />;
                           case "order_urgent":
                             return <Croissant className="h-4 w-4 text-orange-600" />;
+                          case "order_confirmed":
+                          case "order_preparing":
+                          case "order_balance_due":
+                          case "order_completed":
+                            return <ClipboardList className="h-4 w-4 text-blue-600" />;
                           case "order_ready":
                             return <Gift className="h-4 w-4 text-emerald-600" />;
                           case "order_update":
@@ -439,6 +456,19 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
                       };
 
                       const getBadge = () => {
+                        const statusBadges = {
+                          order_pending: ['Pending', 'bg-blue-50 text-blue-700'],
+                          order_confirmed: ['Confirmed', 'bg-blue-50 text-blue-700'],
+                          order_preparing: ['Preparing', 'bg-slate-100 text-slate-700'],
+                          order_balance_due: ['Awaiting Balance Payment', 'bg-amber-50 text-amber-700'],
+                          order_ready: ['Ready for Pickup', 'bg-emerald-50 text-emerald-700'],
+                          order_completed: ['Completed', 'bg-emerald-50 text-emerald-700'],
+                          order_cancelled: ['Cancelled', 'bg-amber-50 text-amber-700'],
+                        };
+                        if (statusBadges[type]) {
+                          const [label, colorClass] = statusBadges[type];
+                          return <span className={`rounded-full px-2.5 py-1 text-[10px] font-semibold ${colorClass}`}>{label}</span>;
+                        }
                         if (isCustomCakeNotice) {
                           const noticeTitle = String(n.title || "").toLowerCase();
                           const declined = type === "Warning" || noticeTitle.includes("declined");

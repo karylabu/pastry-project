@@ -762,9 +762,9 @@ function awardLoyaltyPoints(mysqli $conn, int $userId, int $orderId, float $tota
     }
 }
 
-$conn = @new mysqli("localhost", "root", "", "pastry_db");
+require_once __DIR__ . '/../includes/db.php';
 
-if ($conn->connect_error) {
+if (!isset($conn) || !($conn instanceof mysqli) || $conn->connect_error) {
     sendJson(false, "DB connect failed");
 }
 
@@ -1202,7 +1202,12 @@ try {
                     }
                 }
 
-                insertCustomerNotification($conn, $notifUserId, $notifTitle, $notifMessage, $notifType, '/customer/orders');
+                if ($oldStatus !== $status) {
+                    $notifMessage = "Your order #{$id} status changed from {$oldStatus} to {$status}.";
+                    if (!insertCustomerNotification($conn, $notifUserId, $notifTitle, $notifMessage, $notifType, '/customer/orders')) {
+                        error_log("api_update_order_status: notification insert failed for order #{$id}, user #{$notifUserId}, status {$status}");
+                    }
+                }
             }
         }
     }
