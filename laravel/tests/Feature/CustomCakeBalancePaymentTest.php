@@ -242,6 +242,16 @@ class CustomCakeBalancePaymentTest extends TestCase
                 'created_at' => now(),
                 'updated_at' => now(),
             ],
+            [
+                'id' => 31,
+                'user_id' => 9,
+                'status' => 'Awaiting Payment',
+                'total' => 1200,
+                'payment' => 'QRPh',
+                'payment_status' => 'pending',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
         ]);
 
         $customer = new User();

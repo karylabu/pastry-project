@@ -394,7 +394,10 @@ export default function Orders() {
           items: normalizeOrderItems(order),
         }));
         const userOrders = filterUserOrders(parsedOrders);
-        const visibleOrders = userOrders.length > 0 || parsedOrders.length === 0 ? userOrders : parsedOrders;
+        const loadedOrders = userOrders.length > 0 || parsedOrders.length === 0 ? userOrders : parsedOrders;
+        const visibleOrders = loadedOrders.filter(
+          (order) => String(order.status || '').toLowerCase() !== 'awaiting payment'
+        );
         setOrders(visibleOrders);
         localStorage.setItem(storageKey, JSON.stringify(visibleOrders));
       } else {
@@ -1003,7 +1006,7 @@ export default function Orders() {
   }
 
   // ── Helpers ─────────────────────────────────────────────────────────────────
-  const statusOptions = ["All", "Awaiting Payment", "Pending", "Preparing", "Awaiting Balance Payment", "Ready for Pickup", "Completed", "Cancelled"];
+  const statusOptions = ["All", "Pending", "Preparing", "Awaiting Balance Payment", "Ready for Pickup", "Completed", "Cancelled"];
 
   const statusCounts = statusOptions.reduce((acc, s) => {
     acc[s] = s === 'All' ? orders.length : orders.filter((o) => String(o.status || '').toLowerCase() === s.toLowerCase()).length;
@@ -1061,7 +1064,6 @@ export default function Orders() {
       case "Ready for Pickup": return "bg-emerald-50 text-emerald-800";
       case "Completed":  return "bg-slate-100 text-slate-700";
       case "Cancelled":  return "bg-slate-100 text-slate-700";
-      case "Awaiting Payment": return "bg-amber-50 text-amber-800";
       case "Awaiting Balance Payment": return "bg-amber-50 text-amber-800";
       default:           return "bg-gray-100 text-gray-600";
     }

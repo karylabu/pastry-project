@@ -61,6 +61,7 @@ class OrderController extends Controller
                 $query->whereNull('payment_status')
                     ->orWhereRaw("LOWER(payment_status) <> 'failed'");
             })
+            ->whereRaw("LOWER(COALESCE(status, '')) <> 'awaiting payment'")
             ->orderBy('created_at', 'desc')
             ->get();
 
