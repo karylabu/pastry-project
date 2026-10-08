@@ -369,7 +369,7 @@ export default function Login() {
                       <div className="space-y-2">
                         <label className="text-sm font-bold text-[#171717]">Email or phone number</label>
                         <div className="relative">
-                          <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                          <div className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400">
                             <PersonIcon />
                           </div>
                           <input
@@ -386,7 +386,7 @@ export default function Login() {
                       <div className="space-y-2">
                         <label className="text-sm font-bold text-[#171717]">Password</label>
                         <div className="relative">
-                          <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                          <div className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400">
                             <LockIcon />
                           </div>
                           <input
