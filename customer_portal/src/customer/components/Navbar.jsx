@@ -345,7 +345,7 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
               <Bell size={16} className="sm:h-5 sm:w-5" />
 
               {unreadCount > 0 && (
-                <span className="absolute -top-2 -right-2 bg-red-500 w-3 h-3 rounded-full"></span>
+                <span className="absolute -right-1 -top-1 h-2 w-2 rounded-full bg-red-500 sm:h-3 sm:w-3"></span>
               )}
 
             </button>
