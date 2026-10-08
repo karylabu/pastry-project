@@ -6,8 +6,7 @@ const BASE_URL = CUSTOMER_BASE;
 export function getAuthHeaders() {
   try {
     const user = JSON.parse(localStorage.getItem('user') || 'null');
-    const token = user?.token || localStorage.getItem('auth_token');
-    return token ? { Authorization: `Bearer ${token}` } : {};
+    return user?.token ? { Authorization: `Bearer ${user.token}` } : {};
   } catch {
     return {};
   }

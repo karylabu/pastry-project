@@ -22,44 +22,12 @@ const getNotificationCategory = (notification) => {
   const type = notification.type || 'account';
   const title = String(notification.title || '').toLowerCase();
   const actionUrl = String(notification.action_url || '');
-  const message = String(notification.message || '').toLowerCase();
-  const orderText = `${title} ${message}`;
-  const isOrderNotification = actionUrl.startsWith('/customer/orders')
-    && (orderText.includes('order') || orderText.includes('custom cake'));
-  const changedStatus = orderText.match(/\bto\s+(pending|confirmed|preparing|awaiting balance payment|ready for pickup|completed|cancelled)\b/);
 
-  if (isOrderNotification && changedStatus) {
-    return {
-      pending: 'order_pending',
-      confirmed: 'order_confirmed',
-      preparing: 'order_preparing',
-      'awaiting balance payment': 'order_balance_due',
-      'ready for pickup': 'order_ready',
-      completed: 'order_completed',
-      cancelled: 'order_cancelled',
-    }[changedStatus[1]];
-  }
-  if (isOrderNotification && title.includes('order placed')) {
+  if (type === 'Success' && title.includes('order placed') && actionUrl.startsWith('/customer/orders')) {
     return 'order_pending';
-  }
-  if (isOrderNotification && (orderText.includes('cancel') || orderText.includes('declined'))) {
-    return 'order_cancelled';
-  }
-  if (isOrderNotification && orderText.includes('ready')) {
-    return 'order_ready';
-  }
-  if (isOrderNotification) {
-    return 'order_update';
   }
 
   return type;
-};
-
-const isOrderNotification = (notification) => {
-  const actionUrl = String(notification.action_url || '');
-  const orderText = `${notification.title || ''} ${notification.message || ''}`.toLowerCase();
-  return actionUrl.startsWith('/customer/orders')
-    && (orderText.includes('order') || orderText.includes('custom cake'));
 };
 
 export default function Navbar({ cartCount = 0, onCartClick }) {
@@ -68,7 +36,6 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
   const navigate = useNavigate();
 
   const [notifications, setNotifications] = useState([]);
-  const [notificationError, setNotificationError] = useState("");
   const [openNotif, setOpenNotif] = useState(false);
   const [openSearch, setOpenSearch] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -126,26 +93,37 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
      FETCH NOTIFICATIONS
   ========================= */
   const fetchNotifications = () => {
-    fetch(`${CUSTOMER_BASE}/api/customer/notifications`, {
-      credentials: 'include',
-      headers: getAuthHeaders(),
-    })
-      .then(async (response) => {
-        const data = await safeParseJson(response);
-        if (!response.ok) {
-          throw new Error(data?.message || `Unable to load notifications (${response.status}).`);
-        }
-        if (!Array.isArray(data)) {
-          throw new Error(data?.message || "The notifications response was invalid.");
-        }
-        setNotifications(data);
-        setNotificationError("");
-      })
-      .catch((err) => {
-        console.error("Error fetching notifications:", err);
+    try {
+      const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
+      console.log("Stored user:", storedUser);
+      
+      if (storedUser?.id) {
+        const url = `${CUSTOMER_BASE}/api/customer/notifications`;
+        console.log("Fetching notifications from:", url);
+        
+        fetch(url, { credentials: 'include', headers: getAuthHeaders() })
+          .then(safeParseJson)
+          .then(data => {
+            console.log("Notifications data:", data);
+            if (Array.isArray(data)) {
+              setNotifications(data);
+            } else {
+              console.warn("Data is not an array:", data);
+              setNotifications([]);
+            }
+          })
+          .catch(err => {
+            console.error("Error fetching notifications:", err);
+            setNotifications([]);
+          });
+      } else {
+        console.log("No user_id in localStorage");
         setNotifications([]);
-        setNotificationError(err.message || "Unable to load notifications.");
-      });
+      }
+    } catch (err) {
+      console.error("Error in fetchNotifications:", err);
+      setNotifications([]);
+    }
   };
 
   useEffect(() => {
@@ -186,7 +164,7 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
 
   const filteredNotifications = useMemo(() => {
     if (notifFilter === "All") return notifications;
-    if (notifFilter === "Active Orders") return notifications.filter(isOrderNotification);
+    if (notifFilter === "Active Orders") return notifications.filter((n) => ["order_pending", "order_ready", "order_urgent"].includes(getNotificationCategory(n)) || (n.type === "Success" && n.action_url?.includes("/customer/orders")));
     if (notifFilter === "Reminders & Warnings") return notifications.filter((n) => ["order_expired", "stockout"].includes(n.type) || (n.type === "Warning" && n.action_url?.includes("/customer/orders")));
     if (notifFilter === "Account Updates") return notifications.filter((n) =>
       ["account", "profile"].includes(n.type) ||
@@ -257,28 +235,28 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
 
   return (
     <>
-    <nav className="sticky top-0 z-[50000] border-b border-gray-100 bg-white/90 px-2 py-2 backdrop-blur-xl sm:px-6 sm:py-5 xl:px-10">
+    <nav className="sticky top-0 z-[50000] border-b border-gray-100 bg-white/90 px-4 py-3 backdrop-blur-xl sm:px-6 sm:py-5 xl:px-10">
 
       <div className="flex items-center justify-between">
 
         {/* LEFT */}
-        <div className="flex min-w-0 items-center gap-1 sm:gap-14">
+        <div className="flex items-center gap-2 sm:gap-14">
 
           <Link
             to="/customer"
-            className="flex shrink-0 items-center gap-1 sm:gap-4"
+            className="flex items-center gap-2 sm:gap-4"
           >
             <img
               src={`${BASE}/uploads/logo.png?v=logo-v2`}
               alt="Logo"
-              className="h-8 w-8 object-contain sm:h-14 sm:w-14"
+              className="h-10 w-10 object-contain sm:h-14 sm:w-14"
             />
 
             <div>
-              <h1 className="font-playfair text-[16px] font-bold italic leading-none sm:text-[28px]">
+              <h1 className="font-playfair text-[20px] font-bold italic leading-none sm:text-[28px]">
                 Pastry <span className="text-[#d4af37]">Project</span>
               </h1>
-              <p className="mt-1 text-[7px] uppercase tracking-[0.25em] text-gray-400 sm:text-[8px] sm:tracking-[0.35em]">
+              <p className="text-[8px] uppercase tracking-[0.35em] text-gray-400 mt-1">
                 baked fresh daily
               </p>
             </div>
@@ -307,15 +285,15 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
         </div>
 
         {/* RIGHT */}
-        <div className="flex shrink-0 items-center gap-1 sm:gap-2 lg:gap-6">
+        <div className="flex items-center gap-1 sm:gap-2 lg:gap-6">
 
           {/* SEARCH */}
           <div ref={searchRef} className="relative">
-            <button onClick={() => setOpenSearch(s => !s)} aria-label="Search products" className="flex h-8 w-8 items-center justify-center rounded-full hover:bg-gray-100 sm:h-10 sm:w-10 xl:h-12 xl:w-12">
-              <Search size={16} className="sm:h-[18px] sm:w-[18px]" />
+            <button onClick={() => setOpenSearch(s => !s)} aria-label="Search products" className="flex h-9 w-9 items-center justify-center rounded-full hover:bg-gray-100 sm:h-10 sm:w-10 xl:h-12 xl:w-12">
+              <Search size={18} />
             </button>
             {openSearch && (
-              <div className="fixed left-2 top-24 w-[calc(100vw-2rem)] max-w-[320px] rounded-3xl border border-gray-200 bg-white p-4 shadow-xl sm:absolute sm:left-auto sm:right-0 sm:top-[65px] sm:w-[320px]">
+              <div className="absolute right-0 top-[65px] w-[320px] bg-white border border-gray-200 rounded-3xl shadow-xl p-4">
                 <form
                   onSubmit={(e) => {
                     e.preventDefault();
@@ -331,11 +309,11 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     placeholder="Search products"
-                    className="min-w-0 flex-1 rounded-2xl border border-gray-200 px-3 py-2 text-xs outline-none sm:px-4 sm:py-3 sm:text-sm"
+                    className="flex-1 rounded-2xl border border-gray-200 px-4 py-3 text-sm outline-none"
                   />
                   <button
                     type="submit"
-                    className="rounded-2xl bg-black px-3 py-2 text-xs font-semibold text-white sm:px-4 sm:py-3 sm:text-sm"
+                    className="rounded-2xl bg-black px-4 py-3 text-sm font-semibold text-white"
                   >
                     Go
                   </button>
@@ -349,9 +327,9 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
             to="/customer/favorites"
             title="Favorites"
             aria-label="View favorites"
-            className="flex h-8 w-8 items-center justify-center rounded-full text-gray-700 transition hover:bg-gray-100 sm:h-10 sm:w-10 xl:h-12 xl:w-12"
+            className="flex h-9 w-9 items-center justify-center rounded-full text-gray-700 transition hover:bg-gray-100 sm:h-10 sm:w-10 xl:h-12 xl:w-12"
           >
-            <Heart size={16} className="sm:h-5 sm:w-5" />
+            <Heart size={20} />
           </Link>
 
           {/* NOTIFICATIONS */}
@@ -362,18 +340,18 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
               onClick={handleToggleNotif}
               aria-label={`Notifications${unreadCount ? `, ${unreadCount} unread` : ''}`}
               aria-expanded={openNotif}
-              className="relative flex h-8 w-8 items-center justify-center rounded-full hover:bg-gray-100 sm:h-10 sm:w-10 xl:h-12 xl:w-12"
+              className="relative flex h-9 w-9 items-center justify-center rounded-full hover:bg-gray-100 sm:h-10 sm:w-10 xl:h-12 xl:w-12"
             >
-              <Bell size={16} className="sm:h-5 sm:w-5" />
+              <Bell size={20} />
 
               {unreadCount > 0 && (
-                <span className="absolute -right-1 -top-1 h-2 w-2 rounded-full bg-red-500 sm:h-3 sm:w-3"></span>
+                <span className="absolute -top-2 -right-2 bg-red-500 w-3 h-3 rounded-full"></span>
               )}
 
             </button>
 
             {openNotif && (
-              <div className="fixed left-2 right-2 top-24 z-20 max-h-[calc(100dvh-7rem)] overflow-y-auto rounded-[24px] border border-gray-200 bg-white shadow-2xl sm:absolute sm:left-auto sm:right-0 sm:top-[65px] sm:w-[380px] sm:max-h-[70vh]">
+              <div className="absolute right-0 top-[65px] w-[380px] max-h-[70vh] overflow-y-auto rounded-[24px] border border-gray-200 bg-white shadow-2xl">
                 <div className="sticky top-0 z-10 border-b border-gray-100 bg-white/95 px-4 py-4 backdrop-blur">
                   <div className="flex items-center justify-between gap-3">
                     <div>
@@ -418,7 +396,7 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
                 <div className="p-3">
                   {filteredNotifications.length === 0 ? (
                     <div className="rounded-[18px] border border-dashed border-gray-200 bg-gray-50 p-5 text-center text-sm text-gray-500">
-                      {notificationError || "No notifications in this view."}
+                      No notifications in this view.
                     </div>
                   ) : (
                     filteredNotifications.map((n) => {
@@ -431,17 +409,8 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
                             return <ClipboardList className="h-4 w-4 text-blue-600" />;
                           case "order_urgent":
                             return <Croissant className="h-4 w-4 text-orange-600" />;
-                          case "order_confirmed":
-                          case "order_preparing":
-                          case "order_balance_due":
-                          case "order_completed":
-                            return <ClipboardList className="h-4 w-4 text-blue-600" />;
                           case "order_ready":
                             return <Gift className="h-4 w-4 text-emerald-600" />;
-                          case "order_update":
-                            return <ClipboardList className="h-4 w-4 text-blue-600" />;
-                          case "order_cancelled":
-                            return <AlertTriangle className="h-4 w-4 text-amber-700" />;
                           case "stockout":
                             return <AlertTriangle className="h-4 w-4 text-red-600" />;
                           case "order_expired":
@@ -456,19 +425,6 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
                       };
 
                       const getBadge = () => {
-                        const statusBadges = {
-                          order_pending: ['Pending', 'bg-blue-50 text-blue-700'],
-                          order_confirmed: ['Confirmed', 'bg-blue-50 text-blue-700'],
-                          order_preparing: ['Preparing', 'bg-slate-100 text-slate-700'],
-                          order_balance_due: ['Awaiting Balance Payment', 'bg-amber-50 text-amber-700'],
-                          order_ready: ['Ready for Pickup', 'bg-emerald-50 text-emerald-700'],
-                          order_completed: ['Completed', 'bg-emerald-50 text-emerald-700'],
-                          order_cancelled: ['Cancelled', 'bg-amber-50 text-amber-700'],
-                        };
-                        if (statusBadges[type]) {
-                          const [label, colorClass] = statusBadges[type];
-                          return <span className={`rounded-full px-2.5 py-1 text-[10px] font-semibold ${colorClass}`}>{label}</span>;
-                        }
                         if (isCustomCakeNotice) {
                           const noticeTitle = String(n.title || "").toLowerCase();
                           const declined = type === "Warning" || noticeTitle.includes("declined");
@@ -490,10 +446,6 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
                             return <span className="rounded-full bg-red-600 px-2.5 py-1 text-[10px] font-semibold text-white animate-pulse">Urgent Rush Order</span>;
                           case "order_ready":
                             return <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-semibold text-emerald-700">Ready for Pickup</span>;
-                          case "order_update":
-                            return <span className="rounded-full bg-blue-50 px-2.5 py-1 text-[10px] font-semibold text-blue-700">Order Update</span>;
-                          case "order_cancelled":
-                            return <span className="rounded-full bg-amber-50 px-2.5 py-1 text-[10px] font-semibold text-amber-700">Cancelled</span>;
                           case "stockout":
                             return <span className="rounded-full bg-gray-100 px-2.5 py-1 text-[10px] font-semibold text-gray-700">Cancelled — Stockout</span>;
                           case "order_expired":
@@ -517,15 +469,15 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
                           className={`mb-2 cursor-pointer rounded-[20px] border p-3 transition hover:bg-gray-50 ${isUnread ? 'border-[#d4af37]/30 bg-[#fffdf7]' : 'border-gray-200 bg-white'}`}
                         >
                           <div className="flex items-start gap-3">
-                            <div className={`mt-0.5 flex h-9 w-9 items-center justify-center rounded-2xl ${type === 'order_pending' || type === 'order_update' ? 'bg-blue-50' : type === 'order_urgent' ? 'bg-orange-50' : type === 'order_ready' ? 'bg-emerald-50' : type === 'order_cancelled' || type === 'stockout' || type === 'order_expired' ? 'bg-amber-50' : 'bg-gray-100'}`}>
+                            <div className={`mt-0.5 flex h-9 w-9 items-center justify-center rounded-2xl ${type === 'order_pending' ? 'bg-blue-50' : type === 'order_urgent' ? 'bg-orange-50' : type === 'order_ready' ? 'bg-emerald-50' : type === 'stockout' || type === 'order_expired' ? 'bg-amber-50' : 'bg-gray-100'}`}>
                               {getIcon()}
                             </div>
                             <div className="min-w-0 flex-1">
                               <div className="flex items-center justify-between gap-2">
-                                <p className="min-w-0 break-words text-[13px] font-semibold text-black">{n.title || 'Notification'}</p>
+                                <p className="text-[13px] font-semibold text-black">{n.title || 'Notification'}</p>
                                 {isUnread && <span className="h-2.5 w-2.5 rounded-full bg-red-500" />}
                               </div>
-                              <p className="mt-1 break-words text-[12px] leading-5 text-gray-600">{n.message || 'You have a new update.'}</p>
+                              <p className="mt-1 text-[12px] leading-5 text-gray-600">{n.message || 'You have a new update.'}</p>
                               <div className="mt-2 flex flex-wrap items-center gap-2">
                                 {getBadge()}
                                 <span className="flex items-center gap-1 text-[11px] text-gray-400">
@@ -559,9 +511,9 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
           {/* CART */}
           <button
             onClick={onCartClick}
-            className="relative flex h-7 w-7 items-center justify-center rounded-full bg-black text-white sm:h-10 sm:w-10"
+            className="relative flex h-9 w-9 items-center justify-center rounded-full bg-black text-white sm:h-10 sm:w-10"
           >
-            <ShoppingCart size={14} className="sm:h-[17px] sm:w-[17px]" />
+            <ShoppingCart size={17} />
             {cartCount > 0 && (
               <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-[#d4af37] text-[8px] text-black">
                 {cartCount}
@@ -574,7 +526,7 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
 
             <button
               onClick={() => setOpenAccount(!openAccount)}
-              className="flex h-8 w-8 items-center justify-center rounded-full border border-gray-200 bg-gray-100 transition-all hover:border-[#d4af37] sm:h-10 sm:w-10 xl:h-12 xl:w-12"
+              className="flex h-9 w-9 items-center justify-center rounded-full border border-gray-200 bg-gray-100 transition-all hover:border-[#d4af37] sm:h-10 sm:w-10 xl:h-12 xl:w-12"
             >
               {accountAvatar && failedAccountAvatarUrl !== accountAvatar ? (
                 <img
@@ -586,7 +538,7 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
               ) : user ? (
                 <span className="text-sm font-bold text-[#8b5e34]">{accountInitials}</span>
               ) : (
-                <User size={16} className="text-gray-700 sm:h-5 sm:w-5" />
+                <User size={20} className="text-gray-700" />
               )}
             </button>
             {openAccount && (
@@ -650,6 +602,13 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
                     Favorites
                   </Link>
                   <Link
+                    to="/customer/saved-addresses"
+                    onClick={() => setOpenAccount(false)}
+                    className={accountLinkClass('/customer/saved-addresses')}
+                  >
+                    Saved Addresses
+                  </Link>
+                  <Link
                     to="/customer/account-settings"
                     onClick={() => setOpenAccount(false)}
                     className={accountLinkClass('/customer/account-settings')}
@@ -670,22 +629,6 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
 
         </div>
 
-      </div>
-
-      <div className="mt-2 flex justify-center gap-2 overflow-x-hidden border-t border-gray-100 pt-2 sm:gap-6 lg:hidden">
-        {navs.map(nav => (
-          <Link
-            key={nav.path}
-            to={nav.path}
-            className={`shrink-0 py-1 text-xs font-semibold uppercase tracking-[0.16em] ${
-              location.pathname === nav.path
-                ? "border-b-2 border-[#d4af37] text-black"
-                : "text-gray-500"
-            }`}
-          >
-            {nav.name}
-          </Link>
-        ))}
       </div>
 
     </nav>
