@@ -73,7 +73,7 @@ export default function CustomerApp() {
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [showGuestPrompt, setShowGuestPrompt] = useState(false);
-  const [dashboardReviewsPassed, setDashboardReviewsPassed] = useState(false);
+  const [dashboardFooterApproaching, setDashboardFooterApproaching] = useState(false);
   const paymentReturnInProgress = useRef(false);
 
   useEffect(() => {
@@ -86,31 +86,27 @@ export default function CustomerApp() {
     const isDashboard = ['/','/customer','/customer/home'].includes(
       (location.pathname || '/').replace(/\/+$/, '') || '/'
     );
-    if (!isDashboard || !('IntersectionObserver' in window)) {
-      setDashboardReviewsPassed(false);
+    if (!isDashboard) {
+      setDashboardFooterApproaching(false);
       return undefined;
     }
 
-    setDashboardReviewsPassed(false);
-    const reviews = document.querySelector('#customer-reviews');
-    if (!reviews) return undefined;
+    setDashboardFooterApproaching(false);
+    const footer = document.querySelector('footer');
+    if (!footer) return undefined;
 
-    let starsObserver;
-    const observeReviewStars = () => {
-      const reviewStars = reviews.querySelector('[data-customer-review-stars]');
-      if (!reviewStars || starsObserver) return;
-      starsObserver = new IntersectionObserver(([entry]) => {
-        setDashboardReviewsPassed(entry.boundingClientRect.bottom <= 0);
-      });
-      starsObserver.observe(reviewStars);
+    const updateFooterBoundary = () => {
+      setDashboardFooterApproaching(
+        footer.getBoundingClientRect().top <= window.innerHeight + 80
+      );
     };
-    const mutationObserver = new MutationObserver(observeReviewStars);
-    mutationObserver.observe(reviews, { childList: true, subtree: true });
-    observeReviewStars();
+    window.addEventListener('scroll', updateFooterBoundary, { passive: true });
+    window.addEventListener('resize', updateFooterBoundary);
+    updateFooterBoundary();
 
     return () => {
-      mutationObserver.disconnect();
-      starsObserver?.disconnect();
+      window.removeEventListener('scroll', updateFooterBoundary);
+      window.removeEventListener('resize', updateFooterBoundary);
     };
   }, [location.pathname]);
 
@@ -328,7 +324,7 @@ export default function CustomerApp() {
     !isCheckoutOpen &&
     !['/rewards', '/orders', '/profile', '/checkout', '/customer/rewards', '/customer/orders', '/customer/profile', '/customer/checkout'].includes(normalizedPath) &&
     ['/','/home','/menu','/customized-cakes','/customer','/customer/home','/customer/menu','/customer/customized-cakes'].includes(normalizedPath);
-  const hideDashboardFloaters = dashboardReviewsPassed &&
+  const hideDashboardFloaters = dashboardFooterApproaching &&
     ['/','/customer','/customer/home'].includes(normalizedPath);
 
   let storedRole = '';

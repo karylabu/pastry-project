@@ -417,7 +417,7 @@ function TestimonialsSection() {
   }, []);
 
   return (
-    <section id="customer-reviews" className="relative overflow-hidden bg-[#fffaf0] px-4 py-10 sm:px-8 md:px-12">
+    <section className="relative overflow-hidden bg-[#fffaf0] px-4 py-10 sm:px-8 md:px-12">
       <div className="mx-auto max-w-[1100px]">
         <div className="text-center"><p className="text-[9px] font-black uppercase tracking-[0.3em] text-[#9b7b3d]">Customer reviews</p><h2 className="mt-1 font-serif text-2xl text-[#3c2925] md:text-3xl">Rated by Our Customers</h2><p className="mt-1 text-xs text-[#765f5d]">{totalReviews > 0 ? `${averageRating.toFixed(1)} out of 5 · ${totalReviews} customer ${totalReviews === 1 ? 'rating' : 'ratings'}` : 'No customer ratings yet.'}</p></div>
         <div className="relative mt-7 grid grid-cols-3 gap-2 md:gap-4">
@@ -426,7 +426,7 @@ function TestimonialsSection() {
               <div className="mx-auto flex h-8 w-8 items-center justify-center rounded-full bg-[#f5eee5] text-[10px] font-black text-[#7c654f] md:h-11 md:w-11 md:text-xs">{String(review.customer_name || 'Customer').split(/\s+/).map((part) => part[0]).join('').slice(0, 2).toUpperCase()}</div>
               <p className="mt-3 min-h-[80px] break-words text-[10px] leading-4 text-[#413734] md:mt-4 md:min-h-[72px] md:text-[11px] md:leading-5">{review.comment?.trim() ? `“${review.comment.trim()}”` : 'Customer rating for their order.'}</p>
               <p className="mt-3 break-words text-[10px] font-bold leading-tight text-[#765d50] md:text-[11px]">- {review.customer_name || 'Customer'}</p>
-              <div data-customer-review-stars className="mt-2 flex justify-center gap-0.5 text-[#e8b52e]" aria-label={`${review.rating} out of 5 stars`}>{[1, 2, 3, 4, 5].map((star) => <Star key={star} className="h-3 w-3 md:h-[14px] md:w-[14px]" fill={star <= Number(review.rating) ? 'currentColor' : 'none'} strokeWidth={1.4} />)}</div>
+              <div className="mt-2 flex justify-center gap-0.5 text-[#e8b52e]" aria-label={`${review.rating} out of 5 stars`}>{[1, 2, 3, 4, 5].map((star) => <Star key={star} className="h-3 w-3 md:h-[14px] md:w-[14px]" fill={star <= Number(review.rating) ? 'currentColor' : 'none'} strokeWidth={1.4} />)}</div>
             </article>
           ))}
           {reviews.length > 3 && (
