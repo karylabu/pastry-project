@@ -243,6 +243,7 @@ function FeedbackDialog({ order, onSubmit, onDismiss, isLoading }) {
 // ── Main Component ────────────────────────────────────────────────────────────
 export default function Orders() {
   const [orders, setOrders]           = useState([]);
+  const [ordersLoadError, setOrdersLoadError] = useState(false);
   const [user, setUser]               = useState(null);
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [riderInfoTarget, setRiderInfoTarget] = useState(null);
@@ -324,89 +325,41 @@ export default function Orders() {
   const loadOrders = useCallback(async () => {
     if (!user?.token && !user?.id && !user?.email) {
       setOrders([]);
+      setOrdersLoadError(false);
       return;
     }
 
     try {
-      const customOrdersUrl = user?.id
-        ? `${CUSTOMER_BASE}/api_get_custom_cakes.php`
-        : null;
-      const [ordersResponse, customResponse] = await Promise.all([
-        fetch(`${LARAVEL_BASE}/api/orders`, {
-          credentials: 'include',
-          headers: getAuthHeaders(),
-        }),
-        customOrdersUrl
-          ? fetch(customOrdersUrl, {
-              credentials: 'include',
-              headers: getAuthHeaders(),
-            })
-          : Promise.resolve(null),
-      ]);
-      const data = await safeParseJson(ordersResponse);
-      const customData = customResponse ? await safeParseJson(customResponse) : [];
-      const regularOrders = Array.isArray(data?.orders) ? data.orders : [];
-      if (Array.isArray(data?.orders) || Array.isArray(customData)) {
-        const customOrders = Array.isArray(customData) ? customData.map((order) => ({
-          ...order,
-          is_customized: 1,
-          custom_details: (() => {
-            const legacy = order.custom_cake_details || {};
-            let submitted = {};
-            try {
-              submitted = legacy.notes ? JSON.parse(legacy.notes) : {};
-            } catch {
-              submitted = {};
-            }
-            return {
-              ...submitted,
-              customer_name: submitted.customer_name || order.customer || legacy.customer_name,
-              email: submitted.email || order.email,
-              phone: submitted.phone || order.phone,
-              cake_size: submitted.cake_size || legacy.cake_size,
-              quantity: submitted.quantity || legacy.quantity,
-              cake_flavor: submitted.cake_flavor || legacy.flavor,
-              filling_flavor: submitted.filling_flavor || legacy.filling,
-              frosting_type: submitted.frosting_type || legacy.frosting,
-              occasion: submitted.occasion || legacy.occasion,
-              theme: submitted.theme || legacy.theme_design,
-              cake_color: submitted.cake_color || legacy.preferred_colors,
-              custom_message: submitted.custom_message || legacy.dedication,
-              estimated_price: submitted.estimated_price || legacy.estimated_price,
-              reference_image: submitted.reference_image || null,
-              inspo_images: legacy.inspo_images || submitted.inspo_images || [],
-            };
-          })(),
-          items: Array.isArray(order.items) && order.items.length > 0
-            ? order.items
-            : [{ name: 'Custom Cake Request', qty: order.custom_cake_details?.quantity || 1, price: Number(order.total || order.custom_cake_details?.estimated_price || 0) }],
-        })) : [];
-        const customizedOrderIds = new Set(customOrders.map((order) => String(order.id)));
-        const mergedById = new Map();
-        [...customOrders, ...regularOrders].forEach((order) => {
-          const key = String(order.id);
-          mergedById.set(key, { ...mergedById.get(key), ...order });
-        });
-        const parsedOrders = Array.from(mergedById.values()).map((order) => ({
-          ...order,
-          is_customized: customizedOrderIds.has(String(order.id)) || Boolean(order.is_customized),
-          custom_details: order.custom_details || order.custom_cake_details || {},
-          items: normalizeOrderItems(order),
-        }));
-        const userOrders = filterUserOrders(parsedOrders);
-        const loadedOrders = userOrders.length > 0 || parsedOrders.length === 0 ? userOrders : parsedOrders;
-        const visibleOrders = loadedOrders.filter(
-          (order) => String(order.status || '').toLowerCase() !== 'awaiting payment'
-        );
-        setOrders(visibleOrders);
-        localStorage.setItem(storageKey, JSON.stringify(visibleOrders));
-      } else {
-        setOrders([]);
-        localStorage.setItem(storageKey, JSON.stringify([]));
+      const ordersResponse = await fetch(`${LARAVEL_BASE}/api/orders`, {
+        credentials: 'include',
+        headers: getAuthHeaders(),
+      });
+      if (!ordersResponse.ok) {
+        throw new Error(`Orders request failed with status ${ordersResponse.status}.`);
       }
-    } catch {
-      setOrders([]);
-      localStorage.setItem(storageKey, JSON.stringify([]));
+
+      const data = await safeParseJson(ordersResponse);
+      if (!data?.success || !Array.isArray(data.orders)) {
+        throw new Error(data?.message || 'The orders service returned an invalid response.');
+      }
+
+      const parsedOrders = data.orders.map((order) => ({
+        ...order,
+        is_customized: Boolean(order.is_customized),
+        custom_details: order.custom_details || order.custom_cake_details || {},
+        items: normalizeOrderItems(order),
+      }));
+      const userOrders = filterUserOrders(parsedOrders);
+      const loadedOrders = userOrders.length > 0 || parsedOrders.length === 0 ? userOrders : parsedOrders;
+      const visibleOrders = loadedOrders.filter(
+        (order) => String(order.status || '').toLowerCase() !== 'awaiting payment'
+      );
+      setOrders(visibleOrders);
+      setOrdersLoadError(false);
+      localStorage.setItem(storageKey, JSON.stringify(visibleOrders));
+    } catch (error) {
+      console.error('Failed to load customer orders:', error);
+      setOrdersLoadError(true);
     }
   }, [filterUserOrders, normalizeOrderItems, storageKey, user?.email, user?.id, user?.token]);
 
@@ -1183,7 +1136,16 @@ export default function Orders() {
           {/* EMPTY STATE */}
           {sortedOrders.length === 0 ? (
             <div className="p-14 text-center">
-              <p className="text-gray-400 text-[14px]">No orders found{statusFilter && statusFilter!=='All' ? ` for "${statusFilter}"` : ''}.</p>
+              {ordersLoadError ? (
+                <div role="alert">
+                  <p className="text-gray-500 text-[14px]">We couldn’t load your orders. Check your connection and try again.</p>
+                  <button type="button" onClick={loadOrders} className="mt-3 text-sm font-semibold text-[#8a6b18] underline">
+                    Try again
+                  </button>
+                </div>
+              ) : (
+                <p className="text-gray-400 text-[14px]">No orders found{statusFilter && statusFilter!=='All' ? ` for "${statusFilter}"` : ''}.</p>
+              )}
             </div>
           ) : (
             <div className="divide-y divide-gray-100">
