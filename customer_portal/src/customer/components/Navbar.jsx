@@ -22,12 +22,32 @@ const getNotificationCategory = (notification) => {
   const type = notification.type || 'account';
   const title = String(notification.title || '').toLowerCase();
   const actionUrl = String(notification.action_url || '');
+  const message = String(notification.message || '').toLowerCase();
+  const orderText = `${title} ${message}`;
+  const isOrderNotification = actionUrl.startsWith('/customer/orders')
+    && (orderText.includes('order') || orderText.includes('custom cake'));
 
-  if (type === 'Success' && title.includes('order placed') && actionUrl.startsWith('/customer/orders')) {
+  if (isOrderNotification && title.includes('order placed')) {
     return 'order_pending';
+  }
+  if (isOrderNotification && (orderText.includes('cancel') || orderText.includes('declined'))) {
+    return 'order_cancelled';
+  }
+  if (isOrderNotification && orderText.includes('ready')) {
+    return 'order_ready';
+  }
+  if (isOrderNotification) {
+    return 'order_update';
   }
 
   return type;
+};
+
+const isOrderNotification = (notification) => {
+  const actionUrl = String(notification.action_url || '');
+  const orderText = `${notification.title || ''} ${notification.message || ''}`.toLowerCase();
+  return actionUrl.startsWith('/customer/orders')
+    && (orderText.includes('order') || orderText.includes('custom cake'));
 };
 
 export default function Navbar({ cartCount = 0, onCartClick }) {
@@ -164,7 +184,7 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
 
   const filteredNotifications = useMemo(() => {
     if (notifFilter === "All") return notifications;
-    if (notifFilter === "Active Orders") return notifications.filter((n) => ["order_pending", "order_ready", "order_urgent"].includes(getNotificationCategory(n)) || (n.type === "Success" && n.action_url?.includes("/customer/orders")));
+    if (notifFilter === "Active Orders") return notifications.filter(isOrderNotification);
     if (notifFilter === "Reminders & Warnings") return notifications.filter((n) => ["order_expired", "stockout"].includes(n.type) || (n.type === "Warning" && n.action_url?.includes("/customer/orders")));
     if (notifFilter === "Account Updates") return notifications.filter((n) =>
       ["account", "profile"].includes(n.type) ||
@@ -411,6 +431,10 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
                             return <Croissant className="h-4 w-4 text-orange-600" />;
                           case "order_ready":
                             return <Gift className="h-4 w-4 text-emerald-600" />;
+                          case "order_update":
+                            return <ClipboardList className="h-4 w-4 text-blue-600" />;
+                          case "order_cancelled":
+                            return <AlertTriangle className="h-4 w-4 text-amber-700" />;
                           case "stockout":
                             return <AlertTriangle className="h-4 w-4 text-red-600" />;
                           case "order_expired":
@@ -446,6 +470,10 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
                             return <span className="rounded-full bg-red-600 px-2.5 py-1 text-[10px] font-semibold text-white animate-pulse">Urgent Rush Order</span>;
                           case "order_ready":
                             return <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-semibold text-emerald-700">Ready for Pickup</span>;
+                          case "order_update":
+                            return <span className="rounded-full bg-blue-50 px-2.5 py-1 text-[10px] font-semibold text-blue-700">Order Update</span>;
+                          case "order_cancelled":
+                            return <span className="rounded-full bg-amber-50 px-2.5 py-1 text-[10px] font-semibold text-amber-700">Cancelled</span>;
                           case "stockout":
                             return <span className="rounded-full bg-gray-100 px-2.5 py-1 text-[10px] font-semibold text-gray-700">Cancelled — Stockout</span>;
                           case "order_expired":
@@ -469,7 +497,7 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
                           className={`mb-2 cursor-pointer rounded-[20px] border p-3 transition hover:bg-gray-50 ${isUnread ? 'border-[#d4af37]/30 bg-[#fffdf7]' : 'border-gray-200 bg-white'}`}
                         >
                           <div className="flex items-start gap-3">
-                            <div className={`mt-0.5 flex h-9 w-9 items-center justify-center rounded-2xl ${type === 'order_pending' ? 'bg-blue-50' : type === 'order_urgent' ? 'bg-orange-50' : type === 'order_ready' ? 'bg-emerald-50' : type === 'stockout' || type === 'order_expired' ? 'bg-amber-50' : 'bg-gray-100'}`}>
+                            <div className={`mt-0.5 flex h-9 w-9 items-center justify-center rounded-2xl ${type === 'order_pending' || type === 'order_update' ? 'bg-blue-50' : type === 'order_urgent' ? 'bg-orange-50' : type === 'order_ready' ? 'bg-emerald-50' : type === 'order_cancelled' || type === 'stockout' || type === 'order_expired' ? 'bg-amber-50' : 'bg-gray-100'}`}>
                               {getIcon()}
                             </div>
                             <div className="min-w-0 flex-1">
