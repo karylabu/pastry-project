@@ -34,6 +34,16 @@ class CustomCakeBalancePaymentTest extends TestCase
             $table->text('notes')->nullable();
             $table->text('inspo_images')->nullable();
         });
+        Schema::create('notifications', function ($table) {
+            $table->id();
+            $table->unsignedBigInteger('user_id');
+            $table->string('title');
+            $table->text('message');
+            $table->string('type')->nullable();
+            $table->boolean('is_read')->default(false);
+            $table->string('action_url')->nullable();
+            $table->timestamp('created_at')->nullable();
+        });
 
         config(['services.paymongo.secret' => 'sk_test_balance_flow']);
         Http::fake([
@@ -45,6 +55,7 @@ class CustomCakeBalancePaymentTest extends TestCase
 
     protected function tearDown(): void
     {
+        Schema::dropIfExists('notifications');
         Schema::dropIfExists('custom_cake_orders');
         Schema::dropIfExists('orders');
         config(['services.paymongo.secret' => null]);
@@ -156,6 +167,15 @@ class CustomCakeBalancePaymentTest extends TestCase
             'created_at' => now(),
             'updated_at' => now(),
         ]);
+        \Illuminate\Support\Facades\DB::table('notifications')->insert([
+            'user_id' => 9,
+            'title' => 'Order Placed',
+            'message' => 'Your order #27 has been placed and is awaiting payment.',
+            'type' => 'Success',
+            'is_read' => 0,
+            'action_url' => '/customer/orders',
+            'created_at' => now(),
+        ]);
         Http::fake([
             'https://api.paymongo.com/v1/payment_links/link_unpaid_test/payments' => Http::response(['data' => []], 200),
             'https://api.paymongo.com/v1/payment_links/link_unpaid_test' => Http::response([
@@ -176,6 +196,10 @@ class CustomCakeBalancePaymentTest extends TestCase
             'id' => 27,
             'status' => 'Cancelled',
             'payment_status' => 'failed',
+        ]);
+        $this->assertDatabaseMissing('notifications', [
+            'user_id' => 9,
+            'message' => 'Your order #27 has been placed and is awaiting payment.',
         ]);
         Http::assertSent(fn (ClientRequest $request) =>
             $request->method() === 'PATCH'
@@ -216,6 +240,11 @@ class CustomCakeBalancePaymentTest extends TestCase
             'id' => 28,
             'status' => 'Pending',
             'payment_status' => 'paid',
+        ]);
+        $this->assertDatabaseHas('notifications', [
+            'user_id' => 9,
+            'title' => 'Order Placed',
+            'message' => 'Your order #28 has been placed successfully and is now pending.',
         ]);
     }
 
@@ -263,6 +292,62 @@ class CustomCakeBalancePaymentTest extends TestCase
             ->assertOk()
             ->assertJsonCount(1, 'orders')
             ->assertJsonPath('orders.0.id', 30);
+    }
+
+    public function test_customer_notifications_hide_order_placed_alerts_for_failed_payments(): void
+    {
+        \Illuminate\Support\Facades\DB::table('orders')->insert([
+            [
+                'id' => 32,
+                'user_id' => 9,
+                'status' => 'Cancelled',
+                'total' => 850,
+                'payment' => 'QRPh',
+                'payment_status' => 'failed',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+            [
+                'id' => 33,
+                'user_id' => 9,
+                'status' => 'Pending',
+                'total' => 850,
+                'payment' => 'COD',
+                'payment_status' => 'pending',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+        ]);
+        \Illuminate\Support\Facades\DB::table('notifications')->insert([
+            [
+                'user_id' => 9,
+                'title' => 'Order Placed',
+                'message' => 'Your order #32 has been placed and is awaiting payment.',
+                'type' => 'Success',
+                'is_read' => 0,
+                'action_url' => '/customer/orders',
+                'created_at' => now(),
+            ],
+            [
+                'user_id' => 9,
+                'title' => 'Order Placed',
+                'message' => 'Your order #33 has been placed successfully and is now pending.',
+                'type' => 'Success',
+                'is_read' => 0,
+                'action_url' => '/customer/orders',
+                'created_at' => now(),
+            ],
+        ]);
+
+        $customer = new User();
+        $customer->id = 9;
+        $customer->role = 'customer';
+
+        $this->actingAs($customer)
+            ->getJson('/api/customer/notifications')
+            ->assertOk()
+            ->assertJsonCount(1)
+            ->assertJsonPath('0.message', 'Your order #33 has been placed successfully and is now pending.');
     }
 
 }

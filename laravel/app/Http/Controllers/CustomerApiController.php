@@ -1665,7 +1665,38 @@ PROMPT;
             ->where('user_id', $user->id)
             ->orderByDesc('created_at')
             ->limit(50)
-            ->get(['id', 'user_id', 'title', 'message', 'type', 'is_read', 'action_url', 'created_at'])
+            ->get(['id', 'user_id', 'title', 'message', 'type', 'is_read', 'action_url', 'created_at']);
+
+        $failedOrderIds = $notifications
+            ->filter(function ($notification) {
+                return str_contains(strtolower((string) $notification->title), 'order placed')
+                    && str_starts_with((string) $notification->action_url, '/customer/orders')
+                    && preg_match('/\border\s+#(\d+)\b/i', (string) $notification->message);
+            })
+            ->map(function ($notification) {
+                preg_match('/\border\s+#(\d+)\b/i', (string) $notification->message, $matches);
+                return (int) ($matches[1] ?? 0);
+            })
+            ->filter()
+            ->unique()
+            ->values();
+
+        if ($failedOrderIds->isNotEmpty()) {
+            $failedOrderIds = DB::table('orders')
+                ->where('user_id', $user->id)
+                ->whereIn('id', $failedOrderIds)
+                ->whereRaw("LOWER(payment_status) = 'failed'")
+                ->pluck('id')
+                ->map(fn ($id) => (int) $id)
+                ->all();
+
+            $notifications = $notifications->reject(function ($notification) use ($failedOrderIds) {
+                preg_match('/\border\s+#(\d+)\b/i', (string) $notification->message, $matches);
+                return in_array((int) ($matches[1] ?? 0), $failedOrderIds, true);
+            });
+        }
+
+        $notifications = $notifications
             ->map(fn ($notification) => [
                 'id' => $notification->id,
                 'user_id' => $notification->user_id,

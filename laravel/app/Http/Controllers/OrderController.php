@@ -320,17 +320,17 @@ class OrderController extends Controller
                     'created_at' => now(),
                 ]);
 
-                DB::table('notifications')->insert([
-                    'user_id' => $user->id,
-                    'title' => 'Order Placed',
-                    'message' => $requiresQrPayment
-                        ? "Your order #{$order->id} has been placed and is awaiting payment."
-                        : "Your order #{$order->id} has been placed successfully and is now pending.",
-                    'type' => 'Success',
-                    'is_read' => 0,
-                    'action_url' => '/customer/orders',
-                    'created_at' => now(),
-                ]);
+                if (!$requiresQrPayment && Schema::hasTable('notifications')) {
+                    DB::table('notifications')->insert([
+                        'user_id' => $user->id,
+                        'title' => 'Order Placed',
+                        'message' => "Your order #{$order->id} has been placed successfully and is now pending.",
+                        'type' => 'Success',
+                        'is_read' => 0,
+                        'action_url' => '/customer/orders',
+                        'created_at' => now(),
+                    ]);
+                }
 
                 return response()->json([
                     'success' => true,
@@ -503,6 +503,18 @@ class OrderController extends Controller
                         'payment_status' => 'paid',
                     ]);
 
+                    if (Schema::hasTable('notifications')) {
+                        DB::table('notifications')->insert([
+                            'user_id' => $user->id,
+                            'title' => 'Order Placed',
+                            'message' => "Your order #{$lockedOrder->id} has been placed successfully and is now pending.",
+                            'type' => 'Success',
+                            'is_read' => 0,
+                            'action_url' => '/customer/orders',
+                            'created_at' => now(),
+                        ]);
+                    }
+
                     return response()->json(['success' => true, 'payment_status' => 'paid']);
                 }
 
@@ -510,6 +522,14 @@ class OrderController extends Controller
                     'status' => 'Cancelled',
                     'payment_status' => 'failed',
                 ]);
+
+                if (Schema::hasTable('notifications')) {
+                    DB::table('notifications')
+                        ->where('user_id', $user->id)
+                        ->where('action_url', '/customer/orders')
+                        ->where('message', 'like', "Your order #{$lockedOrder->id} has been placed%")
+                        ->delete();
+                }
 
                 return response()->json(['success' => true, 'payment_status' => 'failed']);
             });
