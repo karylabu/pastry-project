@@ -179,6 +179,14 @@ class RewardCodeCheckoutTest extends TestCase
         $this->assertNull(DB::table('loyalty_transactions')->where('reward_code', 'PPR-STACK0001')->value('order_id'));
     }
 
+    public function test_empty_delivery_time_is_stored_as_null(): void
+    {
+        $response = $this->placeOrder('', 'none', '');
+
+        $this->assertSame(201, $response->getStatusCode());
+        $this->assertNull(DB::table('orders')->value('delivery_time'));
+    }
+
     private function createReward(int $userId, string $code, ?int $orderId = null): int
     {
         return (int) DB::table('loyalty_transactions')->insertGetId([
@@ -193,11 +201,12 @@ class RewardCodeCheckoutTest extends TestCase
         ]);
     }
 
-    private function placeOrder(string $rewardCode, string $discountType = 'none')
+    private function placeOrder(string $rewardCode, string $discountType = 'none', string $deliveryTime = '')
     {
         $request = StoreOrderRequest::create('/api/orders', 'POST', [
             'items' => [['product_id' => 11, 'qty' => 1]],
             'method' => 'Pickup',
+            'delivery_time' => $deliveryTime,
             'payment' => 'Counter',
             'phone' => '09171234567',
             'order_type' => 'Standard',

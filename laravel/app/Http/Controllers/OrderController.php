@@ -244,6 +244,7 @@ class OrderController extends Controller
                 $total = $subtotal - $discountAmount + $rushFee;
                 $requiresQrPayment = in_array(strtolower((string) $request->payment), ['gcash', 'qrph'], true);
                 $initialStatus = $requiresQrPayment ? 'Awaiting Payment' : 'Pending';
+                $deliveryTime = trim((string) $request->input('delivery_time', ''));
 
                 $order = Order::create([
                     'user_id' => $user->id,
@@ -260,7 +261,7 @@ class OrderController extends Controller
                     'delivery_service' => in_array($request->method, ['Delivery', 'Deliver'], true)
                         ? $request->input('delivery_service')
                         : null,
-                    'delivery_time' => $request->input('delivery_time'),
+                    'delivery_time' => $deliveryTime !== '' ? $deliveryTime : null,
                     'payment' => $request->payment,
                     'address' => $request->address ?? '',
                     'phone' => $request->phone,
