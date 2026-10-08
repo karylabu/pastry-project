@@ -798,7 +798,13 @@ export default function CheckoutModal({
                       className={`relative z-[9999] w-full rounded-xl border ${fieldErrors.address ? 'border-red-500' : 'border-[#e8e1d8]'} bg-[#fffdfa] p-3 pr-9 text-sm text-[#33251e] outline-none transition placeholder:text-gray-400 focus:border-[#d4af37] focus:ring-2 focus:ring-[#d4af37]/20 pointer-events-auto`}
                       value={checkoutData.address}
                       onClick={(e) => e.currentTarget.focus()}
-                      onFocus={() => setShowAddressSuggestions(true)}
+                      onFocus={(e) => {
+                        if (selectedAddressId !== null) {
+                          e.currentTarget.select();
+                          setSelectedAddressId(null);
+                        }
+                        setShowAddressSuggestions(true);
+                      }}
                       onBlur={() => {
                         setShowAddressSuggestions(false);
                         geocodeNow();
