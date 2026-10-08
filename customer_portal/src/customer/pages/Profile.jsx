@@ -127,7 +127,6 @@ export default function Profile() {
             <Field icon={UserRound} label="Full Name" value={fullName} />
             <Field icon={Mail} label="Email Address" value={user?.email || 'Not available'} />
             <Field icon={Phone} label="Phone Number" value={user?.phone || user?.phone_number || user?.mobile || 'Not available'} />
-            <Field icon={ShieldCheck} label="Account Role" value={user?.role || 'Customer'} />
           </div>
         </div>
 
