@@ -37,7 +37,7 @@ const getLocalDateString = (date = new Date()) => {
 };
 
 const formatDateForDisplay = (dateString) => {
-  if (!dateString) return 'MM/DD/YYYY';
+  if (!dateString) return 'mm/dd/yyyy';
   const [year, month, day] = dateString.split('-');
   return `${month}/${day}/${year}`;
 };
