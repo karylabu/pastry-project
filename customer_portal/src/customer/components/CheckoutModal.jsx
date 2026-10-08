@@ -105,6 +105,7 @@ export default function CheckoutModal({
   const [savedAddresses, setSavedAddresses] = useState([]);
   const [accountProfile, setAccountProfile] = useState(null);
   const [selectedAddressId, setSelectedAddressId] = useState(null);
+  const defaultAddressAppliedRef = useRef(false);
   const [addressesLoading, setAddressesLoading] = useState(false);
   const [addressFetchError, setAddressFetchError] = useState('');
   const [showPhoneSuggestions, setShowPhoneSuggestions] = useState(false);
@@ -275,6 +276,7 @@ export default function CheckoutModal({
     resetGeocode();
     setShowAddressSuggestions(false);
     setFieldErrors((prev) => ({ ...prev, address: '' }));
+    defaultAddressAppliedRef.current = true;
 
     if (!address) {
       setSelectedAddressId(null);
@@ -302,7 +304,10 @@ export default function CheckoutModal({
   };
 
   const applyDefaultSavedAddress = useCallback(() => {
+    if (defaultAddressAppliedRef.current || addressesLoading) return;
+
     if (selectedAddressId !== null) {
+      defaultAddressAppliedRef.current = true;
       setCheckoutData((prev) => ({
         ...prev,
         phone: prev.phone || savedAccountPhone,
@@ -312,6 +317,8 @@ export default function CheckoutModal({
 
     const defaultAddress = savedAddresses.find((address) => address.is_default) || savedAddresses[0];
     if (!defaultAddress) {
+      if (!savedAccountAddress && !savedAccountPhone) return;
+      defaultAddressAppliedRef.current = true;
       setCheckoutData((prev) => ({
         ...prev,
         address: prev.address || savedAccountAddress,
@@ -321,6 +328,7 @@ export default function CheckoutModal({
       return;
     }
 
+    defaultAddressAppliedRef.current = true;
     setSelectedAddressId(defaultAddress.address_id);
     const formattedAddress = formatSavedAddress(defaultAddress);
     setCheckoutData((prev) => ({
@@ -332,7 +340,7 @@ export default function CheckoutModal({
       lng: null,
     }));
     geocodeNow(formattedAddress);
-  }, [selectedAddressId, savedAddresses, savedAccountPhone, savedAccountAddress, checkoutData.address, geocodeNow]);
+  }, [addressesLoading, selectedAddressId, savedAddresses, savedAccountPhone, savedAccountAddress, geocodeNow]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -341,7 +349,10 @@ export default function CheckoutModal({
   }, [isOpen, loadAccountProfile, loadSavedAddresses]);
 
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen) {
+      defaultAddressAppliedRef.current = false;
+      return;
+    }
     applyDefaultSavedAddress();
   }, [isOpen, applyDefaultSavedAddress]);
 
@@ -795,6 +806,7 @@ export default function CheckoutModal({
                       onChange={(e) => {
                         const value = e.target.value;
                         setSelectedAddressId(null);
+                        defaultAddressAppliedRef.current = true;
                         setFieldErrors((prev) => ({ ...prev, address: '' }));
                         setCheckoutData((prev) => ({
                           ...prev,
