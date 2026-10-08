@@ -235,28 +235,28 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
 
   return (
     <>
-    <nav className="sticky top-0 z-[50000] border-b border-gray-100 bg-white/90 px-4 py-3 backdrop-blur-xl sm:px-6 sm:py-5 xl:px-10">
+    <nav className="sticky top-0 z-[50000] border-b border-gray-100 bg-white/90 px-2 py-2 backdrop-blur-xl sm:px-6 sm:py-5 xl:px-10">
 
       <div className="flex items-center justify-between">
 
         {/* LEFT */}
-        <div className="flex items-center gap-2 sm:gap-14">
+        <div className="flex min-w-0 items-center gap-1 sm:gap-14">
 
           <Link
             to="/customer"
-            className="flex items-center gap-2 sm:gap-4"
+            className="flex shrink-0 items-center gap-1 sm:gap-4"
           >
             <img
               src={`${BASE}/uploads/logo.png?v=logo-v2`}
               alt="Logo"
-              className="h-10 w-10 object-contain sm:h-14 sm:w-14"
+              className="h-8 w-8 object-contain sm:h-14 sm:w-14"
             />
 
             <div>
-              <h1 className="font-playfair text-[20px] font-bold italic leading-none sm:text-[28px]">
+              <h1 className="font-playfair text-[16px] font-bold italic leading-none sm:text-[28px]">
                 Pastry <span className="text-[#d4af37]">Project</span>
               </h1>
-              <p className="text-[8px] uppercase tracking-[0.35em] text-gray-400 mt-1">
+              <p className="mt-1 text-[7px] uppercase tracking-[0.25em] text-gray-400 sm:text-[8px] sm:tracking-[0.35em]">
                 baked fresh daily
               </p>
             </div>
@@ -285,15 +285,15 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
         </div>
 
         {/* RIGHT */}
-        <div className="flex items-center gap-1 sm:gap-2 lg:gap-6">
+        <div className="flex shrink-0 items-center gap-1 sm:gap-2 lg:gap-6">
 
           {/* SEARCH */}
           <div ref={searchRef} className="relative">
-            <button onClick={() => setOpenSearch(s => !s)} aria-label="Search products" className="flex h-9 w-9 items-center justify-center rounded-full hover:bg-gray-100 sm:h-10 sm:w-10 xl:h-12 xl:w-12">
-              <Search size={18} />
+            <button onClick={() => setOpenSearch(s => !s)} aria-label="Search products" className="flex h-8 w-8 items-center justify-center rounded-full hover:bg-gray-100 sm:h-10 sm:w-10 xl:h-12 xl:w-12">
+              <Search size={16} className="sm:h-[18px] sm:w-[18px]" />
             </button>
             {openSearch && (
-              <div className="absolute right-0 top-[65px] w-[320px] bg-white border border-gray-200 rounded-3xl shadow-xl p-4">
+              <div className="fixed left-2 top-24 w-[calc(100vw-2rem)] max-w-[320px] rounded-3xl border border-gray-200 bg-white p-4 shadow-xl sm:absolute sm:left-auto sm:right-0 sm:top-[65px] sm:w-[320px]">
                 <form
                   onSubmit={(e) => {
                     e.preventDefault();
@@ -309,11 +309,11 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     placeholder="Search products"
-                    className="flex-1 rounded-2xl border border-gray-200 px-4 py-3 text-sm outline-none"
+                    className="min-w-0 flex-1 rounded-2xl border border-gray-200 px-3 py-2 text-xs outline-none sm:px-4 sm:py-3 sm:text-sm"
                   />
                   <button
                     type="submit"
-                    className="rounded-2xl bg-black px-4 py-3 text-sm font-semibold text-white"
+                    className="rounded-2xl bg-black px-3 py-2 text-xs font-semibold text-white sm:px-4 sm:py-3 sm:text-sm"
                   >
                     Go
                   </button>
@@ -327,9 +327,9 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
             to="/customer/favorites"
             title="Favorites"
             aria-label="View favorites"
-            className="flex h-9 w-9 items-center justify-center rounded-full text-gray-700 transition hover:bg-gray-100 sm:h-10 sm:w-10 xl:h-12 xl:w-12"
+            className="flex h-8 w-8 items-center justify-center rounded-full text-gray-700 transition hover:bg-gray-100 sm:h-10 sm:w-10 xl:h-12 xl:w-12"
           >
-            <Heart size={20} />
+            <Heart size={16} className="sm:h-5 sm:w-5" />
           </Link>
 
           {/* NOTIFICATIONS */}
@@ -342,7 +342,7 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
               aria-expanded={openNotif}
               className="relative flex h-9 w-9 items-center justify-center rounded-full hover:bg-gray-100 sm:h-10 sm:w-10 xl:h-12 xl:w-12"
             >
-              <Bell size={20} />
+              <Bell size={16} className="sm:h-5 sm:w-5" />
 
               {unreadCount > 0 && (
                 <span className="absolute -top-2 -right-2 bg-red-500 w-3 h-3 rounded-full"></span>
@@ -351,7 +351,7 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
             </button>
 
             {openNotif && (
-              <div className="absolute right-0 top-[65px] w-[380px] max-h-[70vh] overflow-y-auto rounded-[24px] border border-gray-200 bg-white shadow-2xl">
+              <div className="fixed left-2 right-2 top-24 z-20 max-h-[calc(100dvh-7rem)] overflow-y-auto rounded-[24px] border border-gray-200 bg-white shadow-2xl sm:absolute sm:left-auto sm:right-0 sm:top-[65px] sm:w-[380px] sm:max-h-[70vh]">
                 <div className="sticky top-0 z-10 border-b border-gray-100 bg-white/95 px-4 py-4 backdrop-blur">
                   <div className="flex items-center justify-between gap-3">
                     <div>
@@ -511,9 +511,9 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
           {/* CART */}
           <button
             onClick={onCartClick}
-            className="relative flex h-9 w-9 items-center justify-center rounded-full bg-black text-white sm:h-10 sm:w-10"
+            className="relative flex h-7 w-7 items-center justify-center rounded-full bg-black text-white sm:h-10 sm:w-10"
           >
-            <ShoppingCart size={17} />
+            <ShoppingCart size={14} className="sm:h-[17px] sm:w-[17px]" />
             {cartCount > 0 && (
               <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-[#d4af37] text-[8px] text-black">
                 {cartCount}
@@ -526,7 +526,7 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
 
             <button
               onClick={() => setOpenAccount(!openAccount)}
-              className="flex h-9 w-9 items-center justify-center rounded-full border border-gray-200 bg-gray-100 transition-all hover:border-[#d4af37] sm:h-10 sm:w-10 xl:h-12 xl:w-12"
+              className="flex h-8 w-8 items-center justify-center rounded-full border border-gray-200 bg-gray-100 transition-all hover:border-[#d4af37] sm:h-10 sm:w-10 xl:h-12 xl:w-12"
             >
               {accountAvatar && failedAccountAvatarUrl !== accountAvatar ? (
                 <img
@@ -538,7 +538,7 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
               ) : user ? (
                 <span className="text-sm font-bold text-[#8b5e34]">{accountInitials}</span>
               ) : (
-                <User size={20} className="text-gray-700" />
+                <User size={16} className="text-gray-700 sm:h-5 sm:w-5" />
               )}
             </button>
             {openAccount && (
@@ -609,6 +609,13 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
                     Saved Addresses
                   </Link>
                   <Link
+                    to="/customer/saved-addresses"
+                    onClick={() => setOpenAccount(false)}
+                    className={accountLinkClass('/customer/saved-addresses')}
+                  >
+                    Saved Addresses
+                  </Link>
+                  <Link
                     to="/customer/account-settings"
                     onClick={() => setOpenAccount(false)}
                     className={accountLinkClass('/customer/account-settings')}
@@ -629,6 +636,22 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
 
         </div>
 
+      </div>
+
+      <div className="mt-2 flex justify-center gap-2 overflow-x-hidden border-t border-gray-100 pt-2 sm:gap-6 lg:hidden">
+        {navs.map(nav => (
+          <Link
+            key={nav.path}
+            to={nav.path}
+            className={`shrink-0 py-1 text-xs font-semibold uppercase tracking-[0.16em] ${
+              location.pathname === nav.path
+                ? "border-b-2 border-[#d4af37] text-black"
+                : "text-gray-500"
+            }`}
+          >
+            {nav.name}
+          </Link>
+        ))}
       </div>
 
     </nav>
