@@ -372,7 +372,7 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
             </button>
 
             {openNotif && (
-              <div className="fixed left-2 right-2 top-24 z-20 max-h-[calc(100dvh-7rem)] overflow-y-auto rounded-[24px] border border-gray-200 bg-white shadow-2xl sm:absolute sm:left-auto sm:right-0 sm:top-[65px] sm:w-[380px] sm:max-h-[70vh]">
+              <div className="fixed left-2 right-2 top-10 z-20 max-h-[calc(100dvh-3.5rem)] overflow-y-auto rounded-[24px] border border-gray-200 bg-white shadow-2xl sm:absolute sm:left-auto sm:right-0 sm:top-[65px] sm:w-[380px] sm:max-h-[70vh]">
                 <div className="sticky top-0 z-10 border-b border-gray-100 bg-white/95 px-4 py-4 backdrop-blur">
                   <div className="flex items-center justify-between gap-3">
                     <div>
