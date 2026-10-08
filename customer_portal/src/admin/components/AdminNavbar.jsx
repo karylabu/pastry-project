@@ -296,9 +296,10 @@ export default function AdminNavbar({ onSidebarChange }) {
               className="hidden text-[12px] font-semibold leading-5 text-black sm:block sm:text-[13px]"
               aria-label="Current date and time"
             >
-              {currentDateTime.toLocaleDateString([], { weekday: "short", month: "short", day: "numeric", year: "numeric" })}
+              {currentDateTime.toLocaleDateString("en-PH", { weekday: "short", month: "short", day: "numeric", year: "numeric", timeZone: "Asia/Manila" })}
               <span className="mx-2 text-black/40" aria-hidden="true">·</span>
-              {currentDateTime.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+              {currentDateTime.toLocaleTimeString("en-PH", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: true, timeZone: "Asia/Manila" })}
+              <span className="ml-1 text-[10px] font-medium text-black/50">PHT</span>
             </time>
           </div>
 
