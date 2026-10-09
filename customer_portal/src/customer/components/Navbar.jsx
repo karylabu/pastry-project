@@ -254,13 +254,14 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
     }
 
     const bounds = event.currentTarget.getBoundingClientRect();
+    const navbarBounds = event.currentTarget.closest('nav')?.getBoundingClientRect();
     const searchIconColumn = bounds.left + bounds.width / 2;
     const popoverIconOffset = 16 + 10;
     const left = Math.max(8, searchIconColumn - popoverIconOffset);
     const width = Math.min(360, window.innerWidth - left - 8);
     setSearchPosition({
       left,
-      top: bounds.top + (bounds.height - 32) / 2,
+      top: (navbarBounds?.bottom ?? bounds.bottom) + 8,
       width,
     });
     setOpenSearch(true);
