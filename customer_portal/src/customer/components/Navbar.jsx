@@ -254,11 +254,12 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
     }
 
     const bounds = event.currentTarget.getBoundingClientRect();
-    const left = Math.max(8, bounds.left);
+    const width = Math.min(240, window.innerWidth - 16);
+    const left = Math.max(8, Math.min(bounds.left, window.innerWidth - width - 8));
     setSearchPosition({
       left,
       top: bounds.bottom + 8,
-      width: Math.min(120, window.innerWidth - left - 8),
+      width,
     });
     setOpenSearch(true);
   };
@@ -337,7 +338,7 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
           {/* SEARCH */}
           <form
             onSubmit={handleSearchSubmit}
-            className="hidden h-11 w-[clamp(180px,22vw,310px)] items-center gap-3 rounded-full border border-gray-300 bg-gray-50 px-4 transition focus-within:border-gray-400 focus-within:bg-white md:flex"
+            className="hidden h-9 w-[clamp(220px,24vw,340px)] items-center gap-3 rounded-full border border-gray-300 bg-gray-50 px-4 transition focus-within:border-gray-400 focus-within:bg-white md:flex"
           >
             <Search size={20} className="shrink-0 text-gray-600" />
             <input
@@ -367,7 +368,7 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
                   top: `${searchPosition.top}px`,
                   width: `${searchPosition.width}px`,
                 }}
-                className="fixed z-[50001] flex h-11 items-center gap-3 rounded-full border border-gray-300 bg-gray-50 px-4 shadow-lg transition focus-within:border-gray-400 focus-within:bg-white"
+                className="fixed z-[50001] flex h-9 items-center gap-3 rounded-full border border-gray-300 bg-gray-50 px-4 shadow-lg transition focus-within:border-gray-400 focus-within:bg-white"
               >
                 <Search size={20} className="shrink-0 text-gray-600" />
                 <input
