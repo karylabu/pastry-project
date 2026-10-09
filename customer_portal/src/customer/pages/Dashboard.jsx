@@ -914,16 +914,16 @@ export function ChatBubble({ aiMode = false, fullPage = false, hideFloating = fa
 
               {!showHistory && (
                 <>
-                  <div className="border-t border-[#f0e6db] bg-white px-3 pt-2.5">
-                    <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-gray-400">Quick chats</p>
-                    <div className="flex flex-wrap gap-2">
+                  <div className="border-t border-[#f0e6db] px-3 pt-1.5">
+                    <p className="mb-1 text-[9px] font-semibold uppercase tracking-[0.14em] text-gray-400">Quick chats</p>
+                    <div className="grid grid-cols-3 gap-1">
                       {["Hi, I need help", "Where is my order?", "I want to place an order", "Can I customize a cake?", "How can I pay?"].map((suggestion) => (
                         <button
                           key={suggestion}
                           type="button"
                           onClick={() => sendMessage(suggestion, false, 0, "ai", true)}
                           disabled={sending}
-                          className="rounded-full border border-[#f0e6db] bg-white px-3 py-1.5 text-[11px] text-gray-600 transition hover:border-[#d4af37] hover:bg-[#fff4cd] hover:text-[#80600a] disabled:cursor-not-allowed disabled:opacity-40"
+                          className="min-h-7 rounded-full border border-[#f0e6db] px-2 py-1 text-center text-[9px] leading-tight text-gray-600 transition hover:border-[#d4af37] hover:bg-[#fff4cd] hover:text-[#80600a] disabled:cursor-not-allowed disabled:opacity-40"
                         >
                           {suggestion}
                         </button>
