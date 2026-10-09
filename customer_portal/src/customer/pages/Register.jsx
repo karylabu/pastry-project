@@ -202,14 +202,39 @@ export default function Register() {
   };
 
   return (
-    <div className="pastry-register relative min-h-screen w-full overflow-hidden bg-[#f8f4eb] font-['DM_Sans'] text-[#171717]">
+    <div className="pastry-register relative min-h-screen w-full overflow-x-hidden bg-[#f8f4eb] font-['DM_Sans'] text-[#171717]">
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700;800&family=Pacifico&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700;800&family=Pacifico&family=Playfair+Display:wght@600;700&display=swap');
 
         .brand-script { font-family: 'Pacifico', cursive; }
         .pastry-register { background: #fcfbf8; }
-        .pastry-register .register-banner { display: none; position: absolute; z-index: 0; top: 0; left: 0; height: calc(100% - 105px); width: auto; max-width: none; object-fit: contain; object-position: left top; }
-        .pastry-register .hero-panel { visibility: hidden; }
+        .pastry-register::before {
+          content: "";
+          position: absolute;
+          z-index: 0;
+          inset: 0;
+          background-color: #faf8f1;
+          background-image:
+            radial-gradient(circle at 8% 20%, rgba(255, 228, 153, 0.5), transparent 22%),
+            radial-gradient(circle at 92% 88%, rgba(255, 218, 112, 0.45), transparent 20%),
+            linear-gradient(rgba(154, 127, 70, 0.07) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(154, 127, 70, 0.07) 1px, transparent 1px);
+          background-size: auto, auto, 42px 42px, 42px 42px;
+          pointer-events: none;
+        }
+        .pastry-register .register-banner { display: none; }
+        .pastry-register .hero-panel { visibility: visible; }
+        .pastry-register .register-tagline {
+          font-family: 'Playfair Display', Georgia, serif;
+          font-size: 40px;
+          font-weight: 700;
+          letter-spacing: -0.045em;
+          line-height: 1.12;
+        }
+        .pastry-register .register-tagline span { font-style: italic; }
+        .pastry-register .register-welcome { font-family: 'Pacifico', cursive; }
+        .pastry-register .register-welcome svg { display: none; }
+        .pastry-register .register-decorations { display: none; }
 
         .pastry-register .login-card {
           background: rgba(255,255,255,0.96);
@@ -254,7 +279,129 @@ export default function Register() {
         .pastry-register .btn-secondary:hover { background: #F9FAFB; }
 
         @media (min-width: 1024px) {
-          .pastry-register .register-banner { display: block; }
+          .pastry-register > .relative.z-10 { min-height: 100vh; padding: 34px 32px 22px; }
+          .pastry-register main {
+            flex: 0 0 auto;
+            width: min(1030px, 100%);
+            min-height: min(700px, calc(100vh - 110px));
+            margin: auto;
+            gap: 0;
+            align-items: stretch;
+            overflow: hidden;
+            border: 1px solid rgba(255, 255, 255, 0.9);
+            border-radius: 26px;
+            background: #fff;
+            box-shadow: 0 18px 42px rgba(100, 78, 28, 0.16);
+          }
+          .pastry-register .hero-panel {
+            flex: 0 0 45%;
+            width: 45%;
+            justify-content: space-between;
+            padding: 34px 48px;
+            background: linear-gradient(135deg, #fff9e9 0%, #fff6df 100%);
+            border-right: 1px solid #f4ead2;
+          }
+          .pastry-register .hero-panel > .mb-6:first-child {
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 26px;
+          }
+          .pastry-register .hero-panel > .mb-6:first-child img { width: 48px; height: 48px; }
+          .pastry-register .hero-panel > .mb-6:first-child h1 {
+            font-family: 'Playfair Display', Georgia, serif;
+            font-size: 28px;
+            font-style: italic;
+            font-weight: 700;
+            color: #25211a;
+          }
+          .pastry-register .hero-panel > .mb-6:first-child h1 span { color: #e9aa32; }
+          .pastry-register .hero-panel > .mb-6:first-child p { margin-top: 5px; font-size: 8px; letter-spacing: 0.42em; }
+          .pastry-register .hero-tagline { margin-bottom: 18px; }
+          .pastry-register .register-cake { width: 100%; max-width: 355px; }
+          .pastry-register .register-cake img {
+            width: 100%;
+            height: 300px;
+            border-radius: 18px;
+            object-fit: cover;
+            object-position: center 46%;
+            box-shadow: 0 10px 22px rgba(100, 78, 28, 0.14);
+          }
+          .pastry-register main > div:not(.hero-panel) {
+            flex: 1 1 auto;
+            width: 55%;
+            justify-content: center;
+            padding: 28px 38px;
+          }
+          .pastry-register .login-card {
+            width: 100%;
+            max-width: 500px;
+            padding: 0;
+            border: 0;
+            border-radius: 0;
+            background: transparent;
+            box-shadow: none;
+            backdrop-filter: none;
+          }
+          .pastry-register .login-card > .mb-5:first-child { margin-bottom: 18px; }
+          .pastry-register .login-card > .mb-5:first-child h2.register-welcome {
+            position: relative;
+            width: fit-content;
+            font-size: 40px;
+            font-weight: 400;
+            line-height: 1.1;
+            color: #edaf39;
+          }
+          .pastry-register .login-card > .mb-5:first-child h2.register-welcome svg {
+            display: block;
+            position: absolute;
+            top: 0;
+            right: -38px;
+            width: 34px;
+            height: 32px;
+            fill: none;
+            stroke: #edaf39;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+            stroke-width: 1.7;
+          }
+          .pastry-register .login-card > .mb-5:first-child p { margin-top: 2px; font-size: 13px; color: #89909c; }
+          .pastry-register .register-input { height: 42px; border-radius: 9px; font-size: 13px; }
+          .pastry-register .login-card label { font-size: 11px; }
+          .pastry-register .btn-primary,
+          .pastry-register .btn-secondary { height: 42px; border-radius: 9px; }
+          .pastry-register .login-card form.grid { gap: 8px 14px; }
+          .pastry-register .login-card form > div > label { margin-bottom: 4px; }
+          .pastry-register .login-card form > div.flex.flex-col { gap: 5px; font-size: 11px; }
+          .pastry-register .login-card form > div.flex.flex-col label { font-size: 11px; }
+          .pastry-register .login-card form > p a,
+          .pastry-register .login-card form > div > label a { color: #b87808; }
+          .pastry-register .mobile-register-art { display: none; }
+          .pastry-register .register-decorations {
+            position: absolute;
+            z-index: 1;
+            inset: 0;
+            display: block;
+            overflow: hidden;
+            pointer-events: none;
+          }
+          .pastry-register .register-decorations svg { position: absolute; fill: none; stroke: #edbd62; }
+          .pastry-register .register-whisk { top: -12px; right: 12px; width: 152px; height: 152px; stroke-width: 2.2; opacity: .55; }
+          .pastry-register .register-sprig-left { bottom: 82px; left: -14px; width: 82px; height: 130px; stroke-width: 2; opacity: .48; }
+          .pastry-register .register-sprig-right { right: 12px; bottom: 22px; width: 96px; height: 150px; stroke-width: 2; opacity: .52; }
+          .pastry-register .register-bottom-wave { right: 0; bottom: 0; width: 100%; height: 106px; fill: #fcecc8; stroke: none; opacity: .76; }
+          .pastry-register footer {
+            width: min(1030px, 100%);
+            min-height: 36px;
+            margin: 8px auto 0;
+            padding: 0 18px;
+            border: 0;
+            background: transparent;
+          }
+          .pastry-register footer > div:first-child { gap: 9px; }
+          .pastry-register footer img { width: 28px; height: 28px; }
+          .pastry-register footer p,
+          .pastry-register footer a { font-size: 11px; }
+          .pastry-register footer > div:nth-child(2) { gap: 18px; }
         }
 
         @media (max-width: 1023px) {
@@ -268,20 +415,16 @@ export default function Register() {
             display: flex;
             visibility: visible;
             padding: 18px 32px 14px;
-            background-color: #fcfbf8;
-            background-image: radial-gradient(circle at 0 0, #ffc236 0 84px, transparent 85px), url("${ASSET_BASE}/login-mobile-texture.jpg");
-            background-size: 100% 100%, 100% 100%;
-            background-position: top left, top right;
-            background-repeat: no-repeat;
+            background: linear-gradient(135deg, #fff9e9 0%, #fff6df 100%);
           }
           .pastry-register .hero-panel > .mb-6:first-child { justify-content: center; margin-top: 12px; margin-bottom: 0; }
           .pastry-register .hero-panel > .mb-6:first-child img { display: none; }
           .pastry-register .hero-panel > .mb-6:first-child > div { text-align: center; }
           .pastry-register .hero-panel > .mb-6:first-child h1 { font-size: 26px; }
           .pastry-register .hero-panel > .mb-6:first-child p { font-size: 8px; }
-          .pastry-register .hero-panel > div:nth-child(2) { display: none; }
-          .pastry-register .hero-panel > .mb-6:nth-child(2) h2 { font-size: 32px; }
-          .pastry-register .hero-panel > .mb-6:nth-child(2) p { font-size: 14px; line-height: 1.5; }
+          .pastry-register .hero-tagline { margin: 0; text-align: center; }
+          .pastry-register .hero-tagline h2 { font-size: 30px; }
+          .pastry-register .register-cake { display: none; }
           .pastry-register main { flex: 0 0 auto; gap: 0; padding: 0; }
           .pastry-register main > div:not(.hero-panel) { padding: 0 23px 20px; }
           .pastry-register .login-card { border-radius: 20px; }
@@ -289,9 +432,24 @@ export default function Register() {
           .pastry-register .btn-primary, .pastry-register .btn-secondary { height: 44px; }
           .pastry-register .mobile-register-art { display: block; width: 100%; height: clamp(160px, 35.5vw, 185px); object-fit: cover; object-position: center; }
           .pastry-register footer { justify-content: center; border-top: 0; padding: 10px 0 19px; }
-          .pastry-register footer > div:nth-child(2) { display: none; }
+          .pastry-register footer > div:nth-child(2) { display: flex; }
           .pastry-register footer img { width: 30px; height: 30px; }
           .pastry-register footer p { font-size: 11px; }
+          .pastry-register footer > div:nth-child(2) { gap: 12px 18px; }
+          .pastry-register footer a { font-size: 11px; }
+          .pastry-register .mobile-register-art { display: block; width: min(100%, 340px); height: auto; max-height: none; margin: 12px auto; border-radius: 16px; object-fit: contain; }
+          .pastry-register > .relative.z-10 { padding: 0 0 10px; }
+          .pastry-register main { padding-top: 0; }
+          .pastry-register .hero-panel > .mb-6:first-child { margin-bottom: 12px; }
+          .pastry-register .hero-panel > .mb-6:first-child img { display: block; }
+          .pastry-register .hero-panel > .mb-6:first-child h1 { font-family: 'Playfair Display', Georgia, serif; font-size: 22px; font-style: italic; }
+          .pastry-register .hero-panel > .mb-6:first-child h1 span { color: #e9aa32; }
+          .pastry-register .hero-panel > .mb-6:first-child p { margin-top: 4px; font-size: 7px; letter-spacing: .35em; }
+          .pastry-register .hero-tagline { margin-bottom: 0; }
+          .pastry-register .hero-tagline h2 { font-family: 'Playfair Display', Georgia, serif; font-size: 29px; font-weight: 700; line-height: 1.12; }
+          .pastry-register .hero-tagline h2 span { color: #f0b94d; font-style: italic; }
+          .pastry-register .login-card > .mb-5:first-child h2.register-welcome { font-family: 'Pacifico', cursive; font-size: 31px; font-weight: 400; color: #edaf39; }
+          .pastry-register .login-card > .mb-5:first-child p { color: #89909c; }
         }
 
         @media (max-width: 399px) {
@@ -301,7 +459,23 @@ export default function Register() {
         }
       `}</style>
 
-      <img className="register-banner" src={`${ASSET_BASE}/login.png`} alt="" aria-hidden="true" />
+      <div className="register-decorations" aria-hidden="true">
+        <svg className="register-whisk" viewBox="0 0 160 160">
+          <path d="M145 2 69 87M157 12 82 99" />
+          <path d="M69 87c-19 21-40 31-50 22-10-9-1-31 18-52L88 3" />
+          <path d="M69 87c-7-13-4-31 9-49L112 1M69 87c9-3 25-16 38-31l24-54M69 87c1-15 12-37 27-55L100 0" />
+          <path d="M40 56c-4 18 8 31 29 31M36 23c8-8 21 1 19 12 0-12 14-18 20-8 8 13-18 26-18 26S27 36 36 23Z" />
+        </svg>
+        <svg className="register-sprig register-sprig-left" viewBox="0 0 90 140">
+          <path d="M13 137c6-42 19-82 51-126M22 104c-15-3-20-12-17-23 12 2 19 8 17 23ZM30 82c-2-15 4-24 15-28 4 12-1 21-15 28ZM38 62c-14-4-18-14-13-25 12 4 18 12 13 25ZM48 43c0-14 7-21 18-22 2 12-4 20-18 22ZM17 119c-9-12-7-22 1-29 9 9 10 18-1 29ZM48 137c9-14 19-17 29-11-6 12-15 16-29 11Z" />
+        </svg>
+        <svg className="register-sprig register-sprig-right" viewBox="0 0 105 155">
+          <path d="M8 152c29-39 51-80 70-143M24 132c-14-1-21-9-20-20 12 1 19 7 20 20ZM36 111c-3-14 2-23 13-29 5 12 2 21-13 29ZM48 86c-14-3-19-12-15-23 12 3 18 10 15 23ZM58 62c1-14 9-21 20-21 1 12-6 20-20 21ZM52 151c-5-13-1-22 9-27 7 11 5 20-9 27ZM75 119c8-13 18-16 28-10-6 12-15 16-28 10Z" />
+        </svg>
+        <svg className="register-bottom-wave" viewBox="0 0 1365 110" preserveAspectRatio="none">
+          <path d="M0 42c100 15 102 73 250 47 140-24 197-65 320-52 126 13 178 68 323 54 120-12 204-62 326-39 58 11 99 36 146 33v25H0Z" />
+        </svg>
+      </div>
 
       <div className="relative z-10 flex min-h-screen w-full flex-col">
         <main className="flex flex-1 flex-col py-4 lg:flex-row lg:items-center lg:justify-between lg:gap-0 lg:py-0">
@@ -316,11 +490,15 @@ export default function Register() {
               </div>
             </div>
 
-            <div className="max-w-[420px] space-y-4 text-[#171717]">
-              <div className="rounded-[24px] border border-[#f2d181] bg-[#fffaf0] px-5 py-4 shadow-sm">
-                <p className="text-xs font-bold uppercase tracking-[0.25em] text-[#A8354A]">Fresh start</p>
-                <h2 className="mt-2 text-3xl font-extrabold leading-tight text-[#171717]">Create your account</h2>
-              </div>
+            <div className="hero-tagline">
+              <h2 className="register-tagline text-[#171717]">
+                A little sweetness,<br />
+                <span className="text-[#F0B94D]">baked fresh daily.</span>
+              </h2>
+            </div>
+
+            <div className="register-cake">
+              <img src={`${ROOT_BASE}/uploads/floral(1).jpg?v=login-cake-2026`} alt="Floral wedding cake" />
             </div>
           </div>
 
@@ -332,8 +510,14 @@ export default function Register() {
               className="login-card w-full max-w-[500px] px-5 py-4 sm:px-7 sm:py-5"
             >
               <div className="mb-5 text-center lg:text-left">
-                <h2 className="text-2xl font-extrabold text-[#171717]">Create Account</h2>
-                <p className="mt-1 text-xs text-[#171717]/60">Create an account to start ordering your favorites.</p>
+                <h2 className="register-welcome text-2xl font-normal text-[#F0B94D]">
+                  Welcome
+                  <svg viewBox="0 0 40 36" aria-hidden="true">
+                    <path d="M2 29c9 0 12-2 17-8" />
+                    <path d="M18 19c-7-7 2-14 7-7 5-7 14 0 7 7l-7 7Z" />
+                  </svg>
+                </h2>
+                <p className="mt-1 text-xs text-[#171717]/60">Create your account to get started.</p>
               </div>
 
               {error && (
@@ -513,12 +697,12 @@ export default function Register() {
           </div>
         </main>
 
-        <img className="mobile-register-art hidden" src={`${ASSET_BASE}/login-mobile-cake.jpg`} alt="" aria-hidden="true" />
+        <img className="mobile-register-art hidden" src={`${ROOT_BASE}/uploads/floral(1).jpg?v=login-cake-2026`} alt="" aria-hidden="true" />
 
         <footer className="relative z-10 flex flex-col items-center justify-between border-t border-gray-200 bg-white/70 px-5 py-3 md:flex-row md:px-8">
           <div className="flex items-center gap-3">
             <img src={LOGO_URL} alt="Logo" className="h-9 w-9 opacity-80" />
-            <p className="text-sm text-gray-500">© 2024 Pastry Project. All rights reserved.</p>
+            <p className="text-sm text-gray-500">© 2017 Pastry Project. All rights reserved.</p>
           </div>
           <div className="my-2 flex flex-wrap justify-center gap-4 md:my-0 md:gap-6">
             <Link to="/customer/about-us" className="text-sm font-semibold text-gray-600 hover:text-[#F0B94D]">About Us</Link>
