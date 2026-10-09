@@ -154,12 +154,12 @@ export default function Login() {
   }, [showLoginSuccess, justLoggedUser, navigate]);
 
   return (
-    <div className="pastry-login relative min-h-screen w-full overflow-hidden bg-[#f3f6f2] font-['DM_Sans'] text-[#171717]">
+    <div className="pastry-login relative min-h-screen w-full overflow-hidden bg-[#faf8f1] font-['DM_Sans'] text-[#171717]">
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700;800&family=Pacifico&display=swap');
 
         .brand-script { font-family: 'Pacifico', cursive; }
-        .pastry-login { background: #f3f6f2; }
+        .pastry-login { background: #faf8f1; }
         .pastry-login::before {
           content: "";
           position: absolute;
@@ -168,12 +168,12 @@ export default function Login() {
           left: 0;
           width: 100%;
           height: 100%;
-          background-color: #f3f6f2;
+          background-color: #faf8f1;
           background-image:
-            radial-gradient(circle at 8% 20%, rgba(202, 239, 168, 0.52), transparent 22%),
-            radial-gradient(circle at 92% 88%, rgba(255, 226, 150, 0.5), transparent 20%),
-            linear-gradient(rgba(96, 122, 93, 0.055) 1px, transparent 1px),
-            linear-gradient(90deg, rgba(96, 122, 93, 0.055) 1px, transparent 1px);
+            radial-gradient(circle at 8% 20%, rgba(255, 228, 153, 0.5), transparent 22%),
+            radial-gradient(circle at 92% 88%, rgba(255, 218, 112, 0.45), transparent 20%),
+            linear-gradient(rgba(154, 127, 70, 0.07) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(154, 127, 70, 0.07) 1px, transparent 1px);
           background-size: auto, auto, 42px 42px, 42px 42px;
           pointer-events: none;
         }
@@ -259,7 +259,7 @@ export default function Login() {
             border: 1px solid rgba(255, 255, 255, 0.85);
             border-radius: 22px;
             background: rgba(255, 255, 255, 0.96);
-            box-shadow: 0 24px 60px rgba(42, 66, 46, 0.13);
+            box-shadow: 0 24px 60px rgba(100, 78, 28, 0.13);
           }
           .pastry-login .hero-panel {
             display: flex;
@@ -267,8 +267,8 @@ export default function Login() {
             width: 39%;
             justify-content: space-between;
             padding: 34px 30px;
-            background: #f2f7ef;
-            border-right: 1px solid #e8eee5;
+            background: #fff9e9;
+            border-right: 1px solid #f1e6c9;
           }
           .pastry-login .hero-panel > .mb-6:first-child { margin-bottom: 34px; }
           .pastry-login .hero-panel > .mb-6:nth-child(2) { margin-bottom: 24px; }
@@ -281,7 +281,7 @@ export default function Login() {
             height: 230px;
             border-radius: 16px;
             object-position: center 45%;
-            box-shadow: 0 12px 28px rgba(42, 66, 46, 0.14);
+            box-shadow: 0 12px 28px rgba(100, 78, 28, 0.14);
           }
           .pastry-login main > div:not(.hero-panel) {
             flex: 1 1 auto;
@@ -303,17 +303,17 @@ export default function Login() {
           .pastry-login .btn-primary {
             height: 46px;
             border-radius: 9px;
-            background: #0b9b70;
-            color: white;
+            background: #f0b94d;
+            color: #171717;
           }
-          .pastry-login .btn-primary:hover { background: #07845f; }
+          .pastry-login .btn-primary:hover { background: #e5ae3d; }
           .pastry-login .btn-secondary { height: 46px; border-radius: 9px; }
           .pastry-login .login-input:focus {
-            border-color: #0b9b70;
-            box-shadow: 0 0 0 4px rgba(11, 155, 112, 0.1);
+            border-color: #f0b94d;
+            box-shadow: 0 0 0 4px rgba(240, 185, 77, 0.12);
           }
           .pastry-login .login-card a,
-          .pastry-login .login-card button.text-xs { color: #168b50; }
+          .pastry-login .login-card button.text-xs { color: #b87808; }
           .pastry-login .login-footer {
             width: min(940px, 100%);
             grid-template-columns: 1fr auto 1fr;
