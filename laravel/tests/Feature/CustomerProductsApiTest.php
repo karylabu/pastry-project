@@ -2,8 +2,10 @@
 
 namespace Tests\Feature;
 
+use App\Http\Controllers\CustomerApiController;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Carbon;
 use Tests\TestCase;
 
 class CustomerProductsApiTest extends TestCase
@@ -82,6 +84,7 @@ class CustomerProductsApiTest extends TestCase
 
     protected function tearDown(): void
     {
+        Carbon::setTestNow();
         Schema::dropIfExists('user_sessions');
         Schema::dropIfExists('users');
         Schema::dropIfExists('order_items');
@@ -100,6 +103,25 @@ class CustomerProductsApiTest extends TestCase
             ->assertJsonPath('0.id', 1)
             ->assertJsonPath('0.sizes.0.size', 'Small')
             ->assertJsonMissingPath('0.sizes.1');
+    }
+
+    public function test_shop_status_uses_manila_server_time(): void
+    {
+        Carbon::setTestNow(Carbon::parse('2026-10-10 07:59:00', 'Asia/Manila'));
+        $status = app(CustomerApiController::class)->shopStatus()->getData(true);
+        $this->assertFalse($status['is_open']);
+        $this->assertSame('Asia/Manila', $status['timezone']);
+        $this->assertSame('08:00', $status['opens_at']);
+
+        Carbon::setTestNow(Carbon::parse('2026-10-10 08:00:00', 'Asia/Manila'));
+        $status = app(CustomerApiController::class)->shopStatus()->getData(true);
+        $this->assertTrue($status['is_open']);
+
+        Carbon::setTestNow(Carbon::parse('2026-10-10 20:00:00', 'Asia/Manila'));
+        $status = app(CustomerApiController::class)->shopStatus()->getData(true);
+        $this->assertFalse($status['is_open']);
+
+        Carbon::setTestNow();
     }
 
     public function test_all_includes_unavailable_products(): void

@@ -46,6 +46,20 @@ class CustomerApiController extends Controller
             ->header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
     }
 
+    public function shopStatus()
+    {
+        $shopNow = now('Asia/Manila');
+        $shopMinutes = ($shopNow->hour * 60) + $shopNow->minute;
+
+        return $this->corsResponse([
+            'is_open' => $shopMinutes >= 480 && $shopMinutes < 1200,
+            'server_time' => $shopNow->toIso8601String(),
+            'timezone' => 'Asia/Manila',
+            'opens_at' => '08:00',
+            'closes_at' => '20:00',
+        ])->header('Cache-Control', 'no-store, private');
+    }
+
     protected function parseJson(Request $request): array
     {
         $data = $request->all();

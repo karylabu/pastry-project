@@ -18,8 +18,6 @@ L.Icon.Default.mergeOptions({
   shadowUrl: markerShadow,
 });
 
-const SHOP_OPEN_MINUTES = 8 * 60;
-const SHOP_CLOSE_MINUTES = 20 * 60;
 const SHOP_HOURS_LABEL = '8:00 AM to 8:00 PM';
 const FULFILLMENT_TIME_SLOTS = Array.from({ length: 25 }, (_, index) => {
   const totalMinutes = 8 * 60 + index * 30;
@@ -77,7 +75,8 @@ export default function CheckoutModal({
 }) {
   const [loading, setLoading] = useState(false);
   const [fieldErrors, setFieldErrors] = useState({});
-  const [shopOpen, setShopOpen] = useState(true);
+  const [shopOpen, setShopOpen] = useState(null);
+  const [shopStatusError, setShopStatusError] = useState(false);
   const [discountType, setDiscountType] = useState('none');
   const [rewardCodeInput, setRewardCodeInput] = useState('');
   const [firstOrderEligibility, setFirstOrderEligibility] = useState({ status: 'unknown' });
@@ -85,11 +84,22 @@ export default function CheckoutModal({
   const [discountIdPreview, setDiscountIdPreview] = useState('');
   const modalScrollRef = useRef(null);
 
-  const refreshShopStatus = () => {
-    const now = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Manila' }));
-    const currentMinutes = now.getHours() * 60 + now.getMinutes();
-    setShopOpen(currentMinutes >= SHOP_OPEN_MINUTES && currentMinutes < SHOP_CLOSE_MINUTES);
-  };
+  const refreshShopStatus = useCallback(async (signal) => {
+    try {
+      const response = await fetch(`${CUSTOMER_BASE}/api/shop/status`, { signal });
+      const data = await safeParseJson(response);
+      if (!response.ok || typeof data?.is_open !== 'boolean') {
+        throw new Error(data?.message || `Shop status request failed (${response.status}).`);
+      }
+      setShopOpen(data.is_open);
+      setShopStatusError(false);
+    } catch (error) {
+      if (error.name === 'AbortError') return;
+      console.error('Unable to verify shop hours:', error);
+      setShopOpen(null);
+      setShopStatusError(true);
+    }
+  }, []);
 
   const [checkoutData, setCheckoutData] = useState({
     method: "Deliver",
@@ -235,10 +245,18 @@ export default function CheckoutModal({
   }, [isOpen, userId]);
 
   useEffect(() => {
-    refreshShopStatus();
-    const timer = window.setInterval(refreshShopStatus, 60000);
-    return () => window.clearInterval(timer);
-  }, [isOpen]);
+    if (!isOpen) return undefined;
+
+    const controller = new AbortController();
+    setShopOpen(null);
+    setShopStatusError(false);
+    refreshShopStatus(controller.signal);
+    const timer = window.setInterval(() => refreshShopStatus(controller.signal), 60000);
+    return () => {
+      controller.abort();
+      window.clearInterval(timer);
+    };
+  }, [isOpen, refreshShopStatus]);
 
   useEffect(() => {
     if (isOpen && modalScrollRef.current) {
@@ -463,7 +481,15 @@ export default function CheckoutModal({
   ========================= */
   const handlePlaceOrder = async () => {
 
-    if (!shopOpen) {
+    if (shopOpen !== true) {
+      if (shopOpen === null && shopStatusError) {
+        alert('Unable to verify shop hours. Please check your connection and try again.');
+        return;
+      }
+      if (shopOpen === null) {
+        alert('Checking shop hours. Please try again in a moment.');
+        return;
+      }
       alert(`The shop is currently closed. Checkout is available from ${SHOP_HOURS_LABEL}.`);
       return;
     }
@@ -1186,9 +1212,9 @@ export default function CheckoutModal({
             {/* TOTALS */}
             <div className="mt-5 space-y-2 border-t border-[#e9dfd2] pt-5">
 
-              <div className={`rounded-2xl border px-4 py-3 text-sm ${shopOpen ? 'border-green-200 bg-green-50 text-green-700' : 'border-amber-200 bg-amber-50 text-amber-800'}`}>
-                <span className="font-semibold">{shopOpen ? 'Shop is open' : 'Shop is closed'}</span>
-                <span className="ml-2">{shopOpen ? 'You can place your order now.' : `Checkout is available daily from ${SHOP_HOURS_LABEL}.`}</span>
+              <div className={`rounded-2xl border px-4 py-3 text-sm ${shopOpen === true ? 'border-green-200 bg-green-50 text-green-700' : 'border-amber-200 bg-amber-50 text-amber-800'}`}>
+                <span className="font-semibold">{shopOpen === true ? 'Shop is open' : shopOpen === false ? 'Shop is closed' : 'Checking shop hours'}</span>
+                <span className="ml-2">{shopOpen === true ? 'You can place your order now.' : shopOpen === false ? `Checkout is available daily from ${SHOP_HOURS_LABEL}.` : shopStatusError ? 'Shop hours could not be verified. Please try again.' : 'Please wait while we verify the current time.'}</span>
               </div>
 
               {firstOrderEligibility.status === 'checking' && (
@@ -1341,14 +1367,14 @@ export default function CheckoutModal({
 
               <button
                 onClick={handlePlaceOrder}
-                disabled={loading || !shopOpen}
+                disabled={loading || shopOpen !== true}
                 className="mt-3 w-full rounded-xl border border-[#eadfca] bg-[#fff8e9] py-3.5 text-sm font-bold uppercase tracking-[0.16em] text-[#33251e] shadow-sm transition hover:border-[#e7c875] hover:bg-[#fff8df] hover:text-[#8d6a2e] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d4af37] disabled:cursor-not-allowed disabled:border-gray-200 disabled:bg-gray-200 disabled:text-gray-500"
               >
                 {loading
                   ? checkoutData.payment === "QRPh"
                     ? "REDIRECTING..."
                     : "SAVING..."
-                  : shopOpen ? "PLACE ORDER" : "SHOP CLOSED"}
+                  : shopOpen === true ? "PLACE ORDER" : shopOpen === false ? "SHOP CLOSED" : "CHECKING HOURS"}
               </button>
 
             </div>
