@@ -255,7 +255,9 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
 
     const bounds = event.currentTarget.getBoundingClientRect();
     const width = Math.min(240, window.innerWidth - 16);
-    const left = Math.max(8, Math.min(bounds.left, window.innerWidth - width - 8));
+    const searchIconColumn = bounds.left + bounds.width / 2;
+    const popoverIconOffset = 16 + 10;
+    const left = Math.max(8, Math.min(searchIconColumn - popoverIconOffset, window.innerWidth - width - 8));
     setSearchPosition({
       left,
       top: bounds.bottom + 8,
