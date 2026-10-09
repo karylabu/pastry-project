@@ -375,7 +375,6 @@ export default function Register() {
           .pastry-register .login-card form > div.flex.flex-col label { font-size: 11px; }
           .pastry-register .login-card form > p a,
           .pastry-register .login-card form > div > label a { color: #b87808; }
-          .pastry-register .mobile-register-art { display: none; }
           .pastry-register .register-decorations {
             position: absolute;
             z-index: 1;
@@ -430,14 +429,12 @@ export default function Register() {
           .pastry-register .login-card { border-radius: 20px; }
           .pastry-register .register-input { height: 46px; }
           .pastry-register .btn-primary, .pastry-register .btn-secondary { height: 44px; }
-          .pastry-register .mobile-register-art { display: block; width: 100%; height: clamp(160px, 35.5vw, 185px); object-fit: cover; object-position: center; }
           .pastry-register footer { justify-content: center; border-top: 0; padding: 10px 0 19px; }
           .pastry-register footer > div:nth-child(2) { display: flex; }
           .pastry-register footer img { width: 30px; height: 30px; }
           .pastry-register footer p { font-size: 11px; }
           .pastry-register footer > div:nth-child(2) { gap: 12px 18px; }
           .pastry-register footer a { font-size: 11px; }
-          .pastry-register .mobile-register-art { display: block; width: min(100%, 340px); height: auto; max-height: none; margin: 12px auto; border-radius: 16px; object-fit: contain; }
           .pastry-register > .relative.z-10 { padding: 0 0 10px; }
           .pastry-register main { padding-top: 0; }
           .pastry-register .hero-panel > .mb-6:first-child { margin-bottom: 12px; }
@@ -696,8 +693,6 @@ export default function Register() {
             </motion.div>
           </div>
         </main>
-
-        <img className="mobile-register-art hidden" src={`${ROOT_BASE}/uploads/floral(1).jpg?v=login-cake-2026`} alt="" aria-hidden="true" />
 
         <footer className="relative z-10 flex flex-col items-center justify-between border-t border-gray-200 bg-white/70 px-5 py-3 md:flex-row md:px-8">
           <div className="flex items-center gap-3">

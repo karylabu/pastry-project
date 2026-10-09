@@ -189,7 +189,6 @@ export default function Login() {
         .pastry-login .login-banner { display: none; position: absolute; z-index: 0; top: 0; left: 0; height: calc(100% - 105px); width: auto; max-width: none; object-fit: contain; object-position: left top; }
         .pastry-login .brand-icon-overlay { display: none; }
         .pastry-login .hero-panel { display: none; }
-        .pastry-login .mobile-login-art { display: none; }
         .login-decorations { display: none; }
 
         /* Background Blobs */
@@ -393,7 +392,6 @@ export default function Login() {
           .pastry-login .login-footer p,
           .pastry-login .login-footer a { font-size: 11px; }
           .pastry-login .login-footer-links { gap: 18px; }
-          .pastry-login .mobile-login-art { display: none; }
           .pastry-login .login-decorations {
             position: absolute;
             z-index: 1;
@@ -440,7 +438,6 @@ export default function Login() {
           .pastry-login .login-card > .mb-4:first-child { margin-bottom: 12px; text-align: center; }
           .pastry-login .login-card > .mb-4:first-child h2 { font-size: 31px; }
           .pastry-login .login-card > .mb-4:first-child p { color: #89909c; }
-          .pastry-login .mobile-login-art { display: block; width: min(100%, 340px); height: auto; max-height: none; margin: 12px auto; border-radius: 16px; object-fit: contain; object-position: center; }
           .pastry-login .login-footer { justify-content: center; border-top: 0; padding: 10px 0 19px; }
           .pastry-login .login-footer-links { display: flex; justify-content: center; gap: 12px 18px; }
           .pastry-login .login-footer img { width: 30px; height: 30px; }
@@ -472,7 +469,6 @@ export default function Login() {
             .pastry-login .login-card form.space-y-4 > :not([hidden]) ~ :not([hidden]).btn-secondary { margin-top: 0; }
             .pastry-login .login-card form + p { margin-top: 25px; }
             .pastry-login .login-card a.mt-4 { margin-top: 14px; }
-            .pastry-login .mobile-login-art { width: min(100%, 340px); height: auto; margin-top: 12px; object-fit: contain; object-position: center; }
             .pastry-login .login-footer { padding-bottom: 19px; }
           }
           @media (max-width: 399px) {
@@ -720,8 +716,6 @@ export default function Login() {
             </div>
           </div>
         </main>
-
-        <img className="mobile-login-art" src={`${ROOT_BASE}/uploads/floral(1).jpg?v=login-cake-2026`} alt="" aria-hidden="true" />
 
         {/* Footer */}
         <footer className="login-footer relative z-10 flex flex-col items-center justify-between border-t border-gray-200 bg-white/70 px-5 py-3 md:flex-row md:px-8">
