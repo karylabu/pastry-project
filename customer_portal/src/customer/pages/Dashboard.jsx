@@ -12,8 +12,10 @@ import {
   Phone,
   Plus,
   History,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
+  ChevronUp,
   ArrowRight,
   Gift,
   Star,
@@ -467,6 +469,7 @@ export function ChatBubble({ aiMode = false, fullPage = false, hideFloating = fa
   const [selectedImage, setSelectedImage] = useState(null);
   const [showStoreNumber, setShowStoreNumber] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
+  const [showQuickChats, setShowQuickChats] = useState(true);
   const [showAccountPrompt, setShowAccountPrompt] = useState(false);
   const [conversationId, setConversationId] = useState(() => localStorage.getItem("active_customer_service_chat") || "legacy");
   const [historyIds, setHistoryIds] = useState(() => {
@@ -739,9 +742,7 @@ export function ChatBubble({ aiMode = false, fullPage = false, hideFloating = fa
                   <p className={fullPage ? "text-black font-bold text-lg sm:text-xl" : "text-black font-semibold text-sm"}>{fullPage ? (showHistory ? "Chat History" : "Customer Service") : "Admin Support"}</p>
                   {fullPage && !showHistory && <span className="hidden rounded-full bg-[#fff4cd] px-2 py-1 text-[9px] font-bold uppercase tracking-[0.12em] text-[#80600a] sm:inline-flex">Online</span>}
                 </div>
-                <p className={fullPage ? "mt-0.5 text-xs text-gray-500" : "text-xs text-gray-500"}>
-                  {fullPage ? "We usually reply instantly" : "Admin usually replies promptly"}
-                </p>
+                {fullPage && <p className="mt-0.5 text-xs text-gray-500">We usually reply instantly</p>}
               </div>
               {fullPage && (
                 <div className="flex items-center gap-1">
@@ -914,21 +915,34 @@ export function ChatBubble({ aiMode = false, fullPage = false, hideFloating = fa
 
               {!showHistory && (
                 <>
-                  <div className="border-t border-[#f0e6db] px-3 pt-1.5">
-                    <p className="mb-1 text-[9px] font-semibold uppercase tracking-[0.14em] text-gray-400">Quick chats</p>
-                    <div className="grid grid-cols-3 gap-1">
-                      {["Hi, I need help", "Where is my order?", "I want to place an order", "Can I customize a cake?", "How can I pay?"].map((suggestion) => (
-                        <button
-                          key={suggestion}
-                          type="button"
-                          onClick={() => sendMessage(suggestion, false, 0, "ai", true)}
-                          disabled={sending}
-                          className="min-h-7 rounded-full border border-[#f0e6db] px-2 py-1 text-center text-[9px] leading-tight text-gray-600 transition hover:border-[#d4af37] hover:bg-[#fff4cd] hover:text-[#80600a] disabled:cursor-not-allowed disabled:opacity-40"
-                        >
-                          {suggestion}
-                        </button>
-                      ))}
+                  <div className={`border-t border-[#f0e6db] px-3 pt-1.5 ${showQuickChats ? "pb-2" : "pb-1"}`}>
+                    <div className="mb-1 flex items-center justify-between">
+                      <p className="text-[9px] font-semibold uppercase tracking-[0.14em] text-gray-400">Quick chats</p>
+                      <button
+                        type="button"
+                        onClick={() => setShowQuickChats(value => !value)}
+                        aria-label={showQuickChats ? "Hide quick chats" : "Show quick chats"}
+                        title={showQuickChats ? "Hide quick chats" : "Show quick chats"}
+                        className="flex h-6 w-6 items-center justify-center rounded-full text-gray-500 transition hover:bg-[#fff4cd] hover:text-[#80600a]"
+                      >
+                        {showQuickChats ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
+                      </button>
                     </div>
+                    {showQuickChats && (
+                      <div className="grid grid-cols-3 gap-1">
+                        {["Hi, I need help", "Where is my order?", "I want to place an order", "Can I customize a cake?", "How can I pay?"].map((suggestion) => (
+                          <button
+                            key={suggestion}
+                            type="button"
+                            onClick={() => sendMessage(suggestion, false, 0, "ai", true)}
+                            disabled={sending}
+                            className="min-h-7 rounded-full border border-[#f0e6db] px-2 py-1 text-center text-[9px] leading-tight text-gray-600 transition hover:border-[#d4af37] hover:bg-[#fff4cd] hover:text-[#80600a] disabled:cursor-not-allowed disabled:opacity-40"
+                          >
+                            {suggestion}
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
                   <div className="px-3 py-2.5 bg-white flex gap-2 items-end">
                     <input
