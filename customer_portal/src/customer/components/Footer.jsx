@@ -161,7 +161,7 @@ export default function Footer() {
         {/* BOTTOM BAR */}
         <div className="flex items-center justify-center gap-2 border-t border-white/10 py-2 md:flex-row md:justify-between md:gap-2 md:pt-3 md:pb-4">
           <p className="text-center text-[10px] tracking-wide text-gray-500 md:text-left md:text-[10px]">
-            © {new Date().getFullYear()} Pastry Project Bakeshop &amp; Café. All rights reserved.
+            © 2017 Pastry Project Bakeshop &amp; Café. All rights reserved.
           </p>
           <p className="hidden text-[10px] tracking-wide text-gray-500 md:block">
             Baked fresh, made with love.

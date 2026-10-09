@@ -485,7 +485,7 @@ export default function Login() {
           <div className="login-footer-brand flex items-center justify-center gap-4 md:justify-start">
             <img src={LOGO_URL} alt="Logo" className="h-10 w-10 opacity-80" />
             <p className="text-sm text-gray-500">
-              © 2024 Pastry Project. All rights reserved.
+              © 2017 Pastry Project. All rights reserved.
             </p>
           </div>
 
