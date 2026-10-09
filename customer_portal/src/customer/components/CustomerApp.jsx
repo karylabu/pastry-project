@@ -83,6 +83,12 @@ export default function CustomerApp() {
   }, [location.pathname]);
 
   useEffect(() => {
+    const showAccountPrompt = () => setShowGuestPrompt(true);
+    window.addEventListener('customer:require-account', showAccountPrompt);
+    return () => window.removeEventListener('customer:require-account', showAccountPrompt);
+  }, []);
+
+  useEffect(() => {
     const pathname = (location.pathname || '/').replace(/\/+$/, '') || '/';
     const hasFloatingCart = ['/','/home','/menu','/customized-cakes','/customer','/customer/home','/customer/menu','/customer/customized-cakes'].includes(pathname);
     if (!hasFloatingCart) {

@@ -1070,6 +1070,22 @@ export default function Dashboard({ onAddToCart, hideFloating = false }) {
   const [isCustomCakeOpen, setIsCustomCakeOpen]     = useState(false);
   const favoritesStorageKey = `favorite_product_ids_${userId || 'guest'}`;
 
+  const handleViewOrders = () => {
+    let hasAccount = false;
+    try {
+      hasAccount = Boolean(JSON.parse(localStorage.getItem('user') || 'null')?.id);
+    } catch {
+      hasAccount = false;
+    }
+
+    if (hasAccount) {
+      navigate('/customer/orders');
+      return;
+    }
+
+    window.dispatchEvent(new Event('customer:require-account'));
+  };
+
   const saveLocalFavorites = (next) => {
     if (typeof window !== 'undefined') {
       localStorage.setItem(favoritesStorageKey, JSON.stringify(next));
@@ -1269,10 +1285,10 @@ export default function Dashboard({ onAddToCart, hideFloating = false }) {
 
             <section className="relative min-h-[132px] overflow-hidden rounded-xl border border-[#eadfd8] bg-white p-3 text-[#3c2925] shadow-[0_5px_18px_rgba(91,64,39,0.04)]"><div className="absolute -right-7 -top-7 h-28 w-28 rounded-full border-[12px] border-[#f3e3b0]" /><div className="relative z-10 max-w-[220px]"><p className="text-[9px] font-black uppercase tracking-[0.24em] text-[#a57c38]">Special Offer</p><h2 className="mt-1 font-serif text-3xl leading-none">5% OFF</h2><p className="mt-1 text-xs leading-5 text-[#765f3d]">on your first order. Treat yourself to something freshly baked.</p><button type="button" onClick={() => navigate('/customer/menu')} className="mt-2 inline-flex items-center gap-1 rounded-full bg-[#33251e] px-4 py-1.5 text-[10px] font-bold text-white">Shop Now <ChevronRight size={12} /></button></div></section>
 
-            <section className="rounded-xl border border-[#eadfd8] bg-white p-4 shadow-[0_5px_18px_rgba(91,64,39,0.04)]"><p className="mb-3 text-[10px] font-black uppercase tracking-[0.22em] text-[#5d4a42]">Quick Actions</p><div className="grid grid-cols-2 gap-2"><button type="button" onClick={() => navigate('/customer/customized-cakes')} className="flex items-center gap-2 rounded-lg bg-[#fff0f0] px-3 py-3 text-left text-[10px] font-bold text-[#5b4540]"><Gift size={18} className="text-[#c36b77]" />Customize Cake</button><button type="button" onClick={() => navigate('/customer/orders')} className="flex items-center gap-2 rounded-lg bg-[#fff8e9] px-3 py-3 text-left text-[10px] font-bold text-[#5b4540]"><ClipboardList size={18} className="text-[#a57c38]" />View Orders</button><button type="button" onClick={() => navigate('/customer/profile')} className="flex items-center gap-2 rounded-lg bg-[#f7f2fb] px-3 py-3 text-left text-[10px] font-bold text-[#5b4540]"><User size={18} className="text-[#87699a]" />My Profile</button><button type="button" onClick={() => navigate('/customer/chat-support')} className="flex items-center gap-2 rounded-lg bg-[#eef7f4] px-3 py-3 text-left text-[10px] font-bold text-[#5b4540]"><MessageCircle size={18} className="text-[#668e83]" />Help Center</button></div></section>
+            <section className="rounded-xl border border-[#eadfd8] bg-white p-4 shadow-[0_5px_18px_rgba(91,64,39,0.04)]"><p className="mb-3 text-[10px] font-black uppercase tracking-[0.22em] text-[#5d4a42]">Quick Actions</p><div className="grid grid-cols-2 gap-2"><button type="button" onClick={() => navigate('/customer/customized-cakes')} className="flex items-center gap-2 rounded-lg bg-[#fff0f0] px-3 py-3 text-left text-[10px] font-bold text-[#5b4540]"><Gift size={18} className="text-[#c36b77]" />Customize Cake</button><button type="button" onClick={handleViewOrders} className="flex items-center gap-2 rounded-lg bg-[#fff8e9] px-3 py-3 text-left text-[10px] font-bold text-[#5b4540]"><ClipboardList size={18} className="text-[#a57c38]" />View Orders</button><button type="button" onClick={() => navigate('/customer/profile')} className="flex items-center gap-2 rounded-lg bg-[#f7f2fb] px-3 py-3 text-left text-[10px] font-bold text-[#5b4540]"><User size={18} className="text-[#87699a]" />My Profile</button><button type="button" onClick={() => navigate('/customer/chat-support')} className="flex items-center gap-2 rounded-lg bg-[#eef7f4] px-3 py-3 text-left text-[10px] font-bold text-[#5b4540]"><MessageCircle size={18} className="text-[#668e83]" />Help Center</button></div></section>
 
             <section className="rounded-xl border border-[#eadfd8] bg-white p-4 shadow-[0_5px_18px_rgba(91,64,39,0.04)]">
-              <div className="mb-4 flex items-center justify-between"><p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#5d4a42]">Your Order</p><button type="button" onClick={() => navigate('/customer/orders')} className="text-[10px] font-bold text-[#765d50]">View All Orders <ChevronRight size={12} className="inline" /></button></div>
+              <div className="mb-4 flex items-center justify-between"><p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#5d4a42]">Your Order</p><button type="button" onClick={handleViewOrders} className="text-[10px] font-bold text-[#765d50]">View All Orders <ChevronRight size={12} className="inline" /></button></div>
               <div className="flex items-start justify-between text-center text-[10px] text-[#665b55]"><div className="flex flex-col items-center gap-2"><span className="flex h-10 w-10 items-center justify-center rounded-full border-2 border-[#e7c875] bg-[#fff8e9] text-[#a57c38]"><ClipboardList size={18} /></span><span className="font-semibold">Pending</span><small className="text-[9px] text-[#9b8c83]">Order received</small></div><span className="mt-5 h-px flex-1 bg-[#efd8d4]" /><div className="flex flex-col items-center gap-2"><span className="flex h-10 w-10 items-center justify-center rounded-full border border-[#eadfd8] bg-[#fffaf7] text-[#8e7b70]"><Gift size={18} /></span><span className="font-semibold">Processing</span><small className="text-[9px] text-[#9b8c83]">Baking your cake</small></div><span className="mt-5 h-px flex-1 bg-[#efd8d4]" /><div className="flex flex-col items-center gap-2"><span className="flex h-10 w-10 items-center justify-center rounded-full border border-[#eadfd8] bg-[#fffaf7] text-[#8e7b70]"><ChevronRight size={18} /></span><span className="font-semibold">Delivery</span><small className="text-[9px] text-[#9b8c83]">Almost there!</small></div></div>
             </section>
           </aside>
