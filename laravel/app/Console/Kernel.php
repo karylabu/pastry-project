@@ -10,6 +10,7 @@ class Kernel extends ConsoleKernel
 
     protected function schedule($schedule): void
     {
+        $schedule->command('orders:expire-unpaid')->everyTenMinutes()->withoutOverlapping();
     }
 
     protected function commands(): void

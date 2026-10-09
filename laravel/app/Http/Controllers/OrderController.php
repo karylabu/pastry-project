@@ -965,6 +965,20 @@ class OrderController extends Controller
                     $this->restoreOrderProductStock($order, (int) $user->id);
                 }
 
+                if (in_array(strtolower($newStatus), ['confirmed', 'approved', 'preparing'], true)) {
+                    $customizedCakeOrder = DB::table('customized_cake_orders')
+                        ->where('order_id', $order->id)
+                        ->first();
+
+                    if ($customizedCakeOrder) {
+                        $this->customizedCakeService->consumeOrderInventory(
+                            (int) $customizedCakeOrder->id,
+                            (int) $order->id,
+                            (int) $user->id
+                        );
+                    }
+                }
+
                 $order->update(['status' => $newStatus]);
 
                 if ($oldStatus !== $newStatus && Schema::hasTable('notifications')) {
@@ -983,6 +997,11 @@ class OrderController extends Controller
                 return $order->fresh();
             });
         } catch (\Throwable $exception) {
+            if (str_starts_with($exception->getMessage(), 'Insufficient stock for ')
+                || str_starts_with($exception->getMessage(), 'Insufficient ingredient stock')) {
+                $this->notifyOrderStockout($id);
+            }
+
             $status = $exception->getMessage() === 'Order not found.' ? 404 : 409;
             return response()->json(['success' => false, 'message' => $exception->getMessage()], $status);
         }
@@ -990,27 +1009,6 @@ class OrderController extends Controller
         $order = $order->fresh();
         $oldStatus = (string) ($previousStatus ?? $order->status);
         $newStatus = (string) $request->status;
-
-        if (in_array(strtolower($newStatus), ['confirmed', 'approved', 'preparing'], true)) {
-            $customizedCakeOrder = DB::table('customized_cake_orders')
-                ->where('order_id', $order->id)
-                ->first();
-
-            if ($customizedCakeOrder) {
-                try {
-                    $this->customizedCakeService->consumeOrderInventory(
-                        (int) $customizedCakeOrder->id,
-                        (int) $order->id,
-                        (int) $user->id
-                    );
-                } catch (\RuntimeException $exception) {
-                    return response()->json([
-                        'success' => false,
-                        'message' => $exception->getMessage(),
-                    ], 409);
-                }
-            }
-        }
 
         if ($oldStatus !== $newStatus) {
             $this->sendSmsNotification($order, $newStatus);
@@ -1024,6 +1022,34 @@ class OrderController extends Controller
             'success' => true,
             'message' => 'Order status updated successfully.'
         ]);
+    }
+
+    private function notifyOrderStockout(int $orderId): void
+    {
+        $order = Order::query()->find($orderId);
+        if (!Schema::hasTable('notifications') || !$order || !$order->user_id) {
+            return;
+        }
+
+        $title = 'Stockout Alert';
+        $message = "We cannot confirm order #{$order->id} yet because an item is temporarily out of stock. Your order has not been cancelled; we will update you when availability is confirmed.";
+        $exists = DB::table('notifications')
+            ->where('user_id', $order->user_id)
+            ->where('title', $title)
+            ->where('message', $message)
+            ->exists();
+
+        if (!$exists) {
+            DB::table('notifications')->insert([
+                'user_id' => $order->user_id,
+                'title' => $title,
+                'message' => $message,
+                'type' => 'Warning',
+                'is_read' => 0,
+                'action_url' => '/customer/orders',
+                'created_at' => now(),
+            ]);
+        }
     }
 
     private function orderProductLines(Order $order): array

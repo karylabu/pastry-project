@@ -26,7 +26,9 @@ const getNotificationCategory = (notification) => {
   const orderText = `${title} ${message}`;
 
   if (actionUrl.startsWith('/customer/orders') && (/\border\b/.test(orderText) || /custom cake/.test(orderText))) {
+    if (title.includes('expired')) return 'order_expired';
     if (/awaiting payment|payment failed|payment was not completed/.test(orderText)) return 'order_payment_due';
+    if (title.includes('stockout') || /out of stock/.test(message)) return 'stockout';
     if (/order placed|has been placed/.test(orderText)) return 'order_placed';
     const statusChange = orderText.match(/\b(?:to|now|is)\s+(awaiting balance payment|ready for pickup|pending|confirmed|preparing|completed|cancelled|canceled)\b/);
     const newStatus = statusChange?.[1];
@@ -185,9 +187,12 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
 
   const filteredNotifications = useMemo(() => {
     if (notifFilter === "All") return notifications;
-    if (notifFilter === "Active Orders") return notifications.filter((n) =>
-      getNotificationCategory(n).startsWith('order_')
-    );
+    if (notifFilter === "Active Orders") return notifications.filter((n) => {
+      const category = getNotificationCategory(n);
+      return category.startsWith('order_')
+        && String(n.type || '').toLowerCase() !== 'warning'
+        && category !== 'order_payment_due';
+    });
     if (notifFilter === "Reminders & Warnings") return notifications.filter((n) => {
       const type = String(n.type || '').toLowerCase();
       const message = String(n.message || '').toLowerCase();
@@ -548,9 +553,9 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
                             }
                             return <span className="rounded-full bg-blue-50 px-2.5 py-1 text-[10px] font-semibold text-blue-700">Order Update</span>;
                           case "stockout":
-                            return <span className="rounded-full bg-gray-100 px-2.5 py-1 text-[10px] font-semibold text-gray-700">Cancelled — Stockout</span>;
+                            return <span className="rounded-full bg-amber-50 px-2.5 py-1 text-[10px] font-semibold text-amber-700">Stockout Alert</span>;
                           case "order_expired":
-                            return <span className="rounded-full bg-gray-800 px-2.5 py-1 text-[10px] font-semibold text-white">Expired / Discarded</span>;
+                            return <span className="rounded-full bg-gray-800 px-2.5 py-1 text-[10px] font-semibold text-white">Payment Expired</span>;
                           default:
                             if (String(n.type || '').toLowerCase() === 'warning') {
                               return <span className="rounded-full bg-amber-50 px-2.5 py-1 text-[10px] font-semibold text-amber-700">Reminder / Warning</span>;
