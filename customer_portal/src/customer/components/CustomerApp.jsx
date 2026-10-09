@@ -32,7 +32,7 @@ import CartModal from './CartModal';
 import CheckoutModal from './CheckoutModal';
 import { removeOrderedCartItems } from '../utils/cartItems';
 import { getAuthHeaders } from '../../services/api';
-import { LARAVEL_BASE } from '../../services/config';
+import { CUSTOMER_BASE, LARAVEL_BASE } from '../../services/config';
 
 const PENDING_PAYMONGO_CHECKOUT_KEY = 'pendingPaymongoCheckout';
 
@@ -75,6 +75,7 @@ export default function CustomerApp() {
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [showGuestPrompt, setShowGuestPrompt] = useState(false);
+  const [shopAccessNotice, setShopAccessNotice] = useState(null);
   const [floatingFooterApproaching, setFloatingFooterApproaching] = useState(false);
   const paymentReturnInProgress = useRef(false);
 
@@ -254,6 +255,25 @@ export default function CustomerApp() {
     setTimeout(() => setShowToast(false), 3000);
   };
 
+  const ensureShopIsOpen = async () => {
+    try {
+      const response = await fetch(`${CUSTOMER_BASE}/api/shop/status`);
+      const status = await response.json();
+      if (!response.ok || typeof status?.is_open !== 'boolean') {
+        throw new Error(status?.message || `Shop status request failed (${response.status}).`);
+      }
+      if (!status.is_open) {
+        setShopAccessNotice('closed');
+        return false;
+      }
+      return true;
+    } catch (error) {
+      console.error('Unable to verify shop hours before adding to cart:', error);
+      setShopAccessNotice('unavailable');
+      return false;
+    }
+  };
+
   // Toast states
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
@@ -268,7 +288,7 @@ export default function CustomerApp() {
   /* =========================
      ADD TO CART
   ========================= */
-  const addToCart = (product) => {
+  const addToCart = async (product) => {
     if (isGuest()) {
       setShowGuestPrompt(true);
       return;
@@ -277,6 +297,7 @@ export default function CustomerApp() {
       showShopBlockedMessage();
       return;
     }
+    if (!(await ensureShopIsOpen())) return;
 
     const requestedQuantity = Math.max(1, Math.floor(Number(product.qty) || 1));
     const productId = Number(product.product_id ?? product.id);
@@ -436,6 +457,7 @@ export default function CustomerApp() {
         onClose={() => setIsCartOpen(false)}
         items={cartItems}
         setItems={setCartItems}
+        onBeforeAdd={ensureShopIsOpen}
         totalAmount={totalAmount}
         onCheckout={(selectedItems) => {
           setIsCartOpen(false);
@@ -462,6 +484,48 @@ export default function CustomerApp() {
       />
 
       {showGuestPrompt && <GuestAccountPrompt onClose={() => setShowGuestPrompt(false)} />}
+
+      {shopAccessNotice && (
+        <div
+          className="fixed inset-0 z-[100001] flex items-center justify-center bg-black/50 p-5 backdrop-blur-sm"
+          onClick={() => setShopAccessNotice(null)}
+        >
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="shop-access-title"
+            className="relative w-full max-w-sm rounded-3xl bg-white p-7 text-center shadow-2xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <button
+              type="button"
+              aria-label="Close shop notice"
+              onClick={() => setShopAccessNotice(null)}
+              className="absolute right-4 top-4 rounded-full p-2 text-gray-500 transition hover:bg-gray-100 hover:text-gray-900"
+            >
+              <X size={18} />
+            </button>
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-[#fff4df] text-[#9a6d1a]">
+              <ShoppingBag size={26} />
+            </div>
+            <h2 id="shop-access-title" className="mt-4 text-xl font-black text-gray-900">
+              {shopAccessNotice === 'closed' ? 'Shop is Closed' : 'Shop hours unavailable'}
+            </h2>
+            <p className="mt-3 text-sm leading-6 text-gray-600">
+              {shopAccessNotice === 'closed'
+                ? 'Our shop is currently closed. Shop hours are 8AM–8PM. Please come back when we reopen at 8AM.'
+                : 'We couldn’t verify whether the shop is open, so we can’t add items right now. Please try again shortly.'}
+            </p>
+            <button
+              type="button"
+              onClick={() => setShopAccessNotice(null)}
+              className="mt-6 w-full rounded-xl bg-[#d4af37] px-4 py-3 text-sm font-bold text-white transition hover:bg-[#bd9827] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d4af37] focus-visible:ring-offset-2"
+            >
+              Okay
+            </button>
+          </section>
+        </div>
+      )}
 
       {/* TOAST */}
       <AnimatePresence>

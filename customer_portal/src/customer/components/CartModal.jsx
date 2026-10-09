@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { X, Trash2, Plus, Minus, ShoppingBag } from "lucide-react";
 import { getCartItemKey } from '../utils/cartItems';
 
-export default function CartModal({ isOpen, onClose, items = [], setItems, onCheckout }) {
+export default function CartModal({ isOpen, onClose, items = [], setItems, onCheckout, onBeforeAdd }) {
   const [selectedKeys, setSelectedKeys] = useState(null);
 
   const groupedItems = useMemo(() => {
@@ -56,7 +56,7 @@ export default function CartModal({ isOpen, onClose, items = [], setItems, onChe
   };
 
   // Increase: insert a duplicate right after the first occurrence
-  const handleIncrease = (firstIndex, item) => {
+  const handleIncrease = async (firstIndex, item) => {
     const productId = Number(item.product_id ?? item.id);
     if (
       Number.isInteger(productId) &&
@@ -64,6 +64,7 @@ export default function CartModal({ isOpen, onClose, items = [], setItems, onChe
     ) {
       return;
     }
+    if (onBeforeAdd && !(await onBeforeAdd())) return;
 
     const updated = [...items];
     updated.splice(firstIndex + 1, 0, { ...item });
