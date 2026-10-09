@@ -698,7 +698,16 @@ export default function CustomizedCakes() {
             </div>
             <div className="p-4">
               <div className="h-72 overflow-hidden rounded-xl border border-[#f0d98a]">
-                <img src={featuredPreview.url} alt={featuredPreview.name} className="h-full w-full object-cover" />
+                <img
+                  src={featuredPreview.url}
+                  alt={featuredPreview.name}
+                  style={featuredPreview.name === 'Wedding' ? {
+                    objectPosition: featuredImagePositions.Wedding,
+                    transform: 'scale(1.8)',
+                    transformOrigin: 'center 55%',
+                  } : undefined}
+                  className="h-full w-full object-cover"
+                />
               </div>
               <p className="mt-3 text-center text-sm font-semibold text-[#4b3b33]">{featuredPreview.name}</p>
               <div className="mt-4 flex gap-2">
