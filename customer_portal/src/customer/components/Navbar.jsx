@@ -444,13 +444,13 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
                     </button>
                   </div>
 
-                  <div className="mt-3 flex flex-wrap gap-2">
+                  <div className="mt-3 flex flex-nowrap gap-1 overflow-x-auto pb-1">
                     {['All', 'Active Orders', 'Reminders & Warnings', 'Account Updates'].map((filter) => (
                       <button
                         key={filter}
                         type="button"
                         onClick={() => setNotifFilter(filter)}
-                        className={`rounded-full px-3 py-1.5 text-[11px] font-semibold transition ${notifFilter === filter ? 'bg-black text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+                        className={`shrink-0 whitespace-nowrap rounded-full px-2 py-1.5 text-[10px] font-semibold transition sm:px-2.5 sm:text-[11px] ${notifFilter === filter ? 'bg-black text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
                       >
                         {filter}
                       </button>
