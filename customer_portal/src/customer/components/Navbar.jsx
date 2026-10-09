@@ -290,7 +290,7 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
       <div className="flex items-center justify-between">
 
         {/* LEFT */}
-        <div className="flex min-w-0 items-center gap-1 sm:gap-4 2xl:gap-14">
+        <div className="flex min-w-0 items-center gap-1 sm:gap-4 xl:gap-8 2xl:gap-8">
 
           <Link
             to="/customer"
@@ -314,13 +314,13 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
           </Link>
 
           {/* NAV */}
-          <div className="hidden 2xl:flex items-center gap-10">
+          <div className="hidden xl:flex items-center gap-6">
 
             {navs.map(nav => (
               <Link
                 key={nav.path}
                 to={nav.path}
-                className={`text-sm uppercase tracking-[0.3em] ${
+                className={`text-sm uppercase tracking-[0.2em] ${
                   location.pathname === nav.path
                     ? "text-black font-semibold"
                     : "text-gray-400 hover:text-black"
@@ -713,7 +713,7 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
 
       </div>
 
-      <div className="mt-2 flex justify-center gap-2 overflow-x-hidden border-t border-gray-100 pt-2 sm:gap-6 2xl:hidden">
+      <div className="mt-2 flex justify-center gap-2 overflow-x-hidden border-t border-gray-100 pt-2 sm:gap-6 xl:hidden">
         {navs.map(nav => (
           <Link
             key={nav.path}
