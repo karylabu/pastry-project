@@ -65,7 +65,7 @@ export default function Login() {
         method: "POST",
         headers: { "Content-Type": "application/json", Accept: "application/json" },
         credentials: "include",
-        body: JSON.stringify({ id_token: idToken, intent: "login", ...googlePayload }),
+        body: JSON.stringify({ id_token: idToken, intent: "login_or_signup", ...googlePayload }),
       });
       const data = await safeParseJson(response);
 
