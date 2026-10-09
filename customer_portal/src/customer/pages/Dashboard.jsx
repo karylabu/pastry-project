@@ -567,7 +567,7 @@ export function ChatBubble({ aiMode = false, fullPage = false, hideFloating = fa
     }
   };
 
-  const sendMessage = async (text, silent = false, activeOrderId = 0) => {
+  const sendMessage = async (text, silent = false, activeOrderId = 0, supportMode = "admin", quickChat = false) => {
     if (!hasCustomerAccount) {
       setShowAccountPrompt(true);
       return;
@@ -600,7 +600,8 @@ export function ChatBubble({ aiMode = false, fullPage = false, hideFloating = fa
       const formData = new FormData();
       formData.append("order_id", payloadOrderId);
       formData.append("message", msg);
-      formData.append("support_mode", "admin");
+      formData.append("support_mode", supportMode);
+      if (quickChat) formData.append("quick_chat", "1");
       formData.append("conversation_id", conversationId);
       if (image) formData.append("image", image);
 
@@ -920,7 +921,7 @@ export function ChatBubble({ aiMode = false, fullPage = false, hideFloating = fa
                         <button
                           key={suggestion}
                           type="button"
-                          onClick={() => sendMessage(suggestion)}
+                          onClick={() => sendMessage(suggestion, false, 0, "ai", true)}
                           disabled={sending}
                           className="rounded-full border border-[#f0e6db] bg-white px-3 py-1.5 text-[11px] text-gray-600 transition hover:border-[#d4af37] hover:bg-[#fff4cd] hover:text-[#80600a] disabled:cursor-not-allowed disabled:opacity-40"
                         >

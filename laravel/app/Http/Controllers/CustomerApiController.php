@@ -990,6 +990,7 @@ class CustomerApiController extends Controller
         $imageFile = $request->file('image');
         $sender = $isAdmin ? 'admin' : 'customer';
         $supportMode = $data['support_mode'] ?? 'ai';
+        $isQuickChat = filter_var($data['quick_chat'] ?? false, FILTER_VALIDATE_BOOLEAN);
         $conversationId = substr(trim($data['conversation_id'] ?? ''), 0, 64) ?: null;
         $replyToId = isset($data['reply_to_id']) && intval($data['reply_to_id']) > 0 ? intval($data['reply_to_id']) : null;
         $hasConversationId = Schema::hasColumn('messages', 'conversation_id');
@@ -1372,6 +1373,19 @@ PROMPT;
                 } catch (\Throwable $e) {
                     Log::warning('AI chat provider unavailable', ['provider' => $provider, 'error' => $e->getMessage()]);
                 }
+            }
+
+            if (!$aiReply && $isQuickChat) {
+                $quickChatKey = strtolower(trim((string) preg_replace('/[.!?]+$/', '', $message)));
+                $quickChatReplies = [
+                    'hi, i need help' => 'Hi! Nandito ako para tumulong. Tungkol ba ito sa order, pag-order, customized cake, o payment?',
+                    'where is my order' => 'Makikita mo ang kasalukuyang status ng order mo sa My Orders page. Kung kailangan mo pa ng tulong, ipadala ang order number.',
+                    'i want to place an order' => 'Para mag-order, pumunta sa Menu, piliin ang produkto, idagdag sa bag, at mag-checkout.',
+                    'can i customize a cake' => 'Oo! Pumunta sa Customized Cakes at ilagay ang design, flavor, size, message, at preferred date.',
+                    'how can i pay' => 'Makikita ang mga available na payment method sa checkout kapag nag-place ka ng order.',
+                ];
+                $aiReply = $quickChatReplies[$quickChatKey]
+                    ?? 'Salamat sa pag-message! Sabihin kung tungkol ito sa order, pag-order, customized cake, o payment para matulungan kita.';
             }
 
             if ($aiReply) {

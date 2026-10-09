@@ -186,6 +186,27 @@ class CustomerChatApiTest extends TestCase
             ->assertJsonPath('conversations.0.customer_name', 'Test Customer');
     }
 
+    public function test_quick_chat_receives_a_canned_reply_when_ai_is_unavailable(): void
+    {
+        $this->withHeaders(['Authorization' => '******'])
+            ->postJson('/api/customer/chat/messages', [
+                'order_id' => 0,
+                'message' => 'Where is my order?',
+                'support_mode' => 'ai',
+                'quick_chat' => true,
+                'conversation_id' => 'quick-chat-test',
+            ])
+            ->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('ai_reply', 'Makikita mo ang kasalukuyang status ng order mo sa My Orders page. Kung kailangan mo pa ng tulong, ipadala ang order number.');
+
+        $this->assertDatabaseHas('messages', [
+            'user_id' => 7,
+            'sender' => 'ai',
+            'message' => 'Makikita mo ang kasalukuyang status ng order mo sa My Orders page. Kung kailangan mo pa ng tulong, ipadala ang order number.',
+        ]);
+    }
+
     public function test_customer_chat_popup_marks_null_order_messages_read_only_when_opened(): void
     {
         DB::table('messages')->insert([
