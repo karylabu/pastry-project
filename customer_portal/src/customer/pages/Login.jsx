@@ -159,6 +159,8 @@ export default function Login() {
         @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700;800&family=Pacifico&family=Playfair+Display:wght@600;700&display=swap');
 
         .brand-script { font-family: 'Pacifico', cursive; }
+        .login-welcome { font-family: 'Pacifico', cursive; }
+        .login-welcome svg { display: none; }
         .login-tagline {
           font-family: 'Playfair Display', Georgia, serif;
           font-size: 32px;
@@ -188,6 +190,7 @@ export default function Login() {
         .pastry-login .brand-icon-overlay { display: none; }
         .pastry-login .hero-panel { display: none; }
         .pastry-login .mobile-login-art { display: none; }
+        .login-decorations { display: none; }
 
         /* Background Blobs */
         .blob-yellow-top { position: absolute; top: -190px; left: -160px; width: 390px; height: 390px; border-radius: 50%; background: #f4bd2f; z-index: 0; opacity: .95; }
@@ -251,64 +254,117 @@ export default function Login() {
             height: auto;
             align-items: center;
             justify-content: center;
-            gap: 12px;
-            padding: 28px 32px;
+            gap: 0;
+            padding: 40px 32px;
           }
           .pastry-login main {
-            flex: 0 1 auto;
-            width: min(940px, 100%);
-            min-height: 590px;
+            flex: 0 0 auto;
+            width: min(1030px, 100%);
+            height: min(630px, calc(100vh - 80px));
+            min-height: 560px;
             gap: 0;
             align-items: stretch;
             justify-content: initial;
             padding: 0;
             overflow: hidden;
-            border: 1px solid rgba(255, 255, 255, 0.85);
-            border-radius: 22px;
-            background: rgba(255, 255, 255, 0.96);
-            box-shadow: 0 24px 60px rgba(100, 78, 28, 0.13);
+            border: 1px solid rgba(255, 255, 255, 0.9);
+            border-radius: 26px;
+            background: #fff;
+            box-shadow: 0 18px 42px rgba(100, 78, 28, 0.16);
           }
           .pastry-login .hero-panel {
             display: flex;
-            flex: 0 0 39%;
-            width: 39%;
+            flex: 0 0 45%;
+            width: 45%;
             justify-content: space-between;
-            padding: 34px 30px;
-            background: #fff9e9;
-            border-right: 1px solid #f1e6c9;
+            padding: 34px 56px;
+            background: linear-gradient(135deg, #fff9e9 0%, #fff6df 100%);
+            border-right: 1px solid #f4ead2;
           }
-          .pastry-login .hero-panel > .mb-6:first-child { margin-bottom: 22px; }
-          .pastry-login .hero-panel > .mb-6:nth-child(2) { margin-bottom: 24px; }
-          .pastry-login .hero-panel > .mb-6:nth-child(2) h2.login-tagline { font-size: 34px; }
-          .pastry-login .login-cake-section { width: 100%; max-width: none; margin-top: 0; }
+          .pastry-login .hero-panel > .mb-6:first-child {
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 26px;
+          }
+          .pastry-login .hero-panel > .mb-6:first-child img { width: 48px; height: 48px; }
+          .pastry-login .hero-panel > .mb-6:first-child h1 {
+            font-family: 'Playfair Display', Georgia, serif;
+            font-size: 28px;
+            font-style: italic;
+            font-weight: 700;
+            color: #25211a;
+          }
+          .pastry-login .hero-panel > .mb-6:first-child h1 span { color: #e9aa32; }
+          .pastry-login .hero-panel > .mb-6:first-child p {
+            margin-top: 5px;
+            font-size: 8px;
+            letter-spacing: 0.42em;
+          }
+          .pastry-login .hero-panel > .mb-6:nth-child(2) { margin-bottom: 18px; }
+          .pastry-login .hero-panel > .mb-6:nth-child(2) h2.login-tagline {
+            font-size: 40px;
+            letter-spacing: -0.045em;
+            line-height: 1.12;
+          }
+          .pastry-login .hero-panel > .mb-6:nth-child(2) h2.login-tagline span { font-style: italic; }
+          .pastry-login .login-cake-section {
+            width: 100%;
+            max-width: 355px;
+            margin-top: 0;
+          }
           .pastry-login .login-cake-section > div { display: none; }
           .pastry-login .login-cake-section img {
-            width: auto;
+            width: 100%;
             max-width: 100%;
-            height: auto;
-            max-height: min(36vh, 350px);
-            border-radius: 16px;
-            object-fit: contain;
-            object-position: center;
+            height: 300px;
+            border-radius: 18px;
+            object-fit: cover;
+            object-position: center 46%;
             margin-inline: auto;
-            box-shadow: 0 12px 28px rgba(100, 78, 28, 0.14);
+            box-shadow: 0 10px 22px rgba(100, 78, 28, 0.14);
           }
           .pastry-login main > div:not(.hero-panel) {
             flex: 1 1 auto;
-            width: 61%;
+            width: 55%;
             justify-content: center;
-            padding: 36px 44px;
+            padding: 36px 58px;
           }
           .pastry-login .login-card {
             width: 100%;
-            max-width: 420px;
-            padding: 24px 0;
+            max-width: 456px;
+            padding: 0;
             border: 0;
             border-radius: 0;
             background: transparent;
           }
-          .pastry-login .login-card > .mb-4:first-child { margin-bottom: 28px; }
-          .pastry-login .login-card > .mb-4:first-child h2 { font-size: 30px; }
+          .pastry-login .login-card > .mb-4:first-child { margin-bottom: 30px; }
+          .pastry-login .login-card > .mb-4:first-child h2.login-welcome {
+            position: relative;
+            width: fit-content;
+            font-size: 48px;
+            font-weight: 400;
+            line-height: 1.1;
+            color: #edaf39;
+          }
+          .pastry-login .login-card > .mb-4:first-child h2.login-welcome svg {
+            display: block;
+            position: absolute;
+            top: 1px;
+            right: -42px;
+            width: 38px;
+            height: 36px;
+            fill: none;
+            stroke: #edaf39;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+            stroke-width: 1.7;
+          }
+          .pastry-login .login-card > .mb-4:first-child p {
+            margin-top: 2px;
+            font-size: 15px;
+            color: #89909c;
+            opacity: 1;
+          }
           .pastry-login .login-input { height: 46px; border-radius: 9px; }
           .pastry-login .btn-primary {
             height: 46px;
@@ -324,19 +380,21 @@ export default function Login() {
           }
           .pastry-login .login-card a,
           .pastry-login .login-card button.text-xs { color: #b87808; }
-          .pastry-login .login-footer {
-            width: min(940px, 100%);
-            grid-template-columns: 1fr auto 1fr;
-            gap: 12px;
-            margin: 0;
-            padding: 8px 12px;
-            border-top: 0;
+          .pastry-login .login-footer { display: none; }
+          .pastry-login .mobile-login-art { display: none; }
+          .pastry-login .login-decorations {
+            position: absolute;
+            z-index: 1;
+            inset: 0;
+            display: block;
+            overflow: hidden;
+            pointer-events: none;
           }
-          .pastry-login .login-footer-brand img,
-          .pastry-login .login-footer-social { display: none; }
-          .pastry-login .login-footer-brand { justify-content: flex-start; }
-          .pastry-login .login-footer-brand p,
-          .pastry-login .login-footer-links a { font-size: 11px; }
+          .pastry-login .login-decorations svg { position: absolute; fill: none; stroke: #edbd62; }
+          .pastry-login .login-whisk { top: -12px; right: 12px; width: 152px; height: 152px; stroke-width: 2.2; opacity: .55; }
+          .pastry-login .login-sprig-left { bottom: 82px; left: -14px; width: 82px; height: 130px; stroke-width: 2; opacity: .48; }
+          .pastry-login .login-sprig-right { right: 12px; bottom: 22px; width: 96px; height: 150px; stroke-width: 2; opacity: .52; }
+          .pastry-login .login-bottom-wave { right: 0; bottom: 0; width: 100%; height: 106px; fill: #fcecc8; stroke: none; opacity: .76; }
         }
         @media (max-width: 1023px) {
           .pastry-login .login-banner { display: none; }
@@ -348,7 +406,6 @@ export default function Login() {
           .pastry-login .hero-panel > .mb-6:first-child p { font-size: 8px; }
           .pastry-login .hero-panel > .mb-6:nth-child(2) { margin-bottom: 16px; }
           .pastry-login .hero-panel > .mb-6:nth-child(2) h2 { font-size: 36px; }
-          .pastry-login .hero-panel > .mb-6:nth-child(2) p { font-size: 15px; line-height: 1.55; }
           .pastry-login .login-cake-section { display: none; }
           .pastry-login .login-card { padding: 18px 20px; border-radius: 20px; }
           .pastry-login .login-card > .mb-4:first-child { text-align: left; }
@@ -404,6 +461,45 @@ export default function Login() {
       <img className="login-banner" src={`${ASSET_BASE}/login.png`} alt="" aria-hidden="true" />
       <img className="brand-icon-overlay" src={LOGO_URL} alt="Pastry Project logo" />
 
+      <div className="login-decorations" aria-hidden="true">
+        <svg className="login-whisk" viewBox="0 0 160 160">
+          <path d="M145 2 69 87" />
+          <path d="M157 12 82 99" />
+          <path d="M69 87c-19 21-40 31-50 22-10-9-1-31 18-52L88 3" />
+          <path d="M69 87c-7-13-4-31 9-49L112 1" />
+          <path d="M69 87c9-3 25-16 38-31l24-54" />
+          <path d="M69 87c1-15 12-37 27-55L100 0" />
+          <path d="M40 56c-4 18 8 31 29 31" />
+          <path d="M36 23c8-8 21 1 19 12 0-12 14-18 20-8 8 13-18 26-18 26S27 36 36 23Z" />
+          <path d="M117 69c8-7 18 1 16 10 1-10 13-14 18-5 6 11-14 21-14 21s-25-16-20-26Z" />
+        </svg>
+        <svg className="login-sprig-left" viewBox="0 0 90 140">
+          <path d="M13 137c6-42 19-82 51-126" />
+          <path d="M22 104c-15-3-20-12-17-23 12 2 19 8 17 23Z" />
+          <path d="M30 82c-2-15 4-24 15-28 4 12-1 21-15 28Z" />
+          <path d="M38 62c-14-4-18-14-13-25 12 4 18 12 13 25Z" />
+          <path d="M48 43c0-14 7-21 18-22 2 12-4 20-18 22Z" />
+          <path d="M17 119c-9-12-7-22 1-29 9 9 10 18-1 29Z" />
+          <path d="M48 137c9-14 19-17 29-11-6 12-15 16-29 11Z" />
+          <path d="M36 137c-7-12-4-22 5-28 8 10 7 19-5 28Z" />
+        </svg>
+        <svg className="login-sprig-right" viewBox="0 0 105 155">
+          <path d="M8 152c29-39 51-80 70-143" />
+          <path d="M24 132c-14-1-21-9-20-20 12 1 19 7 20 20Z" />
+          <path d="M36 111c-3-14 2-23 13-29 5 12 2 21-13 29Z" />
+          <path d="M48 86c-14-3-19-12-15-23 12 3 18 10 15 23Z" />
+          <path d="M58 62c1-14 9-21 20-21 1 12-6 20-20 21Z" />
+          <path d="M23 136c9-13 19-15 28-8-7 11-16 14-28 8Z" />
+          <path d="M52 151c-5-13-1-22 9-27 7 11 5 20-9 27Z" />
+          <path d="M75 119c8-13 18-16 28-10-6 12-15 16-28 10Z" />
+          <path d="M65 35c-7-11-4-20 5-26 8 9 8 17-5 26Z" />
+          <path d="M69 22c9-14 19-17 29-11-6 12-15 16-29 11Z" />
+        </svg>
+        <svg className="login-bottom-wave" viewBox="0 0 1365 110" preserveAspectRatio="none">
+          <path d="M0 42c100 15 102 73 250 47 140-24 197-65 320-52 126 13 178 68 323 54 120-12 204-62 326-39 58 11 99 36 146 33v25H0Z" />
+        </svg>
+      </div>
+
       <div className="bg-icon icon-croissant">🥐</div>
       <div className="bg-icon icon-whisk">🍳</div>
       <div className="bg-icon icon-cake">🍰</div>
@@ -452,7 +548,13 @@ export default function Login() {
           <div className="flex w-full flex-1 justify-center lg:w-[46%] lg:items-center lg:justify-end lg:pr-[4vw] lg:pl-[2vw]">
             <div className="login-card w-full max-w-[500px] px-6 py-5 md:px-10 md:py-7 lg:px-10">
               <div className="mb-4 text-center lg:text-left">
-                <h2 className="text-2xl font-extrabold text-[#171717] md:text-3xl">Welcome</h2>
+                <h2 className="login-welcome text-2xl font-normal text-[#F0B94D] md:text-3xl">
+                  Welcome
+                  <svg viewBox="0 0 40 36" aria-hidden="true">
+                    <path d="M2 29c9 0 12-2 17-8" />
+                    <path d="M18 19c-7-7 2-14 7-7 5-7 14 0 7 7l-7 7Z" />
+                  </svg>
+                </h2>
                 <p className="mt-1 text-sm text-[#171717] opacity-60">Login to your account to continue</p>
               </div>
 
