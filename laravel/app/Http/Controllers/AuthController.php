@@ -35,9 +35,6 @@ class AuthController extends Controller
             $error = 'Please fill all fields.';
         } else {
             $user = DB::table('users')->where('email', $email)->first();
-            $profileColumn = Schema::hasColumn('users', 'profile_picture')
-                ? 'profile_picture'
-                : (Schema::hasColumn('users', 'profile_image') ? 'profile_image' : null);
 
             if (!$user) {
                 $error = 'User not found.';
@@ -135,6 +132,9 @@ class AuthController extends Controller
         }
 
         $user = DB::table('users')->where('email', $email)->first();
+        $profileColumn = Schema::hasColumn('users', 'profile_picture')
+            ? 'profile_picture'
+            : (Schema::hasColumn('users', 'profile_image') ? 'profile_image' : null);
 
         if (!$user) {
             if (!in_array($request->input('intent'), ['signup', 'login_or_signup'], true)) {
@@ -184,7 +184,8 @@ class AuthController extends Controller
             ]
         );
 
-        $profilePicture = $user->profile_picture ?: $user->profile_image ?: '';
+        $profilePicture = trim((string) ($user->profile_picture ?? ''))
+            ?: trim((string) ($user->profile_image ?? ''));
         $userData = [
             'id' => $user->id,
             'name' => $user->name,
