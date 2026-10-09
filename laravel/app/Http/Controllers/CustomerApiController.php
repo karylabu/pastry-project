@@ -1282,7 +1282,7 @@ PROMPT;
             }
 
             $needsStaff = false;
-            if (($provider === 'ollama' || ($apiKey && !str_contains($apiKey, 'bagong_key')))) {
+            if (!$isQuickChat && ($provider === 'ollama' || ($apiKey && !str_contains($apiKey, 'bagong_key')))) {
                 try {
                     if ($provider === 'ollama') {
                         set_time_limit(0);
