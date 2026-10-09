@@ -290,7 +290,7 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
       <div className="flex items-center justify-between">
 
         {/* LEFT */}
-        <div className="flex min-w-0 items-center gap-1 sm:gap-14">
+        <div className="flex min-w-0 items-center gap-1 sm:gap-4 2xl:gap-14">
 
           <Link
             to="/customer"
@@ -314,7 +314,7 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
           </Link>
 
           {/* NAV */}
-          <div className="hidden lg:flex items-center gap-10">
+          <div className="hidden 2xl:flex items-center gap-10">
 
             {navs.map(nav => (
               <Link
@@ -335,12 +335,12 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
         </div>
 
         {/* RIGHT */}
-        <div className="flex shrink-0 items-center gap-1 sm:gap-2 lg:gap-6">
+        <div className="flex shrink-0 items-center gap-1 sm:gap-2 2xl:gap-6">
 
           {/* SEARCH */}
           <form
             onSubmit={handleSearchSubmit}
-            className="hidden h-8 w-[clamp(220px,24vw,340px)] items-center gap-3 rounded-full border border-gray-300 bg-gray-50 px-4 transition focus-within:border-gray-400 focus-within:bg-white md:flex"
+            className="hidden h-8 w-[clamp(180px,20vw,300px)] items-center gap-3 rounded-full border border-gray-300 bg-gray-50 px-4 transition focus-within:border-gray-400 focus-within:bg-white md:flex"
           >
             <Search size={20} className="shrink-0 text-gray-600" />
             <input
@@ -713,7 +713,7 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
 
       </div>
 
-      <div className="mt-2 flex justify-center gap-2 overflow-x-hidden border-t border-gray-100 pt-2 sm:gap-6 lg:hidden">
+      <div className="mt-2 flex justify-center gap-2 overflow-x-hidden border-t border-gray-100 pt-2 sm:gap-6 2xl:hidden">
         {navs.map(nav => (
           <Link
             key={nav.path}
