@@ -1854,13 +1854,14 @@ PROMPT;
         return $this->corsResponse([
             'id' => (string) $user->id,
             'name' => $user->name,
+            'username' => $user->username ?? '',
             'email' => $user->email,
             'role' => $user->role,
             'phone' => $user->phone ?? '',
             'address' => $user->address ?? '',
-            'profile_image' => $user->profile_picture ?? '',
-            'profile_picture' => $user->profile_picture ?? '',
-            'avatar' => $user->profile_picture ?? '',
+            'profile_image' => $user->profile_picture ?: $user->profile_image ?: '',
+            'profile_picture' => $user->profile_picture ?: $user->profile_image ?: '',
+            'avatar' => $user->profile_picture ?: $user->profile_image ?: '',
         ]);
     }
 }

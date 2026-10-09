@@ -65,6 +65,8 @@ class CustomerAuthApiTest extends TestCase
             'email' => 'customer@example.com',
             'password' => 'legacy-password',
             'role' => 'customer',
+            'username' => 'test-customer',
+            'profile_picture' => 'https://example.com/profile.png',
         ]);
 
         $this->postJson('/api/login', [
@@ -73,7 +75,10 @@ class CustomerAuthApiTest extends TestCase
         ])
             ->assertOk()
             ->assertJsonPath('success', true)
-            ->assertJsonPath('user.id', '7');
+            ->assertJsonPath('user.id', '7')
+            ->assertJsonPath('user.username', 'test-customer')
+            ->assertJsonPath('user.profile_picture', 'https://example.com/profile.png')
+            ->assertJsonPath('user.avatar', 'https://example.com/profile.png');
 
         $storedPassword = DB::table('users')->where('id', 7)->value('password');
         $this->assertTrue(Hash::check('legacy-password', $storedPassword));
@@ -173,9 +178,13 @@ class CustomerAuthApiTest extends TestCase
             'username' => 'updated',
         ])
             ->assertOk()
-            ->assertJsonPath('user.name', 'Updated Customer');
-        $this->assertDatabaseHas('users', ['id' => 7, 'name' => 'Updated Customer']);
+            ->assertJsonPath('user.name', 'Updated Customer')
+            ->assertJsonPath('user.username', 'updated');
+        $this->assertDatabaseHas('users', ['id' => 7, 'name' => 'Updated Customer', 'username' => 'updated']);
         $this->assertDatabaseMissing('users', ['id' => 999]);
+        $this->withHeaders($headers)->getJson('/api/user')
+            ->assertOk()
+            ->assertJsonPath('username', 'updated');
         $this->assertDatabaseHas('notifications', [
             'user_id' => 7,
             'title' => 'Profile Updated',

@@ -173,13 +173,16 @@ class AuthController extends Controller
             ]
         );
 
+        $profilePicture = $user->profile_picture ?: $user->profile_image ?: '';
         $userData = [
             'id' => $user->id,
             'name' => $user->name,
+            'username' => $user->username ?? '',
             'email' => $user->email,
             'role' => $user->role ?? 'customer',
-            'profile_picture' => $user->profile_picture ?? '',
-            'avatar' => $user->profile_picture ?? '',
+            'profile_picture' => $profilePicture,
+            'profile_image' => $profilePicture,
+            'avatar' => $profilePicture,
         ];
 
         $_SESSION['user'] = $userData;

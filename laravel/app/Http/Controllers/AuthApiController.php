@@ -552,15 +552,18 @@ class AuthApiController extends Controller
 
     private function formatUserData($user)
     {
+        $profilePicture = $user->profile_picture ?: $user->profile_image ?: '';
+
         return [
             'id' => (string)$user->id,
             'name' => $user->name,
+            'username' => $user->username ?? '',
             'email' => $user->email,
             'role' => $user->role,
             'phone' => $user->phone ?? '',
-            'profile_image' => $user->profile_picture ?? $user->profile_image ?? '',
-            'profile_picture' => $user->profile_picture ?? $user->profile_image ?? '',
-            'avatar' => $user->profile_picture ?? $user->profile_image ?? '',
+            'profile_image' => $profilePicture,
+            'profile_picture' => $profilePicture,
+            'avatar' => $profilePicture,
             'address' => $user->address ?? '',
         ];
     }

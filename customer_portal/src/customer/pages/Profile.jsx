@@ -42,7 +42,7 @@ export default function Profile() {
           const syncedUser = {
             ...currentUser,
             ...data,
-            avatar: currentUser.avatar || data.avatar || data.profile_image || data.profile_picture || '',
+            avatar: data.avatar || data.profile_image || data.profile_picture || currentUser.avatar || '',
           };
           setUser(syncedUser);
           localStorage.setItem('user', JSON.stringify(syncedUser));

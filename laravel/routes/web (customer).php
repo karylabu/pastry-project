@@ -187,10 +187,11 @@ Route::prefix('api')->group(function () {
                         'user' => [
                             'id' => (string)$user->id,
                             'name' => $user->name,
+                            'username' => $user->username ?? '',
                             'email' => $user->email,
                             'role' => $user->role,
                             'phone' => $user->phone ?? '',
-                            'profile_image' => $user->profile_picture ?? '',
+                            'profile_image' => $user->profile_picture ?: $user->profile_image ?: '',
                         ]
                     ]);
                 }

@@ -98,7 +98,7 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
           setUser({
             ...storedUser,
             ...data,
-            avatar: storedUser.avatar || data.avatar || data.profile_image || data.profile_picture || '',
+            avatar: data.avatar || data.profile_image || data.profile_picture || storedUser.avatar || '',
           });
         }
       })
