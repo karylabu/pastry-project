@@ -1,19 +1,17 @@
 
-import React, { useEffect, useMemo } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { CUSTOMER_BASE } from '../../services/config';
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Trash2, Plus, Minus, ShoppingBag } from "lucide-react";
+import { getCartItemKey } from '../utils/cartItems';
 
 export default function CartModal({ isOpen, onClose, items = [], setItems, onCheckout }) {
-  // Build grouped items with qty and firstIndex
+  const [selectedKeys, setSelectedKeys] = useState(null);
+
   const groupedItems = useMemo(() => {
     const map = new Map();
     items.forEach((item, idx) => {
-      const key = JSON.stringify({
-        name: item.name,
-        variant: item.variant,
-        selectionDetails: item.selectionDetails,
-      });
+      const key = getCartItemKey(item);
       if (!map.has(key)) {
         map.set(key, { ...item, qty: 1, _key: key, firstIndex: idx });
       } else {
@@ -23,10 +21,17 @@ export default function CartModal({ isOpen, onClose, items = [], setItems, onChe
     return Array.from(map.values());
   }, [items]);
 
-  const total = groupedItems.reduce((sum, item) => sum + item.price * item.qty, 0);
+  const isSelected = (key) => selectedKeys === null || selectedKeys.has(key);
+  const selectedItems = items.filter((item) => isSelected(getCartItemKey(item)));
+  const selectedGroups = groupedItems.filter((item) => isSelected(item._key));
+  const selectedQuantity = selectedItems.length;
+  const selectedTotal = selectedGroups.reduce((sum, item) => sum + item.price * item.qty, 0);
 
   useEffect(() => {
-    if (!isOpen) return undefined;
+    if (!isOpen) {
+      setSelectedKeys(null);
+      return undefined;
+    }
 
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
@@ -35,6 +40,20 @@ export default function CartModal({ isOpen, onClose, items = [], setItems, onChe
       document.body.style.overflow = previousOverflow;
     };
   }, [isOpen]);
+
+  const handleToggleAll = () => {
+    setSelectedKeys(
+      selectedGroups.length === groupedItems.length
+        ? new Set()
+        : null
+    );
+  };
+
+  const handleDeleteSelected = () => {
+    if (selectedGroups.length === 0) return;
+    setItems(items.filter((item) => !isSelected(getCartItemKey(item))));
+    setSelectedKeys(null);
+  };
 
   // Increase: insert a duplicate right after the first occurrence
   const handleIncrease = (firstIndex, item) => {
@@ -52,24 +71,29 @@ export default function CartModal({ isOpen, onClose, items = [], setItems, onChe
   };
 
   // Decrease: remove one instance at firstIndex
-  const handleDecrease = (firstIndex) => {
+  const handleDecrease = (firstIndex, key, quantity) => {
     const updated = [...items];
     updated.splice(firstIndex, 1);
     setItems(updated);
+    if (quantity === 1) {
+      setSelectedKeys((current) => {
+        if (current === null) return null;
+        const next = new Set(current);
+        next.delete(key);
+        return next;
+      });
+    }
   };
 
   // Remove all instances matching this key
   const handleRemove = (key) => {
-    setItems(
-      items.filter(
-        (i) =>
-          JSON.stringify({
-            name: i.name,
-            variant: i.variant,
-            selectionDetails: i.selectionDetails,
-          }) !== key
-      )
-    );
+    setItems(items.filter((item) => getCartItemKey(item) !== key));
+    setSelectedKeys((current) => {
+      if (current === null) return null;
+      const updated = new Set(current);
+      updated.delete(key);
+      return updated;
+    });
   };
 
   if (!isOpen) return null;
@@ -106,6 +130,29 @@ export default function CartModal({ isOpen, onClose, items = [], setItems, onChe
                 {items.length} {items.length === 1 ? "item" : "items"}
               </span>
             </div>
+            {groupedItems.length > 0 && (
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#eee5db] bg-[#fffdfa] px-3 py-2">
+                <label className="flex cursor-pointer items-center gap-2 text-xs font-semibold text-[#493a30]">
+                  <input
+                    type="checkbox"
+                    checked={groupedItems.length > 0 && selectedGroups.length === groupedItems.length}
+                    onChange={handleToggleAll}
+                    aria-label="Select all basket items"
+                    className="h-4 w-4 accent-[#a77b26]"
+                  />
+                  Select all
+                </label>
+                <button
+                  type="button"
+                  onClick={handleDeleteSelected}
+                  disabled={selectedGroups.length === 0}
+                  className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  <Trash2 size={14} />
+                  Delete selected
+                </button>
+              </div>
+            )}
             {groupedItems.length === 0 ? (
               <div className="flex min-h-[240px] flex-col items-center justify-center rounded-xl border border-dashed border-[#e7d9c9] bg-[#fffaf2] px-5 text-center">
                 <span className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-[#fff0c2] text-[#a77b26]">
@@ -133,6 +180,20 @@ export default function CartModal({ isOpen, onClose, items = [], setItems, onChe
                   className="rounded-xl border border-[#eee5db] bg-[#fffdfa] p-3 transition-colors hover:border-[#e7c875] sm:p-4"
                 >
                   <div className="flex items-start gap-3 sm:gap-4">
+                    <input
+                      type="checkbox"
+                      checked={isSelected(item._key)}
+                      onChange={() => setSelectedKeys((current) => {
+                        const updated = current === null
+                          ? new Set(groupedItems.map((group) => group._key))
+                          : new Set(current);
+                        if (updated.has(item._key)) updated.delete(item._key);
+                        else updated.add(item._key);
+                        return updated;
+                      })}
+                      aria-label={`Select ${item.name}${item.variant ? ` ${item.variant}` : ''}`}
+                      className="mt-1 h-4 w-4 flex-shrink-0 cursor-pointer accent-[#a77b26]"
+                    />
                     {/* Image */}
                     <div className="h-16 w-16 flex-shrink-0 overflow-hidden rounded-lg border border-[#f1e6df] bg-[#f8eee8] sm:h-20 sm:w-20">
                       <img
@@ -190,7 +251,7 @@ export default function CartModal({ isOpen, onClose, items = [], setItems, onChe
                         </span>
                         <div className="flex items-center gap-2">
                           <button
-                            onClick={() => handleDecrease(item.firstIndex)}
+                            onClick={() => handleDecrease(item.firstIndex, item._key, item.qty)}
                             aria-label={`Decrease ${item.name} quantity`}
                             className="flex h-8 w-8 items-center justify-center rounded-full border border-[#eadfd8] bg-white text-[#765d50] transition hover:border-[#e7c875] hover:bg-[#fff8df] active:scale-90 disabled:cursor-not-allowed disabled:opacity-40"
                           >
@@ -230,7 +291,7 @@ export default function CartModal({ isOpen, onClose, items = [], setItems, onChe
             <p className="mb-4 text-xs font-bold uppercase tracking-[0.16em] text-[#8d7a6e]">Order Summary</p>
 
             <div className="hidden flex-1 space-y-4 overflow-y-auto pr-1 md:block">
-              {groupedItems.map((item) => (
+              {selectedGroups.map((item) => (
                 <div key={item._key} className="flex items-center gap-3">
                   <img
                     src={`${CUSTOMER_BASE}/uploads/${item?.image || ''}`}
@@ -256,17 +317,20 @@ export default function CartModal({ isOpen, onClose, items = [], setItems, onChe
                 <div className="text-right">
                   <span className="flex items-baseline justify-end text-2xl font-extrabold tracking-tight text-[#33251e] md:text-3xl">
                     <span className="mr-1 text-lg">₱</span>
-                    {total.toLocaleString()}
+                    {selectedTotal.toLocaleString()}
+                  </span>
+                  <span className="mt-1 block text-[10px] text-gray-500">
+                    {selectedQuantity} selected {selectedQuantity === 1 ? 'item' : 'items'}
                   </span>
                 </div>
               </div>
 
               <button
-                onClick={onCheckout}
-                disabled={groupedItems.length === 0}
+                onClick={() => onCheckout(selectedItems)}
+                disabled={selectedGroups.length === 0}
                 className="w-full rounded-full border border-[#eadfca] bg-[#fff8e9] py-3.5 text-xs font-bold uppercase tracking-[0.2em] text-[#33251e] shadow-sm transition-all hover:border-[#e7c875] hover:bg-[#fff8df] hover:text-[#8d6a2e] active:scale-[0.98] disabled:cursor-not-allowed disabled:border-gray-200 disabled:bg-gray-100 disabled:text-gray-400 md:py-4"
               >
-                Checkout
+                Checkout selected ({selectedQuantity})
               </button>
             </div>
           </div>

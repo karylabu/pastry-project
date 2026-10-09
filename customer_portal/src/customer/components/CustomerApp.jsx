@@ -30,6 +30,7 @@ import ChatSupport from '../pages/ChatSupport';
 
 import CartModal from './CartModal';
 import CheckoutModal from './CheckoutModal';
+import { removeOrderedCartItems } from '../utils/cartItems';
 import { getAuthHeaders } from '../../services/api';
 import { LARAVEL_BASE } from '../../services/config';
 
@@ -70,6 +71,7 @@ export default function CustomerApp() {
       return [];
     }
   });
+  const [checkoutCartItems, setCheckoutCartItems] = useState([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [showGuestPrompt, setShowGuestPrompt] = useState(false);
@@ -168,6 +170,10 @@ export default function CustomerApp() {
 
         if (response.ok && result.payment_status === 'paid') {
           window.sessionStorage.removeItem(PENDING_PAYMONGO_CHECKOUT_KEY);
+          const orderedItems = Array.isArray(pendingCheckout.checkoutItems)
+            ? pendingCheckout.checkoutItems
+            : pendingCheckout.cartItems || [];
+          setCartItems((currentItems) => removeOrderedCartItems(currentItems, orderedItems));
           window.dispatchEvent(new Event('ordersUpdated'));
           setIsCheckoutOpen(false);
           setToastMessage('Payment completed');
@@ -309,11 +315,9 @@ export default function CustomerApp() {
   /* =========================
      PLACE ORDER
   ========================= */
-  const handleOrderPlaced = (order_id, checkoutData) => {
-    setCartItems([]);
-    if (typeof window !== 'undefined') {
-      window.localStorage.removeItem(storageKey);
-    }
+  const handleOrderPlaced = (order_id, checkoutData, orderedItems = checkoutCartItems) => {
+    setCartItems((currentItems) => removeOrderedCartItems(currentItems, orderedItems));
+    setCheckoutCartItems([]);
 
     // Show toast for order placed
     setToastMessage('Your order was successfully placed!');
@@ -433,7 +437,7 @@ export default function CustomerApp() {
         items={cartItems}
         setItems={setCartItems}
         totalAmount={totalAmount}
-        onCheckout={() => {
+        onCheckout={(selectedItems) => {
           setIsCartOpen(false);
           if (isGuest()) {
             setShowGuestPrompt(true);
@@ -443,6 +447,7 @@ export default function CustomerApp() {
             showShopBlockedMessage();
             return;
           }
+          setCheckoutCartItems(selectedItems);
           setTimeout(() => setIsCheckoutOpen(true), 200);
         }}
       />
@@ -451,8 +456,8 @@ export default function CustomerApp() {
       <CheckoutModal
         isOpen={isCheckoutOpen}
         onClose={() => setIsCheckoutOpen(false)}
-        cartItems={cartItems}
-        setCartItems={setCartItems}
+        cartItems={checkoutCartItems}
+        fullCartItems={cartItems}
         onOrderPlaced={handleOrderPlaced}
       />
 

@@ -72,7 +72,7 @@ export default function CheckoutModal({
   isOpen,
   onClose,
   cartItems = [],
-  setCartItems,
+  fullCartItems = [],
   onOrderPlaced,
 }) {
   const [loading, setLoading] = useState(false);
@@ -687,17 +687,13 @@ export default function CheckoutModal({
         try {
           window.sessionStorage.setItem(PENDING_PAYMONGO_CHECKOUT_KEY, JSON.stringify({
             orderId: result.order_id,
-            cartItems,
+            cartItems: fullCartItems,
+            checkoutItems: cartItems,
             startedAt: Date.now(),
           }));
         } catch (storageError) {
           console.error('Could not save the pending PayMongo checkout state:', storageError);
         }
-
-        // FIX: Clear cart AFTER we have a valid checkout URL, right before redirect.
-        // Previously the cart was cleared before the URL check, so a missing URL
-        // would wipe the cart with no payment made.
-        setCartItems([]);
 
         // REDIRECT TO PAYMONGO
         window.location.href = checkoutUrl;
@@ -709,9 +705,7 @@ export default function CheckoutModal({
          COD FLOW
       ========================= */
 
-      setCartItems([]);
-
-      onOrderPlaced(result.order_id, checkoutData);
+      onOrderPlaced(result.order_id, checkoutData, cartItems);
 
       onClose();
 
