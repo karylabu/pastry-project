@@ -154,7 +154,7 @@ export default function Login() {
   }, [showLoginSuccess, justLoggedUser, navigate]);
 
   return (
-    <div className="pastry-login relative min-h-screen w-full overflow-hidden bg-[#faf8f1] font-['DM_Sans'] text-[#171717]">
+    <div className="pastry-login relative min-h-screen w-full overflow-x-hidden bg-[#faf8f1] font-['DM_Sans'] text-[#171717]">
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700;800&family=Pacifico&family=Playfair+Display:wght@600;700&display=swap');
 
@@ -412,20 +412,38 @@ export default function Login() {
           .pastry-login .login-bottom-wave { right: 0; bottom: 0; width: 100%; height: 106px; fill: #fcecc8; stroke: none; opacity: .76; }
         }
         @media (max-width: 1023px) {
+          .pastry-login .login-welcome svg { display: none; }
           .pastry-login .login-banner { display: none; }
-          .pastry-login .hero-panel { display: flex; padding: 14px 8px 8px; }
-          .pastry-login .hero-panel > .mb-6:first-child { justify-content: center; margin-bottom: 20px; }
-          .pastry-login .hero-panel > .mb-6:first-child img { display: none; }
+          .pastry-login .hero-panel {
+            display: flex;
+            padding: 18px 32px 14px;
+            background: linear-gradient(135deg, #fff9e9 0%, #fff6df 100%);
+          }
+          .pastry-login .hero-panel > .mb-6:first-child { justify-content: center; margin-top: 12px; margin-bottom: 12px; }
+          .pastry-login .hero-panel > .mb-6:first-child img { display: block; }
           .pastry-login .hero-panel > .mb-6:first-child > div { text-align: center; }
-          .pastry-login .hero-panel > .mb-6:first-child h1 { font-size: 30px; }
-          .pastry-login .hero-panel > .mb-6:first-child p { font-size: 8px; }
-          .pastry-login .hero-panel > .mb-6:nth-child(2) { margin-bottom: 16px; }
-          .pastry-login .hero-panel > .mb-6:nth-child(2) h2 { font-size: 36px; }
+          .pastry-login .hero-panel > .mb-6:first-child h1 {
+            font-family: 'Playfair Display', Georgia, serif;
+            font-size: 22px;
+            font-style: italic;
+          }
+          .pastry-login .hero-panel > .mb-6:first-child h1 span { color: #e9aa32; }
+          .pastry-login .hero-panel > .mb-6:first-child p { margin-top: 4px; font-size: 7px; letter-spacing: .35em; }
+          .pastry-login .hero-panel > .mb-6:nth-child(2) { margin-bottom: 0; text-align: center; }
           .pastry-login .login-cake-section { display: none; }
-          .pastry-login .login-card { padding: 18px 20px; border-radius: 20px; }
-          .pastry-login .login-card > .mb-4:first-child { text-align: left; }
-          .pastry-login .login-card > .mb-4:first-child h2 { font-size: 28px; }
-          .pastry-login .mobile-login-art { display: block; width: min(100%, 340px); height: auto; max-height: none; margin: 19px auto 0; border-radius: 16px; object-fit: contain; object-position: center; }
+          .pastry-login main > div:not(.hero-panel) { padding: 0 23px 20px; }
+          .pastry-login .login-card {
+            padding: 14px 30px 24px;
+            border: 1px solid rgba(203, 213, 225, 0.8);
+            border-radius: 20px;
+            background: rgba(255, 255, 255, 0.96);
+            box-shadow: 0 18px 55px rgba(35, 28, 20, 0.14);
+            backdrop-filter: blur(8px);
+          }
+          .pastry-login .login-card > .mb-4:first-child { margin-bottom: 12px; text-align: center; }
+          .pastry-login .login-card > .mb-4:first-child h2 { font-size: 31px; }
+          .pastry-login .login-card > .mb-4:first-child p { color: #89909c; }
+          .pastry-login .mobile-login-art { display: block; width: min(100%, 340px); height: auto; max-height: none; margin: 12px auto; border-radius: 16px; object-fit: contain; object-position: center; }
           .pastry-login .login-footer-links { display: flex; justify-content: center; gap: 12px 18px; }
           .pastry-login .login-footer-social { display: none; }
           .pastry-login .login-footer { display: flex; flex-direction: column; justify-content: center; gap: 9px; border-top: 0; padding: 10px 0 16px; }
@@ -458,13 +476,13 @@ export default function Login() {
             .pastry-login .login-card form.space-y-4 > :not([hidden]) ~ :not([hidden]).btn-secondary { margin-top: 0; }
             .pastry-login .login-card form + p { margin-top: 25px; }
             .pastry-login .login-card a.mt-4 { margin-top: 14px; }
-            .pastry-login .mobile-login-art { width: min(100%, 340px); height: auto; margin-top: 19px; object-fit: contain; object-position: center; }
+            .pastry-login .mobile-login-art { width: min(100%, 340px); height: auto; margin-top: 12px; object-fit: contain; object-position: center; }
             .pastry-login .login-footer { padding-bottom: 19px; }
           }
           @media (max-width: 399px) {
             .pastry-login .hero-panel { padding-right: 20px; padding-left: 20px; }
-            .pastry-login .hero-panel > .mb-6:first-child { margin-bottom: 30px; }
-            .pastry-login .hero-panel > .mb-6:nth-child(2) h2 { font-size: 32px; }
+            .pastry-login .hero-panel > .mb-6:first-child { margin-bottom: 12px; }
+            .pastry-login .hero-panel > .mb-6:nth-child(2) h2.login-tagline { font-size: 29px; }
             .pastry-login main > div:not(.hero-panel) { padding-right: 14px; padding-left: 14px; }
             .pastry-login .login-card { padding-right: 18px; padding-left: 18px; }
           }
