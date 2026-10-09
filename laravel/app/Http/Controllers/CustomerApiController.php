@@ -1106,7 +1106,7 @@ class CustomerApiController extends Controller
 
         $aiReply = null;
         $needsStaff = false;
-        if ($sender === 'customer' && !in_array(strtolower((string) $supportMode), ['staff', 'admin'], true)) {
+        if ($sender === 'customer' && !in_array(strtolower((string) $supportMode), ['staff', 'admin'], true) && !$isQuickChat) {
             $orderContext = 'No order was provided. Answer general questions about products, ordering, delivery, payment, and shop hours.';
             $order = null;
             if ($orderId > 0) {
@@ -1375,19 +1375,6 @@ PROMPT;
                 }
             }
 
-            if (!$aiReply && $isQuickChat) {
-                $quickChatKey = strtolower(trim((string) preg_replace('/[.!?]+$/', '', $message)));
-                $quickChatReplies = [
-                    'hi, i need help' => 'Hi! Nandito ako para tumulong. Tungkol ba ito sa order, pag-order, customized cake, o payment?',
-                    'where is my order' => 'Makikita mo ang kasalukuyang status ng order mo sa My Orders page. Kung kailangan mo pa ng tulong, ipadala ang order number.',
-                    'i want to place an order' => 'Para mag-order, pumunta sa Menu, piliin ang produkto, idagdag sa bag, at mag-checkout.',
-                    'can i customize a cake' => 'Oo! Pumunta sa Customized Cakes at ilagay ang design, flavor, size, message, at preferred date.',
-                    'how can i pay' => 'Makikita ang mga available na payment method sa checkout kapag nag-place ka ng order.',
-                ];
-                $aiReply = $quickChatReplies[$quickChatKey]
-                    ?? 'Salamat sa pag-message! Sabihin kung tungkol ito sa order, pag-order, customized cake, o payment para matulungan kita.';
-            }
-
             if ($aiReply) {
                 // Remove common small-model artifacts while preserving the generated sentence.
                 $aiReply = preg_replace('/\b(\p{L}+)(?:\s+\1\b)+/iu', '$1', $aiReply);
@@ -1429,6 +1416,35 @@ PROMPT;
                 }
                 DB::table('messages')->insert($aiMessageData);
             }
+        }
+
+        if ($sender === 'customer' && $isQuickChat) {
+            $quickChatKey = strtolower(trim((string) preg_replace('/[.!?]+$/', '', $message)));
+            $quickChatReplies = [
+                'hi, i need help' => 'Hi! Nandito ako para tumulong. Tungkol ba ito sa order, pag-order, customized cake, o payment?',
+                'where is my order' => 'Makikita mo ang kasalukuyang status ng order mo sa My Orders page. Kung kailangan mo pa ng tulong, ipadala ang order number.',
+                'i want to place an order' => 'Para mag-order, pumunta sa Menu, piliin ang produkto, idagdag sa bag, at mag-checkout.',
+                'can i customize a cake' => 'Oo! Pumunta sa Customized Cakes at ilagay ang design, flavor, size, message, at preferred date.',
+                'how can i pay' => 'Makikita ang mga available na payment method sa checkout kapag nag-place ka ng order.',
+            ];
+            $aiReply = $quickChatReplies[$quickChatKey]
+                ?? 'Salamat sa pag-message! Sabihin kung tungkol ito sa order, pag-order, customized cake, o payment para matulungan kita.';
+
+            $aiMessageData = [
+                'order_id' => $dbOrderId,
+                'sender' => 'ai',
+                'message' => $aiReply,
+            ];
+            if (Schema::hasColumn('messages', 'user_id')) {
+                $aiMessageData['user_id'] = $dbUserId;
+            }
+            if ($hasConversationId) {
+                $aiMessageData['conversation_id'] = $conversationId;
+            }
+            if (Schema::hasColumn('messages', 'created_at')) {
+                $aiMessageData['created_at'] = now();
+            }
+            DB::table('messages')->insert($aiMessageData);
         }
 
         return $this->corsResponse([
