@@ -1258,6 +1258,8 @@ export default function CheckoutModal({
                     setDiscountType(nextType);
                     if (nextType === 'none') {
                       setDiscountIdFile(null);
+                    } else {
+                      setRewardCodeInput('');
                     }
                   }}
                   className="w-full rounded-lg border border-[#e8e1d8] bg-[#fffdfa] p-2.5 text-sm text-[#33251e] outline-none focus:border-[#d4af37] focus:ring-2 focus:ring-[#d4af37]/20"
@@ -1266,31 +1268,28 @@ export default function CheckoutModal({
                   <option value="senior_citizen">Senior Citizen - 5%</option>
                   <option value="pwd">PWD - 5%</option>
                 </select>
-                <div className="space-y-2 rounded-xl border border-[#eee5db] bg-white p-3">
-                  <label htmlFor="checkout-reward-code" className="block text-xs font-semibold text-[#765d50]">
-                    Pastry Project reward code
-                  </label>
-                  <input
-                    id="checkout-reward-code"
-                    type="text"
-                    value={rewardCodeInput}
-                    onChange={(event) => setRewardCodeInput(event.target.value.toUpperCase())}
-                    maxLength={32}
-                    autoCapitalize="characters"
-                    autoComplete="off"
-                    spellCheck={false}
-                    placeholder="PPR-XXXXXXXX"
-                    className="w-full rounded-lg border border-[#e8e1d8] bg-[#fffdfa] p-2.5 text-sm uppercase text-[#33251e] outline-none placeholder:normal-case placeholder:text-gray-400 focus:border-[#d4af37] focus:ring-2 focus:ring-[#d4af37]/20"
-                  />
-                  <p className="text-[11px] leading-4 text-[#8d7a6e]">
-                    Redeem 5% off your subtotal, up to ₱100. Reward codes cannot be combined with Senior Citizen or PWD discounts.
-                  </p>
-                  {discountType !== 'none' && rewardCode && (
-                    <p role="alert" className="text-xs font-medium text-red-700">
-                      Select Regular or clear the reward code to use your Senior Citizen / PWD discount.
+                {discountType === 'none' && (
+                  <div className="space-y-2 rounded-xl border border-[#eee5db] bg-white p-3">
+                    <label htmlFor="checkout-reward-code" className="block text-xs font-semibold text-[#765d50]">
+                      Pastry Project reward code
+                    </label>
+                    <input
+                      id="checkout-reward-code"
+                      type="text"
+                      value={rewardCodeInput}
+                      onChange={(event) => setRewardCodeInput(event.target.value.toUpperCase())}
+                      maxLength={32}
+                      autoCapitalize="characters"
+                      autoComplete="off"
+                      spellCheck={false}
+                      placeholder="PPR-XXXXXXXX"
+                      className="w-full rounded-lg border border-[#e8e1d8] bg-[#fffdfa] p-2.5 text-sm uppercase text-[#33251e] outline-none placeholder:normal-case placeholder:text-gray-400 focus:border-[#d4af37] focus:ring-2 focus:ring-[#d4af37]/20"
+                    />
+                    <p className="text-[11px] leading-4 text-[#8d7a6e]">
+                      Redeem 5% off your subtotal, up to ₱100. Reward codes cannot be combined with Senior Citizen or PWD discounts.
                     </p>
-                  )}
-                </div>
+                  </div>
+                )}
                 {discountType !== 'none' && (
                   <div className="space-y-2">
                     <label htmlFor="discount-id-image" className="block text-xs leading-relaxed text-[#765d50]">
