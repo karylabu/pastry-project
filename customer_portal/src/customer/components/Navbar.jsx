@@ -260,7 +260,7 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
     const left = Math.max(8, Math.min(searchIconColumn - popoverIconOffset, window.innerWidth - width - 8));
     setSearchPosition({
       left,
-      top: bounds.bottom + 8,
+      top: bounds.top + (bounds.height - 36) / 2,
       width,
     });
     setOpenSearch(true);
@@ -353,15 +353,17 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
             />
           </form>
           <div ref={searchRef} className="relative md:hidden">
-            <button
-              type="button"
-              onClick={toggleMobileSearch}
-              aria-label="Search products"
-              aria-expanded={openSearch}
-              className="flex h-8 w-8 items-center justify-center rounded-full text-gray-700 transition hover:bg-gray-100 sm:h-10 sm:w-10"
-            >
-              <Search size={16} className="sm:h-[18px] sm:w-[18px]" />
-            </button>
+            {!openSearch && (
+              <button
+                type="button"
+                onClick={toggleMobileSearch}
+                aria-label="Search products"
+                aria-expanded={openSearch}
+                className="flex h-8 w-8 items-center justify-center rounded-full text-gray-700 transition hover:bg-gray-100 sm:h-10 sm:w-10"
+              >
+                <Search size={16} className="sm:h-[18px] sm:w-[18px]" />
+              </button>
+            )}
             {openSearch && (
               <form
                 onSubmit={handleSearchSubmit}
