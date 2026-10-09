@@ -18,6 +18,7 @@ import {
   KeyRound,
   Monitor,
   Camera,
+  MapPin,
 } from 'lucide-react';
 import { getAuthHeaders, safeParseJson } from '../../services/api';
 import { LARAVEL_BASE } from '../../services/config';
@@ -47,6 +48,23 @@ export default function AccountSettings() {
   const [profilePhotoFile, setProfilePhotoFile] = useState(null);
   const [profilePhotoPreview, setProfilePhotoPreview] = useState('');
   const profilePhotoInputRef = useRef(null);
+  const [defaultAddressId, setDefaultAddressId] = useState(null);
+  const [addressLoading, setAddressLoading] = useState(false);
+  const [addressSaving, setAddressSaving] = useState(false);
+  const [addressLoadError, setAddressLoadError] = useState('');
+  const [addressForm, setAddressForm] = useState({
+    address_label: 'Home',
+    recipient_name: '',
+    contact_number: '',
+    house_no: '',
+    street: '',
+    barangay: '',
+    city: '',
+    province: '',
+    zip_code: '',
+    landmark: '',
+    delivery_instructions: '',
+  });
 
   const [profileForm, setProfileForm] = useState({
     full_name: '',
@@ -84,6 +102,54 @@ export default function AccountSettings() {
     });
     setLoading(false);
   }, []);
+
+  useEffect(() => {
+    if (!user?.id) return undefined;
+    let cancelled = false;
+
+    const loadDefaultAddress = async () => {
+      setAddressLoading(true);
+      setAddressLoadError('');
+      try {
+        const response = await fetch(`${BASE}/api/addresses`, {
+          credentials: 'include',
+          headers: getAuthHeaders(),
+        });
+        const data = await safeParseJson(response);
+        if (!response.ok || data?.status !== 'success') {
+          throw new Error(data?.message || 'Unable to load your saved addresses.');
+        }
+
+        const savedAddresses = Array.isArray(data.addresses) ? data.addresses : [];
+        const defaultAddress = savedAddresses.find((address) => address.is_default);
+        if (cancelled) return;
+
+        setDefaultAddressId(defaultAddress?.address_id || null);
+        setAddressForm({
+          address_label: defaultAddress?.address_label || 'Home',
+          recipient_name: defaultAddress?.recipient_name || user.name || user.full_name || '',
+          contact_number: defaultAddress?.contact_number || user.phone || user.phone_number || '',
+          house_no: defaultAddress?.house_no || '',
+          street: defaultAddress?.street || '',
+          barangay: defaultAddress?.barangay || '',
+          city: defaultAddress?.city || '',
+          province: defaultAddress?.province || '',
+          zip_code: defaultAddress?.zip_code || '',
+          landmark: defaultAddress?.landmark || '',
+          delivery_instructions: defaultAddress?.delivery_instructions || '',
+        });
+      } catch {
+        if (!cancelled) setAddressLoadError('Unable to load your saved addresses. You can still add a default address.');
+      } finally {
+        if (!cancelled) setAddressLoading(false);
+      }
+    };
+
+    loadDefaultAddress();
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
 
   useEffect(() => {
     if (activeSection !== 'security' || !user?.id) return;
@@ -211,6 +277,45 @@ export default function AccountSettings() {
     }
   };
 
+  const handleDefaultAddressSave = async (e) => {
+    e.preventDefault();
+    if (!user?.id) return;
+
+    setAddressSaving(true);
+    try {
+      const response = await fetch(`${BASE}/api/addresses`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+        body: JSON.stringify({
+          ...addressForm,
+          address_id: defaultAddressId || undefined,
+          is_default: true,
+        }),
+      });
+      const data = await safeParseJson(response);
+      if (!response.ok || data?.status !== 'success') {
+        throw new Error(data?.message || 'Unable to save your default address.');
+      }
+
+      const savedAddresses = Array.isArray(data.addresses) ? data.addresses : [];
+      const savedDefault = savedAddresses.find((address) => address.is_default);
+      setDefaultAddressId(savedDefault?.address_id || data.address_id || null);
+      if (savedDefault) {
+        setAddressForm((current) => ({
+          ...current,
+          ...savedDefault,
+        }));
+      }
+      window.dispatchEvent(new Event('customer:user-updated'));
+      showAlert(data.message || 'Default address saved successfully.', 'success');
+    } catch (error) {
+      showAlert(error.message || 'Unable to save your default address.', 'error');
+    } finally {
+      setAddressSaving(false);
+    }
+  };
+
   const handlePasswordChange = async (e) => {
     e.preventDefault();
     if (!user?.id) return;
@@ -284,7 +389,7 @@ export default function AccountSettings() {
     }
   };
 
-  const renderField = (label, value, onChange, type = 'text', placeholder = '') => (
+  const renderField = (label, value, onChange, type = 'text', placeholder = '', required = false) => (
     <label className="block">
       <span className="text-xs uppercase tracking-[0.16em] text-gray-600 font-bold">{label}</span>
       <input
@@ -292,6 +397,7 @@ export default function AccountSettings() {
         value={value}
         onChange={onChange}
         placeholder={placeholder}
+        required={required}
         className="mt-2 w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-3 text-sm text-gray-900 placeholder-gray-400 outline-none focus:border-[#d4af37] focus:ring-2 focus:ring-[#f1cf72]/30 sm:px-4 sm:py-3.5 sm:text-base"
       />
     </label>
@@ -364,6 +470,49 @@ export default function AccountSettings() {
           {saving ? 'Saving...' : 'Save Profile'}
         </button>
       </form>
+
+      <div className="border-t border-gray-100 pt-5 sm:pt-6">
+        <div className="mb-4 flex items-start gap-3">
+          <span className="mt-0.5 rounded-xl bg-[#fff4cf] p-2 text-[#8b6a24]"><MapPin size={18} /></span>
+          <div>
+            <h3 className="text-base font-bold text-gray-900">Default delivery address</h3>
+            <p className="mt-1 text-sm text-gray-500">This address will be selected automatically when you place a delivery order.</p>
+          </div>
+        </div>
+        {addressLoading && <p className="mb-3 text-sm text-gray-500">Loading saved address…</p>}
+        {addressLoadError && <p role="alert" className="mb-3 text-sm text-amber-700">{addressLoadError}</p>}
+        <form onSubmit={handleDefaultAddressSave} className="space-y-4">
+          <div className="grid gap-3 md:grid-cols-2 sm:gap-5">
+            {renderField('Address Label', addressForm.address_label, (e) => setAddressForm({ ...addressForm, address_label: e.target.value }), 'text', 'Home, Work, etc.', true)}
+            {renderField('Recipient Name', addressForm.recipient_name, (e) => setAddressForm({ ...addressForm, recipient_name: e.target.value }), 'text', 'Name of recipient', true)}
+            {renderField('Contact Number', addressForm.contact_number, (e) => setAddressForm({ ...addressForm, contact_number: e.target.value }), 'tel', '09XX XXX XXXX', true)}
+            {renderField('House / Unit No.', addressForm.house_no, (e) => setAddressForm({ ...addressForm, house_no: e.target.value }), 'text', 'House or unit number')}
+            {renderField('Street', addressForm.street, (e) => setAddressForm({ ...addressForm, street: e.target.value }), 'text', 'Street name', true)}
+            {renderField('Barangay', addressForm.barangay, (e) => setAddressForm({ ...addressForm, barangay: e.target.value }), 'text', 'Barangay', true)}
+            {renderField('City / Municipality', addressForm.city, (e) => setAddressForm({ ...addressForm, city: e.target.value }), 'text', 'City or municipality', true)}
+            {renderField('Province', addressForm.province, (e) => setAddressForm({ ...addressForm, province: e.target.value }), 'text', 'Province', true)}
+            {renderField('Postal Code', addressForm.zip_code, (e) => setAddressForm({ ...addressForm, zip_code: e.target.value }), 'text', 'Postal code')}
+            {renderField('Landmark (Optional)', addressForm.landmark, (e) => setAddressForm({ ...addressForm, landmark: e.target.value }), 'text', 'Nearby landmark')}
+          </div>
+          <label className="block">
+            <span className="text-xs font-bold uppercase tracking-[0.16em] text-gray-600">Delivery Instructions (Optional)</span>
+            <textarea
+              value={addressForm.delivery_instructions}
+              onChange={(e) => setAddressForm({ ...addressForm, delivery_instructions: e.target.value })}
+              rows={3}
+              placeholder="Add directions for your delivery"
+              className="mt-2 w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-3 text-sm text-gray-900 placeholder-gray-400 outline-none focus:border-[#d4af37] focus:ring-2 focus:ring-[#f1cf72]/30 sm:px-4"
+            />
+          </label>
+          <button
+            type="submit"
+            disabled={addressSaving || addressLoading}
+            className="rounded-full bg-[#e7b866] px-5 py-3 text-sm font-bold text-[#4a2b20] transition hover:bg-[#f1cf72] disabled:opacity-50 sm:px-6 sm:py-3.5 sm:text-base"
+          >
+            {addressSaving ? 'Saving address…' : defaultAddressId ? 'Update Default Address' : 'Save Default Address'}
+          </button>
+        </form>
+      </div>
     </section>
   );
 

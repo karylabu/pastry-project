@@ -19,6 +19,7 @@ import { getAuthHeaders, safeParseJson } from '../../services/api';
 
 export default function Profile() {
   const [user, setUser] = useState(null);
+  const [savedDefaultAddress, setSavedDefaultAddress] = useState(null);
   const [failedAvatarUrl, setFailedAvatarUrl] = useState('');
 
   useEffect(() => {
@@ -49,17 +50,41 @@ export default function Profile() {
       .catch(() => {
         // Keep the locally cached account visible when the profile request is unavailable.
       });
+
+    fetch(`${CUSTOMER_BASE}/api/addresses`, {
+      credentials: 'include',
+      headers: getAuthHeaders(),
+    })
+      .then(safeParseJson)
+      .then((data) => {
+        if (data?.status === 'success' && Array.isArray(data.addresses)) {
+          setSavedDefaultAddress(data.addresses.find((address) => address.is_default) || null);
+        }
+      })
+      .catch(() => {
+        // The legacy profile address remains visible if saved addresses are unavailable.
+      });
   }, []);
 
   const fullName = user?.name || 'Not available';
   const firstName = fullName.split(' ')[0];
   const avatarUrl = user?.avatar || user?.profile_image || user?.profile_picture || '';
 
-  const defaultAddress = user?.address || user?.default_address || 'Not set';
+  const savedAddressParts = savedDefaultAddress
+    ? [
+        savedDefaultAddress.house_no,
+        savedDefaultAddress.street,
+        savedDefaultAddress.barangay,
+        savedDefaultAddress.city,
+        savedDefaultAddress.province,
+        savedDefaultAddress.zip_code,
+      ].filter(Boolean)
+    : [];
+  const defaultAddress = savedAddressParts.join(', ') || user?.address || user?.default_address || 'Not set';
   const addressParts = (defaultAddress || '').split(',').map((p) => p.trim()).filter(Boolean);
-  const country = addressParts[addressParts.length - 1] || 'Not set';
-  const city = addressParts[addressParts.length - 2] || 'Not set';
-  const postalCode = user?.postal_code || '—';
+  const provinceOrCountry = savedDefaultAddress?.province || addressParts[addressParts.length - 1] || 'Not set';
+  const city = savedDefaultAddress?.city || addressParts[addressParts.length - 2] || 'Not set';
+  const postalCode = savedDefaultAddress?.zip_code || user?.postal_code || '—';
 
   return (
     <PageShell background="bg-[#fffaf3]" padding="px-4 py-6 sm:px-6 sm:py-8 md:px-10 md:py-10" innerClassName="space-y-5">
@@ -145,7 +170,7 @@ export default function Profile() {
           </div>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <Field icon={MapPinned} label="Default Address" value={defaultAddress} wide />
-            <Field icon={MapPin} label="Country" value={country} />
+            <Field icon={MapPin} label="Province" value={provinceOrCountry} />
             <Field icon={MapPin} label="City" value={city} />
             <Field icon={MapPinned} label="Postal Code" value={postalCode} />
           </div>
