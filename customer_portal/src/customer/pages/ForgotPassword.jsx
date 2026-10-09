@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowLeft, Mail, KeyRound, Lock } from "lucide-react";
 import { LARAVEL_BASE } from "../../services/config";
@@ -69,6 +69,7 @@ export default function ForgotPassword({ onBack }) {
   const [success, setSuccess] = useState("");
   const [emailError, setEmailError] = useState("");
   const [touchedEmail, setTouchedEmail] = useState(false);
+  const codeInputRefs = useRef([]);
 
   const clearAlerts = () => { setError(""); setSuccess(""); };
   const isEmailValid = !validateEmail(email);
@@ -135,6 +136,34 @@ export default function ForgotPassword({ onBack }) {
     } finally {
       setLoading(false);
     }
+  };
+
+  const updateCodeDigit = (index, value) => {
+    const digits = value.replace(/\D/g, "");
+    if (!digits) {
+      setCode((current) => `${current.slice(0, index)}${current.slice(index + 1)}`);
+      return;
+    }
+
+    const nextCode = code.split("");
+    digits.slice(0, 6 - index).split("").forEach((digit, offset) => {
+      nextCode[index + offset] = digit;
+    });
+    const normalizedCode = nextCode.join("").slice(0, 6);
+    setCode(normalizedCode);
+    codeInputRefs.current[Math.min(index + digits.length, 5)]?.focus();
+  };
+
+  const handleCodePaste = (event, index) => {
+    event.preventDefault();
+    const digits = event.clipboardData.getData("text").replace(/\D/g, "").slice(0, 6 - index);
+    if (!digits) return;
+    const nextCode = code.split("");
+    digits.split("").forEach((digit, offset) => {
+      nextCode[index + offset] = digit;
+    });
+    setCode(nextCode.join("").slice(0, 6));
+    codeInputRefs.current[Math.min(index + digits.length, 5)]?.focus();
   };
 
   // ── Step 3: Reset password ─────────────────────────────────────────────────
@@ -244,15 +273,35 @@ export default function ForgotPassword({ onBack }) {
         {/* ── Code step ── */}
         {step === "code" && (
           <div className="space-y-3">
-            <input
-              type="text"
-              inputMode="numeric"
-              maxLength={6}
-              placeholder="000000"
-              value={code}
-              onChange={e => setCode(e.target.value.replace(/\D/g, ""))}
-              className="w-full h-[34px] bg-white border border-black/15 rounded-lg px-3 text-[12px] text-black text-center outline-none focus:border-[#F0B94D] focus:ring-2 focus:ring-[#F0B94D]/30 transition-all"
-            />
+            <div role="group" aria-label="6-digit verification code" className="flex justify-center gap-2">
+              {Array.from({ length: 6 }, (_, index) => (
+                <input
+                  key={index}
+                  ref={(element) => { codeInputRefs.current[index] = element; }}
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  maxLength={1}
+                  autoComplete={index === 0 ? "one-time-code" : "off"}
+                  aria-label={`Verification code digit ${index + 1}`}
+                  value={code[index] || ""}
+                  onChange={(event) => updateCodeDigit(index, event.target.value)}
+                  onPaste={(event) => handleCodePaste(event, index)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Backspace" && !code[index] && index > 0) {
+                      codeInputRefs.current[index - 1]?.focus();
+                    } else if (event.key === "ArrowLeft" && index > 0) {
+                      codeInputRefs.current[index - 1]?.focus();
+                    } else if (event.key === "ArrowRight" && index < 5) {
+                      codeInputRefs.current[index + 1]?.focus();
+                    } else if (event.key === "Enter") {
+                      handleVerifyCode();
+                    }
+                  }}
+                  className="h-11 w-10 rounded-lg border border-black/15 bg-white text-center text-base font-semibold text-black outline-none transition-all focus:border-[#F0B94D] focus:ring-2 focus:ring-[#F0B94D]/30 sm:h-12 sm:w-11"
+                />
+              ))}
+            </div>
             <Btn onClick={handleVerifyCode} loading={loading}>
               Verify Code
             </Btn>
