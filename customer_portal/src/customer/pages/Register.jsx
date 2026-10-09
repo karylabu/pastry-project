@@ -694,7 +694,7 @@ export default function Register() {
           </div>
         </main>
 
-        <footer className="relative z-10 flex flex-col items-center justify-between border-t border-gray-200 bg-white/70 px-5 py-3 md:flex-row md:px-8">
+        <footer className="relative z-10 flex flex-col items-center justify-between border-t border-gray-200 px-5 py-3 md:flex-row md:px-8">
           <div className="flex items-center gap-3">
             <img src={LOGO_URL} alt="Logo" className="h-9 w-9 opacity-80" />
             <p className="text-sm text-gray-500">© 2017 Pastry Project. All rights reserved.</p>

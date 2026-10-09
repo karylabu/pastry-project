@@ -455,7 +455,7 @@ export default function Login() {
             .pastry-login .hero-panel > .mb-6:first-child { margin-top: 8px; margin-bottom: 22px; }
             .pastry-login .hero-panel > .mb-6:first-child h1 { font-size: 26px; }
             .pastry-login .hero-panel > .mb-6:nth-child(2) h2.login-tagline { font-size: 30px; }
-            .pastry-login main > div:not(.hero-panel) { padding: 0 23px; }
+            .pastry-login main > div:not(.hero-panel) { padding: 0 23px 32px; }
             .pastry-login .login-card { padding: 14px 30px 24px; border-radius: 20px; }
             .pastry-login .login-card > .mb-4:first-child { margin-bottom: 12px; }
             .pastry-login .login-card form.space-y-4 > :not([hidden]) ~ :not([hidden]) { margin-top: 12px; }
@@ -718,7 +718,7 @@ export default function Login() {
         </main>
 
         {/* Footer */}
-        <footer className="login-footer relative z-10 flex flex-col items-center justify-between border-t border-gray-200 bg-white/70 px-5 py-3 md:flex-row md:px-8">
+        <footer className="login-footer relative z-10 flex flex-col items-center justify-between border-t border-gray-200 px-5 py-3 md:flex-row md:px-8">
           <div className="flex items-center gap-3">
             <img src={LOGO_URL} alt="Logo" className="h-10 w-10 opacity-80" />
             <p className="text-sm text-gray-500">© 2017 Pastry Project. All rights reserved.</p>
