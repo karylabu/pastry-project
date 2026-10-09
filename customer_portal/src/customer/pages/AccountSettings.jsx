@@ -638,17 +638,16 @@ export default function AccountSettings() {
   const renderSecuritySection = () => (
     <section className="space-y-4">
       <div>
-        <h2 className="text-2xl font-bold text-gray-900">Password and security</h2>
-        <p className="mt-1 text-sm text-gray-500">Manage your password, login preferences and recovery methods.</p>
+        <h2 className="text-2xl font-bold text-gray-900">Security</h2>
+        <p className="mt-1 text-sm text-gray-500">Update your password and review active sessions.</p>
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2 lg:items-start">
         {/* Login & recovery */}
         <div>
         <h3 className="text-lg font-bold text-gray-900">Login &amp; recovery</h3>
-        <p className="mt-1 text-sm text-gray-500">Manage your password and login preferences.</p>
 
-        <div className="mt-4 divide-y divide-gray-100 rounded-2xl border border-gray-200 bg-white">
+        <div className="mt-3 divide-y divide-[#ead8c5] border-y border-[#ead8c5]">
           {/* Change password row */}
           <button
             type="button"
@@ -718,9 +717,8 @@ export default function AccountSettings() {
         {/* Security checks */}
         <div>
         <h3 className="text-lg font-bold text-gray-900">Security checks</h3>
-        <p className="mt-1 text-sm text-gray-500">Review where you're logged in and sign out of devices you don't recognize.</p>
 
-        <div className="mt-4 divide-y divide-gray-100 rounded-2xl border border-gray-200 bg-white">
+        <div className="mt-3 divide-y divide-[#ead8c5] border-y border-[#ead8c5]">
           <button
             type="button"
             onClick={() => setSessionsOpen((open) => !open)}
@@ -770,33 +768,31 @@ export default function AccountSettings() {
   );
 
   const renderPrivacySection = () => (
-    <section className="rounded-2xl border border-gray-200 bg-white p-4 sm:p-6 md:p-8">
+    <section className="space-y-5">
       <div className="flex items-center gap-3">
         <div className="rounded-2xl bg-[#fff1d8] p-3 text-[#a06a2c] sm:p-4"><UserCircle2 size={22} /></div>
         <div>
-          <h3 className="text-xl font-bold text-gray-900 sm:text-2xl">Privacy and Account</h3>
-          <p className="mt-1 text-base text-gray-600">Download your data or remove your account.</p>
+          <h2 className="text-xl font-bold text-gray-900 sm:text-2xl">Privacy &amp; account</h2>
+          <p className="mt-1 text-sm text-gray-600">Manage your data and account preferences.</p>
         </div>
       </div>
 
-      <div className="mt-5 space-y-3 sm:mt-8 sm:space-y-4">
-        <button onClick={handleDownloadData} className="flex w-full items-center justify-between rounded-xl border border-gray-200 px-3 py-3 text-left text-sm font-semibold text-gray-700 hover:border-[#e7b866] hover:text-[#a06a2c] sm:px-5 sm:py-4 sm:text-base">
+      <div className="divide-y divide-[#ead8c5] border-y border-[#ead8c5]">
+        <button onClick={handleDownloadData} className="flex w-full items-center justify-between px-3 py-4 text-left text-sm font-semibold text-gray-700 transition hover:text-[#a06a2c] sm:px-5 sm:py-5 sm:text-base">
           <span className="flex items-center gap-3"><Download size={19} /> Download My Data</span>
-          <span className="text-xs uppercase tracking-[0.15em] text-gray-500">Optional</span>
+          <ChevronRight size={18} className="text-gray-400" />
         </button>
-        <button onClick={handleLogoutAllDevices} className="flex w-full items-center justify-between rounded-xl border border-gray-200 px-3 py-3 text-left text-sm font-semibold text-gray-700 hover:border-red-600 hover:text-red-600 sm:px-5 sm:py-4 sm:text-base">
-          <span className="flex items-center gap-3"><LogOut size={19} /> Logout from All Devices</span>
-          <span className="text-xs uppercase tracking-[0.15em] text-gray-500">Optional</span>
-        </button>
-        <button onClick={() => setShowDeleteConfirm(true)} className="flex w-full items-center justify-between rounded-xl border border-red-200 bg-red-50 px-3 py-3 text-left text-sm font-semibold text-red-600 sm:px-5 sm:py-4 sm:text-base">
+        <button onClick={() => setShowDeleteConfirm(true)} className="flex w-full items-center justify-between px-3 py-4 text-left text-sm font-semibold text-red-600 transition hover:text-red-700 sm:px-5 sm:py-5 sm:text-base">
           <span className="flex items-center gap-3"><Trash2 size={19} /> Delete Account</span>
-          <span className="text-xs uppercase tracking-[0.15em] text-red-500">Confirm</span>
+          <ChevronRight size={18} className="text-red-400" />
         </button>
-        <Link to="/customer/privacy-policy" className="flex w-full items-center justify-between rounded-xl border border-gray-200 px-3 py-3 text-left text-sm font-semibold text-gray-700 hover:border-[#e7b866] hover:text-[#a06a2c] sm:px-5 sm:py-4 sm:text-base">
+        <Link to="/customer/privacy-policy" className="flex w-full items-center justify-between px-3 py-4 text-sm font-semibold text-gray-700 transition hover:text-[#a06a2c] sm:px-5 sm:py-5 sm:text-base">
           <span>Privacy Policy</span>
+          <ChevronRight size={18} className="text-gray-400" />
         </Link>
-        <Link to="/customer/terms" className="flex w-full items-center justify-between rounded-xl border border-gray-200 px-3 py-3 text-left text-sm font-semibold text-gray-700 hover:border-[#e7b866] hover:text-[#a06a2c] sm:px-5 sm:py-4 sm:text-base">
+        <Link to="/customer/terms" className="flex w-full items-center justify-between px-3 py-4 text-sm font-semibold text-gray-700 transition hover:text-[#a06a2c] sm:px-5 sm:py-5 sm:text-base">
           <span>Terms & Conditions</span>
+          <ChevronRight size={18} className="text-gray-400" />
         </Link>
       </div>
     </section>
