@@ -81,11 +81,6 @@ export default function Profile() {
       ].filter(Boolean)
     : [];
   const defaultAddress = savedAddressParts.join(', ') || user?.address || user?.default_address || 'Not set';
-  const addressParts = (defaultAddress || '').split(',').map((p) => p.trim()).filter(Boolean);
-  const provinceOrCountry = savedDefaultAddress?.province || addressParts[addressParts.length - 1] || 'Not set';
-  const city = savedDefaultAddress?.city || addressParts[addressParts.length - 2] || 'Not set';
-  const postalCode = savedDefaultAddress?.zip_code || user?.postal_code || '—';
-
   return (
     <PageShell background="bg-[#fffaf3]" padding="px-4 py-6 sm:px-6 sm:py-8 md:px-10 md:py-10" innerClassName="space-y-5">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
@@ -93,7 +88,7 @@ export default function Profile() {
           <p className="mb-2 text-[10px] font-black uppercase tracking-[0.32em] text-[#c59a36]">My Profile</p>
           <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-[30px]">Account Overview</h1>
           <p className="mt-2 max-w-xl text-sm leading-6 text-slate-500">
-            Keep your contact details and delivery information ready for every order.
+            Keep your contact details and address ready for every order.
           </p>
         </div>
         <Link
@@ -164,15 +159,11 @@ export default function Profile() {
         <div className="bg-[#fffdfa] px-5 py-6 sm:px-8">
           <div className="mb-5 flex items-center justify-between gap-3">
             <div>
-              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#c59a36]">Delivery</p>
-              <h2 className="mt-1 text-base font-bold text-slate-900">Address</h2>
+              <h2 className="text-base font-bold text-slate-900">Address</h2>
             </div>
           </div>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <Field icon={MapPinned} label="Default Address" value={defaultAddress} wide />
-            <Field icon={MapPin} label="Province" value={provinceOrCountry} />
-            <Field icon={MapPin} label="City" value={city} />
-            <Field icon={MapPinned} label="Postal Code" value={postalCode} />
+          <div className="grid gap-3">
+            <Field icon={MapPinned} label="Address" value={defaultAddress} wide />
           </div>
         </div>
       </div>
