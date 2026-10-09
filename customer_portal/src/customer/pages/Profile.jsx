@@ -121,7 +121,12 @@ export default function Profile() {
               <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#c59a36]">Your details</p>
               <h2 className="mt-1 text-base font-bold text-slate-900">Personal Information</h2>
             </div>
-            <Link to="/customer/account-settings" className="text-xs font-bold text-slate-500 transition hover:text-slate-900">Edit</Link>
+            <Link
+              to="/customer/account-settings?section=profile"
+              className="text-xs font-bold text-slate-500 transition hover:text-slate-900"
+            >
+              Edit
+            </Link>
           </div>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             <Field icon={UserRound} label="Full Name" value={fullName} />

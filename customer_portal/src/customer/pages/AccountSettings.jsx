@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import PageShell from '../components/PageShell';
 import {
   Lock,
@@ -24,6 +24,7 @@ import { LARAVEL_BASE } from '../../services/config';
 const BASE = LARAVEL_BASE;
 
 export default function AccountSettings() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -35,7 +36,9 @@ export default function AccountSettings() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
-  const [activeSection, setActiveSection] = useState('overview');
+  const [activeSection, setActiveSection] = useState(() => (
+    searchParams.get('section') === 'profile' ? 'profile' : 'overview'
+  ));
   const [searchQuery, setSearchQuery] = useState('');
   const [passwordFormOpen, setPasswordFormOpen] = useState(true);
   const [sessionsOpen, setSessionsOpen] = useState(false);
@@ -484,6 +487,7 @@ export default function AccountSettings() {
           <button
             onClick={() => {
               setActiveSection('overview');
+              setSearchParams({});
               setMessage('');
             }}
             className={`mt-6 flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-lg font-bold ${activeSection === 'overview' ? 'text-[#a06a2c]' : 'text-[#4a2b20]'}`}
@@ -564,6 +568,7 @@ export default function AccountSettings() {
               <button
                 onClick={() => {
                   setActiveSection('overview');
+                  setSearchParams({});
                   setMessage('');
                 }}
                 className="flex items-center gap-2 rounded-full border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-600 transition hover:border-blue-600 hover:text-blue-600 md:hidden"
