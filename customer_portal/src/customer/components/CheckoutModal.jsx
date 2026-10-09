@@ -1321,11 +1321,25 @@ export default function CheckoutModal({
                       <p role="alert" className="text-xs font-medium text-red-600">{fieldErrors.discountId}</p>
                     )}
                     {discountIdPreview && (
-                      <img
-                        src={discountIdPreview}
-                        alt="Preview of uploaded discount ID"
-                        className="max-h-48 w-full rounded-lg border border-[#e8e1d8] bg-white object-contain"
-                      />
+                      <div className="relative">
+                        <img
+                          src={discountIdPreview}
+                          alt="Preview of uploaded discount ID"
+                          className="max-h-48 w-full rounded-lg border border-[#e8e1d8] bg-white object-contain"
+                        />
+                        <button
+                          type="button"
+                          aria-label="Remove uploaded ID photo"
+                          title="Remove this photo to choose a different ID"
+                          onClick={() => {
+                            setDiscountIdFile(null);
+                            setFieldErrors((prev) => ({ ...prev, discountId: '' }));
+                          }}
+                          className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full bg-black/70 text-xl font-bold leading-none text-white shadow transition hover:bg-black focus:outline-none focus:ring-2 focus:ring-white"
+                        >
+                          ×
+                        </button>
+                      </div>
                     )}
                   </div>
                 )}
