@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Schema;
 
 class AuthController extends Controller
 {
@@ -34,6 +35,9 @@ class AuthController extends Controller
             $error = 'Please fill all fields.';
         } else {
             $user = DB::table('users')->where('email', $email)->first();
+            $profileColumn = Schema::hasColumn('users', 'profile_picture')
+                ? 'profile_picture'
+                : (Schema::hasColumn('users', 'profile_image') ? 'profile_image' : null);
 
             if (!$user) {
                 $error = 'User not found.';
@@ -141,19 +145,26 @@ class AuthController extends Controller
                 ], 404);
             }
 
-            DB::table('users')->insert([
+            $newUser = [
                 'name' => $name,
                 'email' => $email,
                 'password' => Hash::make(bin2hex(random_bytes(16))),
                 'role' => 'customer',
-                'profile_picture' => $profilePicture ?: null,
                 'created_at' => now(),
-            ]);
+            ];
+            if ($profileColumn) {
+                $newUser[$profileColumn] = $profilePicture ?: null;
+            }
+            DB::table('users')->insert($newUser);
 
             $user = DB::table('users')->where('email', $email)->first();
-        } elseif ($profilePicture && $user->profile_picture !== $profilePicture) {
-            DB::table('users')->where('id', $user->id)->update(['profile_picture' => $profilePicture]);
-            $user->profile_picture = $profilePicture;
+        } elseif ($profilePicture && $profileColumn) {
+            $savedPicture = trim((string) ($user->profile_picture ?? ''))
+                ?: trim((string) ($user->profile_image ?? ''));
+            if ($savedPicture === '') {
+                DB::table('users')->where('id', $user->id)->update([$profileColumn => $profilePicture]);
+                $user->{$profileColumn} = $profilePicture;
+            }
         }
 
         if (!in_array(strtolower((string) ($user->role ?? '')), ['customer', 'admin'], true)) {

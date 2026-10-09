@@ -191,7 +191,7 @@ export default function Register() {
       localStorage.setItem("user", JSON.stringify({
         ...data.user,
         token: data.token || '',
-        avatar: photoURL || googleUser?.photoURL || data.user.avatar || data.user.profile_picture || data.user.profile_image || '',
+        avatar: data.user.avatar || data.user.profile_picture || data.user.profile_image || photoURL || googleUser?.photoURL || '',
       }));
       navigate("/customer", { replace: true });
     } catch (error) {
