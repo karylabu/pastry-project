@@ -380,7 +380,22 @@ export default function Login() {
           }
           .pastry-login .login-card a,
           .pastry-login .login-card button.text-xs { color: #b87808; }
-          .pastry-login .login-footer { display: none; }
+          .pastry-login .login-footer {
+            display: flex;
+            width: min(1030px, 100%);
+            align-items: center;
+            justify-content: space-between;
+            gap: 20px;
+            margin: 10px 0 0;
+            padding: 0 18px;
+            border: 0;
+          }
+          .pastry-login .login-footer-brand { justify-content: flex-start; gap: 9px; }
+          .pastry-login .login-footer-brand img { display: block; width: 28px; height: 28px; }
+          .pastry-login .login-footer-brand p,
+          .pastry-login .login-footer-links a { font-size: 11px; }
+          .pastry-login .login-footer-links { justify-content: flex-end; gap: 18px; }
+          .pastry-login .login-footer-social { display: none; }
           .pastry-login .mobile-login-art { display: none; }
           .pastry-login .login-decorations {
             position: absolute;
@@ -411,8 +426,9 @@ export default function Login() {
           .pastry-login .login-card > .mb-4:first-child { text-align: left; }
           .pastry-login .login-card > .mb-4:first-child h2 { font-size: 28px; }
           .pastry-login .mobile-login-art { display: block; width: min(100%, 340px); height: auto; max-height: none; margin: 19px auto 0; border-radius: 16px; object-fit: contain; object-position: center; }
-          .pastry-login .login-footer-links, .pastry-login .login-footer-social { display: none; }
-          .pastry-login .login-footer { display: flex; justify-content: center; border-top: 0; padding: 10px 0 16px; }
+          .pastry-login .login-footer-links { display: flex; justify-content: center; gap: 12px 18px; }
+          .pastry-login .login-footer-social { display: none; }
+          .pastry-login .login-footer { display: flex; flex-direction: column; justify-content: center; gap: 9px; border-top: 0; padding: 10px 0 16px; }
           .pastry-login .login-footer-brand { justify-content: center; gap: 8px; }
           .pastry-login .login-footer-brand img { width: 30px; height: 30px; }
           .pastry-login .login-footer-brand p { font-size: 11px; }
@@ -507,7 +523,7 @@ export default function Login() {
       <div className="bg-icon icon-cupcake">🧁</div>
       <div className="bg-icon icon-branch">🌿</div>
 
-      <div className="relative z-10 flex min-h-screen w-full flex-col overflow-visible px-4 py-2 sm:px-5 lg:h-screen lg:overflow-hidden lg:px-0 lg:py-0">
+      <div className="relative z-10 flex min-h-screen w-full flex-col overflow-visible px-4 py-2 sm:px-5 lg:h-screen lg:overflow-x-hidden lg:px-0 lg:py-0">
 
         {/* Main Content Area */}
         <main className="flex flex-1 flex-col gap-4 py-2 lg:flex-row lg:items-center lg:justify-between lg:gap-0 lg:py-0">
