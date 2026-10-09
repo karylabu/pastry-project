@@ -7,6 +7,8 @@ on:
     paths:
       - "customer_portal/**"
       - "laravel/**"
+      - "customer/api_register.php"
+      - "customer/api_place_order.php"
       - "staff/api_update_order_status.php"
       - ".htaccess"
       - ".github/workflows/deploy-hostinger.yml"
@@ -127,6 +129,16 @@ jobs:
             -e "ssh -i ~/.ssh/id_ed25519 -p $SSH_PORT -o IdentitiesOnly=yes -o BatchMode=yes" \
             staff/api_update_order_status.php \
             "$SSH_USERNAME@$SSH_HOST:$REMOTE_ROOT/staff/api_update_order_status.php"
+
+      - name: Deploy customer registration and order handlers
+        run: |
+          set -eu
+          ssh -i ~/.ssh/id_ed25519 -p "$SSH_PORT" -o IdentitiesOnly=yes -o BatchMode=yes "$SSH_USERNAME@$SSH_HOST" \
+            "mkdir -p '$REMOTE_ROOT/customer'"
+          rsync -az \
+            -e "ssh -i ~/.ssh/id_ed25519 -p $SSH_PORT -o IdentitiesOnly=yes -o BatchMode=yes" \
+            customer/api_register.php customer/api_place_order.php \
+            "$SSH_USERNAME@$SSH_HOST:$REMOTE_ROOT/customer/"
 
       - name: Deploy React production build
         run: |

@@ -66,7 +66,10 @@ export default function DesignGallery({ category, folder, backPath = '/customer/
           {images.map((image) => (
             <article key={image.id} className="group overflow-hidden rounded-xl border border-[#eadfd8] bg-white shadow-[0_6px_16px_rgba(91,64,39,0.06)] transition hover:-translate-y-0.5 hover:border-[#e7c875] hover:shadow-[0_10px_20px_rgba(91,64,39,0.1)]">
               <button type="button" onClick={() => setPreviewImage(image)} className="block w-full text-left">
-                <div className="h-40 overflow-hidden bg-[#f8eee8] sm:h-44"><img src={image.url} alt={image.name} style={imagePositions[image.name] ? { objectPosition: imagePositions[image.name] } : extraLowerItems.includes(image.name) ? { objectPosition: 'center 15%' } : lowerItems.includes(image.name) ? { objectPosition: 'center 40%' } : undefined} className={`h-full w-full object-cover transition duration-500 ${zoomItems.includes(image.name) ? 'scale-[1.5] group-hover:scale-[1.58]' : 'group-hover:scale-105'}`} /></div>
+                <div className="h-40 overflow-hidden bg-[#f8eee8] sm:h-44"><img src={image.url} alt={image.name} style={image.name === 'Kids Themes Cake 6' ? {
+                  objectPosition: 'center top',
+                  transformOrigin: 'center top',
+                } : imagePositions[image.name] ? { objectPosition: imagePositions[image.name] } : extraLowerItems.includes(image.name) ? { objectPosition: 'center 15%' } : lowerItems.includes(image.name) ? { objectPosition: 'center 40%' } : undefined} className={`h-full w-full object-cover transition duration-500 ${image.name === 'Kids Themes Cake 6' ? 'translate-y-1 scale-[1.28] sm:translate-y-0 sm:scale-100' : zoomItems.includes(image.name) ? 'scale-[1.5] group-hover:scale-[1.58]' : 'group-hover:scale-105'}`} /></div>
               </button>
               <div className="flex items-center justify-between gap-2 px-3 py-2.5">
                 <span className="min-w-0 flex-1 truncate text-[10px] font-semibold text-[#4b3b33]">{image.name}</span>
@@ -91,7 +94,18 @@ export default function DesignGallery({ category, folder, backPath = '/customer/
               <button type="button" onClick={() => setPreviewImage(null)} className="text-lg font-semibold text-[#6b4f1d]">×</button>
             </div>
             <div className="p-4">
-              <img src={previewImage.url} alt={previewImage.name} className="h-72 w-full rounded-xl object-cover border border-[#f0d98a]" />
+              <div className="h-72 overflow-hidden rounded-xl border border-[#f0d98a]">
+                <img
+                  src={previewImage.url}
+                  alt={previewImage.name}
+                  style={previewImage.name === 'Kids Themes Cake 6' ? {
+                    objectPosition: 'center top',
+                    transform: 'scale(1.2)',
+                    transformOrigin: 'center top',
+                  } : undefined}
+                  className="h-full w-full object-cover"
+                />
+              </div>
               <p className="mt-3 text-center text-sm font-semibold text-[#4b3b33]">{previewImage.name}</p>
               <div className="mt-4 flex gap-2">
                 <button type="button" onClick={() => setPreviewImage(null)} className="flex-1 rounded-xl border border-[#f0d98a] bg-white px-3 py-2 text-sm font-semibold text-[#6b4f1d]">Cancel</button>

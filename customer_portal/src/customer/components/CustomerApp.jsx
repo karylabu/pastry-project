@@ -227,6 +227,15 @@ export default function CustomerApp() {
     }
   };
 
+  const hasCustomerAccount = () => {
+    try {
+      const storedUser = JSON.parse(localStorage.getItem('user') || 'null');
+      return Boolean(storedUser?.id);
+    } catch {
+      return false;
+    }
+  };
+
   const showShopBlockedMessage = () => {
     setToastMessage('Staff and admin accounts cannot add to cart');
     setShowToast(true);
@@ -349,7 +358,7 @@ export default function CustomerApp() {
       <Routes>
         <Route index element={<Dashboard onAddToCart={addToCart} hideFloating={hideDashboardFloaters} />} />
         <Route path="menu" element={<Menu onAddToCart={addToCart} />} />
-        <Route path="orders" element={<Orders />} />
+        <Route path="orders" element={hasCustomerAccount() ? <Orders /> : <Navigate to="/customer/menu" replace />} />
         <Route path="customized-cakes" element={<CustomizedCakes />} />
         <Route path="birthday-designs" element={<BirthdayDesigns />} />
         <Route path="cutesy-designs" element={<CutesyDesigns />} />

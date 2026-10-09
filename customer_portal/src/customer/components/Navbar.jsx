@@ -57,6 +57,7 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
   const [notifications, setNotifications] = useState([]);
   const [openNotif, setOpenNotif] = useState(false);
   const [openSearch, setOpenSearch] = useState(false);
+  const [searchPosition, setSearchPosition] = useState({ left: 8, top: 68, width: 320 });
   const [searchQuery, setSearchQuery] = useState("");
 
   const [openAccount, setOpenAccount] = useState(false);
@@ -236,7 +237,7 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
     { name: "Home", path: "/customer" },
     { name: "Cakes", path: "/customer/menu" },
     { name: "Customize", path: "/customer/customized-cakes" },
-    { name: "Orders", path: "/customer/orders" }
+    ...(user?.id ? [{ name: "Orders", path: "/customer/orders" }] : [])
   ];
 
   const accountLinkClass = (path) => `block rounded-2xl px-4 py-3 text-sm transition ${
@@ -246,6 +247,31 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
   }`;
 
   const accountAvatar = user?.avatar || user?.profile_image || user?.profile_picture || '';
+  const toggleMobileSearch = (event) => {
+    if (openSearch) {
+      setOpenSearch(false);
+      return;
+    }
+
+    const bounds = event.currentTarget.getBoundingClientRect();
+    const left = Math.max(8, bounds.left);
+    setSearchPosition({
+      left,
+      top: bounds.bottom + 8,
+      width: Math.min(120, window.innerWidth - left - 8),
+    });
+    setOpenSearch(true);
+  };
+
+  const handleSearchSubmit = (e) => {
+    e.preventDefault();
+    const query = searchQuery.trim();
+    if (query) {
+      setOpenSearch(false);
+      navigate(`/customer/menu?search=${encodeURIComponent(query)}`);
+    }
+  };
+
   const [failedAccountAvatarUrl, setFailedAccountAvatarUrl] = useState('');
   const accountInitials = (user?.name || user?.full_name || 'U')
     .split(' ')
@@ -309,37 +335,51 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
         <div className="flex shrink-0 items-center gap-1 sm:gap-2 lg:gap-6">
 
           {/* SEARCH */}
-          <div ref={searchRef} className="relative">
-            <button onClick={() => setOpenSearch(s => !s)} aria-label="Search products" className="flex h-8 w-8 items-center justify-center rounded-full hover:bg-gray-100 sm:h-10 sm:w-10 xl:h-12 xl:w-12">
+          <form
+            onSubmit={handleSearchSubmit}
+            className="hidden h-11 w-[clamp(180px,22vw,310px)] items-center gap-3 rounded-full border border-gray-300 bg-gray-50 px-4 transition focus-within:border-gray-400 focus-within:bg-white md:flex"
+          >
+            <Search size={20} className="shrink-0 text-gray-600" />
+            <input
+              type="search"
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              placeholder="Search"
+              aria-label="Search products"
+              className="min-w-0 flex-1 bg-transparent text-base text-gray-700 outline-none placeholder:text-gray-500"
+            />
+          </form>
+          <div ref={searchRef} className="relative md:hidden">
+            <button
+              type="button"
+              onClick={toggleMobileSearch}
+              aria-label="Search products"
+              aria-expanded={openSearch}
+              className="flex h-8 w-8 items-center justify-center rounded-full text-gray-700 transition hover:bg-gray-100 sm:h-10 sm:w-10"
+            >
               <Search size={16} className="sm:h-[18px] sm:w-[18px]" />
             </button>
             {openSearch && (
-              <div className="fixed left-2 top-24 w-[calc(100vw-2rem)] max-w-[320px] rounded-3xl border border-gray-200 bg-white p-4 shadow-xl sm:absolute sm:left-auto sm:right-0 sm:top-[65px] sm:w-[320px]">
-                <form
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    const query = searchQuery.trim();
-                    if (!query) return;
-                    setOpenSearch(false);
-                    navigate(`/customer/menu?search=${encodeURIComponent(query)}`);
-                  }}
-                  className="flex items-center gap-2"
-                >
-                  <input
-                    type="search"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Search products"
-                    className="min-w-0 flex-1 rounded-2xl border border-gray-200 px-3 py-2 text-xs outline-none sm:px-4 sm:py-3 sm:text-sm"
-                  />
-                  <button
-                    type="submit"
-                    className="rounded-2xl bg-black px-3 py-2 text-xs font-semibold text-white sm:px-4 sm:py-3 sm:text-sm"
-                  >
-                    Go
-                  </button>
-                </form>
-              </div>
+              <form
+                onSubmit={handleSearchSubmit}
+                style={{
+                  left: `${searchPosition.left}px`,
+                  top: `${searchPosition.top}px`,
+                  width: `${searchPosition.width}px`,
+                }}
+                className="fixed z-[50001] flex h-11 items-center gap-3 rounded-full border border-gray-300 bg-gray-50 px-4 shadow-lg transition focus-within:border-gray-400 focus-within:bg-white"
+              >
+                <Search size={20} className="shrink-0 text-gray-600" />
+                <input
+                  type="search"
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                  placeholder="Search"
+                  aria-label="Search products"
+                  autoFocus
+                  className="min-w-0 flex-1 bg-transparent text-base text-gray-700 outline-none placeholder:text-gray-500"
+                />
+              </form>
             )}
           </div>
 
@@ -589,7 +629,7 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
               <div className="absolute right-0 top-[65px] w-[260px] bg-white border border-gray-100 rounded-[28px] shadow-2xl overflow-hidden">
                 <div className="px-5 py-4 border-b border-gray-100">
                   <p className="text-[10px] uppercase tracking-[0.2em] text-gray-400">Customer Account</p>
-                  <h3 className="text-[16px] text-black mt-1 font-semibold">{user?.name || 'Welcome Back'}</h3>
+                  <h3 className="text-[16px] text-black mt-1 font-semibold">{user?.name || 'Welcome'}</h3>
                 </div>
                 <div className="flex flex-col p-2 gap-1">
                   {!user && (
@@ -624,13 +664,15 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
                   >
                     My Rewards
                   </Link>
-                  <Link
-                    to="/customer/orders"
-                    onClick={() => setOpenAccount(false)}
-                    className={accountLinkClass('/customer/orders')}
-                  >
-                    My Orders
-                  </Link>
+                  {user?.id && (
+                    <Link
+                      to="/customer/orders"
+                      onClick={() => setOpenAccount(false)}
+                      className={accountLinkClass('/customer/orders')}
+                    >
+                      My Orders
+                    </Link>
+                  )}
                   <Link
                     to="/customer/customized-cakes"
                     onClick={() => setOpenAccount(false)}
@@ -644,20 +686,6 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
                     className={accountLinkClass('/customer/favorites')}
                   >
                     Favorites
-                  </Link>
-                  <Link
-                    to="/customer/saved-addresses"
-                    onClick={() => setOpenAccount(false)}
-                    className={accountLinkClass('/customer/saved-addresses')}
-                  >
-                    Saved Addresses
-                  </Link>
-                  <Link
-                    to="/customer/saved-addresses"
-                    onClick={() => setOpenAccount(false)}
-                    className={accountLinkClass('/customer/saved-addresses')}
-                  >
-                    Saved Addresses
                   </Link>
                   <Link
                     to="/customer/account-settings"

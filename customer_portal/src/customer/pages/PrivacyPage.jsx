@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { Menu as MenuIcon, X } from "lucide-react";
 import { ROOT_BASE } from "../../services/config";
 
 const sections = [
@@ -23,6 +24,7 @@ const sections = [
 export default function PrivacyPage() {
   const navigate = useNavigate();
   const [activeSection, setActiveSection] = useState(0);
+  const [sectionsOpen, setSectionsOpen] = useState(true);
 
   useEffect(() => {
     const updateActiveSection = () => {
@@ -107,6 +109,38 @@ export default function PrivacyPage() {
           max-width: 100%;
           flex-shrink: 0;
         }
+
+        .privacy-page .privacy-sidebar nav {
+          max-height: none;
+          overflow: visible;
+          scrollbar-width: none;
+        }
+
+        .privacy-page .privacy-sidebar nav::-webkit-scrollbar {
+          display: none;
+        }
+
+        @media (max-width: 1023px) {
+          .privacy-page .privacy-sidebar {
+            width: auto;
+            position: sticky;
+            top: 4.5rem;
+            align-self: start;
+          }
+
+          .privacy-page .privacy-sidebar nav {
+            max-height: calc(100dvh - 10rem);
+            overflow-y: auto;
+            overscroll-behavior-y: contain;
+          }
+
+          .privacy-page .privacy-sidebar-item {
+            font-size: 0.65rem !important;
+            line-height: 1.25 !important;
+            padding: 0.3rem 0.35rem !important;
+            white-space: normal;
+          }
+        }
       `}</style>
       <header className="sticky top-0 z-50 border-b border-[#f0e7cb] bg-[#fffdf9] backdrop-blur-sm">
         <div className="mx-auto flex max-w-[95rem] items-center justify-between px-3 py-3 sm:px-4 lg:px-5">
@@ -127,11 +161,21 @@ export default function PrivacyPage() {
       </header>
 
       <div className="mx-auto max-w-[95rem] px-3 py-4 sm:px-4 lg:px-5">
-        <div className="flex flex-col gap-4 lg:grid lg:grid-cols-[20rem_minmax(0,1fr)] lg:items-start">
+        <div className={`${sectionsOpen ? "grid grid-cols-[minmax(0,9rem)_minmax(0,1fr)] gap-2" : "grid grid-cols-1 gap-3"} items-start lg:grid-cols-[20rem_minmax(0,1fr)] lg:gap-4`}>
           <aside className="privacy-sidebar w-full lg:sticky lg:top-20 lg:w-[20rem] lg:self-start lg:justify-self-start">
-            <div className="rounded-xl border border-[#d4af37]/35 bg-white/80 p-2 shadow-sm backdrop-blur-sm">
+            <button
+              type="button"
+              aria-expanded={sectionsOpen}
+              aria-controls="privacy-sections-nav"
+              onClick={() => setSectionsOpen((open) => !open)}
+              className="mb-2 flex w-full items-center justify-between rounded-xl border border-[#d4af37]/35 bg-white/80 px-3 py-2.5 text-left text-xs font-bold uppercase tracking-[0.14em] text-[#8d6a2e] shadow-sm lg:hidden"
+            >
+              <span>Sections</span>
+              {sectionsOpen ? <X size={18} /> : <MenuIcon size={18} />}
+            </button>
+            <div className={`rounded-xl border border-[#d4af37]/35 bg-white/80 p-2 shadow-sm backdrop-blur-sm ${sectionsOpen ? "block" : "hidden lg:block"}`}>
               <p className="privacy-heading mb-2 font-bold uppercase tracking-[0.25em] text-[#b18a23]">Sections</p>
-              <nav className="space-y-0.5 pr-1">
+              <nav id="privacy-sections-nav" className="space-y-0.5 pr-1">
                 {sections.map((section, index) => {
                   const isActive = activeSection === index;
 
@@ -139,7 +183,14 @@ export default function PrivacyPage() {
                     <a
                       key={section}
                       href={`#section-${index + 1}`}
-                      onClick={() => setActiveSection(index)}
+                      onClick={(event) => {
+                        event.preventDefault();
+                        setActiveSection(index);
+                        document.getElementById(`section-${index + 1}`)?.scrollIntoView({
+                          behavior: "smooth",
+                          block: "start",
+                        });
+                      }}
                       className={`privacy-sidebar-item block rounded-full border transition ${
                         isActive
                           ? "border-[#d4af37]/60 bg-[#fffaf0] font-semibold text-[#171717] shadow-sm"
@@ -160,7 +211,7 @@ export default function PrivacyPage() {
             <h1 className="mt-2 font-black tracking-tight">Privacy Policy</h1>
             <p className="mt-1 text-[10px] font-medium text-gray-600">Last Updated: August 29, 2026</p>
 
-            <div className="mt-3 space-y-3">
+            <div className="mt-3 min-w-0 space-y-3">
           <section>
             <h2 className="text-xl font-bold text-[#171717]">Overview</h2>
             <p className="mt-3 text-base leading-8 text-gray-700">

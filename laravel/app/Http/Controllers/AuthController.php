@@ -133,6 +133,14 @@ class AuthController extends Controller
         $user = DB::table('users')->where('email', $email)->first();
 
         if (!$user) {
+            if ($request->input('intent') !== 'signup') {
+                return $this->googleCorsResponse([
+                    'success' => false,
+                    'code' => 'user_not_found',
+                    'message' => 'User not found. Please create an account.',
+                ], 404);
+            }
+
             DB::table('users')->insert([
                 'name' => $name,
                 'email' => $email,

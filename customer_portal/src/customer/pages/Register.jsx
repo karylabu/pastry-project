@@ -180,7 +180,7 @@ export default function Register() {
         method: "POST",
         headers: { "Content-Type": "application/json", Accept: "application/json" },
         credentials: "include",
-        body: JSON.stringify({ id_token: idToken, ...googlePayload }),
+        body: JSON.stringify({ id_token: idToken, intent: "signup", ...googlePayload }),
       });
       const data = await safeParseJson(response);
 

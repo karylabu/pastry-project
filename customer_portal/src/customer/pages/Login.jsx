@@ -29,6 +29,7 @@ export default function Login() {
   const [password, setPassword]       = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError]             = useState("");
+  const [googleUserNotFound, setGoogleUserNotFound] = useState(false);
   const [success, setSuccess]         = useState("");
   const [loading, setLoading]         = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
@@ -48,6 +49,7 @@ export default function Login() {
 
   const handleGoogleLogin = async () => {
     setError("");
+    setGoogleUserNotFound(false);
     setSuccess("");
     setGoogleLoading(true);
 
@@ -63,11 +65,16 @@ export default function Login() {
         method: "POST",
         headers: { "Content-Type": "application/json", Accept: "application/json" },
         credentials: "include",
-        body: JSON.stringify({ id_token: idToken, ...googlePayload }),
+        body: JSON.stringify({ id_token: idToken, intent: "login", ...googlePayload }),
       });
       const data = await safeParseJson(response);
 
       if (!response.ok || !data?.success) {
+        if (response.status === 404 && data?.code === "user_not_found") {
+          setError(data.message || "User not found. Please create an account.");
+          setGoogleUserNotFound(true);
+          return;
+        }
         throw new Error(data?.message || "Google sign-in failed.");
       }
 
@@ -93,6 +100,7 @@ export default function Login() {
   const handleLogin = async (e) => {
     e.preventDefault();
     setError("");
+    setGoogleUserNotFound(false);
     setSuccess("");
     setLoading(true);
 
@@ -357,6 +365,14 @@ export default function Login() {
                     {error && (
                       <div className="mb-6 rounded-xl border border-red-100 bg-red-50 p-4 text-sm text-red-600">
                         {error}
+                        {googleUserNotFound && (
+                          <>
+                            {" "}
+                            <Link to={REGISTER_URL} className="font-bold underline">
+                              Create account
+                            </Link>
+                          </>
+                        )}
                       </div>
                     )}
                     {success && (

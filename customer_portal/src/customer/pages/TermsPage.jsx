@@ -1,5 +1,6 @@
 ﻿import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { Menu as MenuIcon, X } from "lucide-react";
 import { ROOT_BASE } from "../../services/config";
 
 const sections = [
@@ -30,6 +31,7 @@ const sections = [
 export default function TermsPage() {
   const navigate = useNavigate();
   const [activeSection, setActiveSection] = useState(0);
+  const [sectionsOpen, setSectionsOpen] = useState(true);
 
   useEffect(() => {
     const updateActiveSection = () => {
@@ -133,6 +135,28 @@ export default function TermsPage() {
         .terms-page .terms-sidebar nav::-webkit-scrollbar {
           display: none;
         }
+
+        @media (max-width: 1023px) {
+          .terms-page .terms-sidebar {
+            width: auto;
+            position: sticky;
+            top: 4.5rem;
+            align-self: start;
+          }
+
+          .terms-page .terms-sidebar nav {
+            max-height: calc(100dvh - 10rem);
+            overflow-y: auto;
+            overscroll-behavior-y: contain;
+          }
+
+          .terms-page .terms-sidebar-item {
+            font-size: 0.65rem !important;
+            line-height: 1.25 !important;
+            padding: 0.3rem 0.35rem !important;
+            white-space: normal;
+          }
+        }
       `}</style>
       <header className="sticky top-0 z-50 border-b border-[#f0e7cb] bg-[#fffdf9] backdrop-blur-sm">
         <div className="mx-auto flex max-w-[95rem] items-center justify-between px-3 py-3 sm:px-4 lg:px-5">
@@ -153,11 +177,21 @@ export default function TermsPage() {
       </header>
 
       <div className="mx-auto max-w-[95rem] px-3 py-4 sm:px-4 lg:px-5">
-        <div className="flex flex-col gap-4 lg:grid lg:grid-cols-[20rem_minmax(0,1fr)] lg:items-start">
+        <div className={`${sectionsOpen ? "grid grid-cols-[minmax(0,9rem)_minmax(0,1fr)] gap-2" : "grid grid-cols-1 gap-3"} items-start lg:grid-cols-[20rem_minmax(0,1fr)] lg:gap-4`}>
           <aside className="terms-sidebar w-full lg:sticky lg:top-20 lg:w-[20rem] lg:self-start lg:justify-self-start">
-            <div className="rounded-xl border border-[#d4af37]/35 bg-white/80 p-2 shadow-sm backdrop-blur-sm">
+            <button
+              type="button"
+              aria-expanded={sectionsOpen}
+              aria-controls="terms-sections-nav"
+              onClick={() => setSectionsOpen((open) => !open)}
+              className="mb-2 flex w-full items-center justify-between rounded-xl border border-[#d4af37]/35 bg-white/80 px-3 py-2.5 text-left text-xs font-bold uppercase tracking-[0.14em] text-[#8d6a2e] shadow-sm lg:hidden"
+            >
+              <span>Sections</span>
+              {sectionsOpen ? <X size={18} /> : <MenuIcon size={18} />}
+            </button>
+            <div className={`rounded-xl border border-[#d4af37]/35 bg-white/80 p-2 shadow-sm backdrop-blur-sm ${sectionsOpen ? "block" : "hidden lg:block"}`}>
               <p className="terms-heading mb-2 font-bold uppercase tracking-[0.25em] text-[#b18a23]">Sections</p>
-              <nav className="space-y-0.5 pr-1">
+              <nav id="terms-sections-nav" className="space-y-0.5 pr-1">
                 {sections.map((section, index) => {
                   const isActive = activeSection === index;
 
@@ -165,7 +199,14 @@ export default function TermsPage() {
                     <a
                       key={section}
                       href={`#section-${index}`}
-                      onClick={() => setActiveSection(index)}
+                      onClick={(event) => {
+                        event.preventDefault();
+                        setActiveSection(index);
+                        document.getElementById(`section-${index}`)?.scrollIntoView({
+                          behavior: "smooth",
+                          block: "start",
+                        });
+                      }}
                       className={`terms-sidebar-item block rounded-full border transition ${
                         isActive
                           ? "border-[#d4af37]/60 bg-[#fffaf0] font-semibold text-[#171717] shadow-sm"
@@ -180,7 +221,7 @@ export default function TermsPage() {
             </div>
           </aside>
 
-          <div className="terms-scroll w-full max-w-4xl">
+          <div className="terms-scroll w-full min-w-0 max-w-4xl">
             <p className="terms-heading font-semibold uppercase tracking-[0.35em] text-[#d4af37]">Terms &amp; Conditions</p>
             <h1 className="mt-2 font-black tracking-tight">Terms &amp; Conditions</h1>
             <p className="mt-1 text-[10px] font-medium text-gray-600">Last Updated: August 29, 2026</p>

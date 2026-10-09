@@ -233,8 +233,8 @@ export default function CustomizedCakes() {
     { src: `${ROOT_BASE}/uploads/floral(1).jpg?v=floral-featured-1`, label: 'Floral' },
     { src: `${ROOT_BASE}/uploads/wedding(1).jpg?v=wedding-featured-1`, label: 'Wedding' },
     { src: `${ROOT_BASE}/uploads/holiday(1).jpg?v=holiday-featured-1`, label: 'Holiday' },
-    { src: `${ROOT_BASE}/uploads/kids(1).jpg?v=kids-featured-1`, label: 'Kids' },
-    { src: `${ROOT_BASE}/uploads/cutesy(1).jpg?v=cutesy-featured-1`, label: 'Cutesy' },
+    { src: `${ROOT_BASE}/uploads/kids(8).jpg?v=kids-featured-8`, label: 'Kids' },
+    { src: `${ROOT_BASE}/uploads/cutesy(5).jpg?v=cutesy-featured-5`, label: 'Cutesy' },
   ];
 
   const featuredImagePositions = {
@@ -243,7 +243,7 @@ export default function CustomizedCakes() {
     Wedding: 'center 55%',
     Holiday: 'center 64%',
     Kids: 'center 48%',
-    Cutesy: 'center 50%',
+    Cutesy: 'center 42%',
   };
 
   const twoTierPresets = {
@@ -633,13 +633,12 @@ export default function CustomizedCakes() {
             <p className="text-[9px] font-black uppercase tracking-[0.28em] text-[#9b7b3d]">Featured designs</p>
             <h2 className="mt-1 font-serif text-2xl font-bold text-[#33251e]">Featured Designs</h2>
           </div>
-          <button type="button" className="hidden rounded-full border border-[#e7c875] px-4 py-2 text-[10px] font-bold text-[#8d6a2e] sm:inline-flex">
-            View All <span className="ml-1">→</span>
-          </button>
         </div>
         <div className="grid w-full grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-6">
           {sampleImages.map((item, index) => {
             const isWedding = item.label === 'Wedding';
+            const isKids = item.label === 'Kids';
+            const isCutesy = item.label === 'Cutesy';
 
             return (
               <article key={index} className="group relative aspect-[3/4] min-h-[180px] overflow-hidden rounded-[14px] border border-[#eadfd8] bg-[#f8eee8] shadow-[0_6px_16px_rgba(91,64,39,0.06)] lg:aspect-auto lg:h-52">
@@ -648,7 +647,7 @@ export default function CustomizedCakes() {
                   alt={item.label}
                   style={{ objectPosition: featuredImagePositions[item.label] }}
                   className={`block h-full w-full object-cover transition-transform duration-300 ${
-                    isWedding ? 'scale-[1.5] group-hover:scale-[1.6]' : 'group-hover:scale-[1.02]'
+                    isWedding ? 'scale-[1.5] group-hover:scale-[1.6]' : isKids ? 'scale-[1.5] group-hover:scale-[1.55]' : isCutesy ? 'scale-[1.85] group-hover:scale-[1.9]' : 'group-hover:scale-[1.02]'
                   }`}
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-transparent to-transparent" />

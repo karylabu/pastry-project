@@ -64,7 +64,7 @@ try {
             id INT AUTO_INCREMENT PRIMARY KEY,
             user_id INT NOT NULL,
             code VARCHAR(50) NOT NULL,
-            discount_type ENUM('free_delivery', 'percent') NOT NULL DEFAULT 'free_delivery',
+            discount_type ENUM('percent') NOT NULL DEFAULT 'percent',
             discount_value DECIMAL(10,2) NOT NULL DEFAULT 0,
             status ENUM('unused', 'used', 'expired') NOT NULL DEFAULT 'unused',
             used_order_id INT NULL,

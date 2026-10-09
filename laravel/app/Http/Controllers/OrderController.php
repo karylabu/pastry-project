@@ -192,10 +192,9 @@ class OrderController extends Controller
                 $discountType = $request->input('discount_type', 'none');
                 $rewardCode = strtoupper(trim((string) $request->input('reward_code', '')));
                 $orderDiscountType = $discountType;
-                $discountAmount = in_array($discountType, ['senior_citizen', 'pwd'], true)
-                    ? round($subtotal * 0.05, 2)
-                    : 0.0;
+                $discountAmount = 0.0;
                 $rewardTransactionId = null;
+                $hasExistingOrder = Order::query()->where('user_id', $user->id)->exists();
 
                 if ($rewardCode !== '') {
                     if ($discountType !== 'none') {
@@ -232,6 +231,19 @@ class OrderController extends Controller
                     $rewardTransactionId = (int) $rewardTransaction->id;
                     $discountAmount = round(min($subtotal * 0.05, (float) $rewardTransaction->max_discount_amount), 2);
                     $orderDiscountType = 'reward_5_percent';
+                } elseif ($discountType !== 'none') {
+                    if (!in_array($discountType, ['senior_citizen', 'pwd', 'first_order_5_percent', 'reward_5_percent'], true)) {
+                        return response()->json([
+                            'success' => false,
+                            'message' => 'Unsupported discount type.',
+                        ], 422);
+                    }
+
+                    $discountAmount = round($subtotal * 0.05, 2);
+                    $orderDiscountType = $discountType;
+                } elseif (!$hasExistingOrder) {
+                    $discountAmount = round($subtotal * 0.05, 2);
+                    $orderDiscountType = 'first_order_5_percent';
                 }
 
                 if ($discountAmount > 0) {

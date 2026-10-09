@@ -1,10 +1,18 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import ProductCard from '../components/ProductCard';
 import PageShell from '../components/PageShell';
 import { useLocation } from 'react-router-dom';
 import ProductModal from '../components/ProductModal';
 import { CUSTOMER_BASE } from '../../services/config';
 import { getAuthHeaders, safeParseJson } from '../../services/api';
+import { Check, ChevronDown } from 'lucide-react';
+
+const SORT_OPTIONS = [
+  { value: 'recommended', label: 'Recommended' },
+  { value: 'price-asc', label: 'Price: Low to High' },
+  { value: 'price-desc', label: 'Price: High to Low' },
+  { value: 'name-asc', label: 'Name: A to Z' },
+];
 
 const MISSING_PRODUCT_IMAGES = new Set([
   'affogato.png',
@@ -31,12 +39,31 @@ export default function Menu({ onAddToCart }) {
   const [favoriteIds, setFavoriteIds] = useState([]);
   const [showOnlyAvailable, setShowOnlyAvailable] = useState(false);
   const [sortBy, setSortBy] = useState('recommended');
+  const [sortMenuOpen, setSortMenuOpen] = useState(false);
+  const sortMenuRef = useRef(null);
 
   const [isModalOpen, setIsModalOpen] =
     useState(false);
 
   const [selectedProduct, setSelectedProduct] =
     useState(null);
+
+  useEffect(() => {
+    if (!sortMenuOpen) return undefined;
+
+    const closeSortMenu = (event) => {
+      if (event.type === 'keydown' && event.key !== 'Escape') return;
+      if (event.type === 'pointerdown' && sortMenuRef.current?.contains(event.target)) return;
+      setSortMenuOpen(false);
+    };
+
+    document.addEventListener('pointerdown', closeSortMenu);
+    document.addEventListener('keydown', closeSortMenu);
+    return () => {
+      document.removeEventListener('pointerdown', closeSortMenu);
+      document.removeEventListener('keydown', closeSortMenu);
+    };
+  }, [sortMenuOpen]);
 
   const savedUser = typeof window !== 'undefined'
     ? (() => {
@@ -244,15 +271,55 @@ export default function Menu({ onAddToCart }) {
               >
                 Available now
               </button>
-              <label className="flex shrink-0 items-center gap-1 rounded-full border border-[#eadfd8] bg-transparent px-1.5 py-1.5 text-[9px] font-black uppercase tracking-[0.08em] text-[#765d50] sm:gap-2 sm:px-3.5 sm:py-2 sm:text-[10px] sm:tracking-[0.14em]">
-                <span>Sort</span>
-                <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className="max-w-[88px] bg-transparent text-[9px] font-semibold uppercase outline-none text-slate-700 sm:max-w-none sm:text-[10px]">
-                  <option value="recommended">Recommended</option>
-                  <option value="price-asc">Price ↑</option>
-                  <option value="price-desc">Price ↓</option>
-                  <option value="name-asc">Name A–Z</option>
-                </select>
-              </label>
+              <div className="relative shrink-0" ref={sortMenuRef}>
+                <button
+                  type="button"
+                  aria-haspopup="listbox"
+                  aria-expanded={sortMenuOpen}
+                  onClick={() => setSortMenuOpen((open) => !open)}
+                  className="flex items-center gap-1 rounded-full border border-[#eadfd8] bg-white px-2.5 py-1.5 text-[9px] font-black uppercase tracking-[0.08em] text-[#765d50] shadow-sm transition hover:border-[#e7c875] hover:bg-[#fff8df] sm:gap-2 sm:px-3.5 sm:py-2 sm:text-[10px] sm:tracking-[0.14em]"
+                >
+                  <span>Sort</span>
+                  <span className="max-w-[108px] truncate font-semibold text-slate-700 sm:max-w-none">
+                    {SORT_OPTIONS.find((option) => option.value === sortBy)?.label || 'Recommended'}
+                  </span>
+                  <ChevronDown size={13} className={`shrink-0 text-[#9b7b3d] transition-transform ${sortMenuOpen ? 'rotate-180' : ''}`} />
+                </button>
+                {sortMenuOpen && (
+                  <div
+                    role="listbox"
+                    aria-label="Sort cakes"
+                    className="absolute right-0 top-full z-30 mt-2 w-52 overflow-hidden rounded-2xl border border-[#eadfd8] bg-white p-1.5 shadow-[0_12px_32px_rgba(51,37,30,0.16)]"
+                  >
+                    <p className="px-3 pb-1.5 pt-2 text-[9px] font-black uppercase tracking-[0.16em] text-[#9b8c83]">
+                      Sort cakes by
+                    </p>
+                    {SORT_OPTIONS.map((option) => {
+                      const isSelected = sortBy === option.value;
+                      return (
+                        <button
+                          key={option.value}
+                          type="button"
+                          role="option"
+                          aria-selected={isSelected}
+                          onClick={() => {
+                            setSortBy(option.value);
+                            setSortMenuOpen(false);
+                          }}
+                          className={`flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left text-xs font-semibold transition ${
+                            isSelected
+                              ? 'bg-[#fff8df] text-[#8d6a2e]'
+                              : 'text-[#5f5149] hover:bg-[#fffaf3]'
+                          }`}
+                        >
+                          <span>{option.label}</span>
+                          {isSelected && <Check size={15} className="text-[#b58a37]" />}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
           </div>
         </div>
 

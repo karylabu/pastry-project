@@ -72,11 +72,11 @@ export default function Footer() {
           </div>
 
           {/* INFORMATION */}
-          <div className="order-4 min-w-0 md:order-none">
+          <div className="order-4 mr-4 w-fit max-w-full justify-self-end text-left md:order-none md:mr-0 md:w-auto md:justify-self-auto">
             <p className="mb-2 text-[#d4af37] text-[10px] font-black uppercase tracking-[0.15em] md:mb-3 md:text-[10px] md:tracking-[0.2em]">
               Information
             </p>
-            <ul className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-300 md:flex-col md:gap-0 md:space-y-2 md:text-xs">
+            <ul className="flex flex-col items-start gap-y-1 pl-1 text-[10px] text-gray-300 md:gap-0 md:space-y-2 md:pl-0 md:text-xs">
               <li>
                 <Link to="/customer/about-us" onClick={() => window.scrollTo(0, 0)} className="hover:text-white transition">
                   About Us
@@ -100,24 +100,26 @@ export default function Footer() {
             <p className="mb-2 text-[#d4af37] text-[10px] font-black uppercase tracking-[0.15em] md:mb-3 md:text-[10px] md:tracking-[0.2em]">
               Get in Touch
             </p>
-            <ul className="space-y-2 text-xs text-gray-300 md:space-y-2 md:text-xs">
-              <li className="flex items-center gap-2">
+            <ul className="space-y-2 text-[10px] text-gray-300 md:space-y-2 md:text-xs">
+              <li className="grid grid-cols-[12px_1fr] items-center gap-x-1">
                 <Phone size={14} className="text-[#d4af37]" />
                 0938-796-2033
               </li>
-              <li className="flex min-w-0 items-start gap-2">
-                <Mail size={14} className="mt-0.5 shrink-0 text-[#d4af37]" />
-                <span className="break-all md:break-normal">pastryproject.bc@gmail.com</span>
+              <li className="grid grid-cols-[12px_1fr] items-center gap-x-2 whitespace-nowrap">
+                <Mail size={12} className="shrink-0 text-[#d4af37] md:h-[14px] md:w-[14px]" />
+                <span className="text-[10px] md:text-xs">pastryproject.bc@gmail.com</span>
               </li>
-              <li className="hidden items-center gap-2 md:flex">
+              <li className="grid grid-cols-[12px_1fr] items-center gap-x-1">
                 <HelpCircle size={13} className="text-[#d4af37]" />
-                Help Center
+                <Link to="/customer/chat-support" onClick={() => window.scrollTo(0, 0)} className="hover:text-white transition">
+                  Help Center
+                </Link>
               </li>
             </ul>
           </div>
 
           {/* NEWSLETTER */}
-          <div className="order-2 min-w-0 md:order-none">
+          <div className="order-2 col-span-2 min-w-0 md:order-none md:col-span-1">
             <p className="mb-2 text-[#d4af37] text-[10px] font-black uppercase tracking-[0.12em] md:mb-3 md:text-[10px] md:tracking-[0.2em]">
               Newsletter Sign-Up
             </p>
@@ -136,7 +138,7 @@ export default function Footer() {
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="flex shrink-0 items-center justify-center gap-1 whitespace-nowrap rounded-full bg-[#d4af37] px-2 py-1 text-[9px] font-black uppercase tracking-[0.06em] text-black transition hover:bg-black hover:text-white disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-70 md:px-2.5 md:py-1.5 md:text-[9px] md:tracking-[0.16em]"
+                className="flex shrink-0 items-center justify-center gap-1 whitespace-nowrap rounded-full bg-[#d4af37] px-1.5 py-1 text-[8px] font-black uppercase tracking-[0.04em] text-black transition hover:bg-black hover:text-white disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-70 md:px-2.5 md:py-1.5 md:text-[9px] md:tracking-[0.16em]"
               >
                 {isSubmitting ? (
                   <>
