@@ -254,13 +254,13 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
     }
 
     const bounds = event.currentTarget.getBoundingClientRect();
-    const width = Math.min(240, window.innerWidth - 16);
     const searchIconColumn = bounds.left + bounds.width / 2;
     const popoverIconOffset = 16 + 10;
-    const left = Math.max(8, Math.min(searchIconColumn - popoverIconOffset, window.innerWidth - width - 8));
+    const left = Math.max(8, searchIconColumn - popoverIconOffset);
+    const width = Math.min(360, window.innerWidth - left - 8);
     setSearchPosition({
       left,
-      top: bounds.top + (bounds.height - 36) / 2,
+      top: bounds.top + (bounds.height - 32) / 2,
       width,
     });
     setOpenSearch(true);
@@ -340,7 +340,7 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
           {/* SEARCH */}
           <form
             onSubmit={handleSearchSubmit}
-            className="hidden h-9 w-[clamp(220px,24vw,340px)] items-center gap-3 rounded-full border border-gray-300 bg-gray-50 px-4 transition focus-within:border-gray-400 focus-within:bg-white md:flex"
+            className="hidden h-8 w-[clamp(220px,24vw,340px)] items-center gap-3 rounded-full border border-gray-300 bg-gray-50 px-4 transition focus-within:border-gray-400 focus-within:bg-white md:flex"
           >
             <Search size={20} className="shrink-0 text-gray-600" />
             <input
@@ -372,7 +372,7 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
                   top: `${searchPosition.top}px`,
                   width: `${searchPosition.width}px`,
                 }}
-                className="fixed z-[50001] flex h-9 items-center gap-3 rounded-full border border-gray-300 bg-gray-50 px-4 shadow-lg transition focus-within:border-gray-400 focus-within:bg-white"
+                className="fixed z-[50001] flex h-8 items-center gap-3 rounded-full border border-gray-300 bg-gray-50 px-4 shadow-lg transition focus-within:border-gray-400 focus-within:bg-white"
               >
                 <Search size={20} className="shrink-0 text-gray-600" />
                 <input
