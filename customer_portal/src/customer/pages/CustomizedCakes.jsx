@@ -271,29 +271,43 @@ export default function CustomizedCakes() {
   useEffect(() => {
     let isActive = true;
 
+    const loadSavedAddresses = async () => {
+      if (!storedUser?.id) return;
+
+      setAddressesLoading(true);
+      try {
+        const response = await fetch(`${CUSTOMER_BASE}/api/addresses`, {
+          credentials: 'include',
+          headers: { Accept: 'application/json', ...getAuthHeaders() },
+        });
+        const data = await safeParseJson(response);
+        if (!response.ok || data?.status !== 'success') {
+          throw new Error(data?.message || `Failed to load addresses (${response.status}).`);
+        }
+
+        const addresses = Array.isArray(data.addresses) ? data.addresses : [];
+        if (!isActive) return;
+        setSavedAddresses(addresses);
+
+        const defaultAddress = addresses.find((address) => address.is_default) || addresses[0];
+        if (defaultAddress) setDeliveryAddress(formatSavedAddress(defaultAddress));
+      } catch (error) {
+        if (isActive) console.warn('Could not load saved addresses:', error);
+      } finally {
+        if (isActive) setAddressesLoading(false);
+      }
+    };
+
     try {
       if (storedUser?.id) {
         setUserId(Number(storedUser.id));
-
-        setAddressesLoading(true);
-        fetch(`${CUSTOMER_BASE}/api/addresses`, {
-          credentials: 'include',
-          headers: { Accept: 'application/json', ...getAuthHeaders() },
-        })
-          .then(safeParseJson)
-          .then((data) => {
-            if (!isActive || data?.status !== 'success') return;
-            const addresses = Array.isArray(data.addresses) ? data.addresses : [];
-            setSavedAddresses(addresses);
-          })
-          .catch((error) => console.warn('Could not load saved addresses:', error))
-          .finally(() => {
-            if (isActive) setAddressesLoading(false);
-          });
+        loadSavedAddresses();
       }
     } catch {
       setUserId(0);
     }
+
+    window.addEventListener('customer:address-updated', loadSavedAddresses);
 
     fetch(`${LARAVEL_BASE}/api/user`, {
       credentials: 'include',
@@ -311,8 +325,9 @@ export default function CustomizedCakes() {
 
     return () => {
       isActive = false;
+      window.removeEventListener('customer:address-updated', loadSavedAddresses);
     };
-  }, []);
+  }, [storedUser?.id]);
 
   const handleFiles = (event) => {
     const nextFiles = Array.from(event.target.files || []).slice(0, MAX_REFERENCE_IMAGES);

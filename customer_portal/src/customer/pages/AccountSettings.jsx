@@ -362,6 +362,7 @@ export default function AccountSettings() {
       const savedAddresses = Array.isArray(data.addresses) ? data.addresses : [];
       const savedDefault = savedAddresses.find((address) => address.is_default);
       setDefaultAddressId(savedDefault?.address_id || data.address_id || null);
+      window.dispatchEvent(new Event('customer:address-updated'));
       window.dispatchEvent(new Event('customer:user-updated'));
       showAlert('Address saved successfully.', 'success');
     } catch (error) {
