@@ -19,13 +19,14 @@ import { BASE, CUSTOMER_BASE } from '../../services/config';
 import { getAuthHeaders, safeParseJson } from '../../services/api';
 
 const getNotificationCategory = (notification) => {
-  const type = notification.type || 'account';
+  const type = String(notification.type || 'account').toLowerCase();
   const title = String(notification.title || '').toLowerCase();
   const message = String(notification.message || '').toLowerCase();
   const actionUrl = String(notification.action_url || '');
   const orderText = `${title} ${message}`;
 
   if (actionUrl.startsWith('/customer/orders') && (/\border\b/.test(orderText) || /custom cake/.test(orderText))) {
+    if (/awaiting payment|payment failed|payment was not completed/.test(orderText)) return 'order_payment_due';
     if (/order placed|has been placed/.test(orderText)) return 'order_placed';
     const statusChange = orderText.match(/\b(?:to|now|is)\s+(awaiting balance payment|ready for pickup|pending|confirmed|preparing|completed|cancelled|canceled)\b/);
     const newStatus = statusChange?.[1];
@@ -187,10 +188,17 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
     if (notifFilter === "Active Orders") return notifications.filter((n) =>
       getNotificationCategory(n).startsWith('order_')
     );
-    if (notifFilter === "Reminders & Warnings") return notifications.filter((n) => ["order_expired", "stockout"].includes(n.type) || (n.type === "Warning" && n.action_url?.includes("/customer/orders")));
+    if (notifFilter === "Reminders & Warnings") return notifications.filter((n) => {
+      const type = String(n.type || '').toLowerCase();
+      const message = String(n.message || '').toLowerCase();
+      return ["order_expired", "stockout"].includes(type)
+        || (type === "warning" && n.action_url?.startsWith("/customer/orders"))
+        || (getNotificationCategory(n) === "order_payment_due")
+        || (type === "success" && /awaiting payment/.test(message));
+    });
     if (notifFilter === "Account Updates") return notifications.filter((n) =>
-      ["account", "profile"].includes(n.type) ||
-      (n.type === "Info" && n.action_url?.includes("/customer/account-settings"))
+      ["account", "profile"].includes(String(n.type || '').toLowerCase()) ||
+      (String(n.type || '').toLowerCase() === "info" && n.action_url?.startsWith("/customer/account-settings"))
     );
     return notifications;
   }, [notifications, notifFilter]);
@@ -479,6 +487,7 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
                           case "order_update":
                             return <ClipboardList className="h-4 w-4 text-blue-600" />;
                           case "order_cancelled":
+                          case "order_payment_due":
                             return <AlertTriangle className="h-4 w-4 text-amber-700" />;
                           case "order_urgent":
                             return <Croissant className="h-4 w-4 text-orange-600" />;
@@ -488,9 +497,9 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
                             return <AlertTriangle className="h-4 w-4 text-red-600" />;
                           case "order_expired":
                             return <Trash2 className="h-4 w-4 text-amber-700" />;
-                          case "Success":
+                          case "success":
                             return <Gift className="h-4 w-4 text-emerald-600" />;
-                          case "Warning":
+                          case "warning":
                             return <AlertTriangle className="h-4 w-4 text-amber-700" />;
                           default:
                             return <CheckCheck className="h-4 w-4 text-gray-600" />;
@@ -515,6 +524,8 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
                         switch (type) {
                           case "order_placed":
                             return <span className="rounded-full bg-blue-50 px-2.5 py-1 text-[10px] font-semibold text-blue-700">Order Placed</span>;
+                          case "order_payment_due":
+                            return <span className="rounded-full bg-amber-50 px-2.5 py-1 text-[10px] font-semibold text-amber-700">{String(n.title || '').toLowerCase().includes('failed') ? 'Payment Failed' : 'Payment Reminder'}</span>;
                           case "order_pending":
                             return <span className="rounded-full bg-blue-50 px-2.5 py-1 text-[10px] font-semibold text-blue-700">Standard Pre-order</span>;
                           case "order_confirmed":
@@ -532,12 +543,18 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
                           case "order_cancelled":
                             return <span className="rounded-full bg-amber-50 px-2.5 py-1 text-[10px] font-semibold text-amber-700">Cancelled</span>;
                           case "order_update":
+                            if (String(n.type || '').toLowerCase() === 'warning') {
+                              return <span className="rounded-full bg-amber-50 px-2.5 py-1 text-[10px] font-semibold text-amber-700">{String(n.title || '').toLowerCase().includes('payment') ? 'Payment Failed' : 'Reminder / Warning'}</span>;
+                            }
                             return <span className="rounded-full bg-blue-50 px-2.5 py-1 text-[10px] font-semibold text-blue-700">Order Update</span>;
                           case "stockout":
                             return <span className="rounded-full bg-gray-100 px-2.5 py-1 text-[10px] font-semibold text-gray-700">Cancelled — Stockout</span>;
                           case "order_expired":
                             return <span className="rounded-full bg-gray-800 px-2.5 py-1 text-[10px] font-semibold text-white">Expired / Discarded</span>;
                           default:
+                            if (String(n.type || '').toLowerCase() === 'warning') {
+                              return <span className="rounded-full bg-amber-50 px-2.5 py-1 text-[10px] font-semibold text-amber-700">Reminder / Warning</span>;
+                            }
                             return <span className="rounded-full bg-gray-100 px-2.5 py-1 text-[10px] font-semibold text-gray-700">Account Update</span>;
                         }
                       };

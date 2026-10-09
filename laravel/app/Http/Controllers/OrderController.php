@@ -588,6 +588,26 @@ class OrderController extends Controller
                         ->where('action_url', '/customer/orders')
                         ->where('message', 'like', "Your order #{$lockedOrder->id} has been placed%")
                         ->delete();
+
+                    $failureTitle = 'Payment Failed';
+                    $failureMessage = "Payment for order #{$lockedOrder->id} failed or was not completed. You can place a new order or contact support.";
+                    $hasFailureNotice = DB::table('notifications')
+                        ->where('user_id', $user->id)
+                        ->where('title', $failureTitle)
+                        ->where('message', $failureMessage)
+                        ->exists();
+
+                    if (!$hasFailureNotice) {
+                        DB::table('notifications')->insert([
+                            'user_id' => $user->id,
+                            'title' => $failureTitle,
+                            'message' => $failureMessage,
+                            'type' => 'Warning',
+                            'is_read' => 0,
+                            'action_url' => '/customer/orders',
+                            'created_at' => now(),
+                        ]);
+                    }
                 }
 
                 return response()->json(['success' => true, 'payment_status' => 'failed']);

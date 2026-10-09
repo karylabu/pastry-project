@@ -201,6 +201,13 @@ class CustomCakeBalancePaymentTest extends TestCase
             'user_id' => 9,
             'message' => 'Your order #27 has been placed and is awaiting payment.',
         ]);
+        $this->assertDatabaseHas('notifications', [
+            'user_id' => 9,
+            'title' => 'Payment Failed',
+            'message' => 'Payment for order #27 failed or was not completed. You can place a new order or contact support.',
+            'type' => 'Warning',
+            'action_url' => '/customer/orders',
+        ]);
         Http::assertSent(fn (ClientRequest $request) =>
             $request->method() === 'PATCH'
             && $request->url() === 'https://api.paymongo.com/v1/payment_links/link_unpaid_test'

@@ -242,6 +242,11 @@ class AuthApiController extends Controller
         if ($updates) {
             DB::table('users')->where('id', $user->id)->update($updates);
             $user->refresh();
+            $this->notifyCustomerAccountUpdate(
+                $user,
+                'Profile Updated',
+                'Your account profile details were updated.'
+            );
         }
 
         return response()->json([
@@ -359,6 +364,11 @@ class AuthApiController extends Controller
         if ($user) {
             DB::table('users')->where('id', $user->id)->update(['password' => Hash::make($newPassword)]);
             DB::table('password_resets')->whereRaw('LOWER(email) = ?', [$email])->update(['used' => 1]);
+            $this->notifyCustomerAccountUpdate(
+                $user,
+                'Password Changed',
+                'Your account password was changed. If you did not make this change, contact support.'
+            );
         }
 
         return response()->json(['success' => true]);
@@ -385,8 +395,30 @@ class AuthApiController extends Controller
         DB::table('users')->where('id', $user->id)->update([
             'password' => Hash::make((string) $request->input('new_password')),
         ]);
+        $this->notifyCustomerAccountUpdate(
+            $user,
+            'Password Changed',
+            'Your account password was changed. If you did not make this change, contact support.'
+        );
 
         return response()->json(['success' => true, 'message' => 'Password updated successfully.']);
+    }
+
+    private function notifyCustomerAccountUpdate(User $user, string $title, string $message): void
+    {
+        if (!Schema::hasTable('notifications')) {
+            return;
+        }
+
+        DB::table('notifications')->insert([
+            'user_id' => $user->id,
+            'title' => $title,
+            'message' => $message,
+            'type' => 'Info',
+            'is_read' => 0,
+            'action_url' => '/customer/account-settings',
+            'created_at' => now(),
+        ]);
     }
 
     public function deleteAccount(Request $request)

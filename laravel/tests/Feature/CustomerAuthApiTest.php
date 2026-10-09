@@ -35,11 +35,22 @@ class CustomerAuthApiTest extends TestCase
             $table->string('device_name')->nullable();
             $table->string('ip_address')->nullable();
         });
+        Schema::create('notifications', function ($table) {
+            $table->id();
+            $table->unsignedBigInteger('user_id');
+            $table->string('title');
+            $table->text('message');
+            $table->string('type')->default('Info');
+            $table->boolean('is_read')->default(false);
+            $table->string('action_url')->nullable();
+            $table->timestamp('created_at')->nullable();
+        });
     }
 
     protected function tearDown(): void
     {
         Schema::dropIfExists('password_resets');
+        Schema::dropIfExists('notifications');
         Schema::dropIfExists('user_sessions');
         Schema::dropIfExists('users');
 
@@ -165,6 +176,12 @@ class CustomerAuthApiTest extends TestCase
             ->assertJsonPath('user.name', 'Updated Customer');
         $this->assertDatabaseHas('users', ['id' => 7, 'name' => 'Updated Customer']);
         $this->assertDatabaseMissing('users', ['id' => 999]);
+        $this->assertDatabaseHas('notifications', [
+            'user_id' => 7,
+            'title' => 'Profile Updated',
+            'type' => 'Info',
+            'action_url' => '/customer/account-settings',
+        ]);
 
         $this->withHeaders($headers)->postJson('/api/password/change', [
             'current_password' => 'current-password',
@@ -172,6 +189,12 @@ class CustomerAuthApiTest extends TestCase
         ])->assertOk()->assertJsonPath('success', true);
 
         $this->assertTrue(Hash::check('new-password', DB::table('users')->where('id', 7)->value('password')));
+        $this->assertDatabaseHas('notifications', [
+            'user_id' => 7,
+            'title' => 'Password Changed',
+            'type' => 'Info',
+            'action_url' => '/customer/account-settings',
+        ]);
 
         $this->withHeaders($headers)->getJson('/api/sessions')
             ->assertOk()
@@ -215,6 +238,12 @@ class CustomerAuthApiTest extends TestCase
         $storedPassword = DB::table('users')->where('id', 7)->value('password');
         $this->assertTrue(Hash::check('reset-password', $storedPassword));
         $this->assertDatabaseHas('password_resets', ['email' => 'customer@example.com', 'used' => 1]);
+        $this->assertDatabaseHas('notifications', [
+            'user_id' => 7,
+            'title' => 'Password Changed',
+            'type' => 'Info',
+            'action_url' => '/customer/account-settings',
+        ]);
     }
 
     private function seedCustomer(): void
