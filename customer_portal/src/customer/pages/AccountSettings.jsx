@@ -535,55 +535,11 @@ export default function AccountSettings() {
         {locationSearchError && <p role="alert" className="mb-3 text-sm text-amber-700">{locationSearchError}</p>}
         <form onSubmit={handleDefaultAddressSave} className="space-y-4">
           <div className="grid gap-3 md:grid-cols-2 sm:gap-5">
-            {renderField('House Number', addressForm.house_no, (e) => setAddressForm({ ...addressForm, house_no: e.target.value }), 'text', 'House number', true)}
-            {renderField('Street', addressForm.street, (e) => setAddressForm({ ...addressForm, street: e.target.value }), 'text', 'Street name', true)}
-            <SearchableLocationField
-              label="Barangay"
-              value={addressForm.barangay}
-              options={barangayOptions}
-              listId="profile-barangays"
-              placeholder={cityOptionsLoading || barangayOptionsLoading ? 'Loading locations…' : 'Search barangay'}
-              required
-              disabled={!addressForm.city || barangayOptionsLoading}
-              onChange={(value) => {
-                setAddressForm((current) => ({ ...current, barangay: value }));
-              }}
-            />
-            <SearchableLocationField
-              label="City"
-              value={addressForm.city}
-              options={cityOptions}
-              listId="profile-cities"
-              placeholder={cityOptionsLoading ? 'Loading cities…' : 'Search city'}
-              required
-              disabled={!addressForm.province || cityOptionsLoading}
-              onChange={async (value) => {
-                setAddressForm((current) => ({ ...current, city: value, barangay: '' }));
-                setBarangayOptions([]);
-                setBarangayOptionsLoading(false);
-                const selectedCity = findLocation(cityOptions, value);
-                const requestId = ++locationRequestRef.current.barangays;
-                if (!selectedCity) return;
-
-                setLocationSearchError('');
-                setBarangayOptionsLoading(true);
-                try {
-                  const options = await loadLocationOptions(`cities-municipalities/${selectedCity.code}/barangays/`);
-                  if (requestId === locationRequestRef.current.barangays) setBarangayOptions(options);
-                } catch {
-                  if (requestId === locationRequestRef.current.barangays) {
-                    setLocationSearchError('Could not load Barangay options. Please try again.');
-                  }
-                } finally {
-                  if (requestId === locationRequestRef.current.barangays) setBarangayOptionsLoading(false);
-                }
-              }}
-            />
             <SearchableLocationField
               label="Province"
               value={addressForm.province}
               options={provinceOptions}
-              listId="profile-provinces"
+              loading={addressLoading || (provinceOptions.length === 0 && !locationSearchError)}
               placeholder="Search province"
               required
               onChange={async (value) => {
@@ -611,6 +567,50 @@ export default function AccountSettings() {
                 }
               }}
             />
+            <SearchableLocationField
+              label="City"
+              value={addressForm.city}
+              options={cityOptions}
+              loading={cityOptionsLoading}
+              placeholder="Search city"
+              required
+              disabled={!addressForm.province || cityOptionsLoading}
+              onChange={async (value) => {
+                setAddressForm((current) => ({ ...current, city: value, barangay: '' }));
+                setBarangayOptions([]);
+                setBarangayOptionsLoading(false);
+                const selectedCity = findLocation(cityOptions, value);
+                const requestId = ++locationRequestRef.current.barangays;
+                if (!selectedCity) return;
+
+                setLocationSearchError('');
+                setBarangayOptionsLoading(true);
+                try {
+                  const options = await loadLocationOptions(`cities-municipalities/${selectedCity.code}/barangays/`);
+                  if (requestId === locationRequestRef.current.barangays) setBarangayOptions(options);
+                } catch {
+                  if (requestId === locationRequestRef.current.barangays) {
+                    setLocationSearchError('Could not load Barangay options. Please try again.');
+                  }
+                } finally {
+                  if (requestId === locationRequestRef.current.barangays) setBarangayOptionsLoading(false);
+                }
+              }}
+            />
+            <SearchableLocationField
+              label="Barangay"
+              value={addressForm.barangay}
+              options={barangayOptions}
+              loading={barangayOptionsLoading}
+              placeholder="Search barangay"
+              required
+              disabled={!addressForm.city || barangayOptionsLoading}
+              onChange={(value) => {
+                setAddressForm((current) => ({ ...current, barangay: value }));
+              }}
+            />
+            {renderField('House Number', addressForm.house_no, (e) => setAddressForm({ ...addressForm, house_no: e.target.value }), 'text', 'House number', true)}
+            {renderField('Street', addressForm.street, (e) => setAddressForm({ ...addressForm, street: e.target.value }), 'text', 'Street name', true)}
             {renderField('Postal Code', addressForm.zip_code, (e) => setAddressForm({ ...addressForm, zip_code: e.target.value }), 'text', 'Postal code', true)}
           </div>
           <button
@@ -947,31 +947,80 @@ function SearchableLocationField({
   label,
   value,
   options,
-  listId,
+  loading = false,
   placeholder,
   required = false,
   disabled = false,
   onChange,
 }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [hasTyped, setHasTyped] = useState(false);
+  const normalizedQuery = hasTyped ? value.trim().toLowerCase() : '';
+  const filteredOptions = options
+    .filter((option) => !normalizedQuery || option.name.toLowerCase().includes(normalizedQuery))
+    .slice(0, 100);
+
   return (
-    <label className="block">
-      <span className="text-xs font-bold uppercase tracking-[0.16em] text-gray-600">{label}</span>
-      <input
-        type="text"
-        list={listId}
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        placeholder={placeholder}
-        required={required}
-        disabled={disabled}
-        autoComplete="off"
-        className="mt-2 w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-3 text-sm text-gray-900 placeholder-gray-400 outline-none focus:border-[#d4af37] focus:ring-2 focus:ring-[#f1cf72]/30 disabled:cursor-wait disabled:opacity-60 sm:px-4 sm:py-3.5 sm:text-base"
-      />
-      <datalist id={listId}>
-        {options.map((option) => (
-          <option key={option.code} value={option.name} />
-        ))}
-      </datalist>
-    </label>
+    <div className="relative block">
+      <label className="block">
+        <span className="text-xs font-bold uppercase tracking-[0.16em] text-gray-600">{label}</span>
+        <input
+          type="text"
+          role="combobox"
+          aria-autocomplete="list"
+          aria-expanded={isOpen && !disabled}
+          aria-controls={`${label.toLowerCase()}-location-options`}
+          value={value}
+          onFocus={() => {
+            setHasTyped(false);
+            setIsOpen(true);
+          }}
+          onBlur={() => window.setTimeout(() => setIsOpen(false), 120)}
+          onChange={(event) => {
+            setHasTyped(true);
+            onChange(event.target.value);
+            setIsOpen(true);
+          }}
+          placeholder={loading ? `Loading ${label.toLowerCase()} options…` : placeholder}
+          required={required}
+          disabled={disabled}
+          autoComplete="off"
+          className="mt-2 w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-3 text-sm text-gray-900 placeholder-gray-400 outline-none focus:border-[#d4af37] focus:ring-2 focus:ring-[#f1cf72]/30 disabled:cursor-wait disabled:opacity-60 sm:px-4 sm:py-3.5 sm:text-base"
+        />
+      </label>
+      {isOpen && !disabled && (
+        <div
+          id={`${label.toLowerCase()}-location-options`}
+          role="listbox"
+          className="absolute inset-x-0 top-full z-50 mt-1 max-h-56 overflow-y-auto rounded-xl border border-gray-200 bg-white py-1 shadow-xl"
+        >
+          {loading ? (
+            <p className="px-3 py-2 text-sm text-gray-500">Loading options…</p>
+          ) : filteredOptions.length > 0 ? (
+            filteredOptions.map((option) => (
+              <button
+                key={option.code}
+                type="button"
+                role="option"
+                aria-selected={option.name === value}
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => {
+                  onChange(option.name);
+                  setHasTyped(false);
+                  setIsOpen(false);
+                }}
+                className="block w-full px-3 py-2 text-left text-sm text-gray-800 transition hover:bg-[#fff4cf] focus:bg-[#fff4cf] focus:outline-none"
+              >
+                {option.name}
+              </button>
+            ))
+          ) : (
+            <p className="px-3 py-2 text-sm text-gray-500">
+              {options.length ? 'No matching options.' : 'No options available.'}
+            </p>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
