@@ -130,6 +130,7 @@ export default function ProductCard({
   onAction,
   onSelect,
   onAddToCart,
+  onEnsureShopOpen,
   favorite,
   onToggleFavorite,
 }) {
@@ -354,7 +355,7 @@ export default function ProductCard({
 
         <div className="mt-auto flex h-8 w-full shrink-0 items-center gap-2 pt-1">
           <button
-            onClick={(e) => {
+            onClick={async (e) => {
               e.stopPropagation();
               if (overallOutOfStock) return;
 
@@ -369,6 +370,7 @@ export default function ProductCard({
                 return;
               }
 
+              if (onEnsureShopOpen && !(await onEnsureShopOpen())) return;
               onAction?.(product, label, currentPrice);
             }}
             disabled={overallOutOfStock}

@@ -146,12 +146,11 @@ export default function Menu({ onAddToCart, onEnsureShopOpen }) {
     }
   };
 
-  const handleAction = async (
+  const handleAction = (
     product,
     size,
     price
   ) => {
-    if (onEnsureShopOpen && !(await onEnsureShopOpen())) return;
     setSelectedProduct({
       ...product,
       variant: size,
@@ -160,12 +159,11 @@ export default function Menu({ onAddToCart, onEnsureShopOpen }) {
     setIsModalOpen(true);
   };
 
-  const handleSelectProduct = async (
+  const handleSelectProduct = (
     product,
     size,
     price
   ) => {
-    if (onEnsureShopOpen && !(await onEnsureShopOpen())) return;
     setSelectedProduct({
       ...product,
       variant: size,
@@ -334,6 +332,7 @@ export default function Menu({ onAddToCart, onEnsureShopOpen }) {
               onAction={handleAction}
               onSelect={handleSelectProduct}
               onAddToCart={onAddToCart}
+              onEnsureShopOpen={onEnsureShopOpen}
               favorite={favoriteIds.includes(Number(p.id))}
               onToggleFavorite={toggleFavorite}
             />

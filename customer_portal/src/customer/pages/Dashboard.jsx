@@ -305,7 +305,7 @@ const resolveCustomReferenceImage = (order) => {
   return `${ROOT_BASE}/${String(image).replace(/^\/+/, '')}`;
 };
 
-function RecommendationCard({ product, onSelect }) {
+function RecommendationCard({ product, onSelect, onEnsureShopOpen }) {
   const fallbackImage = getCategoryFallbackImage(product?.category);
   const normalizedProductName = String(product?.name || '').trim().toLowerCase();
   const isStarterProduct = /\b(starter|starters)\b/i.test(String(product?.category || ''));
@@ -377,7 +377,10 @@ function RecommendationCard({ product, onSelect }) {
       </div>
 
       <button
-        onClick={() => onSelect?.(product, selectedSize, Number(selectedPrice || product.price || 0))}
+        onClick={async () => {
+          if (onEnsureShopOpen && !(await onEnsureShopOpen())) return;
+          onSelect?.(product, selectedSize, Number(selectedPrice || product.price || 0));
+        }}
         className="mt-2 h-7 w-full rounded-lg border border-[#eadfca] bg-[#fff8e9] py-1.5 text-[8px] font-semibold text-[#33251e] transition-colors hover:border-[#e7c875] hover:bg-[#fff8df] hover:text-[#8d6a2e]"
       >
         Add to Cart
@@ -1212,14 +1215,12 @@ export default function Dashboard({ onAddToCart, onEnsureShopOpen, hideFloating 
     };
   }, [favoritesStorageKey, userId]);
 
-  const handleAction = async (product, size, price) => {
-    if (onEnsureShopOpen && !(await onEnsureShopOpen())) return;
+  const handleAction = (product, size, price) => {
     setSelectedProduct({ ...product, variant: size, basePrice: price });
     setIsProductModalOpen(true);
   };
 
-  const handleSelectProduct = async (product, size, price) => {
-    if (onEnsureShopOpen && !(await onEnsureShopOpen())) return;
+  const handleSelectProduct = (product, size, price) => {
     setSelectedProduct({ ...product, variant: size, basePrice: price });
     setIsProductModalOpen(true);
   };
@@ -1278,13 +1279,13 @@ export default function Dashboard({ onAddToCart, onEnsureShopOpen, hideFloating 
                 <button type="button" onClick={() => navigate('/customer/menu')} className="inline-flex items-center gap-1 text-[10px] font-bold text-[#765d50]">View All Cakes <ChevronRight size={13} /></button>
               </div>
               <div className="grid grid-cols-2 gap-3 p-3 sm:grid-cols-3 xl:grid-cols-5">
-                {(bestSellers.length ? bestSellers : mustTry).slice(0, 5).map((product) => <RecommendationCard key={product.id} product={product} onSelect={handleSelectProduct} />)}
+                {(bestSellers.length ? bestSellers : mustTry).slice(0, 5).map((product) => <RecommendationCard key={product.id} product={product} onSelect={handleSelectProduct} onEnsureShopOpen={onEnsureShopOpen} />)}
               </div>
             </section>
 
             <section className="mb-4 rounded-xl border border-[#eadfd8] bg-white p-4 shadow-[0_5px_18px_rgba(91,64,39,0.04)] sm:p-5">
               <div className="mb-3 flex items-center justify-between"><div><p className="text-[9px] font-black uppercase tracking-[0.28em] text-[#b17876]">Curated for you</p><h2 className="mt-0.5 font-serif text-xl text-[#33251e]">Just for You</h2></div><button type="button" onClick={() => navigate('/customer/menu')} className="text-[10px] font-bold text-[#765d50]">View All <ChevronRight size={13} className="inline" /></button></div>
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">{(cakeRecommendations.length ? cakeRecommendations : mustTry).slice(0, 4).map((product) => <RecommendationCard key={product.id} product={product} onSelect={handleSelectProduct} />)}</div>
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">{(cakeRecommendations.length ? cakeRecommendations : mustTry).slice(0, 4).map((product) => <RecommendationCard key={product.id} product={product} onSelect={handleSelectProduct} onEnsureShopOpen={onEnsureShopOpen} />)}</div>
             </section>
           </div>
 
