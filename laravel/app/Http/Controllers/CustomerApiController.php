@@ -1421,14 +1421,14 @@ PROMPT;
         if ($sender === 'customer' && $isQuickChat) {
             $quickChatKey = strtolower(trim((string) preg_replace('/[.!?]+$/', '', $message)));
             $quickChatReplies = [
-                'hi, i need help' => 'Hi! Nandito ako para tumulong. Tungkol ba ito sa order, pag-order, customized cake, o payment?',
-                'where is my order' => 'Makikita mo ang kasalukuyang status ng order mo sa My Orders page. Kung kailangan mo pa ng tulong, ipadala ang order number.',
-                'i want to place an order' => 'Para mag-order, pumunta sa Menu, piliin ang produkto, idagdag sa bag, at mag-checkout.',
-                'can i customize a cake' => 'Oo! Pumunta sa Customized Cakes at ilagay ang design, flavor, size, message, at preferred date.',
-                'how can i pay' => 'Makikita ang mga available na payment method sa checkout kapag nag-place ka ng order.',
+                'hi, i need help' => 'Hi! I’m here to help. Is your question about an order, placing an order, a customized cake, or payment?',
+                'where is my order' => 'You can check your current order status on the My Orders page. If you need more help, please send your order number.',
+                'i want to place an order' => 'To place an order, visit the Menu, choose a product, add it to your bag, and proceed to checkout.',
+                'can i customize a cake' => 'Yes! Visit Customized Cakes and provide your preferred design, flavor, size, message, and date.',
+                'how can i pay' => 'Available payment methods will be shown at checkout when you place your order.',
             ];
             $aiReply = $quickChatReplies[$quickChatKey]
-                ?? 'Salamat sa pag-message! Sabihin kung tungkol ito sa order, pag-order, customized cake, o payment para matulungan kita.';
+                ?? 'Thanks for your message! Let me know if you need help with an order, placing an order, a customized cake, or payment.';
 
             $aiMessageData = [
                 'order_id' => $dbOrderId,
