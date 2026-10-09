@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useLocation, useSearchParams } from 'react-router-dom';
 import PageShell from '../components/PageShell';
 import {
   Lock,
@@ -48,6 +48,7 @@ function findLocation(options, name) {
 }
 
 export default function AccountSettings() {
+  const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -126,6 +127,14 @@ export default function AccountSettings() {
     });
     setLoading(false);
   }, []);
+
+  useEffect(() => {
+    if (activeSection !== 'profile' || location.hash !== '#address') return undefined;
+    const frame = window.requestAnimationFrame(() => {
+      document.getElementById('address')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [activeSection, location.hash]);
 
   useEffect(() => {
     if (!user?.id) return undefined;
@@ -527,7 +536,7 @@ export default function AccountSettings() {
         </button>
       </form>
 
-      <div className="border-t border-gray-100 pt-5 sm:pt-6">
+      <div id="address" className="scroll-mt-6 border-t border-gray-100 pt-5 sm:pt-6">
         <h3 className="mb-4 flex items-center gap-2 text-base font-bold text-gray-900">
           <MapPin size={18} className="text-[#8b6a24]" /> Address
         </h3>

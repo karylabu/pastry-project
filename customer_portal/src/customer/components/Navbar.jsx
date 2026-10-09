@@ -667,7 +667,7 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
               <div className="absolute right-0 top-[65px] w-[260px] bg-white border border-gray-100 rounded-[28px] shadow-2xl overflow-hidden">
                 <div className="px-5 py-4 border-b border-gray-100">
                   <p className="text-[10px] uppercase tracking-[0.2em] text-gray-400">Customer Account</p>
-                  <h3 className="text-[16px] text-black mt-1 font-semibold">{user?.name || 'Welcome'}</h3>
+                  <h3 className="text-[16px] text-black mt-1 font-semibold">{user?.username ? `@${user.username}` : user?.name || 'Welcome'}</h3>
                 </div>
                 <div className="flex flex-col p-2 gap-1">
                   {!user && (

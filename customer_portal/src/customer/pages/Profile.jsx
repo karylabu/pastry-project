@@ -11,6 +11,7 @@ import {
   Settings,
   ShieldCheck,
   ShoppingBag,
+  AtSign,
   UserRound,
 } from 'lucide-react';
 import PageShell from '../components/PageShell';
@@ -148,19 +149,26 @@ export default function Profile() {
               Edit
             </Link>
           </div>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <Field icon={UserRound} label="Full Name" value={fullName} />
+            <Field icon={AtSign} label="Username" value={user?.username ? `@${user.username}` : 'Not available'} />
             <Field icon={Mail} label="Email Address" value={user?.email || 'Not available'} />
             <Field icon={Phone} label="Phone Number" value={user?.phone || user?.phone_number || user?.mobile || 'Not available'} />
           </div>
         </div>
 
         {/* Address */}
-        <div className="bg-[#fffdfa] px-5 py-6 sm:px-8">
+        <div id="address" className="scroll-mt-6 bg-[#fffdfa] px-5 py-6 sm:px-8">
           <div className="mb-5 flex items-center justify-between gap-3">
             <div>
               <h2 className="text-base font-bold text-slate-900">Address</h2>
             </div>
+            <Link
+              to="/customer/account-settings?section=profile#address"
+              className="text-xs font-bold text-slate-500 transition hover:text-slate-900"
+            >
+              Edit
+            </Link>
           </div>
           <div className="grid gap-3">
             <Field icon={MapPinned} label="Address" value={defaultAddress} wide />
