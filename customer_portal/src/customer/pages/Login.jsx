@@ -443,7 +443,7 @@ export default function Login() {
               <img
                 src={`${ROOT_BASE}/uploads/floral(1).jpg?v=login-cake-2026`}
                 alt="Pastry Project Cake"
-                className="relative z-10 h-44 w-full max-w-[340px] rounded-[24px] object-cover shadow-2xl sm:h-[220px] sm:rounded-[28px] sm:w-[340px] xl:h-[290px] xl:w-[440px]"
+                className="relative z-10 h-auto w-full max-w-[340px] rounded-[24px] object-contain shadow-2xl sm:rounded-[28px] sm:w-[340px] xl:w-[440px]"
               />
             </div>
           </div>
