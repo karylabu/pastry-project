@@ -12,6 +12,7 @@ import Dashboard from '../pages/Dashboard';
 import CareersPage from '../pages/CareersPage';
 import AboutUsPage from '../pages/AboutUsPage';
 import TermsPage from '../pages/TermsPage';
+import CookiePolicyPage from '../pages/CookiePolicyPage';
 import PrivacyPage from '../pages/PrivacyPage';
 import Menu from '../pages/Menu';
 import Orders from '../pages/Orders';
@@ -358,11 +359,13 @@ export default function CustomerApp() {
   const hideNavbarPaths = [
     '/terms',
     '/privacy-policy',
+    '/cookie-policy',
     '/about-us',
     '/chat-support',
     '/careers',
     '/customer/terms',
     '/customer/privacy-policy',
+    '/customer/cookie-policy',
     '/customer/about-us',
     '/customer/chat-support',
     '/customer/careers',
@@ -422,6 +425,7 @@ export default function CustomerApp() {
         <Route path="about-us" element={<AboutUsPage />} />
         <Route path="terms" element={<TermsPage />} />
         <Route path="privacy-policy" element={<PrivacyPage />} />
+        <Route path="cookie-policy" element={<CookiePolicyPage />} />
       </Routes>
 
       {/* BOTTOM CART SUMMARY */}

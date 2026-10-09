@@ -137,6 +137,12 @@ export default function AccountSettings() {
   }, [activeSection, location.hash]);
 
   useEffect(() => {
+    if (activeSection === 'profile' && location.hash === '#address') return undefined;
+    const frame = window.requestAnimationFrame(() => window.scrollTo({ top: 0, behavior: 'smooth' }));
+    return () => window.cancelAnimationFrame(frame);
+  }, [activeSection, location.hash]);
+
+  useEffect(() => {
     if (!user?.id) return undefined;
     let cancelled = false;
 
@@ -792,6 +798,10 @@ export default function AccountSettings() {
         </Link>
         <Link to="/customer/terms" className="flex w-full items-center justify-between px-3 py-4 text-sm font-semibold text-gray-700 transition hover:text-[#a06a2c] sm:px-5 sm:py-5 sm:text-base">
           <span>Terms & Conditions</span>
+          <ChevronRight size={18} className="text-gray-400" />
+        </Link>
+        <Link to="/customer/cookie-policy" className="flex w-full items-center justify-between px-3 py-4 text-sm font-semibold text-gray-700 transition hover:text-[#a06a2c] sm:px-5 sm:py-5 sm:text-base">
+          <span>Cookie Policy</span>
           <ChevronRight size={18} className="text-gray-400" />
         </Link>
       </div>

@@ -92,6 +92,11 @@ export default function Footer() {
                   Privacy Policy
                 </Link>
               </li>
+              <li>
+                <Link to="/customer/cookie-policy" onClick={() => window.scrollTo(0, 0)} className="hover:text-white transition">
+                  Cookie Policy
+                </Link>
+              </li>
             </ul>
           </div>
 
