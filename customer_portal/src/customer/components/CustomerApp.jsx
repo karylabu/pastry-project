@@ -272,7 +272,20 @@ export default function CustomerApp() {
       return;
     }
 
-    const quantity = Number(product.qty) || 1;
+    const requestedQuantity = Math.max(1, Math.floor(Number(product.qty) || 1));
+    const productId = Number(product.product_id ?? product.id);
+    const existingProductQuantity = Number.isInteger(productId)
+      ? cartItems.filter((item) => Number(item.product_id ?? item.id) === productId).length
+      : 0;
+    const quantity = Math.min(requestedQuantity, Math.max(0, 20 - existingProductQuantity));
+
+    if (quantity === 0) {
+      setToastMessage('A maximum of 20 units per product can be ordered per checkout.');
+      setShowToast(true);
+      setTimeout(() => setShowToast(false), 3000);
+      return;
+    }
+
     const unitPrice = Number(product.price ?? product.basePrice ?? 0);
 
     const newItems = Array.from({ length: quantity }, (_, idx) => ({
@@ -286,7 +299,9 @@ export default function CustomerApp() {
 
     setCartItems((prev) => [...newItems, ...prev]);
 
-    setToastMessage('Added to cart');
+    setToastMessage(quantity < requestedQuantity
+      ? 'A maximum of 20 units per product can be ordered per checkout. Added the remaining quantity only.'
+      : 'Added to cart');
     setShowToast(true);
     setTimeout(() => setShowToast(false), 2200);
   };

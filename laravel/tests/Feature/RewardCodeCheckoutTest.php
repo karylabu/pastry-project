@@ -214,6 +214,38 @@ class RewardCodeCheckoutTest extends TestCase
         $this->assertSame(0.0, (float) $secondOrder['discount']);
     }
 
+    public function test_checkout_rejects_more_than_twenty_units_of_a_product(): void
+    {
+        $response = $this->placeOrder('', 'none', '', [['product_id' => 11, 'qty' => 21]]);
+
+        $this->assertSame(422, $response->getStatusCode());
+        $this->assertSame(0, DB::table('orders')->count());
+    }
+
+    public function test_checkout_limit_counts_all_lines_for_the_same_product(): void
+    {
+        $response = $this->placeOrder('', 'none', '', [
+            ['product_id' => 11, 'qty' => 12],
+            ['product_id' => 11, 'qty' => 9],
+        ]);
+
+        $this->assertSame(422, $response->getStatusCode());
+        $this->assertSame(0, DB::table('orders')->count());
+    }
+
+    public function test_twenty_units_are_allowed_but_later_checkouts_remain_limited(): void
+    {
+        $firstOrder = $this->placeOrder('', 'none', '', [['product_id' => 11, 'qty' => 20]]);
+        $this->assertSame(201, $firstOrder->getStatusCode());
+
+        $laterOrder = $this->placeOrder('', 'none', '', [['product_id' => 11, 'qty' => 21]]);
+        $this->assertSame(422, $laterOrder->getStatusCode());
+        $this->assertSame(1, DB::table('orders')->count());
+
+        $laterOrderAtLimit = $this->placeOrder('', 'none', '', [['product_id' => 11, 'qty' => 20]]);
+        $this->assertSame(201, $laterOrderAtLimit->getStatusCode());
+    }
+
     private function createReward(int $userId, string $code, ?int $orderId = null): int
     {
         return (int) DB::table('loyalty_transactions')->insertGetId([
@@ -228,10 +260,15 @@ class RewardCodeCheckoutTest extends TestCase
         ]);
     }
 
-    private function placeOrder(string $rewardCode, string $discountType = 'none', string $deliveryTime = '')
+    private function placeOrder(
+        string $rewardCode,
+        string $discountType = 'none',
+        string $deliveryTime = '',
+        ?array $items = null
+    )
     {
         $request = StoreOrderRequest::create('/api/orders', 'POST', [
-            'items' => [['product_id' => 11, 'qty' => 1]],
+            'items' => $items ?? [['product_id' => 11, 'qty' => 1]],
             'method' => 'Pickup',
             'delivery_time' => $deliveryTime,
             'payment' => 'Counter',

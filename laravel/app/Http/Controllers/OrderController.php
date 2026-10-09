@@ -128,6 +128,21 @@ class OrderController extends Controller
             return DB::transaction(function () use ($request, $user, &$discountIdPath) {
                 $canonicalItems = [];
                 $subtotal = 0.0;
+                $hasExistingOrder = Order::query()->where('user_id', $user->id)->exists();
+
+                $productQuantities = [];
+                foreach ($request->items as $item) {
+                    $productId = (int) $item['product_id'];
+                    $productQuantities[$productId] = ($productQuantities[$productId] ?? 0) + (int) $item['qty'];
+                }
+
+                if (max($productQuantities) > 20) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'A maximum of 20 units of each product can be ordered per checkout.',
+                        'errors' => ['items' => ['A maximum of 20 units of each product can be ordered per checkout.']],
+                    ], 422);
+                }
 
                 foreach ($request->items as $item) {
                     $product = Product::query()
@@ -211,8 +226,6 @@ class OrderController extends Controller
                 $orderDiscountType = $discountType;
                 $discountAmount = 0.0;
                 $rewardTransactionId = null;
-                $hasExistingOrder = Order::query()->where('user_id', $user->id)->exists();
-
                 if ($rewardCode !== '') {
                     if ($discountType !== 'none') {
                         return response()->json([

@@ -502,6 +502,18 @@ export default function CheckoutModal({
       return;
     }
 
+    const quantitiesByProduct = new Map();
+    groupedItems.forEach((item) => {
+      const productId = Number(item.product_id);
+      if (Number.isInteger(productId)) {
+        quantitiesByProduct.set(productId, (quantitiesByProduct.get(productId) || 0) + item.qty);
+      }
+    });
+    if ([...quantitiesByProduct.values()].some((quantity) => quantity > 20)) {
+      alert('A maximum of 20 units of each product can be ordered per checkout.');
+      return;
+    }
+
     setLoading(true);
     let paymentOrderId = null;
     let paymentSetupStarted = false;

@@ -471,15 +471,17 @@ export default function ProductModal({ isOpen, onClose, product, allCakes, onAdd
                 </button>
                 <span className="w-8 text-center text-sm font-bold text-gray-900" aria-live="polite">{qty}</span>
                 <button
-                  onClick={() => setQty((prev) => prev + 1)}
+                  onClick={() => setQty((prev) => Math.min(20, prev + 1))}
                   aria-label="Increase quantity"
-                  className="flex h-8 w-8 items-center justify-center rounded-full border border-[#e9e3d8] bg-white text-gray-600 transition hover:bg-gray-100"
+                  disabled={qty >= 20}
+                  className="flex h-8 w-8 items-center justify-center rounded-full border border-[#e9e3d8] bg-white text-gray-600 transition hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-40"
                   type="button"
                 >
                   <Plus size={14} />
                 </button>
               </div>
             </div>
+            <p className="text-right text-[11px] text-gray-500">Limit: 20 units per product per checkout</p>
 
             {hasAddOns && (
               <div className="space-y-2">

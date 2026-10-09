@@ -38,6 +38,14 @@ export default function CartModal({ isOpen, onClose, items = [], setItems, onChe
 
   // Increase: insert a duplicate right after the first occurrence
   const handleIncrease = (firstIndex, item) => {
+    const productId = Number(item.product_id ?? item.id);
+    if (
+      Number.isInteger(productId) &&
+      items.filter((cartItem) => Number(cartItem.product_id ?? cartItem.id) === productId).length >= 20
+    ) {
+      return;
+    }
+
     const updated = [...items];
     updated.splice(firstIndex + 1, 0, { ...item });
     setItems(updated);
@@ -92,6 +100,7 @@ export default function CartModal({ isOpen, onClose, items = [], setItems, onChe
               <div>
                 <h2 className="text-xl font-bold text-[#33251e] md:text-2xl">Your Basket</h2>
                 <p className="mt-1 text-xs text-[#8d7a6e]">Review your items before checkout</p>
+                <p className="mt-1 text-xs font-medium text-[#8d6a2e]">Limit: 20 units per product per checkout</p>
               </div>
               <span className="shrink-0 rounded-full bg-[#fff8df] px-3 py-1.5 text-xs font-bold text-[#8d6a2e]">
                 {items.length} {items.length === 1 ? "item" : "items"}
@@ -183,7 +192,7 @@ export default function CartModal({ isOpen, onClose, items = [], setItems, onChe
                           <button
                             onClick={() => handleDecrease(item.firstIndex)}
                             aria-label={`Decrease ${item.name} quantity`}
-                            className="flex h-8 w-8 items-center justify-center rounded-full border border-[#eadfd8] bg-white text-[#765d50] transition hover:border-[#e7c875] hover:bg-[#fff8df] active:scale-90"
+                            className="flex h-8 w-8 items-center justify-center rounded-full border border-[#eadfd8] bg-white text-[#765d50] transition hover:border-[#e7c875] hover:bg-[#fff8df] active:scale-90 disabled:cursor-not-allowed disabled:opacity-40"
                           >
                             <Minus size={10} strokeWidth={2.5} />
                           </button>
@@ -198,7 +207,8 @@ export default function CartModal({ isOpen, onClose, items = [], setItems, onChe
                           <button
                             onClick={() => handleIncrease(item.firstIndex, item)}
                             aria-label={`Increase ${item.name} quantity`}
-                            className="flex h-8 w-8 items-center justify-center rounded-full border border-[#eadfd8] bg-white text-[#765d50] transition hover:border-[#e7c875] hover:bg-[#fff8df] active:scale-90"
+                            disabled={items.filter((cartItem) => Number(cartItem.product_id ?? cartItem.id) === Number(item.product_id ?? item.id)).length >= 20}
+                            className="flex h-8 w-8 items-center justify-center rounded-full border border-[#eadfd8] bg-white text-[#765d50] transition hover:border-[#e7c875] hover:bg-[#fff8df] active:scale-90 disabled:cursor-not-allowed disabled:opacity-40"
                           >
                             <Plus size={10} strokeWidth={2.5} />
                           </button>
