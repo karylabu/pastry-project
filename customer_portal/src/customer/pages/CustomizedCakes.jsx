@@ -706,9 +706,9 @@ export default function CustomizedCakes() {
                     transform: featuredPreview.name === 'Wedding'
                       ? 'scale(1.8)'
                       : featuredPreview.name === 'Kids'
-                        ? 'scale(2)'
+                        ? 'scale(1.5)'
                         : featuredPreview.name === 'Cutesy'
-                          ? 'scale(2.2)'
+                          ? 'scale(1.85)'
                           : undefined,
                     transformOrigin: featuredPreview.name === 'Wedding' ? 'center 55%' : 'center center',
                   }}
