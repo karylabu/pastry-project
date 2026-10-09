@@ -156,9 +156,16 @@ export default function Login() {
   return (
     <div className="pastry-login relative min-h-screen w-full overflow-hidden bg-[#faf8f1] font-['DM_Sans'] text-[#171717]">
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700;800&family=Pacifico&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700;800&family=Pacifico&family=Playfair+Display:wght@600;700&display=swap');
 
         .brand-script { font-family: 'Pacifico', cursive; }
+        .login-tagline {
+          font-family: 'Playfair Display', Georgia, serif;
+          font-size: 32px;
+          font-weight: 700;
+          letter-spacing: -0.035em;
+          line-height: 1.12;
+        }
         .pastry-login { background: #faf8f1; }
         .pastry-login::before {
           content: "";
@@ -270,17 +277,20 @@ export default function Login() {
             background: #fff9e9;
             border-right: 1px solid #f1e6c9;
           }
-          .pastry-login .hero-panel > .mb-6:first-child { margin-bottom: 34px; }
+          .pastry-login .hero-panel > .mb-6:first-child { margin-bottom: 22px; }
           .pastry-login .hero-panel > .mb-6:nth-child(2) { margin-bottom: 24px; }
-          .pastry-login .hero-panel > .mb-6:nth-child(2) h2 { font-size: 34px; line-height: 1.12; }
+          .pastry-login .hero-panel > .mb-6:nth-child(2) h2.login-tagline { font-size: 34px; }
           .pastry-login .login-cake-section { width: 100%; max-width: none; margin-top: 0; }
           .pastry-login .login-cake-section > div { display: none; }
           .pastry-login .login-cake-section img {
-            width: 100%;
-            max-width: none;
-            height: 230px;
+            width: auto;
+            max-width: 100%;
+            height: auto;
+            max-height: min(36vh, 350px);
             border-radius: 16px;
-            object-position: center 45%;
+            object-fit: contain;
+            object-position: center;
+            margin-inline: auto;
             box-shadow: 0 12px 28px rgba(100, 78, 28, 0.14);
           }
           .pastry-login main > div:not(.hero-panel) {
@@ -343,7 +353,7 @@ export default function Login() {
           .pastry-login .login-card { padding: 18px 20px; border-radius: 20px; }
           .pastry-login .login-card > .mb-4:first-child { text-align: left; }
           .pastry-login .login-card > .mb-4:first-child h2 { font-size: 28px; }
-          .pastry-login .mobile-login-art { display: block; width: 100%; height: clamp(180px, 42vw, 230px); object-fit: cover; object-position: left bottom; }
+          .pastry-login .mobile-login-art { display: block; width: min(100%, 340px); height: auto; max-height: none; margin: 19px auto 0; border-radius: 16px; object-fit: contain; object-position: center; }
           .pastry-login .login-footer-links, .pastry-login .login-footer-social { display: none; }
           .pastry-login .login-footer { display: flex; justify-content: center; border-top: 0; padding: 10px 0 16px; }
           .pastry-login .login-footer-brand { justify-content: center; gap: 8px; }
@@ -358,8 +368,9 @@ export default function Login() {
               padding: 18px 32px 14px;
               background: transparent;
             }
-            .pastry-login .hero-panel > .mb-6:first-child { margin-top: 12px; margin-bottom: 38px; }
+            .pastry-login .hero-panel > .mb-6:first-child { margin-top: 8px; margin-bottom: 22px; }
             .pastry-login .hero-panel > .mb-6:first-child h1 { font-size: 26px; }
+            .pastry-login .hero-panel > .mb-6:nth-child(2) h2.login-tagline { font-size: 30px; }
             .pastry-login main > div:not(.hero-panel) { padding: 0 23px; }
             .pastry-login .login-card { padding: 14px 30px 24px; border-radius: 20px; }
             .pastry-login .login-card > .mb-4:first-child { margin-bottom: 12px; }
@@ -374,7 +385,7 @@ export default function Login() {
             .pastry-login .login-card form.space-y-4 > :not([hidden]) ~ :not([hidden]).btn-secondary { margin-top: 0; }
             .pastry-login .login-card form + p { margin-top: 25px; }
             .pastry-login .login-card a.mt-4 { margin-top: 14px; }
-            .pastry-login .mobile-login-art { width: 100%; height: clamp(160px, 35.5vw, 185px); margin-top: 19px; object-fit: cover; object-position: center 55%; }
+            .pastry-login .mobile-login-art { width: min(100%, 340px); height: auto; margin-top: 19px; object-fit: contain; object-position: center; }
             .pastry-login .login-footer { padding-bottom: 19px; }
           }
           @media (max-width: 399px) {
@@ -420,9 +431,9 @@ export default function Login() {
 
             {/* Hero Headlines */}
             <div className="mb-6">
-              <h2 className="text-[32px] font-extrabold leading-[1.05] text-[#171717] sm:text-[40px] xl:text-[52px]">
-                Bakery made <br />
-                <span className="text-[#F0B94D]">simple & sweet.</span>
+              <h2 className="login-tagline text-[#171717]">
+                A little sweetness, <br />
+                <span className="text-[#F0B94D]">baked fresh daily.</span>
               </h2>
             </div>
 
