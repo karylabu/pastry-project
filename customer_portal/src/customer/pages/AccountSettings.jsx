@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import PageShell from '../components/PageShell';
 import {
@@ -17,6 +17,7 @@ import {
   Settings as SettingsIcon,
   KeyRound,
   Monitor,
+  Camera,
 } from 'lucide-react';
 import { getAuthHeaders, safeParseJson } from '../../services/api';
 import { LARAVEL_BASE } from '../../services/config';
@@ -43,6 +44,9 @@ export default function AccountSettings() {
   const [passwordFormOpen, setPasswordFormOpen] = useState(true);
   const [sessionsOpen, setSessionsOpen] = useState(false);
   const [sessions, setSessions] = useState([]);
+  const [profilePhotoFile, setProfilePhotoFile] = useState(null);
+  const [profilePhotoPreview, setProfilePhotoPreview] = useState('');
+  const profilePhotoInputRef = useRef(null);
 
   const [profileForm, setProfileForm] = useState({
     full_name: '',
@@ -76,7 +80,7 @@ export default function AccountSettings() {
       username: storedUser.username || '',
       email: storedUser.email || '',
       phone: storedUser.phone || '',
-      profile_picture: storedUser.profile_picture || '',
+      profile_picture: storedUser.profile_picture || storedUser.profile_image || storedUser.avatar || '',
     });
     setLoading(false);
   }, []);
@@ -97,6 +101,17 @@ export default function AccountSettings() {
     const timer = window.setTimeout(() => setToast(null), 3000);
     return () => window.clearTimeout(timer);
   }, [toast]);
+
+  useEffect(() => {
+    if (!profilePhotoFile) {
+      setProfilePhotoPreview('');
+      return undefined;
+    }
+
+    const previewUrl = URL.createObjectURL(profilePhotoFile);
+    setProfilePhotoPreview(previewUrl);
+    return () => URL.revokeObjectURL(previewUrl);
+  }, [profilePhotoFile]);
 
   const initials = useMemo(() => {
     const name = user?.name || user?.full_name || 'User';
@@ -149,20 +164,45 @@ export default function AccountSettings() {
     setMessage('');
 
     try {
+      const formData = new FormData();
+      formData.append('name', profileForm.full_name);
+      formData.append('username', profileForm.username);
+      formData.append('email', profileForm.email);
+      formData.append('phone', profileForm.phone);
+      if (profilePhotoFile) formData.append('profile_picture', profilePhotoFile);
+
       const res = await fetch(`${BASE}/api/profile`, {
         method: 'POST',
         credentials: 'include',
-        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
-        body: JSON.stringify({ ...profileForm, name: profileForm.full_name }),
+        headers: getAuthHeaders(),
+        body: formData,
       });
       const data = await safeParseJson(res);
-      if (data.success) {
-        const updatedUser = { ...user, ...profileForm, name: profileForm.full_name, email: profileForm.email, phone: profileForm.phone };
+      if (res.ok && data.success) {
+        const savedPhoto = data.user?.profile_image || data.user?.profile_picture || profileForm.profile_picture;
+        const updatedUser = {
+          ...user,
+          ...profileForm,
+          name: profileForm.full_name,
+          email: profileForm.email,
+          phone: profileForm.phone,
+          ...(profilePhotoFile ? {
+            profile_picture: savedPhoto,
+            profile_image: savedPhoto,
+            avatar: savedPhoto,
+          } : {}),
+        };
         localStorage.setItem('user', JSON.stringify(updatedUser));
         setUser(updatedUser);
+        setProfileForm((current) => ({ ...current, profile_picture: savedPhoto }));
+        setProfilePhotoFile(null);
+        window.dispatchEvent(new Event('customer:user-updated'));
         showAlert('Profile updated successfully.', 'success');
       } else {
-        showAlert(data.message || 'Unable to update profile.', 'error');
+        const validationMessage = data.errors
+          ? Object.values(data.errors).flat().join(' ')
+          : '';
+        showAlert(data.message || validationMessage || 'Unable to update profile.', 'error');
       }
     } catch {
       showAlert('Network error. Please try again.', 'error');
@@ -273,14 +313,41 @@ export default function AccountSettings() {
   };
 
   const renderProfileSection = () => (
-    <section className="rounded-2xl border border-gray-200 bg-white p-4 sm:p-6 md:p-8">
-      <div className="flex items-center gap-3 sm:gap-4">
-        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-yellow-50 text-lg font-black text-yellow-600 sm:h-16 sm:w-16 sm:text-xl">
-          {profileForm.profile_picture ? <img src={profileForm.profile_picture} alt="Profile" className="h-full w-full rounded-full object-cover" /> : initials}
+    <section className="space-y-5">
+      <div className="flex items-center gap-4">
+        <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-full bg-yellow-50 text-xl font-black text-yellow-600 ring-2 ring-[#e7c878] sm:h-20 sm:w-20">
+          {(profilePhotoPreview || profileForm.profile_picture) ? (
+            <img src={profilePhotoPreview || profileForm.profile_picture} alt="Profile preview" className="h-full w-full object-cover" />
+          ) : initials}
         </div>
-        <div>
+        <div className="min-w-0">
           <h2 className="text-lg font-bold text-gray-900 sm:text-xl">Edit Profile</h2>
-          <p className="text-sm text-gray-600">Keep your personal details up to date.</p>
+          <p className="text-sm text-gray-600">Keep your personal details and photo up to date.</p>
+          <input
+            ref={profilePhotoInputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            className="sr-only"
+            onChange={(event) => {
+              const file = event.target.files?.[0] || null;
+              event.target.value = '';
+              if (!file) return;
+              if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type) || file.size > 5 * 1024 * 1024) {
+                showAlert('Choose a JPG, PNG, or WEBP photo no larger than 5 MB.', 'error');
+                return;
+              }
+              setProfilePhotoFile(file);
+              setMessage('');
+            }}
+          />
+          <button
+            type="button"
+            onClick={() => profilePhotoInputRef.current?.click()}
+            className="mt-2 inline-flex items-center gap-1.5 text-xs font-bold text-[#8b6a24] transition hover:text-[#5f4819]"
+          >
+            <Camera size={14} />
+            Choose photo
+          </button>
         </div>
       </div>
 
@@ -293,7 +360,6 @@ export default function AccountSettings() {
           {renderField('Email Address', profileForm.email, (e) => setProfileForm({ ...profileForm, email: e.target.value }), 'email', 'Enter email address')}
           {renderField('Phone Number', profileForm.phone, (e) => setProfileForm({ ...profileForm, phone: e.target.value }), 'tel', 'Enter phone number')}
         </div>
-        {renderField('Profile Picture (optional)', profileForm.profile_picture, (e) => setProfileForm({ ...profileForm, profile_picture: e.target.value }), 'text', 'Paste image URL here')}
         <button type="submit" disabled={saving} className="rounded-full bg-[#e7b866] px-5 py-3 text-sm font-bold text-[#4a2b20] transition hover:bg-[#f1cf72] disabled:opacity-50 sm:px-6 sm:py-3.5 sm:text-base">
           {saving ? 'Saving...' : 'Save Profile'}
         </button>

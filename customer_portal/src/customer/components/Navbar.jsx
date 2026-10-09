@@ -112,6 +112,19 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
       });
   }, []);
 
+  useEffect(() => {
+    const syncUpdatedUser = () => {
+      try {
+        setUser(JSON.parse(localStorage.getItem('user') || 'null'));
+      } catch {
+        setUser(null);
+      }
+    };
+
+    window.addEventListener('customer:user-updated', syncUpdatedUser);
+    return () => window.removeEventListener('customer:user-updated', syncUpdatedUser);
+  }, []);
+
   /* =========================
      FETCH NOTIFICATIONS
   ========================= */

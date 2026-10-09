@@ -212,12 +212,15 @@ class AuthApiController extends Controller
             $data['email'] = strtolower(trim((string) $data['email']));
         }
 
+        $hasProfilePhoto = $request->hasFile('profile_picture');
         $validator = Validator::make($data, [
             'name' => 'sometimes|string|max:100',
             'phone' => 'sometimes|nullable|string|max:20',
             'email' => 'sometimes|email|max:150|unique:users,email,' . $user->id,
             'username' => 'sometimes|nullable|string|max:100',
-            'profile_picture' => 'sometimes|nullable|string|max:2048',
+            'profile_picture' => $hasProfilePhoto
+                ? 'sometimes|file|image|mimes:jpeg,png,webp|max:5120'
+                : 'sometimes|nullable|string|max:2048',
         ]);
 
         if ($validator->fails()) {
@@ -236,12 +239,43 @@ class AuthApiController extends Controller
         $profileColumn = Schema::hasColumn('users', 'profile_picture')
             ? 'profile_picture'
             : (Schema::hasColumn('users', 'profile_image') ? 'profile_image' : null);
+        $oldProfilePicture = $profileColumn ? ($user->{$profileColumn} ?? null) : null;
+        if ($hasProfilePhoto && $profileColumn) {
+            $uploadDirectory = public_path('uploads/profile');
+            if (!is_dir($uploadDirectory) && !mkdir($uploadDirectory, 0755, true) && !is_dir($uploadDirectory)) {
+                Log::error('Unable to create customer profile photo upload directory.', ['user_id' => $user->id]);
+                return response()->json(['success' => false, 'message' => 'Unable to save profile photo. Please try again.'], 500);
+            }
+
+            $photo = $request->file('profile_picture');
+            $filename = bin2hex(random_bytes(16)) . '.' . $photo->extension();
+            try {
+                $photo->move($uploadDirectory, $filename);
+            } catch (\Throwable $exception) {
+                Log::error('Unable to save customer profile photo.', [
+                    'user_id' => $user->id,
+                    'error' => $exception->getMessage(),
+                ]);
+                return response()->json(['success' => false, 'message' => 'Unable to save profile photo. Please try again.'], 500);
+            }
+
+            $data['profile_picture'] = url('uploads/profile/' . $filename);
+        }
         if ($profileColumn && array_key_exists('profile_picture', $data)) {
             $updates[$profileColumn] = $data['profile_picture'];
         }
         if ($updates) {
             DB::table('users')->where('id', $user->id)->update($updates);
             $user->refresh();
+            if ($hasProfilePhoto && $oldProfilePicture) {
+                $oldPath = parse_url($oldProfilePicture, PHP_URL_PATH) ?: $oldProfilePicture;
+                if (preg_match('~(?:^|/)uploads/profile/([A-Za-z0-9._-]+)$~', $oldPath, $matches)) {
+                    $oldPhotoPath = $uploadDirectory . DIRECTORY_SEPARATOR . $matches[1];
+                    if (is_file($oldPhotoPath)) {
+                        unlink($oldPhotoPath);
+                    }
+                }
+            }
             $this->notifyCustomerAccountUpdate(
                 $user,
                 'Profile Updated',
@@ -524,7 +558,9 @@ class AuthApiController extends Controller
             'email' => $user->email,
             'role' => $user->role,
             'phone' => $user->phone ?? '',
-            'profile_image' => $user->profile_picture ?? '',
+            'profile_image' => $user->profile_picture ?? $user->profile_image ?? '',
+            'profile_picture' => $user->profile_picture ?? $user->profile_image ?? '',
+            'avatar' => $user->profile_picture ?? $user->profile_image ?? '',
             'address' => $user->address ?? '',
         ];
     }
