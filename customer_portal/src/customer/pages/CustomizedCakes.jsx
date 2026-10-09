@@ -701,11 +701,17 @@ export default function CustomizedCakes() {
                 <img
                   src={featuredPreview.url}
                   alt={featuredPreview.name}
-                  style={featuredPreview.name === 'Wedding' ? {
-                    objectPosition: featuredImagePositions.Wedding,
-                    transform: 'scale(1.8)',
-                    transformOrigin: 'center 55%',
-                  } : undefined}
+                  style={{
+                    objectPosition: featuredImagePositions[featuredPreview.name],
+                    transform: featuredPreview.name === 'Wedding'
+                      ? 'scale(1.8)'
+                      : featuredPreview.name === 'Kids'
+                        ? 'scale(2)'
+                        : featuredPreview.name === 'Cutesy'
+                          ? 'scale(2.2)'
+                          : undefined,
+                    transformOrigin: featuredPreview.name === 'Wedding' ? 'center 55%' : 'center center',
+                  }}
                   className="h-full w-full object-cover"
                 />
               </div>
