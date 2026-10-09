@@ -80,6 +80,7 @@ export default function CheckoutModal({
   const [shopOpen, setShopOpen] = useState(true);
   const [discountType, setDiscountType] = useState('none');
   const [rewardCodeInput, setRewardCodeInput] = useState('');
+  const [firstOrderEligibility, setFirstOrderEligibility] = useState({ status: 'unknown' });
   const [discountIdFile, setDiscountIdFile] = useState(null);
   const [discountIdPreview, setDiscountIdPreview] = useState('');
   const modalScrollRef = useRef(null);
@@ -198,6 +199,40 @@ export default function CheckoutModal({
   const savedAccountPhone = String(accountProfile?.phone || accountProfile?.phone_number || accountProfile?.contact_number || savedUser.phone || savedUser.phone_number || savedUser.contact_number || '').trim();
   const savedAccountAddress = String(accountProfile?.address || accountProfile?.default_address || savedUser.address || savedUser.default_address || '').trim();
   const userId = savedUser.id || 0;
+
+  useEffect(() => {
+    if (!isOpen) return undefined;
+
+    if (!userId) {
+      setFirstOrderEligibility({ status: 'unavailable' });
+      return undefined;
+    }
+
+    let isCurrent = true;
+    setFirstOrderEligibility({ status: 'checking' });
+
+    fetch(`${LARAVEL_BASE}/api/orders/first-order-discount`, {
+      credentials: 'include',
+      headers: getAuthHeaders(),
+    })
+      .then(async (response) => {
+        const data = await safeParseJson(response);
+        if (!response.ok || !data?.success || typeof data.eligible !== 'boolean') {
+          throw new Error(data?.message || 'Could not verify first-order discount eligibility.');
+        }
+        if (isCurrent) {
+          setFirstOrderEligibility({ status: data.eligible ? 'eligible' : 'used' });
+        }
+      })
+      .catch((error) => {
+        console.error('Could not verify first-order discount eligibility:', error);
+        if (isCurrent) setFirstOrderEligibility({ status: 'error' });
+      });
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [isOpen, userId]);
 
   useEffect(() => {
     refreshShopStatus();
@@ -406,7 +441,12 @@ export default function CheckoutModal({
   const rewardDiscountAmount = discountType === 'none' && rewardCode
     ? Number(Math.min(subtotal * 0.05, 100).toFixed(2))
     : 0;
-  const discountAmount = seniorDiscountAmount || rewardDiscountAmount;
+  const firstOrderDiscountAmount = firstOrderEligibility.status === 'eligible' &&
+    discountType === 'none' &&
+    !rewardCode
+    ? Number((subtotal * 0.05).toFixed(2))
+    : 0;
+  const discountAmount = seniorDiscountAmount || rewardDiscountAmount || firstOrderDiscountAmount;
   const taxAmount = 0;
 
   const total = subtotal + rushFee + taxAmount - discountAmount;
@@ -1145,6 +1185,30 @@ export default function CheckoutModal({
                 <span className="ml-2">{shopOpen ? 'You can place your order now.' : `Checkout is available daily from ${SHOP_HOURS_LABEL}.`}</span>
               </div>
 
+              {firstOrderEligibility.status === 'checking' && (
+                <p className="rounded-xl border border-[#eadfca] bg-[#fff8e9] px-4 py-3 text-xs text-[#765d50]">
+                  Checking your first-order special offer…
+                </p>
+              )}
+              {firstOrderEligibility.status === 'eligible' && (
+                <p className="rounded-xl border border-[#eadfca] bg-[#fff8e9] px-4 py-3 text-xs leading-5 text-[#765d50]">
+                  <span className="font-bold text-[#8d6a2e]">First order special offer: 5% off your subtotal.</span>{' '}
+                  {firstOrderDiscountAmount > 0
+                    ? 'It has been applied to your total below.'
+                    : 'This offer cannot be combined with a reward code or Senior Citizen / PWD discount.'}
+                </p>
+              )}
+              {firstOrderEligibility.status === 'used' && (
+                <p className="rounded-xl border border-[#eee5db] bg-white px-4 py-3 text-xs text-[#8d7a6e]">
+                  The first-order special offer has already been used on this account.
+                </p>
+              )}
+              {firstOrderEligibility.status === 'error' && (
+                <p role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-xs text-red-700">
+                  We couldn’t verify your first-order offer. Refresh checkout to check your eligibility.
+                </p>
+              )}
+
               <div className="flex justify-between text-sm text-gray-500">
                 <span>Subtotal</span>
                 <span>₱{subtotal}</span>
@@ -1246,7 +1310,15 @@ export default function CheckoutModal({
 
               {discountAmount > 0 && (
                 <div className="flex justify-between text-sm text-green-700">
-                  <span>{rewardDiscountAmount > 0 ? 'Rewards discount (5%)' : discountType === 'pwd' ? 'PWD discount (5%)' : 'Senior Citizen discount (5%)'}</span>
+                  <span>
+                    {rewardDiscountAmount > 0
+                      ? 'Rewards discount (5%)'
+                      : firstOrderDiscountAmount > 0
+                        ? 'First order discount (5%)'
+                        : discountType === 'pwd'
+                          ? 'PWD discount (5%)'
+                          : 'Senior Citizen discount (5%)'}
+                  </span>
                   <span>-₱{discountAmount.toFixed(2)}</span>
                 </div>
               )}

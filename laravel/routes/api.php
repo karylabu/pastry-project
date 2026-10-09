@@ -50,6 +50,7 @@ Route::get('sessions', [AuthApiController::class, 'sessions']);
 Route::post('google-login', [AuthController::class, 'googleLogin']);
 Route::options('google-login', [AuthController::class, 'googleLogin']);
 Route::get('orders', [OrderController::class, 'index']);
+Route::get('orders/first-order-discount', [OrderController::class, 'firstOrderDiscountEligibility']);
 Route::post('orders', [OrderController::class, 'store']);
 Route::post('orders/{orderId}/cancel', [OrderController::class, 'cancel']);
 Route::post('orders/{orderId}/confirm-received', [OrderController::class, 'confirmReceived']);

@@ -96,6 +96,23 @@ class OrderController extends Controller
         ]);
     }
 
+    public function firstOrderDiscountEligibility(Request $request)
+    {
+        $user = $this->getAuthenticatedUser($request);
+        if (!$user) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+
+        if (strtolower((string) $user->role) !== 'customer') {
+            return response()->json(['success' => false, 'message' => 'Forbidden'], 403);
+        }
+
+        return response()->json([
+            'success' => true,
+            'eligible' => !Order::query()->where('user_id', $user->id)->exists(),
+        ]);
+    }
+
     /**
      * Store a newly created order in storage.
      */
@@ -232,7 +249,7 @@ class OrderController extends Controller
                     $discountAmount = round(min($subtotal * 0.05, (float) $rewardTransaction->max_discount_amount), 2);
                     $orderDiscountType = 'reward_5_percent';
                 } elseif ($discountType !== 'none') {
-                    if (!in_array($discountType, ['senior_citizen', 'pwd', 'first_order_5_percent', 'reward_5_percent'], true)) {
+                    if (!in_array($discountType, ['senior_citizen', 'pwd'], true)) {
                         return response()->json([
                             'success' => false,
                             'message' => 'Unsupported discount type.',

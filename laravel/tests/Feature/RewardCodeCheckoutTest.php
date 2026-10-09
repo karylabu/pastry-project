@@ -187,6 +187,33 @@ class RewardCodeCheckoutTest extends TestCase
         $this->assertNull(DB::table('orders')->value('delivery_time'));
     }
 
+    public function test_first_order_discount_is_applied_once_and_reported_by_eligibility_endpoint(): void
+    {
+        $this->withToken('test-customer-token')
+            ->getJson('/api/orders/first-order-discount')
+            ->assertOk()
+            ->assertJsonPath('eligible', true);
+
+        $forgedDiscount = $this->placeOrder('', 'first_order_5_percent');
+        $this->assertSame(422, $forgedDiscount->getStatusCode());
+        $this->assertSame(0, DB::table('orders')->count());
+
+        $firstOrder = $this->placeOrder('', 'none')->getData(true);
+
+        $this->assertSame('first_order_5_percent', $firstOrder['discount_type']);
+        $this->assertSame(150.0, (float) $firstOrder['discount']);
+        $this->assertSame(2850.0, (float) $firstOrder['total']);
+
+        $this->withToken('test-customer-token')
+            ->getJson('/api/orders/first-order-discount')
+            ->assertOk()
+            ->assertJsonPath('eligible', false);
+
+        $secondOrder = $this->placeOrder('', 'none')->getData(true);
+        $this->assertSame('none', $secondOrder['discount_type']);
+        $this->assertSame(0.0, (float) $secondOrder['discount']);
+    }
+
     private function createReward(int $userId, string $code, ?int $orderId = null): int
     {
         return (int) DB::table('loyalty_transactions')->insertGetId([
