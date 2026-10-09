@@ -31,7 +31,7 @@ const hasMenuImage = (product) => {
   return imageName !== '' && !MISSING_PRODUCT_IMAGES.has(imageName);
 };
 
-export default function Menu({ onAddToCart }) {
+export default function Menu({ onAddToCart, onEnsureShopOpen }) {
   const location = useLocation();
   const urlSearch = new URLSearchParams(location.search).get('search')?.trim() || '';
 
@@ -146,11 +146,12 @@ export default function Menu({ onAddToCart }) {
     }
   };
 
-  const handleAction = (
+  const handleAction = async (
     product,
     size,
     price
   ) => {
+    if (onEnsureShopOpen && !(await onEnsureShopOpen())) return;
     setSelectedProduct({
       ...product,
       variant: size,
@@ -159,11 +160,12 @@ export default function Menu({ onAddToCart }) {
     setIsModalOpen(true);
   };
 
-  const handleSelectProduct = (
+  const handleSelectProduct = async (
     product,
     size,
     price
   ) => {
+    if (onEnsureShopOpen && !(await onEnsureShopOpen())) return;
     setSelectedProduct({
       ...product,
       variant: size,

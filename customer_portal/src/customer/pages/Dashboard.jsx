@@ -1063,7 +1063,7 @@ export function buildMustTryList(products = []) {
 /* =========================
    MAIN DASHBOARD
 ========================= */
-export default function Dashboard({ onAddToCart, hideFloating = false }) {
+export default function Dashboard({ onAddToCart, onEnsureShopOpen, hideFloating = false }) {
   const navigate = useNavigate();
   const savedUser = typeof window !== 'undefined'
     ? (() => {
@@ -1212,12 +1212,14 @@ export default function Dashboard({ onAddToCart, hideFloating = false }) {
     };
   }, [favoritesStorageKey, userId]);
 
-  const handleAction = (product, size, price) => {
+  const handleAction = async (product, size, price) => {
+    if (onEnsureShopOpen && !(await onEnsureShopOpen())) return;
     setSelectedProduct({ ...product, variant: size, basePrice: price });
     setIsProductModalOpen(true);
   };
 
-  const handleSelectProduct = (product, size, price) => {
+  const handleSelectProduct = async (product, size, price) => {
+    if (onEnsureShopOpen && !(await onEnsureShopOpen())) return;
     setSelectedProduct({ ...product, variant: size, basePrice: price });
     setIsProductModalOpen(true);
   };
