@@ -358,7 +358,7 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
               onClick={toggleMobileSearch}
               aria-label="Search products"
               aria-expanded={openSearch}
-              className="flex h-8 w-8 items-center justify-center rounded-full text-gray-700 transition hover:bg-gray-100 sm:h-10 sm:w-10"
+              className={`relative z-[50002] flex h-8 w-8 items-center justify-center rounded-full text-gray-700 transition hover:bg-gray-100 sm:h-10 sm:w-10 ${openSearch ? 'bg-gray-100' : ''}`}
             >
               <Search size={16} className="sm:h-[18px] sm:w-[18px]" />
             </button>
