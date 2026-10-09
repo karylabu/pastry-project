@@ -170,11 +170,8 @@ export default function Login() {
           height: 100%;
           background-color: #faf8f1;
           background-image:
-            radial-gradient(circle at 8% 20%, rgba(255, 228, 153, 0.5), transparent 22%),
-            radial-gradient(circle at 92% 88%, rgba(255, 218, 112, 0.45), transparent 20%),
-            linear-gradient(rgba(154, 127, 70, 0.07) 1px, transparent 1px),
-            linear-gradient(90deg, rgba(154, 127, 70, 0.07) 1px, transparent 1px);
-          background-size: auto, auto, 42px 42px, 42px 42px;
+            radial-gradient(ellipse at 0% 0%, rgba(255, 224, 142, 0.32), transparent 36%),
+            radial-gradient(ellipse at 100% 100%, rgba(255, 212, 104, 0.28), transparent 32%);
           pointer-events: none;
         }
         .pastry-login .login-banner { display: none; position: absolute; z-index: 0; top: 0; left: 0; height: calc(100% - 105px); width: auto; max-width: none; object-fit: contain; object-position: left top; }
@@ -241,73 +238,71 @@ export default function Login() {
         @media (min-width: 1024px) {
           .pastry-login > .relative.z-10 {
             min-height: 100vh;
-            height: auto;
-            align-items: center;
-            justify-content: center;
-            gap: 12px;
-            padding: 28px 32px;
+            height: 100vh;
+            align-items: stretch;
+            justify-content: flex-start;
+            gap: 0;
+            padding: 0;
           }
           .pastry-login main {
-            flex: 0 1 auto;
-            width: min(940px, 100%);
-            min-height: 590px;
+            flex: 1 1 auto;
+            width: 100%;
+            min-height: 0;
             gap: 0;
             align-items: stretch;
             justify-content: initial;
             padding: 0;
-            overflow: hidden;
-            border: 1px solid rgba(255, 255, 255, 0.85);
-            border-radius: 22px;
-            background: rgba(255, 255, 255, 0.96);
-            box-shadow: 0 24px 60px rgba(100, 78, 28, 0.13);
+            overflow: visible;
+            background: transparent;
           }
           .pastry-login .hero-panel {
             display: flex;
-            flex: 0 0 39%;
-            width: 39%;
+            flex: 0 0 52%;
+            width: 52%;
             justify-content: space-between;
-            padding: 34px 30px;
-            background: #fff9e9;
-            border-right: 1px solid #f1e6c9;
+            padding: clamp(36px, 5vw, 80px);
+            background: linear-gradient(145deg, #ffe58d 0%, #f6c34b 58%, #efb93d 100%);
           }
-          .pastry-login .hero-panel > .mb-6:first-child { margin-bottom: 34px; }
-          .pastry-login .hero-panel > .mb-6:nth-child(2) { margin-bottom: 24px; }
-          .pastry-login .hero-panel > .mb-6:nth-child(2) h2 { font-size: 34px; line-height: 1.12; }
+          .pastry-login .hero-panel > .mb-6:first-child { margin-bottom: 0; }
+          .pastry-login .hero-panel > .mb-6:nth-child(2) { margin: 36px 0 28px; }
+          .pastry-login .hero-panel > .mb-6:nth-child(2) h2 { max-width: 540px; font-size: clamp(38px, 4vw, 62px); line-height: 1.04; }
           .pastry-login .login-cake-section { width: 100%; max-width: none; margin-top: 0; }
           .pastry-login .login-cake-section > div { display: none; }
           .pastry-login .login-cake-section img {
-            width: 100%;
-            max-width: none;
-            height: 230px;
-            border-radius: 16px;
-            object-position: center 45%;
-            box-shadow: 0 12px 28px rgba(100, 78, 28, 0.14);
+            width: min(100%, 560px);
+            max-width: 560px;
+            height: clamp(230px, 36vh, 390px);
+            border-radius: 32px 32px 110px 32px;
+            object-position: center 42%;
+            box-shadow: 0 26px 50px rgba(104, 66, 7, 0.2);
           }
           .pastry-login main > div:not(.hero-panel) {
             flex: 1 1 auto;
-            width: 61%;
+            width: 48%;
             justify-content: center;
-            padding: 36px 44px;
+            padding: clamp(32px, 5vw, 76px);
+            background: #fffdf8;
           }
           .pastry-login .login-card {
             width: 100%;
-            max-width: 420px;
-            padding: 24px 0;
-            border: 0;
-            border-radius: 0;
-            background: transparent;
+            max-width: 460px;
+            padding: clamp(28px, 3vw, 44px);
+            border: 1px solid #f0e8d8;
+            border-radius: 28px;
+            background: #ffffff;
+            box-shadow: 0 22px 52px rgba(91, 65, 19, 0.09);
           }
-          .pastry-login .login-card > .mb-4:first-child { margin-bottom: 28px; }
-          .pastry-login .login-card > .mb-4:first-child h2 { font-size: 30px; }
-          .pastry-login .login-input { height: 46px; border-radius: 9px; }
+          .pastry-login .login-card > .mb-4:first-child { margin-bottom: 30px; }
+          .pastry-login .login-card > .mb-4:first-child h2 { font-size: 32px; }
+          .pastry-login .login-input { height: 50px; border-radius: 12px; }
           .pastry-login .btn-primary {
-            height: 46px;
-            border-radius: 9px;
+            height: 50px;
+            border-radius: 12px;
             background: #f0b94d;
             color: #171717;
           }
           .pastry-login .btn-primary:hover { background: #e5ae3d; }
-          .pastry-login .btn-secondary { height: 46px; border-radius: 9px; }
+          .pastry-login .btn-secondary { height: 50px; border-radius: 12px; }
           .pastry-login .login-input:focus {
             border-color: #f0b94d;
             box-shadow: 0 0 0 4px rgba(240, 185, 77, 0.12);
@@ -315,12 +310,13 @@ export default function Login() {
           .pastry-login .login-card a,
           .pastry-login .login-card button.text-xs { color: #b87808; }
           .pastry-login .login-footer {
-            width: min(940px, 100%);
+            width: 100%;
             grid-template-columns: 1fr auto 1fr;
             gap: 12px;
             margin: 0;
-            padding: 8px 12px;
+            padding: 12px 28px;
             border-top: 0;
+            background: #fffdf8;
           }
           .pastry-login .login-footer-brand img,
           .pastry-login .login-footer-social { display: none; }
