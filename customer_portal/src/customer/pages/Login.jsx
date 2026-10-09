@@ -154,12 +154,29 @@ export default function Login() {
   }, [showLoginSuccess, justLoggedUser, navigate]);
 
   return (
-    <div className="pastry-login relative min-h-screen w-full overflow-hidden bg-[#f8f4eb] font-['DM_Sans'] text-[#171717]">
+    <div className="pastry-login relative min-h-screen w-full overflow-hidden bg-[#f3f6f2] font-['DM_Sans'] text-[#171717]">
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700;800&family=Pacifico&display=swap');
 
         .brand-script { font-family: 'Pacifico', cursive; }
-        .pastry-login { background: #fcfbf8; }
+        .pastry-login { background: #f3f6f2; }
+        .pastry-login::before {
+          content: "";
+          position: absolute;
+          z-index: 0;
+          top: 0;
+          left: 0;
+          width: 100%;
+          height: 100%;
+          background-color: #f3f6f2;
+          background-image:
+            radial-gradient(circle at 8% 20%, rgba(202, 239, 168, 0.52), transparent 22%),
+            radial-gradient(circle at 92% 88%, rgba(255, 226, 150, 0.5), transparent 20%),
+            linear-gradient(rgba(96, 122, 93, 0.055) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(96, 122, 93, 0.055) 1px, transparent 1px);
+          background-size: auto, auto, 42px 42px, 42px 42px;
+          pointer-events: none;
+        }
         .pastry-login .login-banner { display: none; position: absolute; z-index: 0; top: 0; left: 0; height: calc(100% - 105px); width: auto; max-width: none; object-fit: contain; object-position: left top; }
         .pastry-login .brand-icon-overlay { display: none; }
         .pastry-login .hero-panel { display: none; }
@@ -222,7 +239,94 @@ export default function Login() {
         .pastry-login .blob-yellow-top, .pastry-login .blob-black-left, .pastry-login .blob-yellow-bottom, .pastry-login .bg-icon { display: none; }
         .pastry-login .login-card { position: relative; }
         @media (min-width: 1024px) {
-          .pastry-login .login-banner { display: block; }
+          .pastry-login > .relative.z-10 {
+            min-height: 100vh;
+            height: auto;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            padding: 28px 32px;
+          }
+          .pastry-login main {
+            flex: 0 1 auto;
+            width: min(940px, 100%);
+            min-height: 590px;
+            gap: 0;
+            align-items: stretch;
+            justify-content: initial;
+            padding: 0;
+            overflow: hidden;
+            border: 1px solid rgba(255, 255, 255, 0.85);
+            border-radius: 22px;
+            background: rgba(255, 255, 255, 0.96);
+            box-shadow: 0 24px 60px rgba(42, 66, 46, 0.13);
+          }
+          .pastry-login .hero-panel {
+            display: flex;
+            flex: 0 0 39%;
+            width: 39%;
+            justify-content: space-between;
+            padding: 34px 30px;
+            background: #f2f7ef;
+            border-right: 1px solid #e8eee5;
+          }
+          .pastry-login .hero-panel > .mb-6:first-child { margin-bottom: 34px; }
+          .pastry-login .hero-panel > .mb-6:nth-child(2) { margin-bottom: 24px; }
+          .pastry-login .hero-panel > .mb-6:nth-child(2) h2 { font-size: 34px; line-height: 1.12; }
+          .pastry-login .login-cake-section { width: 100%; max-width: none; margin-top: 0; }
+          .pastry-login .login-cake-section > div { display: none; }
+          .pastry-login .login-cake-section img {
+            width: 100%;
+            max-width: none;
+            height: 230px;
+            border-radius: 16px;
+            object-position: center 45%;
+            box-shadow: 0 12px 28px rgba(42, 66, 46, 0.14);
+          }
+          .pastry-login main > div:not(.hero-panel) {
+            flex: 1 1 auto;
+            width: 61%;
+            justify-content: center;
+            padding: 36px 44px;
+          }
+          .pastry-login .login-card {
+            width: 100%;
+            max-width: 420px;
+            padding: 24px 0;
+            border: 0;
+            border-radius: 0;
+            background: transparent;
+          }
+          .pastry-login .login-card > .mb-4:first-child { margin-bottom: 28px; }
+          .pastry-login .login-card > .mb-4:first-child h2 { font-size: 30px; }
+          .pastry-login .login-input { height: 46px; border-radius: 9px; }
+          .pastry-login .btn-primary {
+            height: 46px;
+            border-radius: 9px;
+            background: #0b9b70;
+            color: white;
+          }
+          .pastry-login .btn-primary:hover { background: #07845f; }
+          .pastry-login .btn-secondary { height: 46px; border-radius: 9px; }
+          .pastry-login .login-input:focus {
+            border-color: #0b9b70;
+            box-shadow: 0 0 0 4px rgba(11, 155, 112, 0.1);
+          }
+          .pastry-login .login-card a,
+          .pastry-login .login-card button.text-xs { color: #168b50; }
+          .pastry-login .login-footer {
+            width: min(940px, 100%);
+            grid-template-columns: 1fr auto 1fr;
+            gap: 12px;
+            margin: 0;
+            padding: 8px 12px;
+            border-top: 0;
+          }
+          .pastry-login .login-footer-brand img,
+          .pastry-login .login-footer-social { display: none; }
+          .pastry-login .login-footer-brand { justify-content: flex-start; }
+          .pastry-login .login-footer-brand p,
+          .pastry-login .login-footer-links a { font-size: 11px; }
         }
         @media (max-width: 1023px) {
           .pastry-login .login-banner { display: none; }
@@ -252,11 +356,7 @@ export default function Login() {
             .pastry-login .hero-panel {
               position: relative;
               padding: 18px 32px 14px;
-              background-color: #fcfbf8;
-              background-image: radial-gradient(circle at 0 0, #ffc236 0 84px, transparent 85px), url("${ASSET_BASE}/login-mobile-texture.jpg");
-              background-size: 100% 100%, 100% 100%;
-              background-position: top left, top right;
-              background-repeat: no-repeat;
+              background: transparent;
             }
             .pastry-login .hero-panel > .mb-6:first-child { margin-top: 12px; margin-bottom: 38px; }
             .pastry-login .hero-panel > .mb-6:first-child h1 { font-size: 26px; }
@@ -274,7 +374,7 @@ export default function Login() {
             .pastry-login .login-card form.space-y-4 > :not([hidden]) ~ :not([hidden]).btn-secondary { margin-top: 0; }
             .pastry-login .login-card form + p { margin-top: 25px; }
             .pastry-login .login-card a.mt-4 { margin-top: 14px; }
-            .pastry-login .mobile-login-art { width: 100%; height: clamp(160px, 35.5vw, 185px); margin-top: 19px; object-fit: cover; object-position: center; }
+            .pastry-login .mobile-login-art { width: 100%; height: clamp(160px, 35.5vw, 185px); margin-top: 19px; object-fit: cover; object-position: center 55%; }
             .pastry-login .login-footer { padding-bottom: 19px; }
           }
           @media (max-width: 399px) {
@@ -330,7 +430,7 @@ export default function Login() {
             <div className="login-cake-section relative mt-2 max-w-lg">
               <div className="absolute -left-5 bottom-0 h-40 w-40 rounded-full bg-[#171717] sm:-left-8 sm:h-[220px] sm:w-[220px] xl:h-[300px] xl:w-[300px]" />
               <img
-                src={`${ASSET_BASE}/customize/customize_1.jpg`}
+                src={`${ROOT_BASE}/uploads/floral(1).jpg?v=login-cake-2026`}
                 alt="Pastry Project Cake"
                 className="relative z-10 h-44 w-full max-w-[340px] rounded-[24px] object-cover shadow-2xl sm:h-[220px] sm:rounded-[28px] sm:w-[340px] xl:h-[290px] xl:w-[440px]"
               />
@@ -478,7 +578,7 @@ export default function Login() {
           </div>
         </main>
 
-        <img className="mobile-login-art" src={`${ASSET_BASE}/login-mobile-cake.jpg`} alt="" aria-hidden="true" />
+        <img className="mobile-login-art" src={`${ROOT_BASE}/uploads/floral(1).jpg?v=login-cake-2026`} alt="" aria-hidden="true" />
 
         {/* Footer */}
         <footer className="login-footer grid grid-cols-1 gap-3 border-t border-gray-100 py-3 md:grid-cols-[1fr_auto_1fr] md:items-center md:py-4">
