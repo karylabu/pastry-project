@@ -120,6 +120,7 @@ export default function CustomizedCakes() {
   const [quantity, setQuantity] = useState(() => formDraft?.quantity || 1);
   const [files, setFiles] = useState([]);
   const [referenceImage, setReferenceImage] = useState(null);
+  const [featuredPreview, setFeaturedPreview] = useState(null);
   const [filePreviewUrls, setFilePreviewUrls] = useState([]);
   const [isReferencePreviewOpen, setIsReferencePreviewOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -642,16 +643,23 @@ export default function CustomizedCakes() {
 
             return (
               <article key={index} className="group relative aspect-[3/4] min-h-[180px] overflow-hidden rounded-[14px] border border-[#eadfd8] bg-[#f8eee8] shadow-[0_6px_16px_rgba(91,64,39,0.06)] lg:aspect-auto lg:h-52">
-                <img
-                  src={item.src}
-                  alt={item.label}
-                  style={{ objectPosition: featuredImagePositions[item.label] }}
-                  className={`block h-full w-full object-cover transition-transform duration-300 ${
-                    isWedding ? 'scale-[1.5] group-hover:scale-[1.6]' : isKids ? 'scale-[1.5] group-hover:scale-[1.55]' : isCutesy ? 'scale-[1.85] group-hover:scale-[1.9]' : 'group-hover:scale-[1.02]'
-                  }`}
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-transparent to-transparent" />
-                <div className="absolute inset-x-0 top-0 flex items-center justify-start px-3 pt-3">
+                <button
+                  type="button"
+                  onClick={() => setFeaturedPreview({ type: 'example', id: `featured-${index + 1}`, url: item.src, name: item.label })}
+                  aria-label={`Preview ${item.label} featured design`}
+                  className="absolute inset-0 z-0 h-full w-full"
+                >
+                  <img
+                    src={item.src}
+                    alt=""
+                    style={{ objectPosition: featuredImagePositions[item.label] }}
+                    className={`block h-full w-full object-cover transition-transform duration-300 ${
+                      isWedding ? 'scale-[1.5] group-hover:scale-[1.6]' : isKids ? 'scale-[1.5] group-hover:scale-[1.55]' : isCutesy ? 'scale-[1.85] group-hover:scale-[1.9]' : 'group-hover:scale-[1.02]'
+                    }`}
+                  />
+                </button>
+                <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/55 via-transparent to-transparent" />
+                <div className="absolute inset-x-0 top-0 z-10 flex items-center justify-start px-3 pt-3">
                   <button
                     type="button"
                     onClick={() => addGalleryReferenceImage({ type: 'example', id: `featured-${index + 1}`, url: item.src, name: item.label })}
@@ -664,7 +672,7 @@ export default function CustomizedCakes() {
                     {referenceImage?.id === `featured-${index + 1}` ? '✓ Using as Reference' : 'Use as Reference'}
                   </button>
                 </div>
-                <div className="absolute inset-x-0 bottom-0 px-3 pb-3">
+                <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 px-3 pb-3">
                   <span className="inline-block rounded-md bg-white/90 px-2.5 py-1.5 text-[9px] font-black uppercase tracking-[0.1em] text-[#8d6a2e]">
                     {item.label}
                   </span>
@@ -674,6 +682,33 @@ export default function CustomizedCakes() {
           })}
         </div>
       </div>
+
+      {featuredPreview && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-[#1f1a17]/60 p-4 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Featured design preview"
+          onClick={() => setFeaturedPreview(null)}
+        >
+          <div className="w-full max-w-md overflow-hidden rounded-2xl border border-[#eadfd8] bg-white shadow-[0_18px_40px_rgba(0,0,0,0.18)]" onClick={(event) => event.stopPropagation()}>
+            <div className="flex items-center justify-between border-b border-[#f2e8dc] px-4 py-3">
+              <span className="text-[10px] font-black uppercase tracking-[0.2em] text-[#9b7b3d]">Reference preview</span>
+              <button type="button" onClick={() => setFeaturedPreview(null)} aria-label="Close preview" className="text-lg font-semibold text-[#6b4f1d]">×</button>
+            </div>
+            <div className="p-4">
+              <div className="h-72 overflow-hidden rounded-xl border border-[#f0d98a]">
+                <img src={featuredPreview.url} alt={featuredPreview.name} className="h-full w-full object-cover" />
+              </div>
+              <p className="mt-3 text-center text-sm font-semibold text-[#4b3b33]">{featuredPreview.name}</p>
+              <div className="mt-4 flex gap-2">
+                <button type="button" onClick={() => setFeaturedPreview(null)} className="flex-1 rounded-xl border border-[#f0d98a] bg-white px-3 py-2 text-sm font-semibold text-[#6b4f1d]">Cancel</button>
+                <button type="button" onClick={() => { void addGalleryReferenceImage(featuredPreview); setFeaturedPreview(null); }} className="flex-1 rounded-xl border border-[#e5bd45] bg-[#ffe89a] px-3 py-2 text-sm font-semibold text-[#6b4f1d]">Use this image</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <form
         id="custom-cake-request-form"
