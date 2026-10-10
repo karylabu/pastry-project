@@ -57,7 +57,7 @@ export default function CreditsModal({ isOpen, onClose }) {
 
   return (
     <div
-      className="fixed inset-0 z-[120] flex items-center justify-center bg-[#1c130c]/65 px-5 py-7 backdrop-blur-[5px] sm:px-8 sm:py-10 lg:px-12 lg:py-12"
+      className="fixed inset-0 z-[100002] flex items-center justify-center bg-[#1c130c]/65 px-5 py-7 backdrop-blur-[5px] sm:px-8 sm:py-10 lg:px-12 lg:py-12"
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) onClose();
       }}
