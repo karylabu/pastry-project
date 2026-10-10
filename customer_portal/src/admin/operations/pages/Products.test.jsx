@@ -55,6 +55,23 @@ describe('Products admin catalog', () => {
         });
       }
 
+      if (String(url).includes('/api/staff/production/availability/')) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({ is_producible: true, availability_reason: null }),
+        });
+      }
+
+      if (String(url).includes('/api/staff/products/1/recipe')) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            success: true,
+            recipe: [{ name: 'Flour', qty: 1, usable_stock: 5 }],
+          }),
+        });
+      }
+
       if (String(url).includes('action=summary')) {
         return Promise.resolve({
           ok: true,
@@ -113,5 +130,24 @@ describe('Products admin catalog', () => {
     expect(screen.getByText('Strawberry Cake')).toBeInTheDocument();
     expect(screen.getByText('₱320.00')).toBeInTheDocument();
     expect(screen.queryByText('Mini Chocolate Cake')).not.toBeInTheDocument();
+  });
+
+  test('defaults production to the big size and checks availability immediately', async () => {
+    render(<Products allowCatalogManagement />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Strawberry Cake')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getAllByRole('button', { name: 'Produce' })[0]);
+
+    await waitFor(() => {
+      expect(screen.getByRole('combobox')).toHaveValue('12');
+      expect(screen.getByText('Production: ✓ Available')).toBeInTheDocument();
+    });
+    expect(global.fetch).toHaveBeenCalledWith(
+      expect.stringContaining('production/availability/1?product_size_id=12'),
+      expect.any(Object),
+    );
   });
 });

@@ -23,6 +23,13 @@ const getProductSizeOptions = (product) => (
     : []
   ).filter((size) => Number(size?.id) > 0 && String(size?.size || size?.variant_size || '').trim().toLowerCase() !== 'slice');
 
+const getDefaultProductionSize = (product) => {
+  const sizes = getProductSizeOptions(product);
+  return sizes.find((size) => String(size?.size || size?.variant_size || '').trim().toLowerCase() === 'big' && size.available !== false)
+    || sizes.find((size) => size.available !== false)
+    || null;
+};
+
 const getProductBasePrice = (product) => {
   const bigSize = getProductSizeOptions(product).find((size) =>
     String(size?.size || size?.variant_size || '').trim().toLowerCase() === 'big'
@@ -350,9 +357,10 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
     try {
       const res = await laravelStaffFetch(`${LARAVEL_BASE}/api/staff/production/availability/${encodeURIComponent(productId)}?product_size_id=${encodeURIComponent(productSizeId)}`);
       const data = await res.json();
+      if (!res.ok) throw new Error(data?.availability_reason || data?.message || 'Unable to check production availability.');
       setProductionAvailability({ is_producible: data?.is_producible === true, reason: data?.availability_reason || null });
-    } catch (_) {
-      setProductionAvailability({ is_producible: false, reason: 'Unable to check production availability.' });
+    } catch (error) {
+      setProductionAvailability({ is_producible: false, reason: error.message || 'Unable to check production availability.' });
     }
   };
 
@@ -385,9 +393,19 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
     setHistoryEntries([]);
     if (action === "produce") {
       setRecipeLines([]);
-      setProductionSizeId("");
+      const defaultSize = product.production_size_id
+        ? getProductSizeOptions(product).find((size) => Number(size.id) === Number(product.production_size_id))
+        : getDefaultProductionSize(product);
+      const defaultSizeId = defaultSize?.id ? String(defaultSize.id) : "";
+      setProductionSizeId(defaultSizeId);
       setProductionExpiryDate("");
-      setProductionAvailability({ is_producible: false, reason: 'Select a cake size first.' });
+      setProductionAvailability(defaultSizeId
+        ? { is_producible: false, reason: 'Checking production availability...' }
+        : { is_producible: false, reason: 'No available cake size is configured.' });
+      if (defaultSizeId) {
+        loadProductRecipe(product.id, defaultSizeId);
+        loadProductionAvailability(product.id, defaultSizeId);
+      }
     }
     if (action === "history") loadHistory(product.id);
   };
@@ -878,6 +896,7 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
                       onChange={(event) => {
                         const sizeId = event.target.value;
                         setProductionSizeId(sizeId);
+                        setProductionAvailability({ is_producible: false, reason: sizeId ? 'Checking production availability...' : 'Select a cake size first.' });
                         loadProductRecipe(selectedProduct.id, sizeId);
                         loadProductionAvailability(selectedProduct.id, sizeId);
                       }}

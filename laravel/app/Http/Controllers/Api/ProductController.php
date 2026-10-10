@@ -6,10 +6,11 @@ use App\Http\Controllers\Controller;
 use App\Models\Product;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use App\Services\ProductionService;
 
 class ProductController extends Controller
 {
-    public function staffIndex(Request $request): JsonResponse
+    public function staffIndex(Request $request, ProductionService $production): JsonResponse
     {
         $admin = $this->requireRole($request, 'admin');
         if (!$admin instanceof \App\Models\User) {
@@ -23,7 +24,18 @@ class ProductController extends Controller
             ->whereRaw('LOWER(category) IN (?, ?)', ['cake', 'cakes'])
             ->orderBy('name')
             ->get()
-            ->map(fn (Product $product) => $product->toArray())
+            ->map(function (Product $product) use ($production) {
+                $sizes = $product->sizes;
+                $defaultSize = $sizes->first(fn ($size) => strtolower(trim((string) $size->size)) === 'big' && $size->available)
+                    ?? $sizes->first(fn ($size) => $size->available);
+                $availability = $defaultSize
+                    ? $production->checkAvailability($product, (int) $defaultSize->id)
+                    : ['is_producible' => false, 'availability_reason' => 'No available cake size is configured.'];
+
+                return array_merge($product->toArray(), $availability, [
+                    'production_size_id' => $defaultSize ? (int) $defaultSize->id : null,
+                ]);
+            })
             ->values();
 
         return response()->json($products);
