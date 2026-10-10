@@ -1,12 +1,40 @@
 import React, { useEffect } from 'react';
-import { X } from 'lucide-react';
+import { Cake, Heart, Leaf, Users, X } from 'lucide-react';
 import { ROOT_BASE } from '../../services/config';
 
 const teamMembers = [
-  { name: 'Karyl C. Hernandez', role: 'Project Lead' },
-  { name: 'Erryca Bianca M. Abistado', role: 'Core Development Team' },
-  { name: 'Abbygail Eunice Talas', role: 'Core Development Team' },
+  {
+    initials: 'KC',
+    name: 'Karyl C. Hernandez',
+    role: 'Project Lead',
+    description: 'Guiding the project and team.',
+  },
+  {
+    initials: 'EB',
+    name: 'Erryca Bianca M. Abistado',
+    role: 'Core Development Team',
+    description: 'Helping shape and build the customer experience.',
+  },
+  {
+    initials: 'AT',
+    name: 'Abbygail Eunice Talas',
+    role: 'Core Development Team',
+    description: 'Building features and supporting the system.',
+  },
 ];
+
+function DividerHeading({ icon: Icon, children, trailing }) {
+  return (
+    <div className="mb-3 flex items-center gap-3 text-[#986b2e]">
+      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#4a2b20] text-[#f5d493] shadow-sm">
+        <Icon size={16} strokeWidth={1.8} />
+      </span>
+      <h3 className="shrink-0 text-[10px] font-black uppercase tracking-[0.2em] sm:text-xs">{children}</h3>
+      <span className="h-px min-w-3 flex-1 bg-[#dfc69d]" />
+      {trailing && <span className="shrink-0 font-serif text-xs italic text-[#a77a3b] sm:text-sm">{trailing}</span>}
+    </div>
+  );
+}
 
 export default function CreditsModal({ isOpen, onClose }) {
   useEffect(() => {
@@ -29,7 +57,7 @@ export default function CreditsModal({ isOpen, onClose }) {
 
   return (
     <div
-      className="fixed inset-0 z-[120] flex items-center justify-center bg-[#211812]/70 p-3 backdrop-blur-[3px] sm:p-5"
+      className="fixed inset-0 z-[120] flex items-center justify-center bg-[#1c130c]/65 p-3 backdrop-blur-[5px] sm:p-6"
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) onClose();
       }}
@@ -38,85 +66,84 @@ export default function CreditsModal({ isOpen, onClose }) {
         role="dialog"
         aria-modal="true"
         aria-labelledby="credits-modal-title"
-        className="relative flex max-h-[90dvh] w-full max-w-[780px] flex-col overflow-hidden rounded-[26px] border border-[#d9c29c] bg-[#fffaf3] text-[#2f241f] shadow-[0_28px_90px_rgba(0,0,0,0.32)]"
+        className="relative w-full max-w-[1040px] overflow-hidden rounded-[20px] border border-[#d9bd8f] bg-[#fffaf0] text-[#39271c] shadow-[0_28px_90px_rgba(21,12,5,0.38)] sm:rounded-[24px]"
       >
-        <header className="flex items-center justify-between gap-3 border-b border-[#ead8c5] bg-[#fff4df] px-4 py-3 sm:px-7 sm:py-4">
-          <div className="flex min-w-0 items-center gap-3">
-            <img
-              src={`${ROOT_BASE}/uploads/logo.png?v=logo-v2`}
-              alt="Pastry Project logo"
-              className="h-11 w-11 shrink-0 rounded-full bg-white p-1 object-contain sm:h-14 sm:w-14"
-            />
-            <div className="min-w-0">
-              <p className="text-[9px] font-black uppercase tracking-[0.2em] text-[#9a7024] sm:text-[10px]">A little appreciation</p>
-              <h2 id="credits-modal-title" className="mt-0.5 text-lg font-black leading-tight text-[#4a2b20] sm:text-2xl">
-                Pastry Project
-              </h2>
-              <p className="text-[11px] text-[#765e4f] sm:text-xs">Credits &amp; project team</p>
-            </div>
+        <header className="relative flex min-h-[132px] items-center gap-4 overflow-hidden border-b border-[#ead9bc] bg-gradient-to-r from-[#fffaf0] via-[#fbf1df] to-[#f7ead2] px-5 py-5 sm:min-h-[154px] sm:gap-6 sm:px-10 sm:py-7">
+          <div aria-hidden="true" className="pointer-events-none absolute -bottom-12 -left-8 h-28 w-28 rounded-full border border-[#e7c995]/50" />
+          <div aria-hidden="true" className="pointer-events-none absolute -bottom-16 right-10 h-28 w-56 rotate-[-12deg] rounded-[50%] border-t border-[#d5ad70]/60 sm:right-20" />
+          <img
+            src={`${ROOT_BASE}/uploads/logo.png?v=logo-v2`}
+            alt="Pastry Project logo"
+            className="relative z-10 h-[68px] w-[68px] shrink-0 rounded-full border-2 border-[#bd8d46] bg-[#fffdf8] p-2 object-contain sm:h-[88px] sm:w-[88px] sm:p-3"
+          />
+          <span aria-hidden="true" className="relative z-10 hidden h-[72px] w-px bg-[#cba66c] sm:block" />
+          <div className="relative z-10 min-w-0">
+            <p className="text-[9px] font-black uppercase tracking-[0.24em] text-[#9a6a2d] sm:text-[11px] sm:tracking-[0.3em]">
+              A little appreciation
+            </p>
+            <h2 id="credits-modal-title" className="mt-1 font-serif text-[27px] font-bold leading-none tracking-tight text-[#432719] sm:text-[40px]">
+              Pastry Project
+            </h2>
+            <p className="mt-1.5 text-xs font-medium tracking-wide text-[#9a6a2d] sm:text-base">
+              Credits &amp; Project Team
+            </p>
           </div>
           <button
             type="button"
             onClick={onClose}
             aria-label="Close credits"
-            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[#6c5140] transition hover:bg-[#f0dfc2] hover:text-[#321d13]"
+            className="absolute right-3 top-3 z-20 inline-flex h-9 w-9 items-center justify-center rounded-full text-[#65452c] transition hover:bg-[#ead9bc] focus:outline-none focus:ring-2 focus:ring-[#bd8d46] sm:right-5 sm:top-5"
           >
-            <X size={20} />
+            <X size={23} strokeWidth={1.7} />
           </button>
         </header>
 
-        <main className="px-4 py-4 sm:px-7 sm:py-6">
-          <section className="border-b border-[#ead8c5] pb-4 sm:pb-5">
-            <h3 className="text-xs font-black uppercase tracking-[0.15em] text-[#7b4d30] sm:text-sm">About the project</h3>
-            <p className="mt-2 max-w-2xl text-xs leading-5 text-[#695b53] sm:text-sm sm:leading-6">
+        <main className="px-5 py-5 sm:px-10 sm:py-7">
+          <section>
+            <DividerHeading icon={Cake}>About the project</DividerHeading>
+            <p className="ml-11 max-w-[720px] text-xs leading-5 text-[#66564a] sm:text-sm sm:leading-6">
               Pastry Project is an online bakery platform for browsing products, placing orders, requesting custom cakes,
-              and managing customer accounts. Our team brings the experience together from design to development.
+              and managing customer accounts. Our team brought the experience together from design to development.
             </p>
           </section>
 
-          <section className="pt-4 sm:pt-5">
-            <div className="mb-3 flex items-end justify-between gap-3">
-              <div>
-                <p className="text-[9px] font-black uppercase tracking-[0.19em] text-[#a27831] sm:text-[10px]">The people behind it</p>
-                <h3 className="mt-1 text-base font-extrabold text-[#4a2b20] sm:text-lg">Core Development Team</h3>
-              </div>
-              <span className="pb-0.5 text-[10px] font-medium text-[#8a776c]">Project contributors</span>
-            </div>
-            <div className="grid gap-2 sm:grid-cols-3 sm:gap-3">
-              {teamMembers.map((member, index) => (
-                <article key={member.name} className="flex min-h-[76px] items-center gap-3 rounded-xl border border-[#ead8c5] bg-white/75 px-3 py-3 sm:min-h-[96px] sm:px-4">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#6b3d2a] text-xs font-black text-[#fff4df] shadow-sm sm:h-11 sm:w-11 sm:text-sm">
-                    {member.name.split(' ').map((part) => part[0]).slice(0, 2).join('')}
+          <section className="mt-5 sm:mt-7">
+            <DividerHeading icon={Users} trailing="Project Contributors">The people behind it</DividerHeading>
+            <div className="grid gap-2.5 sm:ml-11 sm:grid-cols-3 sm:gap-4">
+              {teamMembers.map((member) => (
+                <article
+                  key={member.name}
+                  className="flex min-h-[102px] items-center gap-3 rounded-2xl border border-[#ead7b7] bg-white/55 px-3 py-3 shadow-[0_3px_12px_rgba(108,73,32,0.04)] sm:min-h-[134px] sm:items-start sm:gap-4 sm:px-4 sm:py-4"
+                >
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border-[3px] border-[#c39143] bg-[#432719] font-serif text-sm font-bold text-[#fff6e4] shadow-sm sm:h-[62px] sm:w-[62px] sm:text-lg">
+                    {member.initials}
                   </div>
-                  <div className="min-w-0">
-                    <h4 className="text-xs font-bold leading-4 text-[#33251e] sm:text-sm sm:leading-5">{member.name}</h4>
-                    {member.role === 'Project Lead' && (
-                      <p className="mt-1 text-[10px] font-bold text-[#a27831] sm:text-xs">Project Lead</p>
-                    )}
-                    {index === 0 && (
-                      <p className="mt-1 hidden text-[10px] leading-4 text-[#817168] sm:block">Guiding the project and team.</p>
-                    )}
+                  <div className="min-w-0 pt-0.5">
+                    <h4 className="font-serif text-sm font-bold leading-5 text-[#432719] sm:text-base">{member.name}</h4>
+                    <p className="mt-1 text-[9px] font-black uppercase tracking-[0.19em] text-[#a87936] sm:text-[10px]">
+                      {member.role}
+                    </p>
+                    <p className="mt-1.5 text-[11px] leading-4 text-[#76665b] sm:text-xs sm:leading-5">
+                      {member.description}
+                    </p>
                   </div>
                 </article>
               ))}
             </div>
           </section>
 
-          <p className="mt-4 rounded-xl bg-[#f5ecd9] px-3 py-2.5 text-[11px] leading-4 text-[#695b53] sm:mt-5 sm:px-4 sm:py-3 sm:text-xs sm:leading-5">
-            Thank you for being part of the Pastry Project community. The project name and logo belong to their respective owners.
-          </p>
+          <section className="mt-5 flex items-center gap-3 rounded-2xl border border-[#9c6a2f] bg-gradient-to-r from-[#321b10] via-[#4b2b19] to-[#321b10] px-4 py-3.5 text-[#f8e7c5] shadow-[0_5px_16px_rgba(50,27,16,0.16)] sm:ml-8 sm:mt-6 sm:gap-5 sm:px-7 sm:py-4">
+            <Heart className="h-6 w-6 shrink-0 text-[#d2a14f] sm:h-7 sm:w-7" strokeWidth={1.6} />
+            <span className="hidden h-9 w-px bg-[#bb8c48]/70 sm:block" />
+            <h3 className="shrink-0 font-serif text-lg font-bold italic text-[#e1b65f] sm:text-2xl">Thank you!</h3>
+            <span className="hidden h-9 w-px bg-[#bb8c48]/70 sm:block" />
+            <p className="text-[11px] leading-4 text-[#fff4df] sm:text-xs sm:leading-5">
+              Thank you for being part of the Pastry Project community.
+              <span className="hidden sm:inline"> Built with creativity, collaboration, and care.</span>
+            </p>
+            <Leaf className="ml-auto hidden h-7 w-7 shrink-0 rotate-[-25deg] text-[#c99543] sm:block" strokeWidth={1.4} />
+          </section>
         </main>
-
-        <footer className="flex items-center justify-between gap-3 border-t border-[#ead8c5] bg-[#fffdf9] px-4 py-3 sm:px-7">
-          <p className="text-[10px] text-[#8a776c] sm:text-xs">© 2017 Pastry Project Bakeshop &amp; Café</p>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-full bg-[#6b3d2a] px-5 py-2 text-xs font-bold text-white transition hover:bg-[#512c1d] focus:outline-none focus:ring-2 focus:ring-[#c49a52] focus:ring-offset-2"
-          >
-            Done
-          </button>
-        </footer>
       </section>
     </div>
   );
