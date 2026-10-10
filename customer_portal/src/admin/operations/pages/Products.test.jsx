@@ -174,4 +174,35 @@ describe('Products admin catalog', () => {
       expect.any(Object),
     );
   });
+
+  test('stock adjustment uses the selected size stock and sends its size id', async () => {
+    render(<Products allowCatalogManagement />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Strawberry Cake')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getAllByRole('button', { name: 'Adjust' })[0]);
+    expect(screen.getByText('Current Stock: 7')).toBeInTheDocument();
+    expect(screen.getByText('Adjusting Big Cake stock')).toBeInTheDocument();
+
+    fireEvent.change(screen.getByPlaceholderText('Quantity'), { target: { value: '1' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm Adjustment' }));
+
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringContaining('/api/admin/stock/mutate'),
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify({
+            product_size_id: 12,
+            action_type: 'stock_out',
+            quantity: 1,
+            reason: 'Inventory Correction',
+            notes: '',
+          }),
+        }),
+      );
+    });
+  });
 });

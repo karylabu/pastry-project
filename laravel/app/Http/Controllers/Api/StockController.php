@@ -22,35 +22,71 @@ class StockController extends Controller
             'product_size_id' => 'required|integer|exists:product_sizes,id',
             'action_type' => 'required|string|in:stock_in,stock_out',
             'quantity' => 'required|integer|min:1',
+            'reason' => 'nullable|string|max:100',
+            'notes' => 'nullable|string|max:150',
         ]);
 
-        $productSize = ProductSize::findOrFail($validated['product_size_id']);
         $quantity = $validated['quantity'];
-
-        if ($validated['action_type'] === 'stock_out' && $quantity > $productSize->stock_quantity) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Not enough stock for the selected size.',
-                'data' => [
-                    'stock_quantity' => $productSize->stock_quantity,
-                    'requested' => $quantity,
-                ],
-            ], 422);
-        }
+        $isStockOut = $validated['action_type'] === 'stock_out';
+        $user = $this->getAuthenticatedUser($request);
 
         try {
-            DB::transaction(function () use ($productSize, $validated, $quantity) {
-                if ($validated['action_type'] === 'stock_out') {
-                    $productSize->stock_quantity = max(0, $productSize->stock_quantity - $quantity);
-                } else {
-                    $productSize->stock_quantity += $quantity;
+            $productSize = DB::transaction(function () use ($validated, $quantity, $isStockOut, $user) {
+                $productSize = ProductSize::query()
+                    ->whereKey($validated['product_size_id'])
+                    ->lockForUpdate()
+                    ->firstOrFail();
+
+                if ($isStockOut && $quantity > $productSize->stock_quantity) {
+                    return null;
                 }
 
+                $previousStock = (int) $productSize->stock_quantity;
+                $productSize->stock_quantity = $isStockOut
+                    ? $previousStock - $quantity
+                    : $previousStock + $quantity;
                 $productSize->save();
 
-                Product::where('id', $productSize->product_id)
-                    ->update(['stock' => ProductSize::where('product_id', $productSize->product_id)->sum('stock_quantity')]);
+                $totalStock = (int) ProductSize::query()
+                    ->where('product_id', $productSize->product_id)
+                    ->sum('stock_quantity');
+
+                Product::whereKey($productSize->product_id)->update(['stock' => $totalStock]);
+
+                $reason = trim(implode(' - ', array_filter([
+                    $validated['reason'] ?? null,
+                    $validated['notes'] ?? null,
+                ])));
+                DB::table('product_inventory_movements')->insert([
+                    'product_id' => $productSize->product_id,
+                    'product_size_id' => $productSize->id,
+                    'movement_type' => $isStockOut ? 'Stock Out' : 'Stock In',
+                    'quantity' => $isStockOut ? -$quantity : $quantity,
+                    'previous_stock' => $previousStock,
+                    'new_stock' => (int) $productSize->stock_quantity,
+                    'reason' => $reason !== '' ? $reason : 'Manual stock adjustment',
+                    'reference_type' => 'adjustment',
+                    'reference_id' => null,
+                    'user_id' => $user?->id,
+                    'created_at' => now(),
+                ]);
+
+                return $productSize;
             });
+
+            if (!$productSize) {
+                $currentStock = (int) ProductSize::query()
+                    ->whereKey($validated['product_size_id'])
+                    ->value('stock_quantity');
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Not enough stock for the selected size.',
+                    'data' => [
+                        'stock_quantity' => $currentStock,
+                        'requested' => $quantity,
+                    ],
+                ], 422);
+            }
         } catch (QueryException $exception) {
             return response()->json([
                 'success' => false,

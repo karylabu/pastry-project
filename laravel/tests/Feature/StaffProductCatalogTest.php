@@ -22,6 +22,7 @@ class StaffProductCatalogTest extends TestCase
             $table->boolean('available')->default(true);
             $table->string('description')->nullable();
             $table->string('image')->nullable();
+            $table->timestamps();
         });
         Schema::create('product_sizes', function ($table) {
             $table->id();
@@ -30,6 +31,21 @@ class StaffProductCatalogTest extends TestCase
             $table->decimal('price', 10, 2)->default(0);
             $table->unsignedInteger('stock_quantity')->default(0);
             $table->boolean('available')->default(true);
+            $table->timestamps();
+        });
+        Schema::create('product_inventory_movements', function ($table) {
+            $table->id();
+            $table->unsignedBigInteger('product_id');
+            $table->unsignedBigInteger('product_size_id')->nullable();
+            $table->string('movement_type', 40);
+            $table->decimal('quantity', 10, 3);
+            $table->decimal('previous_stock', 10, 3);
+            $table->decimal('new_stock', 10, 3);
+            $table->string('reason', 255)->nullable();
+            $table->string('reference_type', 40)->nullable();
+            $table->unsignedBigInteger('reference_id')->nullable();
+            $table->unsignedBigInteger('user_id')->nullable();
+            $table->timestamps();
         });
         Schema::create('ingredients', function ($table) {
             $table->id();
@@ -94,6 +110,7 @@ class StaffProductCatalogTest extends TestCase
     protected function tearDown(): void
     {
         Schema::dropIfExists('product_sizes');
+        Schema::dropIfExists('product_inventory_movements');
         Schema::dropIfExists('products');
         Schema::dropIfExists('product_recipes');
         Schema::dropIfExists('discard_requests');
@@ -135,5 +152,39 @@ class StaffProductCatalogTest extends TestCase
         $this->assertDatabaseHas('product_sizes', ['product_id' => 1, 'size' => 'Slice', 'stock_quantity' => 1]);
         $this->assertDatabaseHas('products', ['id' => 1, 'stock' => 36]);
         $this->assertDatabaseHas('products', ['id' => 2, 'stock' => 0]);
+    }
+
+    public function test_admin_stock_adjustment_changes_only_the_selected_cake_size_and_updates_product_total(): void
+    {
+        $admin = new User();
+        $admin->role = 'admin';
+        $admin->status = 'active';
+        $bigSizeId = DB::table('product_sizes')->where('product_id', 1)->where('size', 'Big')->value('id');
+
+        $this->actingAs($admin)
+            ->postJson('/api/admin/stock/mutate', [
+                'product_size_id' => $bigSizeId,
+                'action_type' => 'stock_in',
+                'quantity' => 2,
+                'reason' => 'Returned',
+                'notes' => 'Test adjustment',
+            ])
+            ->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.product_size.stock_quantity', 6)
+            ->assertJsonPath('data.total_product_stock', 9);
+
+        $this->assertDatabaseHas('product_sizes', ['product_id' => 1, 'size' => 'Big', 'stock_quantity' => 6]);
+        $this->assertDatabaseHas('product_sizes', ['product_id' => 1, 'size' => 'Small', 'stock_quantity' => 2]);
+        $this->assertDatabaseHas('products', ['id' => 1, 'stock' => 9]);
+        $this->assertDatabaseHas('product_inventory_movements', [
+            'product_id' => 1,
+            'product_size_id' => $bigSizeId,
+            'movement_type' => 'Stock In',
+            'quantity' => 2,
+            'previous_stock' => 4,
+            'new_stock' => 6,
+            'reason' => 'Returned - Test adjustment',
+        ]);
     }
 }

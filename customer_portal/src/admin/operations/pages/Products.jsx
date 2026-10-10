@@ -511,10 +511,28 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
       return;
     }
 
+    const selectedSize = canManageCatalog ? getProductSizeForCategory(selectedProduct, activeCat) : null;
+    if (canManageCatalog && !selectedSize?.id) {
+      setUpdateError(`No ${activeCat === "Small Cakes" ? "small" : "big"} cake size is configured for this product.`);
+      return;
+    }
+
     setUpdateError(null);
     setOperationLoading(true);
 
-    staffFetch(`${STAFF_BASE}/api_update_stocks.php`, {
+    const request = canManageCatalog
+      ? laravelStaffFetch(`${LARAVEL_BASE}/api/admin/stock/mutate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          product_size_id: Number(selectedSize.id),
+          action_type: type === "in" ? "stock_in" : "stock_out",
+          quantity: parsed,
+          reason: adjustReason,
+          notes: adjustNotes,
+        }),
+      })
+      : staffFetch(`${STAFF_BASE}/api_update_stocks.php`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -524,11 +542,12 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
         reason: adjustReason,
         note: adjustNotes
       })
-    })
-      .then(res => res.json())
-      .then(data => {
+    });
+    request
+      .then(async (res) => ({ ok: res.ok, data: await res.json() }))
+      .then(({ ok, data }) => {
 
-        if (data.status === "success") {
+        if (ok && (canManageCatalog ? data.success : data.status === "success")) {
           fetchProducts();
           fetchInventorySummary();
           closeInventoryModal();
@@ -579,6 +598,15 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
       reason: product.availability_reason,
     };
   };
+
+  const getSelectedInventoryStock = (product) => {
+    if (canManageCatalog) {
+      return Number(getProductSizeForCategory(product, activeCat)?.stock_quantity ?? 0);
+    }
+    return Number(product.stock ?? 0);
+  };
+
+  const adjustmentStock = selectedProduct ? getSelectedInventoryStock(selectedProduct) : 0;
 
   /* =========================
      FILTER PRODUCTS
@@ -923,7 +951,7 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
                     ? canManageCatalog
                       ? Number(getProductSizeOptions(selectedProduct).find((size) => Number(size.id) === Number(productionSizeId))?.stock_quantity ?? 0)
                       : Number(selectedProduct.stock ?? 0)
-                    : selectedProduct.stock ?? 0}
+                    : getSelectedInventoryStock(selectedProduct)}
                 </p>
 
                 {activeModal === "produce" && <div className="space-y-3 mb-4">
@@ -1031,6 +1059,11 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
 
                 {activeModal === "adjust" && <div className="space-y-3 border-t border-black/10 pt-4">
                   <label className="block text-[11px] font-semibold text-black/70 mb-2">Manual stock adjust</label>
+                  {canManageCatalog && (
+                    <p className="text-[11px] font-medium text-black/60">
+                      Adjusting {activeCat === "Small Cakes" ? "Small" : "Big"} Cake stock
+                    </p>
+                  )}
                   <div className="grid gap-2 sm:grid-cols-2 mb-3">
                     <select value={adjustType} onChange={(e) => setAdjustType(e.target.value)} className="rounded-xl border px-2 py-2 text-xs">
                       <option value="in">Stock In</option><option value="out">Stock Out</option>
@@ -1048,7 +1081,7 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
                     />
                   </div>
                   <textarea value={adjustNotes} onChange={(e) => setAdjustNotes(e.target.value)} placeholder="Optional notes" className="w-full rounded-xl border border-black/10 px-3 py-2 text-xs" />
-                  <p className="text-xs text-black/70">Current Stock: <strong>{selectedProduct.stock ?? 0}</strong> <span className="mx-1">→</span> Adjustment: <strong>{adjustType === "in" ? "+" : "-"}{Number(qty || 0)}</strong> <span className="mx-1">→</span> New Stock: <strong>{Math.max(0, Number(selectedProduct.stock || 0) + (adjustType === "in" ? Number(qty || 0) : -Number(qty || 0)))}</strong></p>
+                  <p className="text-xs text-black/70">Current Stock: <strong>{adjustmentStock}</strong> <span className="mx-1">→</span> Adjustment: <strong>{adjustType === "in" ? "+" : "-"}{Number(qty || 0)}</strong> <span className="mx-1">→</span> New Stock: <strong>{Math.max(0, adjustmentStock + (adjustType === "in" ? Number(qty || 0) : -Number(qty || 0)))}</strong></p>
 
                   {updateError && (
                     <p className="text-red-500 text-xs mb-3">
@@ -1056,7 +1089,7 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
                     </p>
                   )}
 
-                  <button onClick={() => updateStock(adjustType)} disabled={operationLoading || !qty || Number(qty) <= 0 || (adjustType === "out" && Number(qty) > Number(selectedProduct.stock || 0))} className="w-full bg-black text-white px-4 py-2 rounded-xl text-xs font-semibold hover:bg-black/90 disabled:opacity-50">{operationLoading ? "Updating..." : "Confirm Adjustment"}</button>
+                  <button onClick={() => updateStock(adjustType)} disabled={operationLoading || !qty || Number(qty) <= 0 || (adjustType === "out" && Number(qty) > adjustmentStock)} className="w-full bg-black text-white px-4 py-2 rounded-xl text-xs font-semibold hover:bg-black/90 disabled:opacity-50">{operationLoading ? "Updating..." : "Confirm Adjustment"}</button>
                 </div>}
 
                 {activeModal === "history" && <div className="border-t border-black/10 pt-4">
