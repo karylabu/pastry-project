@@ -71,6 +71,36 @@ if (!is_dir($uploadDir)) {
 }
 
 $savedFiles = [];
+$referenceImage = json_decode(trim($_POST['reference_image'] ?? ''), true);
+$referenceImages = json_decode(trim($_POST['reference_images'] ?? '[]'), true);
+$referenceImages = is_array($referenceImages) ? $referenceImages : [];
+$galleryReferenceCount = count(array_filter($referenceImages, static fn ($image) => (
+    is_array($image) && ($image['type'] ?? null) === 'example' && !empty($image['url'])
+)));
+$uploadReferenceCount = count(array_filter($referenceImages, static fn ($image) => (
+    is_array($image) && ($image['type'] ?? null) === 'upload'
+)));
+$fileNames = $_FILES['files']['name'] ?? [];
+$fileCount = is_array($fileNames)
+    ? count(array_filter($fileNames, static fn ($fileName) => $fileName !== ''))
+    : ($fileNames !== '' ? 1 : 0);
+$uploadReferenceCount = max($uploadReferenceCount, $fileCount);
+$primaryReferenceIncluded = is_array($referenceImage) && array_filter($referenceImages, static fn ($image) => (
+    is_array($image)
+    && ((!empty($referenceImage['id']) && ($image['id'] ?? null) === $referenceImage['id'])
+        || (!empty($referenceImage['url']) && ($image['url'] ?? null) === $referenceImage['url']))
+));
+$referenceCount = $galleryReferenceCount + $uploadReferenceCount;
+if (is_array($referenceImage) && !empty($referenceImage['url']) && !$primaryReferenceIncluded && (
+    ($referenceImage['type'] ?? null) === 'example' || $uploadReferenceCount === 0
+)) {
+    $referenceCount++;
+}
+if ($referenceCount > 5) {
+    http_response_code(422);
+    echo json_encode(['success' => false, 'message' => 'You can select up to 5 reference images in one request.']);
+    exit;
+}
 if (!empty($_FILES['files']['name'][0])) {
     foreach ($_FILES['files']['tmp_name'] as $i => $tmpName) {
         $originalName = basename($_FILES['files']['name'][$i]);
@@ -82,6 +112,15 @@ if (!empty($_FILES['files']['name'][0])) {
             // store the relative path that the frontend/admin can use to display it
             $savedFiles[] = 'uploads/custom_cake/' . $safeName;
         }
+    }
+}
+$savedFiles = array_merge($savedFiles, array_values(array_filter($referenceImages, fn ($image) => (
+    is_array($image) && ($image['type'] ?? null) === 'example' && !empty($image['url'])
+))));
+if (is_array($referenceImage) && !empty($referenceImage['url'])) {
+    $alreadySaved = array_filter($savedFiles, fn ($image) => is_array($image) && ($image['id'] ?? null) === ($referenceImage['id'] ?? null));
+    if (!$alreadySaved) {
+        $savedFiles[] = $referenceImage;
     }
 }
 $inspoImagesJson = json_encode($savedFiles);
@@ -125,6 +164,8 @@ $customDetails = [
     'quantity' => $quantity,
     'total_amount' => $totalAmount,
     'details' => $details,
+    'reference_image' => $referenceImage,
+    'reference_images' => $referenceImages,
 ];
 $customDetailsJson = json_encode($customDetails);
 

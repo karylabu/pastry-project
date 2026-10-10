@@ -41,6 +41,7 @@ class CustomizedCakeOrderSubmissionTest extends TestCase
             $table->unsignedBigInteger('user_id')->nullable();
             $table->string('status');
             $table->timestamp('created_at')->nullable();
+            $table->string('payment_status')->nullable();
             $table->string('order_type')->default('Standard');
             $table->boolean('is_customized')->default(false);
         });
@@ -128,8 +129,8 @@ class CustomizedCakeOrderSubmissionTest extends TestCase
         $customer->role = 'customer';
         $customer->status = 'active';
 
-        $this->actingAs($customer)
-            ->postJson('/api/customized-cakes/order', [
+        $response = $this->actingAs($customer)
+            ->postJson('http://localhost/api/customized-cakes/order', [
                 'cake_type' => 'single',
                 'tiers' => [['flavor_id' => 1, 'size_id' => 1]],
                 'notes' => '{"occasion":"Birthday"}',
@@ -139,9 +140,9 @@ class CustomizedCakeOrderSubmissionTest extends TestCase
                     'url' => 'https://pastryproject.shop/uploads/holiday(2).jpg',
                     'name' => 'Holiday Cake 2',
                 ]),
-            ])
-            ->assertOk()
-            ->assertJsonPath('success', true);
+            ]);
+        $this->assertSame(200, $response->getStatusCode(), $response->getContent());
+        $response->assertJsonPath('success', true);
 
         $this->assertDatabaseHas('customized_cake_orders', [
             'order_id' => 1,
@@ -187,6 +188,11 @@ class CustomizedCakeOrderSubmissionTest extends TestCase
             'reference_images' => json_encode([
                 ['type' => 'upload', 'id' => 'first-reference', 'name' => 'reference-one.jpg'],
                 ['type' => 'upload', 'id' => 'second-reference', 'name' => 'reference-two.jpg'],
+                ['type' => 'example', 'id' => 'birthday-3', 'url' => 'https://pastryproject.shop/uploads/birthday(3).jpg', 'name' => 'Birthday Cake 3'],
+            ]),
+            'uploaded_reference_images' => json_encode([
+                ['type' => 'upload', 'id' => 'first-reference', 'name' => 'reference-one.jpg'],
+                ['type' => 'upload', 'id' => 'second-reference', 'name' => 'reference-two.jpg'],
             ]),
         ], [], [
             'files' => [
@@ -200,14 +206,49 @@ class CustomizedCakeOrderSubmissionTest extends TestCase
         $this->assertTrue(json_decode($response->getContent(), true)['success']);
 
         $images = json_decode((string) DB::table('customized_cake_orders')->value('inspo_images'), true);
-        $this->assertCount(2, $images);
-        $this->assertSame(['first-reference', 'second-reference'], array_column($images, 'id'));
-        $this->assertSame(['reference-one.jpg', 'reference-two.jpg'], array_column($images, 'name'));
+        $this->assertCount(3, $images);
+        $this->assertSame(['first-reference', 'second-reference', 'birthday-3'], array_column($images, 'id'));
+        $this->assertSame(['reference-one.jpg', 'reference-two.jpg', 'Birthday Cake 3'], array_column($images, 'name'));
+        $this->assertSame('https://pastryproject.shop/uploads/birthday(3).jpg', $images[2]['url']);
 
         foreach ($images as $image) {
-            $path = public_path($image['path']);
-            $this->assertFileExists($path);
-            unlink($path);
+            if (!empty($image['path'])) {
+                $path = public_path($image['path']);
+                $this->assertFileExists($path);
+                unlink($path);
+            }
         }
+    }
+
+    public function test_customer_custom_cake_request_rejects_more_than_five_reference_images(): void
+    {
+        $customer = new User();
+        $customer->id = 1;
+        $customer->name = 'Customer';
+        $customer->email = 'customer@example.test';
+        $customer->role = 'customer';
+        $customer->status = 'active';
+
+        $this->actingAs($customer);
+        $request = Request::create('/api/customized-cakes/order', 'POST', [
+            'cake_type' => 'single',
+            'tiers' => json_encode([['flavor_id' => 1, 'size_id' => 1]]),
+            'reference_images' => json_encode(array_map(
+                static fn ($index) => [
+                    'type' => 'example',
+                    'id' => "birthday-{$index}",
+                    'url' => "https://pastryproject.shop/uploads/birthday({$index}).jpg",
+                ],
+                range(1, 6)
+            )),
+        ]);
+
+        $response = app(CustomizedCakeController::class)->storeOrder($request);
+
+        $this->assertSame(422, $response->getStatusCode(), $response->getContent());
+        $this->assertSame(
+            'You can select up to 5 reference images in one request.',
+            json_decode($response->getContent(), true)['message']
+        );
     }
 }

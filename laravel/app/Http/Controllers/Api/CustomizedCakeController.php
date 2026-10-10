@@ -288,6 +288,35 @@ class CustomizedCakeController extends Controller
             $referenceImage = is_array($referenceImage) ? $referenceImage : null;
             $referenceImages = json_decode((string) ($payload['reference_images'] ?? ''), true);
             $referenceImages = is_array($referenceImages) ? array_values($referenceImages) : [];
+            $uploadedReferenceImages = json_decode((string) ($payload['uploaded_reference_images'] ?? ''), true);
+            $uploadedReferenceImages = is_array($uploadedReferenceImages)
+                ? array_values($uploadedReferenceImages)
+                : $referenceImages;
+            $galleryReferenceCount = count(array_filter($referenceImages, static fn ($image) => (
+                is_array($image) && ($image['type'] ?? null) === 'example' && !empty($image['url'])
+            )));
+            $uploadReferenceCount = max(
+                count(array_filter($referenceImages, static fn ($image) => is_array($image) && ($image['type'] ?? null) === 'upload')),
+                count(array_filter($uploadedReferenceImages, static fn ($image) => is_array($image) && ($image['type'] ?? null) === 'upload')),
+                count((array) $request->file('files'))
+            );
+            $primaryReferenceIncluded = $referenceImage && collect($referenceImages)->contains(static fn ($image) => (
+                is_array($image)
+                && ((!empty($referenceImage['id']) && ($image['id'] ?? null) === $referenceImage['id'])
+                    || (!empty($referenceImage['url']) && ($image['url'] ?? null) === $referenceImage['url']))
+            ));
+            $referenceCount = $galleryReferenceCount + $uploadReferenceCount;
+            if ($referenceImage && !$primaryReferenceIncluded && (
+                ($referenceImage['type'] ?? null) === 'example' || $uploadReferenceCount === 0
+            )) {
+                $referenceCount++;
+            }
+            if ($referenceCount > 5) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'You can select up to 5 reference images in one request.',
+                ], 422);
+            }
             $uploadedImages = [];
             if ($request->hasFile('files')) {
                 $destination = public_path('uploads/customized-cakes');
@@ -296,7 +325,7 @@ class CustomizedCakeController extends Controller
                     if ($file->isValid()) {
                         $name = 'reference_' . uniqid() . '.' . $file->extension();
                         $file->move($destination, $name);
-                        $imageReference = $referenceImages[$index] ?? $referenceImage;
+                        $imageReference = $uploadedReferenceImages[$index] ?? $referenceImage;
                         $imageReference = is_array($imageReference) ? $imageReference : [];
                         $uploadedImages[] = [
                             'type' => $imageReference['type'] ?? 'upload',
@@ -306,6 +335,11 @@ class CustomizedCakeController extends Controller
                             'path' => 'uploads/customized-cakes/' . $name,
                         ];
                     }
+                }
+            }
+            foreach ($referenceImages as $imageReference) {
+                if (is_array($imageReference) && ($imageReference['type'] ?? null) === 'example' && !empty($imageReference['url'])) {
+                    $uploadedImages[] = $imageReference;
                 }
             }
             if ($uploadedImages === [] && $referenceImage) {

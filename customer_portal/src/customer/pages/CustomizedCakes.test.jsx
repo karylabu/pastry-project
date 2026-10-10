@@ -61,5 +61,28 @@ describe('buildCustomizedCakeSubmissionPayload', () => {
     );
 
     expect(payload.reference_images).toEqual(referenceImages);
+    expect(payload.uploaded_reference_images).toEqual([]);
+  });
+
+  it('keeps gallery examples separate from aligned upload metadata', () => {
+    const referenceImages = [
+      { type: 'example', id: 'birthday-3', url: '/uploads/birthday(3).jpg', name: 'Birthday Cake 3' },
+      { type: 'upload', id: 'cake-one.jpg-100-1', name: 'cake-one.jpg' },
+    ];
+    const uploadedReferenceImages = [referenceImages[1]];
+
+    const payload = buildCustomizedCakeSubmissionPayload(
+      {
+        cakeType: 'single',
+        tiers: [{ flavor_id: 7, size_id: 2 }],
+        referenceImages,
+        uploadedReferenceImages,
+      },
+      [{ id: 7, name: 'Chocolate' }],
+      [{ id: 2, code: '6x3', label: '6x3' }]
+    );
+
+    expect(payload.reference_images).toEqual(referenceImages);
+    expect(payload.uploaded_reference_images).toEqual(uploadedReferenceImages);
   });
 });

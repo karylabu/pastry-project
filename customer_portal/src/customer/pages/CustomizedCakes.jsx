@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 
 const CUSTOM_CAKE_DRAFT_KEY = 'customCakeRequestDraft';
+const MAX_REFERENCE_IMAGES = 5;
 const FULFILLMENT_TIME_SLOTS = Array.from({ length: 29 }, (_, index) => {
   const totalMinutes = 8 * 60 + index * 30;
   const hour = Math.floor(totalMinutes / 60);
@@ -117,8 +118,17 @@ export default function CustomizedCakes() {
   const [cupcakeQuantity, setCupcakeQuantity] = useState(() => formDraft?.cupcakeQuantity || 12);
   const [budget, setBudget] = useState(() => formDraft?.budget || '');
   const [quantity, setQuantity] = useState(() => formDraft?.quantity || 1);
-  const [files, setFiles] = useState([]);
-  const [referenceImage, setReferenceImage] = useState(null);
+  const [files, setFiles] = useState(() => location.state?.referenceFiles || []);
+  const [galleryReferences, setGalleryReferences] = useState(() => location.state?.selectedReferenceImages || []);
+  const [referenceImage, setReferenceImage] = useState(() => (
+    location.state?.selectedReferenceImages?.[0]
+    || (location.state?.referenceFiles?.[0] ? {
+      type: 'upload',
+      id: `${location.state.referenceFiles[0].name}-${location.state.referenceFiles[0].size}-${location.state.referenceFiles[0].lastModified}`,
+      name: location.state.referenceFiles[0].name,
+      file: location.state.referenceFiles[0],
+    } : null)
+  ));
   const [featuredPreview, setFeaturedPreview] = useState(null);
   const [filePreviewUrls, setFilePreviewUrls] = useState([]);
   const [isReferencePreviewOpen, setIsReferencePreviewOpen] = useState(false);
@@ -332,14 +342,24 @@ export default function CustomizedCakes() {
     const nextFiles = Array.from(event.target.files || []);
     event.target.value = '';
     if (nextFiles.length === 0) return;
-    window.sessionStorage.removeItem('customCakeReferenceImage');
-    window.sessionStorage.removeItem(referenceStorageKey);
-    const existingFiles = referenceImage?.type === 'upload' ? files : [];
-    const mergedFiles = [...existingFiles, ...nextFiles].filter((file, index, allFiles) => (
-      allFiles.findIndex((candidate) => candidate.name === file.name && candidate.size === file.size) === index
-    ));
-    const file = mergedFiles[0];
+    const seenFiles = new Set(files.map((file) => `${file.name}-${file.size}`));
+    const uniqueFiles = nextFiles.filter((file) => {
+      const key = `${file.name}-${file.size}`;
+      if (seenFiles.has(key)) return false;
+      seenFiles.add(key);
+      return true;
+    });
+    const availableSlots = Math.max(0, MAX_REFERENCE_IMAGES - galleryReferences.length - files.length);
+    const acceptedFiles = uniqueFiles.slice(0, availableSlots);
+    if (acceptedFiles.length < uniqueFiles.length) {
+      setMessage(`You can select up to ${MAX_REFERENCE_IMAGES} reference images in one request.`);
+    } else {
+      setMessage('');
+    }
+    if (acceptedFiles.length === 0) return;
+    const mergedFiles = [...files, ...acceptedFiles];
     setFiles(mergedFiles);
+    const file = acceptedFiles[acceptedFiles.length - 1];
     setReferenceImage({
       type: 'upload',
       id: `${file.name}-${file.size}-${file.lastModified}`,
@@ -348,85 +368,128 @@ export default function CustomizedCakes() {
       file,
     });
   };
+  const addGalleryReferenceImage = (reference) => {
+    const alreadySelected = galleryReferences.some((item) => item.id === reference.id || item.url === reference.url);
+    if (!alreadySelected && files.length + galleryReferences.length >= MAX_REFERENCE_IMAGES) {
+      setMessage(`You can select up to ${MAX_REFERENCE_IMAGES} reference images in one request.`);
+      return;
+    }
+
+    const nextReferences = alreadySelected ? galleryReferences : [...galleryReferences, reference];
+    setGalleryReferences(nextReferences);
+    setReferenceImage(reference);
+    setMessage('');
+    try {
+      window.sessionStorage.setItem(referenceStorageKey, JSON.stringify(nextReferences));
+      window.sessionStorage.removeItem('customCakeReferenceImage');
+    } catch (error) {
+      console.warn('Could not save gallery references:', error);
+    }
+  };
   const handleAddonChange = (addon) => setAddons((current) => current.includes(addon)
     ? current.filter((item) => item !== addon)
     : [...current, addon]);
 
   const handleRemoveReference = (referenceId) => {
-    if (referenceImage?.type === 'example' && referenceImage.id === referenceId) {
-      setReferenceImage(null);
-      window.sessionStorage.removeItem('customCakeReferenceImage');
-      return;
-    }
-
     const remainingFiles = files.filter((file) => `${file.name}-${file.size}-${file.lastModified}` !== referenceId);
+    const remainingGalleryReferences = galleryReferences.filter((reference) => reference.id !== referenceId);
     setFiles(remainingFiles);
-    if (remainingFiles.length === 0) {
-      setReferenceImage(null);
-      return;
+    setGalleryReferences(remainingGalleryReferences);
+    if (referenceImage?.id === referenceId) {
+      const nextReference = remainingGalleryReferences[0];
+      if (nextReference) {
+        setReferenceImage(nextReference);
+      } else if (remainingFiles.length > 0) {
+        const nextFile = remainingFiles[0];
+        setReferenceImage({
+          type: 'upload',
+          id: `${nextFile.name}-${nextFile.size}-${nextFile.lastModified}`,
+          url: URL.createObjectURL(nextFile),
+          name: nextFile.name,
+          file: nextFile,
+        });
+      } else {
+        setReferenceImage(null);
+      }
     }
-
-    const nextFile = remainingFiles[0];
-    setReferenceImage({
-      type: 'upload',
-      id: `${nextFile.name}-${nextFile.size}-${nextFile.lastModified}`,
-      url: URL.createObjectURL(nextFile),
-      name: nextFile.name,
-      file: nextFile,
-    });
+    if (remainingGalleryReferences.length === 0) {
+      window.sessionStorage.removeItem(referenceStorageKey);
+      window.sessionStorage.removeItem('customCakeReferenceImage');
+    } else {
+      window.sessionStorage.setItem(referenceStorageKey, JSON.stringify(remainingGalleryReferences));
+    }
+    if (remainingFiles.length === 0 && remainingGalleryReferences.length === 0) {
+      setReferenceImage(null);
+    }
   };
 
-  const addGalleryReferenceImage = async (selectedReference) => {
-    if (selectedReference?.type === 'example') {
-      setFiles([]);
-      setReferenceImage({ ...selectedReference });
-      return;
-    }
-
+  const openReferenceGallery = () => {
     try {
-      const response = await fetch(selectedReference.url);
-      if (!response.ok) return;
-
-      const blob = await response.blob();
-      const fileName = `${(selectedReference.name || 'reference-image').replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '').toLowerCase() || 'reference-image'}.jpg`;
-      const file = new File([blob], fileName, { type: blob.type || 'image/jpeg' });
-      setFiles([file]);
-      setReferenceImage({ ...selectedReference, file });
+      if (galleryReferences.length > 0) {
+        window.sessionStorage.setItem(referenceStorageKey, JSON.stringify(galleryReferences));
+      } else {
+        window.sessionStorage.removeItem(referenceStorageKey);
+      }
+      window.sessionStorage.removeItem('customCakeReferenceImage');
     } catch (error) {
-      console.warn('Could not import gallery reference image:', error);
+      console.warn('Could not preserve reference images before opening the gallery:', error);
     }
+    navigate('/customer/birthday-designs', {
+      state: {
+        referenceFiles: files,
+        selectedReferenceImages: galleryReferences,
+      },
+    });
   };
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
-    const stored = window.sessionStorage.getItem('customCakeReferenceImage') || window.sessionStorage.getItem(referenceStorageKey);
-    if (!stored) return;
+    const rawValues = [
+      window.sessionStorage.getItem(referenceStorageKey),
+      window.sessionStorage.getItem('customCakeReferenceImage'),
+    ].filter(Boolean);
+
+    if (rawValues.length === 0) return;
 
     try {
-      const parsed = JSON.parse(stored);
-      const items = Array.isArray(parsed) ? parsed : [parsed];
-      const selectedReference = items[0];
-      if (!selectedReference?.url && !selectedReference?.src) return;
+      const references = rawValues.flatMap((stored) => {
+        const parsed = JSON.parse(stored);
+        const items = Array.isArray(parsed) ? parsed : [parsed];
+        return items.filter((item) => item?.url || item?.src)
+          .map((item) => ({
+            type: 'example',
+            id: item.id || item.url || item.src,
+            url: item.url || item.src,
+            name: item.name || item.label || 'Reference image',
+          }));
+      }).filter((reference, index, all) => (
+        reference.id && all.findIndex((item) => item.id === reference.id && item.url === reference.url) === index
+      ));
 
-      const hydrate = async () => {
-        await addGalleryReferenceImage({
-          type: 'example',
-          id: selectedReference.id || selectedReference.src,
-          url: selectedReference.url || selectedReference.src,
-          name: selectedReference.name || selectedReference.label || 'Reference image',
-        });
-      };
-
-      hydrate();
+      if (references.length === 0) return;
+      setGalleryReferences((current) => {
+        const merged = [...current, ...references].filter((reference, index, all) => (
+          reference.id && all.findIndex((item) => item.id === reference.id && item.url === reference.url) === index
+        ));
+        return merged;
+      });
+      setReferenceImage((current) => current || references[0]);
+      window.sessionStorage.removeItem('customCakeReferenceImage');
+      window.sessionStorage.removeItem(referenceStorageKey);
     } catch (error) {
       console.warn('Could not load gallery reference images:', error);
       window.sessionStorage.removeItem(referenceStorageKey);
+      window.sessionStorage.removeItem('customCakeReferenceImage');
     }
   }, [referenceStorageKey]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (files.length + galleryReferences.length > MAX_REFERENCE_IMAGES) {
+      setMessage(`You can select up to ${MAX_REFERENCE_IMAGES} reference images in one request.`);
+      return;
+    }
     if (pickupDate && pickupDate < getLocalDateString()) {
       setMessage('Please choose today or a future date.');
       return;
@@ -449,7 +512,15 @@ export default function CustomizedCakes() {
           tiers: selectedTiers,
           userId,
           referenceImage,
-          referenceImages: files.map((file) => ({
+          referenceImages: [
+            ...galleryReferences,
+            ...files.map((file) => ({
+              type: 'upload',
+              id: `${file.name}-${file.size}-${file.lastModified}`,
+              name: file.name,
+            })),
+          ],
+          uploadedReferenceImages: files.map((file) => ({
             type: 'upload',
             id: `${file.name}-${file.size}-${file.lastModified}`,
             name: file.name,
@@ -497,6 +568,7 @@ export default function CustomizedCakes() {
           url: referenceImage.url,
           name: referenceImage.name,
         } : null,
+        reference_images: payload.reference_images,
       };
       const orderNotes = JSON.stringify(customizationDetails);
       const laravelForm = new FormData();
@@ -513,6 +585,7 @@ export default function CustomizedCakes() {
         name: referenceImage.name,
       } : null));
       laravelForm.append('reference_images', JSON.stringify(payload.reference_images));
+      laravelForm.append('uploaded_reference_images', JSON.stringify(payload.uploaded_reference_images));
       files.forEach((file, index) => laravelForm.append('files[]', file, file.name || `file${index}`));
 
       const laravelRes = await fetch(`${LARAVEL_BASE}/api/customized-cakes/order`, {
@@ -993,24 +1066,25 @@ export default function CustomizedCakes() {
               <input id="custom-cake-reference-files" type="file" multiple accept="image/*" onChange={handleFiles} className="sr-only" />
               <div className="flex flex-wrap items-center gap-2">
                 <label htmlFor="custom-cake-reference-files" className="inline-flex cursor-pointer rounded-lg border border-[#e5bd45] bg-[#ffe89a] px-4 py-2 text-[12px] font-bold text-[#6b4f1d] transition hover:bg-[#ffedb5]">
-                  {files.length > 0 ? `Add Images (${files.length} selected)` : 'Choose Images'}
+                  {files.length > 0 ? `Add Images (${files.length + galleryReferences.length} selected)` : 'Choose Images'}
                 </label>
+                <button type="button" onClick={openReferenceGallery} className="rounded-lg border border-[#eadfd8] bg-white px-4 py-2 text-[12px] font-bold text-[#8d6a2e] hover:bg-[#fffaf0]">Browse Examples</button>
                 {!referenceImage && <div className="grid min-h-28 flex-1 place-items-center rounded-lg border border-dashed border-[#eadfd8] bg-white px-3 py-4 text-center text-xs text-[#9b8060]">No reference selected</div>}
               </div>
 
               {referenceImage && (
                 <div className="mt-3 space-y-2">
                   <div className="inline-flex rounded-full border border-[#e5bd45] bg-[#fff8df] px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-[#8d6a2e]">
-                    {referenceImage.type === 'example' ? 'Example reference' : `${files.length} uploaded reference${files.length === 1 ? '' : 's'}`}: {referenceImage.name}
+                    {files.length + galleryReferences.length} reference{files.length + galleryReferences.length === 1 ? '' : 's'} selected: {referenceImage.name}
                   </div>
                   <div className="grid grid-cols-3 gap-2">
-                    {(filePreviewUrls.length > 0 ? filePreviewUrls : [{ id: referenceImage.id, name: referenceImage.name, url: referenceImage.url }]).map((preview) => (
+                    {[...filePreviewUrls, ...galleryReferences].map((preview) => (
                       <div key={preview.id} className="group relative overflow-hidden rounded-lg border border-[#eadfd8] bg-white">
                         <button
                           type="button"
                           onClick={() => {
                             const file = files.find((item) => `${item.name}-${item.size}-${item.lastModified}` === preview.id);
-                            setReferenceImage({ type: file ? 'upload' : 'example', id: preview.id, url: preview.url, name: preview.name, file });
+                            setReferenceImage({ ...(file ? { type: 'upload', file } : preview), id: preview.id, url: preview.url, name: preview.name });
                             setIsReferencePreviewOpen(true);
                           }}
                           className="block w-full"
@@ -1023,8 +1097,7 @@ export default function CustomizedCakes() {
                     ))}
                   </div>
                   <div className="flex flex-wrap gap-3">
-                    <button type="button" onClick={() => { setFiles([]); setReferenceImage(null); window.sessionStorage.removeItem('customCakeReferenceImage'); }} className="text-xs font-bold text-[#8d6a2e] underline">Change Reference</button>
-                    <button type="button" onClick={() => navigate('/customer/birthday-designs')} className="text-xs font-bold text-[#8d6a2e] underline">Browse Examples</button>
+                    <button type="button" onClick={() => { setFiles([]); setGalleryReferences([]); setReferenceImage(null); window.sessionStorage.removeItem('customCakeReferenceImage'); window.sessionStorage.removeItem(referenceStorageKey); }} className="text-xs font-bold text-[#8d6a2e] underline">Clear References</button>
                   </div>
                 </div>
               )}
@@ -1145,7 +1218,7 @@ export default function CustomizedCakes() {
                 </div>
               )}
               <div className="mt-4 flex justify-end gap-2 border-t border-[#f3ece6] pt-3">
-                <button type="button" onClick={() => { setCakeType('single'); setSingleSizeId(sizeCatalog[0] ? String(sizeCatalog[0].id) : ''); setTwoTierPreset('standard'); setFlavorId(flavorCatalog[0] ? String(flavorCatalog[0].id) : ''); setCakeStyle(''); setPackaging('Standard'); setAddons([]); setCupcakeQuantity(12); setBudget(''); setFiles([]); setReferenceImage(null); setMessage(''); }} className="rounded-xl border border-[#f0d98a] bg-white px-4 py-2 text-sm font-semibold text-[#6b4f1d] hover:border-[#e5bd45]">
+                <button type="button" onClick={() => { setCakeType('single'); setSingleSizeId(sizeCatalog[0] ? String(sizeCatalog[0].id) : ''); setTwoTierPreset('standard'); setFlavorId(flavorCatalog[0] ? String(flavorCatalog[0].id) : ''); setCakeStyle(''); setPackaging('Standard'); setAddons([]); setCupcakeQuantity(12); setBudget(''); setFiles([]); setGalleryReferences([]); setReferenceImage(null); window.sessionStorage.removeItem(referenceStorageKey); window.sessionStorage.removeItem('customCakeReferenceImage'); setMessage(''); }} className="rounded-xl border border-[#f0d98a] bg-white px-4 py-2 text-sm font-semibold text-[#6b4f1d] hover:border-[#e5bd45]">
                   Reset
                 </button>
                 {userId > 0 ? (
