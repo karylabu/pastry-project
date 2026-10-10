@@ -29,7 +29,7 @@ export default function CreditsModal({ isOpen, onClose }) {
 
   return (
     <div
-      className="fixed inset-0 z-[120] flex items-center justify-center bg-black/55 p-4 backdrop-blur-sm"
+      className="fixed inset-0 z-[120] flex items-center justify-center bg-black/55 backdrop-blur-sm"
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) onClose();
       }}
@@ -38,7 +38,7 @@ export default function CreditsModal({ isOpen, onClose }) {
         role="dialog"
         aria-modal="true"
         aria-labelledby="credits-modal-title"
-        className="relative max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-3xl border border-[#ead8c5] bg-[#fffaf3] p-5 text-[#1a1a1a] shadow-2xl sm:p-8"
+        className="relative flex h-[100dvh] w-full flex-col justify-center overflow-hidden bg-[#fffaf3] p-4 text-[#1a1a1a] sm:p-6 lg:p-8"
       >
         <button
           type="button"
@@ -53,33 +53,33 @@ export default function CreditsModal({ isOpen, onClose }) {
           <img
             src={`${ROOT_BASE}/uploads/logo.png?v=logo-v2`}
             alt="Pastry Project logo"
-            className="h-16 w-16 object-contain sm:h-20 sm:w-20"
+            className="h-12 w-12 object-contain sm:h-16 sm:w-16"
           />
-          <p className="mt-3 text-[10px] font-black uppercase tracking-[0.3em] text-[#b18a23]">Made with care</p>
-          <h2 id="credits-modal-title" className="mt-1 text-2xl font-black tracking-tight text-[#4a2b20] sm:text-3xl">
+          <p className="mt-2 text-[10px] font-black uppercase tracking-[0.3em] text-[#b18a23]">Made with care</p>
+          <h2 id="credits-modal-title" className="mt-1 text-xl font-black tracking-tight text-[#4a2b20] sm:text-3xl">
             Pastry Project Credits
           </h2>
-          <p className="mt-3 max-w-xl text-sm leading-6 text-gray-600">
+          <p className="mt-2 max-w-xl text-xs leading-5 text-gray-600 sm:text-sm sm:leading-6">
             Pastry Project is an online bakery platform for browsing products, placing orders, requesting custom cakes,
             and managing customer accounts.
           </p>
         </header>
 
-        <section className="mt-7">
-          <div className="mb-3 text-center sm:text-left">
+        <section className="mt-4 sm:mt-6">
+          <div className="mb-2 text-center sm:text-left">
             <p className="text-[10px] font-black uppercase tracking-[0.24em] text-[#b18a23]">The people behind the project</p>
             <h3 className="mt-1 text-lg font-bold text-[#4a2b20] sm:text-xl">Core Development Team</h3>
           </div>
-          <div className="grid gap-3 sm:grid-cols-3">
+          <div className="grid gap-2 sm:grid-cols-3 sm:gap-3">
             {teamMembers.map((member, index) => (
-              <article key={member.name} className="rounded-2xl border border-[#ead8c5] bg-white/70 p-4">
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#fff1d8] text-sm font-black text-[#8b6a24]">
+              <article key={member.name} className="rounded-2xl border border-[#ead8c5] bg-white/70 p-3 sm:p-4">
+                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#fff1d8] text-xs font-black text-[#8b6a24] sm:h-10 sm:w-10 sm:text-sm">
                   {member.name.split(' ').map((part) => part[0]).slice(0, 2).join('')}
                 </div>
-                <h4 className="mt-3 text-sm font-bold text-[#2f241f]">{member.name}</h4>
-                <p className="mt-1 text-[10px] font-semibold uppercase tracking-[0.1em] text-[#a06a2c]">{member.role}</p>
+                <h4 className="mt-2 text-xs font-bold text-[#2f241f] sm:text-sm">{member.name}</h4>
+                <p className="mt-1 text-[9px] font-semibold uppercase tracking-[0.1em] text-[#a06a2c] sm:text-[10px]">{member.role}</p>
                 {index === 0 && (
-                  <p className="mt-2 text-xs leading-5 text-gray-600">
+                  <p className="mt-1 text-[11px] leading-4 text-gray-600 sm:text-xs sm:leading-5">
                     Leads project direction and coordinates the team&apos;s development work.
                   </p>
                 )}
@@ -88,7 +88,7 @@ export default function CreditsModal({ isOpen, onClose }) {
           </div>
         </section>
 
-        <footer className="mt-6 border-t border-[#ead8c5] pt-5 text-center">
+        <footer className="mt-4 border-t border-[#ead8c5] pt-3 text-center sm:mt-5 sm:pt-4">
           <h3 className="text-sm font-bold text-[#4a2b20]">About this project</h3>
           <p className="mx-auto mt-2 max-w-2xl text-xs leading-5 text-gray-600">
             The team works together to design, develop, and maintain the Pastry Project customer experience and its
