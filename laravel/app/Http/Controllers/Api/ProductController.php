@@ -9,6 +9,26 @@ use Illuminate\Http\Request;
 
 class ProductController extends Controller
 {
+    public function staffIndex(Request $request): JsonResponse
+    {
+        $admin = $this->requireRole($request, 'admin');
+        if (!$admin instanceof \App\Models\User) {
+            return $admin;
+        }
+
+        $products = Product::with(['sizes' => function ($query) {
+            $query->whereRaw('LOWER(size) <> ?', ['slice']);
+        }])
+            ->where('available', true)
+            ->whereRaw('LOWER(category) IN (?, ?)', ['cake', 'cakes'])
+            ->orderBy('name')
+            ->get()
+            ->map(fn (Product $product) => $product->toArray())
+            ->values();
+
+        return response()->json($products);
+    }
+
     public function index(Request $request): JsonResponse
     {
         $filterCategory = strtolower(trim((string) $request->query('category', 'cakes')));
