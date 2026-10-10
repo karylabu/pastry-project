@@ -217,6 +217,8 @@ class StaffApiController extends Controller
                 ->flip()
                 ->map(fn (int $index): int => $index + 1);
             $itemsByOrder = collect();
+            $legacyCustomByOrder = collect();
+            $customizedByOrder = collect();
 
             if ($orders->isNotEmpty() && Schema::hasTable('order_items')) {
                 $itemsByOrder = DB::table('order_items as oi')
@@ -228,7 +230,23 @@ class StaffApiController extends Controller
                     ->groupBy('order_id');
             }
 
-            $orders = $orders->map(function ($order) use ($orderNumbers, $itemsByOrder) {
+            if ($orders->isNotEmpty()) {
+                $orderIds = $orders->pluck('id');
+                if (Schema::hasTable('custom_cake_orders')) {
+                    $legacyCustomByOrder = DB::table('custom_cake_orders')
+                        ->whereIn('order_id', $orderIds)
+                        ->get()
+                        ->keyBy('order_id');
+                }
+                if (Schema::hasTable('customized_cake_orders')) {
+                    $customizedByOrder = DB::table('customized_cake_orders')
+                        ->whereIn('order_id', $orderIds)
+                        ->get()
+                        ->keyBy('order_id');
+                }
+            }
+
+            $orders = $orders->map(function ($order) use ($orderNumbers, $itemsByOrder, $legacyCustomByOrder, $customizedByOrder) {
                 $rawItems = json_decode((string) ($order->items ?? '[]'), true);
                 $items = $itemsByOrder->get($order->id, collect())
                     ->map(fn ($item) => [
@@ -248,6 +266,41 @@ class StaffApiController extends Controller
                     ])->values();
                 }
 
+                $legacyCustom = $legacyCustomByOrder->get($order->id);
+                $customized = $customizedByOrder->get($order->id);
+                $customDetails = json_decode((string) ($legacyCustom->notes ?? ''), true);
+                if (!is_array($customDetails)) {
+                    $customDetails = [];
+                }
+                $modernDetails = json_decode((string) ($customized->notes ?? ''), true);
+                if (is_array($modernDetails)) {
+                    $customDetails = array_merge($customDetails, $modernDetails);
+                }
+                foreach ([
+                    'cake_size' => $legacyCustom->cake_size ?? null,
+                    'quantity' => $legacyCustom->quantity ?? null,
+                    'cake_flavor' => $legacyCustom->flavor ?? null,
+                    'filling_flavor' => $legacyCustom->filling ?? null,
+                    'frosting_type' => $legacyCustom->frosting ?? null,
+                    'occasion' => $legacyCustom->occasion ?? null,
+                    'theme' => $legacyCustom->theme_design ?? null,
+                    'cake_color' => $legacyCustom->preferred_colors ?? null,
+                    'tiers' => $legacyCustom->tiers ?? null,
+                    'custom_message' => $legacyCustom->dedication ?? null,
+                    'estimated_price' => $legacyCustom->estimated_price ?? null,
+                    'cake_type' => $customized->cake_type ?? null,
+                    'recipe_status' => $customized->status ?? null,
+                ] as $key => $value) {
+                    if ($value !== null && $value !== '' && !array_key_exists($key, $customDetails)) {
+                        $customDetails[$key] = $value;
+                    }
+                }
+                $legacyImages = json_decode((string) ($legacyCustom->inspo_images ?? ''), true);
+                $customizedImages = json_decode((string) ($customized->inspo_images ?? ''), true);
+                $customImages = is_array($legacyImages) && $legacyImages
+                    ? $legacyImages
+                    : (is_array($customizedImages) ? $customizedImages : []);
+
                 $order->order_number = $orderNumbers[$order->id] ?? (int) $order->id;
                 $order->customer = $order->customer ?: $order->email ?: 'Guest';
                 $order->has_discount_id = !empty($order->discount_id_path);
@@ -255,6 +308,12 @@ class StaffApiController extends Controller
                     && strtolower((string) ($order->payment_status ?? '')) === 'proof_submitted';
                 unset($order->discount_id_path, $order->payment_proof_path);
                 $order->items = $items;
+                $order->custom_details = $customDetails;
+                $order->custom_inspo_images = $customImages;
+                $order->customized_inspo_images = is_array($customizedImages) ? $customizedImages : [];
+                $order->details = $customDetails['details'] ?? $customized->notes ?? $legacyCustom->notes ?? null;
+                $order->name = $customDetails['customer_name'] ?? $order->customer;
+                $order->customer_name = $customDetails['customer_name'] ?? $order->customer;
 
                 return $order;
             })->values();

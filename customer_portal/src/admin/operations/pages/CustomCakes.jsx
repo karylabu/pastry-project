@@ -224,13 +224,21 @@ export default function CustomCakes() {
   const fetchOrders = (silent = false) => {
     if (!silent) setLoading(true);
 
-    staffFetch(`${STAFF_BASE}/api_orders.php?custom=1`)
-      .then(res => res.json())
+    laravelStaffFetch(`${LARAVEL_BASE}/api/staff/orders?custom=1`)
+      .then(async (res) => {
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data?.success || !Array.isArray(data.orders)) {
+          throw new Error(data?.message || "Unable to load custom cake requests.");
+        }
+        return data.orders;
+      })
       .then(data => {
         setOrders(normalizeOrders(data));
         setLastRefreshed(new Date());
       })
-      .catch(() => setOrders([]))
+      .catch((error) => {
+        addToast(error.message || "Unable to load custom cake requests.", "error");
+      })
       .finally(() => { if (!silent) setLoading(false); });
   };
 
