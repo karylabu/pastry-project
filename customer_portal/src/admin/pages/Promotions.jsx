@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { CalendarDays, CheckCircle2, ImagePlus, Loader2, Megaphone, Pencil, Tag, XCircle } from "lucide-react";
+import { CalendarDays, CheckCircle2, ImagePlus, Loader2, Megaphone, Pencil, Send, Tag, XCircle } from "lucide-react";
 import { LARAVEL_BASE } from "../../services/config";
 import { getAuthHeaders } from "../../services/api";
 
@@ -81,6 +81,7 @@ export default function Promotions() {
   const [imagePreview, setImagePreview] = useState("");
   const [promotions, setPromotions] = useState([]);
   const [editingPromotion, setEditingPromotion] = useState(null);
+  const [sendingDraftId, setSendingDraftId] = useState(null);
 
   const metrics = useMemo(() => {
     const sent = promotions.filter((item) => item.status === "sent").length;
@@ -167,6 +168,34 @@ export default function Promotions() {
     setImagePreview("");
     setError("");
     setNotice("");
+  };
+
+  const handleSendDraft = async (promotion) => {
+    if (!window.confirm(`Send "${promotion.title}" to all subscribed customers now?`)) return;
+
+    try {
+      setSendingDraftId(promotion.id);
+      setError("");
+      setNotice("");
+
+      const response = await fetch(`${LARAVEL_BASE}/api/admin/promotions/${promotion.id}/send`, {
+        method: "POST",
+        credentials: "include",
+        headers: { Accept: "application/json", ...getAuthHeaders() },
+      });
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.message || "Unable to send the draft promotion.");
+      }
+
+      setNotice(`Draft promotion sent to ${data.data?.sent_count ?? 0} subscribed customers.`);
+      await fetchPromotions();
+    } catch (sendError) {
+      setError(sendError.message || "Unable to send the draft promotion.");
+    } finally {
+      setSendingDraftId(null);
+    }
   };
 
   const handleSubmit = async () => {
@@ -413,15 +442,30 @@ export default function Promotions() {
                               {promotion.status || "draft"}
                             </span>
                             {promotion.status === "draft" && (
-                              <button
-                                type="button"
-                                onClick={() => handleEditDraft(promotion)}
-                                title="Edit draft"
-                                aria-label={`Edit draft ${promotion.title}`}
-                                className="rounded-md border border-[#e8dfd4] p-2 text-black/60 hover:border-[#c9a94f] hover:bg-[#fffaf0] hover:text-black"
-                              >
-                                <Pencil size={14} />
-                              </button>
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={() => handleEditDraft(promotion)}
+                                  title="Edit draft"
+                                  aria-label={`Edit draft ${promotion.title}`}
+                                  className="rounded-md border border-[#e8dfd4] p-2 text-black/60 hover:border-[#c9a94f] hover:bg-[#fffaf0] hover:text-black"
+                                >
+                                  <Pencil size={14} />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleSendDraft(promotion)}
+                                  disabled={sendingDraftId !== null}
+                                  title="Send draft to subscribed customers"
+                                  aria-label={`Send draft ${promotion.title}`}
+                                  className="inline-flex items-center gap-1.5 rounded-md border border-[#d4af37] bg-[#fffaf0] px-2.5 py-2 text-[10px] font-semibold text-[#5c4715] hover:bg-[#fff1c4] disabled:cursor-not-allowed disabled:opacity-50"
+                                >
+                                  {sendingDraftId === promotion.id
+                                    ? <Loader2 size={13} className="animate-spin" />
+                                    : <Send size={13} />}
+                                  Send
+                                </button>
+                              </>
                             )}
                           </div>
                         </div>

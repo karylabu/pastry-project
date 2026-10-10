@@ -2,7 +2,9 @@
 
 namespace Tests\Feature;
 
+use App\Mail\PromotionEmail;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
 
@@ -18,6 +20,7 @@ class PromotionDraftEditingTest extends TestCase
             $table->string('email');
             $table->string('password');
             $table->string('role');
+            $table->boolean('subscribed_promo')->default(false);
         });
         Schema::create('user_sessions', function ($table) {
             $table->id();
@@ -38,6 +41,14 @@ class PromotionDraftEditingTest extends TestCase
             $table->unsignedInteger('failed_count')->default(0);
             $table->timestamps();
         });
+        Schema::create('promotion_email_logs', function ($table) {
+            $table->id();
+            $table->unsignedBigInteger('promotion_id');
+            $table->string('email');
+            $table->string('status', 30);
+            $table->text('error_message')->nullable();
+            $table->timestamp('attempted_at')->useCurrent();
+        });
 
         DB::table('users')->insert([
             'id' => 1,
@@ -56,6 +67,7 @@ class PromotionDraftEditingTest extends TestCase
     protected function tearDown(): void
     {
         Schema::dropIfExists('promotions');
+        Schema::dropIfExists('promotion_email_logs');
         Schema::dropIfExists('user_sessions');
         Schema::dropIfExists('users');
 
@@ -104,6 +116,59 @@ class PromotionDraftEditingTest extends TestCase
         $this->assertDatabaseHas('promotions', [
             'id' => $promotionId,
             'title' => 'Original campaign',
+            'status' => 'sent',
+        ]);
+    }
+
+    public function test_admin_can_send_a_saved_draft_to_subscribed_customers(): void
+    {
+        Mail::fake();
+        $promotionId = $this->createPromotion('draft');
+        DB::table('users')->insert([
+            'id' => 2,
+            'name' => 'Subscribed Customer',
+            'email' => 'customer@example.com',
+            'password' => 'unused',
+            'role' => 'customer',
+            'subscribed_promo' => true,
+        ]);
+
+        $this->withHeader('X-Auth-Token', 'admin-token')
+            ->postJson("/api/admin/promotions/{$promotionId}/send")
+            ->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.recipient_count', 1)
+            ->assertJsonPath('data.sent_count', 1)
+            ->assertJsonPath('data.failed_count', 0)
+            ->assertJsonPath('data.promotion.status', 'sent');
+
+        Mail::assertSent(PromotionEmail::class, 1);
+        $this->assertDatabaseHas('promotion_email_logs', [
+            'promotion_id' => $promotionId,
+            'email' => 'customer@example.com',
+            'status' => 'sent',
+        ]);
+        $this->assertDatabaseHas('promotions', [
+            'id' => $promotionId,
+            'status' => 'sent',
+            'sent_count' => 1,
+            'failed_count' => 0,
+        ]);
+    }
+
+    public function test_admin_cannot_send_a_promotion_that_is_not_a_draft(): void
+    {
+        Mail::fake();
+        $promotionId = $this->createPromotion('sent');
+
+        $this->withHeader('X-Auth-Token', 'admin-token')
+            ->postJson("/api/admin/promotions/{$promotionId}/send")
+            ->assertStatus(409)
+            ->assertJsonPath('success', false);
+
+        Mail::assertNothingSent();
+        $this->assertDatabaseHas('promotions', [
+            'id' => $promotionId,
             'status' => 'sent',
         ]);
     }

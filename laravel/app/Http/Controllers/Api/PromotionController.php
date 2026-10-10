@@ -109,10 +109,47 @@ class PromotionController extends Controller
             'status' => 'draft',
         ]);
 
+        $delivery = $this->sendToSubscribers($promotion);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Promotion sent to subscribed customers.',
+            'data' => array_merge(['promotion' => $promotion], $delivery),
+        ]);
+    }
+
+    public function sendDraft(Request $request, Promotion $promotion): JsonResponse
+    {
+        $user = $this->resolveAdminUser($request);
+
+        if (! $user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized promotion request.',
+            ], 403);
+        }
+
+        if ($promotion->status !== 'draft') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Only draft promotions can be sent.',
+            ], 409);
+        }
+
+        $delivery = $this->sendToSubscribers($promotion);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Draft promotion sent to subscribed customers.',
+            'data' => array_merge(['promotion' => $promotion], $delivery),
+        ]);
+    }
+
+    private function sendToSubscribers(Promotion $promotion): array
+    {
         $subscribers = User::where('role', 'customer')
             ->where('subscribed_promo', true)
             ->get();
-
         $sentCount = 0;
         $failedCount = 0;
 
@@ -123,9 +160,9 @@ class PromotionController extends Controller
             try {
                 Mail::to($subscriber->email)->send(new PromotionEmail($promotion));
                 $sentCount++;
-            } catch (\Throwable $ex) {
+            } catch (\Throwable $exception) {
                 $status = 'failed';
-                $errorMessage = $ex->getMessage();
+                $errorMessage = $exception->getMessage();
                 $failedCount++;
             }
 
@@ -144,16 +181,11 @@ class PromotionController extends Controller
             : ($sentCount > 0 ? 'sent_with_failures' : 'failed');
         $promotion->save();
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Promotion sent to subscribed customers.',
-            'data' => [
-                'promotion' => $promotion,
-                'recipient_count' => $subscribers->count(),
-                'sent_count' => $sentCount,
-                'failed_count' => $failedCount,
-            ],
-        ]);
+        return [
+            'recipient_count' => $subscribers->count(),
+            'sent_count' => $sentCount,
+            'failed_count' => $failedCount,
+        ];
     }
 
     public function update(Request $request, Promotion $promotion): JsonResponse
