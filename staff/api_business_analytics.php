@@ -28,9 +28,15 @@ function analyticsIsCakeCategory(string $category): bool
 function analyticsRows(mysqli $conn, string $sql, string $types = '', array $values = []): array
 {
     $stmt = $conn->prepare($sql);
-    if (!$stmt) analyticsJson(false, ['message' => 'Analytics query preparation failed.'], 500);
+    if (!$stmt) {
+        error_log('Business analytics query preparation failed: ' . $conn->error);
+        analyticsJson(false, ['message' => 'Analytics query preparation failed.'], 500);
+    }
     if ($types !== '') $stmt->bind_param($types, ...$values);
-    if (!$stmt->execute()) analyticsJson(false, ['message' => 'Analytics query failed.'], 500);
+    if (!$stmt->execute()) {
+        error_log('Business analytics query failed: ' . $stmt->error);
+        analyticsJson(false, ['message' => 'Analytics query failed.'], 500);
+    }
     $result = $stmt->get_result();
     $rows = [];
     while ($row = $result->fetch_assoc()) $rows[] = $row;
@@ -74,8 +80,11 @@ function analyticsOrderItems(array $orders, array $products, int $filterProductI
     return $sales;
 }
 
-$conn = new mysqli('localhost', 'root', '', 'pastry_db');
-if ($conn->connect_error) analyticsJson(false, ['message' => 'Database connection failed.'], 500);
+require_once __DIR__ . '/../includes/db.php';
+if (!($conn instanceof mysqli)) {
+    error_log('Business analytics database connection failed: ' . ($db_error ?: 'Unknown database connection error.'));
+    analyticsJson(false, ['message' => 'Database connection failed.'], 500);
+}
 $legacySalesTable = $conn->query("SHOW TABLES LIKE 'sales'");
 $hasLegacySales = $legacySalesTable instanceof mysqli_result && $legacySalesTable->num_rows > 0;
 
