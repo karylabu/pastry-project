@@ -337,6 +337,21 @@ class StaffApiController extends Controller
             })->values();
 
             $pendingOrdersTotal = DB::table('orders')->whereRaw('LOWER(status) = ?', ['pending'])->count();
+            $orderStatusCounts = DB::table('orders')
+                ->selectRaw('LOWER(TRIM(status)) as normalized_status, COUNT(*) as total')
+                ->groupByRaw('LOWER(TRIM(status))')
+                ->get();
+            $orderStatusBreakdown = [];
+            foreach ($orderStatusCounts as $statusRow) {
+                $normalizedStatus = (string) $statusRow->normalized_status;
+                $label = match ($normalizedStatus) {
+                    'ready', 'ready for pickup' => 'Ready for Pickup',
+                    'cancelled', 'canceled', 'rejected' => 'Cancelled',
+                    '' => 'Unknown',
+                    default => ucwords($normalizedStatus),
+                };
+                $orderStatusBreakdown[$label] = ($orderStatusBreakdown[$label] ?? 0) + (int) $statusRow->total;
+            }
 
             $production = DB::table('production_transactions as pt')
                 ->join('products as p', 'p.id', '=', 'pt.product_id')
@@ -370,6 +385,9 @@ class StaffApiController extends Controller
                     'orders_today' => (clone $todayOrders)->count(),
                     'pending_orders' => (clone $todayOrders)->whereRaw('LOWER(status) = ?', ['pending'])->count(),
                     'preparing_orders' => (clone $todayOrders)->whereRaw('LOWER(status) = ?', ['preparing'])->count(),
+                    'pending_orders_total' => $pendingOrdersTotal,
+                    'preparing_orders_total' => DB::table('orders')->whereRaw('LOWER(status) = ?', ['preparing'])->count(),
+                    'completed_orders_total' => (clone $completedOrders)->count(),
                     'sales_today' => (float) (clone $completedOrders)->whereBetween('created_at', [$startOfDay, $endOfDay])->sum('total'),
                     'sales_yesterday' => (float) (clone $completedOrders)->whereBetween('created_at', [$startOfYesterday, $endOfYesterday])->sum('total'),
                     'sales_week' => (float) (clone $completedOrders)->whereBetween('created_at', [$startOfWeek, $endOfDay])->sum('total'),
@@ -406,6 +424,9 @@ class StaffApiController extends Controller
                     'total' => $totalInventoryItems,
                 ],
                 'live_orders' => $liveOrders,
+                'order_status_breakdown' => collect($orderStatusBreakdown)
+                    ->map(fn ($value, $name) => ['name' => $name, 'value' => $value])
+                    ->values(),
                 'production' => $production,
                 'production_summary' => [
                     'planned' => null,

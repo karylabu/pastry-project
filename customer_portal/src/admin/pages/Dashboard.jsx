@@ -1,9 +1,9 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { AlertTriangle, ArrowRight, BarChart3, ShoppingCart, TrendingUp, CakeSlice, Package, Sparkles, CalendarDays, Sun, Clock3, ChefHat, CircleCheck, ChevronRight, Star, MessageSquare } from "lucide-react";
 import { Area, Bar, CartesianGrid, Cell, ComposedChart, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Link } from "react-router-dom";
-import { CUSTOMER_BASE, LARAVEL_BASE, ROOT_BASE, STAFF_BASE } from "../../services/config";
+import { LARAVEL_BASE, ROOT_BASE } from "../../services/config";
 import { getAuthHeaders } from "../../services/api";
 import { subscribeRealtime } from "../../services/realtime";
 
@@ -213,53 +213,47 @@ function RevenueTrendBars({ data }) {
 }
 
 export default function Dashboard() {
-  const [orders, setOrders] = useState([]);
-  const [products, setProducts] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [dashboardData, setDashboardData] = useState(null);
+  const [dashboardLoading, setDashboardLoading] = useState(true);
+  const [dashboardError, setDashboardError] = useState("");
   const [analytics, setAnalytics] = useState(null);
   const [analyticsLoading, setAnalyticsLoading] = useState(true);
-  const [analyticsError, setAnalyticsError] = useState(false);
+  const [analyticsError, setAnalyticsError] = useState("");
   const [analyticsPreset, setAnalyticsPreset] = useState("last_7_days");
   const [trendMetric, setTrendMetric] = useState("revenue");
+  const [analyticsRefreshVersion, setAnalyticsRefreshVersion] = useState(0);
 
-  const normalizeOrders = (items = [], source) =>
-    (Array.isArray(items) ? items : []).map((order) => ({
-      ...order,
-      source,
-      items:
-        typeof order.items === "string" && order.items.length
-          ? JSON.parse(order.items)
-          : Array.isArray(order.items)
-          ? order.items
-          : [],
-    }));
-
-  const fetchOrders = () => {
-    return fetch(`${STAFF_BASE}/api_orders.php`, {
-      credentials: "include",
-      headers: { Accept: "application/json", ...getAuthHeaders() },
-    })
-      .then((res) => res.json())
-      .then((staffOrders) => {
-        const combined = normalizeOrders(staffOrders, "Staff").sort((a, b) => {
-          const dateA = a.created_at ? new Date(a.created_at).getTime() : Number(a.id);
-          const dateB = b.created_at ? new Date(b.created_at).getTime() : Number(b.id);
-          return dateB - dateA;
-        });
-        setOrders(combined);
-      })
-      .catch((err) => {
-        console.log(err);
-        setOrders([]);
+  const fetchDashboardData = useCallback(async () => {
+    setDashboardLoading(true);
+    setDashboardError("");
+    try {
+      const response = await fetch(`${LARAVEL_BASE}/api/staff/dashboard`, {
+        credentials: "include",
+        headers: { Accept: "application/json", ...getAuthHeaders() },
       });
-  };
+      const data = await response.json();
+      if (!response.ok || !data?.success) {
+        throw new Error(data?.message || `Dashboard API returned ${response.status}.`);
+      }
+      setDashboardData(data);
+    } catch (error) {
+      console.error("Admin dashboard data load failed:", error);
+      setDashboardError(error.message || "Unable to load dashboard data.");
+      setDashboardData(null);
+    } finally {
+      setDashboardLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    fetchOrders();
+    fetchDashboardData();
     return subscribeRealtime((event) => {
-      if (event.type === "order.updated") fetchOrders();
+      if (event.type === "order.updated") {
+        fetchDashboardData();
+        setAnalyticsRefreshVersion((version) => version + 1);
+      }
     });
-  }, []);
+  }, [fetchDashboardData]);
 
   useEffect(() => {
     const params = new URLSearchParams();
@@ -267,97 +261,39 @@ export default function Dashboard() {
     let token = "";
     try { token = JSON.parse(localStorage.getItem("user") || "null")?.token || ""; } catch { token = ""; }
     setAnalyticsLoading(true);
-    setAnalyticsError(false);
+    setAnalyticsError("");
     fetch(`${LARAVEL_BASE}/api/admin/analytics/cake-sales?${params.toString()}`, {
       credentials: "include",
       headers: token ? { Authorization: `Bearer ${token}` } : {},
     })
-      .then((response) => response.json())
-      .then((data) => {
+      .then(async (response) => {
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data?.message || `Cake sales analytics API returned ${response.status}.`);
+        }
         if (!data?.success) throw new Error(data?.message || "Unable to load cake sales analytics.");
         setAnalytics(data);
       })
-      .catch(() => {
+      .catch((error) => {
+        console.error("Cake sales analytics load failed:", error);
         setAnalytics(null);
-        setAnalyticsError(true);
+        setAnalyticsError(error.message || "Unable to load cake sales analytics.");
       })
       .finally(() => setAnalyticsLoading(false));
-  }, [analyticsPreset, orders]);
+  }, [analyticsPreset, analyticsRefreshVersion]);
 
-  useEffect(() => {
-    fetch(`${CUSTOMER_BASE}/api/customer/products?action=list`)
-      .then((res) => res.json())
-      .then((data) => {
-        if (Array.isArray(data)) {
-          setProducts(data);
-        } else {
-          setProducts([]);
-        }
-      })
-      .catch((err) => {
-        console.log(err);
-        setProducts([]);
-      });
-  }, []);
-
-  useEffect(() => {
-    if (orders.length || products.length) {
-      setLoading(false);
-    }
-  }, [orders, products]);
-
-  const isToday = (dateString) => {
-    if (!dateString) return false;
-    const date = new Date(dateString);
-    const today = new Date();
-    return date.toDateString() === today.toDateString();
-  };
-
-  const isThisWeek = (dateString) => {
-    if (!dateString) return false;
-    const date = new Date(dateString);
-    const today = new Date();
-    const diffDays = Math.floor((today.setHours(0, 0, 0, 0) - date.setHours(0, 0, 0, 0)) / 86400000);
-    return diffDays >= 0 && diffDays < 7;
-  };
-
-  const totalRevenue = useMemo(() => orders.reduce((sum, order) => sum + Number(order.total || 0), 0), [orders]);
-
-  const todayOrders = useMemo(() => orders.filter((order) => isToday(order.created_at)), [orders]);
-  const pendingOrders = useMemo(() => orders.filter((order) => order.status === "Pending"), [orders]);
-  const preparingOrders = useMemo(() => orders.filter((order) => order.status === "Preparing"), [orders]);
-  const completedOrders = useMemo(() => orders.filter((order) => order.status === "Completed"), [orders]);
-  const totalSalesToday = useMemo(() => todayOrders.reduce((sum, order) => sum + Number(order.total || 0), 0), [todayOrders]);
-  const weeklySales = useMemo(() => orders.filter((order) => isThisWeek(order.created_at)).reduce((sum, order) => sum + Number(order.total || 0), 0), [orders]);
-  const sevenDayRevenue = useMemo(() => {
-    const today = new Date();
-    const days = Array.from({ length: 7 }, (_, index) => {
-      const date = new Date(today);
-      date.setDate(today.getDate() - (6 - index));
-      return { key: date.toDateString(), label: date.toLocaleDateString("en-US", { weekday: "short" }), total: 0 };
-    });
-    orders.forEach((order) => {
-      if (!order.created_at) return;
-      const day = days.find((entry) => entry.key === new Date(order.created_at).toDateString());
-      if (day) day.total += Number(order.total || 0);
-    });
-    return days;
-  }, [orders]);
-  const orderStatusBreakdown = useMemo(() => {
-    const statuses = [
-      { name: "Pending", matches: ["pending"] },
-      { name: "Preparing", matches: ["preparing"] },
-      { name: "Ready for Pickup", matches: ["ready for pickup"] },
-      { name: "Completed", matches: ["completed"] },
-      { name: "Cancelled", matches: ["cancelled", "canceled", "rejected"] },
-    ];
-    return statuses
-      .map((status) => ({
-        name: status.name,
-        value: orders.filter((order) => status.matches.includes(String(order.status || "").trim().toLowerCase())).length,
-      }))
-      .filter((status) => status.value > 0);
-  }, [orders]);
+  const orders = useMemo(() => (Array.isArray(dashboardData?.live_orders) ? dashboardData.live_orders : [])
+    .map((order) => ({ ...order, items: Array.isArray(order.items) ? order.items : [] })), [dashboardData]);
+  const dashboardSummary = dashboardData?.summary || {};
+  const inventoryData = dashboardData?.inventory || {};
+  const orderStatusBreakdown = Array.isArray(dashboardData?.order_status_breakdown)
+    ? dashboardData.order_status_breakdown
+    : [];
+  const sevenDayRevenue = (dashboardData?.sales_overview?.trend || []).map((day) => ({
+    key: day.date,
+    label: new Date(`${day.date}T00:00:00`).toLocaleDateString("en-US", { weekday: "short" }),
+    total: Number(day.revenue || 0),
+  }));
 
   const displayOrders = useMemo(() => {
     const urgent = orders
@@ -367,38 +303,18 @@ export default function Dashboard() {
     return [...urgent, ...rest];
   }, [orders]);
 
-  const lowStockProducts = useMemo(() => products.filter((product) => Number(product.stock) > 0 && Number(product.stock) <= 5), [products]);
-  const outOfStockProducts = useMemo(() => products.filter((product) => Number(product.stock) === 0), [products]);
+  const lowStockProducts = Array.isArray(inventoryData.low_stock) ? inventoryData.low_stock : [];
+  const outOfStockProducts = Array.isArray(inventoryData.out_of_stock) ? inventoryData.out_of_stock : [];
+  const mostSoldItems = Array.isArray(analytics?.topSellingCakes) ? analytics.topSellingCakes : [];
 
-  const mostSoldItems = useMemo(() => {
-    const tally = {};
-    orders.forEach((order) => {
-      Array.isArray(order.items) &&
-        order.items.forEach((item) => {
-          const name = item.name || "Unknown";
-          const qty = Number(item.qty) || 0;
-          if (!name || qty <= 0) return;
-          const product = products.find((entry) => String(entry.name || "").toLowerCase() === String(name).toLowerCase());
-          const unitPrice = Number(item.price || item.unit_price || product?.price || 0);
-          tally[name] ||= { qty: 0, revenue: 0, category: "Cake", image: "" };
-          tally[name].qty += qty;
-          tally[name].revenue += qty * unitPrice;
-          tally[name].category = item.category || product?.category || tally[name].category;
-          tally[name].image = item.image || item.product_image || product?.image || tally[name].image;
-        });
-    });
-    return Object.entries(tally)
-      .map(([name, item]) => ({ name, ...item }))
-      .sort((a, b) => b.qty - a.qty)
-      .slice(0, 5);
-  }, [orders, products]);
-
+  const totalSalesToday = Number(dashboardSummary.sales_today || 0);
+  const weeklySales = Number(dashboardSummary.sales_week || 0);
   const stats = [
-    { label: "Orders Today", value: todayOrders.length, hint: todayOrders.length ? "Orders placed today" : "No orders yet today", icon: ShoppingCart, iconTone: "bg-[#fff4cd] text-[#9b7810]", tone: "text-[#33251e]", accent: "#d4af37", to: "/admin/orders" },
-    { label: "Pending", value: pendingOrders.length, hint: "Awaiting confirmation", icon: Clock3, iconTone: "bg-[#fff4cd] text-[#9b7810]", tone: "text-[#33251e]", accent: "#c87954", to: "/admin/orders" },
-    { label: "Preparing", value: preparingOrders.length, hint: "In production", icon: ChefHat, iconTone: "bg-[#fff4cd] text-[#9b7810]", tone: "text-[#33251e]", accent: "#c9a94f", to: "/admin/orders" },
-    { label: "Completed", value: completedOrders.length, hint: "Delivered / picked up", icon: CircleCheck, iconTone: "bg-[#eef5e9] text-[#68815d]", tone: "text-[#33251e]", accent: "#81906c", to: "/admin/orders/history" },
-    { label: "Sales Today", value: `₱${totalSalesToday.toLocaleString()}`, hint: "Revenue recorded today", icon: TrendingUp, iconTone: "bg-[#fff4cd] text-[#9b7810]", tone: "text-[#33251e]", accent: "#d4af37", to: "/admin/reports" },
+    { label: "Orders Today", value: dashboardLoading ? "…" : dashboardError ? "—" : Number(dashboardSummary.orders_today || 0).toLocaleString(), hint: "Orders placed today", icon: ShoppingCart, iconTone: "bg-[#fff4cd] text-[#9b7810]", tone: "text-[#33251e]", accent: "#d4af37", to: "/admin/orders" },
+    { label: "Pending", value: dashboardLoading ? "…" : dashboardError ? "—" : Number(dashboardSummary.pending_orders_total || 0).toLocaleString(), hint: "Awaiting confirmation", icon: Clock3, iconTone: "bg-[#fff4cd] text-[#9b7810]", tone: "text-[#33251e]", accent: "#c87954", to: "/admin/orders" },
+    { label: "Preparing", value: dashboardLoading ? "…" : dashboardError ? "—" : Number(dashboardSummary.preparing_orders_total || 0).toLocaleString(), hint: "In production", icon: ChefHat, iconTone: "bg-[#fff4cd] text-[#9b7810]", tone: "text-[#33251e]", accent: "#c9a94f", to: "/admin/orders" },
+    { label: "Completed", value: dashboardLoading ? "…" : dashboardError ? "—" : Number(dashboardSummary.completed_orders_total || 0).toLocaleString(), hint: "Delivered / picked up", icon: CircleCheck, iconTone: "bg-[#eef5e9] text-[#68815d]", tone: "text-[#33251e]", accent: "#81906c", to: "/admin/orders/history" },
+    { label: "Sales Today", value: dashboardLoading ? "…" : dashboardError ? "—" : `₱${totalSalesToday.toLocaleString()}`, hint: "Completed revenue today", icon: TrendingUp, iconTone: "bg-[#fff4cd] text-[#9b7810]", tone: "text-[#33251e]", accent: "#d4af37", to: "/admin/reports" },
   ];
 
   const analyticsSummary = analytics?.summary || {};
@@ -443,6 +359,13 @@ export default function Dashboard() {
             </div>
           </div>
 
+          {dashboardError && (
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#efd8d4] bg-[#fff0f0] px-4 py-3 text-[12px] text-[#8d5357]" role="alert">
+              <span>Unable to load dashboard data: {dashboardError}</span>
+              <button type="button" onClick={fetchDashboardData} className="rounded-lg border border-[#d9aaa5] bg-white px-3 py-1.5 font-semibold hover:bg-[#fff8f7]">Retry</button>
+            </div>
+          )}
+
           <div className="mb-5">
             <StatsStrip stats={stats} />
           </div>
@@ -463,7 +386,7 @@ export default function Dashboard() {
               </div>
             </div>
 
-            {analyticsLoading ? <div className="rounded-xl border border-[#eadfd8] bg-white px-6 py-7 text-center text-[13px] text-[#9b8c83]">Loading cake sales analytics...</div> : analyticsError ? <div className="rounded-xl border border-[#efd8d4] bg-[#fff0f0] px-6 py-7 text-center text-[13px] text-[#8d5357]">Unable to load cake sales analytics.</div> : (
+            {analyticsLoading ? <div className="rounded-xl border border-[#eadfd8] bg-white px-6 py-7 text-center text-[13px] text-[#9b8c83]">Loading cake sales analytics...</div> : analyticsError ? <div className="flex flex-wrap items-center justify-center gap-3 rounded-xl border border-[#efd8d4] bg-[#fff0f0] px-6 py-7 text-center text-[13px] text-[#8d5357]" role="alert"><span>Unable to load cake sales analytics: {analyticsError}</span><button type="button" onClick={() => setAnalyticsRefreshVersion((version) => version + 1)} className="rounded-lg border border-[#d9aaa5] bg-white px-3 py-1.5 font-semibold hover:bg-[#fff8f7]">Retry</button></div> : (
               <>
                 <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
                   <AnalyticsCard label="Total Cake Sales" value={Number(analyticsSummary.total_cake_sales || 0).toLocaleString()} icon={CakeSlice} />
@@ -642,10 +565,16 @@ export default function Dashboard() {
                     </tr>
                   </thead>
                   <tbody>
-                    {loading ? (
+                    {dashboardLoading ? (
                       <tr>
-                          <td colSpan={6} className="px-6 py-10 text-center text-[13px] text-[#9b8c83]">
+                        <td colSpan={6} className="px-6 py-10 text-center text-[13px] text-[#9b8c83]">
                           Loading orders…
+                        </td>
+                      </tr>
+                    ) : dashboardError ? (
+                      <tr>
+                        <td colSpan={6} className="px-6 py-6 text-center text-[13px] text-[#8d5357]" role="alert">
+                          Unable to load live orders: {dashboardError}
                         </td>
                       </tr>
                     ) : displayOrders.length === 0 ? (
@@ -687,7 +616,11 @@ export default function Dashboard() {
           <div className="mb-8 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
               <Panel eyebrow="Inventory" title="Low stock">
                 <div className="p-4">
-                  {lowStockProducts.length === 0 ? (
+                  {dashboardLoading ? (
+                    <p className="px-2 py-4 text-[13px] text-black/50">Loading inventory…</p>
+                  ) : dashboardError ? (
+                    <p className="px-2 py-4 text-[13px] text-[#8d5357]">Unable to load inventory.</p>
+                  ) : lowStockProducts.length === 0 ? (
                     <p className="px-2 py-4 text-[13px] text-black/50">No low-stock items.</p>
                   ) : (
                     <ul className="space-y-1">
@@ -704,7 +637,11 @@ export default function Dashboard() {
 
               <Panel eyebrow="Inventory" title="Out of stock">
                 <div className="p-4">
-                  {outOfStockProducts.length === 0 ? (
+                  {dashboardLoading ? (
+                    <p className="px-2 py-4 text-[13px] text-black/50">Loading inventory…</p>
+                  ) : dashboardError ? (
+                    <p className="px-2 py-4 text-[13px] text-[#8d5357]">Unable to load inventory.</p>
+                  ) : outOfStockProducts.length === 0 ? (
                     <p className="px-2 py-4 text-[13px] text-black/50">Nothing out of stock.</p>
                   ) : (
                     <ul className="space-y-1">

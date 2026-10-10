@@ -69,6 +69,7 @@ class CakeSalesAnalytics
                     'product_id' => (int) $product->id,
                     'product' => $product->name,
                     'category' => $product->category,
+                    'image' => $product->image ?? null,
                     'size' => $size,
                     'quantity' => $quantity,
                     'price' => $price,
@@ -99,6 +100,7 @@ class CakeSalesAnalytics
                     'product_id' => (int) $product->id,
                     'product' => $product->name,
                     'category' => $product->category,
+                    'image' => $product->image ?? null,
                     'size' => 'Unknown',
                     'quantity' => $quantity,
                     'price' => $revenue / $quantity,
@@ -109,6 +111,7 @@ class CakeSalesAnalytics
         }
 
         $flavors = $this->rankRegularProducts($regularSales, $customSales);
+        $topSellingCakes = $this->topSellingCakes($regularSales);
         $sizesBySale = $this->rankDimension($regularSales, $customSales, 'size');
         $designs = $this->rankDimension([], $customSales, 'design');
         $cakeTypeBreakdown = $this->regularVsCustomized($regularSales, $customSales);
@@ -121,6 +124,7 @@ class CakeSalesAnalytics
             'summary' => $summary,
             'salesTrend' => $this->salesTrend($regularSales, $customSales, $start, $end),
             'flavors' => $flavors,
+            'topSellingCakes' => $topSellingCakes,
             'sizes' => $sizesBySale,
             'designs' => $designs,
             'cakeTypeBreakdown' => $cakeTypeBreakdown,
@@ -311,6 +315,21 @@ class CakeSalesAnalytics
             $rows[$key]['revenue'] = ($rows[$key]['revenue'] ?? 0) + $sale['revenue'];
         }
         return $this->rankRows(array_values($rows));
+    }
+
+    private function topSellingCakes(array $regularSales): array
+    {
+        $rows = [];
+        foreach ($regularSales as $sale) {
+            $key = (int) $sale['product_id'];
+            $rows[$key]['name'] = $sale['product'];
+            $rows[$key]['category'] = $sale['category'];
+            $rows[$key]['image'] = $sale['image'] ?? null;
+            $rows[$key]['qty'] = ($rows[$key]['qty'] ?? 0) + $sale['quantity'];
+            $rows[$key]['revenue'] = ($rows[$key]['revenue'] ?? 0) + $sale['revenue'];
+        }
+        usort($rows, fn ($a, $b) => $b['qty'] <=> $a['qty']);
+        return array_slice(array_values($rows), 0, 5);
     }
 
     private function rankDimension(array $regular, array $custom, string $field): array
@@ -548,11 +567,11 @@ class CakeSalesAnalytics
         $associations = $rows->filter(fn ($row) => $row->product_id && $row->product_name)->map(fn ($row) => ['product' => $row->product_name, 'ingredient' => $row->ingredient_name ?: $row->item, 'quantity' => (float) $row->qty, 'reason' => $row->reason])->values();
         $wasteValue = $rows->sum(fn ($row) => (float) $row->qty * (float) $row->unit_cost);
         return [
+            'records' => $rows->count(),
             'quantity' => $rows->sum('qty'),
             'cost' => $wasteValue,
             'total_by_unit' => $totalByUnit,
             'waste_value' => $wasteValue,
-            'records' => $rows->count(),
             'by_reason' => $rows->groupBy('reason')->map(fn ($group, $reason) => ['reason' => $reason, 'quantity' => $group->sum('qty'), 'cost' => $group->sum(fn ($row) => (float) $row->qty * (float) $row->unit_cost)])->values(),
             'by_item' => $byItem,
             'trend' => $trend,
