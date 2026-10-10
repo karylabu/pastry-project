@@ -392,7 +392,8 @@ export default function Login() {
           .pastry-login .login-footer > div:first-child { gap: 9px; }
           .pastry-login .login-footer img { width: 28px; height: 28px; }
           .pastry-login .login-footer p,
-          .pastry-login .login-footer a { font-size: 11px; }
+          .pastry-login .login-footer a,
+          .pastry-login .login-footer button { font-size: 11px; line-height: 1.25; }
           .pastry-login .login-footer-links { gap: 18px; }
           .pastry-login .login-decorations {
             position: absolute;
@@ -444,7 +445,8 @@ export default function Login() {
           .pastry-login .login-footer-links { display: flex; justify-content: center; gap: 12px 18px; }
           .pastry-login .login-footer img { width: 30px; height: 30px; }
           .pastry-login .login-footer p,
-          .pastry-login .login-footer a { font-size: 11px; }
+          .pastry-login .login-footer a,
+          .pastry-login .login-footer button { font-size: 11px; line-height: 1.25; }
           @media (max-width: 1023px) {
             .pastry-login { max-width: 522px; margin: 0 auto; border-right: 1px solid #e5e7eb; border-left: 1px solid #e5e7eb; }
             .pastry-login > .relative.z-10 { padding: 0; }
