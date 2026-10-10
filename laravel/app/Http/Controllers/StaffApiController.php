@@ -297,6 +297,7 @@ class StaffApiController extends Controller
             })->values();
 
             $products = DB::table('products')
+                ->whereRaw("LOWER(category) IN ('cake', 'cakes')")
                 ->select('id', 'name', 'category', 'stock', 'minimum_stock', 'price', 'available')
                 ->orderBy('name')
                 ->get();

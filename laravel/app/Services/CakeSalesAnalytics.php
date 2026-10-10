@@ -112,6 +112,7 @@ class CakeSalesAnalytics
 
         $flavors = $this->rankRegularProducts($regularSales, $customSales);
         $topSellingCakes = $this->topSellingCakes($regularSales);
+        $customPreferences = $this->customizedPreferences($start, $end);
         $sizesBySale = $this->rankDimension($regularSales, $customSales, 'size');
         $designs = $this->rankDimension([], $customSales, 'design');
         $cakeTypeBreakdown = $this->regularVsCustomized($regularSales, $customSales);
@@ -133,10 +134,10 @@ class CakeSalesAnalytics
             'topDesigns' => $designs,
             'regularVsCustomized' => $cakeTypeBreakdown,
             'customizedAnalytics' => [
-                'flavors' => $this->rankCustomDimension($customSales, 'flavor'),
-                'sizes' => $this->rankCustomDimension($customSales, 'size'),
-                'designs' => $this->rankCustomDimension($customSales, 'design'),
-                'occasions' => $this->rankCustomDimension($customSales, 'occasion'),
+                'flavors' => $this->rankPreferenceDimension($customPreferences, 'flavors'),
+                'sizes' => $this->rankPreferenceDimension($customPreferences, 'sizes'),
+                'designs' => $this->rankPreferenceDimension($customPreferences, 'designs'),
+                'occasions' => $this->rankPreferenceDimension($customPreferences, 'occasions'),
             ],
             'ingredientAnalytics' => $ingredientAnalytics,
             'inventoryAlerts' => $this->inventoryAlerts(),
@@ -144,6 +145,113 @@ class CakeSalesAnalytics
             'reviewAnalytics' => $this->reviewAnalytics($start, $end),
             'businessInsights' => $this->businessInsights($summary, $flavors, $sizesBySale, $designs, $ingredientAnalytics, $wasteAnalytics),
         ];
+    }
+
+    private function customizedPreferences(string $start, string $end): array
+    {
+        $preferences = [];
+        $seenOrderIds = [];
+
+        if (Schema::hasTable('customized_cake_orders')) {
+            $requests = DB::table('customized_cake_orders as custom')
+                ->leftJoin('orders', 'orders.id', '=', 'custom.order_id')
+                ->whereRaw('DATE(COALESCE(orders.created_at, custom.created_at)) BETWEEN ? AND ?', [$start, $end])
+                ->select('custom.id', 'custom.order_id', 'custom.notes')
+                ->orderBy('custom.id')
+                ->get();
+
+            $tierRows = collect();
+            if (
+                $requests->isNotEmpty()
+                && Schema::hasTable('customized_cake_tiers')
+                && Schema::hasTable('cake_flavors')
+                && Schema::hasTable('cake_sizes')
+            ) {
+                $tierRows = DB::table('customized_cake_tiers as tier')
+                    ->leftJoin('cake_flavors as flavor', 'flavor.id', '=', 'tier.flavor_id')
+                    ->leftJoin('cake_sizes as size', 'size.id', '=', 'tier.size_id')
+                    ->whereIn('tier.customized_cake_order_id', $requests->pluck('id'))
+                    ->orderBy('tier.tier_number')
+                    ->get([
+                        'tier.customized_cake_order_id',
+                        'flavor.name as flavor',
+                        'size.label as size',
+                    ])
+                    ->groupBy('customized_cake_order_id');
+            }
+
+            foreach ($requests as $request) {
+                $details = json_decode((string) ($request->notes ?? ''), true);
+                $details = is_array($details) ? $details : [];
+                $notes = (string) ($request->notes ?? '');
+                $tiers = $tierRows->get($request->id, collect());
+                $preferences[] = [
+                    'flavors' => $this->preferenceValues($tiers->pluck('flavor')->all() ?: ($details['cake_flavor'] ?? '')),
+                    'sizes' => $this->preferenceValues($tiers->pluck('size')->all() ?: ($details['cake_size'] ?? '')),
+                    'designs' => $this->preferenceValues([
+                        $details['cake_style'] ?? $this->preferenceNoteValue($notes, 'Cake style'),
+                        $details['theme'] ?? $this->preferenceNoteValue($notes, 'Theme'),
+                        $details['cake_color'] ?? $this->preferenceNoteValue($notes, 'Colors'),
+                        $details['packaging'] ?? $this->preferenceNoteValue($notes, 'Packaging'),
+                        ...(is_array($details['addons'] ?? null) ? $details['addons'] : []),
+                    ]),
+                    'occasions' => $this->preferenceValues($details['occasion'] ?? $this->preferenceNoteValue($notes, 'Occasion')),
+                ];
+                if ($request->order_id !== null) {
+                    $seenOrderIds[(int) $request->order_id] = true;
+                }
+            }
+        }
+
+        if (Schema::hasTable('custom_cake_orders')) {
+            $requests = DB::table('custom_cake_orders as custom')
+                ->join('orders', 'orders.id', '=', 'custom.order_id')
+                ->whereBetween('orders.created_at', [$start . ' 00:00:00', $end . ' 23:59:59'])
+                ->select('custom.*')
+                ->orderBy('custom.id')
+                ->get();
+
+            foreach ($requests as $request) {
+                if (isset($seenOrderIds[(int) $request->order_id])) {
+                    continue;
+                }
+                $notes = (string) ($request->notes ?? '');
+                $preferences[] = [
+                    'flavors' => $this->preferenceValues($request->flavor ?? ''),
+                    'sizes' => $this->preferenceValues($request->cake_size ?? $request->tiers ?? ''),
+                    'designs' => $this->preferenceValues([
+                        $request->theme_design ?? $this->preferenceNoteValue($notes, 'Theme'),
+                        $request->preferred_colors ?? $this->preferenceNoteValue($notes, 'Colors'),
+                    ]),
+                    'occasions' => $this->preferenceValues($request->occasion ?? $this->preferenceNoteValue($notes, 'Occasion')),
+                ];
+            }
+        }
+
+        return $preferences;
+    }
+
+    private function preferenceValues($values): array
+    {
+        $values = is_array($values) ? $values : [$values];
+        $normalized = [];
+        foreach ($values as $value) {
+            foreach (preg_split('/[,|\\/]+/', trim((string) $value)) ?: [] as $part) {
+                $part = trim($part);
+                if ($part !== '' && !in_array(strtolower($part), ['n/a', 'none', 'unknown'], true)) {
+                    $normalized[$part] = $part;
+                }
+            }
+        }
+        return array_values($normalized);
+    }
+
+    private function preferenceNoteValue(string $notes, string $label): string
+    {
+        if (preg_match('/^' . preg_quote($label, '/') . '\\s*:\\s*(.+)$/mi', $notes, $matches)) {
+            return trim($matches[1]);
+        }
+        return '';
     }
 
     private function reviewAnalytics(string $start, string $end): array
@@ -344,15 +452,17 @@ class CakeSalesAnalytics
         return $this->rankRows(array_values($rows));
     }
 
-    private function rankCustomDimension(array $sales, string $field): array
+    private function rankPreferenceDimension(array $preferences, string $field): array
     {
-        return $this->rankRows(array_values(array_reduce($sales, function ($carry, $sale) use ($field) {
-            $value = trim((string) ($sale[$field] ?? 'Unknown')) ?: 'Unknown';
-            $carry[$value]['name'] = $value;
-            $carry[$value]['quantity'] = ($carry[$value]['quantity'] ?? 0) + $sale['quantity'];
-            $carry[$value]['revenue'] = ($carry[$value]['revenue'] ?? 0) + $sale['revenue'];
-            return $carry;
-        }, [])));
+        $rows = [];
+        foreach ($preferences as $request) {
+            foreach ($request[$field] ?? [] as $value) {
+                $rows[$value]['name'] = $value;
+                $rows[$value]['quantity'] = ($rows[$value]['quantity'] ?? 0) + 1;
+                $rows[$value]['revenue'] = 0;
+            }
+        }
+        return $this->rankRows(array_values($rows));
     }
 
     private function rankRows(array $rows): array

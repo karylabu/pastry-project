@@ -124,11 +124,15 @@ function Panel({ eyebrow, title, action, children, className = "" }) {
   );
 }
 
-function AnalyticsEmpty({ compact = false }) {
+function AnalyticsEmpty({
+  compact = false,
+  title = "No cake sales data yet.",
+  description = "Sales analytics will appear here once completed cake orders are recorded.",
+}) {
   return (
     <div className={`px-6 text-center ${compact ? "py-7" : "py-10"}`}>
-      <p className="text-[13px] font-semibold text-[#5f514a]">No cake sales data yet.</p>
-      <p className="mt-1 text-[12px] text-[#9b8c83]">Sales analytics will appear here once completed cake orders are recorded.</p>
+      <p className="text-[13px] font-semibold text-[#5f514a]">{title}</p>
+      <p className="mt-1 text-[12px] text-[#9b8c83]">{description}</p>
     </div>
   );
 }
@@ -147,8 +151,8 @@ function AnalyticsCard({ label, value, icon: Icon, accent = "gold" }) {
   );
 }
 
-function RankedList({ rows, quantityLabel = "sold", quantityUnitKey = "" }) {
-  if (!rows?.length) return <AnalyticsEmpty />;
+function RankedList({ rows, quantityLabel = "sold", quantityUnitKey = "", emptyState }) {
+  if (!rows?.length) return <AnalyticsEmpty {...emptyState} />;
   return (
     <div className="space-y-2 p-4">
       {rows.slice(0, 5).map((row, index) => (
@@ -507,15 +511,27 @@ export default function Dashboard() {
                     <div className="grid gap-5 p-4 lg:grid-cols-2">
                       <div className="rounded-lg border border-[#eadfd8] bg-white transition hover:border-[#c9a94f] hover:ring-1 hover:ring-[#d4af37]/20">
                         <p className="border-b border-[#f0e7e0] px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#9b8c83]">Most requested flavors</p>
-                        <RankedList rows={analytics.customizedAnalytics?.flavors} quantityLabel="requests" />
+                        <RankedList
+                          rows={analytics.customizedAnalytics?.flavors}
+                          quantityLabel="requests"
+                          emptyState={{ title: "No customized cake requests in this date range.", description: "Submitted requests appear here, even before they are completed." }}
+                        />
                       </div>
                       <div className="rounded-lg border border-[#eadfd8] bg-white transition hover:border-[#c9a94f] hover:ring-1 hover:ring-[#d4af37]/20">
                         <p className="border-b border-[#f0e7e0] px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#9b8c83]">Most requested sizes</p>
-                        <RankedList rows={analytics.customizedAnalytics?.sizes} quantityLabel="requests" />
+                        <RankedList
+                          rows={analytics.customizedAnalytics?.sizes}
+                          quantityLabel="requests"
+                          emptyState={{ title: "No customized cake requests in this date range.", description: "Submitted requests appear here, even before they are completed." }}
+                        />
                       </div>
                       <div className="rounded-lg border border-[#eadfd8] bg-white transition hover:border-[#c9a94f] hover:ring-1 hover:ring-[#d4af37]/20 lg:col-span-2">
                         <p className="border-b border-[#f0e7e0] px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#9b8c83]">Popular customization options</p>
-                        <RankedList rows={analytics.customizedAnalytics?.designs} quantityLabel="requests" />
+                        <RankedList
+                          rows={analytics.customizedAnalytics?.designs}
+                          quantityLabel="requests"
+                          emptyState={{ title: "No customized cake requests in this date range.", description: "Submitted requests appear here, even before they are completed." }}
+                        />
                       </div>
                     </div>
                   </Panel>
