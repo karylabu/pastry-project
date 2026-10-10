@@ -26,7 +26,7 @@ function SectionHeading({ icon: Icon, children, trailing }) {
       </span>
       <h3 className="shrink-0 text-[10px] font-black uppercase tracking-[0.2em] sm:text-xs">{children}</h3>
       <span className="h-px min-w-3 flex-1 bg-[#dfc69d]" />
-      {trailing && <span className="mr-4 shrink-0 text-[7px] font-bold uppercase tracking-[0.12em] text-[#a77a3b] sm:mr-6 sm:text-[8px]">{trailing}</span>}
+      {trailing && <span className="mr-7 shrink-0 text-[7px] font-bold uppercase tracking-[0.12em] text-[#a77a3b] sm:mr-9 sm:text-[8px]">{trailing}</span>}
     </div>
   );
 }
@@ -97,15 +97,15 @@ export default function CreditsModal({ isOpen, onClose }) {
 
         <main className="px-4 py-4 sm:px-7 sm:py-5">
           <section>
-            <SectionHeading icon={Cake}>About the project</SectionHeading>
+            <SectionHeading icon={Cake} className="md:translate-x-2 md:translate-y-1">About the project</SectionHeading>
             <p className="ml-11 max-w-[640px] text-[11px] leading-[1.35rem] text-[#66564a] sm:text-xs sm:leading-5">
-              Pastry Project is an online bakery platform for browsing products, placing orders, requesting custom cakes,
+              Pastry Project is an online pastry platform for browsing products, placing orders, requesting custom cakes,
               and managing customer accounts. Our team brought the experience together from design to development.
             </p>
           </section>
 
           <section className="mt-4 sm:mt-5">
-            <SectionHeading icon={Users} trailing="3 Contributors">Meet the developers</SectionHeading>
+            <SectionHeading icon={Users} trailing="3 Contributors" className="md:translate-x-2 md:translate-y-1">Meet the developers</SectionHeading>
             <div className="grid gap-2.5 sm:ml-11 sm:grid-cols-3 sm:gap-3">
               {teamMembers.map((member) => (
                 <article
