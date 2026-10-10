@@ -102,8 +102,21 @@ jobs:
       - name: Verify Hostinger deployment tools
         run: |
           set -eu
-          ssh -i ~/.ssh/id_ed25519 -p "$SSH_PORT" -o IdentitiesOnly=yes -o BatchMode=yes -o ConnectTimeout=20 -o ConnectionAttempts=3 "$SSH_USERNAME@$SSH_HOST" \
-            "command -v rsync && command -v composer && command -v php"
+          attempt=1
+          max_attempts=5
+          while [ "$attempt" -le "$max_attempts" ]; do
+            if ssh -i ~/.ssh/id_ed25519 -p "$SSH_PORT" -o IdentitiesOnly=yes -o BatchMode=yes -o ConnectTimeout=20 -o ConnectionAttempts=1 "$SSH_USERNAME@$SSH_HOST" \
+              "command -v rsync && command -v composer && command -v php"; then
+              break
+            fi
+            if [ "$attempt" -eq "$max_attempts" ]; then
+              echo "Unable to verify Hostinger deployment tools after $max_attempts SSH attempts."
+              exit 1
+            fi
+            echo "Hostinger SSH check failed (attempt $attempt/$max_attempts); retrying in 10 seconds."
+            sleep 10
+            attempt=$((attempt + 1))
+          done
 
       - name: Deploy Laravel application
         run: |
