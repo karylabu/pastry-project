@@ -23,8 +23,8 @@ describe('Products admin catalog', () => {
               category: 'Cakes',
               price: 0,
               sizes: [
-                { id: 11, size: 'small', price: 320 },
-                { id: 12, size: 'big', price: 480 },
+                { id: 11, size: 'small', price: 320, stock_quantity: 2, is_producible: true },
+                { id: 12, size: 'big', price: 480, stock_quantity: 7, is_producible: true },
               ],
               stock: 10,
               minimum_stock: 5,
@@ -132,7 +132,7 @@ describe('Products admin catalog', () => {
     expect(screen.queryByText('Mini Chocolate Cake')).not.toBeInTheDocument();
   });
 
-  test('defaults production to the big size and checks availability immediately', async () => {
+  test('uses the big tab size for production without showing a redundant size picker', async () => {
     render(<Products allowCatalogManagement />);
 
     await waitFor(() => {
@@ -142,11 +142,35 @@ describe('Products admin catalog', () => {
     fireEvent.click(screen.getAllByRole('button', { name: 'Produce' })[0]);
 
     await waitFor(() => {
-      expect(screen.getByRole('combobox')).toHaveValue('12');
+      expect(screen.getByText('Cake size: Big')).toBeInTheDocument();
+      expect(screen.getByText('Production: ✓ Available')).toBeInTheDocument();
+    });
+    expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
+    expect(global.fetch).toHaveBeenCalledWith(
+      expect.stringContaining('production/availability/1?product_size_id=12'),
+      expect.any(Object),
+    );
+  });
+
+  test('uses the small tab size and displays stock for that size only', async () => {
+    render(<Products allowCatalogManagement />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Strawberry Cake')).toBeInTheDocument();
+    });
+
+    expect(screen.getByText('7', { exact: true })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Small Cakes' }));
+    expect(screen.getByText('2', { exact: true })).toBeInTheDocument();
+    expect(screen.queryByText('7', { exact: true })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getAllByRole('button', { name: 'Produce' })[0]);
+    await waitFor(() => {
+      expect(screen.getByText('Cake size: Small')).toBeInTheDocument();
       expect(screen.getByText('Production: ✓ Available')).toBeInTheDocument();
     });
     expect(global.fetch).toHaveBeenCalledWith(
-      expect.stringContaining('production/availability/1?product_size_id=12'),
+      expect.stringContaining('production/availability/1?product_size_id=11'),
       expect.any(Object),
     );
   });

@@ -28,6 +28,7 @@ class StaffProductCatalogTest extends TestCase
             $table->unsignedBigInteger('product_id');
             $table->string('size');
             $table->decimal('price', 10, 2)->default(0);
+            $table->unsignedInteger('stock_quantity')->default(0);
             $table->boolean('available')->default(true);
         });
         Schema::create('ingredients', function ($table) {
@@ -69,8 +70,9 @@ class StaffProductCatalogTest extends TestCase
             ['id' => 3, 'name' => 'Unavailable Cake', 'category' => 'Cake', 'price' => 300, 'stock' => 0, 'available' => false],
         ]);
         DB::table('product_sizes')->insert([
-            ['product_id' => 1, 'size' => 'Big', 'price' => 450, 'available' => true],
-            ['product_id' => 1, 'size' => 'Slice', 'price' => 80, 'available' => true],
+            ['product_id' => 1, 'size' => 'Big', 'price' => 450, 'stock_quantity' => 4, 'available' => true],
+            ['product_id' => 1, 'size' => 'Small', 'price' => 320, 'stock_quantity' => 2, 'available' => true],
+            ['product_id' => 1, 'size' => 'Slice', 'price' => 80, 'stock_quantity' => 1, 'available' => true],
         ]);
         DB::table('ingredients')->insert(['id' => 1, 'name' => 'Flour', 'unit' => 'kg']);
         DB::table('ingredient_batches')->insert([
@@ -115,6 +117,11 @@ class StaffProductCatalogTest extends TestCase
             ->assertJsonPath('0.production_size_id', 1)
             ->assertJsonPath('0.is_producible', true)
             ->assertJsonPath('0.sizes.0.size', 'Big')
-            ->assertJsonMissingPath('0.sizes.1');
+            ->assertJsonPath('0.sizes.0.stock_quantity', 4)
+            ->assertJsonPath('0.sizes.0.is_producible', true)
+            ->assertJsonPath('0.sizes.1.size', 'Small')
+            ->assertJsonPath('0.sizes.1.stock_quantity', 2)
+            ->assertJsonPath('0.sizes.1.is_producible', false)
+            ->assertJsonMissingPath('0.sizes.2');
     }
 }

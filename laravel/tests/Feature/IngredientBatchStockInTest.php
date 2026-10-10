@@ -8,6 +8,7 @@ use App\Models\Product;
 use App\Models\ProductRecipe;
 use App\Models\ProductSize;
 use App\Models\User;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Database\Schema\Blueprint;
 use Tests\TestCase;
@@ -603,6 +604,8 @@ class IngredientBatchStockInTest extends TestCase
     {
         $user = $this->createTestUser(['role' => 'staff']);
         $product = Product::create(['name' => 'Cake', 'category' => 'Cakes', 'price' => 100, 'stock' => 3, 'available' => true]);
+        $bigSize = ProductSize::create(['product_id' => $product->id, 'size' => 'Big', 'price' => 150, 'available' => true]);
+        DB::table('product_sizes')->where('id', $bigSize->id)->update(['stock_quantity' => 4]);
         $size = ProductSize::create(['product_id' => $product->id, 'size' => 'Small', 'price' => 100, 'available' => true]);
         $ingredient = Ingredient::create(['name' => 'Flour', 'unit' => 'kg', 'stock' => 999]);
         $early = IngredientBatch::create(['ingredient_id' => $ingredient->id, 'batch_number' => 'FLOUR-EARLY', 'quantity_received' => 2, 'quantity_remaining' => 2, 'expiry_date' => today()->addDay()]);
@@ -620,6 +623,8 @@ class IngredientBatchStockInTest extends TestCase
         $this->assertDatabaseHas('ingredient_batches', ['id' => $early->id, 'quantity_remaining' => 0]);
         $this->assertDatabaseHas('ingredient_batches', ['id' => $late->id, 'quantity_remaining' => 0]);
         $this->assertDatabaseHas('products', ['id' => $product->id, 'stock' => 5]);
+        $this->assertDatabaseHas('product_sizes', ['id' => $size->id, 'stock_quantity' => 2]);
+        $this->assertDatabaseHas('product_sizes', ['id' => $bigSize->id, 'stock_quantity' => 4]);
         $this->assertDatabaseCount('production_transactions', 1);
         $this->assertDatabaseCount('production_batch_allocations', 2);
         $this->assertDatabaseHas('ingredient_movements', ['batch_id' => $early->id, 'reference_type' => 'production']);

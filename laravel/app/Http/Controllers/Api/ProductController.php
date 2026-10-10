@@ -25,15 +25,24 @@ class ProductController extends Controller
             ->orderBy('name')
             ->get()
             ->map(function (Product $product) use ($production) {
-                $sizes = $product->sizes;
-                $defaultSize = $sizes->first(fn ($size) => strtolower(trim((string) $size->size)) === 'big' && $size->available)
-                    ?? $sizes->first(fn ($size) => $size->available);
+                $sizes = $product->sizes->map(function ($size) use ($product, $production) {
+                    return array_merge(
+                        $size->toArray(),
+                        $production->checkAvailability($product, (int) $size->id)
+                    );
+                });
+                $defaultSize = $sizes->first(fn ($size) => strtolower(trim((string) $size['size'])) === 'big' && $size['available'])
+                    ?? $sizes->first(fn ($size) => $size['available']);
                 $availability = $defaultSize
-                    ? $production->checkAvailability($product, (int) $defaultSize->id)
+                    ? [
+                        'is_producible' => $defaultSize['is_producible'],
+                        'availability_reason' => $defaultSize['availability_reason'],
+                    ]
                     : ['is_producible' => false, 'availability_reason' => 'No available cake size is configured.'];
 
                 return array_merge($product->toArray(), $availability, [
-                    'production_size_id' => $defaultSize ? (int) $defaultSize->id : null,
+                    'sizes' => $sizes->values(),
+                    'production_size_id' => $defaultSize ? (int) $defaultSize['id'] : null,
                 ]);
             })
             ->values();

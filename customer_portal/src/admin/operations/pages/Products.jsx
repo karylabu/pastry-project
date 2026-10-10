@@ -30,6 +30,13 @@ const getDefaultProductionSize = (product) => {
     || null;
 };
 
+const getProductSizeForCategory = (product, category) => {
+  const sizeName = category === "Small Cakes" ? "small" : "big";
+  return getProductSizeOptions(product).find((size) =>
+    String(size?.size || size?.variant_size || '').trim().toLowerCase() === sizeName
+  ) || null;
+};
+
 const getProductBasePrice = (product) => {
   const bigSize = getProductSizeOptions(product).find((size) =>
     String(size?.size || size?.variant_size || '').trim().toLowerCase() === 'big'
@@ -393,7 +400,9 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
     setHistoryEntries([]);
     if (action === "produce") {
       setRecipeLines([]);
-      const defaultSize = product.production_size_id
+      const defaultSize = canManageCatalog
+        ? getProductSizeForCategory(product, activeCat)
+        : product.production_size_id
         ? getProductSizeOptions(product).find((size) => Number(size.id) === Number(product.production_size_id))
         : getDefaultProductionSize(product);
       const defaultSizeId = defaultSize?.id ? String(defaultSize.id) : "";
@@ -539,11 +548,36 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
      STOCK COLORS
   ========================= */
   const getStockStatus = (product) => {
-    const stock = Number(product.stock || 0);
-    const minimum = Number(product.minimum_stock ?? 0);
+    const size = canManageCatalog ? getProductSizeForCategory(product, activeCat) : null;
+    const stock = canManageCatalog ? Number(size?.stock_quantity ?? 0) : Number(product.stock || 0);
+    const minimum = Number(size?.threshold ?? product.minimum_stock ?? 0);
     if (stock <= 0) return { label: "Out of Stock", icon: "🔴", classes: "bg-[#FEE2E2] text-[#991B1B]" };
     if (stock <= minimum) return { label: "Low Stock", icon: "🟡", classes: "bg-[#FEF3C7] text-[#92400E]" };
     return { label: "In Stock", icon: "🟢", classes: "bg-[#DCFCE7] text-[#166534]" };
+  };
+
+  const getDisplayedStock = (product) => {
+    const size = canManageCatalog ? getProductSizeForCategory(product, activeCat) : null;
+    return canManageCatalog ? Number(size?.stock_quantity ?? 0) : Number(product.stock ?? 0);
+  };
+
+  const getProductionStatus = (product) => {
+    if (canManageCatalog) {
+      const size = getProductSizeForCategory(product, activeCat);
+      return size
+        ? { is_producible: Boolean(size.is_producible), reason: size.availability_reason }
+        : { is_producible: false, reason: `No ${activeCat === "Small Cakes" ? "small" : "big"} cake size is configured.` };
+    }
+
+    const size = getProductSizeOptions(product).find((option) => Number(option.id) === Number(product.production_size_id))
+      || getDefaultProductionSize(product);
+    if (size && typeof size.is_producible === "boolean") {
+      return { is_producible: size.is_producible, reason: size.availability_reason };
+    }
+    return {
+      is_producible: Boolean(product.is_producible),
+      reason: product.availability_reason,
+    };
   };
 
   /* =========================
@@ -745,21 +779,21 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
                 <div className="mb-1 flex items-center justify-between gap-2 text-left">
                   <div>
                     <p className="text-[9px] text-[#9b8c83]">Stock</p>
-                    <p className="text-sm font-bold leading-none text-[#33251e]">{product.stock ?? 0}</p>
+                    <p className="text-sm font-bold leading-none text-[#33251e]">{getDisplayedStock(product)}</p>
                   </div>
                   <span className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-[9px] font-semibold ${getStockStatus(product).classes}`}>
                     {getStockStatus(product).icon} {getStockStatus(product).label}
                   </span>
                 </div>
-                <p className="mb-1 text-left text-[9px] text-[#9b8c83]">Minimum: {product.minimum_stock ?? "Not set"}</p>
+                <p className="mb-1 text-left text-[9px] text-[#9b8c83]">Minimum: {getProductSizeForCategory(product, activeCat)?.threshold ?? product.minimum_stock ?? "Not set"}</p>
 
                 {/* PRODUCTION AVAILABILITY */}
                 <div className="mb-1 text-left">
-                  <span className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-[9px] font-semibold ${product.is_producible ? 'bg-[#edf5eb] text-[#4f7654]' : 'bg-[#fff0eb] text-[#9a5947]'}`}>
-                    {product.is_producible ? '✓ Can Produce' : '✗ Cannot Produce'}
+                  <span className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-[9px] font-semibold ${getProductionStatus(product).is_producible ? 'bg-[#edf5eb] text-[#4f7654]' : 'bg-[#fff0eb] text-[#9a5947]'}`}>
+                    {getProductionStatus(product).is_producible ? '✓ Can Produce' : '✗ Cannot Produce'}
                   </span>
-                  {!product.is_producible && product.availability_reason && (
-                    <p className="mt-1 line-clamp-1 text-[9px] text-[#9a5947]">{product.availability_reason}</p>
+                  {!getProductionStatus(product).is_producible && getProductionStatus(product).reason && (
+                    <p className="mt-1 line-clamp-1 text-[9px] text-[#9a5947]">{getProductionStatus(product).reason}</p>
                   )}
                 </div>
 
@@ -824,16 +858,16 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
                 <div className="px-4 py-4 text-[12px] font-semibold text-[#33251e]">₱{formatProductPrice(product, activeCat)}</div>
                 <div className="px-4 py-4">
                   <div>
-                    <div className="text-[12px] font-semibold text-[#33251e]">{product.stock ?? 0}</div>
+                    <div className="text-[12px] font-semibold text-[#33251e]">{getDisplayedStock(product)}</div>
                     <div className={`mt-1 inline-flex rounded-full px-2 py-1 text-[10px] font-semibold ${getStockStatus(product).classes}`}>{getStockStatus(product).icon} {getStockStatus(product).label}</div>
                   </div>
                 </div>
                 <div className="px-4 py-4">
-                  <div className={`inline-flex rounded-full px-2 py-1 text-[10px] font-semibold ${product.is_producible ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                    {product.is_producible ? '✓ Available' : '✗ Unavailable'}
+                  <div className={`inline-flex rounded-full px-2 py-1 text-[10px] font-semibold ${getProductionStatus(product).is_producible ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                    {getProductionStatus(product).is_producible ? '✓ Available' : '✗ Unavailable'}
                   </div>
-                  {!product.is_producible && product.availability_reason && (
-                    <p className="text-[9px] text-red-700 mt-1">{product.availability_reason}</p>
+                  {!getProductionStatus(product).is_producible && getProductionStatus(product).reason && (
+                    <p className="text-[9px] text-red-700 mt-1">{getProductionStatus(product).reason}</p>
                   )}
                 </div>
                 <div className="px-4 py-4 flex flex-wrap gap-2">
@@ -885,30 +919,42 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
                 </h2>
 
                 <p className="text-xs text-black/60 mb-4">
-                  Current Stock: {selectedProduct.stock ?? 0}
+                  Current Stock: {activeModal === "produce"
+                    ? canManageCatalog
+                      ? Number(getProductSizeOptions(selectedProduct).find((size) => Number(size.id) === Number(productionSizeId))?.stock_quantity ?? 0)
+                      : Number(selectedProduct.stock ?? 0)
+                    : selectedProduct.stock ?? 0}
                 </p>
 
                 {activeModal === "produce" && <div className="space-y-3 mb-4">
                   <div>
-                    <label className="mb-1 block text-[11px] font-semibold text-black/70">Cake Size</label>
-                    <select
-                      value={productionSizeId}
-                      onChange={(event) => {
-                        const sizeId = event.target.value;
-                        setProductionSizeId(sizeId);
-                        setProductionAvailability({ is_producible: false, reason: sizeId ? 'Checking production availability...' : 'Select a cake size first.' });
-                        loadProductRecipe(selectedProduct.id, sizeId);
-                        loadProductionAvailability(selectedProduct.id, sizeId);
-                      }}
-                      className="w-full rounded-xl border border-black/10 bg-white px-3 py-2 text-xs text-black outline-none focus:ring-2 focus:ring-[#D4AF37]"
-                    >
-                      <option value="">Select cake size</option>
-                      {getProductSizeOptions(selectedProduct).map((size) => (
-                        <option key={size.id} value={size.id}>
-                          {size.size} {size.price !== undefined ? `- ₱${Number(size.price).toLocaleString()}` : ''}
-                        </option>
-                      ))}
-                    </select>
+                    {canManageCatalog ? (
+                      <p className="text-[11px] font-semibold text-black/70">
+                        Cake size: {activeCat === "Small Cakes" ? "Small" : "Big"}
+                      </p>
+                    ) : (
+                      <>
+                        <label className="mb-1 block text-[11px] font-semibold text-black/70">Cake Size</label>
+                        <select
+                          value={productionSizeId}
+                          onChange={(event) => {
+                            const sizeId = event.target.value;
+                            setProductionSizeId(sizeId);
+                            setProductionAvailability({ is_producible: false, reason: sizeId ? 'Checking production availability...' : 'Select a cake size first.' });
+                            loadProductRecipe(selectedProduct.id, sizeId);
+                            loadProductionAvailability(selectedProduct.id, sizeId);
+                          }}
+                          className="w-full rounded-xl border border-black/10 bg-white px-3 py-2 text-xs text-black outline-none focus:ring-2 focus:ring-[#D4AF37]"
+                        >
+                          <option value="">Select cake size</option>
+                          {getProductSizeOptions(selectedProduct).map((size) => (
+                            <option key={size.id} value={size.id}>
+                              {size.size} {size.price !== undefined ? `- ₱${Number(size.price).toLocaleString()}` : ''}
+                            </option>
+                          ))}
+                        </select>
+                      </>
+                    )}
                   </div>
                   
                   {/* AVAILABILITY STATUS */}
