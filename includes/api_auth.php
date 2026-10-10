@@ -1,5 +1,7 @@
 <?php
 
+require_once __DIR__ . '/../laravel/legacy_compat.php';
+
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
@@ -25,30 +27,38 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     exit;
 }
 
+function apiFindUserForToken(string $token): ?array
+{
+    try {
+        $statement = legacy_get_pdo()->prepare(
+            "SELECT u.id, u.name, u.email, u.role
+             FROM user_sessions s
+             JOIN users u ON u.id = s.user_id
+             WHERE s.token = ? AND (s.expires_at IS NULL OR s.expires_at > NOW())
+             LIMIT 1"
+        );
+        $statement->execute([$token]);
+        $user = $statement->fetch(PDO::FETCH_ASSOC);
+
+        return $user ?: null;
+    } catch (Throwable $error) {
+        error_log('Staff API authentication database error: ' . $error->getMessage());
+        http_response_code(500);
+        echo json_encode([
+            'success' => false,
+            'message' => 'Authentication service is temporarily unavailable.',
+        ]);
+        exit;
+    }
+}
+
 function apiUser(): ?array
 {
     if (!empty($_SESSION['user']) && is_array($_SESSION['user']) && !empty($_SESSION['auth_token'])) {
-        $conn = @new mysqli('localhost', 'root', '', 'pastry_db');
-        if (!$conn->connect_error) {
-            $stmt = $conn->prepare(
-                     "SELECT u.id, u.name, u.email, u.role
-                 FROM user_sessions s
-                 JOIN users u ON u.id = s.user_id
-                 WHERE s.token = ? AND (s.expires_at IS NULL OR s.expires_at > NOW())
-                 LIMIT 1"
-            );
-            if ($stmt) {
-                $stmt->bind_param('s', $_SESSION['auth_token']);
-                $stmt->execute();
-                $user = $stmt->get_result()->fetch_assoc() ?: null;
-                $stmt->close();
-                $conn->close();
-                if ($user) {
-                    $_SESSION['user'] = $user;
-                    return $user;
-                }
-            }
-            $conn->close();
+        $user = apiFindUserForToken((string) $_SESSION['auth_token']);
+        if ($user) {
+            $_SESSION['user'] = $user;
+            return $user;
         }
         unset($_SESSION['user'], $_SESSION['auth_token']);
     }
@@ -67,28 +77,7 @@ function apiUser(): ?array
         return null;
     }
 
-    $conn = @new mysqli('localhost', 'root', '', 'pastry_db');
-    if ($conn->connect_error) {
-        return null;
-    }
-
-    $stmt = $conn->prepare(
-            "SELECT u.id, u.name, u.email, u.role
-         FROM user_sessions s
-         JOIN users u ON u.id = s.user_id
-         WHERE s.token = ? AND (s.expires_at IS NULL OR s.expires_at > NOW())
-         LIMIT 1"
-    );
-    if (!$stmt) {
-        $conn->close();
-        return null;
-    }
-
-    $stmt->bind_param('s', $matches[1]);
-    $stmt->execute();
-    $user = $stmt->get_result()->fetch_assoc() ?: null;
-    $stmt->close();
-    $conn->close();
+    $user = apiFindUserForToken($matches[1]);
 
     if ($user) {
         $_SESSION['user'] = $user;
