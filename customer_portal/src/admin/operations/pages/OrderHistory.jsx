@@ -2,10 +2,28 @@ import React, { useEffect, useMemo, useState } from "react";
 import { jsPDF } from "jspdf";
 import { AnimatePresence, motion } from "framer-motion";
 import { Archive, Ban, CheckCircle2, CircleDollarSign, Download, Eye, Search, X } from "lucide-react";
-import { LARAVEL_BASE, STAFF_BASE } from "../../../services/config";
+import { LARAVEL_BASE } from "../../../services/config";
 import { getAuthHeaders } from "../../../services/api";
 
-const staffFetch = (url, options = {}) => fetch(url, { credentials: "include", ...options });
+const laravelStaffFetch = (url, options = {}) => {
+  let token = "";
+  try {
+    token = JSON.parse(localStorage.getItem("user") || "null")?.token || "";
+  } catch (_) {
+    token = "";
+  }
+
+  return fetch(url, {
+    ...options,
+    credentials: "include",
+    headers: {
+      Accept: "application/json",
+      ...getAuthHeaders(),
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(options.headers || {}),
+    },
+  });
+};
 
 export default function OrderHistory() {
   const [orders, setOrders] = useState([]);
@@ -26,14 +44,20 @@ export default function OrderHistory() {
   const [importHistoryError, setImportHistoryError] = useState("");
 
   useEffect(() => {
-    staffFetch(`${STAFF_BASE}/api_orders.php`)
+    laravelStaffFetch(`${LARAVEL_BASE}/api/staff/orders`)
       .then(async (response) => {
-        if (!response.ok) throw new Error("Unable to load order history.");
-        return response.json();
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok || !payload.success || !Array.isArray(payload.orders)) {
+          throw new Error(payload.message || "Unable to load order history.");
+        }
+        return payload.orders;
       })
-      .then((data) => setOrders(Array.isArray(data)
-        ? data.filter((order) => ["Completed", "Cancelled", "Ready for Pickup"].includes(order.status))
-        : []))
+      .then((data) => setOrders(data
+        .filter((order) => ["Completed", "Cancelled", "Ready for Pickup"].includes(order.status))
+        .map((order) => ({
+          ...order,
+          items: Array.isArray(order.items) ? order.items : [],
+        }))))
       .catch((error) => {
         setOrders([]);
         setLoadError(error.message || "Unable to load order history.");
