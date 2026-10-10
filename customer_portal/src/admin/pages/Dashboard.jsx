@@ -512,7 +512,7 @@ export default function Dashboard() {
                   <TrendChart rows={trendRows} metric={trendMetric} />
                 </Panel>
 
-                <div className="grid items-stretch gap-3 lg:grid-cols-[1.1fr_0.9fr]">
+                <div className="grid items-stretch gap-3 lg:grid-cols-2">
                   <Panel
                     eyebrow={null}
                     title="Top Selling Cakes"
