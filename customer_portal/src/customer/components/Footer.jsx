@@ -120,6 +120,11 @@ export default function Footer() {
                   Help Center
                 </Link>
               </li>
+              <li>
+                <Link to="/customer/credits" onClick={() => window.scrollTo(0, 0)} className="hover:text-white transition">
+                  Credits
+                </Link>
+              </li>
             </ul>
           </div>
 

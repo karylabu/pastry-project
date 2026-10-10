@@ -703,6 +703,8 @@ export default function Register() {
             <Link to="/customer/about-us" className="text-sm font-semibold text-gray-600 hover:text-[#F0B94D]">About Us</Link>
             <Link to="/customer/terms" className="text-sm font-semibold text-gray-600 hover:text-[#F0B94D]">Terms &amp; Conditions</Link>
             <Link to="/customer/privacy-policy" className="text-sm font-semibold text-gray-600 hover:text-[#F0B94D]">Privacy Policy</Link>
+            <Link to="/customer/cookie-policy" className="text-sm font-semibold text-gray-600 hover:text-[#F0B94D]">Cookie Policy</Link>
+            <Link to="/customer/credits" className="text-sm font-semibold text-gray-600 hover:text-[#F0B94D]">Credits</Link>
             <Link to="/customer/chat-support" className="text-sm font-semibold text-gray-600 hover:text-[#F0B94D]">Help</Link>
           </div>
         </footer>
