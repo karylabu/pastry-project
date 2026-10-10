@@ -18,15 +18,15 @@ const teamMembers = [
   },
 ];
 
-function SectionHeading({ icon: Icon, children, trailing }) {
+function SectionHeading({ icon: Icon, children, trailing, className = '' }) {
   return (
-    <div className="mb-3 flex items-center gap-3 text-[#986b2e]">
+    <div className={`mb-3 flex items-center gap-3 text-[#986b2e] ${className}`}>
       <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#4a2b20] text-[#f5d493]">
         <Icon size={15} strokeWidth={1.8} />
       </span>
-      <h3 className="shrink-0 text-[10px] font-black uppercase tracking-[0.2em] sm:text-xs">{children}</h3>
+      <h3 className="shrink-0 text-[9px] font-black uppercase tracking-[0.18em] sm:text-[10px]">{children}</h3>
       <span className="h-px min-w-3 flex-1 bg-[#dfc69d]" />
-      {trailing && <span className="mr-7 shrink-0 text-[7px] font-bold uppercase tracking-[0.12em] text-[#a77a3b] sm:mr-9 sm:text-[8px]">{trailing}</span>}
+      {trailing && <span className="mr-12 shrink-0 text-[6px] font-bold uppercase tracking-[0.1em] text-[#a77a3b] sm:mr-14 sm:text-[7px]">{trailing}</span>}
     </div>
   );
 }
