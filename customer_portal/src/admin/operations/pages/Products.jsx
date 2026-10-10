@@ -376,7 +376,12 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
     setHistoryError(null);
     try {
       const res = await staffFetch(`${STAFF_BASE}/api_product_stock_history.php?product_id=${encodeURIComponent(productId)}&per_page=50`);
-      const data = await res.json();
+      let data;
+      try {
+        data = await res.json();
+      } catch {
+        throw new Error("Stock history returned an invalid response. Please refresh and try again.");
+      }
       if (!res.ok || !data?.success) throw new Error(data?.message || "Unable to load stock history.");
       setHistoryEntries(Array.isArray(data.history) ? data.history : []);
     } catch (error) {

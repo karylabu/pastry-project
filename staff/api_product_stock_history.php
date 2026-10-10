@@ -12,7 +12,9 @@ if ($conn->connect_error) {
 }
 
 $productId = filter_input(INPUT_GET, 'product_id', FILTER_VALIDATE_INT) ?: 0;
-$productVariantId = filter_input(INPUT_GET, 'product_variant_id', FILTER_VALIDATE_INT) ?: 0;
+$productSizeId = filter_input(INPUT_GET, 'product_size_id', FILTER_VALIDATE_INT)
+    ?: filter_input(INPUT_GET, 'product_variant_id', FILTER_VALIDATE_INT)
+    ?: 0;
 $userId = filter_input(INPUT_GET, 'user_id', FILTER_VALIDATE_INT) ?: 0;
 $movementType = trim((string) ($_GET['movement_type'] ?? ''));
 $from = trim((string) ($_GET['from'] ?? ''));
@@ -28,8 +30,8 @@ if ($productId > 0) {
     $types .= 'i';
     $params[] = $productId;
 }
-if ($productVariantId > 0) {
-    $conditions[] = 'm.product_variant_id = ?';
+if ($productSizeId > 0) {
+    $conditions[] = 'm.product_size_id = ?';
     $types .= 'i';
     $params[] = $productVariantId;
 }
@@ -77,7 +79,7 @@ try {
     $total = (int) $countStmt->get_result()->fetch_assoc()['total'];
     $countStmt->close();
 
-    $sql = "SELECT m.id, m.product_id, m.product_variant_id, p.name AS product_name, m.movement_type, m.quantity,
+    $sql = "SELECT m.id, m.product_id, m.product_size_id, p.name AS product_name, m.movement_type, m.quantity,
                    m.previous_stock, m.new_stock, m.reason, m.reference_type, m.reference_id,
                    m.created_at, u.name AS staff_name
             FROM product_inventory_movements m
@@ -97,7 +99,7 @@ try {
         $history[] = [
             'movement_id' => (int) $row['id'],
             'product_id' => (int) $row['product_id'],
-            'product_variant_id' => $row['product_variant_id'] === null ? null : (int) $row['product_variant_id'],
+            'product_size_id' => $row['product_size_id'] === null ? null : (int) $row['product_size_id'],
             'product_name' => $row['product_name'],
             'movement_type' => $row['movement_type'],
             'quantity' => (float) $row['quantity'],

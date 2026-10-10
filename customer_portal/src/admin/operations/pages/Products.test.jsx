@@ -241,4 +241,41 @@ describe('Products admin catalog', () => {
       expect.objectContaining({ method: 'PUT' }),
     );
   });
+
+  test('loads product stock history from the deployed staff endpoint', async () => {
+    render(<Products allowCatalogManagement />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Strawberry Cake')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'View Strawberry Cake history' }));
+
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringContaining('/staff/api_product_stock_history.php?product_id=1&per_page=50'),
+        expect.objectContaining({ credentials: 'include' }),
+      );
+    });
+    expect(await screen.findByText('No movement history.')).toBeInTheDocument();
+  });
+
+  test('shows a readable error when stock history responds with non-JSON', async () => {
+    const existingFetch = global.fetch.getMockImplementation();
+    global.fetch.mockImplementation((url) => {
+      if (String(url).includes('api_product_stock_history.php')) {
+        return Promise.resolve({ ok: true, json: async () => { throw new SyntaxError("Unexpected token '<'"); } });
+      }
+      return existingFetch(url);
+    });
+    render(<Products allowCatalogManagement />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Strawberry Cake')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'View Strawberry Cake history' }));
+
+    expect(await screen.findByText('Stock history returned an invalid response. Please refresh and try again.')).toBeInTheDocument();
+  });
 });
