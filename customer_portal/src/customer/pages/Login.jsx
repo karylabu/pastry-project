@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import ForgotPassword from "./ForgotPassword";
+import CreditsModal from "../components/CreditsModal";
 import { LARAVEL_BASE, ROOT_BASE } from "../../services/config";
 import { safeParseJson } from '../../services/api';
 import { signInWithGoogle } from "../../services/firebase";
@@ -36,6 +37,7 @@ export default function Login() {
   const [showLoginSuccess, setShowLoginSuccess] = useState(false);
   const [justLoggedUser, setJustLoggedUser] = useState(null);
   const [showForgot, setShowForgot]   = useState(false);
+  const [showCredits, setShowCredits] = useState(false);
   useEffect(() => {
     localStorage.removeItem('pastry_saved_accounts');
   }, []);
@@ -729,11 +731,13 @@ export default function Login() {
             <Link to="/customer/terms" className="text-sm font-semibold text-gray-600 hover:text-[#F0B94D]">Terms &amp; Conditions</Link>
             <Link to="/customer/privacy-policy" className="text-sm font-semibold text-gray-600 hover:text-[#F0B94D]">Privacy Policy</Link>
             <Link to="/customer/cookie-policy" className="text-sm font-semibold text-gray-600 hover:text-[#F0B94D]">Cookie Policy</Link>
-            <Link to="/customer/credits" className="text-sm font-semibold text-gray-600 hover:text-[#F0B94D]">Credits</Link>
+            <button type="button" onClick={() => setShowCredits(true)} className="text-sm font-semibold text-gray-600 hover:text-[#F0B94D]">Credits</button>
             <Link to="/customer/chat-support" className="text-sm font-semibold text-gray-600 hover:text-[#F0B94D]">Help</Link>
           </div>
         </footer>
       </div>
+
+      <CreditsModal isOpen={showCredits} onClose={() => setShowCredits(false)} />
 
       {/* Success Modal */}
       {showLoginSuccess && justLoggedUser && (

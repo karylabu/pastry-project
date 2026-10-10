@@ -2,11 +2,13 @@ import React, { useState } from "react";
 import { Link } from "react-router-dom";
 import { Cake, Phone, Mail, HelpCircle, Loader2 } from "lucide-react";
 import { LARAVEL_BASE } from "../../services/config";
+import CreditsModal from "./CreditsModal";
 
 export default function Footer() {
   const [email, setEmail] = useState("");
   const [status, setStatus] = useState({ type: "idle", message: "" });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showCredits, setShowCredits] = useState(false);
 
   const handleSubscribe = async (e) => {
     e.preventDefault();
@@ -121,9 +123,9 @@ export default function Footer() {
                 </Link>
               </li>
               <li>
-                <Link to="/customer/credits" onClick={() => window.scrollTo(0, 0)} className="hover:text-white transition">
+                <button type="button" onClick={() => setShowCredits(true)} className="hover:text-white transition">
                   Credits
-                </Link>
+                </button>
               </li>
             </ul>
           </div>
@@ -178,6 +180,7 @@ export default function Footer() {
           </p>
         </div>
       </div>
+      <CreditsModal isOpen={showCredits} onClose={() => setShowCredits(false)} />
     </footer>
   );
 }

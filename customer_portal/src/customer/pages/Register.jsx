@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import { CUSTOMER_BASE, LARAVEL_BASE, ROOT_BASE } from "../../services/config";
 import { safeParseJson } from '../../services/api';
 import { signInWithGoogle } from "../../services/firebase";
+import CreditsModal from "../components/CreditsModal";
 
 const ASSET_BASE = process.env.NODE_ENV === "production"
   ? `${ROOT_BASE}/customer_portal/build/assets`
@@ -58,6 +59,7 @@ export default function Register() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+  const [showCredits, setShowCredits] = useState(false);
   const [errors, setErrors] = useState({});
   const [touched, setTouched] = useState({
     name: false,
@@ -704,11 +706,12 @@ export default function Register() {
             <Link to="/customer/terms" className="text-sm font-semibold text-gray-600 hover:text-[#F0B94D]">Terms &amp; Conditions</Link>
             <Link to="/customer/privacy-policy" className="text-sm font-semibold text-gray-600 hover:text-[#F0B94D]">Privacy Policy</Link>
             <Link to="/customer/cookie-policy" className="text-sm font-semibold text-gray-600 hover:text-[#F0B94D]">Cookie Policy</Link>
-            <Link to="/customer/credits" className="text-sm font-semibold text-gray-600 hover:text-[#F0B94D]">Credits</Link>
+            <button type="button" onClick={() => setShowCredits(true)} className="text-sm font-semibold text-gray-600 hover:text-[#F0B94D]">Credits</button>
             <Link to="/customer/chat-support" className="text-sm font-semibold text-gray-600 hover:text-[#F0B94D]">Help</Link>
           </div>
         </footer>
       </div>
+      <CreditsModal isOpen={showCredits} onClose={() => setShowCredits(false)} />
     </div>
   );
 }
