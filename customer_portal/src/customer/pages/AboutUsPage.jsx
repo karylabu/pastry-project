@@ -74,7 +74,7 @@ export default function AboutUsPage() {
             <div className="absolute -right-6 bottom-8 h-32 w-32 rounded-full bg-gray-100 blur-3xl" />
             <div className="relative overflow-hidden rounded-[32px] border border-gray-200 bg-white p-3 shadow-[0_20px_60px_rgba(0,0,0,0.06)]">
               <img
-                src={`${process.env.PUBLIC_URL}/assets/about-pastry-project.png`}
+                src={`${ROOT_BASE}/uploads/${encodeURIComponent('about us.jpg')}`}
                 alt="Pastry Project café in Tanauan City, Batangas"
                 className="h-[520px] w-full rounded-[26px] object-cover object-center"
               />
