@@ -283,6 +283,7 @@ class CustomerProductCatalog
 
     private function sizeOptions(array $product): array
     {
+        $hasSizeStock = Schema::hasColumn('product_sizes', 'stock_quantity');
         $rows = DB::table('product_sizes')
             ->where('product_id', (int) ($product['id'] ?? 0))
             ->whereRaw("LOWER(size) <> 'slice'")
@@ -304,6 +305,9 @@ class CustomerProductCatalog
                 'size' => $size,
                 'price' => (float) $row->price,
                 'available' => (int) ($row->available ?? 1),
+                'stock_quantity' => $hasSizeStock
+                    ? (int) ($row->stock_quantity ?? 0)
+                    : 0,
             ];
         }
 

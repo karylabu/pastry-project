@@ -35,6 +35,7 @@ class CustomerProductsApiTest extends TestCase
             $table->unsignedBigInteger('product_id');
             $table->string('size');
             $table->decimal('price', 10, 2);
+            $table->unsignedInteger('stock_quantity')->default(0);
             $table->boolean('available')->default(true);
         });
         Schema::create('orders', function ($table) {
@@ -77,8 +78,9 @@ class CustomerProductsApiTest extends TestCase
             'available' => false,
         ]);
         DB::table('product_sizes')->insert([
-            ['product_id' => 1, 'size' => 'Small', 'price' => 200, 'available' => true],
-            ['product_id' => 1, 'size' => 'Slice', 'price' => 50, 'available' => true],
+            ['product_id' => 1, 'size' => 'Small', 'price' => 200, 'stock_quantity' => 0, 'available' => true],
+            ['product_id' => 1, 'size' => 'Big', 'price' => 400, 'stock_quantity' => 3, 'available' => true],
+            ['product_id' => 1, 'size' => 'Slice', 'price' => 50, 'stock_quantity' => 1, 'available' => true],
         ]);
     }
 
@@ -102,7 +104,10 @@ class CustomerProductsApiTest extends TestCase
             ->assertJsonCount(1)
             ->assertJsonPath('0.id', 1)
             ->assertJsonPath('0.sizes.0.size', 'Small')
-            ->assertJsonMissingPath('0.sizes.1');
+            ->assertJsonPath('0.sizes.0.stock_quantity', 0)
+            ->assertJsonPath('0.sizes.1.size', 'Big')
+            ->assertJsonPath('0.sizes.1.stock_quantity', 3)
+            ->assertJsonMissingPath('0.sizes.2');
     }
 
     public function test_shop_status_uses_manila_server_time(): void

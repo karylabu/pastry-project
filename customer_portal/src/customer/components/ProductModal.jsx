@@ -182,11 +182,14 @@ export default function ProductModal({ isOpen, onClose, product, allCakes, onAdd
         variant?.variant_size ?? variant?.size ?? variant?.name ?? variant?.label ?? `Option ${index + 1}`;
       const priceValue = parseFloat(variant?.price ?? variant?.unit_price ?? product?.price ?? 0);
       const stockValue = Number(
-        variant?.stock_quantity ?? variant?.stock ?? variant?.quantity ?? product?.stock ?? 0
+        variant?.stock_quantity ?? variant?.stock ?? variant?.quantity ?? (isCakeProduct ? 0 : product?.stock) ?? 0
       );
       const isAvailable = variant?.available === undefined
         ? stockValue > 0
         : Boolean(Number(variant.available));
+      const canSelect = isCakeProduct
+        ? stockValue > 0 && variant?.available !== false && Number(variant?.available ?? 1) !== 0
+        : isAvailable;
       const rawId = variant?.id;
       const normalizedId = rawId === undefined || rawId === null || rawId === '' || rawId === 0
         ? `${sizeLabel}-${index}`
@@ -208,8 +211,8 @@ export default function ProductModal({ isOpen, onClose, product, allCakes, onAdd
         id: normalizedId,
         size: labelMap[displayLabel] || String(sizeLabel),
         price: Number.isFinite(priceValue) ? priceValue : 0,
-        stock_quantity: isAvailable ? 1 : 0,
-        available: isAvailable,
+        stock_quantity: isCakeProduct ? Math.max(0, Number.isFinite(stockValue) ? stockValue : 0) : isAvailable ? 1 : 0,
+        available: canSelect,
       };
     });
     const uniqueVariants = normalizedVariants.filter((variant, index, variants) =>
@@ -243,7 +246,9 @@ export default function ProductModal({ isOpen, onClose, product, allCakes, onAdd
   const currentVariant = useMemo(() => {
     if (variantButtons.length === 0) return null;
     const selected = variantButtons.find((v) => v.id === selectedSizeId);
-    return selected || variantButtons[0];
+    return selected?.stock_quantity > 0 && selected.available
+      ? selected
+      : variantButtons.find((v) => v.stock_quantity > 0 && v.available) || selected || variantButtons[0];
   }, [selectedSizeId, variantButtons]);
 
   const variantLabel = (currentVariant?.size || product?.variant || product?.defaultSize || '')
@@ -285,14 +290,17 @@ export default function ProductModal({ isOpen, onClose, product, allCakes, onAdd
       return labels.includes(incoming) || String(variant?.id).toLowerCase() === incoming;
     });
 
-    setSelectedSizeId(matchedVariant ? matchedVariant.id : variantButtons.length > 0 ? variantButtons[0].id : null);
+    const defaultVariant = matchedVariant?.stock_quantity > 0 && matchedVariant.available
+      ? matchedVariant
+      : variantButtons.find((variant) => variant.stock_quantity > 0 && variant.available) || variantButtons[0];
+    setSelectedSizeId(defaultVariant?.id ?? null);
   }, [isOpen, product, availableCakes.length, variantButtons]);
 
   if (!isOpen || !product) return null;
 
   const overallOutOfStock =
     variantButtons.length > 0
-      ? variantButtons.every((v) => v.stock_quantity <= 0)
+      ? variantButtons.every((v) => v.stock_quantity <= 0 || !v.available)
       : Number(product?.stock || 0) <= 0;
 
   const parsedUnitPrice = currentVariant
@@ -309,11 +317,13 @@ export default function ProductModal({ isOpen, onClose, product, allCakes, onAdd
   };
 
   const handleSelectSize = (variant) => {
-    if (variant.stock_quantity <= 0) return;
+    if (variant.stock_quantity <= 0 || !variant.available) return;
     setSelectedSizeId(variant.id);
   };
 
   const handleConfirm = () => {
+    if (overallOutOfStock || !currentVariant || currentVariant.stock_quantity <= 0 || !currentVariant.available) return;
+
     onAddToCart({
       ...product,
       product_id: Number(product.id),
@@ -384,7 +394,7 @@ export default function ProductModal({ isOpen, onClose, product, allCakes, onAdd
           {shouldShowVariantSelector && variantButtons.length > 0 && (
             <div className={`grid w-full ${variantButtons.length === 1 ? 'grid-cols-1' : variantButtons.length === 2 ? 'grid-cols-2' : 'grid-cols-3'} gap-1.5 rounded-2xl border border-gray-100 bg-white p-1.5`}>
               {variantButtons.map((v) => {
-                const disabled = v.stock_quantity <= 0;
+                const disabled = v.stock_quantity <= 0 || !v.available;
                 const selected = currentVariant && currentVariant.id === v.id;
                 return (
                   <button

@@ -160,10 +160,14 @@ export default function ProductCard({
     const normalizedVariants = rawVariants.map((variant, index) => {
       const sizeLabel = variant?.variant_size ?? variant?.size ?? variant?.name ?? variant?.label ?? `Option ${index + 1}`;
       const priceValue = parseFloat(variant?.price ?? variant?.unit_price ?? product?.price ?? 0);
-      const stockValue = Number(variant?.stock_quantity ?? variant?.stock ?? variant?.quantity ?? product?.stock ?? 0);
+      const rawStock = Number(variant?.stock_quantity ?? variant?.stock ?? variant?.quantity ?? (isCakeProduct ? 0 : product?.stock) ?? 0);
+      const stockValue = Number.isFinite(rawStock) ? Math.max(0, rawStock) : 0;
       const isAvailable = variant?.available === undefined
         ? stockValue > 0
         : Boolean(Number(variant.available));
+      const canSelect = isCakeProduct
+        ? stockValue > 0 && variant?.available !== false && Number(variant?.available ?? 1) !== 0
+        : isAvailable;
       const rawId = variant?.id;
       const normalizedId = rawId === undefined || rawId === null || rawId === '' || rawId === 0
         ? `${sizeLabel}-${index}`
@@ -185,8 +189,8 @@ export default function ProductCard({
         id: normalizedId,
         size: labelMap[displayLabel] || String(sizeLabel),
         price: Number.isFinite(priceValue) ? priceValue : 0,
-        stock_quantity: isAvailable ? 1 : 0,
-        available: isAvailable,
+        stock_quantity: isCakeProduct ? stockValue : isAvailable ? 1 : 0,
+        available: canSelect,
       };
     });
     const uniqueVariants = normalizedVariants.filter((variant, index, variants) =>
@@ -223,7 +227,9 @@ export default function ProductCard({
     }
 
     const selected = variantButtons.find((variant) => variant.id === selectedSizeId);
-    return selected || variantButtons[0];
+    return selected?.stock_quantity > 0 && selected.available
+      ? selected
+      : variantButtons.find((variant) => variant.stock_quantity > 0 && variant.available) || selected || variantButtons[0];
   }, [selectedSizeId, variantButtons]);
 
   useEffect(() => {
@@ -238,12 +244,15 @@ export default function ProductCard({
       return labels.includes(incoming) || String(variant?.id).toLowerCase() === incoming;
     });
 
-    if (matchedVariant && matchedVariant.id !== selectedSizeId) {
+    if (matchedVariant?.stock_quantity > 0 && matchedVariant.available && matchedVariant.id !== selectedSizeId) {
       setSelectedSizeId(matchedVariant.id);
       return;
     }
 
-    if (!selectedSizeId) {
+    const firstInStockVariant = variantButtons.find((variant) => variant.stock_quantity > 0 && variant.available);
+    if (firstInStockVariant && firstInStockVariant.id !== selectedSizeId) {
+      setSelectedSizeId(firstInStockVariant.id);
+    } else if (!selectedSizeId) {
       setSelectedSizeId(variantButtons[0].id);
     }
   }, [selectedSizeId, variantButtons, product?.variant, product?.defaultSize]);
@@ -255,7 +264,7 @@ export default function ProductCard({
   const overallOutOfStock = isSimpleProduct
     ? Number(product?.available) === 0 || product?.available === false
     : variantButtons.length > 0
-    ? variantButtons.every((variant) => variant.stock_quantity <= 0)
+    ? variantButtons.every((variant) => variant.stock_quantity <= 0 || !variant.available)
     : Number(product?.stock ?? 0) <= 0;
   const stockLabel = overallOutOfStock
     ? 'Out of stock'
@@ -264,7 +273,7 @@ export default function ProductCard({
     : '';
 
   const handleSelection = (variant) => {
-    if (variant.stock_quantity <= 0) return;
+    if (variant.stock_quantity <= 0 || !variant.available) return;
     setSelectedSizeId(variant.id);
   };
 
@@ -274,7 +283,8 @@ export default function ProductCard({
         const label = currentVariant ? currentVariant.size : fallbackOptions[0];
         onSelect?.(product, label, currentPrice);
       }}
-      className="group relative flex h-full min-h-[292px] min-w-0 flex-col items-center overflow-hidden rounded-xl border border-[#eadfd8] bg-[#fffaf7] p-2 text-center shadow-[0_5px_14px_rgba(91,64,39,0.06)] transition-all duration-300 hover:-translate-y-0.5 hover:border-[#e7c875] hover:shadow-[0_10px_20px_rgba(91,64,39,0.1)]"
+      aria-disabled={overallOutOfStock}
+      className={`group relative flex h-full min-h-[292px] min-w-0 flex-col items-center overflow-hidden rounded-xl border border-[#eadfd8] bg-[#fffaf7] p-2 text-center shadow-[0_5px_14px_rgba(91,64,39,0.06)] transition-all duration-300 ${overallOutOfStock ? 'border-gray-300 bg-gray-100 opacity-70' : 'hover:-translate-y-0.5 hover:border-[#e7c875] hover:shadow-[0_10px_20px_rgba(91,64,39,0.1)]'}`}
     >
       <div
         className="mb-2 flex h-[130px] w-full flex-shrink-0 items-center justify-center overflow-hidden rounded-lg border border-[#f1e6df] bg-[#f8eee8] p-2"
@@ -321,7 +331,7 @@ export default function ProductCard({
           <div className="mb-1 flex min-h-[25px] w-full items-center justify-center gap-1 overflow-hidden rounded-full border border-[#f1e6df] bg-[#f8f3ee] p-1">
             <div className="flex w-full items-center justify-center gap-1 overflow-hidden">
               {variantButtons.map((variant) => {
-                const disabled = variant.stock_quantity <= 0;
+                const disabled = variant.stock_quantity <= 0 || !variant.available;
                 const selected = currentVariant && currentVariant.id === variant.id;
 
                 return (

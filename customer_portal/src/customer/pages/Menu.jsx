@@ -31,6 +31,21 @@ const hasMenuImage = (product) => {
   return imageName !== '' && !MISSING_PRODUCT_IMAGES.has(imageName);
 };
 
+const hasCakeSizeStock = (product) => {
+  const sizes = Array.isArray(product?.sizes)
+    ? product.sizes
+    : Array.isArray(product?.variants)
+    ? product.variants
+    : [];
+  const cakeSizes = sizes.filter((size) => ['small', 'big'].includes(
+    String(size?.size ?? size?.variant_size ?? '').trim().toLowerCase()
+  ));
+
+  return cakeSizes.length > 0
+    ? cakeSizes.some((size) => Number(size?.stock_quantity ?? size?.stock ?? 0) > 0 && Number(size?.available ?? 1) !== 0)
+    : Number(product?.stock ?? 0) > 0;
+};
+
 export default function Menu({ onAddToCart, onEnsureShopOpen }) {
   const location = useLocation();
   const urlSearch = new URLSearchParams(location.search).get('search')?.trim() || '';
@@ -210,14 +225,14 @@ export default function Menu({ onAddToCart, onEnsureShopOpen }) {
       p.name?.toLowerCase().includes(normalizedSearch) ||
       p.description?.toLowerCase().includes(normalizedSearch) ||
       p.category?.toLowerCase().includes(normalizedSearch);
-    const matchesAvailability = !showOnlyAvailable || Number(p.stock || 0) > 0;
+    const matchesAvailability = !showOnlyAvailable || hasCakeSizeStock(p);
 
     return matchesCategory && matchesSearch && matchesAvailability;
   });
 
   const sortedProducts = filtered.slice().sort((a, b) => {
-    const aOut = Number(a.stock || 0) <= 0;
-    const bOut = Number(b.stock || 0) <= 0;
+    const aOut = !hasCakeSizeStock(a);
+    const bOut = !hasCakeSizeStock(b);
     if (aOut !== bOut) return aOut ? 1 : -1;
 
     if (sortBy === 'price-asc') {
