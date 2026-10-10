@@ -132,6 +132,7 @@ Route::post('customized-cakes/consume-inventory', [CustomizedCakeController::cla
 Route::get('promotions/unsubscribe', [PromotionUnsubscribeController::class, 'show'])
     ->name('promotions.unsubscribe');
 Route::post('promotions/unsubscribe', [PromotionUnsubscribeController::class, 'unsubscribe']);
+Route::post('promotions/validate-coupon', [PromotionController::class, 'validateCoupon']);
 
 Route::middleware(['api'])->group(function () {
     Route::apiResource('users', UserController::class);

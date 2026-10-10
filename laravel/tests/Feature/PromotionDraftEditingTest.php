@@ -36,6 +36,7 @@ class PromotionDraftEditingTest extends TestCase
             $table->text('description');
             $table->string('image_url')->nullable();
             $table->string('coupon_code', 50)->nullable();
+            $table->decimal('discount_percent', 5, 2)->nullable();
             $table->dateTime('starts_at');
             $table->dateTime('ends_at');
             $table->string('status', 30)->default('draft');
@@ -85,6 +86,7 @@ class PromotionDraftEditingTest extends TestCase
                 'title' => 'Updated draft',
                 'message' => 'New draft copy',
                 'coupon_code' => 'SAVE20',
+                'discount_percent' => 20,
                 'starts_at' => '2026-10-10 09:00:00',
                 'ends_at' => '2026-10-12 18:00:00',
             ])
@@ -97,6 +99,7 @@ class PromotionDraftEditingTest extends TestCase
             'title' => 'Updated draft',
             'description' => 'New draft copy',
             'coupon_code' => 'SAVE20',
+            'discount_percent' => 20,
             'status' => 'draft',
         ]);
     }
@@ -119,6 +122,28 @@ class PromotionDraftEditingTest extends TestCase
             'id' => $promotionId,
             'title' => 'Original campaign',
             'status' => 'sent',
+        ]);
+    }
+
+    public function test_draft_coupon_requires_a_discount_percent(): void
+    {
+        $promotionId = $this->createPromotion('draft');
+
+        $this->withHeader('X-Auth-Token', 'admin-token')
+            ->postJson("/api/admin/promotions/{$promotionId}", [
+                'title' => 'Updated draft',
+                'message' => 'New draft copy',
+                'coupon_code' => 'SAVE20',
+                'starts_at' => '2026-10-10 09:00:00',
+                'ends_at' => '2026-10-12 18:00:00',
+            ])
+            ->assertStatus(422)
+            ->assertJsonPath('success', false);
+
+        $this->assertDatabaseHas('promotions', [
+            'id' => $promotionId,
+            'coupon_code' => null,
+            'discount_percent' => null,
         ]);
     }
 
@@ -252,6 +277,7 @@ class PromotionDraftEditingTest extends TestCase
             'title' => 'Original campaign',
             'description' => 'Original copy',
             'coupon_code' => null,
+            'discount_percent' => null,
             'starts_at' => '2026-10-10 09:00:00',
             'ends_at' => '2026-10-12 18:00:00',
             'status' => $status,

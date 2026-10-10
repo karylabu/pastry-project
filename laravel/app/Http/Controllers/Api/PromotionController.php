@@ -68,7 +68,8 @@ class PromotionController extends Controller
         $validator = Validator::make($payload, [
             'title' => ['required', 'string', 'max:150'],
             'message' => ['required', 'string'],
-            'coupon_code' => ['nullable', 'string', 'max:50'],
+            'coupon_code' => ['nullable', 'required_with:discount_percent', 'string', 'max:50'],
+            'discount_percent' => ['nullable', 'required_with:coupon_code', 'integer', 'min:1', 'max:100'],
             'image_url' => ['nullable', 'string', 'max:255'],
             'image' => ['nullable', 'file', 'image', 'mimes:jpg,jpeg,png,gif,webp', 'max:5120'],
             'starts_at' => ['required', 'date'],
@@ -103,6 +104,7 @@ class PromotionController extends Controller
             'title' => $validated['title'],
             'description' => $validated['message'],
             'coupon_code' => $validated['coupon_code'] ?? null,
+            'discount_percent' => $validated['discount_percent'] ?? null,
             'image_url' => $imageUrl,
             'starts_at' => $validated['starts_at'],
             'ends_at' => $validated['ends_at'],
@@ -188,6 +190,54 @@ class PromotionController extends Controller
         ];
     }
 
+    public function validateCoupon(Request $request): JsonResponse
+    {
+        $user = $this->getAuthenticatedUser($request);
+
+        if (! $user || $user->role !== 'customer') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Authentication required.',
+            ], 401);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'coupon_code' => ['required', 'string', 'max:50'],
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => $validator->errors()->first(),
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        $code = strtoupper(trim($validator->validated()['coupon_code']));
+        $promotions = Promotion::acceptingCoupons()
+            ->whereRaw('UPPER(coupon_code) = ?', [$code])
+            ->limit(2)
+            ->get();
+
+        if ($promotions->count() !== 1) {
+            return response()->json([
+                'success' => false,
+                'message' => 'This coupon is invalid, expired, or unavailable.',
+            ], 422);
+        }
+
+        $promotion = $promotions->first();
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'coupon_code' => $promotion->coupon_code,
+                'discount_percent' => (float) $promotion->discount_percent,
+                'promotion_title' => $promotion->title,
+            ],
+        ]);
+    }
+
     public function update(Request $request, Promotion $promotion): JsonResponse
     {
         $user = $this->resolveAdminUser($request);
@@ -209,7 +259,8 @@ class PromotionController extends Controller
         $validator = Validator::make($request->all(), [
             'title' => ['required', 'string', 'max:150'],
             'message' => ['required', 'string'],
-            'coupon_code' => ['nullable', 'string', 'max:50'],
+            'coupon_code' => ['nullable', 'required_with:discount_percent', 'string', 'max:50'],
+            'discount_percent' => ['nullable', 'required_with:coupon_code', 'integer', 'min:1', 'max:100'],
             'image_url' => ['nullable', 'string', 'max:255'],
             'image' => ['nullable', 'file', 'image', 'mimes:jpg,jpeg,png,gif,webp', 'max:5120'],
             'starts_at' => ['required', 'date'],
@@ -244,6 +295,7 @@ class PromotionController extends Controller
             'title' => $validated['title'],
             'description' => $validated['message'],
             'coupon_code' => $validated['coupon_code'] ?: null,
+            'discount_percent' => $validated['discount_percent'] ?? null,
             'image_url' => $imageUrl,
             'starts_at' => $validated['starts_at'],
             'ends_at' => $validated['ends_at'],

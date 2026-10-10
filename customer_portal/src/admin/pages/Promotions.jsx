@@ -47,6 +47,7 @@ const emptyForm = {
   title: "",
   message: "",
   coupon_code: "",
+  discount_percent: "",
   starts_at: "",
   ends_at: "",
 };
@@ -151,6 +152,7 @@ export default function Promotions() {
       title: promotion.title || "",
       message: promotion.description || "",
       coupon_code: promotion.coupon_code || "",
+      discount_percent: promotion.discount_percent ? String(Number(promotion.discount_percent)) : "",
       starts_at: toDateTimeLocal(promotion.starts_at),
       ends_at: toDateTimeLocal(promotion.ends_at),
     });
@@ -208,6 +210,7 @@ export default function Promotions() {
     payload.append("title", form.title.trim());
     payload.append("message", form.message.trim());
     payload.append("coupon_code", form.coupon_code.trim());
+    if (form.coupon_code.trim()) payload.append("discount_percent", form.discount_percent);
     payload.append("starts_at", form.starts_at);
     payload.append("ends_at", form.ends_at);
     payload.append("user_id", String(user.id));
@@ -215,6 +218,10 @@ export default function Promotions() {
 
     if (!form.title.trim() || !form.message.trim() || !form.starts_at || !form.ends_at) {
       setError("Title, message, start date, and end date are required.");
+      return;
+    }
+    if (form.coupon_code.trim() && (!form.discount_percent || Number(form.discount_percent) < 1 || Number(form.discount_percent) > 100)) {
+      setError("Enter a coupon discount between 1% and 100%.");
       return;
     }
 
@@ -306,6 +313,22 @@ export default function Promotions() {
                         className="w-full bg-transparent text-[12px] text-black placeholder:text-black/35 outline-none"
                       />
                     </div>
+                  </label>
+
+                  <label className="block">
+                    <span className="mb-1.5 block text-[10px] font-semibold uppercase tracking-[0.16em] text-black/55">Coupon discount (%)</span>
+                    <input
+                      type="number"
+                      name="discount_percent"
+                      value={form.discount_percent}
+                      onChange={handleInputChange}
+                      min="1"
+                      max="100"
+                      step="1"
+                      disabled={!form.coupon_code.trim()}
+                      placeholder="10"
+                      className="h-10 w-full rounded-md border border-[#e8dfd4] bg-white px-3 text-[12px] text-black placeholder:text-black/35 focus:border-[#b89646] focus:outline-none focus:ring-2 focus:ring-[#d4af37]/15 disabled:cursor-not-allowed disabled:bg-[#f5f2ed]"
+                    />
                   </label>
 
                   <label className="block md:col-span-2">
@@ -471,8 +494,15 @@ export default function Promotions() {
                         </div>
 
                         {promotion.coupon_code && (
-                          <div className="mt-3 inline-flex rounded-full bg-[#1e1e1e] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-[#f1d06a]">
-                            {promotion.coupon_code}
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            <span className="inline-flex rounded-full bg-[#1e1e1e] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-[#f1d06a]">
+                              {promotion.coupon_code}
+                            </span>
+                            {Number(promotion.discount_percent) > 0 && (
+                              <span className="inline-flex rounded-full bg-green-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-green-800">
+                                {Number(promotion.discount_percent)}% off
+                              </span>
+                            )}
                           </div>
                         )}
 

@@ -43,8 +43,11 @@ class PromotionEmail extends Mailable
         $couponHtml = '';
         if (! empty($this->promotion->coupon_code)) {
             $couponHtml = sprintf(
-                '<p style="margin: 0 0 12px 0; font-size: 16px; color: #111111;"><strong>Use code:</strong> %s</p>',
+                '<p style="margin: 0 0 12px 0; font-size: 16px; color: #111111;"><strong>Use code:</strong> %s%s</p>',
                 e($this->promotion->coupon_code),
+                (float) $this->promotion->discount_percent > 0
+                    ? ' for ' . e((string) (float) $this->promotion->discount_percent) . '% off at checkout'
+                    : '',
             );
         }
 

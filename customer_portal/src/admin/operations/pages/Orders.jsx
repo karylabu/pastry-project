@@ -602,15 +602,21 @@ export default function Orders() {
                       {['gcash', 'qrph'].includes(String(order.payment || '').toLowerCase()) && <div className="mt-3 rounded-md border border-amber-200 bg-amber-50/70 p-3"><p className="text-[9px] font-semibold uppercase tracking-[0.14em] text-amber-800">QRPh payment · {String(order.payment_status || "pending").replaceAll("_", " ")}</p>{order.has_payment_proof && paymentProofPreviews[order.id] ? <img src={paymentProofPreviews[order.id]} alt={`Payment proof for order ${order.id}`} className="mt-2 max-h-64 w-full rounded border border-black/10 bg-white object-contain" /> : order.has_payment_proof ? <button type="button" onClick={() => viewPaymentProof(order.id)} disabled={paymentProofLoading === order.id} className="mt-2 rounded-md bg-black px-3 py-2 text-[10px] font-semibold text-white disabled:opacity-60">{paymentProofLoading === order.id ? "Loading proof..." : "View payment proof"}</button> : <p className="mt-1 text-[10px] text-amber-900">Waiting for customer payment proof.</p>}</div>}
                       {order.discount_type && order.discount_type !== "none" && (
                         <div className="mt-3 rounded-md border border-[#e8dfd4] bg-white p-3">
-                          <p className="text-[9px] font-semibold uppercase tracking-[0.14em] text-[#8f8076]">{order.discount_type === "pwd" ? "PWD" : "Senior Citizen"} discount · 5%</p>
+                          <p className="text-[9px] font-semibold uppercase tracking-[0.14em] text-[#8f8076]">
+                            {order.discount_type === 'promotion_coupon'
+                              ? `Promotion coupon${order.coupon_code ? `: ${order.coupon_code}` : ''}`
+                              : order.discount_type === 'reward_5_percent'
+                                ? 'Rewards discount · 5%'
+                                : `${order.discount_type === "pwd" ? "PWD" : "Senior Citizen"} discount · 5%`}
+                          </p>
                           <p className="mt-1">₱{Number(order.discount || 0).toFixed(2)}</p>
-                          {order.has_discount_id && discountIdPreviews[order.id] ? (
+                          {order.discount_type !== 'promotion_coupon' && order.discount_type !== 'reward_5_percent' && order.has_discount_id && discountIdPreviews[order.id] ? (
                             <img src={discountIdPreviews[order.id]} alt={`Discount ID for order ${order.id}`} className="mt-2 max-h-64 w-full rounded border border-black/10 bg-white object-contain" />
-                          ) : order.has_discount_id ? (
+                          ) : order.discount_type !== 'promotion_coupon' && order.discount_type !== 'reward_5_percent' && order.has_discount_id ? (
                             <button type="button" onClick={() => viewDiscountId(order.id)} disabled={discountIdLoading === order.id} className="mt-2 rounded-md bg-black px-3 py-2 text-[10px] font-semibold text-white disabled:opacity-60">{discountIdLoading === order.id ? "Loading ID..." : "View uploaded ID"}</button>
-                          ) : (
+                          ) : order.discount_type !== 'promotion_coupon' && order.discount_type !== 'reward_5_percent' ? (
                             <p className="mt-1 text-[10px] text-red-700">No ID image attached.</p>
-                          )}
+                          ) : null}
                         </div>
                       )}
                     </div>}
@@ -700,17 +706,22 @@ export default function Orders() {
                               )}
                               {order.discount_type && order.discount_type !== 'none' && (
                                 <div className="mt-4 rounded-xl border border-black/10 bg-white p-3">
-                                  <p className="text-[9px] uppercase tracking-[0.2em] text-black/50">Discount proof</p>
+                                  <p className="text-[9px] uppercase tracking-[0.2em] text-black/50">Discount</p>
                                   <p className="mt-1 font-semibold text-black">
-                                    {order.discount_type === 'pwd' ? 'PWD' : 'Senior Citizen'} · 5% (₱{Number(order.discount || 0).toFixed(2)})
+                                    {order.discount_type === 'promotion_coupon'
+                                      ? `Promotion coupon${order.coupon_code ? `: ${order.coupon_code}` : ''}`
+                                      : order.discount_type === 'reward_5_percent'
+                                        ? 'Rewards discount · 5%'
+                                        : `${order.discount_type === 'pwd' ? 'PWD' : 'Senior Citizen'} · 5%`}
+                                    {' '}(₱{Number(order.discount || 0).toFixed(2)})
                                   </p>
-                                  {order.has_discount_id && discountIdPreviews[order.id] ? (
+                                  {order.discount_type !== 'promotion_coupon' && order.discount_type !== 'reward_5_percent' && order.has_discount_id && discountIdPreviews[order.id] ? (
                                     <img
                                       src={discountIdPreviews[order.id]}
                                       alt={`${order.discount_type === 'pwd' ? 'PWD' : 'Senior Citizen'} ID for order ${order.id}`}
                                       className="mt-3 max-h-80 w-full rounded-lg border border-black/10 bg-black/[0.03] object-contain"
                                     />
-                                  ) : order.has_discount_id ? (
+                                  ) : order.discount_type !== 'promotion_coupon' && order.discount_type !== 'reward_5_percent' && order.has_discount_id ? (
                                     <button
                                       type="button"
                                       onClick={() => viewDiscountId(order.id)}
@@ -719,9 +730,9 @@ export default function Orders() {
                                     >
                                       {discountIdLoading === order.id ? 'Loading ID...' : 'View uploaded ID'}
                                     </button>
-                                  ) : (
+                                  ) : order.discount_type !== 'promotion_coupon' && order.discount_type !== 'reward_5_percent' ? (
                                     <p className="mt-2 text-xs text-red-700">No ID image attached.</p>
-                                  )}
+                                  ) : null}
                                 </div>
                               )}
                             </td>

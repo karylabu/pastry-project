@@ -37,6 +37,7 @@ class Order extends Model
         'order_type',
         'is_customized',
         'discount_type',
+        'coupon_code',
         'discount',
         'discount_id_path',
         'payment_proof_path'

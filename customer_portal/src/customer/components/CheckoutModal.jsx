@@ -79,6 +79,10 @@ export default function CheckoutModal({
   const [shopStatusError, setShopStatusError] = useState(false);
   const [discountType, setDiscountType] = useState('none');
   const [rewardCodeInput, setRewardCodeInput] = useState('');
+  const [promotionCouponInput, setPromotionCouponInput] = useState('');
+  const [promotionCoupon, setPromotionCoupon] = useState(null);
+  const [couponValidationMessage, setCouponValidationMessage] = useState('');
+  const [validatingCoupon, setValidatingCoupon] = useState(false);
   const [firstOrderEligibility, setFirstOrderEligibility] = useState({ status: 'unknown' });
   const [discountIdFile, setDiscountIdFile] = useState(null);
   const [discountIdPreview, setDiscountIdPreview] = useState('');
@@ -243,6 +247,55 @@ export default function CheckoutModal({
       isCurrent = false;
     };
   }, [isOpen, userId]);
+
+  const handleApplyPromotionCoupon = async () => {
+    const code = promotionCouponInput.trim().toUpperCase();
+    if (!code) {
+      setCouponValidationMessage('Enter a promotion coupon code.');
+      setPromotionCoupon(null);
+      return;
+    }
+    if (rewardCodeInput.trim() || discountType !== 'none') {
+      setCouponValidationMessage('Promotion coupons cannot be combined with reward, Senior Citizen, or PWD discounts.');
+      setPromotionCoupon(null);
+      return;
+    }
+
+    try {
+      setValidatingCoupon(true);
+      setCouponValidationMessage('');
+      setPromotionCoupon(null);
+
+      const response = await fetch(`${LARAVEL_BASE}/api/promotions/validate-coupon`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+          ...getAuthHeaders(),
+        },
+        body: JSON.stringify({ coupon_code: code }),
+      });
+      const data = await safeParseJson(response);
+
+      if (!response.ok || !data?.success || !data.data) {
+        throw new Error(data?.message || 'This promotion coupon is invalid or expired.');
+      }
+
+      setPromotionCoupon({
+        code: data.data.coupon_code,
+        discountPercent: Number(data.data.discount_percent),
+        promotionTitle: data.data.promotion_title,
+      });
+      setPromotionCouponInput(data.data.coupon_code);
+      setCouponValidationMessage(`${Number(data.data.discount_percent)}% promotion discount applied.`);
+    } catch (error) {
+      setCouponValidationMessage(error.message || 'Unable to validate this promotion coupon.');
+      setPromotionCoupon(null);
+    } finally {
+      setValidatingCoupon(false);
+    }
+  };
 
   useEffect(() => {
     if (!isOpen) return undefined;
@@ -453,18 +506,25 @@ export default function CheckoutModal({
 
   const rushFee = checkoutData.orderType === "Urgent" ? 100 : 0;
   const rewardCode = rewardCodeInput.trim().toUpperCase();
+  const hasCouponConflict = Boolean(promotionCoupon && (rewardCode || discountType !== 'none'));
   const seniorDiscountAmount = discountType === 'none' || !discountIdFile
     ? 0
     : Number((subtotal * 0.05).toFixed(2));
-  const rewardDiscountAmount = discountType === 'none' && rewardCode
+  const rewardDiscountAmount = discountType === 'none' && rewardCode && !promotionCoupon
     ? Number(Math.min(subtotal * 0.05, 100).toFixed(2))
+    : 0;
+  const promotionCouponDiscountAmount = promotionCoupon &&
+    discountType === 'none' &&
+    !rewardCode
+    ? Number((subtotal * promotionCoupon.discountPercent / 100).toFixed(2))
     : 0;
   const firstOrderDiscountAmount = firstOrderEligibility.status === 'eligible' &&
     discountType === 'none' &&
-    !rewardCode
+    !rewardCode &&
+    !promotionCoupon
     ? Number((subtotal * 0.05).toFixed(2))
     : 0;
-  const discountAmount = seniorDiscountAmount || rewardDiscountAmount || firstOrderDiscountAmount;
+  const discountAmount = seniorDiscountAmount || rewardDiscountAmount || promotionCouponDiscountAmount || firstOrderDiscountAmount;
   const taxAmount = 0;
 
   const total = subtotal + rushFee + taxAmount - discountAmount;
@@ -527,6 +587,14 @@ export default function CheckoutModal({
       alert('A reward code cannot be combined with a Senior Citizen or PWD discount.');
       return;
     }
+    if (hasCouponConflict) {
+      alert('A promotion coupon cannot be combined with a reward code or Senior Citizen / PWD discount.');
+      return;
+    }
+    if (promotionCouponInput.trim() && !promotionCoupon) {
+      alert('Apply the promotion coupon or clear the code before placing your order.');
+      return;
+    }
 
     const quantitiesByProduct = new Map();
     groupedItems.forEach((item) => {
@@ -578,6 +646,7 @@ export default function CheckoutModal({
         order_type: checkoutData.orderType || "Standard",
         discount_type: discountType,
         reward_code: rewardCode,
+        promotion_coupon_code: promotionCoupon?.code || '',
         address: checkoutData.address,
         phone: checkoutData.phone,
 
@@ -1227,7 +1296,7 @@ export default function CheckoutModal({
                   <span className="font-bold text-[#8d6a2e]">First order special offer: 5% off your subtotal.</span>{' '}
                   {firstOrderDiscountAmount > 0
                     ? 'It has been applied to your total below.'
-                    : 'This offer cannot be combined with a reward code or Senior Citizen / PWD discount.'}
+                    : 'This offer cannot be combined with a promotion coupon, reward code, or Senior Citizen / PWD discount.'}
                 </p>
               )}
               {firstOrderEligibility.status === 'used' && (
@@ -1260,6 +1329,9 @@ export default function CheckoutModal({
                       setDiscountIdFile(null);
                     } else {
                       setRewardCodeInput('');
+                      setPromotionCoupon(null);
+                      setPromotionCouponInput('');
+                      setCouponValidationMessage('');
                     }
                   }}
                   className="w-full rounded-lg border border-[#e8e1d8] bg-[#fffdfa] p-2.5 text-sm text-[#33251e] outline-none focus:border-[#d4af37] focus:ring-2 focus:ring-[#d4af37]/20"
@@ -1269,25 +1341,68 @@ export default function CheckoutModal({
                   <option value="pwd">PWD - 5%</option>
                 </select>
                 {discountType === 'none' && (
-                  <div className="space-y-2 rounded-xl border border-[#eee5db] bg-white p-3">
-                    <label htmlFor="checkout-reward-code" className="block text-xs font-semibold text-[#765d50]">
-                      Pastry Project reward code
-                    </label>
-                    <input
-                      id="checkout-reward-code"
-                      type="text"
-                      value={rewardCodeInput}
-                      onChange={(event) => setRewardCodeInput(event.target.value.toUpperCase())}
-                      maxLength={32}
-                      autoCapitalize="characters"
-                      autoComplete="off"
-                      spellCheck={false}
-                      placeholder="PPR-XXXXXXXX"
-                      className="w-full rounded-lg border border-[#e8e1d8] bg-[#fffdfa] p-2.5 text-sm uppercase text-[#33251e] outline-none placeholder:normal-case placeholder:text-gray-400 focus:border-[#d4af37] focus:ring-2 focus:ring-[#d4af37]/20"
-                    />
-                    <p className="text-[11px] leading-4 text-[#8d7a6e]">
-                      Redeem 5% off your subtotal, up to ₱100. Reward codes cannot be combined with Senior Citizen or PWD discounts.
-                    </p>
+                  <div className="space-y-3">
+                    <div className="space-y-2 rounded-xl border border-[#eee5db] bg-white p-3">
+                      <label htmlFor="checkout-promotion-coupon" className="block text-xs font-semibold text-[#765d50]">
+                        Promotion coupon
+                      </label>
+                      <div className="flex gap-2">
+                        <input
+                          id="checkout-promotion-coupon"
+                          type="text"
+                          value={promotionCouponInput}
+                          onChange={(event) => {
+                            setPromotionCouponInput(event.target.value.toUpperCase());
+                            setPromotionCoupon(null);
+                            setCouponValidationMessage('');
+                          }}
+                          maxLength={50}
+                          autoCapitalize="characters"
+                          autoComplete="off"
+                          spellCheck={false}
+                          placeholder="SPECIAL10"
+                          className="min-w-0 flex-1 rounded-lg border border-[#e8e1d8] bg-[#fffdfa] p-2.5 text-sm uppercase text-[#33251e] outline-none placeholder:normal-case placeholder:text-gray-400 focus:border-[#d4af37] focus:ring-2 focus:ring-[#d4af37]/20"
+                        />
+                        <button
+                          type="button"
+                          onClick={handleApplyPromotionCoupon}
+                          disabled={validatingCoupon || !promotionCouponInput.trim()}
+                          className="inline-flex shrink-0 items-center gap-1 rounded-lg bg-[#5c4715] px-3 py-2 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          {validatingCoupon && <Loader2 size={13} className="animate-spin" />}
+                          Apply
+                        </button>
+                      </div>
+                      {couponValidationMessage && (
+                        <p role="status" className={`text-[11px] leading-4 ${promotionCoupon ? 'text-green-700' : 'text-red-600'}`}>
+                          {couponValidationMessage}
+                        </p>
+                      )}
+                      <p className="text-[11px] leading-4 text-[#8d7a6e]">
+                        Use a coupon from an active promotion. Promotion coupons cannot be combined with reward or Senior Citizen / PWD discounts.
+                      </p>
+                    </div>
+
+                    <div className="space-y-2 rounded-xl border border-[#eee5db] bg-white p-3">
+                      <label htmlFor="checkout-reward-code" className="block text-xs font-semibold text-[#765d50]">
+                        Pastry Project reward code
+                      </label>
+                      <input
+                        id="checkout-reward-code"
+                        type="text"
+                        value={rewardCodeInput}
+                        onChange={(event) => setRewardCodeInput(event.target.value.toUpperCase())}
+                        maxLength={32}
+                        autoCapitalize="characters"
+                        autoComplete="off"
+                        spellCheck={false}
+                        placeholder="PPR-XXXXXXXX"
+                        className="w-full rounded-lg border border-[#e8e1d8] bg-[#fffdfa] p-2.5 text-sm uppercase text-[#33251e] outline-none placeholder:normal-case placeholder:text-gray-400 focus:border-[#d4af37] focus:ring-2 focus:ring-[#d4af37]/20"
+                      />
+                      <p className="text-[11px] leading-4 text-[#8d7a6e]">
+                        Redeem 5% off your subtotal, up to ₱100. Reward codes cannot be combined with promotion coupons or Senior Citizen / PWD discounts.
+                      </p>
+                    </div>
                   </div>
                 )}
                 {discountType !== 'none' && (
@@ -1357,6 +1472,8 @@ export default function CheckoutModal({
                   <span>
                     {rewardDiscountAmount > 0
                       ? 'Rewards discount (5%)'
+                      : promotionCouponDiscountAmount > 0
+                        ? `Promotion coupon (${promotionCoupon.discountPercent}% off)`
                       : firstOrderDiscountAmount > 0
                         ? 'First order discount (5%)'
                         : discountType === 'pwd'

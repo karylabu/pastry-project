@@ -626,7 +626,13 @@ export default function Orders() {
         ['Delivery time', formatReceiptValue(o.delivery_time || rawCustomDetails.delivery_time || rawCustomDetails.pickup_time)],
         ['Subtotal', o.subtotal !== undefined ? `₱${Number(o.subtotal || 0).toLocaleString()}` : ''],
         ['Delivery fee', o.delivery_fee !== undefined ? `₱${Number(o.delivery_fee || 0).toLocaleString()}` : ''],
-        ['Discount', Number(o.discount || 0) > 0 ? `${o.discount_type === 'reward_5_percent' ? 'Rewards (5%)' : formatReceiptValue(o.discount_type)} · ₱${Number(o.discount).toLocaleString()}` : ''],
+        ['Discount', Number(o.discount || 0) > 0
+          ? `${o.discount_type === 'promotion_coupon'
+            ? `Promotion coupon${o.coupon_code ? ` (${formatReceiptValue(o.coupon_code)})` : ''}`
+            : o.discount_type === 'reward_5_percent'
+              ? 'Rewards (5%)'
+              : formatReceiptValue(o.discount_type)} · ₱${Number(o.discount).toLocaleString()}`
+          : ''],
       ].filter(([, value]) => value);
       const receiptDetailsHtml = receiptDetails.map(([label, value]) => `
         <tr><th style="width:32%;padding:7px;border:1px solid #eee;text-align:left;vertical-align:top">${escapeReceiptHtml(label)}</th><td style="padding:7px;border:1px solid #eee;white-space:pre-wrap">${escapeReceiptHtml(value)}</td></tr>

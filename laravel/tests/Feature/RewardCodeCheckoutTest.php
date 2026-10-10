@@ -14,7 +14,7 @@ class RewardCodeCheckoutTest extends TestCase
     {
         parent::setUp();
 
-        foreach (['notifications', 'realtime_events', 'order_items', 'product_sizes', 'products', 'loyalty_transactions', 'orders', 'user_sessions', 'users'] as $table) {
+        foreach (['notifications', 'realtime_events', 'order_items', 'product_sizes', 'products', 'loyalty_transactions', 'promotions', 'orders', 'user_sessions', 'users'] as $table) {
             Schema::dropIfExists($table);
         }
 
@@ -42,6 +42,7 @@ class RewardCodeCheckoutTest extends TestCase
             $table->decimal('subtotal', 10, 2)->default(0);
             $table->decimal('delivery_fee', 10, 2)->default(0);
             $table->string('discount_type')->nullable();
+            $table->string('coupon_code')->nullable();
             $table->decimal('discount', 10, 2)->default(0);
             $table->string('discount_id_path')->nullable();
             $table->decimal('total', 10, 2)->default(0);
@@ -98,6 +99,16 @@ class RewardCodeCheckoutTest extends TestCase
             $table->string('reward_code', 32)->nullable();
             $table->timestamp('created_at')->nullable();
         });
+        Schema::create('promotions', function ($table) {
+            $table->id();
+            $table->string('title');
+            $table->string('coupon_code')->nullable();
+            $table->decimal('discount_percent', 5, 2)->nullable();
+            $table->dateTime('starts_at');
+            $table->dateTime('ends_at');
+            $table->string('status');
+            $table->timestamps();
+        });
         Schema::create('notifications', function ($table) {
             $table->id();
             $table->unsignedBigInteger('user_id')->nullable();
@@ -134,7 +145,7 @@ class RewardCodeCheckoutTest extends TestCase
 
     protected function tearDown(): void
     {
-        foreach (['notifications', 'realtime_events', 'order_items', 'product_sizes', 'products', 'loyalty_transactions', 'orders', 'user_sessions', 'users'] as $table) {
+        foreach (['notifications', 'realtime_events', 'order_items', 'product_sizes', 'products', 'loyalty_transactions', 'promotions', 'orders', 'user_sessions', 'users'] as $table) {
             Schema::dropIfExists($table);
         }
 
@@ -177,6 +188,66 @@ class RewardCodeCheckoutTest extends TestCase
         $this->assertSame(422, $response->getStatusCode());
         $this->assertSame(0, DB::table('orders')->count());
         $this->assertNull(DB::table('loyalty_transactions')->where('reward_code', 'PPR-STACK0001')->value('order_id'));
+    }
+
+    public function test_active_promotion_coupon_applies_admin_configured_percent_and_is_saved_with_order(): void
+    {
+        $this->createPromotionCoupon('BAKE15', 15);
+
+        $response = $this->placeOrder('', 'none', '', null, ' bake15 ');
+        $data = $response->getData(true);
+
+        $this->assertSame(201, $response->getStatusCode());
+        $this->assertSame('promotion_coupon', $data['discount_type']);
+        $this->assertSame('BAKE15', $data['coupon_code']);
+        $this->assertSame(450.0, (float) $data['discount']);
+        $this->assertSame(2550.0, (float) $data['total']);
+        $this->assertDatabaseHas('orders', [
+            'id' => $data['order_id'],
+            'coupon_code' => 'BAKE15',
+            'discount' => 450,
+            'total' => 2550,
+        ]);
+    }
+
+    public function test_invalid_expired_or_unsent_promotion_coupons_are_rejected(): void
+    {
+        $this->createPromotionCoupon('EXPIRED10', 10, 'sent', now()->subDays(3), now()->subDay());
+        $this->createPromotionCoupon('DRAFT10', 10, 'draft');
+
+        foreach (['UNKNOWN10', 'EXPIRED10', 'DRAFT10'] as $code) {
+            $response = $this->placeOrder('', 'none', '', null, $code);
+            $this->assertSame(422, $response->getStatusCode(), "Expected {$code} to be rejected.");
+        }
+
+        $this->assertSame(0, DB::table('orders')->count());
+    }
+
+    public function test_promotion_coupon_cannot_be_combined_with_other_discounts(): void
+    {
+        $this->createPromotionCoupon('BAKE15', 15);
+        $this->createReward(7, 'PPR-STACKPROMO');
+
+        foreach ([
+            $this->placeOrder('PPR-STACKPROMO', 'none', '', null, 'BAKE15'),
+            $this->placeOrder('', 'pwd', '', null, 'BAKE15'),
+        ] as $response) {
+            $this->assertSame(422, $response->getStatusCode());
+        }
+
+        $this->assertSame(0, DB::table('orders')->count());
+    }
+
+    public function test_checkout_coupon_validation_returns_configured_percent_for_active_code(): void
+    {
+        $this->createPromotionCoupon('BAKE15', 15);
+
+        $this->withHeader('X-Auth-Token', 'test-customer-token')
+            ->postJson('/api/promotions/validate-coupon', ['coupon_code' => ' bake15 '])
+            ->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.coupon_code', 'BAKE15')
+            ->assertJsonPath('data.discount_percent', 15);
     }
 
     public function test_empty_delivery_time_is_stored_as_null(): void
@@ -260,11 +331,31 @@ class RewardCodeCheckoutTest extends TestCase
         ]);
     }
 
+    private function createPromotionCoupon(
+        string $code,
+        int $discountPercent,
+        string $status = 'sent',
+        ?\Illuminate\Support\Carbon $startsAt = null,
+        ?\Illuminate\Support\Carbon $endsAt = null
+    ): int {
+        return (int) DB::table('promotions')->insertGetId([
+            'title' => 'Test promotion',
+            'coupon_code' => $code,
+            'discount_percent' => $discountPercent,
+            'starts_at' => ($startsAt ?? now()->subDay())->toDateTimeString(),
+            'ends_at' => ($endsAt ?? now()->addDay())->toDateTimeString(),
+            'status' => $status,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+    }
+
     private function placeOrder(
         string $rewardCode,
         string $discountType = 'none',
         string $deliveryTime = '',
-        ?array $items = null
+        ?array $items = null,
+        string $promotionCouponCode = ''
     )
     {
         $request = StoreOrderRequest::create('/api/orders', 'POST', [
@@ -276,6 +367,7 @@ class RewardCodeCheckoutTest extends TestCase
             'order_type' => 'Standard',
             'discount_type' => $discountType,
             'reward_code' => $rewardCode,
+            'promotion_coupon_code' => $promotionCouponCode,
         ], [], [], [
             'HTTP_ACCEPT' => 'application/json',
             'HTTP_AUTHORIZATION' => 'Bearer test-customer-token',

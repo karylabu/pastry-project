@@ -6,6 +6,7 @@ use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\CustomCakeOrder;
 use App\Models\AdminNotification;
+use App\Models\Promotion;
 use App\Models\Product;
 use App\Http\Requests\StoreOrderRequest;
 use App\Services\CustomizedCakeService;
@@ -223,9 +224,36 @@ class OrderController extends Controller
                 $rushFee = ($request->order_type ?? 'Standard') === 'Urgent' ? 100.0 : 0.0;
                 $discountType = $request->input('discount_type', 'none');
                 $rewardCode = strtoupper(trim((string) $request->input('reward_code', '')));
+                $promotionCouponCode = strtoupper(trim((string) $request->input('promotion_coupon_code', '')));
                 $orderDiscountType = $discountType;
                 $discountAmount = 0.0;
                 $rewardTransactionId = null;
+                $promotionCoupon = null;
+
+                if ($promotionCouponCode !== '') {
+                    if ($rewardCode !== '' || $discountType !== 'none') {
+                        return response()->json([
+                            'success' => false,
+                            'message' => 'A promotion coupon cannot be combined with a reward code or Senior Citizen / PWD discount.',
+                        ], 422);
+                    }
+
+                    $matchingPromotions = Promotion::acceptingCoupons()
+                        ->whereRaw('UPPER(coupon_code) = ?', [$promotionCouponCode])
+                        ->limit(2)
+                        ->lockForUpdate()
+                        ->get();
+
+                    if ($matchingPromotions->count() !== 1) {
+                        return response()->json([
+                            'success' => false,
+                            'message' => 'This coupon is invalid, expired, or unavailable.',
+                        ], 422);
+                    }
+
+                    $promotionCoupon = $matchingPromotions->first();
+                }
+
                 if ($rewardCode !== '') {
                     if ($discountType !== 'none') {
                         return response()->json([
@@ -261,6 +289,9 @@ class OrderController extends Controller
                     $rewardTransactionId = (int) $rewardTransaction->id;
                     $discountAmount = round(min($subtotal * 0.05, (float) $rewardTransaction->max_discount_amount), 2);
                     $orderDiscountType = 'reward_5_percent';
+                } elseif ($promotionCoupon) {
+                    $discountAmount = round($subtotal * ((float) $promotionCoupon->discount_percent / 100), 2);
+                    $orderDiscountType = 'promotion_coupon';
                 } elseif ($discountType !== 'none') {
                     if (!in_array($discountType, ['senior_citizen', 'pwd'], true)) {
                         return response()->json([
@@ -297,6 +328,7 @@ class OrderController extends Controller
                     'subtotal' => $subtotal,
                     'delivery_fee' => $deliveryFee,
                     'discount_type' => $orderDiscountType,
+                    'coupon_code' => $promotionCoupon?->coupon_code,
                     'discount' => $discountAmount,
                     'discount_id_path' => $discountIdPath,
                     'total' => $total,
@@ -384,6 +416,7 @@ class OrderController extends Controller
                     'subtotal' => $subtotal,
                     'delivery_fee' => $deliveryFee,
                     'discount_type' => $orderDiscountType,
+                    'coupon_code' => $promotionCoupon?->coupon_code,
                     'discount' => $discountAmount,
                     'total' => $total,
                     'order' => $order->load('orderItems'),
