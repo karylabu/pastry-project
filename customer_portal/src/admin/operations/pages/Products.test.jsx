@@ -205,4 +205,40 @@ describe('Products admin catalog', () => {
       );
     });
   });
+
+  test('edits product name, category, and selected cake price without submitting stock', async () => {
+    render(<Products allowCatalogManagement />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Strawberry Cake')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getAllByRole('button', { name: 'Edit' })[0]);
+    fireEvent.change(screen.getByLabelText('Product Name'), { target: { value: 'Pistachio Dream' } });
+    fireEvent.change(screen.getByLabelText('Category'), { target: { value: 'Small Cakes' } });
+    fireEvent.change(screen.getByLabelText('Big Cake Price'), { target: { value: '525' } });
+
+    expect(screen.queryByLabelText('Current Stock')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+    await waitFor(() => {
+      expect(screen.queryByRole('heading', { name: 'Edit Product' })).not.toBeInTheDocument();
+    });
+
+    const updateCall = global.fetch.mock.calls.find(([url]) =>
+      String(url).includes('api_products.php?action=update')
+    );
+    expect(updateCall).toBeDefined();
+    const formData = updateCall[1].body;
+    expect(formData.get('id')).toBe('1');
+    expect(formData.get('name')).toBe('Pistachio Dream');
+    expect(formData.get('category')).toBe('Small Cakes');
+    expect(formData.get('price')).toBe('525');
+    expect(formData.get('price_size')).toBe('big');
+    expect(formData.has('stock')).toBe(false);
+    expect(global.fetch).toHaveBeenCalledWith(
+      expect.stringContaining('/api/staff/products/1/recipe'),
+      expect.objectContaining({ method: 'PUT' }),
+    );
+  });
 });

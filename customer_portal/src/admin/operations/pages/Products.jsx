@@ -1329,8 +1329,9 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
 
                 <div className="grid gap-3 md:grid-cols-2">
                   <div className="space-y-2">
-                    <label className="block text-[10px] font-bold uppercase tracking-[0.16em] text-[#8f8076]">Product Name</label>
+                    <label htmlFor="edit-product-name" className="block text-[10px] font-bold uppercase tracking-[0.16em] text-[#8f8076]">Product Name</label>
                     <input
+                      id="edit-product-name"
                       type="text"
                       value={editProduct.name}
                       onChange={(e) => setEditProduct((p) => ({ ...p, name: e.target.value }))}
@@ -1339,35 +1340,31 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
                   </div>
 
                   <div className="space-y-2">
-                    <label className="block text-[10px] font-bold uppercase tracking-[0.16em] text-[#8f8076]">Category</label>
-                    <input
-                      type="text"
+                    <label htmlFor="edit-product-category" className="block text-[10px] font-bold uppercase tracking-[0.16em] text-[#8f8076]">Category</label>
+                    <select
+                      id="edit-product-category"
                       value={editProduct.category}
                       onChange={(e) => setEditProduct((p) => ({ ...p, category: e.target.value }))}
-                      readOnly={allowCatalogManagement}
-                      className="w-full rounded-lg border border-[#eadfd8] bg-white px-3 py-2.5 text-[12px] text-[#33251e] outline-none transition focus:border-[#d4af37] focus:ring-2 focus:ring-[#d4af37]/15 read-only:bg-[#fbf7f2]"
-                    />
+                      className="w-full rounded-lg border border-[#eadfd8] bg-white px-3 py-2.5 text-[12px] text-[#33251e] outline-none transition focus:border-[#d4af37] focus:ring-2 focus:ring-[#d4af37]/15"
+                    >
+                      {[...new Set([
+                        ...(canManageCatalog ? ["Cakes", "Small Cakes"] : ["Cakes", "Small Cakes", "Meals", "Pasta", "Starter"]),
+                        editProduct.category,
+                      ].filter(Boolean))].map((category) => (
+                        <option key={category} value={category}>{category}</option>
+                      ))}
+                    </select>
                   </div>
 
                   <div className="space-y-2">
-                    <label className="block text-[10px] font-bold uppercase tracking-[0.16em] text-[#8f8076]">{activeCat === "Small Cakes" ? "Small Cake Price" : "Big Cake Price"}</label>
+                    <label htmlFor="edit-product-price" className="block text-[10px] font-bold uppercase tracking-[0.16em] text-[#8f8076]">{activeCat === "Small Cakes" ? "Small Cake Price" : "Big Cake Price"}</label>
                     <input
+                      id="edit-product-price"
                       type="number"
                       min="0"
                       step="0.01"
                       value={editProduct.price}
                       onChange={(e) => setEditProduct((p) => ({ ...p, price: e.target.value }))}
-                      className="w-full rounded-lg border border-[#eadfd8] bg-white px-3 py-2.5 text-[12px] text-[#33251e] outline-none transition focus:border-[#d4af37] focus:ring-2 focus:ring-[#d4af37]/15"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <label className="block text-[10px] font-bold uppercase tracking-[0.16em] text-[#8f8076]">Current Stock</label>
-                    <input
-                      type="number"
-                      min="0"
-                      value={editProduct.stock}
-                      onChange={(e) => setEditProduct((p) => ({ ...p, stock: e.target.value }))}
                       className="w-full rounded-lg border border-[#eadfd8] bg-white px-3 py-2.5 text-[12px] text-[#33251e] outline-none transition focus:border-[#d4af37] focus:ring-2 focus:ring-[#d4af37]/15"
                     />
                   </div>
@@ -1467,7 +1464,6 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
                         formData.append('category', (editProduct.category || '').toString());
                         if (canManageCatalog) formData.append('price_size', activeCat === "Small Cakes" ? "small" : "big");
                         formData.append('price', Number(editProduct.price) || 0);
-                        formData.append('stock', Number(editProduct.stock) || 0);
                         formData.append('description', (editProduct.description || '').toString());
                         if (editImage) formData.append('image', editImage);
 
@@ -1475,13 +1471,14 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
                           method: 'POST',
                           body: formData
                         });
-                        const data = await res.json();
+                        const data = await res.json().catch(() => ({}));
+                        if (!res.ok) throw new Error(data.error || data.message || 'Product update failed.');
                         if (data.success) {
                           const recipePayload = recipeRows
                             .filter((row) => row.ingredient_id && Number(row.qty) > 0)
                             .map((row) => ({ ingredient_id: Number(row.ingredient_id), qty: Number(row.qty) }));
                           if (recipeSizeId) {
-                            const recipeRes = await laravelStaffFetch(`${LARAVEL_BASE}/api/staff/products/${data.product_id}/recipe`, {
+                            const recipeRes = await laravelStaffFetch(`${LARAVEL_BASE}/api/staff/products/${data.product_id || editProduct.id}/recipe`, {
                               method: 'PUT',
                               headers: { 'Content-Type': 'application/json' },
                               body: JSON.stringify({ product_size_id: Number(recipeSizeId), recipes: recipePayload }),
@@ -1492,10 +1489,10 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
                           await fetchProducts();
                           setEditOpen(false);
                         } else {
-                          alert(data.error || 'Update failed.');
+                          throw new Error(data.error || data.message || 'Product update failed.');
                         }
                       } catch (err) {
-                        alert('Server error while updating product.');
+                        alert(err.message || 'Server error while updating product.');
                       } finally {
                         setEditSaving(false);
                       }

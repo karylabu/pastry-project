@@ -308,6 +308,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $name = trim($_POST['name'] ?? '');
         $category = trim($_POST['category'] ?? '');
         $price = floatval($_POST['price'] ?? 0);
+        $priceSize = strtolower(trim($_POST['price_size'] ?? ''));
         $stock = intval($_POST['stock'] ?? 0);
         $description = trim($_POST['description'] ?? '');
 
