@@ -512,28 +512,28 @@ export default function Dashboard() {
                   <TrendChart rows={trendRows} metric={trendMetric} />
                 </Panel>
 
-                <div className="grid gap-3 lg:grid-cols-[1.1fr_0.9fr]">
+                <div className="grid items-stretch gap-3 lg:grid-cols-[1.1fr_0.9fr]">
                   <Panel
                     eyebrow={null}
                     title="Top Selling Cakes"
-                    className="min-w-0"
+                    className="h-full min-h-[190px] min-w-0"
                     action={<Link to="/admin/products" aria-label="View all cakes in Products" className="group inline-flex items-center gap-1 rounded-md px-2 py-1 text-[10px] font-semibold text-[#876a19] transition hover:bg-[#fff8df] hover:text-[#5d470e] hover:outline hover:outline-1 hover:outline-[#d4af37] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d4af37] focus-visible:ring-offset-2">View All <ArrowRight size={12} className="transition-transform group-hover:translate-x-0.5" /></Link>}
                   >
                     <TopSellingTable rows={mostSoldItems} />
                   </Panel>
-                  <Panel eyebrow={null} title="Order Status Breakdown">
+                  <Panel eyebrow={null} title="Order Status Breakdown" className="h-full min-h-[190px]">
                     <OrderStatusBreakdown rows={orderStatusBreakdown} />
                   </Panel>
                 </div>
 
-                <div className="grid gap-6 lg:grid-cols-2">
-                  <Panel eyebrow="Best Sellers" title="Best-selling flavors"><RankedList rows={analytics.flavors} /></Panel>
-                  <Panel eyebrow="Best Sellers" title="Best-selling sizes"><RankedList rows={analytics.sizes} /></Panel>
+                <div className="grid items-stretch gap-3 lg:grid-cols-2">
+                  <Panel eyebrow="Best Sellers" title="Best-selling flavors" className="h-full min-h-[190px]"><RankedList rows={analytics.flavors} /></Panel>
+                  <Panel eyebrow="Best Sellers" title="Best-selling sizes" className="h-full min-h-[190px]"><RankedList rows={analytics.sizes} /></Panel>
                 </div>
 
-                <div className="grid gap-3 lg:grid-cols-2">
-                  <Panel eyebrow="Customized Cakes" title="Best-selling cake designs" className="min-w-0"><RankedList rows={analytics.designs} /></Panel>
-                  <Panel eyebrow="Sales Mix" title="Regular vs. customized cakes">
+                <div className="grid items-stretch gap-3 lg:grid-cols-2">
+                  <Panel eyebrow="Customized Cakes" title="Best-selling cake designs" className="h-full min-h-[190px] min-w-0"><RankedList rows={analytics.designs} /></Panel>
+                  <Panel eyebrow="Sales Mix" title="Regular vs. customized cakes" className="h-full min-h-[190px]">
                     <div className="space-y-4 p-5">
                       {Object.entries(regularVsCustomized).map(([type, row]) => (
                         <div key={type}>
