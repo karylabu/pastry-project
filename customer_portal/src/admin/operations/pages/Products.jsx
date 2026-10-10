@@ -91,6 +91,7 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
   const [adjustType, setAdjustType] = useState("out");
   const [adjustNotes, setAdjustNotes] = useState("");
   const [inventorySummary, setInventorySummary] = useState(null);
+  const [inventorySummaryError, setInventorySummaryError] = useState("");
   const [productionAvailability, setProductionAvailability] = useState({ is_producible: false, reason: null });
 
   const [ingredients, setIngredients] = useState([]);
@@ -167,14 +168,19 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
 
   };
 
-  const fetchInventorySummary = () => {
-    staffFetch(`${STAFF_BASE}/api_products.php?action=summary`)
-      .then((res) => res.json().then((data) => ({ res, data })))
-      .then(({ res, data }) => {
-        if (!res.ok || !data?.success) throw new Error(data?.message || "Unable to load inventory summary.");
-        setInventorySummary(data.summary);
-      })
-      .catch(() => setInventorySummary(null));
+  const fetchInventorySummary = async () => {
+    setInventorySummaryError("");
+    try {
+      const res = await laravelStaffFetch(`${LARAVEL_BASE}/api/admin/stock/summary`);
+      const data = await res.json();
+      if (!res.ok || !data?.success || !data.summary) {
+        throw new Error(data?.message || "Unable to load inventory summary.");
+      }
+      setInventorySummary(data.summary);
+    } catch (error) {
+      setInventorySummary(null);
+      setInventorySummaryError(error.message || "Unable to load inventory summary.");
+    }
   };
 
   useEffect(() => {
@@ -664,6 +670,11 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
             </div>
           ))}
         </div>
+        {inventorySummaryError && (
+          <p role="alert" className="-mt-4 mb-5 text-xs text-red-700">
+            Inventory summary unavailable: {inventorySummaryError}
+          </p>
+        )}
 
         {/* =========================
             CATEGORY FILTER + SEARCH + ACTIONS

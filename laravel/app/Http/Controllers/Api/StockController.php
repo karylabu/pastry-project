@@ -13,6 +13,45 @@ use Illuminate\Validation\ValidationException;
 
 class StockController extends Controller
 {
+    public function summary(Request $request): JsonResponse
+    {
+        if ($response = $this->authorizeAdmin($request)) {
+            return $response;
+        }
+
+        $cakeProducts = DB::table('products')
+            ->where('available', 1)
+            ->whereRaw("LOWER(TRIM(category)) IN ('cake', 'cakes')");
+
+        $todayProduction = DB::table('production_transactions as pt')
+            ->join('products as p', 'p.id', '=', 'pt.product_id')
+            ->where('p.available', 1)
+            ->whereRaw("LOWER(TRIM(p.category)) IN ('cake', 'cakes')")
+            ->whereDate('pt.created_at', now()->toDateString())
+            ->sum('pt.quantity');
+
+        $todayWaste = DB::table('waste_log as w')
+            ->join('products as p', 'p.id', '=', 'w.product_id')
+            ->where('p.available', 1)
+            ->whereRaw("LOWER(TRIM(p.category)) IN ('cake', 'cakes')")
+            ->whereDate('w.datetime', now()->toDateString())
+            ->sum('w.qty');
+
+        return response()->json([
+            'success' => true,
+            'summary' => [
+                'total_finished_products' => (int) (clone $cakeProducts)->count(),
+                'low_stock' => (int) (clone $cakeProducts)
+                    ->where('stock', '>', 0)
+                    ->whereColumn('stock', '<=', 'minimum_stock')
+                    ->count(),
+                'out_of_stock' => (int) (clone $cakeProducts)->where('stock', '<=', 0)->count(),
+                'today_production' => (float) $todayProduction,
+                'today_waste' => (float) $todayWaste,
+            ],
+        ]);
+    }
+
     public function history(Request $request): JsonResponse
     {
         if ($response = $this->authorizeAdmin($request)) {

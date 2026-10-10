@@ -72,7 +72,7 @@ describe('Products admin catalog', () => {
         });
       }
 
-      if (String(url).includes('action=summary')) {
+      if (String(url).includes('/api/admin/stock/summary')) {
         return Promise.resolve({
           ok: true,
           json: async () => ({
@@ -277,5 +277,22 @@ describe('Products admin catalog', () => {
     fireEvent.click(screen.getByRole('button', { name: 'View Strawberry Cake history' }));
 
     expect(await screen.findByText('Stock history returned an invalid response. Please refresh and try again.')).toBeInTheDocument();
+  });
+
+  test('loads inventory cards from the authenticated Laravel summary endpoint', async () => {
+    render(<Products allowCatalogManagement />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Strawberry Cake')).toBeInTheDocument();
+    });
+    const lowStockCard = screen.getByText('Low Stock').parentElement;
+    await waitFor(() => expect(lowStockCard).toHaveTextContent('0'));
+    expect(screen.getByText('Out of Stock').parentElement).toHaveTextContent('0');
+    expect(screen.getByText("Today's Production").parentElement).toHaveTextContent('0');
+    expect(screen.getByText("Today's Waste").parentElement).toHaveTextContent('0');
+    expect(global.fetch).toHaveBeenCalledWith(
+      expect.stringContaining('/api/admin/stock/summary'),
+      expect.objectContaining({ credentials: 'include' }),
+    );
   });
 });

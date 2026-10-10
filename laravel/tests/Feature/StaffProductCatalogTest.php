@@ -19,6 +19,7 @@ class StaffProductCatalogTest extends TestCase
             $table->string('category');
             $table->decimal('price', 10, 2)->default(0);
             $table->integer('stock')->default(0);
+            $table->integer('minimum_stock')->default(5);
             $table->boolean('available')->default(true);
             $table->string('description')->nullable();
             $table->string('image')->nullable();
@@ -50,6 +51,18 @@ class StaffProductCatalogTest extends TestCase
             $table->unsignedBigInteger('reference_id')->nullable();
             $table->unsignedBigInteger('user_id')->nullable();
             $table->timestamps();
+        });
+        Schema::create('production_transactions', function ($table) {
+            $table->id();
+            $table->unsignedBigInteger('product_id');
+            $table->integer('quantity');
+            $table->timestamp('created_at')->nullable();
+        });
+        Schema::create('waste_log', function ($table) {
+            $table->id();
+            $table->dateTime('datetime');
+            $table->decimal('qty', 10, 3);
+            $table->unsignedBigInteger('product_id')->nullable();
         });
         Schema::create('ingredients', function ($table) {
             $table->id();
@@ -114,6 +127,8 @@ class StaffProductCatalogTest extends TestCase
     protected function tearDown(): void
     {
         Schema::dropIfExists('users');
+        Schema::dropIfExists('waste_log');
+        Schema::dropIfExists('production_transactions');
         Schema::dropIfExists('product_sizes');
         Schema::dropIfExists('product_inventory_movements');
         Schema::dropIfExists('products');
@@ -222,5 +237,35 @@ class StaffProductCatalogTest extends TestCase
             ->assertJsonPath('history.0.movement_type', 'Stock In')
             ->assertJsonPath('history.0.staff', 'System')
             ->assertJsonPath('pagination.total', 1);
+    }
+
+    public function test_admin_stock_summary_returns_cake_stock_production_and_waste_totals(): void
+    {
+        $admin = new User();
+        $admin->role = 'admin';
+        $admin->status = 'active';
+
+        DB::table('products')->where('id', 1)->update(['stock' => 4, 'minimum_stock' => 5]);
+        DB::table('products')->where('id', 3)->update(['stock' => 0, 'minimum_stock' => 5]);
+        DB::table('production_transactions')->insert([
+            'product_id' => 1,
+            'quantity' => 3,
+            'created_at' => now(),
+        ]);
+        DB::table('waste_log')->insert([
+            'datetime' => now(),
+            'qty' => 2,
+            'product_id' => 1,
+        ]);
+
+        $this->actingAs($admin)
+            ->getJson('/api/admin/stock/summary')
+            ->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('summary.total_finished_products', 1)
+            ->assertJsonPath('summary.low_stock', 1)
+            ->assertJsonPath('summary.out_of_stock', 0)
+            ->assertJsonPath('summary.today_production', 3)
+            ->assertJsonPath('summary.today_waste', 2);
     }
 }
