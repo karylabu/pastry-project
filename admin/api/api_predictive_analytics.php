@@ -166,7 +166,7 @@ function getProductRecipes(mysqli $conn): array {
         $ingredientName = trim((string) ($row['ingredient_name'] ?? ''));
         $usage = max(0, (float) ($row['usage'] ?? 0));
         if ($productName && $ingredientName) {
-            $recipes[$productName][] = [
+            $recipes[strtolower($productName)][] = [
                 'name' => $ingredientName,
                 'usage' => $usage,
             ];
@@ -374,6 +374,24 @@ function buildDetailedForecastPayload(array $history, array $products, array $in
     $actions = [];
     $risks = [];
 
+    foreach ($recipes as $recipe) {
+        foreach ($recipe as $ingredient) {
+            $ingredientName = trim((string) ($ingredient['name'] ?? ''));
+            if ($ingredientName === '') continue;
+
+            foreach ($ingredientStock as $stock) {
+                if (strcasecmp($stock['name'], $ingredientName) !== 0) continue;
+
+                $ingredientTotals[$stock['id']]['name'] = $stock['name'];
+                $ingredientTotals[$stock['id']]['unit'] = $stock['unit'];
+                $ingredientTotals[$stock['id']]['stock'] = $stock['stock'];
+                $ingredientTotals[$stock['id']]['threshold'] = $stock['threshold'];
+                $ingredientTotals[$stock['id']]['consumption'] ??= 0;
+                break;
+            }
+        }
+    }
+
     foreach ($historyByProduct as $productName => $daily) {
         $dateKeys = array_keys($daily);
         $firstDate = new DateTimeImmutable(min($dateKeys));
@@ -412,7 +430,7 @@ function buildDetailedForecastPayload(array $history, array $products, array $in
         $catalogue = $productByName[strtolower($productName)] ?? ['name' => $productName, 'category' => 'Unknown', 'stock' => 0, 'minimum_stock' => 0];
         $totalForecast = round(array_sum($forecastSeries), 2);
         $previousEquivalent = count($values) >= $period * 2 ? array_sum(array_slice($values, -$period * 2, $period)) : 0;
-        $recipe = $recipes[$productName] ?? [];
+        $recipe = $recipes[strtolower($productName)] ?? [];
         $ingredientRows = [];
         foreach ($recipe as $ingredient) {
             $ingredientName = trim((string) ($ingredient['name'] ?? ''));
