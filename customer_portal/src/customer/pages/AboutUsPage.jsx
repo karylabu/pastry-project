@@ -73,12 +73,10 @@ export default function AboutUsPage() {
             <div className="absolute -left-10 top-8 h-28 w-28 rounded-full bg-gray-100 blur-3xl" />
             <div className="absolute -right-6 bottom-8 h-32 w-32 rounded-full bg-gray-100 blur-3xl" />
             <div className="relative overflow-hidden rounded-[32px] border border-gray-200 bg-white p-3 shadow-[0_20px_60px_rgba(0,0,0,0.06)]">
-              <div
-                className="h-[520px] rounded-[26px] bg-cover bg-center"
-                style={{
-                  backgroundImage:
-                    "url('https://images.unsplash.com/photo-1555507036-ab1f4038808a?auto=format&fit=crop&w=1000&q=80')",
-                }}
+              <img
+                src={`${process.env.PUBLIC_URL}/assets/about-pastry-project.png`}
+                alt="Pastry Project café in Tanauan City, Batangas"
+                className="h-[520px] w-full rounded-[26px] object-cover object-center"
               />
             </div>
           </div>
