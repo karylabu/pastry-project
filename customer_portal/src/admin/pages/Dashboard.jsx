@@ -198,24 +198,6 @@ function TrendChart({ rows, metric }) {
   );
 }
 
-function RevenueTrendBars({ data }) {
-  const max = Math.max(...data.map((day) => day.total), 1);
-  return (
-    <div className="mt-3">
-      <div className="flex h-[66px] items-end gap-1.5 border-b border-[#f0e7e0] px-1">
-        {data.map((day) => (
-          <div key={day.key} className="flex h-full flex-1 items-end" title={`${day.label}: ₱${day.total.toLocaleString()}`}>
-            <div className="w-full rounded-t-[3px] bg-[#d4af37] transition-[height]" style={{ height: `${Math.max(4, day.total / max * 58)}px` }} />
-          </div>
-        ))}
-      </div>
-      <div className="mt-1 grid grid-cols-7 text-center text-[8px] text-[#9b8c83]">
-        {data.map((day) => <span key={day.key}>{day.label}</span>)}
-      </div>
-    </div>
-  );
-}
-
 export default function Dashboard() {
   const [dashboardData, setDashboardData] = useState(null);
   const [dashboardLoading, setDashboardLoading] = useState(true);
@@ -289,15 +271,9 @@ export default function Dashboard() {
   const orders = useMemo(() => (Array.isArray(dashboardData?.live_orders) ? dashboardData.live_orders : [])
     .map((order) => ({ ...order, items: Array.isArray(order.items) ? order.items : [] })), [dashboardData]);
   const dashboardSummary = dashboardData?.summary || {};
-  const inventoryData = dashboardData?.inventory || {};
   const orderStatusBreakdown = Array.isArray(dashboardData?.order_status_breakdown)
     ? dashboardData.order_status_breakdown
     : [];
-  const sevenDayRevenue = (dashboardData?.sales_overview?.trend || []).map((day) => ({
-    key: day.date,
-    label: new Date(`${day.date}T00:00:00`).toLocaleDateString("en-US", { weekday: "short" }),
-    total: Number(day.revenue || 0),
-  }));
 
   const displayOrders = useMemo(() => {
     const urgent = orders
@@ -307,20 +283,9 @@ export default function Dashboard() {
     return [...urgent, ...rest];
   }, [orders]);
 
-  const lowStockItems = [
-    ...(Array.isArray(inventoryData.low_stock) ? inventoryData.low_stock : []),
-    ...(Array.isArray(inventoryData.low_stock_ingredients) ? inventoryData.low_stock_ingredients : [])
-      .map((ingredient) => ({ ...ingredient, id: `ingredient-${ingredient.id}`, inventory_type: "ingredient" })),
-  ];
-  const outOfStockItems = [
-    ...(Array.isArray(inventoryData.out_of_stock) ? inventoryData.out_of_stock : []),
-    ...(Array.isArray(inventoryData.out_of_stock_ingredients) ? inventoryData.out_of_stock_ingredients : [])
-      .map((ingredient) => ({ ...ingredient, id: `ingredient-${ingredient.id}`, inventory_type: "ingredient" })),
-  ];
   const mostSoldItems = Array.isArray(analytics?.topSellingCakes) ? analytics.topSellingCakes : [];
 
   const totalSalesToday = Number(dashboardSummary.sales_today || 0);
-  const weeklySales = Number(dashboardSummary.sales_week || 0);
   const stats = [
     { label: "Orders Today", value: dashboardLoading ? "…" : dashboardError ? "—" : Number(dashboardSummary.orders_today || 0).toLocaleString(), hint: "Orders placed today", icon: ShoppingCart, iconTone: "bg-[#fff4cd] text-[#9b7810]", tone: "text-[#33251e]", accent: "#d4af37", to: "/admin/orders" },
     { label: "Pending", value: dashboardLoading ? "…" : dashboardError ? "—" : Number(dashboardSummary.pending_orders_total || 0).toLocaleString(), hint: "Awaiting confirmation", icon: Clock3, iconTone: "bg-[#fff4cd] text-[#9b7810]", tone: "text-[#33251e]", accent: "#c87954", to: "/admin/orders" },
@@ -635,72 +600,6 @@ export default function Dashboard() {
                 </table>
               </div>
             </Panel>
-          </div>
-
-          <div className="mb-8 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-              <Panel eyebrow="Inventory" title="Low stock">
-                <div className="p-4">
-                  {dashboardLoading ? (
-                    <p className="px-2 py-4 text-[13px] text-black/50">Loading inventory…</p>
-                  ) : dashboardError ? (
-                    <p className="px-2 py-4 text-[13px] text-[#8d5357]">Unable to load inventory.</p>
-                  ) : lowStockItems.length === 0 ? (
-                    <p className="px-2 py-4 text-[13px] text-black/50">No low-stock items.</p>
-                  ) : (
-                    <ul className="space-y-1">
-                      {lowStockItems.slice(0, 5).map((product) => (
-                        <li key={product.id} className="flex items-center justify-between rounded-lg px-3 py-2.5 transition-colors hover:bg-[#fff8df]">
-                          <span className="truncate text-[13px] text-[#5f514a]">{product.name}</span>
-                          <span className="ml-2 shrink-0 text-[12px] font-semibold text-[#33251e]">{product.stock}{product.unit ? ` ${product.unit}` : ""} left</span>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              </Panel>
-
-              <Panel eyebrow="Inventory" title="Out of stock">
-                <div className="p-4">
-                  {dashboardLoading ? (
-                    <p className="px-2 py-4 text-[13px] text-black/50">Loading inventory…</p>
-                  ) : dashboardError ? (
-                    <p className="px-2 py-4 text-[13px] text-[#8d5357]">Unable to load inventory.</p>
-                  ) : outOfStockItems.length === 0 ? (
-                    <p className="px-2 py-4 text-[13px] text-black/50">Nothing out of stock.</p>
-                  ) : (
-                    <ul className="space-y-1">
-                      {outOfStockItems.slice(0, 5).map((product) => (
-                        <li key={product.id} className="flex items-center justify-between rounded-lg px-3 py-2.5 transition-colors hover:bg-[#fff8df]">
-                          <span className="truncate text-[13px] text-[#5f514a]">{product.name}</span>
-                          <span className="ml-2 shrink-0 text-[12px] font-semibold text-[#9b7810]">{product.unit ? `0 ${product.unit}` : "Out"}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              </Panel>
-
-              <Panel eyebrow="Revenue" title="Revenue snapshot" className="flex h-full flex-col sm:col-span-2 xl:col-span-1">
-                <div className="flex flex-1 flex-col p-4">
-                  <div className="grid grid-cols-2 divide-x divide-[#f0e7e0]">
-                    <div className="pr-3">
-                      <p className="text-[10px] uppercase tracking-[0.18em] text-[#9b8c83]">Today</p>
-                      <p className="mt-1.5 text-[18px] font-semibold text-[#33251e]">₱{totalSalesToday.toLocaleString()}</p>
-                    </div>
-                    <div className="pl-3">
-                      <p className="text-[10px] uppercase tracking-[0.18em] text-[#9b8c83]">This week</p>
-                      <p className="mt-1.5 text-[18px] font-semibold text-[#33251e]">₱{weeklySales.toLocaleString()}</p>
-                    </div>
-                  </div>
-                  <div className="mt-auto pt-1">
-                    <div className="mt-3 flex items-center justify-between">
-                      <span className="text-[9px] font-semibold uppercase tracking-[0.14em] text-[#9b8c83]">Last 7 days</span>
-                      <span className="text-[9px] text-[#a57c38]">Sales</span>
-                    </div>
-                    <RevenueTrendBars data={sevenDayRevenue} />
-                  </div>
-                </div>
-              </Panel>
           </div>
 
         </div>
