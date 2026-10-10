@@ -124,4 +124,16 @@ class StaffProductCatalogTest extends TestCase
             ->assertJsonPath('0.sizes.1.is_producible', false)
             ->assertJsonMissingPath('0.sizes.2');
     }
+
+    public function test_stock_migration_sets_confirmed_big_and_small_counts_for_all_cakes(): void
+    {
+        $migration = require database_path('migrations/2026_10_10_000002_set_confirmed_cake_stock_by_size.php');
+        $migration->up();
+
+        $this->assertDatabaseHas('product_sizes', ['product_id' => 1, 'size' => 'Big', 'stock_quantity' => 20]);
+        $this->assertDatabaseHas('product_sizes', ['product_id' => 1, 'size' => 'Small', 'stock_quantity' => 15]);
+        $this->assertDatabaseHas('product_sizes', ['product_id' => 1, 'size' => 'Slice', 'stock_quantity' => 1]);
+        $this->assertDatabaseHas('products', ['id' => 1, 'stock' => 36]);
+        $this->assertDatabaseHas('products', ['id' => 2, 'stock' => 0]);
+    }
 }

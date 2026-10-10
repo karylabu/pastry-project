@@ -183,4 +183,4 @@ jobs:
         run: |
           set -eu
           ssh -i ~/.ssh/id_ed25519 -p "$SSH_PORT" -o IdentitiesOnly=yes -o BatchMode=yes -o ConnectTimeout=20 -o ConnectionAttempts=3 "$SSH_USERNAME@$SSH_HOST" \
-            "cd '$REMOTE_ROOT/laravel' && php artisan migrate --path=database/migrations/2026_10_10_000001_add_username_and_profile_picture_to_users.php --force && php artisan migrate --path=database/migrations/2026_10_07_000002_create_customized_cake_order_tables.php --force && php artisan package:discover --ansi && php artisan config:cache"
+            "cd '$REMOTE_ROOT/laravel' && php artisan migrate --path=database/migrations/2026_10_10_000001_add_username_and_profile_picture_to_users.php --force && php artisan migrate --path=database/migrations/2026_10_10_000002_set_confirmed_cake_stock_by_size.php --force && php artisan migrate --path=database/migrations/2026_10_07_000002_create_customized_cake_order_tables.php --force && php artisan package:discover --ansi && php artisan config:cache"
