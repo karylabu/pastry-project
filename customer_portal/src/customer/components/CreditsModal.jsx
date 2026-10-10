@@ -52,7 +52,7 @@ export default function CreditsModal({ isOpen, onClose }) {
 
   return (
     <div
-      className="fixed inset-0 z-[100002] flex items-center justify-center bg-[#1c130c]/65 px-5 py-7 backdrop-blur-[5px] sm:px-8 sm:py-10 lg:px-12 lg:py-12"
+      className="fixed inset-0 z-[100002] flex items-center justify-center bg-[#1c130c]/65 px-6 py-10 backdrop-blur-[5px] sm:px-10 sm:py-12 lg:px-12 lg:py-14"
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) onClose();
       }}
@@ -61,7 +61,7 @@ export default function CreditsModal({ isOpen, onClose }) {
         role="dialog"
         aria-modal="true"
         aria-labelledby="credits-modal-title"
-        className="relative max-h-[calc(100dvh-56px)] w-full max-w-[700px] overflow-x-hidden overflow-y-auto rounded-[18px] border border-[#d9bd8f] bg-[#fffaf0] text-[#39271c] shadow-[0_28px_90px_rgba(21,12,5,0.38)] sm:max-h-[calc(100dvh-80px)] sm:rounded-[20px] md:overflow-hidden"
+        className="relative max-h-[calc(100dvh-80px)] w-full max-w-[700px] overflow-x-hidden overflow-y-auto rounded-[18px] border border-[#d9bd8f] bg-[#fffaf0] text-[#39271c] shadow-[0_28px_90px_rgba(21,12,5,0.38)] sm:max-h-[calc(100dvh-96px)] sm:rounded-[20px] md:overflow-hidden"
       >
         <header className="relative flex min-h-[96px] items-center gap-3 overflow-hidden border-b border-[#ead9bc] bg-gradient-to-r from-[#fffaf0] via-[#fbf1df] to-[#f7ead2] px-4 py-3 sm:min-h-[112px] sm:gap-4 sm:px-7 sm:py-4">
           <div aria-hidden="true" className="pointer-events-none absolute -bottom-10 -left-6 h-20 w-20 rounded-full border border-[#e7c995]/60" />
