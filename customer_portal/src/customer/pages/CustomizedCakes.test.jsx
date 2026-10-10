@@ -46,4 +46,20 @@ describe('buildCustomizedCakeSubmissionPayload', () => {
 
     expect(payload.reference_image).toEqual(referenceImage);
   });
+
+  it('keeps metadata for every uploaded reference image', () => {
+    const referenceImages = [
+      { type: 'upload', id: 'cake-one.jpg-100-1', name: 'cake-one.jpg' },
+      { type: 'upload', id: 'cake-two.jpg-200-2', name: 'cake-two.jpg' },
+      { type: 'upload', id: 'cake-three.jpg-300-3', name: 'cake-three.jpg' },
+    ];
+
+    const payload = buildCustomizedCakeSubmissionPayload(
+      { cakeType: 'single', tiers: [{ flavor_id: 7, size_id: 2 }], referenceImages },
+      [{ id: 7, name: 'Chocolate' }],
+      [{ id: 2, code: '6x3', label: '6x3' }]
+    );
+
+    expect(payload.reference_images).toEqual(referenceImages);
+  });
 });

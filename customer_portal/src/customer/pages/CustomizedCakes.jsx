@@ -14,7 +14,6 @@ import {
   Sparkles,
 } from 'lucide-react';
 
-const MAX_REFERENCE_IMAGES = 5;
 const CUSTOM_CAKE_DRAFT_KEY = 'customCakeRequestDraft';
 const FULFILLMENT_TIME_SLOTS = Array.from({ length: 29 }, (_, index) => {
   const totalMinutes = 8 * 60 + index * 30;
@@ -330,14 +329,15 @@ export default function CustomizedCakes() {
   }, [storedUser?.id]);
 
   const handleFiles = (event) => {
-    const nextFiles = Array.from(event.target.files || []).slice(0, MAX_REFERENCE_IMAGES);
+    const nextFiles = Array.from(event.target.files || []);
+    event.target.value = '';
     if (nextFiles.length === 0) return;
     window.sessionStorage.removeItem('customCakeReferenceImage');
     window.sessionStorage.removeItem(referenceStorageKey);
     const existingFiles = referenceImage?.type === 'upload' ? files : [];
     const mergedFiles = [...existingFiles, ...nextFiles].filter((file, index, allFiles) => (
       allFiles.findIndex((candidate) => candidate.name === file.name && candidate.size === file.size) === index
-    )).slice(0, MAX_REFERENCE_IMAGES);
+    ));
     const file = mergedFiles[0];
     setFiles(mergedFiles);
     setReferenceImage({
@@ -449,6 +449,11 @@ export default function CustomizedCakes() {
           tiers: selectedTiers,
           userId,
           referenceImage,
+          referenceImages: files.map((file) => ({
+            type: 'upload',
+            id: `${file.name}-${file.size}-${file.lastModified}`,
+            name: file.name,
+          })),
         },
         flavorCatalog,
         sizeCatalog
@@ -507,6 +512,7 @@ export default function CustomizedCakes() {
         url: referenceImage.url,
         name: referenceImage.name,
       } : null));
+      laravelForm.append('reference_images', JSON.stringify(payload.reference_images));
       files.forEach((file, index) => laravelForm.append('files[]', file, file.name || `file${index}`));
 
       const laravelRes = await fetch(`${LARAVEL_BASE}/api/customized-cakes/order`, {
@@ -561,6 +567,7 @@ export default function CustomizedCakes() {
         url: referenceImage.url,
         name: referenceImage.name,
       } : null));
+      fd.append('reference_images', JSON.stringify(payload.reference_images));
       files.forEach((file, index) => fd.append('files[]', file, file.name || `file${index}`));
 
       const res = await fetch(`${CUSTOMER_BASE}/api_custom_cake.php`, {
@@ -982,11 +989,11 @@ export default function CustomizedCakes() {
                 <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#fff3c8] text-[11px]">4</span>
                 Reference Images
               </p>
-              <p className="mb-2 text-[11px] text-[#9b8c83]">Add an example or upload up to 5 images.</p>
-              <input id="custom-cake-reference-files" type="file" multiple accept="image/*" onChange={handleFiles} disabled={files.length >= MAX_REFERENCE_IMAGES} className="sr-only" />
+              <p className="mb-2 text-[11px] text-[#9b8c83]">Add an example or upload as many images as you need.</p>
+              <input id="custom-cake-reference-files" type="file" multiple accept="image/*" onChange={handleFiles} className="sr-only" />
               <div className="flex flex-wrap items-center gap-2">
-                <label htmlFor="custom-cake-reference-files" className={`inline-flex rounded-lg border border-[#e5bd45] bg-[#ffe89a] px-4 py-2 text-[12px] font-bold text-[#6b4f1d] transition ${files.length >= MAX_REFERENCE_IMAGES ? 'cursor-not-allowed opacity-60' : 'cursor-pointer hover:bg-[#ffedb5]'}`}>
-                  {files.length >= MAX_REFERENCE_IMAGES ? '5 Images Selected' : files.length > 0 ? `Add Images (${files.length}/${MAX_REFERENCE_IMAGES})` : 'Choose Images'}
+                <label htmlFor="custom-cake-reference-files" className="inline-flex cursor-pointer rounded-lg border border-[#e5bd45] bg-[#ffe89a] px-4 py-2 text-[12px] font-bold text-[#6b4f1d] transition hover:bg-[#ffedb5]">
+                  {files.length > 0 ? `Add Images (${files.length} selected)` : 'Choose Images'}
                 </label>
                 {!referenceImage && <div className="grid min-h-28 flex-1 place-items-center rounded-lg border border-dashed border-[#eadfd8] bg-white px-3 py-4 text-center text-xs text-[#9b8060]">No reference selected</div>}
               </div>

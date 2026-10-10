@@ -39,6 +39,11 @@ export function buildCustomizedCakeSubmissionPayload(formState, flavorOptions = 
       url: formState.referenceImage.url,
       name: formState.referenceImage.name,
     } : null,
+    reference_images: Array.isArray(formState.referenceImages) ? formState.referenceImages.map((image) => ({
+      type: image.type,
+      id: image.id,
+      name: image.name,
+    })) : [],
   };
 }
 

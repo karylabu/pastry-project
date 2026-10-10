@@ -286,6 +286,8 @@ class CustomizedCakeController extends Controller
         try {
             $referenceImage = json_decode((string) ($payload['reference_image'] ?? ''), true);
             $referenceImage = is_array($referenceImage) ? $referenceImage : null;
+            $referenceImages = json_decode((string) ($payload['reference_images'] ?? ''), true);
+            $referenceImages = is_array($referenceImages) ? array_values($referenceImages) : [];
             $uploadedImages = [];
             if ($request->hasFile('files')) {
                 $destination = public_path('uploads/customized-cakes');
@@ -294,14 +296,15 @@ class CustomizedCakeController extends Controller
                     if ($file->isValid()) {
                         $name = 'reference_' . uniqid() . '.' . $file->extension();
                         $file->move($destination, $name);
+                        $imageReference = $referenceImages[$index] ?? $referenceImage;
+                        $imageReference = is_array($imageReference) ? $imageReference : [];
                         $uploadedImages[] = [
-                            'type' => $referenceImage['type'] ?? 'upload',
-                            'id' => $referenceImage['id'] ?? ('upload-' . $name),
-                            'url' => ($referenceImage['type'] ?? null) === 'example' ? ($referenceImage['url'] ?? null) : null,
-                            'name' => $referenceImage['name'] ?? $file->getClientOriginalName(),
+                            'type' => $imageReference['type'] ?? 'upload',
+                            'id' => $imageReference['id'] ?? ('upload-' . $name),
+                            'url' => ($imageReference['type'] ?? null) === 'example' ? ($imageReference['url'] ?? null) : null,
+                            'name' => $imageReference['name'] ?? $file->getClientOriginalName(),
                             'path' => 'uploads/customized-cakes/' . $name,
                         ];
-                        if ($index === 0) break;
                     }
                 }
             }

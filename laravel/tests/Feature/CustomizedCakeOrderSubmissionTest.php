@@ -3,6 +3,9 @@
 namespace Tests\Feature;
 
 use App\Models\User;
+use App\Http\Controllers\Api\CustomizedCakeController;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
@@ -160,5 +163,51 @@ class CustomizedCakeOrderSubmissionTest extends TestCase
             ->assertOk()
             ->assertJsonPath('orders.0.custom_details.reference_image.url', 'https://pastryproject.shop/uploads/holiday(2).jpg')
             ->assertJsonPath('orders.0.is_customized', true);
+    }
+
+    public function test_customer_custom_cake_request_saves_all_uploaded_reference_images(): void
+    {
+        $customer = new User();
+        $customer->id = 1;
+        $customer->name = 'Customer';
+        $customer->email = 'customer@example.test';
+        $customer->role = 'customer';
+        $customer->status = 'active';
+
+        $this->actingAs($customer);
+        $request = Request::create('/api/customized-cakes/order', 'POST', [
+            'cake_type' => 'single',
+            'tiers' => json_encode([['flavor_id' => 1, 'size_id' => 1]]),
+            'notes' => '{"occasion":"Birthday"}',
+            'reference_image' => json_encode([
+                'type' => 'upload',
+                'id' => 'first-reference',
+                'name' => 'reference-one.jpg',
+            ]),
+            'reference_images' => json_encode([
+                ['type' => 'upload', 'id' => 'first-reference', 'name' => 'reference-one.jpg'],
+                ['type' => 'upload', 'id' => 'second-reference', 'name' => 'reference-two.jpg'],
+            ]),
+        ], [], [
+            'files' => [
+                UploadedFile::fake()->create('reference-one.jpg', 10, 'image/jpeg'),
+                UploadedFile::fake()->create('reference-two.jpg', 10, 'image/jpeg'),
+            ],
+        ]);
+        $response = app(CustomizedCakeController::class)->storeOrder($request);
+
+        $this->assertSame(200, $response->getStatusCode(), $response->getContent());
+        $this->assertTrue(json_decode($response->getContent(), true)['success']);
+
+        $images = json_decode((string) DB::table('customized_cake_orders')->value('inspo_images'), true);
+        $this->assertCount(2, $images);
+        $this->assertSame(['first-reference', 'second-reference'], array_column($images, 'id'));
+        $this->assertSame(['reference-one.jpg', 'reference-two.jpg'], array_column($images, 'name'));
+
+        foreach ($images as $image) {
+            $path = public_path($image['path']);
+            $this->assertFileExists($path);
+            unlink($path);
+        }
     }
 }
