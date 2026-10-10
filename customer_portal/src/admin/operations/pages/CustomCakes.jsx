@@ -120,9 +120,23 @@ export default function CustomCakes() {
     }));
 
   const parseCustomDetails = (order) => {
-    const parsed = typeof order?.custom_details === "string"
-      ? (() => { try { return JSON.parse(order.custom_details); } catch { return {}; } })()
-      : (order?.custom_details || {});
+    const parseObject = (value) => {
+      if (typeof value !== "string") return value && typeof value === "object" && !Array.isArray(value) ? value : {};
+      try {
+        const parsedValue = JSON.parse(value);
+        return parsedValue && typeof parsedValue === "object" && !Array.isArray(parsedValue) ? parsedValue : {};
+      } catch {
+        return null;
+      }
+    };
+    const detailsObject = parseObject(order?.details);
+    const parsed = {
+      ...(detailsObject || {}),
+      ...parseObject(order?.custom_details),
+    };
+    const detailsText = typeof order?.details === "string" && !detailsObject
+      ? order.details
+      : "";
 
     const formatValue = (value) => {
       if (Array.isArray(value)) return value.filter(Boolean).join(", ");
@@ -139,12 +153,16 @@ export default function CustomCakes() {
       pickup_date: order?.pickup_date || order?.delivery_date || parsed.pickup_date,
       pickup_time: order?.pickup_time || parsed.pickup_time,
       cake_size: order?.cake_size || parsed.cake_size,
+      cake_type: order?.cake_type || parsed.cake_type,
       servings: order?.servings || parsed.servings,
       cake_flavor: order?.cake_flavor || parsed.cake_flavor,
       filling_flavor: order?.filling_flavor || parsed.filling_flavor,
       frosting_type: order?.frosting_type || parsed.frosting_type,
       occasion: order?.occasion || parsed.occasion,
       theme: order?.theme || parsed.theme,
+      packaging: order?.packaging || parsed.packaging,
+      delivery_service: order?.delivery_service || parsed.delivery_service,
+      budget: order?.budget || parsed.budget,
       cake_color: order?.cake_color || parsed.cake_color,
       custom_message: order?.custom_message || parsed.custom_message,
       special_instructions: order?.special_instructions || parsed.special_instructions,
@@ -154,7 +172,7 @@ export default function CustomCakes() {
       downpayment_percent: order?.downpayment_percent || parsed.downpayment_percent,
       downpayment_amount: order?.downpayment_amount || parsed.downpayment_amount,
       quantity: order?.quantity || parsed.quantity,
-      details: order?.details || parsed.details,
+      details: parsed.details || detailsText,
     };
 
     return [
@@ -166,12 +184,16 @@ export default function CustomCakes() {
       ["Pickup date", formatValue(fallbackValues.pickup_date)],
       ["Pickup time", formatValue(fallbackValues.pickup_time)],
       ["Cake size", formatValue(fallbackValues.cake_size)],
+      ["Cake type", formatValue(fallbackValues.cake_type)],
       ["Servings", formatValue(fallbackValues.servings)],
       ["Cake flavor", formatValue(fallbackValues.cake_flavor)],
       ["Filling flavor", formatValue(fallbackValues.filling_flavor)],
       ["Frosting type", formatValue(fallbackValues.frosting_type)],
       ["Occasion", formatValue(fallbackValues.occasion)],
       ["Theme", formatValue(fallbackValues.theme)],
+      ["Packaging", formatValue(fallbackValues.packaging)],
+      ["Delivery service", formatValue(fallbackValues.delivery_service)],
+      ["Budget", formatValue(fallbackValues.budget)],
       ["Cake color", formatValue(fallbackValues.cake_color)],
       ["Custom message", formatValue(fallbackValues.custom_message)],
       ["Special instructions", formatValue(fallbackValues.special_instructions)],
@@ -435,9 +457,24 @@ export default function CustomCakes() {
         reader.onerror = () => reject(new Error("Could not prepare the Pastry Project logo for the PDF."));
         reader.readAsDataURL(logoBlob);
       });
+      const logoImage = await new Promise((resolve, reject) => {
+        const image = new Image();
+        image.onload = () => resolve(image);
+        image.onerror = () => reject(new Error("Could not decode the Pastry Project logo for the PDF."));
+        image.src = logoData;
+      });
+      const logoCanvas = document.createElement("canvas");
+      logoCanvas.width = logoImage.naturalWidth;
+      logoCanvas.height = logoImage.naturalHeight;
+      const logoContext = logoCanvas.getContext("2d");
+      if (!logoContext) throw new Error("Could not prepare the Pastry Project logo for the PDF.");
+      logoContext.fillStyle = "#ffffff";
+      logoContext.fillRect(0, 0, logoCanvas.width, logoCanvas.height);
+      logoContext.drawImage(logoImage, 0, 0);
+      const printableLogo = logoCanvas.toDataURL("image/jpeg", 0.95);
 
       const addPageHeader = () => {
-        doc.addImage(logoData, "PNG", (pageWidth - 68) / 2, 30, 68, 68, undefined, "FAST");
+        doc.addImage(printableLogo, "JPEG", (pageWidth - 68) / 2, 30, 68, 68, undefined, "FAST");
         const nameY = 126;
         doc.setFont("times", "bolditalic");
         doc.setFontSize(25);
