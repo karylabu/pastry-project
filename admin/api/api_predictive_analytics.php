@@ -114,6 +114,7 @@ function getSalesHistory(mysqli $conn): array {
 function getIngredientStock(mysqli $conn): array {
     $result = mysqli_query($conn, "SELECT id, name, stock, threshold, unit FROM ingredients ORDER BY name ASC");
     if (!$result) {
+        error_log('Predictive analytics ingredient inventory query failed: ' . mysqli_error($conn));
         return [];
     }
 
@@ -150,26 +151,74 @@ function getProducts(mysqli $conn): array {
 
 function getProductRecipes(mysqli $conn): array {
     $result = mysqli_query($conn, "
-        SELECT p.name AS product_name, i.name AS ingredient_name, pr.qty AS usage
+        SELECT p.name AS product_name, i.id AS ingredient_id, i.name AS ingredient_name, pr.qty AS usage
         FROM product_recipes pr
         LEFT JOIN products p ON p.id = pr.product_id
         LEFT JOIN ingredients i ON i.id = pr.ingredient_id
+        WHERE pr.active = 1
         ORDER BY p.name ASC, i.name ASC
     ");
     if (!$result) {
-        return [];
+        error_log('Predictive analytics product recipe query failed: ' . mysqli_error($conn));
+        $recipes = [];
+    } else {
+        $recipes = [];
+        while ($row = mysqli_fetch_assoc($result)) {
+            $productName = normalizeProductName($row['product_name'] ?? '');
+            $ingredientName = trim((string) ($row['ingredient_name'] ?? ''));
+            $usage = max(0, (float) ($row['usage'] ?? 0));
+            if ($productName && $ingredientName) {
+                $recipes[strtolower($productName)][] = [
+                    'ingredient_id' => (int) ($row['ingredient_id'] ?? 0),
+                    'name' => $ingredientName,
+                    'usage' => $usage,
+                ];
+            }
+        }
     }
 
-    $recipes = [];
-    while ($row = mysqli_fetch_assoc($result)) {
-        $productName = normalizeProductName($row['product_name'] ?? '');
-        $ingredientName = trim((string) ($row['ingredient_name'] ?? ''));
-        $usage = max(0, (float) ($row['usage'] ?? 0));
-        if ($productName && $ingredientName) {
-            $recipes[strtolower($productName)][] = [
-                'name' => $ingredientName,
-                'usage' => $usage,
+    $hasCakeRecipeTable = mysqli_query($conn, "SHOW TABLES LIKE 'cake_recipes'");
+    $hasCakeRecipes = mysqli_query($conn, "SHOW TABLES LIKE 'cake_recipe_ingredients'");
+    $hasCakeCatalog = mysqli_query($conn, "SHOW TABLES LIKE 'cake_flavors'");
+    if ($hasCakeRecipeTable && mysqli_num_rows($hasCakeRecipeTable) > 0
+        && $hasCakeRecipes && mysqli_num_rows($hasCakeRecipes) > 0
+        && $hasCakeCatalog && mysqli_num_rows($hasCakeCatalog) > 0) {
+        $cakeResult = mysqli_query($conn, "
+            SELECT flavor.name AS flavor_name, ingredient.id AS ingredient_id,
+                   ingredient.name AS ingredient_name, recipe_ingredient.quantity AS usage
+            FROM cake_recipes AS recipe
+            INNER JOIN cake_flavors AS flavor ON flavor.id = recipe.flavor_id
+            INNER JOIN cake_recipe_ingredients AS recipe_ingredient ON recipe_ingredient.recipe_id = recipe.id
+            INNER JOIN ingredients AS ingredient ON ingredient.id = recipe_ingredient.ingredient_id
+            WHERE recipe.active = 1 AND flavor.active = 1
+            ORDER BY flavor.name ASC, ingredient.name ASC
+        ");
+        if (!$cakeResult) {
+            error_log('Predictive analytics cake recipe query failed: ' . mysqli_error($conn));
+        } else {
+            $productByFlavor = [
+                'moist chocolate' => 'Chocolate Ganache Cake',
+                'red velvet' => 'Red Velvet Cake',
+                'carrot' => 'Carrot Cake',
             ];
+            $cakeRecipes = [];
+            while ($row = mysqli_fetch_assoc($cakeResult)) {
+                $flavor = strtolower(trim((string) ($row['flavor_name'] ?? '')));
+                $productName = $productByFlavor[$flavor] ?? '';
+                $ingredientName = trim((string) ($row['ingredient_name'] ?? ''));
+                if ($productName !== '' && $ingredientName !== '') {
+                    $cakeRecipes[strtolower($productName)][] = [
+                        'ingredient_id' => (int) ($row['ingredient_id'] ?? 0),
+                        'name' => $ingredientName,
+                        'usage' => max(0, (float) ($row['usage'] ?? 0)),
+                    ];
+                }
+            }
+            foreach ($cakeRecipes as $productName => $recipe) {
+                if (empty($recipes[$productName])) {
+                    $recipes[$productName] = $recipe;
+                }
+            }
         }
     }
 
@@ -373,22 +422,23 @@ function buildDetailedForecastPayload(array $history, array $products, array $in
     $ingredientTotals = [];
     $actions = [];
     $risks = [];
+    $stockById = [];
+    foreach ($ingredientStock as $stock) {
+        $stockById[(int) $stock['id']] = $stock;
+    }
 
     foreach ($recipes as $recipe) {
         foreach ($recipe as $ingredient) {
             $ingredientName = trim((string) ($ingredient['name'] ?? ''));
             if ($ingredientName === '') continue;
 
-            foreach ($ingredientStock as $stock) {
-                if (strcasecmp($stock['name'], $ingredientName) !== 0) continue;
-
-                $ingredientTotals[$stock['id']]['name'] = $stock['name'];
-                $ingredientTotals[$stock['id']]['unit'] = $stock['unit'];
-                $ingredientTotals[$stock['id']]['stock'] = $stock['stock'];
-                $ingredientTotals[$stock['id']]['threshold'] = $stock['threshold'];
-                $ingredientTotals[$stock['id']]['consumption'] ??= 0;
-                break;
-            }
+            $stock = $stockById[(int) ($ingredient['ingredient_id'] ?? 0)] ?? null;
+            if (!$stock) continue;
+            $ingredientTotals[$stock['id']]['name'] = $stock['name'];
+            $ingredientTotals[$stock['id']]['unit'] = $stock['unit'];
+            $ingredientTotals[$stock['id']]['stock'] = $stock['stock'];
+            $ingredientTotals[$stock['id']]['threshold'] = $stock['threshold'];
+            $ingredientTotals[$stock['id']]['consumption'] ??= 0;
         }
     }
 
@@ -433,12 +483,8 @@ function buildDetailedForecastPayload(array $history, array $products, array $in
         $recipe = $recipes[strtolower($productName)] ?? [];
         $ingredientRows = [];
         foreach ($recipe as $ingredient) {
-            $ingredientName = trim((string) ($ingredient['name'] ?? ''));
             $usage = max(0, (float) ($ingredient['usage'] ?? 0));
-            $stock = null;
-            foreach ($ingredientStock as $item) {
-                if (strcasecmp($item['name'], $ingredientName) === 0) { $stock = $item; break; }
-            }
+            $stock = $stockById[(int) ($ingredient['ingredient_id'] ?? 0)] ?? null;
             if (!$stock) continue;
             $consumption = round($usage * $totalForecast, 2);
             $ingredientTotals[$stock['id']]['name'] = $stock['name'];
