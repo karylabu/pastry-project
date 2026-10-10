@@ -84,6 +84,7 @@ Route::put('addresses/{id}', [AddressController::class, 'update']);
 Route::delete('addresses/{id}', [AddressController::class, 'destroy']);
 Route::get('staff/orders/{orderId}/discount-id', [StaffApiController::class, 'viewOrderDiscountId']);
 Route::get('staff/orders/{orderId}/payment-proof', [StaffApiController::class, 'viewOrderPaymentProof']);
+Route::get('staff/orders', [StaffApiController::class, 'getOrders']);
 Route::get('admin/analytics/cake-sales', [CakeSalesAnalyticsController::class, 'index']);
 Route::get('admin/reviews', [OrderFeedbackController::class, 'index']);
 

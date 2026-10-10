@@ -8,6 +8,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 
 class StaffApiController extends Controller
@@ -171,20 +172,96 @@ class StaffApiController extends Controller
 
         try {
             $query = DB::table('orders');
-            if ($request->query('custom') == '1') $query->where('is_customized', 1);
+            $customOnly = in_array(strtolower((string) $request->query('custom', '0')), ['1', 'true'], true);
+            $customTables = array_values(array_filter(
+                ['custom_cake_orders', 'customized_cake_orders'],
+                static fn (string $table): bool => Schema::hasTable($table)
+            ));
 
-            $orders = $query->orderBy('created_at', 'desc')->get()->map(function ($order) {
-                return [
-                    'id' => $order->id,
-                    'customer' => $order->customer ?: $order->email ?: 'Guest',
-                    'total' => (float)$order->total,
-                    'status' => $order->status,
-                    'created_at' => $order->created_at,
-                ];
-            });
+            if ($customOnly) {
+                if (!$customTables) {
+                    $query->whereRaw('1 = 0');
+                } else {
+                    $query->where(function ($customQuery) use ($customTables) {
+                        foreach ($customTables as $table) {
+                            $customQuery->orWhereExists(function ($subQuery) use ($table) {
+                                $subQuery->selectRaw('1')
+                                    ->from($table)
+                                    ->whereColumn("{$table}.order_id", 'orders.id');
+                            });
+                        }
+                    });
+                }
+            } else {
+                foreach ($customTables as $table) {
+                    $query->whereNotExists(function ($subQuery) use ($table) {
+                        $subQuery->selectRaw('1')
+                            ->from($table)
+                            ->whereColumn("{$table}.order_id", 'orders.id');
+                    });
+                }
+            }
+
+            if (!$customOnly) {
+                $query->where(function ($paymentQuery) {
+                    $paymentQuery->whereRaw("LOWER(COALESCE(payment, '')) != 'gcash'")
+                        ->orWhereRaw("LOWER(COALESCE(payment_status, 'pending')) IN ('paid', 'proof_submitted')");
+                });
+            }
+
+            $orders = $query->orderByDesc('id')->get();
+            $orderNumbers = DB::table('orders')
+                ->orderBy('created_at')
+                ->orderBy('id')
+                ->pluck('id')
+                ->flip()
+                ->map(fn (int $index): int => $index + 1);
+            $itemsByOrder = collect();
+
+            if ($orders->isNotEmpty() && Schema::hasTable('order_items')) {
+                $itemsByOrder = DB::table('order_items as oi')
+                    ->leftJoin('products as p', 'p.id', '=', 'oi.product_id')
+                    ->whereIn('oi.order_id', $orders->pluck('id'))
+                    ->select('oi.order_id', 'oi.product', 'oi.qty', 'oi.price', 'p.category')
+                    ->orderBy('oi.id')
+                    ->get()
+                    ->groupBy('order_id');
+            }
+
+            $orders = $orders->map(function ($order) use ($orderNumbers, $itemsByOrder) {
+                $rawItems = json_decode((string) ($order->items ?? '[]'), true);
+                $items = $itemsByOrder->get($order->id, collect())
+                    ->map(fn ($item) => [
+                        'name' => $item->product ?: 'Item',
+                        'qty' => (int) ($item->qty ?? 1),
+                        'price' => (float) ($item->price ?? 0),
+                        'category' => $item->category ?? '',
+                    ])
+                    ->values();
+
+                if ($items->isEmpty() && is_array($rawItems)) {
+                    $items = collect($rawItems)->map(fn ($item) => [
+                        'name' => $item['name'] ?? $item['product'] ?? 'Item',
+                        'qty' => (int) ($item['qty'] ?? $item['quantity'] ?? 1),
+                        'price' => (float) ($item['price'] ?? 0),
+                        'category' => $item['category'] ?? '',
+                    ])->values();
+                }
+
+                $order->order_number = $orderNumbers[$order->id] ?? (int) $order->id;
+                $order->customer = $order->customer ?: $order->email ?: 'Guest';
+                $order->has_discount_id = !empty($order->discount_id_path);
+                $order->has_payment_proof = !empty($order->payment_proof_path)
+                    && strtolower((string) ($order->payment_status ?? '')) === 'proof_submitted';
+                unset($order->discount_id_path, $order->payment_proof_path);
+                $order->items = $items;
+
+                return $order;
+            })->values();
 
             return $this->corsResponse(['success' => true, 'orders' => $orders]);
         } catch (\Exception $e) {
+            Log::error('Staff order list query failed', ['exception' => $e]);
             return $this->corsResponse(['success' => false, 'message' => $e->getMessage()], 500);
         }
     }

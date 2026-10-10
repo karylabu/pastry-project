@@ -210,15 +210,17 @@ export default function Orders() {
   const fetchOrders = (silent = false) => {
     if (!silent) setLoading(true);
 
-    staffFetch(`${STAFF_BASE}/api_orders.php`)
-      .then((res) => res.json())
-      .then((regularOrders) => {
-        setOrders(normalizeOrders(regularOrders, "Regular"));
+    laravelStaffFetch(`${LARAVEL_BASE}/api/staff/orders`)
+      .then(async (res) => {
+        const data = await res.json();
+        if (!res.ok || !data?.success || !Array.isArray(data.orders)) {
+          throw new Error(data?.message || "Unable to load orders.");
+        }
+        setOrders(normalizeOrders(data.orders, "Regular"));
         setConnectionIssue(false);
         setLastRefreshed(new Date());
       })
       .catch(() => {
-        setOrders([]);
         setConnectionIssue(true);
       })
       .finally(() => {
@@ -232,7 +234,10 @@ export default function Orders() {
     const unsubscribe = subscribeRealtime((event) => {
       if (event.type === "order.updated") fetchOrders(true);
     });
-    pollRef.current = setInterval(fetchIngredients, POLL_INTERVAL);
+    pollRef.current = setInterval(() => {
+      fetchOrders(true);
+      fetchIngredients();
+    }, POLL_INTERVAL);
     return () => {
       unsubscribe();
       clearInterval(pollRef.current);
