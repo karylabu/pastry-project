@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Link } from "react-router-dom";
-import { Cake, Phone, Mail, HelpCircle, Loader2 } from "lucide-react";
+import { Cake, Phone, Mail, HelpCircle, Loader2, Heart } from "lucide-react";
 import { LARAVEL_BASE } from "../../services/config";
 import CreditsModal from "./CreditsModal";
 
@@ -123,7 +123,8 @@ export default function Footer() {
                 </Link>
               </li>
               <li>
-                <button type="button" onClick={() => setShowCredits(true)} className="hover:text-white transition">
+                <button type="button" onClick={() => setShowCredits(true)} className="inline-flex items-center gap-1.5 text-left hover:text-white transition">
+                  <Heart size={13} className="shrink-0 text-[#d4af37]" aria-hidden="true" />
                   Credits
                 </button>
               </li>
