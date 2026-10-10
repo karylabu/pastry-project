@@ -225,10 +225,6 @@ class CakeOrderRecipesSeeder extends Seeder
                 }
             }
 
-            if (DB::table('product_recipes')->whereIn('product_id', array_values($products))->exists()) {
-                throw new RuntimeException('Recipes already exist for one or more cake products; refusing to overwrite them.');
-            }
-
             $ingredientIds = [];
             foreach ($ingredientUnits as $name => $unit) {
                 $ingredient = DB::table('ingredients')->where('name', $name)->first();
@@ -251,9 +247,24 @@ class CakeOrderRecipesSeeder extends Seeder
                 ]);
             }
 
+            $existingRecipes = DB::table('product_recipes')
+                ->whereIn('product_id', array_values($products))
+                ->get(['product_id', 'product_size_id', 'ingredient_id'])
+                ->mapWithKeys(fn ($row) => [
+                    $row->product_id . '|' . $row->product_size_id . '|' . $row->ingredient_id => true,
+                ])
+                ->all();
+
             foreach ($recipes as $fallbackId => $recipe) {
                 foreach ($sizeScales as $sizeName => $scale) {
                     foreach ($recipe as $ingredientName => $bigCakeQuantity) {
+                        $key = $products[$fallbackId]
+                            . '|' . $productSizes[$fallbackId][$sizeName]
+                            . '|' . $ingredientIds[$ingredientName];
+                        if (isset($existingRecipes[$key])) {
+                            continue;
+                        }
+
                         DB::table('product_recipes')->insert([
                             'product_id' => $products[$fallbackId],
                             'product_size_id' => $productSizes[$fallbackId][$sizeName],

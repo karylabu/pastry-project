@@ -43,7 +43,11 @@ or `ingredients.stock`). Everything else is derived or historical.
 | `products` | `id` AI | `name`, `category`, `price`, `stock` (finished goods), `image`; UNIQUE `(name, category)` |
 | `product_sizes` | `id` AI | FK `product_id → products.id` CASCADE; `size` VARCHAR(30); `price`, `available`; UNIQUE `(product_id, size)` |
 | `ingredients` | `id` AI | `name` UNIQUE, `unit`, `stock`, `threshold` (reorder point), `cost` |
-| `product_recipes` | `id` AI | FK `product_id → products.id`, FK `ingredient_id → ingredients.id`; `qty` used per unit |
+| `product_recipes` | `id` AI | FK `product_id → products.id`, FK `ingredient_id → ingredients.id`; `product_size_id` selects the size-specific recipe; `qty` is ingredient usage per unit |
+
+The deployment runs `CakeOrderRecipesSeeder` after applying the size-aware
+recipe migrations. It adds missing reference cake recipes without overwriting
+existing product/size/ingredient recipe rows.
 
 ### Inventory ledger (append-only)
 | Table | PK | Purpose |
