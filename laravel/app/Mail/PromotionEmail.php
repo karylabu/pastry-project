@@ -3,28 +3,42 @@
 namespace App\Mail;
 
 use App\Models\Promotion;
+use App\Models\User;
 use Illuminate\Bus\Queueable;
 use Illuminate\Mail\Mailable;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Facades\URL;
 
 class PromotionEmail extends Mailable
 {
     use Queueable, SerializesModels;
 
     public Promotion $promotion;
+    public User $recipient;
 
-    public function __construct(Promotion $promotion)
+    public function __construct(Promotion $promotion, User $recipient)
     {
         $this->promotion = $promotion;
+        $this->recipient = $recipient;
     }
 
     public function build()
     {
+        $unsubscribeUrl = URL::signedRoute('promotions.unsubscribe', [
+            'token' => Crypt::encryptString((string) $this->recipient->getKey()),
+        ]);
+
+        $this->withSymfonyMessage(function ($message) use ($unsubscribeUrl) {
+            $message->getHeaders()->addTextHeader('List-Unsubscribe', '<' . $unsubscribeUrl . '>');
+            $message->getHeaders()->addTextHeader('List-Unsubscribe-Post', 'List-Unsubscribe=One-Click');
+        });
+
         return $this->subject($this->promotion->title)
-            ->html($this->renderHtml());
+            ->html($this->renderHtml($unsubscribeUrl));
     }
 
-    protected function renderHtml(): string
+    protected function renderHtml(string $unsubscribeUrl): string
     {
         $couponHtml = '';
         if (! empty($this->promotion->coupon_code)) {
@@ -81,6 +95,12 @@ class PromotionEmail extends Mailable
               <p style="margin:8px 0 0 0;">Thank you for being part of our pastry family!</p>
             </td>
           </tr>
+          <tr>
+            <td style="padding-top:24px; border-top:1px solid #eeeeee; color:#666666; font-size:13px; line-height:1.5;">
+              <p style="margin:0 0 12px 0;">No longer want promotional emails?</p>
+              <a href="%s" style="display:inline-block; padding:10px 16px; border:1px solid #999999; border-radius:6px; color:#333333; text-decoration:none;">Unsubscribe from promotions</a>
+            </td>
+          </tr>
         </table>
       </td>
     </tr>
@@ -94,6 +114,7 @@ class PromotionEmail extends Mailable
             $couponHtml,
             e($this->promotion->starts_at->format('F j, Y')),
             e($this->promotion->ends_at->format('F j, Y')),
+            e($unsubscribeUrl),
         );
     }
 }

@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\AdminAlertController;
 use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\PromotionController;
+use App\Http\Controllers\Api\PromotionUnsubscribeController;
 use App\Http\Controllers\Api\StockController;
 use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\IngredientBatchController;
@@ -128,6 +129,9 @@ Route::put('staff/customized-cakes/recipes', [CustomizedCakeController::class, '
 Route::post('customized-cakes/preview', [CustomizedCakeController::class, 'preview']);
 Route::post('customized-cakes/order', [CustomizedCakeController::class, 'storeOrder']);
 Route::post('customized-cakes/consume-inventory', [CustomizedCakeController::class, 'consume']);
+Route::get('promotions/unsubscribe', [PromotionUnsubscribeController::class, 'show'])
+    ->name('promotions.unsubscribe');
+Route::post('promotions/unsubscribe', [PromotionUnsubscribeController::class, 'unsubscribe']);
 
 Route::middleware(['api'])->group(function () {
     Route::apiResource('users', UserController::class);

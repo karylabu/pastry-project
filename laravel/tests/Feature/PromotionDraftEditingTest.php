@@ -3,9 +3,11 @@
 namespace Tests\Feature;
 
 use App\Mail\PromotionEmail;
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\URL;
 use Tests\TestCase;
 
 class PromotionDraftEditingTest extends TestCase
@@ -142,7 +144,9 @@ class PromotionDraftEditingTest extends TestCase
             ->assertJsonPath('data.failed_count', 0)
             ->assertJsonPath('data.promotion.status', 'sent');
 
-        Mail::assertSent(PromotionEmail::class, 1);
+        Mail::assertSent(PromotionEmail::class, function (PromotionEmail $mail) {
+            return $mail->recipient->id === 2;
+        });
         $this->assertDatabaseHas('promotion_email_logs', [
             'promotion_id' => $promotionId,
             'email' => 'customer@example.com',
@@ -170,6 +174,75 @@ class PromotionDraftEditingTest extends TestCase
         $this->assertDatabaseHas('promotions', [
             'id' => $promotionId,
             'status' => 'sent',
+        ]);
+    }
+
+    public function test_customer_can_unsubscribe_from_promotional_emails(): void
+    {
+        DB::table('users')->insert([
+            'id' => 2,
+            'name' => 'Subscribed Customer',
+            'email' => 'customer@example.com',
+            'password' => 'unused',
+            'role' => 'customer',
+            'subscribed_promo' => true,
+        ]);
+
+        $url = URL::signedRoute('promotions.unsubscribe', [
+            'token' => Crypt::encryptString('2'),
+        ]);
+
+        $this->get($url)
+            ->assertOk()
+            ->assertSee('Confirm unsubscribe')
+            ->assertSee('promotional emails');
+        $this->assertDatabaseHas('users', [
+            'id' => 2,
+            'subscribed_promo' => true,
+        ]);
+
+        $this->post($url, ['unsubscribe' => '1'])
+            ->assertOk()
+            ->assertSee('You will no longer receive promotional emails.');
+
+        $this->assertDatabaseHas('users', [
+            'id' => 2,
+            'subscribed_promo' => false,
+        ]);
+
+        Mail::fake();
+        $promotionId = $this->createPromotion('draft');
+        $this->withHeader('X-Auth-Token', 'admin-token')
+            ->postJson("/api/admin/promotions/{$promotionId}/send")
+            ->assertOk()
+            ->assertJsonPath('data.recipient_count', 0)
+            ->assertJsonPath('data.sent_count', 0);
+
+        Mail::assertNothingSent();
+    }
+
+    public function test_invalid_unsubscribe_link_does_not_change_subscription(): void
+    {
+        DB::table('users')->insert([
+            'id' => 2,
+            'name' => 'Subscribed Customer',
+            'email' => 'customer@example.com',
+            'password' => 'unused',
+            'role' => 'customer',
+            'subscribed_promo' => true,
+        ]);
+
+        $url = URL::signedRoute('promotions.unsubscribe', [
+            'token' => Crypt::encryptString('2'),
+        ]);
+        $tamperedUrl = $url . '&tampered=1';
+
+        $this->post($tamperedUrl)
+            ->assertForbidden();
+
+        $this->assertDatabaseHas('users', [
+            'id' => 2,
+            'subscribed_promo' => true,
         ]);
     }
 

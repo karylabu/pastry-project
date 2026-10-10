@@ -158,7 +158,7 @@ class PromotionController extends Controller
             $errorMessage = null;
 
             try {
-                Mail::to($subscriber->email)->send(new PromotionEmail($promotion));
+                Mail::to($subscriber->email)->send(new PromotionEmail($promotion, $subscriber));
                 $sentCount++;
             } catch (\Throwable $exception) {
                 $status = 'failed';
