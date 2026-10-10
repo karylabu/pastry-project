@@ -66,22 +66,22 @@ export default function CreditsModal({ isOpen, onClose }) {
         role="dialog"
         aria-modal="true"
         aria-labelledby="credits-modal-title"
-        className="relative w-full max-w-[1040px] overflow-hidden rounded-[20px] border border-[#d9bd8f] bg-[#fffaf0] text-[#39271c] shadow-[0_28px_90px_rgba(21,12,5,0.38)] sm:rounded-[24px]"
+        className="relative h-fit max-h-[90dvh] w-full max-w-[820px] overflow-y-auto overflow-x-hidden rounded-[20px] border border-[#d9bd8f] bg-[#fffaf0] text-[#39271c] shadow-[0_28px_90px_rgba(21,12,5,0.38)] sm:rounded-[24px]"
       >
-        <header className="relative flex min-h-[132px] items-center gap-4 overflow-hidden border-b border-[#ead9bc] bg-gradient-to-r from-[#fffaf0] via-[#fbf1df] to-[#f7ead2] px-5 py-5 sm:min-h-[154px] sm:gap-6 sm:px-10 sm:py-7">
-          <div aria-hidden="true" className="pointer-events-none absolute -bottom-12 -left-8 h-28 w-28 rounded-full border border-[#e7c995]/50" />
-          <div aria-hidden="true" className="pointer-events-none absolute -bottom-16 right-10 h-28 w-56 rotate-[-12deg] rounded-[50%] border-t border-[#d5ad70]/60 sm:right-20" />
+        <header className="relative flex min-h-[100px] items-center gap-3 overflow-hidden border-b border-[#ead9bc] bg-gradient-to-r from-[#fffaf0] via-[#fbf1df] to-[#f7ead2] px-4 py-4 sm:min-h-[118px] sm:gap-5 sm:px-7 sm:py-5">
+          <div aria-hidden="true" className="pointer-events-none absolute -bottom-12 -left-8 h-24 w-24 rounded-full border border-[#e7c995]/50" />
+          <div aria-hidden="true" className="pointer-events-none absolute -bottom-16 right-8 h-24 w-44 rotate-[-12deg] rounded-[50%] border-t border-[#d5ad70]/60 sm:right-16" />
           <img
             src={`${ROOT_BASE}/uploads/logo.png?v=logo-v2`}
             alt="Pastry Project logo"
-            className="relative z-10 h-[68px] w-[68px] shrink-0 rounded-full border-2 border-[#bd8d46] bg-[#fffdf8] p-2 object-contain sm:h-[88px] sm:w-[88px] sm:p-3"
+            className="relative z-10 h-[58px] w-[58px] shrink-0 rounded-full border-2 border-[#bd8d46] bg-[#fffdf8] p-2 object-contain sm:h-[72px] sm:w-[72px] sm:p-2.5"
           />
-          <span aria-hidden="true" className="relative z-10 hidden h-[72px] w-px bg-[#cba66c] sm:block" />
+          <span aria-hidden="true" className="relative z-10 hidden h-[58px] w-px bg-[#cba66c] sm:block" />
           <div className="relative z-10 min-w-0">
             <p className="text-[9px] font-black uppercase tracking-[0.24em] text-[#9a6a2d] sm:text-[11px] sm:tracking-[0.3em]">
               A little appreciation
             </p>
-            <h2 id="credits-modal-title" className="mt-1 font-serif text-[27px] font-bold leading-none tracking-tight text-[#432719] sm:text-[40px]">
+            <h2 id="credits-modal-title" className="mt-1 font-serif text-[24px] font-bold leading-none tracking-tight text-[#432719] sm:text-[32px]">
               Pastry Project
             </h2>
             <p className="mt-1.5 text-xs font-medium tracking-wide text-[#9a6a2d] sm:text-base">
@@ -98,7 +98,7 @@ export default function CreditsModal({ isOpen, onClose }) {
           </button>
         </header>
 
-        <main className="px-5 py-5 sm:px-10 sm:py-7">
+        <main className="px-4 py-4 sm:px-7 sm:py-5">
           <section>
             <DividerHeading icon={Cake}>About the project</DividerHeading>
             <p className="ml-11 max-w-[720px] text-xs leading-5 text-[#66564a] sm:text-sm sm:leading-6">
@@ -107,19 +107,19 @@ export default function CreditsModal({ isOpen, onClose }) {
             </p>
           </section>
 
-          <section className="mt-5 sm:mt-7">
+          <section className="mt-4 sm:mt-5">
             <DividerHeading icon={Users} trailing="Project Contributors">The people behind it</DividerHeading>
-            <div className="grid gap-2.5 sm:ml-11 sm:grid-cols-3 sm:gap-4">
+            <div className="grid gap-2 sm:ml-11 sm:grid-cols-3 sm:gap-3">
               {teamMembers.map((member) => (
                 <article
                   key={member.name}
-                  className="flex min-h-[102px] items-center gap-3 rounded-2xl border border-[#ead7b7] bg-white/55 px-3 py-3 shadow-[0_3px_12px_rgba(108,73,32,0.04)] sm:min-h-[134px] sm:items-start sm:gap-4 sm:px-4 sm:py-4"
+                  className="flex min-h-[80px] items-center gap-3 rounded-xl border border-[#ead7b7] bg-white/55 px-3 py-2.5 shadow-[0_3px_12px_rgba(108,73,32,0.04)] sm:min-h-[108px] sm:items-start sm:gap-3 sm:px-3 sm:py-3"
                 >
-                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border-[3px] border-[#c39143] bg-[#432719] font-serif text-sm font-bold text-[#fff6e4] shadow-sm sm:h-[62px] sm:w-[62px] sm:text-lg">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border-[2px] border-[#c39143] bg-[#432719] font-serif text-xs font-bold text-[#fff6e4] shadow-sm sm:h-[50px] sm:w-[50px] sm:text-base">
                     {member.initials}
                   </div>
                   <div className="min-w-0 pt-0.5">
-                    <h4 className="font-serif text-sm font-bold leading-5 text-[#432719] sm:text-base">{member.name}</h4>
+                    <h4 className="font-serif text-xs font-bold leading-4 text-[#432719] sm:text-sm sm:leading-5">{member.name}</h4>
                     <p className="mt-1 text-[9px] font-black uppercase tracking-[0.19em] text-[#a87936] sm:text-[10px]">
                       {member.role}
                     </p>
@@ -132,16 +132,16 @@ export default function CreditsModal({ isOpen, onClose }) {
             </div>
           </section>
 
-          <section className="mt-5 flex items-center gap-3 rounded-2xl border border-[#9c6a2f] bg-gradient-to-r from-[#321b10] via-[#4b2b19] to-[#321b10] px-4 py-3.5 text-[#f8e7c5] shadow-[0_5px_16px_rgba(50,27,16,0.16)] sm:ml-8 sm:mt-6 sm:gap-5 sm:px-7 sm:py-4">
-            <Heart className="h-6 w-6 shrink-0 text-[#d2a14f] sm:h-7 sm:w-7" strokeWidth={1.6} />
-            <span className="hidden h-9 w-px bg-[#bb8c48]/70 sm:block" />
-            <h3 className="shrink-0 font-serif text-lg font-bold italic text-[#e1b65f] sm:text-2xl">Thank you!</h3>
-            <span className="hidden h-9 w-px bg-[#bb8c48]/70 sm:block" />
-            <p className="text-[11px] leading-4 text-[#fff4df] sm:text-xs sm:leading-5">
+          <section className="mt-4 flex items-center gap-2.5 rounded-xl border border-[#9c6a2f] bg-gradient-to-r from-[#321b10] via-[#4b2b19] to-[#321b10] px-3 py-3 text-[#f8e7c5] shadow-[0_5px_16px_rgba(50,27,16,0.16)] sm:ml-6 sm:mt-5 sm:gap-4 sm:px-5 sm:py-3">
+            <Heart className="h-5 w-5 shrink-0 text-[#d2a14f] sm:h-6 sm:w-6" strokeWidth={1.6} />
+            <span className="hidden h-7 w-px bg-[#bb8c48]/70 sm:block" />
+            <h3 className="shrink-0 font-serif text-base font-bold italic text-[#e1b65f] sm:text-xl">Thank you!</h3>
+            <span className="hidden h-7 w-px bg-[#bb8c48]/70 sm:block" />
+            <p className="text-[10px] leading-4 text-[#fff4df] sm:text-[11px] sm:leading-5">
               Thank you for being part of the Pastry Project community.
               <span className="hidden sm:inline"> Built with creativity, collaboration, and care.</span>
             </p>
-            <Leaf className="ml-auto hidden h-7 w-7 shrink-0 rotate-[-25deg] text-[#c99543] sm:block" strokeWidth={1.4} />
+            <Leaf className="ml-auto hidden h-6 w-6 shrink-0 rotate-[-25deg] text-[#c99543] sm:block" strokeWidth={1.4} />
           </section>
         </main>
       </section>
