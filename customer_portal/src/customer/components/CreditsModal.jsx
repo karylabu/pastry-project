@@ -29,7 +29,7 @@ export default function CreditsModal({ isOpen, onClose }) {
 
   return (
     <div
-      className="fixed inset-0 z-[120] flex items-center justify-center bg-black/55 backdrop-blur-sm"
+      className="fixed inset-0 z-[120] flex items-center justify-center bg-black/55 p-3 backdrop-blur-sm sm:p-5 lg:p-6"
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) onClose();
       }}
@@ -38,7 +38,7 @@ export default function CreditsModal({ isOpen, onClose }) {
         role="dialog"
         aria-modal="true"
         aria-labelledby="credits-modal-title"
-        className="relative flex h-[100dvh] w-full flex-col justify-center overflow-hidden bg-[#fffaf3] p-4 text-[#1a1a1a] sm:p-6 lg:p-8"
+        className="relative flex h-full w-full max-w-[1400px] flex-col justify-center overflow-hidden rounded-2xl border border-[#ead8c5] bg-[#fffaf3] p-4 text-[#1a1a1a] shadow-2xl sm:p-6 lg:p-8"
       >
         <button
           type="button"
