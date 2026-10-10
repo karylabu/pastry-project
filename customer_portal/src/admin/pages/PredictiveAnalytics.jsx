@@ -9,7 +9,7 @@ import {
   TrendingUp,
   UploadCloud,
 } from "lucide-react";
-import { LARAVEL_BASE } from "../../services/config";
+import { ROOT_BASE } from "../../services/config";
 import { getAuthHeaders } from "../../services/api";
 
 // ---------------------------------------------------------------------------
@@ -317,7 +317,7 @@ export default function PredictiveAnalytics() {
         ...getAuthHeaders(),
         ...(!options.formData && options.action === "refresh" ? { "Content-Type": "application/json" } : {}),
       };
-      const response = await fetch(`${LARAVEL_BASE}/admin/api/api_predictive_analytics.php?${query.toString()}`, {
+      const response = await fetch(`${ROOT_BASE}/admin/api/api_predictive_analytics.php?${query.toString()}`, {
         method: options.action === "refresh" ? "POST" : "GET",
         credentials: "include",
         headers,
@@ -407,7 +407,7 @@ export default function PredictiveAnalytics() {
     setErrorMessage("");
 
     try {
-      const response = await fetch(`${LARAVEL_BASE}/admin/api/api_predictive_analytics.php`, {
+      const response = await fetch(`${ROOT_BASE}/admin/api/api_predictive_analytics.php`, {
         method: "POST",
         credentials: "include",
         headers: { Accept: "application/json", ...getAuthHeaders() },

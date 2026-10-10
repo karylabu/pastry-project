@@ -554,19 +554,18 @@ function persistForecastData(mysqli $conn, array $history, array $forecastPayloa
 $method = $_SERVER['REQUEST_METHOD'];
 $action = '';
 
-if ($method === 'POST') {
-    $authenticatedUser = apiUser();
-    if (!$authenticatedUser) {
-        http_response_code(401);
-        echo json_encode(['success' => false, 'message' => 'Authentication required.']);
-        exit;
-    }
+// Forecast data is staff-only, including read requests.
+$authenticatedUser = apiUser();
+if (!$authenticatedUser) {
+    http_response_code(401);
+    echo json_encode(['success' => false, 'message' => 'Authentication required.']);
+    exit;
+}
 
-    if (trim(strtolower((string) ($authenticatedUser['role'] ?? ''))) !== 'admin') {
-        http_response_code(403);
-        echo json_encode(['success' => false, 'message' => 'You are not authorized for this action.']);
-        exit;
-    }
+if (trim(strtolower((string) ($authenticatedUser['role'] ?? ''))) !== 'admin') {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'message' => 'You are not authorized for this action.']);
+    exit;
 }
 
 if ($method === 'GET') {

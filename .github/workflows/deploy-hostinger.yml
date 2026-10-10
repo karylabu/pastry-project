@@ -9,6 +9,7 @@ on:
       - "laravel/**"
       - "customer/api_register.php"
       - "customer/api_place_order.php"
+      - "admin/api/api_predictive_analytics.php"
       - "staff/api_business_analytics.php"
       - "staff/api_product_stock_history.php"
       - "staff/api_update_order_status.php"
@@ -166,6 +167,16 @@ jobs:
             -e "ssh -i ~/.ssh/id_ed25519 -p $SSH_PORT -o IdentitiesOnly=yes -o BatchMode=yes -o ConnectTimeout=20 -o ConnectionAttempts=3" \
             staff/api_business_analytics.php \
             "$SSH_USERNAME@$SSH_HOST:$REMOTE_ROOT/staff/api_business_analytics.php"
+
+      - name: Deploy predictive analytics handler
+        run: |
+          set -eu
+          ssh -i ~/.ssh/id_ed25519 -p "$SSH_PORT" -o IdentitiesOnly=yes -o BatchMode=yes -o ConnectTimeout=20 -o ConnectionAttempts=3 "$SSH_USERNAME@$SSH_HOST" \
+            "mkdir -p '$REMOTE_ROOT/admin/api'"
+          rsync -az \
+            -e "ssh -i ~/.ssh/id_ed25519 -p $SSH_PORT -o IdentitiesOnly=yes -o BatchMode=yes -o ConnectTimeout=20 -o ConnectionAttempts=3" \
+            admin/api/api_predictive_analytics.php \
+            "$SSH_USERNAME@$SSH_HOST:$REMOTE_ROOT/admin/api/api_predictive_analytics.php"
 
       - name: Deploy customer registration and order handlers
         run: |
