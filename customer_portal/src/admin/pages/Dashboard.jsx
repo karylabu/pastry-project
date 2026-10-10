@@ -307,8 +307,16 @@ export default function Dashboard() {
     return [...urgent, ...rest];
   }, [orders]);
 
-  const lowStockProducts = Array.isArray(inventoryData.low_stock) ? inventoryData.low_stock : [];
-  const outOfStockProducts = Array.isArray(inventoryData.out_of_stock) ? inventoryData.out_of_stock : [];
+  const lowStockItems = [
+    ...(Array.isArray(inventoryData.low_stock) ? inventoryData.low_stock : []),
+    ...(Array.isArray(inventoryData.low_stock_ingredients) ? inventoryData.low_stock_ingredients : [])
+      .map((ingredient) => ({ ...ingredient, id: `ingredient-${ingredient.id}`, inventory_type: "ingredient" })),
+  ];
+  const outOfStockItems = [
+    ...(Array.isArray(inventoryData.out_of_stock) ? inventoryData.out_of_stock : []),
+    ...(Array.isArray(inventoryData.out_of_stock_ingredients) ? inventoryData.out_of_stock_ingredients : [])
+      .map((ingredient) => ({ ...ingredient, id: `ingredient-${ingredient.id}`, inventory_type: "ingredient" })),
+  ];
   const mostSoldItems = Array.isArray(analytics?.topSellingCakes) ? analytics.topSellingCakes : [];
 
   const totalSalesToday = Number(dashboardSummary.sales_today || 0);
@@ -636,14 +644,14 @@ export default function Dashboard() {
                     <p className="px-2 py-4 text-[13px] text-black/50">Loading inventory…</p>
                   ) : dashboardError ? (
                     <p className="px-2 py-4 text-[13px] text-[#8d5357]">Unable to load inventory.</p>
-                  ) : lowStockProducts.length === 0 ? (
+                  ) : lowStockItems.length === 0 ? (
                     <p className="px-2 py-4 text-[13px] text-black/50">No low-stock items.</p>
                   ) : (
                     <ul className="space-y-1">
-                      {lowStockProducts.slice(0, 5).map((product) => (
+                      {lowStockItems.slice(0, 5).map((product) => (
                         <li key={product.id} className="flex items-center justify-between rounded-lg px-3 py-2.5 transition-colors hover:bg-[#fff8df]">
                           <span className="truncate text-[13px] text-[#5f514a]">{product.name}</span>
-                          <span className="ml-2 shrink-0 text-[12px] font-semibold text-[#33251e]">{product.stock} left</span>
+                          <span className="ml-2 shrink-0 text-[12px] font-semibold text-[#33251e]">{product.stock}{product.unit ? ` ${product.unit}` : ""} left</span>
                         </li>
                       ))}
                     </ul>
@@ -657,14 +665,14 @@ export default function Dashboard() {
                     <p className="px-2 py-4 text-[13px] text-black/50">Loading inventory…</p>
                   ) : dashboardError ? (
                     <p className="px-2 py-4 text-[13px] text-[#8d5357]">Unable to load inventory.</p>
-                  ) : outOfStockProducts.length === 0 ? (
+                  ) : outOfStockItems.length === 0 ? (
                     <p className="px-2 py-4 text-[13px] text-black/50">Nothing out of stock.</p>
                   ) : (
                     <ul className="space-y-1">
-                      {outOfStockProducts.slice(0, 5).map((product) => (
+                      {outOfStockItems.slice(0, 5).map((product) => (
                         <li key={product.id} className="flex items-center justify-between rounded-lg px-3 py-2.5 transition-colors hover:bg-[#fff8df]">
                           <span className="truncate text-[13px] text-[#5f514a]">{product.name}</span>
-                          <span className="ml-2 shrink-0 text-[12px] font-semibold text-[#9b7810]">Out</span>
+                          <span className="ml-2 shrink-0 text-[12px] font-semibold text-[#9b7810]">{product.unit ? `0 ${product.unit}` : "Out"}</span>
                         </li>
                       ))}
                     </ul>

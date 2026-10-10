@@ -38,6 +38,24 @@ class StaffProductCatalogTest extends TestCase
             $table->boolean('available')->default(true);
             $table->timestamps();
         });
+        Schema::create('orders', function ($table) {
+            $table->id();
+            $table->string('status')->nullable();
+            $table->timestamp('created_at')->nullable();
+            $table->decimal('total', 10, 2)->default(0);
+            $table->string('payment')->nullable();
+            $table->string('payment_status')->nullable();
+            $table->string('customer')->nullable();
+            $table->string('email')->nullable();
+        });
+        Schema::create('order_items', function ($table) {
+            $table->id();
+            $table->unsignedBigInteger('order_id');
+            $table->unsignedBigInteger('product_id')->nullable();
+            $table->string('product')->nullable();
+            $table->unsignedInteger('qty')->default(1);
+            $table->decimal('price', 10, 2)->default(0);
+        });
         Schema::create('product_inventory_movements', function ($table) {
             $table->id();
             $table->unsignedBigInteger('product_id');
@@ -62,6 +80,8 @@ class StaffProductCatalogTest extends TestCase
             $table->id();
             $table->dateTime('datetime');
             $table->decimal('qty', 10, 3);
+            $table->decimal('unit_cost', 10, 2)->default(0);
+            $table->string('reason')->nullable();
             $table->unsignedBigInteger('product_id')->nullable();
         });
         Schema::create('ingredients', function ($table) {
@@ -126,6 +146,8 @@ class StaffProductCatalogTest extends TestCase
 
     protected function tearDown(): void
     {
+        Schema::dropIfExists('order_items');
+        Schema::dropIfExists('orders');
         Schema::dropIfExists('users');
         Schema::dropIfExists('waste_log');
         Schema::dropIfExists('production_transactions');
@@ -267,5 +289,51 @@ class StaffProductCatalogTest extends TestCase
             ->assertJsonPath('summary.out_of_stock', 0)
             ->assertJsonPath('summary.today_production', 3)
             ->assertJsonPath('summary.today_waste', 2);
+    }
+
+    public function test_admin_dashboard_returns_low_and_out_of_stock_products_by_size_and_ingredients(): void
+    {
+        $admin = new User();
+        $admin->role = 'admin';
+        $admin->status = 'active';
+
+        DB::table('product_sizes')->where('product_id', 1)->where('size', 'Big')->update(['stock_quantity' => 0]);
+        DB::table('product_sizes')->where('product_id', 1)->where('size', 'Small')->update(['stock_quantity' => 2]);
+        DB::table('product_sizes')->where('product_id', 1)->where('size', 'Slice')->update(['stock_quantity' => 8]);
+        DB::table('ingredients')->where('id', 1)->update(['threshold' => 2]);
+        DB::table('ingredient_batches')->where('ingredient_id', 1)->update(['quantity_remaining' => 1]);
+        DB::table('ingredients')->insert([
+            'id' => 2,
+            'name' => 'Sugar',
+            'unit' => 'kg',
+            'threshold' => 1,
+        ]);
+
+        $response = $this->actingAs($admin)
+            ->getJson('/api/staff/dashboard')
+            ->assertOk()
+            ->assertJsonPath('success', true);
+
+        $response->assertJsonFragment([
+            'name' => 'Chocolate Cake (Small)',
+            'stock' => 2,
+            'inventory_type' => 'product',
+        ])->assertJsonFragment([
+            'name' => 'Flour',
+            'stock' => 1,
+            'unit' => 'kg',
+        ])->assertJsonFragment([
+            'name' => 'Chocolate Cake (Big)',
+            'stock' => 0,
+            'inventory_type' => 'product',
+        ])->assertJsonFragment([
+            'name' => 'Sugar',
+            'stock' => 0,
+            'unit' => 'kg',
+        ])->assertJsonFragment([
+            'name' => 'Affogato',
+            'stock' => 0,
+            'inventory_type' => 'product',
+        ]);
     }
 }

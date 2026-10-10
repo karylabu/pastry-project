@@ -433,12 +433,66 @@ class StaffApiController extends Controller
             })->values();
 
             $products = DB::table('products')
-                ->whereRaw("LOWER(category) IN ('cake', 'cakes')")
                 ->select('id', 'name', 'category', 'stock', 'minimum_stock', 'price', 'available')
                 ->orderBy('name')
                 ->get();
-            $lowStock = $products->filter(fn ($product) => (float) $product->stock > 0 && (float) $product->stock <= (float) $product->minimum_stock)->values();
-            $outOfStock = $products->filter(fn ($product) => (float) $product->stock <= 0)->values();
+            $productSizesByProduct = collect();
+            if (Schema::hasTable('product_sizes') && Schema::hasColumn('product_sizes', 'stock_quantity')) {
+                $sizeThreshold = Schema::hasColumn('product_sizes', 'threshold')
+                    ? DB::raw('COALESCE(size.threshold, product.minimum_stock) as threshold')
+                    : DB::raw('product.minimum_stock as threshold');
+                $productSizesByProduct = DB::table('product_sizes as size')
+                    ->join('products as product', 'product.id', '=', 'size.product_id')
+                    ->select(
+                        'size.id as size_id',
+                        'size.product_id',
+                        'size.size',
+                        'size.stock_quantity as stock',
+                        $sizeThreshold
+                    )
+                    ->orderBy('size.size')
+                    ->get()
+                    ->groupBy('product_id');
+            }
+
+            $lowStock = collect();
+            $outOfStock = collect();
+            $productInventoryItemCount = 0;
+            foreach ($products as $product) {
+                $sizes = $productSizesByProduct->get($product->id, collect());
+                if ($sizes->isNotEmpty()) {
+                    foreach ($sizes as $size) {
+                        $item = [
+                            'id' => 'product-' . $product->id . '-size-' . $size->size_id,
+                            'name' => $product->name . ' (' . $size->size . ')',
+                            'stock' => (float) $size->stock,
+                            'threshold' => (float) $size->threshold,
+                            'inventory_type' => 'product',
+                        ];
+                        $productInventoryItemCount++;
+                        if ($item['stock'] <= 0) {
+                            $outOfStock->push($item);
+                        } elseif ($item['threshold'] > 0 && $item['stock'] <= $item['threshold']) {
+                            $lowStock->push($item);
+                        }
+                    }
+                    continue;
+                }
+
+                $item = [
+                    'id' => 'product-' . $product->id,
+                    'name' => $product->name,
+                    'stock' => (float) $product->stock,
+                    'threshold' => (float) $product->minimum_stock,
+                    'inventory_type' => 'product',
+                ];
+                $productInventoryItemCount++;
+                if ($item['stock'] <= 0) {
+                    $outOfStock->push($item);
+                } elseif ($item['threshold'] > 0 && $item['stock'] <= $item['threshold']) {
+                    $lowStock->push($item);
+                }
+            }
 
             $ingredients = DB::table('ingredients')
                 ->select('id', 'name', 'unit', 'stock', 'threshold', 'expiry')
@@ -448,7 +502,7 @@ class StaffApiController extends Controller
             $ingredients->each(function ($ingredient) use ($inventory) {
                 $ingredient->stock = $inventory->getUsableStock((int) $ingredient->id);
             });
-            $lowStockIngredients = $ingredients->filter(fn ($ingredient) => (float) $ingredient->stock > 0 && (float) $ingredient->stock <= (float) $ingredient->threshold)->values();
+            $lowStockIngredients = $ingredients->filter(fn ($ingredient) => (float) $ingredient->threshold > 0 && (float) $ingredient->stock > 0 && (float) $ingredient->stock <= (float) $ingredient->threshold)->values();
             $outOfStockIngredients = $ingredients->filter(fn ($ingredient) => (float) $ingredient->stock <= 0)->values();
 
             $liveOrders = DB::table('orders')
@@ -512,7 +566,7 @@ class StaffApiController extends Controller
                     return $ingredient->expiry !== null && $ingredient->expiry >= $today->toDateString() && $ingredient->expiry <= $today->copy()->addDays(7)->toDateString();
                 })
                 ->values();
-            $totalInventoryItems = $products->count() + $ingredients->count();
+            $totalInventoryItems = $productInventoryItemCount + $ingredients->count();
             $lowStockCount = $lowStock->count() + $lowStockIngredients->count();
             $outOfStockCount = $outOfStock->count() + $outOfStockIngredients->count();
 
