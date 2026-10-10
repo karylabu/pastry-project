@@ -773,7 +773,17 @@ class CustomerApiController extends Controller
         // Mark messages as read depending on role
         if ($orderId > 0) {
             if ($role === 'admin') {
-                DB::table('messages')->where('order_id', $orderId)->where('sender', 'customer')->update(['is_read' => 1]);
+                $readQuery = DB::table('messages')
+                    ->where('order_id', $orderId)
+                    ->where('sender', 'customer');
+                if ($hasConversationId && $conversationId && $conversationId !== 'legacy') {
+                    $readQuery->where('conversation_id', $conversationId);
+                } elseif ($hasConversationId && $conversationId === 'legacy') {
+                    $readQuery->where(function ($query) {
+                        $query->whereNull('conversation_id')->orWhere('conversation_id', 'legacy');
+                    });
+                }
+                $readQuery->update(['is_read' => 1]);
             } else {
                 $readQuery = DB::table('messages')->where('order_id', $orderId)->whereIn('sender', ['admin', 'staff', 'ai']);
                 if ($hasConversationId && $conversationId && $conversationId !== 'legacy') {
@@ -787,7 +797,20 @@ class CustomerApiController extends Controller
             }
         } else {
             if ($role === 'admin') {
-                DB::table('messages')->where('user_id', $userId)->where('order_id', 0)->where('sender', 'customer')->update(['is_read' => 1]);
+                $readQuery = DB::table('messages')
+                    ->where('user_id', $userId)
+                    ->where(function ($query) {
+                        $query->where('order_id', 0)->orWhereNull('order_id');
+                    })
+                    ->where('sender', 'customer');
+                if ($hasConversationId && $conversationId && $conversationId !== 'legacy') {
+                    $readQuery->where('conversation_id', $conversationId);
+                } elseif ($hasConversationId && $conversationId === 'legacy') {
+                    $readQuery->where(function ($query) {
+                        $query->whereNull('conversation_id')->orWhere('conversation_id', 'legacy');
+                    });
+                }
+                $readQuery->update(['is_read' => 1]);
             } elseif ($markRead) {
                 $readQuery = DB::table('messages')
                     ->where('user_id', $userId)

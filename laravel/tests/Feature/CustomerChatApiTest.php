@@ -53,6 +53,7 @@ class CustomerChatApiTest extends TestCase
             $table->string('customer_name')->nullable();
             $table->string('customer_email')->nullable();
             $table->string('image_path')->nullable();
+            $table->string('conversation_id')->nullable();
         });
         Schema::create('products', function ($table) {
             $table->id();
@@ -188,7 +189,7 @@ class CustomerChatApiTest extends TestCase
 
     public function test_quick_chat_receives_a_canned_reply_when_ai_is_unavailable(): void
     {
-        $this->withHeaders(['Authorization' => '******'])
+        $this->withToken('test-customer-token')
             ->postJson('/api/customer/chat/messages', [
                 'order_id' => 0,
                 'message' => 'Where is my order?',
@@ -198,12 +199,12 @@ class CustomerChatApiTest extends TestCase
             ])
             ->assertOk()
             ->assertJsonPath('success', true)
-            ->assertJsonPath('ai_reply', 'Makikita mo ang kasalukuyang status ng order mo sa My Orders page. Kung kailangan mo pa ng tulong, ipadala ang order number.');
+            ->assertJsonPath('ai_reply', 'You can check your current order status on the My Orders page. If you need more help, please send your order number.');
 
         $this->assertDatabaseHas('messages', [
             'user_id' => 7,
             'sender' => 'ai',
-            'message' => 'Makikita mo ang kasalukuyang status ng order mo sa My Orders page. Kung kailangan mo pa ng tulong, ipadala ang order number.',
+            'message' => 'You can check your current order status on the My Orders page. If you need more help, please send your order number.',
         ]);
     }
 
@@ -217,21 +218,63 @@ class CustomerChatApiTest extends TestCase
             'is_read' => 0,
         ]);
 
-        $headers = ['Authorization' => '******'];
-
-        $this->withHeaders($headers)
+        $this->withToken('test-customer-token')
             ->getJson('/api/customer/chat/messages?order_id=0&mark_read=0')
             ->assertOk()
             ->assertJsonPath('messages.0.is_read', 0);
 
         $this->assertDatabaseHas('messages', ['user_id' => 7, 'is_read' => 0]);
 
-        $this->withHeaders($headers)
+        $this->withToken('test-customer-token')
             ->getJson('/api/customer/chat/messages?order_id=0&mark_read=1')
             ->assertOk()
             ->assertJsonPath('messages.0.is_read', 1);
 
         $this->assertDatabaseHas('messages', ['user_id' => 7, 'is_read' => 1]);
+    }
+
+    public function test_admin_opening_a_conversation_clears_only_that_conversations_unread_messages(): void
+    {
+        DB::table('messages')->insert([
+            [
+                'order_id' => null,
+                'user_id' => 7,
+                'sender' => 'customer',
+                'message' => 'First conversation message',
+                'is_read' => 0,
+                'conversation_id' => 'conversation-alpha',
+            ],
+            [
+                'order_id' => null,
+                'user_id' => 7,
+                'sender' => 'customer',
+                'message' => 'Second conversation message',
+                'is_read' => 0,
+                'conversation_id' => 'conversation-beta',
+            ],
+        ]);
+
+        $this->withToken('test-admin-token')
+            ->getJson('/api/staff/chat/messages?order_id=0&user_id=7&conversation_id=conversation-alpha')
+            ->assertOk()
+            ->assertJsonPath('messages.0.message', 'First conversation message');
+
+        $this->assertDatabaseHas('messages', [
+            'conversation_id' => 'conversation-alpha',
+            'is_read' => 1,
+        ]);
+        $this->assertDatabaseHas('messages', [
+            'conversation_id' => 'conversation-beta',
+            'is_read' => 0,
+        ]);
+
+        $response = $this->withToken('test-admin-token')
+            ->getJson('/api/staff/chat/conversations')
+            ->assertOk();
+        $conversations = collect($response->json('conversations'))->keyBy('conversation_id');
+
+        $this->assertSame(0, (int) $conversations['conversation-alpha']['unread_count']);
+        $this->assertSame(1, (int) $conversations['conversation-beta']['unread_count']);
     }
 
     public function test_customer_can_send_an_image_without_text(): void

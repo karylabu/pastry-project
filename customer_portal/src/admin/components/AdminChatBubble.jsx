@@ -65,7 +65,14 @@ export default function AdminChatBubble() {
         headers: getAuthHeaders(),
       });
       const data = await safeParseJson(response);
-      if (response.ok && data?.success !== false) setMessages(Array.isArray(data.messages) ? data.messages : []);
+      if (response.ok && data?.success !== false) {
+        setMessages(Array.isArray(data.messages) ? data.messages : []);
+        setConversations((current) => current.map((item) => (
+          String(item.conversation_key) === String(conversation.conversation_key)
+            ? { ...item, unread_count: 0 }
+            : item
+        )));
+      }
     } catch {
       // Polling errors are non-blocking.
     }
