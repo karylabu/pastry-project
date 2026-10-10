@@ -137,6 +137,7 @@ Route::middleware(['api'])->group(function () {
         Route::post('notifications/mark-all-read', [NotificationController::class, 'markAllRead']);
         Route::post('device-token', [NotificationController::class, 'registerDeviceToken']);
         Route::post('notifications/send', [NotificationController::class, 'dispatchPushNotification']);
+        Route::get('stock/history', [StockController::class, 'history']);
         Route::post('stock/mutate', [StockController::class, 'mutate']);
 
         Route::get('alerts', [AdminAlertController::class, 'index']);

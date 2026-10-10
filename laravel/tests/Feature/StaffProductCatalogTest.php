@@ -24,6 +24,10 @@ class StaffProductCatalogTest extends TestCase
             $table->string('image')->nullable();
             $table->timestamps();
         });
+        Schema::create('users', function ($table) {
+            $table->id();
+            $table->string('name')->nullable();
+        });
         Schema::create('product_sizes', function ($table) {
             $table->id();
             $table->unsignedBigInteger('product_id');
@@ -109,6 +113,7 @@ class StaffProductCatalogTest extends TestCase
 
     protected function tearDown(): void
     {
+        Schema::dropIfExists('users');
         Schema::dropIfExists('product_sizes');
         Schema::dropIfExists('product_inventory_movements');
         Schema::dropIfExists('products');
@@ -186,5 +191,36 @@ class StaffProductCatalogTest extends TestCase
             'new_stock' => 6,
             'reason' => 'Returned - Test adjustment',
         ]);
+    }
+
+    public function test_admin_stock_history_returns_size_aware_movement_data(): void
+    {
+        $admin = new User();
+        $admin->role = 'admin';
+        $admin->status = 'active';
+        $bigSizeId = DB::table('product_sizes')->where('product_id', 1)->where('size', 'Big')->value('id');
+
+        DB::table('product_inventory_movements')->insert([
+            'product_id' => 1,
+            'product_size_id' => $bigSizeId,
+            'movement_type' => 'Stock In',
+            'quantity' => 2,
+            'previous_stock' => 4,
+            'new_stock' => 6,
+            'reason' => 'Test movement',
+            'reference_type' => 'adjustment',
+            'user_id' => null,
+            'created_at' => now(),
+        ]);
+
+        $this->actingAs($admin)
+            ->getJson("/api/admin/stock/history?product_id=1&product_size_id={$bigSizeId}&per_page=10")
+            ->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('history.0.product_id', 1)
+            ->assertJsonPath('history.0.product_size_id', $bigSizeId)
+            ->assertJsonPath('history.0.movement_type', 'Stock In')
+            ->assertJsonPath('history.0.staff', 'System')
+            ->assertJsonPath('pagination.total', 1);
     }
 }

@@ -33,7 +33,7 @@ if ($productId > 0) {
 if ($productSizeId > 0) {
     $conditions[] = 'm.product_size_id = ?';
     $types .= 'i';
-    $params[] = $productVariantId;
+    $params[] = $productSizeId;
 }
 if ($userId > 0) {
     $conditions[] = 'm.user_id = ?';

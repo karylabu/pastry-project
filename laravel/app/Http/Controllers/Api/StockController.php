@@ -9,9 +9,108 @@ use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class StockController extends Controller
 {
+    public function history(Request $request): JsonResponse
+    {
+        if ($response = $this->authorizeAdmin($request)) {
+            return $response;
+        }
+
+        try {
+            $validated = $request->validate([
+                'product_id' => 'required|integer|exists:products,id',
+                'product_size_id' => 'nullable|integer|exists:product_sizes,id',
+                'user_id' => 'nullable|integer|exists:users,id',
+                'movement_type' => 'nullable|string|max:40',
+                'from' => 'nullable|date_format:Y-m-d',
+                'to' => 'nullable|date_format:Y-m-d|after_or_equal:from',
+                'page' => 'nullable|integer|min:1',
+                'per_page' => 'nullable|integer|min:1|max:100',
+            ]);
+        } catch (ValidationException $exception) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Invalid stock history filters.',
+                'errors' => $exception->errors(),
+            ], 422);
+        }
+
+        $page = (int) ($validated['page'] ?? 1);
+        $perPage = (int) ($validated['per_page'] ?? 25);
+        $query = DB::table('product_inventory_movements as m')
+            ->join('products as p', 'p.id', '=', 'm.product_id')
+            ->leftJoin('users as u', 'u.id', '=', 'm.user_id')
+            ->where('m.product_id', $validated['product_id']);
+
+        if (!empty($validated['product_size_id'])) {
+            $query->where('m.product_size_id', $validated['product_size_id']);
+        }
+        if (!empty($validated['user_id'])) {
+            $query->where('m.user_id', $validated['user_id']);
+        }
+        if (!empty($validated['movement_type'])) {
+            $query->where('m.movement_type', $validated['movement_type']);
+        }
+        if (!empty($validated['from'])) {
+            $query->where('m.created_at', '>=', $validated['from'] . ' 00:00:00');
+        }
+        if (!empty($validated['to'])) {
+            $query->where('m.created_at', '<=', $validated['to'] . ' 23:59:59');
+        }
+
+        $total = (clone $query)->count('m.id');
+        $history = $query
+            ->select([
+                'm.id as movement_id',
+                'm.product_id',
+                'm.product_size_id',
+                'p.name as product_name',
+                'm.movement_type',
+                'm.quantity',
+                'm.previous_stock',
+                'm.new_stock',
+                'm.reason',
+                'm.reference_type',
+                'm.reference_id',
+                'm.created_at',
+                'u.name as staff_name',
+            ])
+            ->orderByDesc('m.created_at')
+            ->orderByDesc('m.id')
+            ->offset(($page - 1) * $perPage)
+            ->limit($perPage)
+            ->get()
+            ->map(static fn ($row) => [
+                'movement_id' => (int) $row->movement_id,
+                'product_id' => (int) $row->product_id,
+                'product_size_id' => $row->product_size_id === null ? null : (int) $row->product_size_id,
+                'product_name' => $row->product_name,
+                'movement_type' => $row->movement_type,
+                'quantity' => (float) $row->quantity,
+                'previous_stock' => (float) $row->previous_stock,
+                'new_stock' => (float) $row->new_stock,
+                'reason' => $row->reason,
+                'reference_type' => $row->reference_type,
+                'reference_id' => $row->reference_id === null ? null : (int) $row->reference_id,
+                'staff' => $row->staff_name ?: 'System',
+                'created_at' => $row->created_at,
+            ]);
+
+        return response()->json([
+            'success' => true,
+            'history' => $history,
+            'pagination' => [
+                'page' => $page,
+                'per_page' => $perPage,
+                'total' => $total,
+                'total_pages' => (int) ceil($total / $perPage),
+            ],
+        ]);
+    }
+
     public function mutate(Request $request): JsonResponse
     {
         if ($response = $this->authorizeAdmin($request)) {

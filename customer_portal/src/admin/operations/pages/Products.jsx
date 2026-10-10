@@ -375,7 +375,7 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
     setHistoryLoading(true);
     setHistoryError(null);
     try {
-      const res = await staffFetch(`${STAFF_BASE}/api_product_stock_history.php?product_id=${encodeURIComponent(productId)}&per_page=50`);
+      const res = await laravelStaffFetch(`${LARAVEL_BASE}/api/admin/stock/history?product_id=${encodeURIComponent(productId)}&per_page=50`);
       let data;
       try {
         data = await res.json();

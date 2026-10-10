@@ -253,7 +253,7 @@ describe('Products admin catalog', () => {
 
     await waitFor(() => {
       expect(global.fetch).toHaveBeenCalledWith(
-        expect.stringContaining('/staff/api_product_stock_history.php?product_id=1&per_page=50'),
+        expect.stringContaining('/api/admin/stock/history?product_id=1&per_page=50'),
         expect.objectContaining({ credentials: 'include' }),
       );
     });
@@ -263,7 +263,7 @@ describe('Products admin catalog', () => {
   test('shows a readable error when stock history responds with non-JSON', async () => {
     const existingFetch = global.fetch.getMockImplementation();
     global.fetch.mockImplementation((url) => {
-      if (String(url).includes('api_product_stock_history.php')) {
+      if (String(url).includes('/api/admin/stock/history')) {
         return Promise.resolve({ ok: true, json: async () => { throw new SyntaxError("Unexpected token '<'"); } });
       }
       return existingFetch(url);
