@@ -45,8 +45,8 @@ function OrderStatusBreakdown({ rows }) {
   if (!total) return <AnalyticsEmpty compact />;
 
   return (
-    <div className="grid items-center gap-3 p-4 sm:grid-cols-[150px_minmax(0,1fr)] sm:gap-4">
-      <div className="relative mx-auto h-[148px] w-[148px]">
+    <div className="grid items-center gap-3 p-4 sm:grid-cols-[150px_minmax(0,1fr)] sm:gap-4 lg:max-h-[100px] lg:overflow-y-auto lg:p-2">
+      <div className="relative mx-auto h-[148px] w-[148px] lg:h-[92px] lg:w-[92px]">
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
             <Pie data={rows} dataKey="value" nameKey="name" innerRadius={47} outerRadius={65} paddingAngle={2} stroke="#fffdfa" strokeWidth={2}>
@@ -60,7 +60,7 @@ function OrderStatusBreakdown({ rows }) {
           <span className="mt-1 text-[9px] text-[#9b8c83]">Total Orders</span>
         </div>
       </div>
-      <div className="space-y-1.5">
+      <div className="space-y-1.5 lg:max-h-[88px] lg:overflow-y-auto">
         {rows.map((row, index) => (
           <div key={row.name} className="grid grid-cols-[minmax(0,1fr)_34px_42px] items-center gap-2 rounded-lg border border-[#f1e9e3] px-2.5 py-2 text-[10px] transition hover:border-[#c9a94f] hover:ring-1 hover:ring-[#d4af37]/20">
             <span className="flex min-w-0 items-center gap-2 text-[#6a5a50]"><span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: ORDER_STATUS_COLORS[index % ORDER_STATUS_COLORS.length] }} /><span className="truncate">{row.name}</span></span>
@@ -75,7 +75,7 @@ function OrderStatusBreakdown({ rows }) {
 
 function TopSellingTable({ rows }) {
   return (
-    <div className="overflow-x-auto p-3">
+    <div className="overflow-x-auto p-3 lg:max-h-[100px] lg:overflow-y-auto lg:p-2">
       <table className="w-full min-w-[440px] border-collapse text-left">
         <thead>
           <tr className="bg-[#fbf7f2] text-[9px] uppercase tracking-[0.13em] text-[#9b8c83]">
@@ -100,7 +100,7 @@ function TopSellingTable({ rows }) {
               <td className="px-2.5 py-2 text-right text-[10px] font-semibold text-[#4b3930]">{item.qty}</td>
               <td className="px-2.5 py-2 text-right text-[10px] font-semibold text-[#4b3930]">₱{Number(item.revenue || 0).toLocaleString()}</td>
             </tr>
-          )) : <tr><td colSpan={5} className="px-4 py-7 text-center text-[11px] text-[#9b8c83]">No sales data yet.</td></tr>}
+          )) : <tr><td colSpan={5} className="px-4 py-4 text-center text-[11px] text-[#9b8c83]">No sales data yet.</td></tr>}
         </tbody>
       </table>
     </div>
@@ -516,25 +516,25 @@ export default function Dashboard() {
                   <Panel
                     eyebrow={null}
                     title="Top Selling Cakes"
-                    className="h-full min-h-[190px] min-w-0"
+                    className="flex h-full min-h-[190px] min-w-0 flex-col overflow-hidden lg:h-[190px]"
                     action={<Link to="/admin/products" aria-label="View all cakes in Products" className="group inline-flex items-center gap-1 rounded-md px-2 py-1 text-[10px] font-semibold text-[#876a19] transition hover:bg-[#fff8df] hover:text-[#5d470e] hover:outline hover:outline-1 hover:outline-[#d4af37] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d4af37] focus-visible:ring-offset-2">View All <ArrowRight size={12} className="transition-transform group-hover:translate-x-0.5" /></Link>}
                   >
                     <TopSellingTable rows={mostSoldItems} />
                   </Panel>
-                  <Panel eyebrow={null} title="Order Status Breakdown" className="h-full min-h-[190px]">
+                  <Panel eyebrow={null} title="Order Status Breakdown" className="flex h-full min-h-[190px] flex-col overflow-hidden lg:h-[190px]">
                     <OrderStatusBreakdown rows={orderStatusBreakdown} />
                   </Panel>
                 </div>
 
                 <div className="grid items-stretch gap-3 lg:grid-cols-2">
-                  <Panel eyebrow="Best Sellers" title="Best-selling flavors" className="h-full min-h-[190px]"><RankedList rows={analytics.flavors} /></Panel>
-                  <Panel eyebrow="Best Sellers" title="Best-selling sizes" className="h-full min-h-[190px]"><RankedList rows={analytics.sizes} /></Panel>
+                  <Panel eyebrow="Best Sellers" title="Best-selling flavors" className="flex h-full min-h-[190px] flex-col overflow-hidden lg:h-[190px]"><div className="lg:max-h-[110px] lg:overflow-y-auto"><RankedList rows={analytics.flavors} /></div></Panel>
+                  <Panel eyebrow="Best Sellers" title="Best-selling sizes" className="flex h-full min-h-[190px] flex-col overflow-hidden lg:h-[190px]"><div className="lg:max-h-[110px] lg:overflow-y-auto"><RankedList rows={analytics.sizes} /></div></Panel>
                 </div>
 
                 <div className="grid items-stretch gap-3 lg:grid-cols-2">
-                  <Panel eyebrow="Customized Cakes" title="Best-selling cake designs" className="h-full min-h-[190px] min-w-0"><RankedList rows={analytics.designs} /></Panel>
-                  <Panel eyebrow="Sales Mix" title="Regular vs. customized cakes" className="h-full min-h-[190px]">
-                    <div className="space-y-4 p-5">
+                  <Panel eyebrow="Customized Cakes" title="Best-selling cake designs" className="flex h-full min-h-[190px] min-w-0 flex-col overflow-hidden lg:h-[190px]"><div className="lg:max-h-[110px] lg:overflow-y-auto"><RankedList rows={analytics.designs} /></div></Panel>
+                  <Panel eyebrow="Sales Mix" title="Regular vs. customized cakes" className="flex h-full min-h-[190px] flex-col overflow-hidden lg:h-[190px]">
+                    <div className="space-y-4 p-5 lg:max-h-[70px] lg:overflow-y-auto lg:p-2">
                       {Object.entries(regularVsCustomized).map(([type, row]) => (
                         <div key={type}>
                           <div className="mb-1 flex items-center justify-between gap-3">
