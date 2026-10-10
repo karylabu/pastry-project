@@ -31,7 +31,7 @@ function SectionHeading({ icon: Icon, children, trailing }) {
       </span>
       <h3 className="shrink-0 text-[10px] font-black uppercase tracking-[0.2em] sm:text-xs">{children}</h3>
       <span className="h-px min-w-3 flex-1 bg-[#dfc69d]" />
-      {trailing && <span className="shrink-0 text-[8px] font-bold uppercase tracking-[0.14em] text-[#a77a3b] sm:text-[9px]">{trailing}</span>}
+      {trailing && <span className="mr-2 shrink-0 text-[8px] font-bold uppercase tracking-[0.14em] text-[#a77a3b] sm:mr-4 sm:text-[9px]">{trailing}</span>}
     </div>
   );
 }
