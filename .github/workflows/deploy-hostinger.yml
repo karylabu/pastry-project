@@ -11,6 +11,7 @@ on:
       - "customer/api_place_order.php"
       - "staff/api_update_order_status.php"
       - "uploads/about us.jpg"
+      - "uploads/login_cake.png"
       - ".htaccess"
       - ".github/workflows/deploy-hostinger.yml"
   workflow_dispatch:
@@ -159,6 +160,16 @@ jobs:
           rsync -az \
             -e "ssh -i ~/.ssh/id_ed25519 -p $SSH_PORT -o IdentitiesOnly=yes -o BatchMode=yes -o ConnectTimeout=20 -o ConnectionAttempts=3" \
             "uploads/about us.jpg" \
+            "$SSH_USERNAME@$SSH_HOST:$REMOTE_ROOT/uploads/"
+
+      - name: Deploy login cake image
+        run: |
+          set -eu
+          ssh -i ~/.ssh/id_ed25519 -p "$SSH_PORT" -o IdentitiesOnly=yes -o BatchMode=yes -o ConnectTimeout=20 -o ConnectionAttempts=3 "$SSH_USERNAME@$SSH_HOST" \
+            "mkdir -p '$REMOTE_ROOT/uploads'"
+          rsync -az \
+            -e "ssh -i ~/.ssh/id_ed25519 -p $SSH_PORT -o IdentitiesOnly=yes -o BatchMode=yes -o ConnectTimeout=20 -o ConnectionAttempts=3" \
+            uploads/login_cake.png \
             "$SSH_USERNAME@$SSH_HOST:$REMOTE_ROOT/uploads/"
 
       - name: Deploy root rewrite rules

@@ -164,10 +164,10 @@ export default function Login() {
         .login-welcome { font-family: 'Pacifico', cursive; }
         .login-welcome svg { display: none; }
         .login-tagline {
-          font-family: 'Playfair Display', Georgia, serif;
+          font-family: 'DM Sans', sans-serif;
           font-size: 32px;
           font-weight: 700;
-          letter-spacing: -0.035em;
+          letter-spacing: -0.02em;
           line-height: 1.12;
         }
         .pastry-login { background: #faf8f1; }
@@ -307,7 +307,6 @@ export default function Login() {
             letter-spacing: -0.045em;
             line-height: 1.12;
           }
-          .pastry-login .hero-panel > .mb-6:nth-child(2) h2.login-tagline span { font-style: italic; }
           .pastry-login .login-cake-section {
             width: 100%;
             max-width: 355px;
@@ -426,6 +425,10 @@ export default function Login() {
             font-style: italic;
           }
           .pastry-login .hero-panel > .mb-6:first-child h1 span { color: #e9aa32; }
+          .pastry-login .login-card > .mb-4:first-child h2.login-welcome {
+            font-family: 'Playfair Display', Georgia, serif;
+            font-style: italic;
+          }
           .pastry-login .hero-panel > .mb-6:first-child p { margin-top: 4px; font-size: 7px; letter-spacing: .35em; }
           .pastry-login .hero-panel > .mb-6:nth-child(2) { margin-bottom: 0; text-align: center; }
           .pastry-login .login-cake-section { display: none; }
@@ -567,7 +570,7 @@ export default function Login() {
             <div className="login-cake-section relative mt-2 max-w-lg">
               <div className="absolute -left-5 bottom-0 h-40 w-40 rounded-full bg-[#171717] sm:-left-8 sm:h-[220px] sm:w-[220px] xl:h-[300px] xl:w-[300px]" />
               <img
-                src={`${ROOT_BASE}/uploads/floral(1).jpg?v=login-cake-2026`}
+                src={`${ROOT_BASE}/uploads/login_cake.png?v=login-cake-20261010`}
                 alt="Pastry Project Cake"
                 className="relative z-10 h-auto w-full max-w-[340px] rounded-[24px] object-contain shadow-2xl sm:rounded-[28px] sm:w-[340px] xl:w-[440px]"
               />
