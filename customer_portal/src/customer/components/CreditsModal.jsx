@@ -7,19 +7,14 @@ const teamMembers = [
     initials: 'KC',
     name: 'Karyl C. Hernandez',
     role: 'PROJECT LEAD',
-    description: 'Guiding the project and team.',
   },
   {
     initials: 'EB',
     name: 'Erryca Bianca M. Abistado',
-    role: 'UI/UX & DEVELOPMENT',
-    description: 'Designing the interface and customer experience.',
   },
   {
     initials: 'AT',
     name: 'Abbygail Eunice Talas',
-    role: 'DEVELOPMENT TEAM',
-    description: 'Building features and supporting system functionality.',
   },
 ];
 
@@ -31,7 +26,7 @@ function SectionHeading({ icon: Icon, children, trailing }) {
       </span>
       <h3 className="shrink-0 text-[10px] font-black uppercase tracking-[0.2em] sm:text-xs">{children}</h3>
       <span className="h-px min-w-3 flex-1 bg-[#dfc69d]" />
-      {trailing && <span className="mr-2 shrink-0 text-[8px] font-bold uppercase tracking-[0.14em] text-[#a77a3b] sm:mr-4 sm:text-[9px]">{trailing}</span>}
+      {trailing && <span className="mr-4 shrink-0 text-[7px] font-bold uppercase tracking-[0.12em] text-[#a77a3b] sm:mr-6 sm:text-[8px]">{trailing}</span>}
     </div>
   );
 }
@@ -122,12 +117,11 @@ export default function CreditsModal({ isOpen, onClose }) {
                   </div>
                   <div className="min-w-0 pt-0.5">
                     <h4 className="font-serif text-[11px] font-bold leading-4 text-[#432719] sm:text-xs sm:leading-4">{member.name}</h4>
-                    <p className="mt-1 text-[8px] font-black uppercase tracking-[0.14em] text-[#a87936] sm:text-[9px]">
-                      {member.role}
-                    </p>
-                    <p className="mt-1 text-[10px] leading-4 text-[#76665b]">
-                      {member.description}
-                    </p>
+                    {member.role && (
+                      <p className="mt-1 text-[8px] font-black uppercase tracking-[0.14em] text-[#a87936] sm:text-[9px]">
+                        {member.role}
+                      </p>
+                    )}
                   </div>
                 </article>
               ))}
