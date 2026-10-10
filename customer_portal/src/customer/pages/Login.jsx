@@ -308,20 +308,32 @@ export default function Login() {
             line-height: 1.12;
           }
           .pastry-login .login-cake-section {
+            position: relative;
+            isolation: isolate;
             width: 100%;
             max-width: 355px;
             margin-top: 0;
           }
-          .pastry-login .login-cake-section > div { display: none; }
+          .pastry-login .login-cake-section::before {
+            content: "";
+            position: absolute;
+            z-index: -1;
+            inset: 8% 5% 3%;
+            border: 1px dashed rgba(201, 151, 45, 0.45);
+            border-radius: 50%;
+            background: radial-gradient(ellipse, rgba(255, 241, 196, 0.9) 0%, rgba(255, 241, 196, 0.5) 48%, rgba(255, 241, 196, 0) 74%);
+          }
           .pastry-login .login-cake-section img {
+            display: block;
             width: 100%;
             max-width: 100%;
             height: 300px;
-            border-radius: 18px;
-            object-fit: cover;
+            border-radius: 0;
+            object-fit: contain;
             object-position: center 46%;
             margin-inline: auto;
-            box-shadow: 0 10px 22px rgba(100, 78, 28, 0.14);
+            box-shadow: none;
+            filter: drop-shadow(0 12px 12px rgba(100, 78, 28, 0.12));
           }
           .pastry-login main > div:not(.hero-panel) {
             flex: 1 1 auto;
@@ -422,16 +434,42 @@ export default function Login() {
           .pastry-login .hero-panel > .mb-6:first-child h1 {
             font-family: 'Playfair Display', Georgia, serif;
             font-size: 22px;
-            font-style: italic;
+            font-style: normal;
+            font-weight: 700;
+            color: #171717;
           }
           .pastry-login .hero-panel > .mb-6:first-child h1 span { color: #e9aa32; }
           .pastry-login .login-card > .mb-4:first-child h2.login-welcome {
-            font-family: 'Playfair Display', Georgia, serif;
-            font-style: italic;
+            font-family: 'Pacifico', cursive;
+            font-style: normal;
+            font-weight: 400;
           }
           .pastry-login .hero-panel > .mb-6:first-child p { margin-top: 4px; font-size: 7px; letter-spacing: .35em; }
           .pastry-login .hero-panel > .mb-6:nth-child(2) { margin-bottom: 0; text-align: center; }
-          .pastry-login .login-cake-section { display: none; }
+          .pastry-login .login-cake-section {
+            position: relative;
+            isolation: isolate;
+            display: block;
+            width: min(100%, 300px);
+            max-width: 300px;
+            margin: 12px auto 0;
+          }
+          .pastry-login .login-cake-section::before {
+            content: "";
+            position: absolute;
+            z-index: -1;
+            inset: 8% 5% 3%;
+            border: 1px dashed rgba(201, 151, 45, 0.45);
+            border-radius: 50%;
+            background: radial-gradient(ellipse, rgba(255, 241, 196, 0.9) 0%, rgba(255, 241, 196, 0.5) 48%, rgba(255, 241, 196, 0) 74%);
+          }
+          .pastry-login .login-cake-section img {
+            width: 100%;
+            height: auto;
+            max-height: 220px;
+            object-fit: contain;
+            object-position: center;
+          }
           .pastry-login main > div:not(.hero-panel) { padding: 0 23px 20px; }
           .pastry-login .login-card {
             padding: 14px 30px 24px;
@@ -551,8 +589,8 @@ export default function Login() {
             <div className="mb-6 flex items-center gap-1">
               <img src={LOGO_URL} alt="Logo" className="h-14 w-14 object-contain" />
               <div>
-                <h1 className="brand-script text-2xl leading-none text-[#F0B94D]">
-                  Pastry <span className="text-[#171717]">Project</span>
+                <h1 className="brand-script text-2xl leading-none text-[#171717]">
+                  Pastry <span className="text-[#F0B94D]">Project</span>
                 </h1>
                 <p className="text-[9px] font-bold uppercase tracking-[0.3em] text-[#171717] opacity-80">Sweetening moments</p>
               </div>
@@ -568,11 +606,10 @@ export default function Login() {
 
             {/* Cake Image Section */}
             <div className="login-cake-section relative mt-2 max-w-lg">
-              <div className="absolute -left-5 bottom-0 h-40 w-40 rounded-full bg-[#171717] sm:-left-8 sm:h-[220px] sm:w-[220px] xl:h-[300px] xl:w-[300px]" />
               <img
-                src={`${ROOT_BASE}/uploads/login_cake.png?v=login-cake-20261010`}
+                src={`${ROOT_BASE}/uploads/login_cake.png?v=login-cake-20261010-v2`}
                 alt="Pastry Project Cake"
-                className="relative z-10 h-auto w-full max-w-[340px] rounded-[24px] object-contain shadow-2xl sm:rounded-[28px] sm:w-[340px] xl:w-[440px]"
+                className="relative z-10 h-auto w-full max-w-[340px] object-contain sm:w-[340px] xl:w-[440px]"
               />
             </div>
           </div>
