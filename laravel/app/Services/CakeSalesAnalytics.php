@@ -22,12 +22,47 @@ class CakeSalesAnalytics
             ->orderBy('created_at')
             ->get();
 
-        $customRows = DB::table('custom_cake_orders as custom')
-            ->join('orders', 'orders.id', '=', 'custom.order_id')
-            ->whereRaw('LOWER(orders.status) = ?', ['completed'])
-            ->whereBetween('orders.created_at', [$start . ' 00:00:00', $end . ' 23:59:59'])
-            ->get();
+        $customRows = collect();
+        if (Schema::hasTable('custom_cake_orders')) {
+            $customRows = DB::table('custom_cake_orders as custom')
+                ->join('orders', 'orders.id', '=', 'custom.order_id')
+                ->whereRaw('LOWER(orders.status) = ?', ['completed'])
+                ->whereBetween('orders.created_at', [$start . ' 00:00:00', $end . ' 23:59:59'])
+                ->get();
+        }
         $customByOrder = $customRows->keyBy('order_id');
+        if (Schema::hasTable('customized_cake_orders')) {
+            $newCustomRows = DB::table('customized_cake_orders as custom')
+                ->join('orders', 'orders.id', '=', 'custom.order_id')
+                ->whereRaw('LOWER(orders.status) = ?', ['completed'])
+                ->whereBetween('orders.created_at', [$start . ' 00:00:00', $end . ' 23:59:59'])
+                ->get([
+                    'custom.order_id',
+                    'custom.notes',
+                    'orders.subtotal',
+                    'orders.total',
+                ]);
+
+            foreach ($newCustomRows as $custom) {
+                if ($customByOrder->has($custom->order_id)) {
+                    continue;
+                }
+
+                $details = json_decode((string) ($custom->notes ?? ''), true);
+                $details = is_array($details) ? $details : [];
+                $customByOrder->put($custom->order_id, (object) [
+                    'order_id' => $custom->order_id,
+                    'quantity' => $details['quantity'] ?? 1,
+                    'estimated_price' => $details['estimated_price'] ?? $details['total_amount'] ?? 0,
+                    'flavor' => $details['cake_flavor'] ?? $details['flavor'] ?? 'Unknown',
+                    'cake_size' => $details['cake_size'] ?? 'Unknown',
+                    'theme_design' => $details['cake_style'] ?? $details['theme'] ?? 'Unknown',
+                    'occasion' => $details['occasion'] ?? 'Unknown',
+                    'subtotal' => $custom->subtotal,
+                    'total' => $custom->total,
+                ]);
+            }
+        }
 
         $orderIds = $completedOrders->pluck('id')->all();
         $normalizedItems = $this->normalizedOrderItems($orderIds);
@@ -79,21 +114,45 @@ class CakeSalesAnalytics
         }
 
         if (Schema::hasTable('analytics_sales_history')) {
+            $hasImportSalesType = Schema::hasColumn('analytics_imports', 'sales_type');
             $importedRows = DB::table('analytics_sales_history as history')
                 ->join('analytics_imports as imports', 'imports.id', '=', 'history.import_id')
                 ->where('imports.status', 'completed')
                 ->whereBetween('history.sale_date', [$start, $end])
                 ->groupBy('history.product_name', 'history.sale_date')
                 ->orderBy('history.sale_date')
-                ->selectRaw('history.product_name, history.sale_date, SUM(history.units_sold) AS units_sold, SUM(history.revenue) AS revenue, COUNT(*) AS record_count')
-                ->get();
+                ->selectRaw(
+                    'history.product_name, history.sale_date, ' .
+                    ($hasImportSalesType ? 'imports.sales_type' : "'other' AS sales_type") .
+                    ', SUM(history.units_sold) AS units_sold, SUM(history.revenue) AS revenue, COUNT(*) AS record_count'
+                );
+            if ($hasImportSalesType) {
+                $importedRows->groupBy('imports.sales_type');
+            }
+            $importedRows = $importedRows->get();
 
             foreach ($importedRows as $row) {
-                $product = $productsByName->get($this->nameKey($row->product_name));
                 $quantity = max(0, (float) $row->units_sold);
-                if (!$product || $quantity <= 0) continue;
+                if ($quantity <= 0) continue;
 
                 $revenue = (float) $row->revenue;
+                if (($row->sales_type ?? 'other') === 'customized_cake') {
+                    $customSales[] = [
+                        'order_id' => 'import-' . $row->product_name . '-' . $row->sale_date,
+                        'date' => (string) $row->sale_date,
+                        'quantity' => $quantity,
+                        'revenue' => $revenue,
+                        'flavor' => 'Unknown',
+                        'size' => 'Unknown',
+                        'design' => trim((string) $row->product_name) ?: 'Historical customized cake',
+                        'occasion' => 'Unknown',
+                        'imported_record_count' => (int) $row->record_count,
+                    ];
+                    continue;
+                }
+
+                $product = $productsByName->get($this->nameKey($row->product_name));
+                if (!$product) continue;
                 $regularSales[] = [
                     'order_id' => 'import-' . $row->product_name . '-' . $row->sale_date,
                     'date' => (string) $row->sale_date,
@@ -348,12 +407,13 @@ class CakeSalesAnalytics
 
     private function summary(array $regular, array $custom): array
     {
-        $regularOrderIds = array_column(array_filter($regular, static fn ($sale) => !isset($sale['imported_record_count'])), 'order_id');
-        $saleOrderIds = array_unique(array_merge(
-            $regularOrderIds,
-            array_column($custom, 'order_id')
-        ));
-        $saleRecords = count($saleOrderIds) + $this->importedRecordCount($regular);
+        $liveOrderIds = array_merge(
+            array_column(array_filter($regular, static fn ($sale) => !isset($sale['imported_record_count'])), 'order_id'),
+            array_column(array_filter($custom, static fn ($sale) => !isset($sale['imported_record_count'])), 'order_id')
+        );
+        $saleRecords = count(array_unique($liveOrderIds))
+            + $this->importedRecordCount($regular)
+            + $this->importedRecordCount($custom);
         $regularQty = array_sum(array_column($regular, 'quantity'));
         $customQty = array_sum(array_column($custom, 'quantity'));
         $regularRevenue = array_sum(array_column($regular, 'revenue'));
@@ -368,7 +428,9 @@ class CakeSalesAnalytics
             'customized_cakes_sold' => $customQty,
             'regular_revenue' => $regularRevenue,
             'customized_revenue' => $customRevenue,
-            'average_order_value' => $this->salesRecordCount($regular) + count($custom) ? $totalRevenue / ($this->salesRecordCount($regular) + count($custom)) : 0,
+            'average_order_value' => $this->salesRecordCount($regular) + $this->salesRecordCount($custom)
+                ? $totalRevenue / ($this->salesRecordCount($regular) + $this->salesRecordCount($custom))
+                : 0,
         ];
     }
 
@@ -482,7 +544,7 @@ class CakeSalesAnalytics
         foreach ([['regular', $regular], ['customized', $custom]] as [$type, $sales]) {
             $quantity = array_sum(array_column($sales, 'quantity'));
             $revenue = array_sum(array_column($sales, 'revenue'));
-            $recordCount = $type === 'regular' ? $this->salesRecordCount($sales) : count($sales);
+            $recordCount = $this->salesRecordCount($sales);
             $rows[$type] = ['quantity' => $quantity, 'revenue' => $revenue, 'average_order_value' => $recordCount ? $revenue / $recordCount : 0];
         }
         $total = $rows['regular']['quantity'] + $rows['customized']['quantity'] ?: 1;
