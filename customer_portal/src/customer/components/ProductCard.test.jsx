@@ -19,7 +19,7 @@ describe('ProductCard cake stock options', () => {
     render(<ProductCard product={makeCake(0, 3)} />);
 
     expect(screen.getByRole('button', { name: 'Small, out of stock' })).toBeDisabled();
-    expect(screen.getByText('OUT OF STOCK')).toBeInTheDocument();
+    expect(screen.getByText('OUT OF STOCK')).toHaveClass('absolute', 'rotate-45', 'bg-[#d93045]');
     expect(screen.getByRole('button', { name: 'Big' })).toBeEnabled();
   });
 
