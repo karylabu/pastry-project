@@ -562,9 +562,9 @@ export default function PredictiveAnalytics() {
                   This estimate uses past sales to help you prepare products. It is a guide, not a guaranteed number.
                 </p>
               </div>
-              <div className="flex flex-wrap gap-2">
-                <select aria-label="Filter by product" value={productFilter} onChange={(event) => setProductFilter(event.target.value)} className="rounded-xl border border-black/10 px-3 py-2 text-xs"><option value="">All products</option>{forecast.products.map((product) => <option key={product.product} value={product.product}>{product.product}</option>)}</select>
-                <select aria-label="Filter by category" value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)} className="rounded-xl border border-black/10 px-3 py-2 text-xs"><option value="">All categories</option>{[...new Set(forecast.products.map((product) => product.category))].map((category) => <option key={category} value={category}>{category}</option>)}</select>
+              <div className="grid w-full shrink-0 grid-cols-2 gap-2 md:w-[320px]">
+                <select aria-label="Filter by product" value={productFilter} onChange={(event) => setProductFilter(event.target.value)} className="h-10 w-full min-w-0 rounded-xl border border-black/10 px-3 text-xs"><option value="">All products</option>{forecast.products.map((product) => <option key={product.product} value={product.product}>{product.product}</option>)}</select>
+                <select aria-label="Filter by category" value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)} className="h-10 w-full min-w-0 rounded-xl border border-black/10 px-3 text-xs"><option value="">All categories</option>{[...new Set(forecast.products.map((product) => product.category))].map((category) => <option key={category} value={category}>{category}</option>)}</select>
               </div>
             </div>
             <div className="overflow-x-auto">
