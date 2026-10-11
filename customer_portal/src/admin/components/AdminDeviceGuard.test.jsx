@@ -35,6 +35,7 @@ describe("AdminDeviceGuard", () => {
 
     expect(screen.getByRole("heading", { name: /best viewed on a larger screen/i })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /pastry project customer website/i })).toHaveAttribute("href", "/customer");
+    expect(screen.getByRole("img", { name: "Pastry Project logo" })).toHaveAttribute("src", "/assets/logo.png");
     expect(screen.queryByText("Admin dashboard")).not.toBeInTheDocument();
   });
 

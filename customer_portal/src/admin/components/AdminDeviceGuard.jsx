@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { CakeSlice, Heart, LaptopMinimal } from "lucide-react";
+import { Heart, LaptopMinimal } from "lucide-react";
 import { ROOT_BASE } from "../../services/config";
 
 const LOGO_URL = process.env.NODE_ENV === "production"
@@ -40,7 +40,7 @@ export default function AdminDeviceGuard({ children }) {
 
       <section className="relative z-10 w-full max-w-[620px] rounded-[30px] border border-white/80 bg-white/75 px-6 py-9 text-center shadow-[0_20px_70px_rgba(112,78,30,0.09)] backdrop-blur-sm sm:px-12 sm:py-12">
         <div className="flex flex-col items-center">
-          <CakeSlice className="h-12 w-12 text-[#57301f]" strokeWidth={1.7} />
+          <img src={LOGO_URL} alt="Pastry Project logo" className="h-14 w-14 object-contain" />
           <div className="mt-2 flex items-center gap-1 font-serif text-[34px] font-bold leading-none sm:text-[42px]">
             <span>Pastry</span>
             <span className="text-[#dfb34a]">Project</span>
@@ -56,7 +56,7 @@ export default function AdminDeviceGuard({ children }) {
         <h1 className="mt-8 font-serif text-[30px] font-bold leading-[1.12] text-[#4a2b1d] sm:text-[38px]">
           Best Viewed on a<br />Larger Screen
         </h1>
-        <p className="mx-auto mt-5 max-w-[440px] text-[15px] leading-7 text-[#70594a] sm:text-base sm:leading-8">
+        <p className="mx-auto mt-5 max-w-[440px] text-justify [text-align-last:center] text-[15px] leading-7 text-[#70594a] sm:text-base sm:leading-8">
           The Pastry Project Admin Portal is designed for tablets, laptops, and desktop computers.
           For the best experience, please open this page on a larger device.
         </p>
@@ -71,13 +71,6 @@ export default function AdminDeviceGuard({ children }) {
           </p>
         </div>
       </section>
-
-      <img
-        src={LOGO_URL}
-        alt=""
-        aria-hidden="true"
-        className="pointer-events-none absolute -left-5 top-5 h-20 w-20 opacity-[0.04]"
-      />
     </main>
   );
 }
