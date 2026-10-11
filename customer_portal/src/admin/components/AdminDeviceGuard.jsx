@@ -6,7 +6,8 @@ import { ROOT_BASE } from "../../services/config";
 const LOGO_URL = process.env.NODE_ENV === "production"
   ? `${ROOT_BASE}/uploads/logo.png`
   : "/assets/logo.png";
-const PHONE_QUERY = "(max-width: 767px)";
+const ADMIN_MIN_WIDTH = 768;
+const PHONE_QUERY = `(max-width: ${ADMIN_MIN_WIDTH - 1}px)`;
 
 function isPhoneViewport() {
   return typeof window !== "undefined" && window.matchMedia(PHONE_QUERY).matches;
