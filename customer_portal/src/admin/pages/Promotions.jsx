@@ -322,7 +322,7 @@ export default function Promotions() {
               }
             >
               <div className="p-4 sm:p-5">
-                <div className="grid gap-3 md:grid-cols-2">
+                <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
                   <label className="block">
                       <span className="mb-1.5 block text-[10px] font-semibold uppercase tracking-[0.16em] text-black/55">Title</span>
                     <input
@@ -366,7 +366,7 @@ export default function Promotions() {
                     />
                   </label>
 
-                  <label className="block md:col-span-2">
+                  <label className="block md:col-span-2 lg:col-span-3">
                     <span className="mb-1.5 block text-[10px] font-semibold uppercase tracking-[0.16em] text-black/55">Message</span>
                     <textarea
                       name="message"
@@ -378,7 +378,7 @@ export default function Promotions() {
                     />
                   </label>
 
-                  <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="grid gap-4 sm:grid-cols-2 md:col-span-2 lg:col-span-3">
                     <label className="block">
                       <span className="mb-1.5 block text-[10px] font-semibold uppercase tracking-[0.16em] text-black/55">Starts</span>
                       <div className="flex h-10 items-center gap-2 rounded-md border border-[#e8dfd4] bg-white px-3 focus-within:border-[#b89646] focus-within:ring-2 focus-within:ring-[#d4af37]/15">
@@ -408,7 +408,7 @@ export default function Promotions() {
                     </label>
                   </div>
 
-                  <label className="block md:col-span-2">
+                  <label className="block md:col-span-2 lg:col-span-3">
                     <span className="mb-2 block text-[10px] font-semibold uppercase tracking-[0.2em] text-black/45">Promotion image</span>
                     <div className="rounded-md border border-dashed border-[#d8c18b] bg-[#fffaf0] p-3">
                       <label className="flex cursor-pointer items-center gap-3 rounded-md border border-[#e8dfd4] bg-white px-3.5 py-3 transition hover:border-[#c9a94f]">
