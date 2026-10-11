@@ -279,7 +279,7 @@ export default function Reports() {
   const [products,      setProducts]      = useState([]);
   const [ingredientsRaw, setIngredientsRaw] = useState([]);
   const [loading,       setLoading]       = useState(true);
-  const [range,         setRange]         = useState('7');
+  const [range,         setRange]         = useState('week');
   const [interval,      setInterval]      = useState('weekly');
   const [dateFilterStart, setDateFilterStart] = useState('');
   const [dateFilterEnd,   setDateFilterEnd]   = useState('');
@@ -825,13 +825,13 @@ export default function Reports() {
                 {['daily', 'weekly', 'monthly', 'all'].map((key) => (
                   <button
                     key={key}
+                    type="button"
+                    aria-pressed={interval === key && (key !== 'all' || (!dateFilterStart && !dateFilterEnd))}
                     onClick={() => {
                       setInterval(key);
-                      if (key === 'all') {
-                        setRange('all');
-                        setDateFilterStart('');
-                        setDateFilterEnd('');
-                      }
+                      setRange({ daily: 'today', weekly: 'week', monthly: 'month', all: 'all' }[key]);
+                      setDateFilterStart('');
+                      setDateFilterEnd('');
                     }}
                     className="rounded px-2 py-2 text-[10px] font-semibold capitalize transition sm:text-[11px]"
                     style={{
