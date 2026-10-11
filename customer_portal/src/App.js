@@ -14,6 +14,7 @@ import Register from "./customer/pages/Register";
 import ForgotPassword from "./customer/pages/ForgotPassword"; // ← your ForgotPassword.jsx
 
 import StaffAdminLogin from "./admin/pages/StaffAdminLogin";
+import AdminDeviceGuard from "./admin/components/AdminDeviceGuard";
 
 /* ADMIN */
 import AdminApp from "./admin/components/AdminApp";
@@ -97,17 +98,19 @@ function App() {
         <Route path="staff/*" element={<Navigate to="/admin" replace />} />
 
         {/* ================= ADMIN ================= */}
-        <Route path="admin/login" element={<StaffAdminLogin />} />
+        <Route path="admin/login" element={<AdminDeviceGuard><StaffAdminLogin /></AdminDeviceGuard>} />
         <Route
           path="admin/*"
           element={
-            <ProtectedRoute
-              allowedRoles={["admin"]}
-              loginPath="/admin/login"
-              deniedPath="/admin/access-denied"
-            >
-              <AdminApp />
-            </ProtectedRoute>
+            <AdminDeviceGuard>
+              <ProtectedRoute
+                allowedRoles={["admin"]}
+                loginPath="/admin/login"
+                deniedPath="/admin/access-denied"
+              >
+                <AdminApp />
+              </ProtectedRoute>
+            </AdminDeviceGuard>
           }
         />
 
