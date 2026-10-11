@@ -945,7 +945,7 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/40 p-4"
+              className="fixed inset-x-0 bottom-0 top-[72px] z-50 flex items-center justify-center overflow-y-auto bg-black/40 p-4"
               role="dialog"
               aria-modal="true"
               aria-labelledby="inventory-modal-title"
@@ -955,7 +955,7 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
                 initial={{ scale: 0.9 }}
                 animate={{ scale: 1 }}
                 exit={{ scale: 0.9 }}
-                className="w-full max-w-[360px] rounded-2xl border border-black/10 bg-white p-6 shadow-xl"
+                className="max-h-full w-full max-w-[480px] overflow-y-auto rounded-2xl border border-black/10 bg-white p-6 shadow-xl"
               >
 
                 <h2 id="inventory-modal-title" className="text-lg font-semibold mb-1">

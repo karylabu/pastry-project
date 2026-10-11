@@ -141,6 +141,10 @@ describe('Products admin catalog', () => {
 
     fireEvent.click(screen.getAllByRole('button', { name: 'Produce' })[0]);
 
+    const dialog = await screen.findByRole('dialog');
+    expect(dialog).toHaveClass('top-[72px]');
+    expect(dialog.firstElementChild).toHaveClass('max-w-[480px]', 'max-h-full', 'overflow-y-auto');
+
     await waitFor(() => {
       expect(screen.getByText('Cake size: Big')).toBeInTheDocument();
       expect(screen.getByText('Production: ✓ Available')).toBeInTheDocument();
