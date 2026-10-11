@@ -955,12 +955,21 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
                 initial={{ scale: 0.9 }}
                 animate={{ scale: 1 }}
                 exit={{ scale: 0.9 }}
-                className="max-h-full w-full max-w-[480px] overflow-y-auto rounded-2xl border border-black/10 bg-white p-6 shadow-xl"
+                className="max-h-full w-full max-w-[600px] overflow-y-auto rounded-2xl border border-black/10 bg-white p-6 shadow-xl"
               >
 
-                <h2 id="inventory-modal-title" className="text-lg font-semibold mb-1">
-                  {selectedProduct.name}
-                </h2>
+                <div className="mb-1 flex items-start justify-between gap-4">
+                  <h2 id="inventory-modal-title" className="text-lg font-semibold">
+                    {selectedProduct.name}
+                  </h2>
+                  <button
+                    type="button"
+                    onClick={closeInventoryModal}
+                    className="shrink-0 rounded-lg border border-black/10 bg-white px-3 py-1.5 text-xs font-medium text-black hover:bg-black/5"
+                  >
+                    Close
+                  </button>
+                </div>
 
                 <p className="text-xs text-black/60 mb-4">
                   Current Stock: {activeModal === "produce"

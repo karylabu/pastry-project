@@ -143,7 +143,7 @@ describe('Products admin catalog', () => {
 
     const dialog = await screen.findByRole('dialog');
     expect(dialog).toHaveClass('top-[72px]');
-    expect(dialog.firstElementChild).toHaveClass('max-w-[480px]', 'max-h-full', 'overflow-y-auto');
+    expect(dialog.firstElementChild).toHaveClass('max-w-[600px]', 'max-h-full', 'overflow-y-auto');
 
     await waitFor(() => {
       expect(screen.getByText('Cake size: Big')).toBeInTheDocument();
@@ -154,6 +154,22 @@ describe('Products admin catalog', () => {
       expect.stringContaining('production/availability/1?product_size_id=12'),
       expect.any(Object),
     );
+  });
+
+  test('closes the production modal from its top Close button', async () => {
+    render(<Products allowCatalogManagement />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Strawberry Cake')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getAllByRole('button', { name: 'Produce' })[0]);
+    await screen.findByRole('dialog');
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    });
   });
 
   test('uses the small tab size and displays stock for that size only', async () => {
