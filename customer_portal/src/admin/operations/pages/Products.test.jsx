@@ -132,6 +132,22 @@ describe('Products admin catalog', () => {
     expect(screen.queryByText('Mini Chocolate Cake')).not.toBeInTheDocument();
   });
 
+  test('keeps table action buttons in a fixed four-column row', async () => {
+    render(<Products allowCatalogManagement />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Strawberry Cake')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: /table/i }));
+    const actions = screen.getByLabelText('Actions for Strawberry Cake');
+    expect(actions).toHaveClass('grid', 'grid-cols-4');
+    expect(Array.from(actions.children)).toHaveLength(4);
+    Array.from(actions.children).forEach((button) => {
+      expect(button).toHaveClass('w-full');
+    });
+  });
+
   test('uses the big tab size for production without showing a redundant size picker', async () => {
     render(<Products allowCatalogManagement />);
 

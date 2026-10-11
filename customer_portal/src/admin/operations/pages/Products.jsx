@@ -871,7 +871,7 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
           </div>
         ) : (
           <div className="overflow-x-auto rounded-xl border border-[#eadfd8] bg-white shadow-[0_5px_18px_rgba(91,64,39,0.04)]">
-            <div className="grid grid-cols-[1.5fr_0.7fr_0.7fr_0.6fr_0.8fr_0.8fr] gap-0 bg-[#fbf7f2] text-[10px] uppercase tracking-[0.16em] text-[#9b8c83]">
+            <div className="grid min-w-[1040px] grid-cols-[minmax(240px,1.5fr)_minmax(100px,0.7fr)_minmax(100px,0.7fr)_minmax(90px,0.6fr)_minmax(150px,0.8fr)_minmax(280px,1.2fr)] gap-0 bg-[#fbf7f2] text-[10px] uppercase tracking-[0.16em] text-[#9b8c83]">
               <div className="px-4 py-3 font-semibold">Product</div>
               <div className="px-4 py-3 font-semibold">Category</div>
               <div className="px-4 py-3 font-semibold">Price</div>
@@ -880,7 +880,7 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
               <div className="px-4 py-3 font-semibold">Actions</div>
             </div>
             {filteredProducts.map((product) => (
-              <div key={product.id} className="grid grid-cols-[1.5fr_0.7fr_0.7fr_0.6fr_0.8fr_0.8fr] gap-0 border-t border-[#f0e7e0] bg-white transition hover:bg-[#fffaf0]">
+              <div key={product.id} className="grid min-w-[1040px] grid-cols-[minmax(240px,1.5fr)_minmax(100px,0.7fr)_minmax(100px,0.7fr)_minmax(90px,0.6fr)_minmax(150px,0.8fr)_minmax(280px,1.2fr)] gap-0 border-t border-[#f0e7e0] bg-white transition hover:bg-[#fffaf0]">
                 <div className="px-4 py-4">
                   <div className="flex items-center gap-3">
                     <div className="h-14 w-14 overflow-hidden rounded-lg border border-[#eadfd8] bg-[#f5eee5]">
@@ -912,19 +912,19 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
                     <p className="text-[9px] text-red-700 mt-1">{getProductionStatus(product).reason}</p>
                   )}
                 </div>
-                <div className="px-4 py-4 flex flex-wrap gap-2">
-                  <button onClick={() => openInventoryModal(product, "produce")} className="rounded-lg bg-[#33251e] px-3 py-2 text-[11px] text-white transition hover:bg-[#5b4540]">Produce</button>
-                  <button onClick={() => openInventoryModal(product, "adjust")} className="rounded-lg border border-[#eadfd8] bg-white px-3 py-2 text-[11px] text-[#5f514a] transition hover:bg-[#fff8df]">Adjust</button>
-                  {canEditCatalog && (
+                <div aria-label={`Actions for ${product.name}`} className="grid grid-cols-4 items-center gap-2 px-4 py-4">
+                  <button onClick={() => openInventoryModal(product, "produce")} className="w-full whitespace-nowrap rounded-lg bg-[#33251e] px-2 py-2 text-[11px] text-white transition hover:bg-[#5b4540]">Produce</button>
+                  <button onClick={() => openInventoryModal(product, "adjust")} className="w-full whitespace-nowrap rounded-lg border border-[#eadfd8] bg-white px-2 py-2 text-[11px] text-[#5f514a] transition hover:bg-[#fff8df]">Adjust</button>
+                  {canEditCatalog ? (
                     <button
                       type="button"
                       onClick={() => openEditProductModal(product)}
-                      className="rounded-lg border border-[#eadfd8] bg-white px-3 py-2 text-[11px] leading-none text-[#5f514a] transition hover:bg-[#fff8df]"
+                      className="w-full whitespace-nowrap rounded-lg border border-[#eadfd8] bg-white px-2 py-2 text-[11px] leading-none text-[#5f514a] transition hover:bg-[#fff8df]"
                     >
                       Edit
                     </button>
-                  )}
-                  <button onClick={() => openInventoryModal(product, "history")} aria-label={`View ${product.name} history`} className="rounded-lg border border-[#eadfd8] bg-white px-3 py-2 text-[#765d50] transition hover:bg-[#fff8df]"><History size={15} /></button>
+                  ) : <span aria-hidden="true" />}
+                  <button onClick={() => openInventoryModal(product, "history")} aria-label={`View ${product.name} history`} className="inline-flex w-full items-center justify-center rounded-lg border border-[#eadfd8] bg-white px-2 py-2 text-[#765d50] transition hover:bg-[#fff8df]"><History size={15} /></button>
                 </div>
               </div>
             ))}
