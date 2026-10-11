@@ -103,7 +103,6 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
   const [newImage, setNewImage] = useState(null);
   const newImageInputRef = useRef(null);
   const [recipeRows, setRecipeRows] = useState([{ ingredient_id: "", qty: "" }]);
-  const [recipeSizeId, setRecipeSizeId] = useState("");
   const editImageInputRef = useRef(null);
 
   const location = useLocation();
@@ -111,10 +110,10 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
   const [activeCat, setActiveCat] = useState(allowCatalogManagement ? catalogCategory : "All");
   const canManageCatalog = Boolean(allowCatalogManagement);
   const canEditCatalog = Boolean(allowCatalogManagement);
+  const editRecipeSize = editProduct ? getProductSizeForCategory(editProduct, activeCat) : null;
+  const editRecipeSizeId = editRecipeSize?.id ? String(editRecipeSize.id) : "";
 
   const openEditProductModal = (product) => {
-    const sizeOptions = getProductSizeOptions(product);
-    const firstSizeId = sizeOptions.find((size) => Number(size?.id) > 0)?.id || "";
     setEditProduct({
       ...product,
       name: product.name || "",
@@ -125,7 +124,6 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
       image: product.image || "",
     });
     setEditImage(null);
-    setRecipeSizeId(firstSizeId ? String(firstSizeId) : "");
     setRecipeRows([{ ingredient_id: "", qty: "" }]);
     setEditOpen(true);
   };
@@ -358,9 +356,9 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
   };
 
   useEffect(() => {
-    if (!editOpen || !editProduct?.id || !recipeSizeId) return;
-    loadSizeRecipe(editProduct.id, recipeSizeId);
-  }, [editOpen, editProduct?.id, recipeSizeId]);
+    if (!editOpen || !editProduct?.id || !editRecipeSizeId) return;
+    loadSizeRecipe(editProduct.id, editRecipeSizeId);
+  }, [editOpen, editProduct?.id, editRecipeSizeId]);
 
   const loadProductionAvailability = async (productId, productSizeId) => {
     if (!productSizeId) {
@@ -1436,21 +1434,15 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
                       Add Ingredient
                     </button>
                   </div>
-                  <div className="space-y-2">
-                    <label className="block text-[11px] font-semibold text-black/70">Cake Size</label>
-                    <select
-                      value={recipeSizeId}
-                      onChange={(event) => setRecipeSizeId(event.target.value)}
-                      className="w-full rounded-xl border border-black/10 bg-white px-3 py-2 text-xs text-black outline-none focus:ring-2 focus:ring-[#D4AF37]"
-                    >
-                      <option value="">Select cake size</option>
-                      {getProductSizeOptions(editProduct).map((size) => (
-                        <option key={size.id} value={size.id}>
-                          {size.size} {size.price !== undefined ? `- ₱${Number(size.price).toLocaleString()}` : ''}
-                        </option>
-                      ))}
-                    </select>
-                    {!recipeSizeId && <p className="text-[11px] text-amber-700">Add a size before defining its recipe.</p>}
+                  <div>
+                    <p className="text-[11px] font-semibold text-black/70">
+                      Recipe for: {activeCat === "Small Cakes" ? "Small" : "Big"} Cake
+                    </p>
+                    {!editRecipeSizeId && (
+                      <p className="mt-1 text-[11px] text-amber-700">
+                        No {activeCat === "Small Cakes" ? "small" : "big"} cake size is configured for this product.
+                      </p>
+                    )}
                   </div>
                   <div className="space-y-2">
                     {recipeRows.map((row, index) => (
@@ -1502,11 +1494,11 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
                           const recipePayload = recipeRows
                             .filter((row) => row.ingredient_id && Number(row.qty) > 0)
                             .map((row) => ({ ingredient_id: Number(row.ingredient_id), qty: Number(row.qty) }));
-                          if (recipeSizeId) {
+                          if (editRecipeSizeId) {
                             const recipeRes = await laravelStaffFetch(`${LARAVEL_BASE}/api/staff/products/${data.product_id || editProduct.id}/recipe`, {
                               method: 'PUT',
                               headers: { 'Content-Type': 'application/json' },
-                              body: JSON.stringify({ product_size_id: Number(recipeSizeId), recipes: recipePayload }),
+                              body: JSON.stringify({ product_size_id: Number(editRecipeSizeId), recipes: recipePayload }),
                             });
                             const recipeData = await recipeRes.json().catch(() => ({}));
                             if (!recipeRes.ok || !recipeData.success) throw new Error(recipeData.message || 'Failed to save product recipe.');

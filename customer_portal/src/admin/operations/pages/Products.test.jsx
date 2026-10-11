@@ -67,7 +67,7 @@ describe('Products admin catalog', () => {
           ok: true,
           json: async () => ({
             success: true,
-            recipe: [{ name: 'Flour', qty: 1, usable_stock: 5 }],
+            recipe: [{ ingredient_id: 4, name: 'Flour', qty: 1, usable_stock: 5 }],
           }),
         });
       }
@@ -260,6 +260,42 @@ describe('Products admin catalog', () => {
       expect.stringContaining('/api/staff/products/1/recipe'),
       expect.objectContaining({ method: 'PUT' }),
     );
+  });
+
+  test('loads and saves the recipe for the selected cake tab without a size picker', async () => {
+    render(<Products allowCatalogManagement />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Strawberry Cake')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Small Cakes' }));
+    fireEvent.click(screen.getAllByRole('button', { name: 'Edit' })[0]);
+
+    expect(screen.getByText('Recipe for: Small Cake')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Cake Size')).not.toBeInTheDocument();
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringContaining('/api/staff/products/1/recipe?product_size_id=11'),
+        expect.any(Object),
+      );
+    });
+    await waitFor(() => {
+      expect(screen.getByDisplayValue('1')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+    await waitFor(() => {
+      const recipeUpdate = global.fetch.mock.calls.find(([url, options]) =>
+        String(url).endsWith('/api/staff/products/1/recipe') && options?.method === 'PUT'
+      );
+      expect(recipeUpdate).toBeDefined();
+      expect(JSON.parse(recipeUpdate[1].body)).toEqual({
+        product_size_id: 11,
+        recipes: [{ ingredient_id: 4, qty: 1 }],
+      });
+    });
   });
 
   test('loads product stock history from the deployed staff endpoint', async () => {
