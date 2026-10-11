@@ -19,7 +19,9 @@ describe('ProductCard cake stock options', () => {
     render(<ProductCard product={makeCake(0, 3)} />);
 
     expect(screen.getByRole('button', { name: 'Small, out of stock' })).toBeDisabled();
-    expect(screen.getByText('OUT OF STOCK')).toHaveClass('absolute', 'rotate-45', 'bg-[#d93045]');
+    const ribbon = screen.getByText('OUT OF STOCK');
+    expect(ribbon).toHaveClass('absolute', 'rotate-45', 'bg-[#d93045]', 'w-20');
+    expect(ribbon.closest('button')).not.toHaveClass('overflow-hidden');
     expect(screen.getByRole('button', { name: 'Big' })).toBeEnabled();
   });
 

@@ -348,7 +348,7 @@ export default function ProductCard({
                     }}
                     aria-label={disabled ? `${variant.size}, out of stock` : variant.size}
                     title={disabled ? 'Out of stock' : undefined}
-                    className={`relative flex min-w-0 flex-1 flex-col items-center overflow-hidden rounded-xl border px-1.5 py-1 text-[8px] font-semibold uppercase tracking-[0.08em] whitespace-nowrap transition-all ${
+                    className={`relative flex min-w-0 flex-1 flex-col items-center rounded-xl border px-1.5 py-1 text-[8px] font-semibold uppercase tracking-[0.08em] whitespace-nowrap transition-all ${
                       disabled
                         ? 'cursor-not-allowed border-stone-200 bg-stone-100 text-stone-400'
                         : selected
@@ -358,7 +358,7 @@ export default function ProductCard({
                   >
                     {variant.size}
                     {disabled && (
-                      <span className="absolute -right-4 top-1/2 w-16 -translate-y-1/2 rotate-45 bg-[#d93045] px-1 py-0.5 text-center text-[5px] font-bold leading-none tracking-normal text-white shadow-sm">
+                      <span className="absolute -right-5 top-1/2 w-20 -translate-y-1/2 rotate-45 bg-[#d93045] px-1 py-0.5 text-center text-[6px] font-bold leading-none tracking-normal text-white shadow-sm">
                         OUT OF STOCK
                       </span>
                     )}
