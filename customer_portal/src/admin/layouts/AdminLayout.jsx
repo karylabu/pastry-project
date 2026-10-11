@@ -75,6 +75,33 @@ export default function AdminLayout({ children }) {
           outline-offset: 2px;
           box-shadow: none !important;
         }
+
+        @media (min-width: 600px) and (max-width: 767px) {
+          .admin-page-surface,
+          .admin-page-surface > * {
+            min-width: 0;
+            max-width: 100%;
+          }
+
+          .admin-page-surface :is(.grid, .flex) > * {
+            min-width: 0;
+          }
+
+          .admin-page-surface :is(input, select, textarea) {
+            min-width: 0;
+            max-width: 100%;
+          }
+
+          .admin-page-surface table {
+            display: block;
+            max-width: 100%;
+            overflow-x: auto;
+          }
+
+          .admin-page-surface :is(section, article)[class*="rounded-"][class*="border"][class*="p-"] {
+            padding: 1rem;
+          }
+        }
       `}</style>
     </div>
   );

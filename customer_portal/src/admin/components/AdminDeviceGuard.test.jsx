@@ -46,10 +46,10 @@ describe("AdminDeviceGuard", () => {
     expect(screen.queryByRole("heading", { name: /best viewed on a larger screen/i })).not.toBeInTheDocument();
   });
 
-  test("allows admin at 768px and blocks it below that width", () => {
+  test("blocks below 600px and allows small tablets from 600px", () => {
     const { mediaQuery, updateViewport } = renderGuard(true);
 
-    expect(window.matchMedia).toHaveBeenCalledWith("(max-width: 767px)");
+    expect(window.matchMedia).toHaveBeenCalledWith("(max-width: 599px)");
     expect(screen.getByRole("heading", { name: /best viewed on a larger screen/i })).toBeInTheDocument();
 
     updateViewport(false);

@@ -229,8 +229,8 @@ export default function AdminNavbar({ onSidebarChange }) {
 
   return (
     <>
-      <aside id="admin-sidebar" className={`fixed top-0 left-0 z-[10000] flex h-full w-[260px] flex-col border-r border-[#eadfd8] bg-[#fffdfa] shadow-sm transition-transform duration-300 ease-out ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}`}>
-        <div className="flex shrink-0 items-center justify-between border-b border-[#f0e7e0] px-6 py-6">
+      <aside id="admin-sidebar" className={`fixed top-0 left-0 z-[10000] flex h-full w-[min(260px,calc(100vw-2rem))] flex-col border-r border-[#eadfd8] bg-[#fffdfa] shadow-sm transition-transform duration-300 ease-out ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}`}>
+        <div className="flex shrink-0 items-center justify-between gap-2 border-b border-[#f0e7e0] px-4 py-5 sm:px-6 sm:py-6">
           <Link to="/admin/dashboard" className="flex items-center gap-3" onClick={closeSidebarAfterNavigation}>
             <img src={`${BASE}/uploads/logo.png`} className="h-9 w-9 object-contain" alt="Pastry Project logo" />
             <div>
