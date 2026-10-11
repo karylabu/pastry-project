@@ -249,13 +249,6 @@ class PromotionController extends Controller
             ], 403);
         }
 
-        if ($promotion->status !== 'draft') {
-            return response()->json([
-                'success' => false,
-                'message' => 'Only draft promotions can be edited.',
-            ], 409);
-        }
-
         $validator = Validator::make($request->all(), [
             'title' => ['required', 'string', 'max:150'],
             'message' => ['required', 'string'],
@@ -303,8 +296,27 @@ class PromotionController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Draft promotion updated successfully.',
+            'message' => 'Promotion updated successfully.',
             'data' => $promotion->fresh(),
+        ]);
+    }
+
+    public function destroy(Request $request, Promotion $promotion): JsonResponse
+    {
+        $user = $this->resolveAdminUser($request);
+
+        if (! $user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized promotion request.',
+            ], 403);
+        }
+
+        $promotion->delete();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Promotion and delivery history deleted.',
         ]);
     }
 }

@@ -46,7 +46,7 @@ class PromotionDraftEditingTest extends TestCase
         });
         Schema::create('promotion_email_logs', function ($table) {
             $table->id();
-            $table->unsignedBigInteger('promotion_id');
+            $table->foreignId('promotion_id')->constrained()->cascadeOnDelete();
             $table->string('email');
             $table->string('status', 30);
             $table->text('error_message')->nullable();
@@ -69,8 +69,8 @@ class PromotionDraftEditingTest extends TestCase
 
     protected function tearDown(): void
     {
-        Schema::dropIfExists('promotions');
         Schema::dropIfExists('promotion_email_logs');
+        Schema::dropIfExists('promotions');
         Schema::dropIfExists('user_sessions');
         Schema::dropIfExists('users');
 
@@ -104,25 +104,45 @@ class PromotionDraftEditingTest extends TestCase
         ]);
     }
 
-    public function test_admin_cannot_edit_a_sent_promotion(): void
+    public function test_admin_can_edit_a_sent_promotion(): void
     {
         $promotionId = $this->createPromotion('sent');
 
         $this->withHeader('Authorization', 'Bearer admin-token')
             ->postJson("/api/admin/promotions/{$promotionId}", [
                 'title' => 'Changed sent campaign',
-                'message' => 'Should remain unchanged',
+                'message' => 'Updated campaign copy',
                 'starts_at' => '2026-10-10 09:00:00',
                 'ends_at' => '2026-10-12 18:00:00',
             ])
-            ->assertStatus(409)
-            ->assertJsonPath('success', false);
+            ->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.title', 'Changed sent campaign');
 
         $this->assertDatabaseHas('promotions', [
             'id' => $promotionId,
-            'title' => 'Original campaign',
+            'title' => 'Changed sent campaign',
             'status' => 'sent',
         ]);
+    }
+
+    public function test_admin_can_delete_a_promotion_and_its_delivery_history(): void
+    {
+        $promotionId = $this->createPromotion('sent');
+        $logId = DB::table('promotion_email_logs')->insertGetId([
+            'promotion_id' => $promotionId,
+            'email' => 'customer@example.com',
+            'status' => 'sent',
+            'attempted_at' => now(),
+        ]);
+
+        $this->withHeader('X-Auth-Token', 'admin-token')
+            ->deleteJson("/api/admin/promotions/{$promotionId}")
+            ->assertOk()
+            ->assertJsonPath('success', true);
+
+        $this->assertDatabaseMissing('promotions', ['id' => $promotionId]);
+        $this->assertDatabaseMissing('promotion_email_logs', ['id' => $logId]);
     }
 
     public function test_draft_coupon_requires_a_discount_percent(): void

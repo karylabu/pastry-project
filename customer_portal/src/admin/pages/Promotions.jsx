@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { CalendarDays, CheckCircle2, ImagePlus, Loader2, Megaphone, Pencil, Send, Tag, XCircle } from "lucide-react";
+import { CalendarDays, CheckCircle2, ImagePlus, Loader2, Megaphone, Pencil, Send, Tag, Trash2, XCircle } from "lucide-react";
 import { LARAVEL_BASE } from "../../services/config";
 import { getAuthHeaders } from "../../services/api";
 
@@ -83,6 +83,7 @@ export default function Promotions() {
   const [promotions, setPromotions] = useState([]);
   const [editingPromotion, setEditingPromotion] = useState(null);
   const [sendingDraftId, setSendingDraftId] = useState(null);
+  const [deletingPromotionId, setDeletingPromotionId] = useState(null);
 
   const metrics = useMemo(() => {
     const sent = promotions.filter((item) => item.status === "sent").length;
@@ -146,7 +147,7 @@ export default function Promotions() {
     setImagePreview(file ? URL.createObjectURL(file) : "");
   };
 
-  const handleEditDraft = (promotion) => {
+  const handleEditPromotion = (promotion) => {
     setEditingPromotion(promotion);
     setForm({
       title: promotion.title || "",
@@ -200,6 +201,40 @@ export default function Promotions() {
     }
   };
 
+  const handleDeletePromotion = async (promotion) => {
+    const confirmed = window.confirm(
+      `Delete "${promotion.title}"? This will permanently remove the campaign and its delivery history${promotion.coupon_code ? ", and disable its coupon" : ""}.`
+    );
+    if (!confirmed) return;
+
+    try {
+      setDeletingPromotionId(promotion.id);
+      setError("");
+      setNotice("");
+
+      const response = await fetch(`${LARAVEL_BASE}/api/admin/promotions/${promotion.id}`, {
+        method: "DELETE",
+        credentials: "include",
+        headers: { Accept: "application/json", ...getAuthHeaders() },
+      });
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.message || "Unable to delete the campaign.");
+      }
+
+      if (editingPromotion?.id === promotion.id) {
+        handleCancelEdit();
+      }
+      setNotice("Campaign and delivery history deleted.");
+      await fetchPromotions();
+    } catch (deleteError) {
+      setError(deleteError.message || "Unable to delete the campaign.");
+    } finally {
+      setDeletingPromotionId(null);
+    }
+  };
+
   const handleSubmit = async () => {
     if (!user?.id) {
       setError("Please sign in again to manage promotions.");
@@ -249,7 +284,7 @@ export default function Promotions() {
         throw new Error(data.message || "Unable to send the promotion.");
       }
 
-      setNotice(editingPromotion ? "Draft promotion updated successfully." : "Promotion scheduled and sent to subscribed customers successfully.");
+      setNotice(editingPromotion ? "Promotion updated successfully." : "Promotion scheduled and sent to subscribed customers successfully.");
       setEditingPromotion(null);
       setForm(emptyForm);
       setImageFile(null);
@@ -278,7 +313,7 @@ export default function Promotions() {
           <div className="space-y-4">
             <Panel
               eyebrow="Campaign"
-              title={editingPromotion ? "Edit draft promotion" : "Send promotion"}
+              title={editingPromotion ? "Edit promotion" : "Send promotion"}
               action={
                 <div className="inline-flex items-center gap-2 rounded-md border border-[#e9e1d9] bg-[#fffdfa] px-2.5 py-1.5 text-[9px] font-semibold uppercase tracking-[0.14em] text-[#65574d]">
                   <Megaphone size={11} />
@@ -434,7 +469,7 @@ export default function Promotions() {
                     className="inline-flex items-center gap-2 rounded-xl bg-black px-4 py-2.5 text-[11px] font-semibold uppercase tracking-[0.2em] text-white transition hover:bg-black/90 disabled:cursor-not-allowed disabled:opacity-65"
                   >
                     {saving ? <Loader2 size={14} className="animate-spin" /> : null}
-                    {saving ? (editingPromotion ? "Saving..." : "Sending...") : (editingPromotion ? "Save draft" : "Send promotion")}
+                    {saving ? (editingPromotion ? "Saving..." : "Sending...") : (editingPromotion ? "Save changes" : "Send promotion")}
                   </button>
                 </div>
               </div>
@@ -464,17 +499,29 @@ export default function Promotions() {
                             <span className={`rounded-full px-2 py-1 text-[9px] font-semibold uppercase tracking-[0.15em] ${promotion.status === "sent" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
                               {promotion.status || "draft"}
                             </span>
+                            <button
+                              type="button"
+                              onClick={() => handleEditPromotion(promotion)}
+                              title="Edit campaign"
+                              aria-label={`Edit ${promotion.title}`}
+                              className="rounded-md border border-[#e8dfd4] p-2 text-black/60 hover:border-[#c9a94f] hover:bg-[#fffaf0] hover:text-black"
+                            >
+                              <Pencil size={14} />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeletePromotion(promotion)}
+                              disabled={deletingPromotionId !== null}
+                              title="Delete campaign"
+                              aria-label={`Delete ${promotion.title}`}
+                              className="rounded-md border border-red-200 p-2 text-red-600 hover:border-red-400 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                              {deletingPromotionId === promotion.id
+                                ? <Loader2 size={14} className="animate-spin" />
+                                : <Trash2 size={14} />}
+                            </button>
                             {promotion.status === "draft" && (
                               <>
-                                <button
-                                  type="button"
-                                  onClick={() => handleEditDraft(promotion)}
-                                  title="Edit draft"
-                                  aria-label={`Edit draft ${promotion.title}`}
-                                  className="rounded-md border border-[#e8dfd4] p-2 text-black/60 hover:border-[#c9a94f] hover:bg-[#fffaf0] hover:text-black"
-                                >
-                                  <Pencil size={14} />
-                                </button>
                                 <button
                                   type="button"
                                   onClick={() => handleSendDraft(promotion)}

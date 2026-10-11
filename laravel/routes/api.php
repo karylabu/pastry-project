@@ -155,5 +155,6 @@ Route::middleware(['api'])->group(function () {
         Route::post('promotions/send', [PromotionController::class, 'send']);
         Route::post('promotions/{promotion}/send', [PromotionController::class, 'sendDraft']);
         Route::post('promotions/{promotion}', [PromotionController::class, 'update']);
+        Route::delete('promotions/{promotion}', [PromotionController::class, 'destroy']);
     });
 });
