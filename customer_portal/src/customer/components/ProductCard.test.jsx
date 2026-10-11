@@ -20,8 +20,9 @@ describe('ProductCard cake stock options', () => {
 
     expect(screen.getByRole('button', { name: 'Small, out of stock' })).toBeDisabled();
     const ribbon = screen.getByText('OUT OF STOCK');
-    expect(ribbon).toHaveClass('absolute', 'rotate-45', 'bg-[#d93045]', 'w-20');
-    expect(ribbon.closest('button')).not.toHaveClass('overflow-hidden');
+    expect(ribbon).toHaveClass('mt-0.5', 'rounded-sm', 'bg-[#d93045]');
+    expect(ribbon).not.toHaveClass('absolute', 'rotate-45', 'w-20');
+    expect(ribbon.previousSibling).toHaveTextContent('Small');
     expect(screen.getByRole('button', { name: 'Big' })).toBeEnabled();
   });
 

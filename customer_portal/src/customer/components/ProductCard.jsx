@@ -358,7 +358,7 @@ export default function ProductCard({
                   >
                     {variant.size}
                     {disabled && (
-                      <span className="absolute -right-5 top-1/2 w-20 -translate-y-1/2 rotate-45 bg-[#d93045] px-1 py-0.5 text-center text-[6px] font-bold leading-none tracking-normal text-white shadow-sm">
+                      <span className="mt-0.5 inline-flex rounded-sm bg-[#d93045] px-1 py-0.5 text-[5px] font-bold leading-none tracking-normal text-white shadow-sm">
                         OUT OF STOCK
                       </span>
                     )}
