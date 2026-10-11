@@ -580,7 +580,7 @@ export default function PredictiveAnalytics() {
                     ))}
                     <th className="py-3 pr-4">Estimated total</th>
                     <th className="py-3 pr-4">Extra to prepare</th>
-                    <th className="py-3">Action</th>
+                    <th className="whitespace-nowrap py-3">Action</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -593,8 +593,8 @@ export default function PredictiveAnalytics() {
                       ))}
                       <td className="py-3 pr-4 font-semibold">{product.totalForecast}</td>
                       <td className="py-3 pr-4 font-semibold">{product.recommendedPreorderQuantity ?? 0}</td>
-                      <td className="py-3">
-                        <span className="rounded-full bg-[#f7f2e8] px-2.5 py-1 text-[10px] font-semibold">
+                      <td className="whitespace-nowrap py-3">
+                        <span className="inline-flex whitespace-nowrap rounded-full bg-[#f7f2e8] px-2.5 py-1 text-[10px] font-semibold">
                           {({ High: "Prepare first", Medium: "Plan ahead", Low: "Stock is enough" })[product.priority] || product.priority}
                         </span>
                       </td>
