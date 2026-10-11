@@ -69,6 +69,39 @@ function procurementStatus(ing) {
   return 'Optimal Stock';
 }
 
+export function groupRevenueByInterval(rows, interval) {
+  const buckets = new Map();
+  rows.forEach((row) => {
+    const sourceDate = String(row.date || '');
+    if (!sourceDate) return;
+
+    let key = sourceDate;
+    let label = sourceDate;
+    if (interval === 'weekly') {
+      const date = new Date(`${sourceDate}T00:00:00`);
+      date.setDate(date.getDate() - ((date.getDay() + 6) % 7));
+      key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+      label = `Week of ${key}`;
+    } else if (interval === 'monthly') {
+      key = sourceDate.slice(0, 7);
+      const date = new Date(`${key}-01T00:00:00`);
+      label = date.toLocaleString('default', { month: 'short', year: 'numeric' });
+    } else if (interval === 'all') {
+      key = 'all';
+      label = 'All time';
+    }
+
+    const bucket = buckets.get(key) || { date: label, revenue: 0, orders: 0 };
+    bucket.revenue += Number(row.revenue || 0);
+    bucket.orders += Number(row.orders || 0);
+    buckets.set(key, bucket);
+  });
+
+  return [...buckets.entries()]
+    .sort(([keyA], [keyB]) => keyB.localeCompare(keyA))
+    .map(([, bucket]) => bucket);
+}
+
 function recommendationFor(ing) {
   const expiryDays = daysUntil(ing.expiry);
   const expiryNote = expiryDays !== null && expiryDays <= 5
@@ -396,7 +429,7 @@ export default function Reports() {
 
   useEffect(() => {
     setRevenueDayPage(1);
-  }, [analytics, range, dateFilterStart, dateFilterEnd]);
+  }, [analytics, range, interval, dateFilterStart, dateFilterEnd]);
 
   useEffect(() => subscribeRealtime((event) => {
     if (event.type !== 'order.updated') return;
@@ -596,36 +629,16 @@ export default function Reports() {
     : [], [analytics]);
   const leaderList = leaderTab === 'top' ? topSellers : bottomSellers;
   const leaderMax = Math.max(...topSellers.map(p => p.qty), 1);
-  const revenueByDay = [...(analytics?.sales?.daily || [])].sort((a, b) => String(b.date).localeCompare(String(a.date)));
+  const revenueByDay = useMemo(
+    () => groupRevenueByInterval(analytics?.sales?.daily || [], interval),
+    [analytics, interval]
+  );
   const revenueDayPageCount = Math.max(1, Math.ceil(revenueByDay.length / REVENUE_DAYS_PER_PAGE));
   const visibleRevenueDayPage = Math.min(revenueDayPage, revenueDayPageCount);
   const revenueDaysOnPage = revenueByDay.slice(
     (visibleRevenueDayPage - 1) * REVENUE_DAYS_PER_PAGE,
     visibleRevenueDayPage * REVENUE_DAYS_PER_PAGE
   );
-
-  const intervalBuckets = useMemo(() => {
-    const buckets = {};
-    visibleOrders.forEach(o => {
-      if (!o.created_at) return;
-      const d = new Date(o.created_at);
-      let key;
-      if (interval === 'daily') {
-        key = d.toISOString().slice(0, 10);
-      } else if (interval === 'monthly') {
-        key = d.toLocaleString('default', { month: 'short', year: 'numeric' });
-      } else if (interval === 'all') {
-        key = 'All time';
-      } else {
-        const year = d.getFullYear();
-        const firstJan = new Date(year, 0, 1);
-        const weekNumber = Math.ceil((((d - firstJan) / 86400000) + firstJan.getDay() + 1) / 7);
-        key = `W${weekNumber} ${year}`;
-      }
-      buckets[key] = (buckets[key] || 0) + 1;
-    });
-    return buckets;
-  }, [visibleOrders, interval]);
 
   const exportReport = () => {
     const title = 'Pastry Project - Business Analytics Report';
@@ -919,7 +932,9 @@ export default function Reports() {
 
               <div className="mb-4 grid gap-3 xl:grid-cols-2">
                 <div className="rounded-2xl border bg-white p-4" style={{ borderColor: C.border }}>
-                  <h3 className="mb-4 text-base font-bold" style={{ color: C.ink }}>Revenue by Day</h3>
+                  <h3 className="mb-4 text-base font-bold" style={{ color: C.ink }}>
+                    Revenue by {{ daily: 'Day', weekly: 'Week', monthly: 'Month', all: 'Period' }[interval]}
+                  </h3>
                   {analytics?.summary?.imported_revenue_by_type && (
                     <div className="mb-3 grid gap-2 sm:grid-cols-3">
                       {[
