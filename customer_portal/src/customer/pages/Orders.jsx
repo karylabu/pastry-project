@@ -1054,7 +1054,7 @@ export default function Orders() {
   return (
     <>
       <style>{'.order-status-tabs::-webkit-scrollbar { display: none; }'}</style>
-      <PageShell background="bg-[#fbfaf5]" padding="px-4 md:px-7 lg:px-10 py-6" className="overflow-x-clip" innerClassName="space-y-0">
+      <PageShell background="bg-[#fbfaf5]" padding="px-4 md:px-10 py-6" className="overflow-x-clip" innerClassName="space-y-0">
         {/* HEADER */}
         <div className="mb-6 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
           <div>
@@ -1065,21 +1065,21 @@ export default function Orders() {
         </div>
 
         {/* TABS + SEARCH */}
-        <div className="sticky top-[96px] z-30 mb-4 flex min-w-0 max-w-full flex-col gap-4 overflow-x-clip border-b border-[#eadfd8] bg-[#fbfaf5]/95 backdrop-blur-sm lg:static lg:flex-row lg:items-center lg:justify-between lg:overflow-visible lg:bg-transparent lg:backdrop-blur-none">
+        <div className="sticky top-[96px] z-30 mb-4 flex min-w-0 max-w-full flex-col gap-4 overflow-x-clip border-b border-[#eadfd8] bg-[#fbfaf5]/95 backdrop-blur-sm md:static md:flex-row md:items-center md:justify-between md:overflow-visible md:bg-transparent md:backdrop-blur-none">
           <div
-            className="order-status-tabs flex h-10 w-full min-w-0 max-w-full flex-nowrap items-center gap-4 overflow-x-auto overscroll-x-contain touch-pan-x lg:h-auto lg:w-auto lg:flex-1 lg:gap-6"
+            className="order-status-tabs flex h-10 w-full min-w-0 max-w-full flex-nowrap items-center gap-4 overflow-x-auto overscroll-x-contain touch-pan-x md:h-auto md:w-auto md:flex-1 md:gap-6"
             style={{ scrollbarWidth: 'none', msOverflowStyle: 'none', overscrollBehaviorX: 'contain', overflowAnchor: 'none' }}
           >
             {statusOptions.map((s) => (
               <button
                 key={s}
                 onClick={() => setStatusFilter(s)}
-                className={`relative flex h-full shrink-0 items-center whitespace-nowrap py-0 text-left text-[11px] font-semibold transition-colors lg:h-auto lg:pb-3 lg:pt-0 lg:text-[13px] ${
+                className={`relative flex h-full shrink-0 items-center whitespace-nowrap py-0 text-left text-[11px] font-semibold transition-colors md:h-auto md:pb-3 md:pt-0 md:text-[13px] ${
                   statusFilter === s ? 'text-[#8d6a2e]' : 'text-[#9b8c83] hover:text-[#765d50]'
                 }`}
               >
                 {s === 'All' ? 'All order' : s}
-                <span className={`ml-1 tabular-nums text-[10px] lg:ml-1.5 lg:text-[12px] ${statusFilter === s ? 'text-slate-900' : 'text-gray-300'}`}>
+                <span className={`ml-1 tabular-nums text-[10px] md:ml-1.5 md:text-[12px] ${statusFilter === s ? 'text-slate-900' : 'text-gray-300'}`}>
                   ({statusCounts[s] ?? 0})
                 </span>
                 <span className={`absolute inset-x-0 -bottom-px h-[2px] rounded-full bg-[#e7c875] transition-opacity duration-150 ${statusFilter === s ? 'opacity-100' : 'opacity-0'}`} />

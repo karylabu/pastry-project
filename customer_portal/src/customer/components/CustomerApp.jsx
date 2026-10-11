@@ -33,6 +33,7 @@ import ChatSupport from '../pages/ChatSupport';
 import CartModal from './CartModal';
 import CheckoutModal from './CheckoutModal';
 import { removeOrderedCartItems } from '../utils/cartItems';
+import { getStockKeyQuantity, getStockLimit } from '../utils/cartStock';
 import { getAuthHeaders } from '../../services/api';
 import { CUSTOMER_BASE, LARAVEL_BASE } from '../../services/config';
 
@@ -303,6 +304,16 @@ export default function CustomerApp() {
 
     const requestedQuantity = Math.max(1, Math.floor(Number(product.qty) || 1));
     const productId = Number(product.product_id ?? product.id);
+    const stockLimit = getStockLimit(product);
+    if (
+      stockLimit !== null &&
+      getStockKeyQuantity(cartItems, product) + requestedQuantity > stockLimit
+    ) {
+      setToastMessage('You ordered more than the stock available.');
+      setShowToast(true);
+      setTimeout(() => setShowToast(false), 3000);
+      return;
+    }
     const existingProductQuantity = Number.isInteger(productId)
       ? cartItems.filter((item) => Number(item.product_id ?? item.id) === productId).length
       : 0;

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { ChevronLeft, ChevronRight, Eye, Loader2, Pencil, Plus, Search, ShieldCheck, Trash2, UserPlus } from "lucide-react";
+import { ChevronLeft, ChevronRight, Eye, EyeOff, Loader2, Pencil, Plus, Search, ShieldCheck, Trash2, UserPlus } from "lucide-react";
 import { LARAVEL_BASE } from "../../services/config";
 import { getAuthHeaders } from "../../services/api";
 import { useAdminUsers } from "../hooks/useAdminUsers";
@@ -71,6 +71,8 @@ export default function UserManagement() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [updatingStatusId, setUpdatingStatusId] = useState(null);
   const [savingUser, setSavingUser] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showPasswordConfirmation, setShowPasswordConfirmation] = useState(false);
   const [deletingUserId, setDeletingUserId] = useState(null);
   const [confirmAction, setConfirmAction] = useState(null);
   const [notice, setNotice] = useState({ type: "", message: "" });
@@ -134,6 +136,8 @@ export default function UserManagement() {
   const resetForm = () => {
     setForm(initialForm);
     setFormErrors({});
+    setShowPassword(false);
+    setShowPasswordConfirmation(false);
   };
 
   const validateForm = (payload) => {
@@ -272,6 +276,8 @@ export default function UserManagement() {
 
   const openEditModal = (user) => {
     setSelectedUser(user);
+    setShowPassword(false);
+    setShowPasswordConfirmation(false);
     setForm({
       name: user.name || "",
       email: user.email || "",
@@ -622,14 +628,24 @@ export default function UserManagement() {
                 </div>
                 <div>
                   <label className="mb-1.5 block text-[11px] font-medium text-[#65574d]">Password</label>
-                  <input type="password" value={form.password} onChange={(event) => setForm({ ...form, password: event.target.value })} className="h-10 w-full rounded-md border border-[#e8dfd4] px-3 text-[12px] text-[#33251e] outline-none transition focus:border-[#b89646] focus:ring-2 focus:ring-[#d4af37]/15" />
+                  <div className="flex h-10 items-center rounded-md border border-[#e8dfd4] bg-white pr-3 transition focus-within:border-[#b89646] focus-within:ring-2 focus-within:ring-[#d4af37]/15">
+                    <input type={showPassword ? "text" : "password"} value={form.password} onChange={(event) => setForm({ ...form, password: event.target.value })} className="h-full min-w-0 flex-1 rounded-md bg-transparent px-3 text-[12px] text-[#33251e] outline-none" />
+                    <button type="button" onClick={() => setShowPassword((visible) => !visible)} className="text-[#8f8076] transition hover:text-[#33251e]" aria-label={showPassword ? "Hide password" : "Show password"}>
+                      {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </button>
+                  </div>
                   {formErrors.password ? <p className="mt-1 text-[11px] text-[#8b2e2e]">{formErrors.password}</p> : null}
                 </div>
               </div>
 
               <div>
                 <label className="mb-1.5 block text-[11px] font-medium text-[#65574d]">Confirm Password</label>
-                <input type="password" value={form.password_confirmation} onChange={(event) => setForm({ ...form, password_confirmation: event.target.value })} className="h-10 w-full rounded-md border border-[#e8dfd4] px-3 text-[12px] text-[#33251e] outline-none transition focus:border-[#b89646] focus:ring-2 focus:ring-[#d4af37]/15" />
+                <div className="flex h-10 items-center rounded-md border border-[#e8dfd4] bg-white pr-3 transition focus-within:border-[#b89646] focus-within:ring-2 focus-within:ring-[#d4af37]/15">
+                  <input type={showPasswordConfirmation ? "text" : "password"} value={form.password_confirmation} onChange={(event) => setForm({ ...form, password_confirmation: event.target.value })} className="h-full min-w-0 flex-1 rounded-md bg-transparent px-3 text-[12px] text-[#33251e] outline-none" />
+                  <button type="button" onClick={() => setShowPasswordConfirmation((visible) => !visible)} className="text-[#8f8076] transition hover:text-[#33251e]" aria-label={showPasswordConfirmation ? "Hide confirm password" : "Show confirm password"}>
+                    {showPasswordConfirmation ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
                 {formErrors.password_confirmation ? <p className="mt-1 text-[11px] text-[#8b2e2e]">{formErrors.password_confirmation}</p> : null}
               </div>
 

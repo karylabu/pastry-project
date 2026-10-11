@@ -1,6 +1,6 @@
 import React, { useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, Mail, KeyRound, Lock } from "lucide-react";
+import { ArrowLeft, Mail, KeyRound, Lock, Eye, EyeOff } from "lucide-react";
 import { LARAVEL_BASE } from "../../services/config";
 import { safeParseJson } from '../../services/api';
 
@@ -14,18 +14,30 @@ const validateEmail = (value) => {
 };
 
 // Reusable input
-function Input({ type = "text", placeholder, value, onChange, maxLength, inputMode, error }) {
+function Input({ type = "text", placeholder, value, onChange, maxLength, inputMode, error, showPassword, onTogglePassword }) {
   return (
     <div>
-      <input
-        type={type}
-        placeholder={placeholder}
-        value={value}
-        onChange={onChange}
-        maxLength={maxLength}
-        inputMode={inputMode}
-        className={`w-full h-[34px] bg-white border rounded-lg px-3 text-[10px] text-black outline-none focus:border-[#F0B94D] focus:ring-2 focus:ring-[#F0B94D]/30 transition-all ${error ? "border-[#A8354A]" : "border-black/15"}`}
-      />
+      <div className="relative">
+        <input
+          type={onTogglePassword ? (showPassword ? "text" : "password") : type}
+          placeholder={placeholder}
+          value={value}
+          onChange={onChange}
+          maxLength={maxLength}
+          inputMode={inputMode}
+          className={`w-full h-[34px] bg-white border rounded-lg px-3 ${onTogglePassword ? "pr-9" : ""} text-[10px] text-black outline-none focus:border-[#F0B94D] focus:ring-2 focus:ring-[#F0B94D]/30 transition-all ${error ? "border-[#A8354A]" : "border-black/15"}`}
+        />
+        {onTogglePassword && (
+          <button
+            type="button"
+            onClick={onTogglePassword}
+            aria-label={showPassword ? "Hide password" : "Show password"}
+            className="absolute right-2 top-1/2 -translate-y-1/2 text-black/50 hover:text-black"
+          >
+            {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
+          </button>
+        )}
+      </div>
       {error ? <p className="mt-1 text-[10px] text-[#A8354A]">{error}</p> : null}
     </div>
   );
@@ -64,6 +76,8 @@ export default function ForgotPassword({ onBack }) {
   const [code, setCode] = useState("");
   const [newPass, setNewPass] = useState("");
   const [confirmPass, setConfirmPass] = useState("");
+  const [showNewPass, setShowNewPass] = useState(false);
+  const [showConfirmPass, setShowConfirmPass] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -322,12 +336,16 @@ export default function ForgotPassword({ onBack }) {
               placeholder="New Password (min 6 characters)"
               value={newPass}
               onChange={e => setNewPass(e.target.value)}
+              showPassword={showNewPass}
+              onTogglePassword={() => setShowNewPass(value => !value)}
             />
             <Input
               type="password"
               placeholder="Confirm New Password"
               value={confirmPass}
               onChange={e => setConfirmPass(e.target.value)}
+              showPassword={showConfirmPass}
+              onTogglePassword={() => setShowConfirmPass(value => !value)}
             />
             <Btn onClick={handleResetPassword} loading={loading}>
               Update Password

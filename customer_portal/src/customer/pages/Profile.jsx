@@ -149,7 +149,7 @@ export default function Profile() {
               Edit
             </Link>
           </div>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-4">
             <Field icon={UserRound} label="Full Name" value={fullName} />
             <Field icon={AtSign} label="Username" value={user?.username ? `@${user.username}` : 'Not available'} />
             <Field icon={Mail} label="Email Address" value={user?.email || 'Not available'} />
@@ -182,7 +182,7 @@ export default function Profile() {
           <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#c59a36]">Shortcuts</p>
           <h2 className="mt-1 text-base font-bold text-slate-900">Quick Links</h2>
         </div>
-        <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-2.5 sm:grid-cols-2 md:grid-cols-3">
           <QuickLink to="/customer/orders" icon={ShoppingBag} title="My Orders" description="Track recent purchases" />
           <QuickLink to="/customer/customized-cakes" icon={Cake} title="Custom Cakes" description="View cake requests" />
           <QuickLink to="/customer/favorites" icon={Heart} title="Favorites" description="See saved products" />
@@ -195,7 +195,7 @@ export default function Profile() {
 
 function Field({ icon: Icon, label, value, wide = false }) {
   return (
-    <div className={`${wide ? 'sm:col-span-2 lg:col-span-1' : ''} rounded-2xl border border-stone-100 bg-[#fafaf9] px-3.5 py-3`}>
+    <div className={`${wide ? 'sm:col-span-2 md:col-span-1' : ''} rounded-2xl border border-stone-100 bg-[#fafaf9] px-3.5 py-3`}>
       <div className="flex items-center gap-2 text-slate-400">
         {Icon && <Icon size={14} className="text-[#c59a36]" />}
         <p className="text-[9px] font-bold uppercase tracking-[0.16em]">{label}</p>

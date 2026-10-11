@@ -191,6 +191,10 @@ export default function Login() {
         .pastry-login .login-banner { display: none; position: absolute; z-index: 0; top: 0; left: 0; height: calc(100% - 105px); width: auto; max-width: none; object-fit: contain; object-position: left top; }
         .pastry-login .brand-icon-overlay { display: none; }
         .pastry-login .hero-panel { display: none; }
+        .pastry-login .login-reference-art { display: none; }
+        .pastry-login .web-brand-mark { display: none; }
+        .pastry-login .login-phone-cake { display: none; }
+        .pastry-login .login-phone-brand { display: none; }
         .login-decorations { display: none; }
 
         /* Background Blobs */
@@ -249,17 +253,18 @@ export default function Login() {
         .btn-secondary:hover { background: #F9FAFB; }
         .pastry-login .blob-yellow-top, .pastry-login .blob-black-left, .pastry-login .blob-yellow-bottom, .pastry-login .bg-icon { display: none; }
         .pastry-login .login-card { position: relative; }
-        @media (min-width: 1024px) {
+        @media (min-width: 1200px) {
           .pastry-login > .relative.z-10 {
             min-height: 100vh;
             height: auto;
             align-items: center;
             justify-content: center;
             gap: 0;
-            padding: 40px 32px;
+            padding: 40px clamp(12px, 4vw, 32px);
           }
           .pastry-login main {
             flex: 0 0 auto;
+            flex-direction: row;
             width: min(1030px, 100%);
             height: min(630px, calc(100vh - 80px));
             min-height: 560px;
@@ -274,14 +279,36 @@ export default function Login() {
             box-shadow: 0 18px 42px rgba(100, 78, 28, 0.16);
           }
           .pastry-login .hero-panel {
+            position: relative;
+            overflow: hidden;
             display: flex;
             flex: 0 0 45%;
             width: 45%;
             justify-content: space-between;
-            padding: 34px 56px;
-            background: linear-gradient(135deg, #fff9e9 0%, #fff6df 100%);
+            padding: clamp(22px, 3.8vw, 56px);
+            background: #fff9e9;
             border-right: 1px solid #f4ead2;
           }
+          .pastry-login .login-reference-art {
+            position: absolute;
+            inset: 0;
+            display: block;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            object-position: left center;
+          }
+          .pastry-login .web-brand-mark {
+            position: absolute;
+            z-index: 2;
+            top: 11%;
+            left: 20%;
+            display: block;
+            width: 44px;
+            height: 44px;
+            object-fit: contain;
+          }
+          .pastry-login .hero-panel > *:not(.login-reference-art):not(.web-brand-mark) { display: none; }
           .pastry-login .hero-panel > .mb-6:first-child {
             align-items: center;
             gap: 12px;
@@ -339,7 +366,7 @@ export default function Login() {
             flex: 1 1 auto;
             width: 55%;
             justify-content: center;
-            padding: 36px 58px;
+            padding: 36px clamp(24px, 4vw, 58px);
           }
           .pastry-login .login-card {
             width: 100%;
@@ -349,8 +376,8 @@ export default function Login() {
             border-radius: 0;
             background: transparent;
           }
-          .pastry-login .login-card > .mb-4:first-child { margin-bottom: 30px; }
-          .pastry-login .login-card > .mb-4:first-child h2.login-welcome {
+          .pastry-login .login-card > .mb-4 { margin-bottom: 30px; }
+          .pastry-login .login-card > .mb-4 h2.login-welcome {
             position: relative;
             width: fit-content;
             font-size: 48px;
@@ -358,7 +385,7 @@ export default function Login() {
             line-height: 1.1;
             color: #edaf39;
           }
-          .pastry-login .login-card > .mb-4:first-child h2.login-welcome svg {
+          .pastry-login .login-card > .mb-4 h2.login-welcome svg {
             display: block;
             position: absolute;
             top: 1px;
@@ -371,7 +398,7 @@ export default function Login() {
             stroke-linejoin: round;
             stroke-width: 1.7;
           }
-          .pastry-login .login-card > .mb-4:first-child p {
+          .pastry-login .login-card > .mb-4 p {
             margin-top: 2px;
             font-size: 15px;
             color: #89909c;
@@ -402,9 +429,9 @@ export default function Login() {
           }
           .pastry-login .login-footer > div:first-child { gap: 9px; }
           .pastry-login .login-footer img { width: 28px; height: 28px; }
-          .pastry-login .login-footer p,
-          .pastry-login .login-footer a,
-          .pastry-login .login-footer button { font-size: 11px; line-height: 1.25; }
+          .pastry-login .login-footer p { font-size: 11px; line-height: 1.25; }
+          .pastry-login .login-footer-links a,
+          .pastry-login .login-footer-links button { font-size: 12px; line-height: 1.25; }
           .pastry-login .login-footer-links { gap: 18px; }
           .pastry-login .login-decorations {
             position: absolute;
@@ -420,7 +447,7 @@ export default function Login() {
           .pastry-login .login-sprig-right { right: 12px; bottom: 22px; width: 96px; height: 150px; stroke-width: 2; opacity: .52; }
           .pastry-login .login-bottom-wave { right: 0; bottom: 0; width: 100%; height: 106px; fill: #fcecc8; stroke: none; opacity: .76; }
         }
-        @media (max-width: 1023px) {
+        @media (max-width: 1199px) {
           .pastry-login .login-welcome svg { display: none; }
           .pastry-login .login-banner { display: none; }
           .pastry-login .hero-panel {
@@ -439,7 +466,7 @@ export default function Login() {
             color: #171717;
           }
           .pastry-login .hero-panel > .mb-6:first-child h1 span { color: #e9aa32; }
-          .pastry-login .login-card > .mb-4:first-child h2.login-welcome {
+          .pastry-login .login-card > .mb-4 h2.login-welcome {
             font-family: 'Pacifico', cursive;
             font-style: normal;
             font-weight: 400;
@@ -479,30 +506,76 @@ export default function Login() {
             box-shadow: 0 18px 55px rgba(35, 28, 20, 0.14);
             backdrop-filter: blur(8px);
           }
-          .pastry-login .login-card > .mb-4:first-child { margin-bottom: 12px; text-align: center; }
-          .pastry-login .login-card > .mb-4:first-child h2 { font-size: 31px; }
-          .pastry-login .login-card > .mb-4:first-child p { color: #89909c; }
+          .pastry-login .login-card > .mb-4 { margin-bottom: 12px; text-align: center; }
+          .pastry-login .login-card > .mb-4 h2 { font-size: 31px; }
+          .pastry-login .login-card > .mb-4 p { color: #89909c; }
           .pastry-login .login-footer { justify-content: center; border-top: 0; padding: 10px 0 19px; }
           .pastry-login .login-footer-links { display: flex; justify-content: center; gap: 12px 18px; }
           .pastry-login .login-footer img { width: 30px; height: 30px; }
-          .pastry-login .login-footer p,
-          .pastry-login .login-footer a,
-          .pastry-login .login-footer button { font-size: 11px; line-height: 1.25; }
-          @media (max-width: 1023px) {
-            .pastry-login { max-width: 522px; margin: 0 auto; border-right: 1px solid #e5e7eb; border-left: 1px solid #e5e7eb; }
-            .pastry-login > .relative.z-10 { padding: 0; }
-            .pastry-login main { flex: 0 0 auto; gap: 0; padding: 0; }
+          .pastry-login .login-footer p { font-size: 11px; line-height: 1.25; }
+          .pastry-login .login-footer-links a,
+          .pastry-login .login-footer-links button { font-size: 12px; line-height: 1.25; }
+          @media (max-width: 1199px) {
+            .pastry-login { width: 100%; max-width: none; margin: 0; border: 0; }
+            .pastry-login > .relative.z-10 { width: 100%; padding: 0; }
+            .pastry-login main { width: 100%; flex: 0 0 auto; flex-direction: column; gap: 0; padding: 0; }
             .pastry-login .hero-panel {
               position: relative;
-              padding: 18px 32px 14px;
-              background: transparent;
+              flex: 0 0 auto;
+              width: 100%;
+              min-height: 205px;
+              overflow: visible;
+              align-items: flex-start;
+              justify-content: center;
+              padding: 22px clamp(22px, 7vw, 38px) 16px;
+              background: linear-gradient(135deg, #fff9e9 0%, #fff6df 100%);
+              border: 0;
             }
-            .pastry-login .hero-panel > .mb-6:first-child { margin-top: 8px; margin-bottom: 22px; }
-            .pastry-login .hero-panel > .mb-6:first-child h1 { font-size: 26px; }
-            .pastry-login .hero-panel > .mb-6:nth-child(2) h2.login-tagline { font-size: 30px; }
-            .pastry-login main > div:not(.hero-panel) { padding: 0 23px 32px; }
-            .pastry-login .login-card { padding: 14px 30px 24px; border-radius: 20px; }
-            .pastry-login .login-card > .mb-4:first-child { margin-bottom: 12px; }
+            .pastry-login .login-reference-art {
+              display: none;
+            }
+            .pastry-login .hero-panel > .mb-6:first-child {
+              display: flex;
+              align-items: center;
+              gap: 10px;
+              margin: 0 0 14px;
+            }
+            .pastry-login .hero-panel > .mb-6:first-child img { width: 42px; height: 42px; }
+            .pastry-login .hero-panel > .mb-6:first-child h1 { font-size: 23px; }
+            .pastry-login .hero-panel > .mb-6:first-child p { margin-top: 3px; font-size: 7px; }
+            .pastry-login .hero-panel > .mb-6:nth-child(2) {
+              display: block;
+              margin: 0;
+              text-align: left;
+            }
+            .pastry-login .hero-panel > .mb-6:nth-child(2) h2.login-tagline {
+              font-size: clamp(27px, 7vw, 34px);
+              line-height: 1.08;
+            }
+            .pastry-login .login-cake-section { display: none; }
+            .pastry-login main > div:not(.hero-panel) {
+              flex: 0 0 auto;
+              width: 100%;
+              justify-content: center;
+              padding: 22px clamp(18px, 6vw, 64px) 32px;
+            }
+            .pastry-login .login-card {
+              width: 100%;
+              max-width: 560px;
+              margin: 0 auto;
+              padding: 24px clamp(20px, 5vw, 38px) 30px;
+              border-radius: 22px;
+            }
+            .pastry-login .login-phone-cake {
+              display: flex;
+              width: 100%;
+              justify-content: center;
+              padding: 0 20px 18px;
+            }
+            .pastry-login .login-phone-cake img {
+              display: block;
+            }
+            .pastry-login .login-card > .mb-4 { margin-bottom: 12px; }
             .pastry-login .login-card form.space-y-4 > :not([hidden]) ~ :not([hidden]) { margin-top: 12px; }
             .pastry-login .login-card form.space-y-4 > :not([hidden]) ~ div.space-y-2:nth-child(2) { margin-top: 14px; }
             .pastry-login .login-card form .space-y-2 > :not([hidden]) ~ :not([hidden]) { margin-top: 3px; }
@@ -517,12 +590,176 @@ export default function Login() {
             .pastry-login .login-footer { padding-bottom: 19px; }
           }
           @media (max-width: 399px) {
-            .pastry-login .hero-panel { padding-right: 20px; padding-left: 20px; }
-            .pastry-login .hero-panel > .mb-6:first-child { margin-bottom: 12px; }
-            .pastry-login .hero-panel > .mb-6:nth-child(2) h2.login-tagline { font-size: 29px; }
+            .pastry-login .hero-panel { min-height: 195px; padding: 18px 20px 14px; }
             .pastry-login main > div:not(.hero-panel) { padding-right: 14px; padding-left: 14px; }
             .pastry-login .login-card { padding-right: 18px; padding-left: 18px; }
           }
+        }
+        @media (max-width: 1199px) {
+          .pastry-login > .relative.z-10 {
+            min-height: 100vh;
+            height: auto;
+            align-items: center;
+            padding: 18px 14px;
+          }
+          .pastry-login main {
+            width: min(100%, 359px);
+            flex: 0 0 auto;
+            flex-direction: column;
+            gap: 0;
+            overflow: hidden;
+            border: 1px solid rgba(255, 255, 255, 0.95);
+            border-radius: 22px;
+            background: #fff;
+            box-shadow: 0 18px 42px rgba(100, 78, 28, 0.16);
+          }
+          .pastry-login .hero-panel {
+            position: relative;
+            display: flex;
+            flex: 0 0 auto;
+            width: 100%;
+            height: clamp(300px, 88vw, 420px);
+            overflow: hidden;
+            padding: 0;
+            background: #fff9e9;
+            border: 0;
+            border-bottom: 1px solid #f4ead2;
+          }
+          .pastry-login .login-reference-art {
+            position: absolute;
+            inset: 0;
+            display: block;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            object-position: left center;
+          }
+          .pastry-login .hero-panel > *:not(.login-reference-art) { display: none; }
+          .pastry-login main > div:not(.hero-panel) {
+            flex: 0 0 auto;
+            width: 100%;
+            justify-content: center;
+            padding: 0;
+          }
+          .pastry-login .login-card {
+            width: 100%;
+            max-width: none;
+            margin: 0;
+            padding: 22px clamp(20px, 6vw, 32px) 28px;
+            border: 0;
+            border-radius: 0;
+            background: #fff;
+            box-shadow: none;
+          }
+          .pastry-login .login-phone-cake { display: none; }
+          .pastry-login .login-card > .mb-4 { text-align: left; }
+        }
+        @media (max-width: 399px) {
+          .pastry-login > .relative.z-10 { padding: 12px 10px; }
+          .pastry-login .hero-panel { height: 300px; }
+        }
+        @media (max-width: 1199px) {
+          .pastry-login > .relative.z-10 { padding: 14px 12px; }
+          .pastry-login main {
+            width: min(100%, 359px);
+            border-color: rgba(255, 255, 255, 0.8);
+            border-radius: 24px;
+            background: #fbf8ed;
+            box-shadow: 0 16px 40px rgba(100, 78, 28, 0.13);
+          }
+          .pastry-login .hero-panel { display: none; }
+          .pastry-login main > div:not(.hero-panel) {
+            background: #fbf8ed;
+          }
+          .pastry-login .login-card {
+            padding: 26px clamp(22px, 7vw, 42px) 12px;
+            background: #fbf8ed;
+          }
+          .pastry-login .login-phone-brand {
+            display: flex;
+            align-items: center;
+            gap: 9px;
+            margin-bottom: 18px;
+          }
+          .pastry-login .login-phone-brand img {
+            width: 34px;
+            height: 34px;
+            object-fit: contain;
+            opacity: .86;
+          }
+          .pastry-login .login-phone-brand h1 {
+            font-family: 'Playfair Display', Georgia, serif;
+            font-size: 19px;
+            font-style: italic;
+            font-weight: 700;
+            line-height: 1;
+            color: #edaf39;
+          }
+          .pastry-login .login-phone-brand h1 span { color: #25211a; }
+          .pastry-login .login-phone-brand p {
+            margin-top: 4px;
+            font-size: 6px;
+            font-weight: 700;
+            letter-spacing: .32em;
+            color: #171717;
+          }
+          .pastry-login .login-card > .mb-4 {
+            margin-bottom: 20px;
+            text-align: left;
+          }
+          .pastry-login .login-card > .mb-4 h2.login-welcome {
+            font-size: 42px;
+            line-height: 1.12;
+            color: #edaf39;
+          }
+          .pastry-login .login-card > .mb-4 p {
+            margin-top: 2px;
+            font-size: 15px;
+          }
+          .pastry-login .login-input {
+            height: 54px;
+            border-radius: 11px;
+            font-size: 14px;
+          }
+          .pastry-login .btn-primary,
+          .pastry-login .btn-secondary {
+            height: 52px;
+            border-radius: 11px;
+          }
+          .pastry-login .btn-primary { background: #ffbf2f; }
+          .pastry-login .login-phone-cake {
+            position: relative;
+            display: flex;
+            width: 100%;
+            height: 300px;
+            overflow: hidden;
+            background: #fbf8ed;
+          }
+          .pastry-login .login-phone-cake img {
+            position: absolute;
+            left: -21%;
+            bottom: 0;
+            display: block;
+            width: 250%;
+            max-width: none;
+            height: auto;
+          }
+        }
+        @media (max-width: 399px) {
+          .pastry-login > .relative.z-10 { padding: 10px 8px; }
+          .pastry-login .login-card { padding-right: 20px; padding-left: 20px; }
+          .pastry-login .login-phone-cake { height: 300px; }
+        }
+        @media (min-width: 480px) and (max-width: 1199px) {
+          .pastry-login main {
+            width: min(100%, 600px);
+            margin-inline: auto;
+          }
+          .pastry-login .login-phone-cake img {
+            left: calc(50% - 255px);
+            width: 894px;
+          }
+        }
       `}</style>
 
       {/* Background Decorations */}
@@ -578,13 +815,19 @@ export default function Login() {
       <div className="bg-icon icon-cupcake">🧁</div>
       <div className="bg-icon icon-branch">🌿</div>
 
-      <div className="relative z-10 flex min-h-screen w-full flex-col overflow-visible px-4 py-2 sm:px-5 lg:h-screen lg:overflow-x-hidden lg:px-0 lg:py-0">
+      <div className="relative z-10 flex min-h-screen w-full flex-col overflow-visible px-4 py-2 sm:px-5 md:h-screen md:overflow-x-hidden md:px-0 md:py-0">
 
         {/* Main Content Area */}
-        <main className="flex flex-1 flex-col gap-4 py-2 lg:flex-row lg:items-center lg:justify-between lg:gap-0 lg:py-0">
+        <main className="flex flex-1 flex-col gap-4 py-2 md:flex-row md:items-center md:justify-between md:gap-0 md:py-0">
 
           {/* Left Side: Hero */}
-          <div className="hero-panel flex w-full flex-none flex-col justify-center py-3 lg:w-[53%] lg:flex-1 lg:py-0 lg:pl-[5.9vw]">
+          <div className="hero-panel flex w-full flex-none flex-col justify-center py-3 md:w-[53%] md:flex-1 md:py-0 md:pl-[5.9vw]">
+            <img
+              className="login-reference-art"
+              src={`${ASSET_BASE}/login.png?v=20261011`}
+              alt="Bakery made simple and sweet"
+            />
+            <img className="web-brand-mark" src={LOGO_URL} alt="" aria-hidden="true" />
             {/* Header / Logo */}
             <div className="mb-6 flex items-center gap-1">
               <img src={LOGO_URL} alt="Logo" className="h-14 w-14 object-contain" />
@@ -615,9 +858,16 @@ export default function Login() {
           </div>
 
           {/* Right Side: Login Card */}
-          <div className="flex w-full flex-1 justify-center lg:w-[46%] lg:items-center lg:justify-end lg:pr-[4vw] lg:pl-[2vw]">
-            <div className="login-card w-full max-w-[500px] px-6 py-5 md:px-10 md:py-7 lg:px-10">
-              <div className="mb-4 text-center lg:text-left">
+          <div className="flex w-full flex-1 justify-center md:w-[46%] md:items-center md:justify-end md:pr-[4vw] md:pl-[2vw]">
+            <div className="login-card w-full max-w-[500px] px-6 py-5 md:px-10 md:py-7">
+              <div className="login-phone-brand">
+                <img src={LOGO_URL} alt="" />
+                <div>
+                  <h1>Pastry <span>Project</span></h1>
+                  <p>Sweetening moments</p>
+                </div>
+              </div>
+              <div className="mb-4 text-center md:text-left">
                 <h2 className="login-welcome text-2xl font-normal text-[#F0B94D] md:text-3xl">
                   Welcome
                   <svg viewBox="0 0 40 36" aria-hidden="true">
@@ -675,7 +925,7 @@ export default function Login() {
                             type="text"
                             value={email}
                             onChange={e => setEmail(e.target.value)}
-                            placeholder="Enter your email or phone number"
+                            placeholder="name@example.com or 09123456789"
                             required
                             className="login-input w-full"
                           />
@@ -692,7 +942,7 @@ export default function Login() {
                             type={showPassword ? "text" : "password"}
                             value={password}
                             onChange={e => setPassword(e.target.value)}
-                            placeholder="Enter your password"
+                            placeholder="••••••••"
                             required
                             className="login-input w-full"
                           />
@@ -758,6 +1008,12 @@ export default function Login() {
                 )}
               </AnimatePresence>
             </div>
+          </div>
+          <div className="login-phone-cake" aria-hidden="true">
+            <img
+              src={`${ASSET_BASE}/login.png?v=20261011`}
+              alt=""
+            />
           </div>
         </main>
 

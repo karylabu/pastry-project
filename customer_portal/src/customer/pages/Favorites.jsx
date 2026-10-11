@@ -147,7 +147,7 @@ export default function Favorites() {
               <ArrowRight size={14} />
             </Link>
           </div>
-          <div className="grid auto-rows-fr grid-cols-2 items-stretch gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
+          <div className="grid auto-rows-fr grid-cols-2 items-stretch gap-3 sm:grid-cols-3 md:grid-cols-5 xl:grid-cols-6">
             {favoriteProducts.map((product) => (
               <ProductCard
                 key={product.id}

@@ -25,6 +25,8 @@ class CustomerAuthApiTest extends TestCase
             $table->string('address')->nullable();
             $table->string('username')->nullable();
             $table->boolean('subscribed_promo')->default(false);
+            $table->timestamp('terms_accepted_at')->nullable();
+            $table->timestamp('privacy_accepted_at')->nullable();
         });
         Schema::create('user_sessions', function ($table) {
             $table->id();
@@ -151,6 +153,55 @@ class CustomerAuthApiTest extends TestCase
         $this->assertDatabaseHas('user_sessions', ['user_id' => 1]);
     }
 
+    public function test_registration_returns_login_message_when_email_is_already_registered(): void
+    {
+        DB::table('users')->insert([
+            'id' => 15,
+            'name' => 'Existing Customer',
+            'email' => 'existing@example.com',
+            'password' => Hash::make('existing-password'),
+            'role' => 'customer',
+        ]);
+
+        $this->postJson('http://localhost/api/register', [
+            'name' => 'Existing Customer',
+            'email' => 'EXISTING@example.com',
+            'phone' => '09123456789',
+            'password' => 'new-password',
+        ])
+            ->assertStatus(409)
+            ->assertJsonPath('success', false)
+            ->assertJsonPath('code', 'account_already_registered')
+            ->assertJsonPath('message', 'This account is already registered. Please login.');
+
+        $this->assertDatabaseCount('users', 1);
+    }
+
+    public function test_registration_rejects_an_existing_admin_account(): void
+    {
+        DB::table('users')->insert([
+            'id' => 16,
+            'name' => 'Existing Admin',
+            'email' => 'admin@example.com',
+            'password' => Hash::make('admin-password'),
+            'role' => 'admin',
+        ]);
+
+        $this->postJson('http://localhost/api/register', [
+            'name' => 'Existing Admin',
+            'email' => 'ADMIN@example.com',
+            'phone' => '09123456789',
+            'password' => 'new-password',
+        ])
+            ->assertForbidden()
+            ->assertJsonPath('success', false)
+            ->assertJsonPath('code', 'admin_account_not_allowed')
+            ->assertJsonPath('message', 'This is an admin account. Please continue to the admin login page.');
+
+        $this->assertDatabaseCount('users', 1);
+        $this->assertDatabaseCount('user_sessions', 0);
+    }
+
     public function test_registration_without_privacy_acceptance_does_not_subscribe_to_promotions(): void
     {
         $this->postJson('/api/register', [
@@ -163,6 +214,106 @@ class CustomerAuthApiTest extends TestCase
             'email' => 'no-consent@example.com',
             'subscribed_promo' => false,
         ]);
+    }
+
+    public function test_google_signup_requires_phone_and_both_policy_acceptances_before_token_verification(): void
+    {
+        $this->postJson('http://localhost/api/google-login', [
+            'intent' => 'signup',
+            'id_token' => 'not-used-with-invalid-signup-details',
+            'phone' => '09123456789',
+            'agree_terms' => true,
+            'agree_privacy' => false,
+        ])
+            ->assertUnprocessable()
+            ->assertJsonPath('success', false)
+            ->assertJsonValidationErrors(['agree_privacy']);
+
+        $this->postJson('http://localhost/api/google-login', [
+            'intent' => 'signup',
+            'id_token' => 'not-used-with-invalid-signup-details',
+            'phone' => 'invalid',
+            'agree_terms' => false,
+            'agree_privacy' => true,
+        ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['phone', 'agree_terms']);
+
+        $this->assertDatabaseCount('users', 0);
+    }
+
+    public function test_google_signup_rejects_phone_already_used_by_an_existing_account(): void
+    {
+        DB::table('users')->insert([
+            'name' => 'Existing Customer',
+            'email' => 'existing@example.com',
+            'phone' => '+63 912-345-6789',
+            'password' => Hash::make('existing-password'),
+        ]);
+
+        $this->postJson('http://localhost/api/google-login', [
+            'intent' => 'signup',
+            'id_token' => 'not-used-with-duplicate-phone',
+            'email' => 'new-google-user@example.com',
+            'phone' => '09123456789',
+            'agree_terms' => true,
+            'agree_privacy' => true,
+        ])
+            ->assertStatus(409)
+            ->assertJsonPath('code', 'phone_already_registered');
+
+        $this->assertDatabaseCount('users', 1);
+        $this->assertDatabaseCount('user_sessions', 0);
+    }
+
+    public function test_google_signup_rejects_an_email_already_used_by_an_existing_account(): void
+    {
+        DB::table('users')->insert([
+            'name' => 'Existing Customer',
+            'email' => 'existing@example.com',
+            'phone' => '09987654321',
+            'password' => Hash::make('existing-password'),
+        ]);
+
+        $this->postJson('http://localhost/api/google-login', [
+            'intent' => 'signup',
+            'id_token' => 'not-used-with-existing-email',
+            'email' => 'EXISTING@example.com',
+            'phone' => '09123456789',
+            'agree_terms' => true,
+            'agree_privacy' => true,
+        ])
+            ->assertStatus(409)
+            ->assertJsonPath('code', 'account_already_exists');
+
+        $this->assertDatabaseCount('users', 1);
+        $this->assertDatabaseCount('user_sessions', 0);
+    }
+
+    public function test_google_signup_rejects_an_existing_admin_account(): void
+    {
+        DB::table('users')->insert([
+            'name' => 'Existing Admin',
+            'email' => 'admin@example.com',
+            'phone' => '09987654321',
+            'password' => Hash::make('admin-password'),
+            'role' => 'admin',
+        ]);
+
+        $this->postJson('http://localhost/api/google-login', [
+            'intent' => 'signup',
+            'id_token' => 'not-used-with-existing-admin',
+            'email' => 'ADMIN@example.com',
+            'phone' => '09123456789',
+            'agree_terms' => true,
+            'agree_privacy' => true,
+        ])
+            ->assertForbidden()
+            ->assertJsonPath('success', false)
+            ->assertJsonPath('code', 'admin_account_not_allowed');
+
+        $this->assertDatabaseCount('users', 1);
+        $this->assertDatabaseCount('user_sessions', 0);
     }
 
     public function test_profile_password_and_sessions_use_the_authenticated_user(): void
@@ -187,9 +338,10 @@ class CustomerAuthApiTest extends TestCase
             ->assertJsonPath('username', 'updated');
         $this->assertDatabaseHas('notifications', [
             'user_id' => 7,
-            'title' => 'Profile Updated',
+            'title' => 'Account Updated',
+            'message' => 'You successfully edited your username.',
             'type' => 'Info',
-            'action_url' => '/customer/account-settings',
+            'action_url' => '/customer/account-settings?section=profile#username',
         ]);
 
         $this->withHeaders($headers)->postJson('/api/password/change', [

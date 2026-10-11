@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Menu as MenuIcon, X } from "lucide-react";
 import { ROOT_BASE } from "../../services/config";
@@ -159,7 +159,7 @@ export default function TermsPage() {
         }
       `}</style>
       <header className="sticky top-0 z-50 border-b border-[#f0e7cb] bg-[#fffdf9] backdrop-blur-sm">
-        <div className="mx-auto flex max-w-[95rem] items-center justify-between px-3 py-3 sm:px-4 lg:px-5">
+        <div className="mx-auto flex max-w-[95rem] items-center justify-between px-3 py-3 sm:px-4 md:px-5">
           <div className="flex items-center gap-3">
             <button
               type="button"
@@ -176,20 +176,20 @@ export default function TermsPage() {
         </div>
       </header>
 
-      <div className="mx-auto max-w-[95rem] px-3 py-4 sm:px-4 lg:px-5">
-        <div className={`${sectionsOpen ? "grid grid-cols-[minmax(0,9rem)_minmax(0,1fr)] gap-2" : "grid grid-cols-1 gap-3"} items-start lg:grid-cols-[20rem_minmax(0,1fr)] lg:gap-4`}>
-          <aside className="terms-sidebar w-full lg:sticky lg:top-20 lg:w-[20rem] lg:self-start lg:justify-self-start">
+      <div className="mx-auto max-w-[95rem] px-3 py-4 sm:px-4 md:px-5">
+        <div className={`${sectionsOpen ? "grid grid-cols-[minmax(0,9rem)_minmax(0,1fr)] gap-2" : "grid grid-cols-1 gap-3"} items-start md:grid-cols-[20rem_minmax(0,1fr)] md:gap-4`}>
+          <aside className="terms-sidebar w-full md:sticky md:top-20 md:w-[20rem] md:self-start md:justify-self-start">
             <button
               type="button"
               aria-expanded={sectionsOpen}
               aria-controls="terms-sections-nav"
               onClick={() => setSectionsOpen((open) => !open)}
-              className="mb-2 flex w-full items-center justify-between rounded-xl border border-[#d4af37]/35 bg-white/80 px-3 py-2.5 text-left text-xs font-bold uppercase tracking-[0.14em] text-[#8d6a2e] shadow-sm lg:hidden"
+              className="mb-2 flex w-full items-center justify-between rounded-xl border border-[#d4af37]/35 bg-white/80 px-3 py-2.5 text-left text-xs font-bold uppercase tracking-[0.14em] text-[#8d6a2e] shadow-sm md:hidden"
             >
               <span>Sections</span>
               {sectionsOpen ? <X size={18} /> : <MenuIcon size={18} />}
             </button>
-            <div className={`rounded-xl border border-[#d4af37]/35 bg-white/80 p-2 shadow-sm backdrop-blur-sm ${sectionsOpen ? "block" : "hidden lg:block"}`}>
+            <div className={`rounded-xl border border-[#d4af37]/35 bg-white/80 p-2 shadow-sm backdrop-blur-sm ${sectionsOpen ? "block" : "hidden md:block"}`}>
               <p className="terms-heading mb-2 font-bold uppercase tracking-[0.25em] text-[#b18a23]">Sections</p>
               <nav id="terms-sections-nav" className="space-y-0.5 pr-1">
                 {sections.map((section, index) => {

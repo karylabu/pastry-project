@@ -30,7 +30,7 @@ export default function AboutUsPage() {
   return (
     <div className="min-h-screen bg-[#fffaf3] text-[#171717]">
       <section className="relative overflow-hidden bg-white">
-        <div className="relative mx-auto grid max-w-7xl gap-10 px-5 py-12 sm:px-6 lg:grid-cols-[1.1fr_0.9fr] lg:px-10 lg:py-14">
+        <div className="relative mx-auto grid max-w-7xl gap-10 px-5 py-12 sm:px-6 md:grid-cols-[1.1fr_0.9fr] md:px-10 md:py-14">
           <div className="flex flex-col justify-center">
             <div className="mb-4 flex items-center gap-3">
               <img src={`${ROOT_BASE}/uploads/logo.png?v=logo-v2`} alt="Pastry Project logo" className="h-12 w-12 rounded-none bg-transparent object-contain" />
@@ -38,7 +38,7 @@ export default function AboutUsPage() {
             </div>
 
             <p className="text-xs font-black uppercase tracking-[0.35em] text-[#b18a23]">About Pastry Project</p>
-            <h1 className="mt-5 text-4xl font-black tracking-[-0.05em] text-[#171717] sm:text-5xl lg:text-6xl">
+            <h1 className="mt-5 text-4xl font-black tracking-[-0.05em] text-[#171717] sm:text-5xl md:text-6xl">
               Making Sweet Moments Special
             </h1>
             <p className="mt-6 max-w-xl text-lg leading-8 text-gray-700">
@@ -83,7 +83,7 @@ export default function AboutUsPage() {
         </div>
       </section>
 
-      <main className="mx-auto max-w-7xl px-5 py-16 sm:px-6 lg:px-10">
+      <main className="mx-auto max-w-7xl px-5 py-16 sm:px-6 md:px-10">
         <section className="p-8 sm:p-10">
           <p className="text-xs font-black uppercase tracking-[0.35em] text-[#b18a23]">Our Story</p>
           <h2 className="mt-4 text-3xl font-black tracking-tight text-[#171717] sm:text-4xl">Built for convenient, joyful ordering</h2>
@@ -118,7 +118,7 @@ export default function AboutUsPage() {
           </div>
         </section>
 
-        <section className="mt-16 grid gap-8 lg:grid-cols-2">
+        <section className="mt-16 grid gap-8 md:grid-cols-2">
           <div className="p-8">
             <p className="text-xs font-black uppercase tracking-[0.35em] text-[#b18a23]">Our Mission</p>
             <h3 className="mt-4 text-3xl font-black tracking-tight text-[#171717]">To make ordering pastries and cakes simple and joyful</h3>
@@ -159,7 +159,7 @@ export default function AboutUsPage() {
           </div>
         </section>
 
-        <section className="mt-16 rounded-[32px] bg-[#171717] px-6 py-12 text-center text-white sm:px-8 lg:px-12">
+        <section className="mt-16 rounded-[32px] bg-[#171717] px-6 py-12 text-center text-white sm:px-8 md:px-12">
           <p className="text-xs font-black uppercase tracking-[0.35em] text-[#f2d77c]">Made for Every Sweet Moment</p>
           <h2 className="mt-5 text-3xl font-black tracking-tight sm:text-5xl">Browse. Customize. Order. Enjoy.</h2>
           <p className="mx-auto mt-5 max-w-2xl text-lg leading-8 text-gray-300">

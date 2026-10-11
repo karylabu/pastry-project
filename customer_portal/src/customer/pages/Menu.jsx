@@ -249,7 +249,7 @@ export default function Menu({ onAddToCart, onEnsureShopOpen }) {
   });
 
   return (
-    <PageShell background="bg-[#fffaf3]" padding="px-4 md:px-7 lg:px-10 pt-5 pb-10">
+    <PageShell background="bg-[#fffaf3]" padding="px-4 md:px-10 pt-5 pb-10">
 
         {/* HEADER */}
         <div className="mb-5 flex flex-col gap-5 px-1 py-2 sm:flex-row sm:items-end sm:justify-between">
@@ -339,7 +339,7 @@ export default function Menu({ onAddToCart, onEnsureShopOpen }) {
         </div>
 
         {/* PRODUCTS */}
-        <div className="grid auto-rows-fr grid-cols-2 items-stretch gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
+        <div className="grid auto-rows-fr grid-cols-2 items-stretch gap-3 sm:grid-cols-3 md:grid-cols-5 xl:grid-cols-6">
           {sortedProducts.map((p) => (
             <ProductCard
               key={p.id}

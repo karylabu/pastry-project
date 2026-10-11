@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
+import "./Dashboard.css";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   MessageCircle,
@@ -153,7 +154,7 @@ function SecondaryBanner({ onOrderNow }) {
 
   return (
     <section className="mb-4 mt-2 overflow-hidden rounded-xl border border-[#eadfd8] bg-white shadow-[0_5px_18px_rgba(91,64,39,0.05)]">
-      <div className="relative aspect-[5/2] w-full overflow-hidden md:aspect-auto md:h-[290px] lg:h-[340px]">
+      <div className="relative aspect-[5/2] w-full overflow-hidden md:aspect-auto md:h-[340px]">
         {secondaryBanner.type === "video" ? (
           <video
             className="h-full w-full object-contain md:scale-[1.08] md:object-cover"
@@ -316,24 +317,41 @@ function RecommendationCard({ product, onSelect, onEnsureShopOpen }) {
   const cakeSizeOptions = Array.isArray(product?.sizes)
     ? product.sizes.filter((option) => String(option.size || '').trim().toLowerCase() !== 'slice')
     : [];
-  const sizeOptions = Array.isArray(product?.sizes) && product.sizes.length > 0
+  const rawSizeOptions = Array.isArray(product?.sizes) && product.sizes.length > 0
     ? cakeSizeOptions.length > 0 ? cakeSizeOptions : [{ size: 'Small', price: Number(product?.small_price || 0) }, { size: 'Big', price: Number(product?.big_price || 0) }]
     : [{ size: 'Regular', price: Number(product?.price || 0) }];
+  const sizeOptions = rawSizeOptions.map((option) => {
+    const stock = Number(option.stock_quantity ?? option.stock ?? option.quantity ?? product?.stock ?? 0);
+    const availabilityValue = option.available;
+    const available = option.available === undefined
+      ? Number.isFinite(stock) && stock > 0
+      : availabilityValue === true || availabilityValue === 1 || availabilityValue === '1' || availabilityValue === 'true';
+    return {
+      ...option,
+      stock_quantity: Number.isFinite(stock) ? Math.max(0, stock) : 0,
+      available,
+    };
+  });
 
-  const [selectedSize, setSelectedSize] = useState(sizeOptions[0]?.size || 'Regular');
+  const [selectedSize, setSelectedSize] = useState(
+    sizeOptions.find((option) => option.stock_quantity > 0 && option.available)?.size || sizeOptions[0]?.size || 'Regular'
+  );
+  const availableSizeOptions = sizeOptions.filter((option) => option.stock_quantity > 0 && option.available);
+  const allSizesOutOfStock = sizeOptions.length > 0 && availableSizeOptions.length === 0;
 
   useEffect(() => {
-    if (sizeOptions.length > 0 && !sizeOptions.some((option) => String(option.size || 'Regular') === selectedSize)) {
-      setSelectedSize(sizeOptions[0].size || 'Regular');
+    const selectedOption = sizeOptions.find((option) => String(option.size || 'Regular') === selectedSize);
+    if ((!selectedOption || selectedOption.stock_quantity <= 0 || !selectedOption.available) && availableSizeOptions.length > 0) {
+      setSelectedSize(availableSizeOptions[0].size || 'Regular');
     }
-  }, [selectedSize, sizeOptions]);
+  }, [selectedSize, sizeOptions, availableSizeOptions]);
 
   const selectedPrice = sizeOptions.find((option) => String(option.size || 'Regular') === selectedSize)?.price
     ?? Number(product?.price || 0);
 
   return (
-    <div className="flex h-full min-h-[226px] min-w-0 flex-col rounded-xl border border-[#eadfd8] bg-[#fffaf7] p-2 shadow-[0_5px_14px_rgba(91,64,39,0.06)] transition-all duration-200 hover:-translate-y-0.5 hover:border-[#e7c875] hover:shadow-[0_10px_20px_rgba(91,64,39,0.1)]">
-      <div className="mb-2 flex h-[105px] w-full flex-shrink-0 items-center justify-center overflow-hidden rounded-lg border border-[#f1e6df] bg-[#f8eee8] p-1">
+    <div className="home-recommendation-card flex h-full min-h-[226px] min-w-0 flex-col rounded-xl border border-[#eadfd8] bg-[#fffaf7] p-2 shadow-[0_5px_14px_rgba(91,64,39,0.06)] transition-all duration-200 hover:-translate-y-0.5 hover:border-[#e7c875] hover:shadow-[0_10px_20px_rgba(91,64,39,0.1)]">
+      <div className="home-recommendation-image mb-2 flex h-[105px] w-full flex-shrink-0 items-center justify-center overflow-hidden rounded-lg border border-[#f1e6df] bg-[#f8eee8] p-1">
         <img
           src={resolveProductImage(product)}
           alt={product.name}
@@ -352,25 +370,32 @@ function RecommendationCard({ product, onSelect, onEnsureShopOpen }) {
         />
       </div>
 
-      <h3 className="min-h-[1.35rem] line-clamp-2 text-[11px] font-bold leading-tight text-[#33251e]">{product.name}</h3>
-      <p className="mt-0.5 text-[11px] font-semibold text-[#33251e]">₱{Number(selectedPrice || 0).toLocaleString()}</p>
+      <h3 className="home-recommendation-title min-h-[2.5rem] line-clamp-2 overflow-hidden text-[11px] font-bold leading-tight text-[#33251e]">{product.name}</h3>
+      <p className="home-recommendation-price mt-0.5 min-h-4 text-[11px] font-semibold text-[#33251e]">₱{Number(selectedPrice || 0).toLocaleString()}</p>
 
-      <div className="mt-1 flex min-h-[16px] flex-wrap justify-center gap-1">
+      <div className="home-recommendation-options mt-1 flex min-h-6 flex-wrap content-start justify-center gap-1">
         {sizeOptions.map((option) => {
           const label = String(option.size || 'Regular');
           const isSelected = selectedSize === label;
+          const disabled = option.stock_quantity <= 0 || !option.available;
           return (
             <button
               key={`${product.id}-${label}`}
               type="button"
-              onClick={() => setSelectedSize(label)}
-              className={`rounded-full border px-1.5 py-0.5 text-[7px] font-semibold uppercase tracking-[0.08em] ${
-                isSelected
-                  ? 'border-[#d4af37] bg-[#f7e8b0] text-black'
-                  : 'border-stone-200 bg-stone-50 text-stone-600'
+              disabled={disabled}
+              aria-label={disabled ? `${label}, out of stock` : label}
+              title={disabled ? 'Out of stock' : undefined}
+              onClick={() => !disabled && setSelectedSize(label)}
+              className={`flex flex-col items-center rounded-xl border px-1.5 py-1 text-[7px] font-semibold uppercase tracking-[0.08em] ${
+                disabled
+                  ? 'cursor-not-allowed border-gray-200 bg-gray-100 text-gray-400'
+                  : isSelected
+                ? 'border-[#d4af37] bg-[#f7e8b0] text-black'
+                : 'border-stone-200 bg-stone-50 text-stone-600'
               }`}
             >
               {label}
+              {disabled && <span className="mt-0.5 rounded-sm bg-gray-300 px-1 py-px text-[5px] leading-none tracking-normal text-gray-700">OUT OF STOCK</span>}
             </button>
           );
         })}
@@ -378,10 +403,12 @@ function RecommendationCard({ product, onSelect, onEnsureShopOpen }) {
 
       <button
         onClick={async () => {
+          if (allSizesOutOfStock) return;
           if (onEnsureShopOpen && !(await onEnsureShopOpen())) return;
           onSelect?.(product, selectedSize, Number(selectedPrice || product.price || 0));
         }}
-        className="mt-2 h-7 w-full rounded-lg border border-[#eadfca] bg-[#fff8e9] py-1.5 text-[8px] font-semibold text-[#33251e] transition-colors hover:border-[#e7c875] hover:bg-[#fff8df] hover:text-[#8d6a2e]"
+        disabled={allSizesOutOfStock}
+        className={`home-recommendation-add mt-auto h-7 w-full shrink-0 rounded-lg border py-1.5 text-[8px] font-semibold transition-colors ${allSizesOutOfStock ? 'cursor-not-allowed border-gray-200 bg-gray-100 text-gray-400' : 'border-[#eadfca] bg-[#fff8e9] text-[#33251e] hover:border-[#e7c875] hover:bg-[#fff8df] hover:text-[#8d6a2e]'}`}
       >
         Add to Cart
       </button>
@@ -1247,7 +1274,7 @@ export default function Dashboard({ onAddToCart, onEnsureShopOpen, hideFloating 
         onCustomizeNow={() => navigate("/customer/customized-cakes")}
       />
 
-      <main className="mx-auto max-w-[1380px] px-4 py-5 md:px-7 lg:px-10">
+      <main className="mx-auto max-w-[1380px] px-4 py-5 md:px-10">
         <div className="mb-3 grid grid-cols-6 gap-1 px-0 py-1 md:gap-3 md:px-1">
           {[
             ['Birthday', CakeSlice, '/customer/birthday-designs'],
@@ -1271,41 +1298,46 @@ export default function Dashboard({ onAddToCart, onEnsureShopOpen, hideFloating 
 
         <SecondaryBanner onOrderNow={() => navigate("/customer/customized-cakes")} />
 
-        <div className="grid gap-3 lg:gap-4 lg:grid-cols-[minmax(0,2.1fr)_minmax(300px,0.88fr)]">
-          <div className="order-2 min-w-0 lg:order-1">
-            <section className="mb-4 overflow-hidden rounded-xl border border-[#eadfd8] bg-white shadow-[0_5px_18px_rgba(91,64,39,0.05)]">
+        <div className="home-sections-layout">
+          <div className="home-products-stack">
+            <section className="home-best-sellers overflow-hidden rounded-xl border border-[#eadfd8] bg-white shadow-[0_5px_18px_rgba(91,64,39,0.05)]">
               <div className="flex items-center justify-between border-b border-[#f0e7e0] px-4 py-3 sm:px-5">
                 <div><p className="text-[9px] font-black uppercase tracking-[0.28em] text-[#b17876]">Featured cakes</p><h2 className="mt-0.5 font-serif text-xl text-[#33251e] md:text-2xl">Our Best Sellers</h2></div>
                 <button type="button" onClick={() => navigate('/customer/menu')} className="inline-flex items-center gap-1 text-[10px] font-bold text-[#765d50]">View All Cakes <ChevronRight size={13} /></button>
               </div>
-              <div className="grid grid-cols-2 gap-3 p-3 sm:grid-cols-3 xl:grid-cols-5">
+              <div className="home-best-sellers-grid grid auto-rows-fr grid-cols-2 items-stretch gap-3 p-3">
                 {(bestSellers.length ? bestSellers : mustTry).slice(0, 5).map((product) => <RecommendationCard key={product.id} product={product} onSelect={handleSelectProduct} onEnsureShopOpen={onEnsureShopOpen} />)}
               </div>
             </section>
 
-            <section className="mb-4 rounded-xl border border-[#eadfd8] bg-white p-4 shadow-[0_5px_18px_rgba(91,64,39,0.04)] sm:p-5">
-              <div className="mb-3 flex items-center justify-between"><div><p className="text-[9px] font-black uppercase tracking-[0.28em] text-[#b17876]">Curated for you</p><h2 className="mt-0.5 font-serif text-xl text-[#33251e]">Just for You</h2></div><button type="button" onClick={() => navigate('/customer/menu')} className="text-[10px] font-bold text-[#765d50]">View All <ChevronRight size={13} className="inline" /></button></div>
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">{(cakeRecommendations.length ? cakeRecommendations : mustTry).slice(0, 4).map((product) => <RecommendationCard key={product.id} product={product} onSelect={handleSelectProduct} onEnsureShopOpen={onEnsureShopOpen} />)}</div>
+            <section className="home-curated overflow-hidden rounded-xl border border-[#eadfd8] bg-white p-4 shadow-[0_5px_18px_rgba(91,64,39,0.04)] sm:p-5">
+              <div className="home-curated-heading mb-3 flex items-center justify-between"><div><p className="text-[9px] font-black uppercase tracking-[0.28em] text-[#b17876]">Curated for you</p><h2 className="mt-0.5 font-serif text-xl text-[#33251e]">Just for You</h2></div><button type="button" onClick={() => navigate('/customer/menu')} className="text-[10px] font-bold text-[#765d50]">View All <ChevronRight size={13} className="inline" /></button></div>
+              <div className="home-curated-grid grid auto-rows-fr grid-cols-2 items-stretch gap-3">{(cakeRecommendations.length ? cakeRecommendations : mustTry).slice(0, 4).map((product) => <RecommendationCard key={product.id} product={product} onSelect={handleSelectProduct} onEnsureShopOpen={onEnsureShopOpen} />)}</div>
             </section>
           </div>
 
-          <aside className="order-1 space-y-4 lg:order-2">
-            <section className="rounded-xl border border-[#eadfd8] bg-white p-4 shadow-[0_5px_18px_rgba(91,64,39,0.04)]">
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex min-w-0 items-center gap-3">
-                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#fff8e9] text-[#a57c38]"><Gift size={19} /></span>
-                  <div className="min-w-0"><p className="text-[9px] font-black uppercase tracking-[0.2em] text-[#9b7b3d]">Pastry Project Rewards</p><p className="mt-1 max-w-[190px] text-[13px] font-black leading-snug text-[#33251e]">Every order comes with a little extra.</p></div>
+          <aside className="home-sidebar-stack">
+            <section className="home-rewards rounded-xl border border-[#eadfd8] bg-white p-3 shadow-[0_5px_18px_rgba(91,64,39,0.04)] sm:p-4">
+              <div className="flex min-w-0 items-center gap-2">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#fff8e9] text-[#a57c38]"><Gift size={18} /></span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-[8px] font-black uppercase tracking-[0.12em] text-[#9b7b3d] sm:text-[9px] sm:tracking-[0.16em]">Pastry Project Rewards</p>
+                  <p className="mt-1 text-xs font-black leading-snug text-[#33251e] sm:text-[13px]">Every order comes with a little extra.</p>
                 </div>
-                <button type="button" onClick={() => navigate('/customer/rewards')} className="shrink-0 rounded-lg bg-[#fff8e9] px-3 py-2 text-[9px] font-bold text-[#33251e] hover:bg-[#111111] hover:text-white">View Rewards</button>
+                <button type="button" onClick={() => navigate('/customer/rewards')} className="shrink-0 rounded-lg bg-[#fff8e9] px-2 py-1.5 text-[8px] font-bold text-[#33251e] transition hover:bg-[#111111] hover:text-white sm:px-2.5 sm:text-[9px]">View Rewards</button>
               </div>
-              <div className="mt-3 grid grid-cols-3 gap-2 border-t border-[#eadfca] pt-3 text-center"><div><Star size={15} className="mx-auto text-[#a57c38]" /><p className="mt-1 text-[10px] font-bold text-[#33251e]">10 points</p><p className="text-[8px] text-[#74675f]">per ₱100</p></div><div><Gift size={15} className="mx-auto text-[#a57c38]" /><p className="mt-1 text-[10px] font-bold text-[#33251e]">1,000 points</p><p className="text-[8px] text-[#74675f]">5% OFF</p></div><div><Tag size={15} className="mx-auto text-[#a57c38]" /><p className="mt-1 text-[10px] font-bold text-[#33251e]">₱100 max</p><p className="text-[8px] text-[#74675f]">per reward</p></div></div>
+              <div className="mt-3 grid grid-cols-3 gap-1 border-t border-[#eadfca] pt-3 text-center sm:gap-2">
+                <div><Star size={15} className="mx-auto text-[#a57c38]" /><p className="mt-1 text-[9px] font-bold text-[#33251e] sm:text-[10px]">10 points</p><p className="text-[8px] text-[#74675f]">per ₱100</p></div>
+                <div><Gift size={15} className="mx-auto text-[#a57c38]" /><p className="mt-1 text-[9px] font-bold text-[#33251e] sm:text-[10px]">1,000 points</p><p className="text-[8px] text-[#74675f]">5% OFF</p></div>
+                <div><Tag size={15} className="mx-auto text-[#a57c38]" /><p className="mt-1 text-[9px] font-bold text-[#33251e] sm:text-[10px]">₱100 max</p><p className="text-[8px] text-[#74675f]">per reward</p></div>
+              </div>
             </section>
 
-            <section className="relative min-h-[132px] overflow-hidden rounded-xl border border-[#eadfd8] bg-white p-3 text-[#3c2925] shadow-[0_5px_18px_rgba(91,64,39,0.04)]"><div className="absolute -right-7 -top-7 h-28 w-28 rounded-full border-[12px] border-[#f3e3b0]" /><div className="relative z-10 max-w-[220px]"><p className="text-[9px] font-black uppercase tracking-[0.24em] text-[#a57c38]">Special Offer</p><h2 className="mt-1 font-serif text-3xl leading-none">5% OFF</h2><p className="mt-1 text-xs leading-5 text-[#765f3d]">on your first order. Treat yourself to something freshly baked.</p><button type="button" onClick={() => navigate('/customer/menu')} className="mt-2 inline-flex items-center gap-1 rounded-full bg-[#33251e] px-4 py-1.5 text-[10px] font-bold text-white">Shop Now <ChevronRight size={12} /></button></div></section>
+            <section className="home-offer relative min-h-[132px] overflow-hidden rounded-xl border border-[#eadfd8] bg-white p-3 text-[#3c2925] shadow-[0_5px_18px_rgba(91,64,39,0.04)]"><div className="absolute -right-7 -top-7 h-28 w-28 rounded-full border-[12px] border-[#f3e3b0]" /><div className="relative z-10 max-w-[220px]"><p className="text-[9px] font-black uppercase tracking-[0.24em] text-[#a57c38]">Special Offer</p><h2 className="mt-1 font-serif text-3xl leading-none">5% OFF</h2><p className="mt-1 text-xs leading-5 text-[#765f3d]">on your first order. Treat yourself to something freshly baked.</p><button type="button" onClick={() => navigate('/customer/menu')} className="mt-2 inline-flex items-center gap-1 rounded-full bg-[#33251e] px-4 py-1.5 text-[10px] font-bold text-white">Shop Now <ChevronRight size={12} /></button></div></section>
 
-            <section className="rounded-xl border border-[#eadfd8] bg-white p-4 shadow-[0_5px_18px_rgba(91,64,39,0.04)]"><p className="mb-3 text-[10px] font-black uppercase tracking-[0.22em] text-[#5d4a42]">Quick Actions</p><div className="grid grid-cols-2 gap-2"><button type="button" onClick={() => navigate('/customer/customized-cakes')} className="flex items-center gap-2 rounded-lg bg-[#fff0f0] px-3 py-3 text-left text-[10px] font-bold text-[#5b4540]"><Gift size={18} className="text-[#c36b77]" />Customize Cake</button><button type="button" onClick={handleViewOrders} className="flex items-center gap-2 rounded-lg bg-[#fff8e9] px-3 py-3 text-left text-[10px] font-bold text-[#5b4540]"><ClipboardList size={18} className="text-[#a57c38]" />View Orders</button><button type="button" onClick={() => navigate('/customer/profile')} className="flex items-center gap-2 rounded-lg bg-[#f7f2fb] px-3 py-3 text-left text-[10px] font-bold text-[#5b4540]"><User size={18} className="text-[#87699a]" />My Profile</button><button type="button" onClick={() => navigate('/customer/chat-support')} className="flex items-center gap-2 rounded-lg bg-[#eef7f4] px-3 py-3 text-left text-[10px] font-bold text-[#5b4540]"><MessageCircle size={18} className="text-[#668e83]" />Help Center</button></div></section>
+            <section className="home-quick-actions rounded-xl border border-[#eadfd8] bg-white p-4 shadow-[0_5px_18px_rgba(91,64,39,0.04)]"><p className="mb-3 text-[10px] font-black uppercase tracking-[0.22em] text-[#5d4a42]">Quick Actions</p><div className="grid grid-cols-2 gap-2"><button type="button" onClick={() => navigate('/customer/customized-cakes')} className="flex items-center gap-2 rounded-lg bg-[#fff0f0] px-3 py-3 text-left text-[10px] font-bold text-[#5b4540]"><Gift size={18} className="text-[#c36b77]" />Customize Cake</button><button type="button" onClick={handleViewOrders} className="flex items-center gap-2 rounded-lg bg-[#fff8e9] px-3 py-3 text-left text-[10px] font-bold text-[#5b4540]"><ClipboardList size={18} className="text-[#a57c38]" />View Orders</button><button type="button" onClick={() => navigate('/customer/profile')} className="flex items-center gap-2 rounded-lg bg-[#f7f2fb] px-3 py-3 text-left text-[10px] font-bold text-[#5b4540]"><User size={18} className="text-[#87699a]" />My Profile</button><button type="button" onClick={() => navigate('/customer/chat-support')} className="flex items-center gap-2 rounded-lg bg-[#eef7f4] px-3 py-3 text-left text-[10px] font-bold text-[#5b4540]"><MessageCircle size={18} className="text-[#668e83]" />Help Center</button></div></section>
 
-            <section className="rounded-xl border border-[#eadfd8] bg-white p-4 shadow-[0_5px_18px_rgba(91,64,39,0.04)]">
+            <section className="home-order-status rounded-xl border border-[#eadfd8] bg-white p-4 shadow-[0_5px_18px_rgba(91,64,39,0.04)]">
               <div className="mb-4 flex items-center justify-between"><p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#5d4a42]">Your Order</p><button type="button" onClick={handleViewOrders} className="text-[10px] font-bold text-[#765d50]">View All Orders <ChevronRight size={12} className="inline" /></button></div>
               <div className="flex items-start justify-between text-center text-[10px] text-[#665b55]"><div className="flex flex-col items-center gap-2"><span className="flex h-10 w-10 items-center justify-center rounded-full border-2 border-[#e7c875] bg-[#fff8e9] text-[#a57c38]"><ClipboardList size={18} /></span><span className="font-semibold">Pending</span><small className="text-[9px] text-[#9b8c83]">Order received</small></div><span className="mt-5 h-px flex-1 bg-[#efd8d4]" /><div className="flex flex-col items-center gap-2"><span className="flex h-10 w-10 items-center justify-center rounded-full border border-[#eadfd8] bg-[#fffaf7] text-[#8e7b70]"><Gift size={18} /></span><span className="font-semibold">Processing</span><small className="text-[9px] text-[#9b8c83]">Baking your cake</small></div><span className="mt-5 h-px flex-1 bg-[#efd8d4]" /><div className="flex flex-col items-center gap-2"><span className="flex h-10 w-10 items-center justify-center rounded-full border border-[#eadfd8] bg-[#fffaf7] text-[#8e7b70]"><ChevronRight size={18} /></span><span className="font-semibold">Delivery</span><small className="text-[9px] text-[#9b8c83]">Almost there!</small></div></div>
             </section>

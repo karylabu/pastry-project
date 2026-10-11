@@ -164,9 +164,9 @@ export default function ChatSupport() {
   };
 
   return (
-    <main className="min-h-screen bg-[#fffaf3] px-4 py-8 sm:px-6 lg:px-10">
+    <main className="min-h-screen bg-[#fffaf3] px-4 py-8 sm:px-6 md:px-10">
       <div className="mx-auto max-w-5xl bg-white">
-        <div className="border-b border-[#f0e6db] px-5 py-7 sm:px-8 lg:px-10">
+        <div className="border-b border-[#f0e6db] px-5 py-7 sm:px-8 md:px-10">
           <div className="flex items-center gap-3">
             <img
               src={`${ROOT_BASE}/uploads/logo.png?v=logo-v2`}
@@ -188,7 +188,7 @@ export default function ChatSupport() {
 
         </div>
 
-        <div className="px-5 py-6 sm:px-8 lg:px-10">
+        <div className="px-5 py-6 sm:px-8 md:px-10">
           <div className="mb-5">
             <label htmlFor="help-search" className="sr-only">Search FAQs</label>
             <div className="flex items-center gap-3 rounded-2xl border border-[#f0e5d7] bg-[#fffdf8] px-3 py-3 shadow-sm">

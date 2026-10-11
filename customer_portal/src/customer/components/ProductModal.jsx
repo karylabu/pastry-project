@@ -211,7 +211,7 @@ export default function ProductModal({ isOpen, onClose, product, allCakes, onAdd
         id: normalizedId,
         size: labelMap[displayLabel] || String(sizeLabel),
         price: Number.isFinite(priceValue) ? priceValue : 0,
-        stock_quantity: isCakeProduct ? Math.max(0, Number.isFinite(stockValue) ? stockValue : 0) : isAvailable ? 1 : 0,
+        stock_quantity: Math.max(0, Number.isFinite(stockValue) ? stockValue : 0),
         available: canSelect,
       };
     });
@@ -309,6 +309,11 @@ export default function ProductModal({ isOpen, onClose, product, allCakes, onAdd
 
   const extraCost = addOns.reduce((sum, addon) => sum + addon.price, 0);
   const totalPrice = qty * parsedUnitPrice + extraCost;
+  const stockLimit = currentVariant?.stock_quantity ?? Number(product?.stock_quantity ?? product?.stock);
+  const maxQuantity = Number.isFinite(stockLimit)
+    ? Math.max(0, Math.min(20, Math.floor(stockLimit)))
+    : 20;
+  const exceedsStock = Number.isFinite(stockLimit) && qty > stockLimit;
 
   const toggleAddOn = (name, price) => {
     setAddOns((prev) =>
@@ -319,10 +324,11 @@ export default function ProductModal({ isOpen, onClose, product, allCakes, onAdd
   const handleSelectSize = (variant) => {
     if (variant.stock_quantity <= 0 || !variant.available) return;
     setSelectedSizeId(variant.id);
+    setQty((previous) => Math.max(1, Math.min(previous, variant.stock_quantity, 20)));
   };
 
   const handleConfirm = () => {
-    if (overallOutOfStock || !currentVariant || currentVariant.stock_quantity <= 0 || !currentVariant.available) return;
+    if (overallOutOfStock || exceedsStock || !currentVariant || currentVariant.stock_quantity <= 0 || !currentVariant.available) return;
 
     onAddToCart({
       ...product,
@@ -331,6 +337,7 @@ export default function ProductModal({ isOpen, onClose, product, allCakes, onAdd
       variant: currentVariant ? currentVariant.size : product.variant || product.defaultSize,
       qty,
       price: parsedUnitPrice + extraCost,
+      stock_quantity: stockLimit,
       selectionDetails: {
         drink: showDrinks ? selectedDrink : null,
         cake: showCake ? selectedCake : null,
@@ -402,7 +409,9 @@ export default function ProductModal({ isOpen, onClose, product, allCakes, onAdd
                     type="button"
                     disabled={disabled}
                     onClick={() => handleSelectSize(v)}
-                    className={`min-w-0 rounded-xl border px-2 py-2 text-center text-[10px] font-semibold uppercase tracking-[0.08em] transition-all ${
+                    aria-label={disabled ? `${v.size}, out of stock` : v.size}
+                    title={disabled ? 'Out of stock' : undefined}
+                    className={`flex min-w-0 flex-col items-center rounded-xl border px-2 py-2 text-center text-[10px] font-semibold uppercase tracking-[0.08em] transition-all ${
                       disabled
                         ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
                         : selected
@@ -411,6 +420,7 @@ export default function ProductModal({ isOpen, onClose, product, allCakes, onAdd
                     }`}
                   >
                     {v.size}
+                    {disabled && <span className="mt-1 rounded-sm bg-gray-300 px-1.5 py-0.5 text-[7px] leading-none tracking-normal text-gray-700">OUT OF STOCK</span>}
                   </button>
                 );
               })}
@@ -481,9 +491,9 @@ export default function ProductModal({ isOpen, onClose, product, allCakes, onAdd
                 </button>
                 <span className="w-8 text-center text-sm font-bold text-gray-900" aria-live="polite">{qty}</span>
                 <button
-                  onClick={() => setQty((prev) => Math.min(20, prev + 1))}
+                  onClick={() => setQty((prev) => Math.min(maxQuantity, prev + 1))}
                   aria-label="Increase quantity"
-                  disabled={qty >= 20}
+                  disabled={qty >= maxQuantity}
                   className="flex h-8 w-8 items-center justify-center rounded-full border border-[#e9e3d8] bg-white text-gray-600 transition hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-40"
                   type="button"
                 >
@@ -492,6 +502,11 @@ export default function ProductModal({ isOpen, onClose, product, allCakes, onAdd
               </div>
             </div>
             <p className="text-right text-[11px] text-gray-500">Limit: 20 units per product per checkout</p>
+            {exceedsStock && (
+              <p role="alert" className="text-right text-xs font-semibold text-red-600">
+                You ordered more than the stock available.
+              </p>
+            )}
 
             {hasAddOns && (
               <div className="space-y-2">
@@ -545,15 +560,15 @@ export default function ProductModal({ isOpen, onClose, product, allCakes, onAdd
         <div className="flex-shrink-0 rounded-b-[24px] bg-white px-6 pb-5 pt-3">
           <button
             onClick={handleConfirm}
-            disabled={overallOutOfStock}
+            disabled={overallOutOfStock || exceedsStock}
             className={`w-full h-[48px] rounded-[20px] font-black uppercase tracking-[0.16em] text-xs flex items-center justify-center gap-2 active:scale-[0.97] shadow-lg shadow-black/10 ${
-              overallOutOfStock
+              overallOutOfStock || exceedsStock
                 ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                 : 'border border-[#eadfca] bg-[#fff8e9] text-[#33251e] hover:border-[#e7c875] hover:bg-[#fff8df] hover:text-[#8d6a2e]'
             }`}
           >
             <ShoppingBag size={16} />
-            {overallOutOfStock ? 'Out of Stock' : 'Confirm & Add'}
+            {overallOutOfStock ? 'Out of Stock' : exceedsStock ? 'Exceeds Available Stock' : 'Confirm & Add'}
           </button>
         </div>
       </motion.div>

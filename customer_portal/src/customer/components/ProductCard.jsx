@@ -189,7 +189,7 @@ export default function ProductCard({
         id: normalizedId,
         size: labelMap[displayLabel] || String(sizeLabel),
         price: Number.isFinite(priceValue) ? priceValue : 0,
-        stock_quantity: isCakeProduct ? stockValue : isAvailable ? 1 : 0,
+        stock_quantity: stockValue,
         available: canSelect,
       };
     });
@@ -235,6 +235,9 @@ export default function ProductCard({
   useEffect(() => {
     if (!variantButtons.length) return;
 
+    const selectedVariant = variantButtons.find((variant) => variant.id === selectedSizeId);
+    if (selectedVariant?.stock_quantity > 0 && selectedVariant.available) return;
+
     const incomingVariant = product?.variant || product?.defaultSize || '';
     const matchedVariant = variantButtons.find((variant) => {
       const incoming = String(incomingVariant).trim().toLowerCase();
@@ -250,7 +253,7 @@ export default function ProductCard({
     }
 
     const firstInStockVariant = variantButtons.find((variant) => variant.stock_quantity > 0 && variant.available);
-    if (firstInStockVariant && firstInStockVariant.id !== selectedSizeId) {
+    if (firstInStockVariant) {
       setSelectedSizeId(firstInStockVariant.id);
     } else if (!selectedSizeId) {
       setSelectedSizeId(variantButtons[0].id);
@@ -261,10 +264,10 @@ export default function ProductCard({
 
   const currentPrice = currentVariant ? parseFloat(currentVariant.price) || 0 : 0;
 
-  const overallOutOfStock = isSimpleProduct
-    ? Number(product?.available) === 0 || product?.available === false
-    : variantButtons.length > 0
+  const overallOutOfStock = variantButtons.length > 0
     ? variantButtons.every((variant) => variant.stock_quantity <= 0 || !variant.available)
+    : isSimpleProduct
+    ? Number(product?.available) === 0 || product?.available === false || Number(product?.stock ?? 0) <= 0
     : Number(product?.stock ?? 0) <= 0;
   const stockLabel = overallOutOfStock
     ? 'Out of stock'
@@ -328,8 +331,8 @@ export default function ProductCard({
         </h3>
 
         {shouldShowVariantSelector && (
-          <div className="mb-1 flex min-h-[25px] w-full items-center justify-center gap-1 overflow-hidden rounded-full border border-[#f1e6df] bg-[#f8f3ee] p-1">
-            <div className="flex w-full items-center justify-center gap-1 overflow-hidden">
+          <div className="mb-1 flex min-h-[25px] w-full items-center justify-center gap-1 rounded-full border border-[#f1e6df] bg-[#f8f3ee] p-1">
+            <div className="flex w-full items-center justify-center gap-1">
               {variantButtons.map((variant) => {
                 const disabled = variant.stock_quantity <= 0 || !variant.available;
                 const selected = currentVariant && currentVariant.id === variant.id;
@@ -343,7 +346,9 @@ export default function ProductCard({
                       e.stopPropagation();
                       handleSelection(variant);
                     }}
-                    className={`rounded-full border px-1.5 py-1 text-[8px] font-semibold uppercase tracking-[0.08em] whitespace-nowrap transition-all ${
+                    aria-label={disabled ? `${variant.size}, out of stock` : variant.size}
+                    title={disabled ? 'Out of stock' : undefined}
+                    className={`flex flex-col items-center rounded-xl border px-1.5 py-1 text-[8px] font-semibold uppercase tracking-[0.08em] whitespace-nowrap transition-all ${
                       disabled
                         ? 'cursor-not-allowed border-stone-200 bg-stone-100 text-stone-400'
                         : selected
@@ -352,6 +357,7 @@ export default function ProductCard({
                     }`}
                   >
                     {variant.size}
+                    {disabled && <span className="mt-0.5 rounded-sm bg-gray-300 px-1 py-px text-[5px] leading-none tracking-normal text-gray-700">OUT OF STOCK</span>}
                   </button>
                 );
               })}
@@ -373,9 +379,14 @@ export default function ProductCard({
               if (isSimpleProduct && onAddToCart) {
                 onAddToCart({
                   ...product,
+                  product_id: Number(product.product_id ?? product.id),
+                  product_size_id: currentVariant && Number.isInteger(Number(currentVariant.id))
+                    ? Number(currentVariant.id)
+                    : null,
                   variant: label,
                   qty: 1,
                   price: currentPrice,
+                  stock_quantity: currentVariant?.stock_quantity ?? product.stock,
                 });
                 return;
               }

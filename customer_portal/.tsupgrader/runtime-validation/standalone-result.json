@@ -1,0 +1,102 @@
+{
+  "planHash": "95c0602a9272c790308658b5510dc41304491d4890efa0d8886502a49b0d12cb",
+  "phase": "standalone",
+  "recordedAtUtc": "2026-10-11T06:42:13.7386154Z",
+  "retryCount": 0,
+  "resetBaseline": false,
+  "complete": true,
+  "result": {
+    "setupSucceeded": true,
+    "setupDurationMs": 0,
+    "setupFailureOutput": null,
+    "assertions": [
+      {
+        "name": "production-build",
+        "kind": "process",
+        "verificationMethod": "exit-code",
+        "passed": true,
+        "timedOut": false,
+        "skipped": false,
+        "skippedReason": null,
+        "exitCode": 0,
+        "outputSample": "\r\n\u003E customer_portal@0.1.0 build\r\n\u003E react-scripts build\r\n\r\n(node:19756) [DEP0176] DeprecationWarning: fs.F_OK is deprecated, use fs.constants.F_OK instead\r\n(Use \u0060node --trace-deprecation ...\u0060 to show where the warning was created)\r\nCreating an optimized production build...\r\nCompiled with warnings.\r\n\r\n[eslint] \r\nsrc\\admin\\components\\AdminChatBubble.jsx\r\n  Line 21:10:  \u0027loading\u0027 is assigned a value but never used                                                                           no-unused-vars\r\n  Line 21:19:  \u0027setLoading\u0027 is assigned a value but never used                                                                        no-unused-vars\r\n  Line 87:6:   React Hook useEffect has a missing dependency: \u0027fetchConversations\u0027. Either include it or remove the dependency array  react-hooks/exhaustive-deps\r\n  Line 97:6:   React Hook useEffect has a missing dependency: \u0027fetchMessages\u0027. Either include it or remove the dependency array       react-hooks/exhaustive-deps\r\n\r\nsrc\\admin\\operations\\pages\\CustomCakes.jsx\r\n  Line 272:6:   React Hook useEffect has a missing dependency: \u0027fetchOrders\u0027. Either include it or remove the dependency array  react-hooks/exhaustive-deps\r\n  Line 349:26:  Unexpected mix of \u0027\u0026\u0026\u0027 and \u0027||\u0027. Use parentheses to clarify the intended order of operations                    no-mixed-operators\r\n  Line 350:7:   Unexpected mix of \u0027\u0026\u0026\u0027 and \u0027||\u0027. Use parentheses to clarify the intended order of operations                    no-mixed-operators\r\n  Line 775:25:  \u0027orderTypeStyle\u0027 is assigned a value but never used                                                             no-unused-vars\r\n  Line 821:27:  \u0027isCompleted\u0027 is assigned a value but never used                                                                no-unused-vars\r\n  Line 822:27:  \u0027acceptStatus\u0027 is assigned a value but never used                                                               no-unused-vars\r\n\r\nsrc\\admin\\operations\\pages\\OrderHistory.jsx\r\n  Line 266:11:  \u0027tableStartY\u0027 is assigned a value but never used  no-unused-vars\r\n\r\nsrc\\admin\\operations\\pages\\Orders.jsx\r\n  Line 245:6:  React Hook useEffect has a missing dependency: \u0027fetchOrders\u0027. Either include it or remove the dependency array  react-hooks/exhaustive-deps\r\n\r\nsrc\\admin\\operations\\pages\\Reports.jsx\r\n  Line 4:64:   \u0027Trash2\u0027 is defined but never used                             no-unused-vars\r\n  Line 6:3:    \u0027UploadCloud\u0027 is defined but never used                        no-unused-vars\r\n  Line 6:16:   \u0027FileSpreadsheet\u0027 is defined but never used                    no-unused-vars\r\n  Line 6:33:   \u0027CheckCircle2\u0027 is defined but never used                       no-unused-vars\r\n  Line 6:47:   \u0027AlertCircle\u0027 is defined but never used                        no-unused-vars\r\n  Line 309:5:  Implied eval. Consider passing a function instead of a string  no-implied-eval\r\n  Line 498:9:  \u0027revenueTrend\u0027 is assigned a value but never used              no-unused-vars\r\n  Line 505:9:  \u0027lowStockCount\u0027 is assigned a value but never used             no-unused-vars\r\n  Line 583:9:  \u0027allProductSales\u0027 is assigned a value but never used           no-unused-vars\r\n  Line 607:9:  \u0027intervalBuckets\u0027 is assigned a value but never used           no-unused-vars\r\n\r\nsrc\\admin\\pages\\CakeRecipes.jsx\r\n  Line 86:9:  \u0027saveFlavor\u0027 is assigned a value but never used  no-unused-vars\r\n  Line 96:9:  \u0027saveSize\u0027 is assigned a value but never used    no-unused-vars\r\n\r\nsrc\\admin\\pages\\PredictiveAnalytics.jsx\r\n  Line 344:6:  React Hook useEffect has a missing dependency: \u0027loadForecast\u0027. Either include it or remove the dependency array  react-hooks/exhaustive-deps\r\n\r\nsrc\\admin\\pages\\Promotions.jsx\r\n  Line 136:6:  React Hook useEffect has a missing dependency: \u0027fetchPromotions\u0027. Either include it or remove the dependency array  react-hooks/exhaustive-deps\r\n\r\nsrc\\customer\\components\\CheckoutModal.jsx\r\n  Line 449:6:    React Hook useCallback has a missing dependency: \u0027checkoutData.address\u0027. Either include it or remove the dependency array  react-hooks/exhaustive-deps\r\n  Line 881:17:   The attribute aria-expanded is not supported by the role t\n\u2026[truncated]",
+        "durationMs": 55242
+      },
+      {
+        "name": "tests-pass",
+        "kind": "process",
+        "verificationMethod": "test-results",
+        "passed": true,
+        "timedOut": false,
+        "skipped": false,
+        "skippedReason": null,
+        "exitCode": 1,
+        "outputSample": "\r\n\u003E customer_portal@0.1.0 test\r\n\u003E react-scripts test --watchAll=false\r\n\r\nPASS src/services/config.test.js\r\nPASS src/customer/utils/cartItems.test.js\r\nPASS src/admin/operations/pages/CustomCakes.test.jsx\r\nPASS src/admin/operations/pages/OrderHistory.test.jsx\r\nPASS src/customer/components/CartModal.test.jsx\r\nPASS src/customer/pages/customCakeImages.test.js\r\nPASS src/customer/utils/discountIdOcr.test.js\r\nPASS src/customer/utils/locationBoundaryUtils.test.js\r\nPASS src/customer/pages/CustomizedCakes.test.jsx\r\nPASS src/customer/utils/cartStock.test.js\r\nPASS src/customer/components/ProductModal.test.jsx\r\nPASS src/customer/components/ProductCard.test.jsx\r\nFAIL src/App.test.js\r\n  \u25CF Test suite failed to run\r\n\r\n    Cannot find module \u0027react-router/dom\u0027 from \u0027node_modules/react-router-dom/dist/index.js\u0027\r\n\r\n    Require stack:\r\n      node_modules/react-router-dom/dist/index.js\r\n      src/App.js\r\n      src/App.test.js\r\n\r\n    \u001B[0m \u001B[90m 1 |\u001B[39m \u001B[36mimport\u001B[39m \u001B[33mReact\u001B[39m\u001B[33m,\u001B[39m { useEffect } \u001B[36mfrom\u001B[39m \u001B[32m\u0022react\u0022\u001B[39m\u001B[33m;\u001B[39m\r\n    \u001B[31m\u001B[1m\u003E\u001B[22m\u001B[39m\u001B[90m 2 |\u001B[39m \u001B[36mimport\u001B[39m {\r\n     \u001B[90m   |\u001B[39m \u001B[31m\u001B[1m^\u001B[22m\u001B[39m\r\n     \u001B[90m 3 |\u001B[39m   \u001B[33mBrowserRouter\u001B[39m \u001B[36mas\u001B[39m \u001B[33mRouter\u001B[39m\u001B[33m,\u001B[39m\r\n     \u001B[90m 4 |\u001B[39m   \u001B[33mRoutes\u001B[39m\u001B[33m,\u001B[39m\r\n     \u001B[90m 5 |\u001B[39m   \u001B[33mRoute\u001B[39m\u001B[33m,\u001B[39m\u001B[0m\r\n\r\n      at Resolver.resolveModule (node_modules/jest-resolve/build/resolver.js:324:11)\r\n      at Object.\u003Canonymous\u003E (node_modules/react-router-dom/dist/index.js:38:18)\r\n      at Object.\u003Canonymous\u003E (src/App.js:2:1)\r\n      at Object.\u003Canonymous\u003E (src/App.test.js:2:1)\r\n\r\nPASS src/customer/pages/Register.test.jsx (5.182 s)\r\nPASS src/customer/pages/DesignGallery.test.jsx (5.649 s)\r\nPASS src/admin/operations/pages/Products.test.jsx (6.203 s)\r\n  \u25CF Console\r\n\r\n    console.error\r\n      Each child in a list should have a unique \u0022key\u0022 prop.\r\n      \r\n      Check the render method of \u0060Products\u0060. See https://react.dev/link/warning-keys for more information.\r\n\r\n      at node_modules/react-dom/cjs/react-dom-client.development.js:26084:21\r\n      at runWithFiberInDEV (node_modules/react-dom/cjs/react-dom-client.development.js:874:13)\r\n      at warnForMissingKey (node_modules/react-dom/cjs/react-dom-client.development.js:26083:11)\r\n      at warnOnInvalidKey (node_modules/react-dom/cjs/react-dom-client.development.js:6591:13)\r\n      at reconcileChildrenArray (node_modules/react-dom/cjs/react-dom-client.development.js:6672:31)\r\n      at reconcileChildFibersImpl (node_modules/react-dom/cjs/react-dom-client.development.js:6993:30)\r\n      at node_modules/react-dom/cjs/react-dom-client.development.js:7098:33\r\n      at reconcileChildren (node_modules/react-dom/cjs/react-dom-client.development.js:9701:13)\r\n      at beginWork (node_modules/react-dom/cjs/react-dom-client.development.js:12049:13)\r\n      at runWithFiberInDEV (node_modules/react-dom/cjs/react-dom-client.development.js:874:13)\r\n      at performUnitOfWork (node_modules/react-dom/cjs/react-dom-client.development.js:17641:22)\r\n      at workLoopSync (node_modules/react-dom/cjs/react-dom-client.development.js:17469:41)\r\n      at renderRootSync (node_modules/react-dom/cjs/react-dom-client.development.js:17450:11)\r\n      at performWorkOnRoot (node_modules/react-dom/cjs/react-dom-client.development.js:16504:11)\r\n      at performWorkOnRootViaSchedulerTask (node_modules/react-dom/cjs/react-dom-client.development.js:18957:7)\r\n      at performWorkUntilDeadline (node_modules/scheduler/cjs/scheduler.development.js:45:48)\r\n      at Timeout.task [as _onTimeout] (node_modules/jsdom/lib/jsdom/browser/Window.js:516:19)\r\n\r\n\r\nTest Suites: 1 failed, 15 passed, 16 total\r\nTests:       47 passed, 47 total\r\nSnapshots:   0 total\r\nTime:        9.33 s\r\nRan all test suites.\r\n",
+        "durationMs": 11555,
+        "testResults": {
+          "testFramework": "jest",
+          "runnerDetectedFrom": "output_banner",
+          "testsTotal": 47,
+          "testsPassed": 47,
+          "testsFailed": 0,
+          "testsSkipped": 0,
+          "parseFailed": false
+        }
+      },
+      {
+        "name": "dev-server-serves-home",
+        "kind": "http-probe",
+        "verificationMethod": "http-status",
+        "passed": false,
+        "timedOut": false,
+        "skipped": false,
+        "skippedReason": null,
+        "exitCode": 1,
+        "outputSample": "server exited before responding (exit=1)\n--- server output ---\n\r\n\u003E customer_portal@0.1.0 start\r\n\u003E react-scripts start\r\n\r\nAttempting to bind to HOST environment variable: 127.0.0.1\r\nIf this was unintentional, check that you haven\u0027t mistakenly set it in your shell.\r\nLearn more here: https://cra.link/advanced-config\r\n\r\n(node:33748) [DEP0176] DeprecationWarning: fs.F_OK is deprecated, use fs.constants.F_OK instead\r\n(Use \u0060node --trace-deprecation ...\u0060 to show where the warning was created)\r\nInvalid options object. Dev Server has been initialized using an options object that does not match the API schema.\r\n - options.allowedHosts[0] should be a non-empty string.\r\n",
+        "durationMs": 4592
+      }
+    ],
+    "executions": [
+      {
+        "source": "production-build",
+        "resolvedExecutable": "C:\\Program Files\\nodejs\\npm.CMD",
+        "args": [
+          "run",
+          "build"
+        ],
+        "cwd": "D:\\xampp\\htdocs\\pastry-project\\customer_portal",
+        "env": {},
+        "prependPath": [],
+        "platform": "win32"
+      },
+      {
+        "source": "tests-pass",
+        "resolvedExecutable": "C:\\Program Files\\nodejs\\npm.CMD",
+        "args": [
+          "test",
+          "--",
+          "--watchAll=false"
+        ],
+        "cwd": "D:\\xampp\\htdocs\\pastry-project\\customer_portal",
+        "env": {},
+        "prependPath": [],
+        "platform": "win32"
+      },
+      {
+        "source": "dev-server-serves-home",
+        "resolvedExecutable": "C:\\Program Files\\nodejs\\npm.CMD",
+        "args": [
+          "start"
+        ],
+        "cwd": "D:\\xampp\\htdocs\\pastry-project\\customer_portal",
+        "env": {
+          "BROWSER": "none",
+          "HOST": "127.0.0.1",
+          "PORT": "3000"
+        },
+        "prependPath": [],
+        "platform": "win32"
+      }
+    ]
+  }
+}

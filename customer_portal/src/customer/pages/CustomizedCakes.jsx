@@ -672,7 +672,7 @@ export default function CustomizedCakes() {
   };
 
   return (
-    <PageShell background="bg-[#fffaf3]" padding="px-4 md:px-7 lg:px-10 py-4" innerClassName="max-w-[1180px]">
+    <PageShell background="bg-[#fffaf3]" padding="px-4 md:px-10 py-4" innerClassName="max-w-[1180px]">
       <section className="relative mb-4 min-h-[230px] overflow-hidden rounded-[18px] border border-[#eadfd8] bg-[#fffaf0] shadow-[0_8px_22px_rgba(91,64,39,0.05)] sm:min-h-[260px]">
         <div className="absolute inset-y-0 right-0 w-[58%] sm:w-[56%]">
           <img
@@ -730,14 +730,14 @@ export default function CustomizedCakes() {
             <h2 className="mt-1 font-serif text-2xl font-bold text-[#33251e]">Featured Designs</h2>
           </div>
         </div>
-        <div className="grid w-full grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-6">
+        <div className="grid w-full grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
           {sampleImages.map((item, index) => {
             const isWedding = item.label === 'Wedding';
             const isKids = item.label === 'Kids';
             const isCutesy = item.label === 'Cutesy';
 
             return (
-              <article key={index} className="group relative aspect-[3/4] min-h-[180px] overflow-hidden rounded-[14px] border border-[#eadfd8] bg-[#f8eee8] shadow-[0_6px_16px_rgba(91,64,39,0.06)] lg:aspect-auto lg:h-52">
+              <article key={index} className="group relative aspect-[3/4] min-h-[180px] overflow-hidden rounded-[14px] border border-[#eadfd8] bg-[#f8eee8] shadow-[0_6px_16px_rgba(91,64,39,0.06)] md:aspect-auto md:h-52">
                 <button
                   type="button"
                   onClick={() => setFeaturedPreview({ type: 'example', id: `featured-${index + 1}`, url: item.src, name: item.label })}
@@ -834,8 +834,8 @@ export default function CustomizedCakes() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 gap-3 lg:grid-cols-2 lg:items-start lg:gap-4">
-          <div className="contents lg:flex lg:flex-col lg:gap-3">
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 md:items-start md:gap-4">
+          <div className="contents md:flex md:flex-col md:gap-3">
             <div data-custom-card="1" style={{ order: 1 }} className="rounded-2xl border border-[#eee4de] bg-white p-4 shadow-[0_3px_12px_rgba(91,64,39,0.04)] sm:p-5">
               <p className="mb-4 flex items-center gap-2 border-b border-[#f3ece6] pb-3 text-sm font-bold text-[#6b4f1d]">
                 <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#fff3c8] text-[11px]">1</span>
@@ -1104,7 +1104,7 @@ export default function CustomizedCakes() {
             </div>
 
           </div>
-          <div className="contents lg:flex lg:flex-col lg:gap-3">
+          <div className="contents md:flex md:flex-col md:gap-3">
             <section data-custom-card="7" style={{ order: 7 }} className="rounded-2xl border border-[#eee4de] bg-white p-4 shadow-[0_3px_12px_rgba(91,64,39,0.04)] sm:p-5">
               <p className="mb-4 flex items-center gap-2 border-b border-[#f3ece6] pb-3 text-sm font-bold text-[#6b4f1d]">
                 <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#fff3c8] text-[11px]">7</span>
@@ -1112,7 +1112,7 @@ export default function CustomizedCakes() {
               </p>
               <fieldset>
                 <legend className="mb-2 text-xs font-semibold text-[#6b4f1d]">Choose add-ons</legend>
-                <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-1">
+                <div className="grid gap-2 sm:grid-cols-2 md:grid-cols-1">
                   <label className="flex min-h-11 items-center gap-2 rounded-lg border border-[#eadfd8] bg-white px-3 py-2 text-sm text-[#33251e]">
                     <input type="checkbox" checked={addons.includes('Cake topper')} onChange={() => handleAddonChange('Cake topper')} className="accent-[#c9972d]" />
                     Cake topper

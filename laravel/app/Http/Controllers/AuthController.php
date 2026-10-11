@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Validator;
 
 class AuthController extends Controller
 {
@@ -34,7 +35,9 @@ class AuthController extends Controller
         if (!$email || !$password) {
             $error = 'Please fill all fields.';
         } else {
-            $user = DB::table('users')->where('email', $email)->first();
+            $user = DB::table('users')
+                ->whereRaw('LOWER(email) = ?', [$email])
+                ->first();
 
             if (!$user) {
                 $error = 'User not found.';
@@ -70,6 +73,57 @@ class AuthController extends Controller
     {
         if ($request->isMethod('options')) {
             return $this->googleCorsResponse(['success' => true]);
+        }
+
+        $intent = $request->input('intent');
+        if ($intent === 'signup') {
+            $validator = Validator::make($request->all(), [
+                'phone' => ['required', 'string', 'max:30', 'regex:/^\+?[0-9\s-]{7,15}$/'],
+                'agree_terms' => ['accepted'],
+                'agree_privacy' => ['accepted'],
+            ]);
+
+            if ($validator->fails()) {
+                return $this->googleCorsResponse([
+                    'success' => false,
+                    'message' => 'A valid phone number and acceptance of both policies are required.',
+                    'errors' => $validator->errors(),
+                ], 422);
+            }
+
+            $requestedEmail = strtolower(trim((string) $request->input('email', '')));
+            if ($requestedEmail !== '') {
+                $existingUser = DB::table('users')->whereRaw('LOWER(email) = ?', [$requestedEmail])->first();
+                if ($existingUser) {
+                    if (strtolower((string) ($existingUser->role ?? '')) === 'admin') {
+                        return $this->googleCorsResponse([
+                            'success' => false,
+                            'code' => 'admin_account_not_allowed',
+                            'message' => 'This is an admin account. Please continue to the admin login page.',
+                        ], 403);
+                    }
+
+                    return $this->googleCorsResponse([
+                        'success' => false,
+                        'code' => 'account_already_exists',
+                        'message' => 'An account with this Google email already exists. Please log in instead.',
+                    ], 409);
+                }
+            }
+
+            $requestedPhone = $this->normalizePhoneNumber((string) $request->input('phone'));
+            $phoneAlreadyRegistered = DB::table('users')
+                ->whereNotNull('phone')
+                ->pluck('phone')
+                ->contains(fn ($savedPhone) => $this->normalizePhoneNumber((string) $savedPhone) === $requestedPhone);
+
+            if ($phoneAlreadyRegistered) {
+                return $this->googleCorsResponse([
+                    'success' => false,
+                    'code' => 'phone_already_registered',
+                    'message' => 'This phone number is already linked to an account. Please log in to your existing account.',
+                ], 409);
+            }
         }
 
         $idToken = $request->input('id_token');
@@ -131,13 +185,53 @@ class AuthController extends Controller
             return $this->googleCorsResponse(['success' => false, 'message' => 'A verified Google email is required.'], 422);
         }
 
-        $user = DB::table('users')->where('email', $email)->first();
+        $user = DB::table('users')->whereRaw('LOWER(email) = ?', [$email])->first();
         $profileColumn = Schema::hasColumn('users', 'profile_picture')
             ? 'profile_picture'
             : (Schema::hasColumn('users', 'profile_image') ? 'profile_image' : null);
 
+        if ($intent === 'signup_check') {
+            if ($user) {
+                if (strtolower((string) ($user->role ?? '')) === 'admin') {
+                    return $this->googleCorsResponse([
+                        'success' => false,
+                        'code' => 'admin_account_not_allowed',
+                        'message' => 'This is an admin account. Please continue to the admin login page.',
+                    ], 403);
+                }
+
+                return $this->googleCorsResponse([
+                    'success' => false,
+                    'code' => 'account_already_exists',
+                    'message' => 'This account is already registered. Please continue to the login page.',
+                ], 409);
+            }
+
+            return $this->googleCorsResponse([
+                'success' => false,
+                'code' => 'user_not_found',
+                'message' => 'User not found. Please create an account.',
+            ], 404);
+        }
+
+        if ($intent === 'signup' && $user) {
+            if (strtolower((string) ($user->role ?? '')) === 'admin') {
+                return $this->googleCorsResponse([
+                    'success' => false,
+                    'code' => 'admin_account_not_allowed',
+                    'message' => 'This is an admin account. Please continue to the admin login page.',
+                ], 403);
+            }
+
+            return $this->googleCorsResponse([
+                'success' => false,
+                'code' => 'account_already_exists',
+                'message' => 'An account with this Google email already exists. Please log in instead.',
+            ], 409);
+        }
+
         if (!$user) {
-            if (!in_array($request->input('intent'), ['signup', 'login_or_signup'], true)) {
+            if ($intent !== 'signup') {
                 return $this->googleCorsResponse([
                     'success' => false,
                     'code' => 'user_not_found',
@@ -152,6 +246,9 @@ class AuthController extends Controller
                 'role' => 'customer',
                 'created_at' => now(),
             ];
+            $newUser['phone'] = trim((string) $request->input('phone'));
+            $newUser['terms_accepted_at'] = now();
+            $newUser['privacy_accepted_at'] = now();
             if ($profileColumn) {
                 $newUser[$profileColumn] = $profilePicture ?: null;
             }
@@ -246,6 +343,17 @@ class AuthController extends Controller
         }
 
         return null;
+    }
+
+    private function normalizePhoneNumber(string $phone): string
+    {
+        $digits = preg_replace('/\D+/', '', $phone) ?? '';
+
+        if (strlen($digits) === 12 && str_starts_with($digits, '63')) {
+            return '0' . substr($digits, 2);
+        }
+
+        return $digits;
     }
 
     private function googleCorsResponse(array $payload, int $status = 200)

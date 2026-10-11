@@ -145,6 +145,63 @@ class OrderController extends Controller
                     ], 422);
                 }
 
+                $inventoryQuantities = [];
+                foreach ($request->items as $item) {
+                    $productId = (int) $item['product_id'];
+                    $productSizeId = (int) ($item['product_size_id'] ?? 0);
+                    $inventoryKey = $productId . ':' . ($productSizeId > 0 ? $productSizeId : 'product');
+                    $inventoryQuantities[$inventoryKey] = [
+                        'product_id' => $productId,
+                        'product_size_id' => $productSizeId,
+                        'quantity' => ($inventoryQuantities[$inventoryKey]['quantity'] ?? 0) + (int) $item['qty'],
+                    ];
+                }
+                ksort($inventoryQuantities);
+
+                foreach ($inventoryQuantities as $inventory) {
+                    $product = Product::query()
+                        ->whereKey($inventory['product_id'])
+                        ->where('available', true)
+                        ->lockForUpdate()
+                        ->first();
+
+                    if (!$product) {
+                        continue;
+                    }
+
+                    $productSizeId = $inventory['product_size_id'];
+                    if ($productSizeId > 0) {
+                        $productSize = $product->sizes()
+                            ->whereKey($productSizeId)
+                            ->lockForUpdate()
+                            ->first();
+
+                        if (
+                            $productSize &&
+                            $productSize->available &&
+                            Schema::hasColumn('product_sizes', 'stock_quantity') &&
+                            $inventory['quantity'] > (int) $productSize->stock_quantity
+                        ) {
+                            $message = 'You ordered more than the stock available.';
+                            return response()->json([
+                                'success' => false,
+                                'message' => $message,
+                                'errors' => ['items' => [$message]],
+                            ], 422);
+                        }
+                    } elseif (
+                        Schema::hasColumn('products', 'stock') &&
+                        $inventory['quantity'] > (int) $product->stock
+                    ) {
+                        $message = 'You ordered more than the stock available.';
+                        return response()->json([
+                            'success' => false,
+                            'message' => $message,
+                            'errors' => ['items' => [$message]],
+                        ], 422);
+                    }
+                }
+
                 foreach ($request->items as $item) {
                     $product = Product::query()
                         ->whereKey((int) $item['product_id'])

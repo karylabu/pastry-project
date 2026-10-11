@@ -65,6 +65,7 @@ class RewardCodeCheckoutTest extends TestCase
             $table->string('name');
             $table->string('category');
             $table->decimal('price', 10, 2);
+            $table->unsignedInteger('stock')->default(0);
             $table->boolean('available')->default(true);
             $table->string('image')->nullable();
         });
@@ -73,6 +74,7 @@ class RewardCodeCheckoutTest extends TestCase
             $table->unsignedBigInteger('product_id');
             $table->string('size');
             $table->decimal('price', 10, 2);
+            $table->unsignedInteger('stock_quantity')->default(0);
             $table->boolean('available')->default(true);
         });
         Schema::create('order_items', function ($table) {
@@ -139,6 +141,7 @@ class RewardCodeCheckoutTest extends TestCase
             'name' => 'Celebration Cake',
             'category' => 'pastry',
             'price' => 3000,
+            'stock' => 20,
             'available' => true,
         ]);
     }
@@ -235,6 +238,39 @@ class RewardCodeCheckoutTest extends TestCase
             $this->assertSame(422, $response->getStatusCode());
         }
 
+        $this->assertSame(0, DB::table('orders')->count());
+    }
+
+    public function test_order_quantity_cannot_exceed_product_stock(): void
+    {
+        DB::table('products')->where('id', 11)->update(['stock' => 2]);
+
+        $response = $this->placeOrder('', 'none', '', [
+            ['product_id' => 11, 'qty' => 3],
+        ]);
+
+        $this->assertSame(422, $response->getStatusCode());
+        $this->assertSame('You ordered more than the stock available.', $response->getData(true)['message']);
+        $this->assertSame(0, DB::table('orders')->count());
+    }
+
+    public function test_order_quantity_cannot_exceed_selected_size_stock(): void
+    {
+        DB::table('product_sizes')->insert([
+            'id' => 31,
+            'product_id' => 11,
+            'size' => 'Small',
+            'price' => 200,
+            'stock_quantity' => 2,
+            'available' => true,
+        ]);
+
+        $response = $this->placeOrder('', 'none', '', [
+            ['product_id' => 11, 'product_size_id' => 31, 'qty' => 3],
+        ]);
+
+        $this->assertSame(422, $response->getStatusCode());
+        $this->assertSame('You ordered more than the stock available.', $response->getData(true)['message']);
         $this->assertSame(0, DB::table('orders')->count());
     }
 

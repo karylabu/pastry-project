@@ -49,6 +49,26 @@ class AuthApiController extends Controller
         ]);
 
         if ($validator->fails()) {
+            if (
+                $validator->errors()->has('email') &&
+                User::whereRaw('LOWER(email) = ?', [$request->email])->exists()
+            ) {
+                $existingUser = User::whereRaw('LOWER(email) = ?', [$request->email])->first();
+                if (strtolower((string) $existingUser->role) === 'admin') {
+                    return response()->json([
+                        'success' => false,
+                        'code' => 'admin_account_not_allowed',
+                        'message' => 'This is an admin account. Please continue to the admin login page.',
+                    ], 403);
+                }
+
+                return response()->json([
+                    'success' => false,
+                    'code' => 'account_already_registered',
+                    'message' => 'This account is already registered. Please login.',
+                ], 409);
+            }
+
             return response()->json([
                 'success' => false,
                 'message' => 'Validation error',
@@ -264,6 +284,22 @@ class AuthApiController extends Controller
         if ($profileColumn && array_key_exists('profile_picture', $data)) {
             $updates[$profileColumn] = $data['profile_picture'];
         }
+        $profileFieldLabels = [
+            'name' => ['your full name', 'full_name'],
+            'username' => ['your username', 'username'],
+            'email' => ['your email address', 'email'],
+            'phone' => ['your phone number', 'phone'],
+        ];
+        if ($profileColumn) {
+            $profileFieldLabels[$profileColumn] = ['your profile photo', 'profile-photo'];
+        }
+        $changedFields = [];
+        foreach ($updates as $field => $value) {
+            if ((string) ($user->{$field} ?? '') !== (string) $value && isset($profileFieldLabels[$field])) {
+                $changedFields[] = $profileFieldLabels[$field];
+            }
+        }
+
         if ($updates) {
             DB::table('users')->where('id', $user->id)->update($updates);
             $user->refresh();
@@ -276,11 +312,14 @@ class AuthApiController extends Controller
                     }
                 }
             }
-            $this->notifyCustomerAccountUpdate(
-                $user,
-                'Profile Updated',
-                'Your account profile details were updated.'
-            );
+            foreach ($changedFields as [$label, $anchor]) {
+                $this->notifyCustomerAccountUpdate(
+                    $user,
+                    'Account Updated',
+                    'You successfully edited ' . $label . '.',
+                    '/customer/account-settings?section=profile#' . $anchor
+                );
+            }
         }
 
         return response()->json([
@@ -438,7 +477,12 @@ class AuthApiController extends Controller
         return response()->json(['success' => true, 'message' => 'Password updated successfully.']);
     }
 
-    private function notifyCustomerAccountUpdate(User $user, string $title, string $message): void
+    private function notifyCustomerAccountUpdate(
+        User $user,
+        string $title,
+        string $message,
+        string $actionUrl = '/customer/account-settings'
+    ): void
     {
         if (!Schema::hasTable('notifications')) {
             return;
@@ -450,7 +494,7 @@ class AuthApiController extends Controller
             'message' => $message,
             'type' => 'Info',
             'is_read' => 0,
-            'action_url' => '/customer/account-settings',
+            'action_url' => $actionUrl,
             'created_at' => now(),
         ]);
     }

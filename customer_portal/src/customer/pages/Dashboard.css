@@ -1,0 +1,131 @@
+.home-products-stack,
+.home-sidebar-stack {
+  display: contents;
+}
+
+.home-sections-layout {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.home-rewards {
+  order: 1;
+}
+
+.home-offer {
+  order: 2;
+}
+
+.home-quick-actions {
+  order: 3;
+}
+
+.home-order-status {
+  order: 4;
+}
+
+.home-best-sellers {
+  order: 5;
+}
+
+.home-curated {
+  order: 6;
+}
+
+@media (min-width: 1024px) and (hover: hover) and (pointer: fine) {
+  .home-sections-layout {
+    grid-template-columns: minmax(0, 2.1fr) minmax(300px, 0.88fr);
+    align-items: stretch;
+    gap: 1rem;
+  }
+
+  .home-products-stack,
+  .home-sidebar-stack {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .home-products-stack {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .home-sidebar-stack {
+    grid-column: 2;
+    grid-row: 1;
+    height: 100%;
+  }
+
+  .home-sidebar-stack > section {
+    display: flex;
+    min-height: 0;
+    flex: 1 1 0;
+    flex-direction: column;
+    justify-content: center;
+  }
+
+  .home-best-sellers,
+  .home-curated,
+  .home-rewards,
+  .home-offer,
+  .home-quick-actions,
+  .home-order-status {
+    order: initial;
+  }
+
+  .home-sections-layout .home-best-sellers-grid {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+
+  .home-sections-layout .home-curated-grid {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    padding: 0.75rem;
+  }
+
+  .home-sections-layout .home-curated {
+    padding: 0;
+  }
+
+  .home-sections-layout .home-curated-heading {
+    margin: 0;
+    padding: 0.75rem 1rem;
+  }
+
+  .home-sections-layout .home-recommendation-card {
+    min-height: 250px;
+    padding: 0.5rem;
+  }
+
+  .home-sections-layout .home-recommendation-image {
+    height: 124px;
+    padding: 0.5rem;
+  }
+
+  .home-sections-layout .home-recommendation-image img {
+    width: auto !important;
+    height: 112px !important;
+    max-width: 85% !important;
+    max-height: 112px !important;
+  }
+
+  .home-sections-layout .home-recommendation-title {
+    min-height: 2.25rem;
+    font-size: 11px;
+  }
+
+  .home-sections-layout .home-recommendation-price {
+    font-size: 11px;
+  }
+
+  .home-sections-layout .home-recommendation-options button {
+    padding: 0.25rem 0.375rem;
+    font-size: 8px;
+  }
+
+  .home-sections-layout .home-recommendation-add {
+    height: 28px;
+    font-size: 8px;
+  }
+}

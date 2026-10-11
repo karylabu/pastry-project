@@ -695,6 +695,15 @@ export default function CheckoutModal({
       if (!response.ok) {
         const text = await response.text();
         console.error('Order API returned non-OK:', response.status, text);
+        try {
+          const errorResult = JSON.parse(text);
+          if (errorResult.message?.includes('stock available')) {
+            alert(errorResult.message);
+            return;
+          }
+        } catch {
+          // Fall through to the existing response detail for non-JSON errors.
+        }
         alert(`Order failed: ${response.status} - ${text}`);
         return;
       }

@@ -4,9 +4,11 @@ import { CUSTOMER_BASE } from '../../services/config';
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Trash2, Plus, Minus, ShoppingBag } from "lucide-react";
 import { getCartItemKey } from '../utils/cartItems';
+import { getStockKeyQuantity, getStockLimit } from '../utils/cartStock';
 
 export default function CartModal({ isOpen, onClose, items = [], setItems, onCheckout, onBeforeAdd }) {
   const [selectedKeys, setSelectedKeys] = useState(null);
+  const [stockMessage, setStockMessage] = useState(null);
 
   const groupedItems = useMemo(() => {
     const map = new Map();
@@ -64,8 +66,17 @@ export default function CartModal({ isOpen, onClose, items = [], setItems, onChe
     ) {
       return;
     }
+    const stockLimit = getStockLimit(item);
+    if (stockLimit !== null && getStockKeyQuantity(items, item) >= stockLimit) {
+      setStockMessage({
+        key: getCartItemKey(item),
+        text: 'You ordered more than the stock available.',
+      });
+      return;
+    }
     if (onBeforeAdd && !(await onBeforeAdd())) return;
 
+    setStockMessage(null);
     const updated = [...items];
     updated.splice(firstIndex + 1, 0, { ...item });
     setItems(updated);
@@ -171,115 +182,129 @@ export default function CartModal({ isOpen, onClose, items = [], setItems, onChe
               </div>
             ) : (
             <div className="space-y-3">
-              {groupedItems.map((item) => (
-                <motion.div
-                  key={item._key}
-                  layout
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, x: 30 }}
-                  className="rounded-xl border border-[#eee5db] bg-[#fffdfa] p-3 transition-colors hover:border-[#e7c875] sm:p-4"
-                >
-                  <div className="flex items-start gap-3 sm:gap-4">
-                    <input
-                      type="checkbox"
-                      checked={isSelected(item._key)}
-                      onChange={() => setSelectedKeys((current) => {
-                        const updated = current === null
-                          ? new Set(groupedItems.map((group) => group._key))
-                          : new Set(current);
-                        if (updated.has(item._key)) updated.delete(item._key);
-                        else updated.add(item._key);
-                        return updated;
-                      })}
-                      aria-label={`Select ${item.name}${item.variant ? ` ${item.variant}` : ''}`}
-                      className="mt-1 h-4 w-4 flex-shrink-0 cursor-pointer accent-[#a77b26]"
-                    />
-                    {/* Image */}
-                    <div className="h-16 w-16 flex-shrink-0 overflow-hidden rounded-lg border border-[#f1e6df] bg-[#f8eee8] sm:h-20 sm:w-20">
-                      <img
-                        src={`${CUSTOMER_BASE}/uploads/${item?.image || ''}`}
-                        alt={item?.name}
-                        className="w-full h-full object-contain"
-                        onError={(e) => { e.target.src = 'https://via.placeholder.com/150?text=Item'; }}
+              {groupedItems.map((item) => {
+                const stockLimit = getStockLimit(item);
+                const stockLimitReached = stockLimit !== null &&
+                  getStockKeyQuantity(items, item) >= stockLimit;
+                const productLimitReached = items.filter((cartItem) =>
+                  Number(cartItem.product_id ?? cartItem.id) === Number(item.product_id ?? item.id)
+                ).length >= 20;
+
+                return (
+                  <motion.div
+                    key={item._key}
+                    layout
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, x: 30 }}
+                    className="rounded-xl border border-[#eee5db] bg-[#fffdfa] p-3 transition-colors hover:border-[#e7c875] sm:p-4"
+                  >
+                    <div className="flex items-start gap-3 sm:gap-4">
+                      <input
+                        type="checkbox"
+                        checked={isSelected(item._key)}
+                        onChange={() => setSelectedKeys((current) => {
+                          const updated = current === null
+                            ? new Set(groupedItems.map((group) => group._key))
+                            : new Set(current);
+                          if (updated.has(item._key)) updated.delete(item._key);
+                          else updated.add(item._key);
+                          return updated;
+                        })}
+                        aria-label={`Select ${item.name}${item.variant ? ` ${item.variant}` : ''}`}
+                        className="mt-1 h-4 w-4 flex-shrink-0 cursor-pointer accent-[#a77b26]"
                       />
+                      {/* Image */}
+                      <div className="h-16 w-16 flex-shrink-0 overflow-hidden rounded-lg border border-[#f1e6df] bg-[#f8eee8] sm:h-20 sm:w-20">
+                        <img
+                          src={`${CUSTOMER_BASE}/uploads/${item?.image || ''}`}
+                          alt={item?.name}
+                          className="w-full h-full object-contain"
+                          onError={(e) => { e.target.src = 'https://via.placeholder.com/150?text=Item'; }}
+                        />
+                      </div>
+
+                      {/* Info */}
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <p className="break-words text-sm font-semibold text-[#33251e]">{item.name}</p>
+                            {item.variant && <p className="mt-0.5 text-xs text-[#8d7a6e]">{item.variant}</p>}
+                          </div>
+                          <div className="flex items-center gap-2 ml-2">
+                            <span className="whitespace-nowrap text-sm font-bold text-[#493a30]">₱{(item.price * item.qty).toLocaleString()}</span>
+                            <button
+                              onClick={() => handleRemove(item._key)}
+                              aria-label={`Remove ${item.name} from basket`}
+                              className="rounded-md p-1 text-gray-400 transition-colors hover:bg-red-50 hover:text-red-500"
+                              title="Remove all"
+                            >
+                              <Trash2 size={16} strokeWidth={1.5} />
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Tags */}
+                        <div className="flex flex-wrap gap-2 mt-2">
+                          {item.selectionDetails?.drink && (
+                            <span className="px-2 py-0.5 bg-blue-50 text-[9px] text-blue-500 rounded-full flex items-center gap-1">
+                              <span className="w-1 h-1 rounded-full bg-blue-500" />
+                              {item.selectionDetails.drink}
+                            </span>
+                          )}
+                          {item.selectionDetails?.cake && (
+                            <span className="px-2 py-0.5 bg-yellow-50 text-[9px] text-yellow-600 rounded-full flex items-center gap-1">
+                              {item.selectionDetails.cake}
+                            </span>
+                          )}
+                          {item.selectionDetails?.extras?.map((extra, i) => (
+                            <span key={i} className="px-2 py-0.5 bg-green-50 text-[9px] text-green-600 rounded-full flex items-center gap-1">
+                              {extra.name}
+                            </span>
+                          ))}
+                        </div>
+
+                        {/* Quantity Controls */}
+                        <div className="flex items-center justify-between mt-3 pt-3 border-t border-gray-50">
+                          <span className="text-[10px] font-medium text-[#8d7a6e]">
+                            ₱{item.price.toLocaleString()} each
+                          </span>
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => handleDecrease(item.firstIndex, item._key, item.qty)}
+                              aria-label={`Decrease ${item.name}${item.variant ? ` ${item.variant}` : ''} quantity`}
+                              className="flex h-8 w-8 items-center justify-center rounded-full border border-[#eadfd8] bg-white text-[#765d50] transition hover:border-[#e7c875] hover:bg-[#fff8df] active:scale-90 disabled:cursor-not-allowed disabled:opacity-40"
+                            >
+                              <Minus size={10} strokeWidth={2.5} />
+                            </button>
+                            <motion.span
+                              key={item.qty}
+                              initial={{ scale: 1.4, opacity: 0 }}
+                              animate={{ scale: 1, opacity: 1 }}
+                              className="w-6 text-center text-sm font-bold text-[#33251e]"
+                            >
+                              {item.qty}
+                            </motion.span>
+                            <button
+                              onClick={() => handleIncrease(item.firstIndex, item)}
+                              aria-label={`Increase ${item.name}${item.variant ? ` ${item.variant}` : ''} quantity`}
+                              disabled={stockLimitReached || productLimitReached}
+                              className="flex h-8 w-8 items-center justify-center rounded-full border border-[#eadfd8] bg-white text-[#765d50] transition hover:border-[#e7c875] hover:bg-[#fff8df] active:scale-90 disabled:cursor-not-allowed disabled:opacity-40"
+                            >
+                              <Plus size={10} strokeWidth={2.5} />
+                            </button>
+                          </div>
+                          {stockMessage?.key === item._key && (
+                            <p role="alert" className="mt-2 text-right text-xs font-semibold text-red-600">
+                              {stockMessage.text}
+                            </p>
+                          )}
+                        </div>
+                      </div>
                     </div>
-
-                    {/* Info */}
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0">
-                          <p className="break-words text-sm font-semibold text-[#33251e]">{item.name}</p>
-                          {item.variant && <p className="mt-0.5 text-xs text-[#8d7a6e]">{item.variant}</p>}
-                        </div>
-                        <div className="flex items-center gap-2 ml-2">
-                          <span className="whitespace-nowrap text-sm font-bold text-[#493a30]">₱{(item.price * item.qty).toLocaleString()}</span>
-                          <button
-                            onClick={() => handleRemove(item._key)}
-                            aria-label={`Remove ${item.name} from basket`}
-                            className="rounded-md p-1 text-gray-400 transition-colors hover:bg-red-50 hover:text-red-500"
-                            title="Remove all"
-                          >
-                            <Trash2 size={16} strokeWidth={1.5} />
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* Tags */}
-                      <div className="flex flex-wrap gap-2 mt-2">
-                        {item.selectionDetails?.drink && (
-                          <span className="px-2 py-0.5 bg-blue-50 text-[9px] text-blue-500 rounded-full flex items-center gap-1">
-                            <span className="w-1 h-1 rounded-full bg-blue-500" />
-                            {item.selectionDetails.drink}
-                          </span>
-                        )}
-                        {item.selectionDetails?.cake && (
-                          <span className="px-2 py-0.5 bg-yellow-50 text-[9px] text-yellow-600 rounded-full flex items-center gap-1">
-                            {item.selectionDetails.cake}
-                          </span>
-                        )}
-                        {item.selectionDetails?.extras?.map((extra, i) => (
-                          <span key={i} className="px-2 py-0.5 bg-green-50 text-[9px] text-green-600 rounded-full flex items-center gap-1">
-                            {extra.name}
-                          </span>
-                        ))}
-                      </div>
-
-                      {/* Quantity Controls */}
-                      <div className="flex items-center justify-between mt-3 pt-3 border-t border-gray-50">
-                        <span className="text-[10px] font-medium text-[#8d7a6e]">
-                          ₱{item.price.toLocaleString()} each
-                        </span>
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => handleDecrease(item.firstIndex, item._key, item.qty)}
-                            aria-label={`Decrease ${item.name} quantity`}
-                            className="flex h-8 w-8 items-center justify-center rounded-full border border-[#eadfd8] bg-white text-[#765d50] transition hover:border-[#e7c875] hover:bg-[#fff8df] active:scale-90 disabled:cursor-not-allowed disabled:opacity-40"
-                          >
-                            <Minus size={10} strokeWidth={2.5} />
-                          </button>
-                          <motion.span
-                            key={item.qty}
-                            initial={{ scale: 1.4, opacity: 0 }}
-                            animate={{ scale: 1, opacity: 1 }}
-                            className="w-6 text-center text-sm font-bold text-[#33251e]"
-                          >
-                            {item.qty}
-                          </motion.span>
-                          <button
-                            onClick={() => handleIncrease(item.firstIndex, item)}
-                            aria-label={`Increase ${item.name} quantity`}
-                            disabled={items.filter((cartItem) => Number(cartItem.product_id ?? cartItem.id) === Number(item.product_id ?? item.id)).length >= 20}
-                            className="flex h-8 w-8 items-center justify-center rounded-full border border-[#eadfd8] bg-white text-[#765d50] transition hover:border-[#e7c875] hover:bg-[#fff8df] active:scale-90 disabled:cursor-not-allowed disabled:opacity-40"
-                          >
-                            <Plus size={10} strokeWidth={2.5} />
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </motion.div>
-              ))}
+                  </motion.div>
+                );
+              })}
             </div>
             )}
           </div>

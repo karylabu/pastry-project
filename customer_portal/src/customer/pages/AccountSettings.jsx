@@ -129,15 +129,16 @@ export default function AccountSettings() {
   }, []);
 
   useEffect(() => {
-    if (activeSection !== 'profile' || location.hash !== '#address') return undefined;
+    if (activeSection !== 'profile' || !location.hash) return undefined;
+    const targetId = decodeURIComponent(location.hash.slice(1));
     const frame = window.requestAnimationFrame(() => {
-      document.getElementById('address')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      document.getElementById(targetId)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
     });
     return () => window.cancelAnimationFrame(frame);
   }, [activeSection, location.hash]);
 
   useEffect(() => {
-    if (activeSection === 'profile' && location.hash === '#address') return undefined;
+    if (activeSection === 'profile' && location.hash) return undefined;
     const frame = window.requestAnimationFrame(() => window.scrollTo({ top: 0, behavior: 'smooth' }));
     return () => window.cancelAnimationFrame(frame);
   }, [activeSection, location.hash]);
@@ -460,10 +461,11 @@ export default function AccountSettings() {
     }
   };
 
-  const renderField = (label, value, onChange, type = 'text', placeholder = '', required = false) => (
+  const renderField = (label, value, onChange, type = 'text', placeholder = '', required = false, id) => (
     <label className="block">
       <span className="text-xs uppercase tracking-[0.16em] text-gray-600 font-bold">{label}</span>
       <input
+        id={id}
         type={type}
         value={value}
         onChange={onChange}
@@ -492,7 +494,7 @@ export default function AccountSettings() {
   const renderProfileSection = () => (
     <section className="space-y-5">
       <div className="flex items-center gap-4">
-        <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-full bg-yellow-50 text-xl font-black text-yellow-600 ring-2 ring-[#e7c878] sm:h-20 sm:w-20">
+        <div id="profile-photo" className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-full bg-yellow-50 text-xl font-black text-yellow-600 ring-2 ring-[#e7c878] sm:h-20 sm:w-20">
           {(profilePhotoPreview || profileForm.profile_picture) ? (
             <img src={profilePhotoPreview || profileForm.profile_picture} alt="Profile preview" className="h-full w-full object-cover" />
           ) : initials}
@@ -530,12 +532,12 @@ export default function AccountSettings() {
 
       <form onSubmit={handleProfileSave} className="mt-4 space-y-3 sm:mt-6 sm:space-y-4">
         <div className="grid gap-3 md:grid-cols-2 sm:gap-5">
-          {renderField('Full Name', profileForm.full_name, (e) => setProfileForm({ ...profileForm, full_name: e.target.value }), 'text', 'Enter full name')}
-          {renderField('Username', profileForm.username, (e) => setProfileForm({ ...profileForm, username: e.target.value }), 'text', 'Enter username')}
+          {renderField('Full Name', profileForm.full_name, (e) => setProfileForm({ ...profileForm, full_name: e.target.value }), 'text', 'Enter full name', false, 'full_name')}
+          {renderField('Username', profileForm.username, (e) => setProfileForm({ ...profileForm, username: e.target.value }), 'text', 'Enter username', false, 'username')}
         </div>
         <div className="grid gap-3 md:grid-cols-2 sm:gap-5">
-          {renderField('Email Address', profileForm.email, (e) => setProfileForm({ ...profileForm, email: e.target.value }), 'email', 'Enter email address')}
-          {renderField('Phone Number', profileForm.phone, (e) => setProfileForm({ ...profileForm, phone: e.target.value }), 'tel', 'Enter phone number')}
+          {renderField('Email Address', profileForm.email, (e) => setProfileForm({ ...profileForm, email: e.target.value }), 'email', 'Enter email address', false, 'email')}
+          {renderField('Phone Number', profileForm.phone, (e) => setProfileForm({ ...profileForm, phone: e.target.value }), 'tel', 'Enter phone number', false, 'phone')}
         </div>
         <button type="submit" disabled={saving} className="rounded-full bg-[#e7b866] px-5 py-3 text-sm font-bold text-[#4a2b20] transition hover:bg-[#f1cf72] disabled:opacity-50 sm:px-6 sm:py-3.5 sm:text-base">
           {saving ? 'Saving...' : 'Save Profile'}
@@ -648,7 +650,7 @@ export default function AccountSettings() {
         <p className="mt-1 text-sm text-gray-500">Update your password and review active sessions.</p>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-2 lg:items-start">
+      <div className="grid gap-4 md:grid-cols-2 md:items-start">
         {/* Login & recovery */}
         <div>
         <h3 className="text-lg font-bold text-gray-900">Login &amp; recovery</h3>
@@ -884,7 +886,7 @@ export default function AccountSettings() {
                 {filteredSections.length === 0 ? (
                   <p className="text-sm text-gray-500">No settings match "{searchQuery}".</p>
                 ) : (
-                  <div className="grid gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3">
+                  <div className="grid gap-3 sm:grid-cols-2 sm:gap-4 md:grid-cols-3">
                     {filteredSections.map((item) => (
                       <button
                         key={item.key}

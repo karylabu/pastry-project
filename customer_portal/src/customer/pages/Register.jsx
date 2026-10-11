@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
+import { Eye, EyeOff } from "lucide-react";
 import { CUSTOMER_BASE, LARAVEL_BASE, ROOT_BASE } from "../../services/config";
 import { safeParseJson } from '../../services/api';
 import { signInWithGoogle } from "../../services/firebase";
@@ -54,9 +55,14 @@ export default function Register() {
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [googleSignup, setGoogleSignup] = useState(null);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [agreeTerms, setAgreeTerms] = useState(false);
   const [agreePrivacy, setAgreePrivacy] = useState(false);
   const [error, setError] = useState("");
+  const [accountAlreadyRegistered, setAccountAlreadyRegistered] = useState(false);
+  const [adminAccountNotAllowed, setAdminAccountNotAllowed] = useState(false);
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [showCredits, setShowCredits] = useState(false);
@@ -75,8 +81,7 @@ export default function Register() {
     !validateName(name) &&
     !validateEmail(email) &&
     !validatePhone(phone) &&
-    !validatePassword(password) &&
-    !validateConfirmPassword(confirmPassword, password) &&
+    (googleSignup || (!validatePassword(password) && !validateConfirmPassword(confirmPassword, password))) &&
     agreeTerms &&
     agreePrivacy;
 
@@ -116,13 +121,15 @@ export default function Register() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
+    setAccountAlreadyRegistered(false);
+    setAdminAccountNotAllowed(false);
 
     const nextErrors = {
       name: validateName(name),
       email: validateEmail(email),
       phone: validatePhone(phone),
-      password: validatePassword(password),
-      confirmPassword: validateConfirmPassword(confirmPassword, password),
+      password: googleSignup ? "" : validatePassword(password),
+      confirmPassword: googleSignup ? "" : validateConfirmPassword(confirmPassword, password),
       terms: agreeTerms ? "" : "Please accept the Terms & Conditions.",
       privacy: agreePrivacy ? "" : "Please accept the Privacy Policy.",
     };
@@ -137,6 +144,44 @@ export default function Register() {
     setLoading(true);
 
     try {
+      if (googleSignup) {
+        const response = await fetch(`${LARAVEL_BASE}/api/google-login`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Accept: "application/json" },
+          credentials: "include",
+          body: JSON.stringify({
+            id_token: googleSignup.idToken,
+            intent: "signup",
+            phone: phone.trim(),
+            agree_terms: agreeTerms,
+            agree_privacy: agreePrivacy,
+            photoUrl: googleSignup.photoURL,
+          }),
+        });
+        const data = await safeParseJson(response);
+
+        if (!response.ok || !data?.success) {
+          if (data?.code === "admin_account_not_allowed") {
+            setAdminAccountNotAllowed(true);
+            setError(data.message || "This is an admin account. Please continue to the admin login page.");
+            return;
+          }
+          if (data?.code === "account_already_registered" || data?.code === "account_already_exists") {
+            setAccountAlreadyRegistered(true);
+          }
+          setError(data?.message || "Google sign-up failed. Please try again.");
+          return;
+        }
+
+        localStorage.setItem("user", JSON.stringify({
+          ...data.user,
+          token: data.token || '',
+          avatar: data.user.avatar || data.user.profile_picture || data.user.profile_image || googleSignup.photoURL || '',
+        }));
+        navigate("/customer", { replace: true });
+        return;
+      }
+
       const response = await fetch(`${LARAVEL_BASE}/api/register`, {
         method: "POST",
         headers: {
@@ -157,6 +202,16 @@ export default function Register() {
       if (data?.success) {
         navigate("/customer/login?registered=true");
       } else {
+        if (response.status === 403 && data?.code === "admin_account_not_allowed") {
+          setAdminAccountNotAllowed(true);
+          setError(data.message || "This is an admin account. Please continue to the admin login page.");
+          return;
+        }
+        if (response.status === 409 && data?.code === "account_already_registered") {
+          setAccountAlreadyRegistered(true);
+          setError("This account is already registered.");
+          return;
+        }
         setError(data?.message || "Registration failed. Please try again.");
       }
     } catch (err) {
@@ -168,34 +223,64 @@ export default function Register() {
 
   const handleGoogleSignup = async () => {
     setError("");
+    setAccountAlreadyRegistered(false);
+    setAdminAccountNotAllowed(false);
     setGoogleLoading(true);
 
     try {
       const { idToken, user: googleUser, email, name, photoURL } = await signInWithGoogle();
-      const googlePayload = {
+      const googleProfile = {
+        idToken,
         email: email || googleUser?.email || "",
-        name: name || googleUser?.displayName || "Google User",
-        photoUrl: photoURL || googleUser?.photoURL || "",
+        name: name || googleUser?.displayName || "",
+        photoURL: photoURL || googleUser?.photoURL || "",
       };
 
-      const response = await fetch(`${LARAVEL_BASE}/api/google-login`, {
+      const loginResponse = await fetch(`${LARAVEL_BASE}/api/google-login`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Accept: "application/json" },
         credentials: "include",
-        body: JSON.stringify({ id_token: idToken, intent: "signup", ...googlePayload }),
+        body: JSON.stringify({
+          id_token: idToken,
+          intent: "signup_check",
+          photoUrl: googleProfile.photoURL,
+        }),
       });
-      const data = await safeParseJson(response);
+      const loginData = await safeParseJson(loginResponse);
 
-      if (!response.ok || !data?.success) {
-        throw new Error(data?.message || "Google sign-up failed.");
+      if (loginResponse.status !== 404 || loginData?.code !== "user_not_found") {
+        if (loginData?.code === "admin_account_not_allowed") {
+          setAdminAccountNotAllowed(true);
+          setError(loginData.message || "This is an admin account. Please continue to the admin login page.");
+          return;
+        }
+        if (loginData?.code === "account_already_registered" || loginData?.code === "account_already_exists") {
+          setAccountAlreadyRegistered(true);
+          setError("This account is already registered.");
+          return;
+        }
+        setError(loginData?.message || "Google sign-in failed. Please try again.");
+        return;
       }
 
-      localStorage.setItem("user", JSON.stringify({
-        ...data.user,
-        token: data.token || '',
-        avatar: data.user.avatar || data.user.profile_picture || data.user.profile_image || photoURL || googleUser?.photoURL || '',
-      }));
-      navigate("/customer", { replace: true });
+      setGoogleSignup(googleProfile);
+      setName(googleProfile.name);
+      setEmail(googleProfile.email);
+      setPhone("");
+      setPassword("");
+      setConfirmPassword("");
+      setAgreeTerms(false);
+      setAgreePrivacy(false);
+      setErrors({});
+      setTouched({
+        name: false,
+        email: false,
+        phone: false,
+        password: false,
+        confirmPassword: false,
+        terms: false,
+        privacy: false,
+      });
     } catch (error) {
       setError(error?.code === "auth/popup-closed-by-user" ? "Google sign-up was cancelled." : (error.message || "Google sign-up failed."));
     } finally {
@@ -226,6 +311,7 @@ export default function Register() {
         }
         .pastry-register .register-banner { display: none; }
         .pastry-register .hero-panel { visibility: visible; }
+        .pastry-register .web-brand-mark { display: none; }
         .pastry-register .register-tagline {
           font-family: 'Playfair Display', Georgia, serif;
           font-size: 40px;
@@ -280,10 +366,11 @@ export default function Register() {
         }
         .pastry-register .btn-secondary:hover { background: #F9FAFB; }
 
-        @media (min-width: 1024px) {
-          .pastry-register > .relative.z-10 { min-height: 100vh; padding: 34px 32px 22px; }
+        @media (min-width: 1200px) {
+          .pastry-register > .relative.z-10 { min-height: 100vh; padding: 34px clamp(12px, 4vw, 32px) 22px; }
           .pastry-register main {
             flex: 0 0 auto;
+            flex-direction: row;
             width: min(1030px, 100%);
             min-height: min(700px, calc(100vh - 110px));
             margin: auto;
@@ -296,13 +383,35 @@ export default function Register() {
             box-shadow: 0 18px 42px rgba(100, 78, 28, 0.16);
           }
           .pastry-register .hero-panel {
+            position: relative;
+            display: flex;
             flex: 0 0 45%;
             width: 45%;
-            justify-content: space-between;
-            padding: 34px 48px;
-            background: linear-gradient(135deg, #fff9e9 0%, #fff6df 100%);
+            overflow: hidden;
+            padding: 0;
+            background: #fff9e9;
             border-right: 1px solid #f4ead2;
           }
+          .pastry-register .register-reference-art {
+            position: absolute;
+            inset: 0;
+            display: block;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            object-position: left center;
+          }
+          .pastry-register .web-brand-mark {
+            position: absolute;
+            z-index: 2;
+            top: 11%;
+            left: 20%;
+            display: block;
+            width: 44px;
+            height: 44px;
+            object-fit: contain;
+          }
+          .pastry-register .hero-panel > *:not(.register-reference-art):not(.web-brand-mark) { display: none; }
           .pastry-register .hero-panel > .mb-6:first-child {
             align-items: center;
             gap: 12px;
@@ -344,8 +453,8 @@ export default function Register() {
             box-shadow: none;
             backdrop-filter: none;
           }
-          .pastry-register .login-card > .mb-5:first-child { margin-bottom: 18px; }
-          .pastry-register .login-card > .mb-5:first-child h2.register-welcome {
+          .pastry-register .login-card > .mb-5 { margin-bottom: 18px; }
+          .pastry-register .login-card > .mb-5 h2.register-welcome {
             position: relative;
             width: fit-content;
             font-size: 40px;
@@ -353,7 +462,7 @@ export default function Register() {
             line-height: 1.1;
             color: #edaf39;
           }
-          .pastry-register .login-card > .mb-5:first-child h2.register-welcome svg {
+          .pastry-register .login-card > .mb-5 h2.register-welcome svg {
             display: block;
             position: absolute;
             top: 0;
@@ -366,7 +475,7 @@ export default function Register() {
             stroke-linejoin: round;
             stroke-width: 1.7;
           }
-          .pastry-register .login-card > .mb-5:first-child p { margin-top: 2px; font-size: 13px; color: #89909c; }
+          .pastry-register .login-card > .mb-5 p { margin-top: 2px; font-size: 13px; color: #89909c; }
           .pastry-register .register-input { height: 42px; border-radius: 9px; font-size: 13px; }
           .pastry-register .login-card label { font-size: 11px; }
           .pastry-register .btn-primary,
@@ -405,7 +514,7 @@ export default function Register() {
           .pastry-register footer > div:nth-child(2) { gap: 18px; }
         }
 
-        @media (max-width: 1023px) {
+        @media (max-width: 1199px) {
           .pastry-register {
             max-width: 522px;
             margin: 0 auto;
@@ -447,14 +556,151 @@ export default function Register() {
           .pastry-register .hero-tagline { margin-bottom: 0; }
           .pastry-register .hero-tagline h2 { font-family: 'Playfair Display', Georgia, serif; font-size: 29px; font-weight: 700; line-height: 1.12; }
           .pastry-register .hero-tagline h2 span { color: #f0b94d; font-style: italic; }
-          .pastry-register .login-card > .mb-5:first-child h2.register-welcome { font-family: 'Pacifico', cursive; font-size: 31px; font-weight: 400; color: #edaf39; }
-          .pastry-register .login-card > .mb-5:first-child p { color: #89909c; }
+          .pastry-register .login-card > .mb-5 h2.register-welcome { font-family: 'Pacifico', cursive; font-size: 31px; font-weight: 400; color: #edaf39; }
+          .pastry-register .login-card > .mb-5 p { color: #89909c; }
         }
 
         @media (max-width: 399px) {
           .pastry-register .hero-panel { padding-right: 20px; padding-left: 20px; }
           .pastry-register main > div:not(.hero-panel) { padding-right: 14px; padding-left: 14px; }
           .pastry-register .login-card { padding-right: 18px; padding-left: 18px; }
+        }
+
+        @media (max-width: 1199px) {
+          .pastry-register {
+            width: 100%;
+            max-width: none;
+            margin: 0;
+            border: 0;
+          }
+          .pastry-register > .relative.z-10 {
+            width: 100%;
+            padding: 10px 8px;
+          }
+          .pastry-register main {
+            width: min(100%, 359px);
+            flex: 0 0 auto;
+            flex-direction: column;
+            gap: 0;
+            margin: 0 auto;
+            overflow: hidden;
+            border: 1px solid rgba(255, 255, 255, .8);
+            border-radius: 24px;
+            background: #fbf8ed;
+            box-shadow: 0 16px 40px rgba(100, 78, 28, .13);
+          }
+          .pastry-register .hero-panel { display: none; }
+          .pastry-register .hero-tagline { display: none; }
+          .pastry-register main > div:not(.hero-panel) {
+            width: 100%;
+            flex: 0 0 auto;
+            padding: 0;
+          }
+          .pastry-register .login-card {
+            width: 100%;
+            max-width: none;
+            padding: 24px clamp(20px, 6vw, 32px) 22px;
+            border: 0;
+            border-radius: 0;
+            background: #fbf8ed;
+            box-shadow: none;
+            backdrop-filter: none;
+          }
+          .pastry-register .register-phone-brand {
+            display: flex;
+            align-items: center;
+            gap: 9px;
+            margin-bottom: 16px;
+          }
+          .pastry-register .register-phone-brand img {
+            width: 34px;
+            height: 34px;
+            object-fit: contain;
+            opacity: .86;
+          }
+          .pastry-register .register-phone-brand h1 {
+            font-family: 'Playfair Display', Georgia, serif;
+            font-size: 19px;
+            font-style: italic;
+            font-weight: 700;
+            line-height: 1;
+            color: #edaf39;
+          }
+          .pastry-register .register-phone-brand h1 span { color: #25211a; }
+          .pastry-register .register-phone-brand p {
+            margin-top: 4px;
+            font-size: 6px;
+            font-weight: 700;
+            letter-spacing: .32em;
+            color: #171717;
+          }
+          .pastry-register .login-card > .mb-5 {
+            margin-bottom: 16px;
+            text-align: left;
+          }
+          .pastry-register .login-card > .mb-5 h2.register-welcome {
+            font-size: 38px;
+            line-height: 1.12;
+            color: #edaf39;
+          }
+          .pastry-register .login-card > .mb-5 p {
+            margin-top: 2px;
+            font-size: 14px;
+            color: #89909c;
+          }
+          .pastry-register .login-card form.grid {
+            grid-template-columns: minmax(0, 1fr);
+            gap: 12px;
+          }
+          .pastry-register .login-card form.grid > * { grid-column: 1 / -1; min-width: 0; }
+          .pastry-register .login-card label { font-size: 13px; }
+          .pastry-register .register-input {
+            height: 48px;
+            border-radius: 11px;
+            font-size: 14px;
+          }
+          .pastry-register .btn-primary,
+          .pastry-register .btn-secondary {
+            height: 48px;
+            border-radius: 11px;
+          }
+          .pastry-register .register-phone-banner {
+            position: relative;
+            display: block;
+            width: 100%;
+            height: 300px;
+            overflow: hidden;
+            background: #fbf8ed;
+          }
+          .pastry-register .register-phone-banner img {
+            position: absolute;
+            left: -21%;
+            bottom: 0;
+            display: block;
+            width: 250%;
+            max-width: none;
+            height: auto;
+          }
+          .pastry-register footer {
+            justify-content: center;
+            gap: 12px;
+            border: 0;
+            padding: 12px 8px 18px;
+          }
+          .pastry-register footer > div:first-child { display: none; }
+          .pastry-register footer > div:nth-child(2) { display: flex; }
+          .pastry-register footer a,
+          .pastry-register footer button { font-size: 11px; }
+        }
+        @media (min-width: 480px) and (max-width: 1199px) {
+          .pastry-register main {
+            width: min(100%, 600px);
+            margin-inline: auto;
+          }
+          .pastry-register .register-phone-banner img {
+            left: calc(50% - 255px);
+            width: 894px;
+          }
         }
       `}</style>
 
@@ -477,8 +723,14 @@ export default function Register() {
       </div>
 
       <div className="relative z-10 flex min-h-screen w-full flex-col">
-        <main className="flex flex-1 flex-col py-4 lg:flex-row lg:items-center lg:justify-between lg:gap-0 lg:py-0">
-          <div className="hero-panel hidden w-full flex-1 flex-col justify-center py-3 lg:flex lg:w-[53%] lg:py-0 lg:pl-[5.9vw]">
+        <main className="flex flex-1 flex-col py-4 md:flex-row md:items-center md:justify-between md:gap-0 md:py-0">
+          <div className="hero-panel hidden w-full flex-1 flex-col justify-center py-3 md:flex md:w-[53%] md:py-0 md:pl-[5.9vw]">
+            <img
+              className="register-reference-art hidden"
+              src={`${ASSET_BASE}/login.png?v=20261011`}
+              alt="Pastry Project cake banner"
+            />
+            <img className="web-brand-mark" src={LOGO_URL} alt="" aria-hidden="true" />
             <div className="mb-6 flex items-center gap-1">
               <img src={LOGO_URL} alt="Logo" className="h-14 w-14 object-contain" />
               <div>
@@ -501,14 +753,21 @@ export default function Register() {
             </div>
           </div>
 
-          <div className="flex w-full flex-1 items-center justify-center px-4 pb-5 pt-5 lg:justify-end lg:px-[4vw]">
+          <div className="flex w-full flex-1 items-center justify-center px-4 pb-5 pt-5 md:justify-end md:px-[4vw]">
             <motion.div
               initial={{ opacity: 0, y: 14 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.22 }}
               className="login-card w-full max-w-[500px] px-5 py-4 sm:px-7 sm:py-5"
             >
-              <div className="mb-5 text-center lg:text-left">
+              <div className="register-phone-brand hidden">
+                <img src={LOGO_URL} alt="" />
+                <div>
+                  <h1>Pastry <span>Project</span></h1>
+                  <p>Sweetening moments</p>
+                </div>
+              </div>
+              <div className="mb-5 text-center md:text-left">
                 <h2 className="register-welcome text-2xl font-normal text-[#F0B94D]">
                   Welcome
                   <svg viewBox="0 0 40 36" aria-hidden="true">
@@ -521,17 +780,45 @@ export default function Register() {
 
               {error && (
                 <div className="mb-4 rounded-xl border border-red-100 bg-red-50 p-4 text-sm text-red-600">
-                  {error}
+                  {accountAlreadyRegistered
+                    ? "This account is already registered."
+                    : adminAccountNotAllowed
+                      ? "This is an admin account."
+                      : error}
+                  {adminAccountNotAllowed && (
+                    <>
+                      {" Please continue to the "}
+                      <Link to="/admin/login" className="font-bold underline">
+                        admin login page
+                      </Link>
+                      .
+                    </>
+                  )}
+                  {accountAlreadyRegistered && (
+                    <>
+                      {" Please continue to the "}
+                      <Link to="/customer/login" className="font-bold underline">
+                        login page
+                      </Link>
+                      .
+                    </>
+                  )}
                 </div>
               )}
 
               <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-x-4 gap-y-2 sm:grid-cols-2">
+                {googleSignup && (
+                  <p className="rounded-lg bg-[#fff8e9] p-3 text-sm text-[#765d50] sm:col-span-2">
+                    Your Google details are ready. Add your phone number and accept the Terms &amp; Conditions and Privacy Policy to finish signing up.
+                  </p>
+                )}
                 <div>
                   <label className="mb-1.5 block text-xs font-bold text-[#171717]">Full Name</label>
                   <input
                     type="text"
-                    placeholder="Full Name"
+                    placeholder="Juan Dela Cruz"
                     value={name}
+                    readOnly={Boolean(googleSignup)}
                     onBlur={() => handleBlur("name")}
                     onChange={(e) => {
                       setName(e.target.value);
@@ -539,7 +826,7 @@ export default function Register() {
                         setErrors((prev) => ({ ...prev, name: validateName(e.target.value) }));
                       }
                     }}
-                    className="register-input w-full bg-white text-[#171717]"
+                    className={`register-input w-full bg-white text-[#171717] ${googleSignup ? 'read-only:cursor-not-allowed read-only:bg-gray-100' : ''}`}
                   />
                   {touched.name && errors.name && <p className="mt-1 text-[10px] text-[#A8354A]">{errors.name}</p>}
                 </div>
@@ -548,8 +835,9 @@ export default function Register() {
                   <label className="mb-1.5 block text-xs font-bold text-[#171717]">Email Address</label>
                   <input
                     type="email"
-                    placeholder="Email Address"
+                    placeholder="name@example.com"
                     value={email}
+                    readOnly={Boolean(googleSignup)}
                     onBlur={() => handleBlur("email")}
                     onChange={(e) => {
                       setEmail(e.target.value);
@@ -557,7 +845,7 @@ export default function Register() {
                         setErrors((prev) => ({ ...prev, email: validateEmail(e.target.value) }));
                       }
                     }}
-                    className="register-input w-full bg-white text-[#171717]"
+                    className={`register-input w-full bg-white text-[#171717] ${googleSignup ? 'read-only:cursor-not-allowed read-only:bg-gray-100' : ''}`}
                   />
                   {touched.email && errors.email && <p className="mt-1 text-[10px] text-[#A8354A]">{errors.email}</p>}
                 </div>
@@ -567,7 +855,7 @@ export default function Register() {
                   <input
                     type="tel"
                     required
-                    placeholder="Phone Number"
+                    placeholder="09123456789"
                     value={phone}
                     onBlur={() => handleBlur("phone")}
                     onChange={(e) => {
@@ -581,46 +869,71 @@ export default function Register() {
                   {touched.phone && errors.phone && <p className="mt-1 text-[10px] text-[#A8354A]">{errors.phone}</p>}
                 </div>
 
-                <div>
-                  <label className="mb-1.5 block text-xs font-bold text-[#171717]">Password</label>
-                  <input
-                    type="password"
-                    placeholder="Password"
-                    value={password}
-                    onBlur={() => handleBlur("password")}
-                    onChange={(e) => {
-                      setPassword(e.target.value);
-                      if (touched.password) {
-                        setErrors((prev) => ({ ...prev, password: validatePassword(e.target.value) }));
-                      }
-                    }}
-                    className="register-input w-full bg-white text-[#171717]"
-                  />
-                  {touched.password && errors.password && <p className="mt-1 text-[10px] text-[#A8354A]">{errors.password}</p>}
-                </div>
+                {!googleSignup && (
+                  <div>
+                    <label className="mb-1.5 block text-xs font-bold text-[#171717]">Password</label>
+                    <div className="relative">
+                      <input
+                        type={showPassword ? "text" : "password"}
+                        placeholder="••••••••"
+                        value={password}
+                        onBlur={() => handleBlur("password")}
+                        onChange={(e) => {
+                          setPassword(e.target.value);
+                          if (touched.password) {
+                            setErrors((prev) => ({ ...prev, password: validatePassword(e.target.value) }));
+                          }
+                        }}
+                        className="register-input w-full bg-white pr-10 text-[#171717]"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(value => !value)}
+                        aria-label={showPassword ? "Hide password" : "Show password"}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                      >
+                        {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                      </button>
+                    </div>
+                    {touched.password && errors.password && <p className="mt-1 text-[10px] text-[#A8354A]">{errors.password}</p>}
+                  </div>
+                )}
 
-                <div className="sm:col-span-2">
-                  <label className="mb-1.5 block text-xs font-bold text-[#171717]">Confirm Password</label>
-                  <input
-                    type="password"
-                    placeholder="Confirm Password"
-                    value={confirmPassword}
-                    onBlur={() => handleBlur("confirmPassword")}
-                    onChange={(e) => {
-                      setConfirmPassword(e.target.value);
-                      if (touched.confirmPassword) {
-                        setErrors((prev) => ({ ...prev, confirmPassword: validateConfirmPassword(e.target.value, password) }));
-                      }
-                    }}
-                    className="register-input w-full bg-white text-[#171717]"
-                  />
-                  {touched.confirmPassword && errors.confirmPassword && <p className="mt-1 text-[10px] text-[#A8354A]">{errors.confirmPassword}</p>}
-                </div>
+                {!googleSignup && (
+                  <div className="sm:col-span-2">
+                    <label className="mb-1.5 block text-xs font-bold text-[#171717]">Confirm Password</label>
+                    <div className="relative">
+                      <input
+                        type={showConfirmPassword ? "text" : "password"}
+                        placeholder="••••••••"
+                        value={confirmPassword}
+                        onBlur={() => handleBlur("confirmPassword")}
+                        onChange={(e) => {
+                          setConfirmPassword(e.target.value);
+                          if (touched.confirmPassword) {
+                            setErrors((prev) => ({ ...prev, confirmPassword: validateConfirmPassword(e.target.value, password) }));
+                          }
+                        }}
+                        className="register-input w-full bg-white pr-10 text-[#171717]"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowConfirmPassword(value => !value)}
+                        aria-label={showConfirmPassword ? "Hide password" : "Show password"}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                      >
+                        {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                      </button>
+                    </div>
+                    {touched.confirmPassword && errors.confirmPassword && <p className="mt-1 text-[10px] text-[#A8354A]">{errors.confirmPassword}</p>}
+                  </div>
+                )}
 
                 <div className="flex flex-col gap-2 pt-1 text-xs leading-relaxed text-[#171717]/80 sm:col-span-2">
                   <label className="flex items-center gap-2">
                     <input
                       type="checkbox"
+                      required
                       checked={agreeTerms}
                       onBlur={() => handleBlur("terms")}
                       onChange={(e) => {
@@ -642,6 +955,7 @@ export default function Register() {
                   <label className="flex items-center gap-2">
                     <input
                       type="checkbox"
+                      required
                       checked={agreePrivacy}
                       onBlur={() => handleBlur("privacy")}
                       onChange={(e) => {
@@ -669,16 +983,16 @@ export default function Register() {
                   disabled={loading || !isFormValid}
                   className="btn-primary w-full text-sm active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40 sm:col-span-2"
                 >
-                  {loading ? "Creating account…" : "Create account"}
+                  {loading ? "Creating account…" : googleSignup ? "Complete Google Sign Up" : "Create account"}
                 </button>
 
-                <div className="flex items-center gap-4 py-1 sm:col-span-2">
+                {!googleSignup && <div className="flex items-center gap-4 py-1 sm:col-span-2">
                   <div className="h-px flex-1 bg-gray-200" />
                   <span className="text-sm text-gray-400">or</span>
                   <div className="h-px flex-1 bg-gray-200" />
-                </div>
+                </div>}
 
-                <button
+                {!googleSignup ? <button
                   type="button"
                   onClick={handleGoogleSignup}
                   disabled={googleLoading}
@@ -686,13 +1000,34 @@ export default function Register() {
                 >
                   <GoogleIcon />
                   {googleLoading ? "Redirecting…" : "Sign Up with Google"}
-                </button>
+                </button> : (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setGoogleSignup(null);
+                      setName("");
+                      setEmail("");
+                      setPhone("");
+                      setError("");
+                      setAccountAlreadyRegistered(false);
+                      setAgreeTerms(false);
+                      setAgreePrivacy(false);
+                      setErrors({});
+                    }}
+                    className="btn-secondary w-full text-sm font-semibold text-[#171717] sm:col-span-2"
+                  >
+                    Choose a different Google account
+                  </button>
+                )}
 
                 <p className="mt-2 text-center text-xs text-[#171717]/80 sm:col-span-2">
                   Already have an account? <Link to="/customer/login" className="font-bold text-[#F0B94D] hover:underline">Log in</Link>
                 </p>
               </form>
             </motion.div>
+          </div>
+          <div className="register-phone-banner hidden" aria-hidden="true">
+            <img src={`${ASSET_BASE}/login.png?v=20261011`} alt="" />
           </div>
         </main>
 

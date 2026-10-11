@@ -340,13 +340,13 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
           </Link>
 
           {/* NAV */}
-          <div className="hidden xl:flex items-center gap-6">
+          <div className="hidden items-center gap-3 md:flex xl:gap-6">
 
             {navs.map(nav => (
               <Link
                 key={nav.path}
                 to={nav.path}
-                className={`text-sm uppercase tracking-[0.2em] ${
+                className={`text-xs uppercase tracking-[0.12em] xl:text-sm xl:tracking-[0.2em] ${
                   location.pathname === nav.path
                     ? "text-black font-semibold"
                     : "text-gray-400 hover:text-black"
@@ -366,7 +366,7 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
           {/* SEARCH */}
           <form
             onSubmit={handleSearchSubmit}
-            className="hidden h-8 w-[clamp(180px,20vw,300px)] items-center gap-3 rounded-full border border-gray-300 bg-gray-50 px-4 transition focus-within:border-gray-400 focus-within:bg-white md:flex"
+            className="hidden h-8 w-[clamp(150px,16vw,260px)] items-center gap-3 rounded-full border border-gray-300 bg-gray-50 px-4 transition focus-within:border-gray-400 focus-within:bg-white lg:flex"
           >
             <Search size={20} className="shrink-0 text-gray-600" />
             <input
@@ -378,7 +378,7 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
               className="min-w-0 flex-1 bg-transparent text-base text-gray-700 outline-none placeholder:text-gray-500"
             />
           </form>
-          <div ref={searchRef} className="relative md:hidden">
+          <div ref={searchRef} className="relative lg:hidden">
             <button
               type="button"
               onClick={toggleMobileSearch}
@@ -748,12 +748,12 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
 
       </div>
 
-      <div className="mt-2 flex justify-center gap-2 overflow-x-hidden border-t border-gray-100 pt-2 sm:gap-6 xl:hidden">
+      <div className="mt-2 flex justify-center gap-2 overflow-x-hidden border-t border-gray-100 pt-2 sm:gap-6 md:mt-3 md:gap-10 md:pt-3 md:hidden">
         {navs.map(nav => (
           <Link
             key={nav.path}
             to={nav.path}
-            className={`shrink-0 py-1 text-xs font-semibold uppercase tracking-[0.16em] ${
+            className={`shrink-0 py-1 text-xs font-semibold uppercase tracking-[0.16em] md:text-sm md:tracking-[0.2em] ${
               location.pathname === nav.path
                 ? "border-b-2 border-[#d4af37] text-black"
                 : "text-gray-500"
