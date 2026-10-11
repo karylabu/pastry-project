@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Menu, MessageCircle, Paperclip, RefreshCw, Search, Send, UserRound, X } from "lucide-react";
+import { Bot, Menu, MessageCircle, Paperclip, RefreshCw, Search, Send, UserRound, X } from "lucide-react";
 import { CUSTOMER_BASE, LARAVEL_BASE } from "../../services/config";
 import { getAuthHeaders, safeParseJson } from "../../services/api";
 import { subscribeRealtime } from "../../services/realtime";
@@ -174,6 +174,7 @@ export default function AdminChatBubble() {
                   <div className="min-h-0 flex-1 space-y-2.5 overflow-y-auto bg-[#fffaf3] px-3 py-4 sm:px-6 sm:py-5">
                     {messages.length === 0 ? <div className="grid h-full place-items-center text-center text-xs text-gray-400">Select a conversation to begin.</div> : messages.map((item, index) => {
                       const isAdmin = item.sender === "admin";
+                      const isAi = item.sender === "ai";
                       const messageDate = new Date(item.created_at).toDateString();
                       const previousDate = index > 0 ? new Date(messages[index - 1].created_at).toDateString() : null;
                       const showDateSeparator = index === 0 || messageDate !== previousDate;
@@ -182,9 +183,9 @@ export default function AdminChatBubble() {
                         <React.Fragment key={item.id}>
                           {showDateSeparator && <div className="flex items-center gap-3 py-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-gray-400"><span className="h-px flex-1 bg-gray-200" /><span>{new Date(item.created_at).toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" })}</span><span className="h-px flex-1 bg-gray-200" /></div>}
                           <div className={`flex gap-2 ${isAdmin ? "flex-row-reverse" : "flex-row"}`}>
-                            <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold ${isAdmin ? "bg-[#fff4cd] text-[#80600a]" : "border border-[#d5d5d5] bg-white text-black"}`}>{isAdmin ? "A" : <UserRound size={12} />}</div>
+                            <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold ${isAdmin || isAi ? "bg-[#fff4cd] text-[#80600a]" : "border border-[#d5d5d5] bg-white text-black"}`}>{isAdmin ? "A" : isAi ? <Bot size={13} /> : <UserRound size={12} />}</div>
                             <div className={`flex max-w-[78%] flex-col gap-1 ${isAdmin ? "items-end" : "items-start"}`}>
-                              <span className="px-1 text-[11px] text-gray-400">{isAdmin ? "Admin" : customerName} · {messageTime}</span>
+                              <span className="px-1 text-[11px] text-gray-400">{isAdmin ? "Admin" : isAi ? "Chat Bot" : customerName} · {messageTime}</span>
                               <div className={`rounded-2xl px-3 py-2 text-[13px] leading-relaxed ${isAdmin ? "rounded-tr-sm bg-[#fff4cd] text-black" : "rounded-tl-sm border border-[#f0e6db] bg-white text-black"}`}>
                                 {getImageUrl(item.image_path) && <img src={getImageUrl(item.image_path)} alt="Chat attachment" className="mb-1 max-h-48 max-w-full rounded-lg object-contain" />}
                                 {item.message && <p className="whitespace-pre-wrap">{item.message}</p>}

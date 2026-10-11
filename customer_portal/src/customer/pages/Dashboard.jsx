@@ -689,7 +689,7 @@ export function ChatBubble({ aiMode = false, fullPage = false, hideFloating = fa
     customer: "You",
     staff: "Admin",
     admin: "Admin",
-    ai: "Admin"
+    ai: "Chat Bot"
   };
 
   const getImageUrl = (message) => message.image_url || (
