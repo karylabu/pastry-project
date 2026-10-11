@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Database\QueryException;
 
 class AuthApiController extends Controller
 {
@@ -42,33 +43,13 @@ class AuthApiController extends Controller
         $request->merge(['email' => strtolower(trim((string) $request->input('email', '')))]);
         $validator = Validator::make($request->all(), [
             'name' => 'required|string|max:100',
-            'email' => 'required|string|email|max:150|unique:users',
+            'email' => 'required|string|email|max:150',
             'password' => 'required|string|min:6',
             'phone' => 'nullable|string',
             'agree_privacy' => 'sometimes|boolean',
         ]);
 
         if ($validator->fails()) {
-            if (
-                $validator->errors()->has('email') &&
-                User::whereRaw('LOWER(email) = ?', [$request->email])->exists()
-            ) {
-                $existingUser = User::whereRaw('LOWER(email) = ?', [$request->email])->first();
-                if (strtolower((string) $existingUser->role) === 'admin') {
-                    return response()->json([
-                        'success' => false,
-                        'code' => 'admin_account_not_allowed',
-                        'message' => 'This is an admin account. Please continue to the admin login page.',
-                    ], 403);
-                }
-
-                return response()->json([
-                    'success' => false,
-                    'code' => 'account_already_registered',
-                    'message' => 'This account is already registered. Please login.',
-                ], 409);
-            }
-
             return response()->json([
                 'success' => false,
                 'message' => 'Validation error',
@@ -76,14 +57,26 @@ class AuthApiController extends Controller
             ], 422);
         }
 
-        $user = User::create([
-            'name' => $request->name,
-            'email' => $request->email,
-            'password' => Hash::make($request->password),
-            'role' => 'customer',
-            'phone' => $request->phone,
-            'subscribed_promo' => $request->boolean('agree_privacy'),
-        ]);
+        if ($response = $this->existingAccountResponse($request->email)) {
+            return $response;
+        }
+
+        try {
+            $user = User::create([
+                'name' => $request->name,
+                'email' => $request->email,
+                'password' => Hash::make($request->password),
+                'role' => 'customer',
+                'phone' => $request->phone,
+                'subscribed_promo' => $request->boolean('agree_privacy'),
+            ]);
+        } catch (QueryException $exception) {
+            if ($response = $this->existingAccountResponse($request->email)) {
+                return $response;
+            }
+
+            throw $exception;
+        }
 
         $token = bin2hex(random_bytes(32));
 
@@ -109,6 +102,28 @@ class AuthApiController extends Controller
             'jwt_token' => $jwtToken,
             'user' => $userData,
         ], 201);
+    }
+
+    private function existingAccountResponse(string $email): ?\Illuminate\Http\JsonResponse
+    {
+        $existingUser = User::whereRaw('LOWER(email) = ?', [$email])->first();
+        if (!$existingUser) {
+            return null;
+        }
+
+        if (strtolower((string) $existingUser->role) === 'admin') {
+            return response()->json([
+                'success' => false,
+                'code' => 'admin_account_not_allowed',
+                'message' => 'This is an admin account. Please continue to the admin login page.',
+            ], 403);
+        }
+
+        return response()->json([
+            'success' => false,
+            'code' => 'account_already_registered',
+            'message' => 'This account is already registered. Please login.',
+        ], 409);
     }
 
     /**

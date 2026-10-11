@@ -134,7 +134,7 @@ class CustomerAuthApiTest extends TestCase
 
     public function test_registration_creates_a_customer_and_session_token(): void
     {
-        $this->postJson('/api/register', [
+        $this->postJson('http://localhost/api/register', [
             'name' => 'New Customer',
             'email' => 'new@example.com',
             'phone' => '09123456789',
@@ -166,6 +166,30 @@ class CustomerAuthApiTest extends TestCase
         $this->postJson('http://localhost/api/register', [
             'name' => 'Existing Customer',
             'email' => 'EXISTING@example.com',
+            'phone' => '09123456789',
+            'password' => 'new-password',
+        ])
+            ->assertStatus(409)
+            ->assertJsonPath('success', false)
+            ->assertJsonPath('code', 'account_already_registered')
+            ->assertJsonPath('message', 'This account is already registered. Please login.');
+
+        $this->assertDatabaseCount('users', 1);
+    }
+
+    public function test_registration_rejects_a_case_variant_of_a_legacy_email(): void
+    {
+        DB::table('users')->insert([
+            'id' => 17,
+            'name' => 'Legacy Customer',
+            'email' => 'LegacyCustomer@example.com',
+            'password' => Hash::make('existing-password'),
+            'role' => 'customer',
+        ]);
+
+        $this->postJson('http://localhost/api/register', [
+            'name' => 'Duplicate Customer',
+            'email' => 'legacycustomer@EXAMPLE.com',
             'phone' => '09123456789',
             'password' => 'new-password',
         ])

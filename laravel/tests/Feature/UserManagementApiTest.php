@@ -149,6 +149,50 @@ class UserManagementApiTest extends TestCase
         $this->assertDatabaseHas('users', ['email' => 'new-managed@example.com', 'status' => 'active']);
     }
 
+    public function test_admin_cannot_create_an_account_with_a_case_variant_of_an_existing_email(): void
+    {
+        DB::table('users')->insert([
+            'id' => 3,
+            'name' => 'Legacy User',
+            'email' => 'LegacyUser@example.com',
+            'password' => 'unused',
+            'role' => 'customer',
+            'status' => 'active',
+        ]);
+
+        $this->withHeader('Authorization', '******')
+            ->postJson('/api/users', [
+                'name' => 'Duplicate User',
+                'email' => 'legacyuser@EXAMPLE.com',
+                'role' => 'customer',
+                'password' => 'new-password',
+                'password_confirmation' => 'new-password',
+            ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('email');
+
+        $this->assertDatabaseCount('users', 3);
+    }
+
+    public function test_admin_cannot_update_a_user_to_a_case_variant_of_another_users_email(): void
+    {
+        DB::table('users')->insert([
+            'id' => 3,
+            'name' => 'Legacy User',
+            'email' => 'LegacyUser@example.com',
+            'password' => 'unused',
+            'role' => 'customer',
+            'status' => 'active',
+        ]);
+
+        $this->withHeader('Authorization', '******')
+            ->putJson('/api/users/2', ['email' => 'legacyuser@EXAMPLE.com'])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('email');
+
+        $this->assertDatabaseHas('users', ['id' => 2, 'email' => 'customer@example.com']);
+    }
+
     public function test_deactivated_user_cannot_use_an_existing_session_token(): void
     {
         $this->withHeader('Authorization', 'Bearer admin-token')

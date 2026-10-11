@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
+use Illuminate\Database\QueryException;
 
 class UserController extends Controller
 {
@@ -118,15 +119,26 @@ class UserController extends Controller
 
         $payload = $this->resolvePayload($request);
 
-        $validated = Validator::make($payload, [
+        $validator = Validator::make($payload, [
             'name' => ['required', 'string', 'max:255'],
-            'email' => ['required', 'email', 'max:255', 'unique:users,email'],
+            'email' => ['required', 'email', 'max:255'],
             'phone_number' => ['nullable', 'string', 'max:20'],
             'phone' => ['nullable', 'string', 'max:20'],
             'role' => ['required', Rule::in(['admin', 'customer'])],
             'status' => ['sometimes', Rule::in(['active', 'inactive', 'banned'])],
             'password' => ['required', 'string', 'min:8', 'confirmed'],
-        ])->validate();
+        ]);
+        $validator->after(function ($validator) use ($payload) {
+            $email = strtolower(trim((string) ($payload['email'] ?? '')));
+            if (
+                $email !== ''
+                && filter_var($email, FILTER_VALIDATE_EMAIL)
+                && DB::table('users')->whereRaw('LOWER(email) = ?', [$email])->exists()
+            ) {
+                $validator->errors()->add('email', 'This email is already registered.');
+            }
+        });
+        $validated = $validator->validate();
 
         $validated = $this->normalizeValidatedData($validated);
         $validated['status'] = $validated['status'] ?? 'active';
@@ -135,7 +147,18 @@ class UserController extends Controller
             $validated['password'] = Hash::make($validated['password']);
         }
 
-        $user = User::create($validated);
+        try {
+            $user = User::create($validated);
+        } catch (QueryException $exception) {
+            if (!DB::table('users')->whereRaw('LOWER(email) = ?', [$validated['email']])->exists()) {
+                throw $exception;
+            }
+
+            return response()->json([
+                'success' => false,
+                'message' => 'This email is already registered.',
+            ], 409);
+        }
 
         return response()->json([
             'success' => true,
@@ -166,15 +189,29 @@ class UserController extends Controller
 
         $payload = $this->resolvePayload($request);
 
-        $validated = Validator::make($payload, [
+        $validator = Validator::make($payload, [
             'name' => ['sometimes', 'string', 'max:255'],
-            'email' => ['sometimes', 'email', 'max:255', Rule::unique('users')->ignore($user->id)],
+            'email' => ['sometimes', 'email', 'max:255'],
             'phone_number' => ['nullable', 'string', 'max:20'],
             'phone' => ['nullable', 'string', 'max:20'],
             'role' => ['sometimes', Rule::in(['admin', 'customer'])],
             'status' => ['sometimes', Rule::in(['active', 'inactive', 'banned'])],
             'password' => ['nullable', 'string', 'min:8', 'confirmed'],
-        ])->validate();
+        ]);
+        $validator->after(function ($validator) use ($payload, $user) {
+            $email = strtolower(trim((string) ($payload['email'] ?? '')));
+            if (
+                $email !== ''
+                && filter_var($email, FILTER_VALIDATE_EMAIL)
+                && DB::table('users')
+                    ->whereRaw('LOWER(email) = ?', [$email])
+                    ->where('id', '!=', $user->id)
+                    ->exists()
+            ) {
+                $validator->errors()->add('email', 'This email is already registered.');
+            }
+        });
+        $validated = $validator->validate();
 
         $validated = $this->normalizeValidatedData($validated);
 
@@ -184,7 +221,24 @@ class UserController extends Controller
             unset($validated['password']);
         }
 
-        $user->update($validated);
+        try {
+            $user->update($validated);
+        } catch (QueryException $exception) {
+            if (
+                empty($validated['email'])
+                || !DB::table('users')
+                    ->whereRaw('LOWER(email) = ?', [$validated['email']])
+                    ->where('id', '!=', $user->id)
+                    ->exists()
+            ) {
+                throw $exception;
+            }
+
+            return response()->json([
+                'success' => false,
+                'message' => 'This email is already registered.',
+            ], 409);
+        }
 
         return response()->json([
             'success' => true,
