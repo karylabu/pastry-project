@@ -336,6 +336,7 @@ class StaffApiController extends Controller
         $filters = $request->validate([
             'start_date' => ['sometimes', 'required_with:end_date', 'date_format:Y-m-d'],
             'end_date' => ['sometimes', 'required_with:start_date', 'date_format:Y-m-d', 'after_or_equal:start_date'],
+            'category' => ['sometimes', 'string', 'max:100'],
         ]);
 
         $query = DB::table('orders')->whereNotNull('created_at');
@@ -344,6 +345,42 @@ class StaffApiController extends Controller
                 $filters['start_date'].' 00:00:00',
                 $filters['end_date'].' 23:59:59',
             ]);
+        }
+
+        $category = trim($filters['category'] ?? '');
+        if ($category !== '') {
+            if (strcasecmp($category, 'Customized Cakes') === 0) {
+                $customOrderTables = array_values(array_filter(
+                    ['customized_cake_orders', 'custom_cake_orders'],
+                    fn (string $table): bool => Schema::hasTable($table)
+                ));
+
+                $query->where(function ($categoryQuery) use ($customOrderTables) {
+                    foreach ($customOrderTables as $table) {
+                        $categoryQuery->orWhereExists(function ($customOrders) use ($table) {
+                            $customOrders->selectRaw('1')
+                                ->from($table)
+                                ->whereColumn($table.'.order_id', 'orders.id');
+                        });
+                    }
+
+                    if (!$customOrderTables) {
+                        $categoryQuery->whereRaw('1 = 0');
+                    }
+                });
+            } elseif (strcasecmp($category, 'Imported Sales') === 0) {
+                $query->whereRaw('1 = 0');
+            } elseif (Schema::hasTable('order_items') && Schema::hasTable('products')) {
+                $query->whereExists(function ($categoryOrders) use ($category) {
+                    $categoryOrders->selectRaw('1')
+                        ->from('order_items as peak_category_items')
+                        ->join('products as peak_category_products', 'peak_category_products.id', '=', 'peak_category_items.product_id')
+                        ->whereColumn('peak_category_items.order_id', 'orders.id')
+                        ->whereRaw('LOWER(TRIM(peak_category_products.category)) = ?', [strtolower($category)]);
+                });
+            } else {
+                $query->whereRaw('1 = 0');
+            }
         }
 
         $matrix = array_fill(0, 7, array_fill(0, 24, 0));

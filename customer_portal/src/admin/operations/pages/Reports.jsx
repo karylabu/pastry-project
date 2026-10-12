@@ -437,6 +437,7 @@ export default function Reports() {
       params.set('start_date', toDateString(start));
       params.set('end_date', toDateString(end));
     }
+    if (analyticsCategory) params.set('category', analyticsCategory);
 
     setHeatmapLoading(true);
     setHeatmapError('');
@@ -464,7 +465,7 @@ export default function Reports() {
       });
 
     return () => { isCurrentRequest = false; };
-  }, [range, dateFilterStart, dateFilterEnd, orderRefreshKey]);
+  }, [range, dateFilterStart, dateFilterEnd, analyticsCategory, orderRefreshKey]);
 
   useEffect(() => {
     const params = new URLSearchParams({ page: String(salesPage), per_page: String(REPORT_ROWS_PER_PAGE) });
