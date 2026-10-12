@@ -188,7 +188,7 @@ export default function StaffAdminLogin() {
                           onChange={(event) => setPassword(event.target.value)}
                           required
                           placeholder="Enter your password"
-                          className="admin-input h-full w-full bg-transparent text-sm"
+                          className="admin-input admin-password-input h-full w-full bg-transparent text-sm"
                         />
                         <button
                           type="button"

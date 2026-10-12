@@ -629,7 +629,7 @@ export default function UserManagement() {
                 <div>
                   <label className="mb-1.5 block text-[11px] font-medium text-[#65574d]">Password</label>
                   <div className="flex h-10 items-center rounded-md border border-[#e8dfd4] bg-white pr-3 transition focus-within:border-[#b89646] focus-within:ring-2 focus-within:ring-[#d4af37]/15">
-                    <input type={showPassword ? "text" : "password"} value={form.password} onChange={(event) => setForm({ ...form, password: event.target.value })} className="h-full min-w-0 flex-1 rounded-md bg-transparent px-3 text-[12px] text-[#33251e] outline-none" />
+                    <input type={showPassword ? "text" : "password"} value={form.password} onChange={(event) => setForm({ ...form, password: event.target.value })} className="admin-password-input h-full min-w-0 flex-1 rounded-md bg-transparent px-3 text-[12px] text-[#33251e] outline-none" />
                     <button type="button" onClick={() => setShowPassword((visible) => !visible)} className="text-[#8f8076] transition hover:text-[#33251e]" aria-label={showPassword ? "Hide password" : "Show password"}>
                       {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                     </button>
@@ -641,7 +641,7 @@ export default function UserManagement() {
               <div>
                 <label className="mb-1.5 block text-[11px] font-medium text-[#65574d]">Confirm Password</label>
                 <div className="flex h-10 items-center rounded-md border border-[#e8dfd4] bg-white pr-3 transition focus-within:border-[#b89646] focus-within:ring-2 focus-within:ring-[#d4af37]/15">
-                  <input type={showPasswordConfirmation ? "text" : "password"} value={form.password_confirmation} onChange={(event) => setForm({ ...form, password_confirmation: event.target.value })} className="h-full min-w-0 flex-1 rounded-md bg-transparent px-3 text-[12px] text-[#33251e] outline-none" />
+                  <input type={showPasswordConfirmation ? "text" : "password"} value={form.password_confirmation} onChange={(event) => setForm({ ...form, password_confirmation: event.target.value })} className="admin-password-input h-full min-w-0 flex-1 rounded-md bg-transparent px-3 text-[12px] text-[#33251e] outline-none" />
                   <button type="button" onClick={() => setShowPasswordConfirmation((visible) => !visible)} className="text-[#8f8076] transition hover:text-[#33251e]" aria-label={showPasswordConfirmation ? "Hide confirm password" : "Show confirm password"}>
                     {showPasswordConfirmation ? <EyeOff size={16} /> : <Eye size={16} />}
                   </button>

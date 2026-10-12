@@ -2,6 +2,11 @@
 @tailwind components;
 @tailwind utilities;
 
+input.admin-password-input::-ms-reveal,
+input.admin-password-input::-ms-clear {
+  display: none;
+}
+
 /* 1. Global Base Styles - DM Sans as primary font */
 @layer base {
   html, body {

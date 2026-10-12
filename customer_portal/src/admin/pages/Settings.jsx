@@ -50,7 +50,7 @@ function Field({ label, value, onChange, type = "text", placeholder = "" }) {
     <label className="block">
       <span className="text-[10px] font-semibold text-[#65574d]">{label}</span>
       <span className="mt-1.5 flex h-10 w-full items-center rounded-md border border-[#e8dfd4] bg-white transition focus-within:border-[#b89646] focus-within:ring-2 focus-within:ring-[#d4af37]/15">
-        <input type={isPassword && showPassword ? "text" : type} value={value} onChange={onChange} placeholder={placeholder} className="h-full min-w-0 flex-1 rounded-md bg-transparent px-3 text-[12px] text-[#33251e] outline-none placeholder:text-[#a99a8e]" />
+        <input type={isPassword && showPassword ? "text" : type} value={value} onChange={onChange} placeholder={placeholder} className={`${isPassword ? "admin-password-input" : ""} h-full min-w-0 flex-1 rounded-md bg-transparent px-3 text-[12px] text-[#33251e] outline-none placeholder:text-[#a99a8e]`} />
         {isPassword && (
           <button type="button" onClick={() => setShowPassword((visible) => !visible)} className="mr-3 text-[#8f8076] transition hover:text-[#33251e]" aria-label={`${showPassword ? "Hide" : "Show"} ${label.toLowerCase()}`}>
             {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
