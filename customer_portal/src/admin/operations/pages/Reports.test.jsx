@@ -1,4 +1,4 @@
-import { filterImportedTransactions, filterSalesTransactions, groupRevenueByInterval } from "./Reports";
+import { filterImportedTransactions, filterSalesTransactions, getAnalyticsDateRange, groupRevenueByInterval } from "./Reports";
 
 const sales = [
   { date: "2026-10-05", revenue: 100, orders: 2 },
@@ -33,6 +33,36 @@ describe("groupRevenueByInterval", () => {
     expect(groupRevenueByInterval(sales, "all")).toEqual([
       { date: "All time", revenue: 500, orders: 9 },
     ]);
+  });
+});
+
+describe("getAnalyticsDateRange", () => {
+  const now = new Date(2026, 9, 12, 21, 0, 0);
+
+  test("uses the selected day, week, or month for analytics requests", () => {
+    expect(getAnalyticsDateRange("today", "", "", now)).toEqual({
+      start_date: "2026-10-12",
+      end_date: "2026-10-12",
+    });
+    expect(getAnalyticsDateRange("week", "", "", now)).toEqual({
+      start_date: "2026-10-12",
+      end_date: "2026-10-12",
+    });
+    expect(getAnalyticsDateRange("month", "", "", now)).toEqual({
+      start_date: "2026-10-01",
+      end_date: "2026-10-12",
+    });
+  });
+
+  test("preserves a custom date range and gives All an end date", () => {
+    expect(getAnalyticsDateRange("month", "2026-09-02", "2026-09-18", now)).toEqual({
+      start_date: "2026-09-02",
+      end_date: "2026-09-18",
+    });
+    expect(getAnalyticsDateRange("all", "", "", now)).toEqual({
+      all: true,
+      end_date: "2026-10-12",
+    });
   });
 });
 

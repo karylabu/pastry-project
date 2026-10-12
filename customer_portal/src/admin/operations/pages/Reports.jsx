@@ -102,6 +102,36 @@ export function groupRevenueByInterval(rows, interval) {
     .map(([, bucket]) => bucket);
 }
 
+export function getAnalyticsDateRange(range, startDate = '', endDate = '', now = new Date()) {
+  const formatDate = (date) => [
+    date.getFullYear(),
+    String(date.getMonth() + 1).padStart(2, '0'),
+    String(date.getDate()).padStart(2, '0'),
+  ].join('-');
+
+  if (startDate && endDate) {
+    return { start_date: startDate, end_date: endDate };
+  }
+
+  const end = new Date(now);
+  const start = new Date(now);
+  if (range === 'all') {
+    return { all: true, end_date: formatDate(end) };
+  }
+  if (range === 'today') {
+    return { start_date: formatDate(start), end_date: formatDate(end) };
+  }
+  if (range === 'week') {
+    start.setDate(start.getDate() - ((start.getDay() + 6) % 7));
+  } else if (range === 'month') {
+    start.setDate(1);
+  } else {
+    start.setDate(start.getDate() - Math.max(1, Number(range)) + 1);
+  }
+
+  return { start_date: formatDate(start), end_date: formatDate(end) };
+}
+
 export function filterSalesTransactions(orders, products, category) {
   const completedOrders = orders.filter((order) => String(order.status || '').trim().toLowerCase() === 'completed');
   if (!category) return completedOrders;
@@ -374,6 +404,7 @@ export default function Reports() {
   const [ingredientsPage, setIngredientsPage] = useState(1);
   const [checked,       setChecked]       = useState({});
   const [analytics, setAnalytics] = useState(null);
+  const [analyticsLoading, setAnalyticsLoading] = useState(true);
   const [analyticsError, setAnalyticsError] = useState('');
   const [analyticsProductId, setAnalyticsProductId] = useState('');
   const [analyticsCategory, setAnalyticsCategory] = useState('');
@@ -566,41 +597,33 @@ export default function Reports() {
 
   useEffect(() => {
     const params = new URLSearchParams();
-    if (dateFilterStart && dateFilterEnd) {
-      params.set('start_date', dateFilterStart);
-      params.set('end_date', dateFilterEnd);
-    } else if (range === 'all') {
-      params.set('all', '1');
-      params.set('end_date', new Date().toISOString().slice(0, 10));
-    } else {
-      const start = new Date();
-      if (range === 'today') {
-        // keep today's date
-      } else if (range === 'week') {
-        start.setDate(start.getDate() - ((start.getDay() + 6) % 7));
-      } else if (range === 'month') {
-        start.setDate(1);
-      } else if (range !== 'all') {
-        start.setDate(start.getDate() - Math.max(1, Number(range)) + 1);
-      }
-      params.set('start_date', start.toISOString().slice(0, 10));
-      params.set('end_date', new Date().toISOString().slice(0, 10));
-    }
+    const dateRange = getAnalyticsDateRange(range, dateFilterStart, dateFilterEnd);
+    if (dateRange.all) params.set('all', '1');
+    if (dateRange.start_date) params.set('start_date', dateRange.start_date);
+    params.set('end_date', dateRange.end_date);
     if (analyticsProductId) params.set('product_id', analyticsProductId);
     if (analyticsCategory) params.set('category', analyticsCategory);
     if (analyticsIngredientId) params.set('ingredient_id', analyticsIngredientId);
     if (analyticsMovementType) params.set('movement_type', analyticsMovementType);
+    let isCurrentRequest = true;
+    setAnalyticsLoading(true);
     setAnalyticsError('');
     staffFetch(`${STAFF_BASE}/api_business_analytics.php?${params.toString()}`)
       .then(async (res) => {
         const data = await res.json().catch(() => ({}));
         if (!res.ok || !data.success) throw new Error(data.message || 'Unable to load business analytics.');
-        setAnalytics(data);
+        if (isCurrentRequest) setAnalytics(data);
       })
       .catch((error) => {
+        if (!isCurrentRequest) return;
         setAnalytics(null);
         setAnalyticsError(error.message || 'Unable to load business analytics.');
+      })
+      .finally(() => {
+        if (isCurrentRequest) setAnalyticsLoading(false);
       });
+
+    return () => { isCurrentRequest = false; };
   }, [range, dateFilterStart, dateFilterEnd, analyticsProductId, analyticsCategory, analyticsIngredientId, analyticsMovementType, analyticsRefreshKey]);
 
   const normalizeStatus = status => String(status || '').trim().toLowerCase();
@@ -753,6 +776,9 @@ export default function Reports() {
     (visibleRevenueDayPage - 1) * REVENUE_DAYS_PER_PAGE,
     visibleRevenueDayPage * REVENUE_DAYS_PER_PAGE
   );
+  const revenuePeriodLabel = dateFilterStart && dateFilterEnd
+    ? `${dateFilterStart} to ${dateFilterEnd}`
+    : ({ today: 'Today', week: 'This week', month: 'This month', all: 'All time' }[range] || `Last ${range} days`);
 
   const exportReport = () => {
     const title = 'Pastry Project - Business Analytics Report';
@@ -924,18 +950,18 @@ export default function Reports() {
           <div className="mb-5 grid grid-cols-1 gap-2.5 sm:grid-cols-2 xl:grid-cols-4">
             <StatCard
               title="Total Revenue" icon={DollarSign} color={C.violet} soft={C.violetSoft}
-              value={analytics ? peso(analytics.summary.revenue) : '—'}
-              sub={analytics ? `${analytics.filters.start_date} to ${analytics.filters.end_date}` : 'Analytics unavailable'}
+              value={analyticsLoading ? '…' : analytics ? peso(analytics.summary.revenue) : '—'}
+              sub={analyticsLoading ? `${revenuePeriodLabel} · updating` : analytics ? `${analytics.filters.start_date} to ${analytics.filters.end_date}` : 'Analytics unavailable'}
             />
             <StatCard
               title="Orders Processed" icon={Package} color="#68815d" soft="#eef5e9"
-              value={analytics ? fmt(analytics.summary.orders) : '—'}
-              sub={analytics ? 'completed transactions' : 'Analytics unavailable'}
+              value={analyticsLoading ? '…' : analytics ? fmt(analytics.summary.orders) : '—'}
+              sub={analyticsLoading ? `${revenuePeriodLabel} · updating` : analytics ? `${revenuePeriodLabel} · completed transactions` : 'Analytics unavailable'}
             />
             <StatCard
               title="Avg. Order Value" icon={Wallet} color="#000000" soft="#fff4cd"
-              value={analytics?.summary?.average_order_value == null ? '—' : peso(analytics.summary.average_order_value)}
-              sub={analytics ? 'Total revenue ÷ completed orders' : 'Analytics unavailable'}
+              value={analyticsLoading ? '…' : analytics?.summary?.average_order_value == null ? '—' : peso(analytics.summary.average_order_value)}
+              sub={analyticsLoading ? `${revenuePeriodLabel} · updating` : analytics ? `${revenuePeriodLabel} · revenue ÷ completed orders` : 'Analytics unavailable'}
             />
             <StatCard
               title="Order Fulfillment" icon={AlertTriangle} color="#000000" soft="#fff4cd"
@@ -1058,7 +1084,8 @@ export default function Reports() {
                       ].map(([label, amount]) => (
                         <div key={label} className="rounded-md bg-[#fffaf0] px-3 py-2">
                           <p className="text-[10px] text-black/55">{label}</p>
-                          <p className="text-sm font-bold text-black">{peso(Number(amount || 0))}</p>
+                          <p className="text-sm font-bold text-black">{analyticsLoading ? '…' : peso(Number(amount || 0))}</p>
+                          <p className="mt-0.5 text-[9px] text-black/45">{revenuePeriodLabel}</p>
                         </div>
                       ))}
                     </div>
