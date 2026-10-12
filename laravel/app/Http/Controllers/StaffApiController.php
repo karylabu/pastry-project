@@ -376,7 +376,12 @@ class StaffApiController extends Controller
                         ->from('order_items as peak_category_items')
                         ->join('products as peak_category_products', 'peak_category_products.id', '=', 'peak_category_items.product_id')
                         ->whereColumn('peak_category_items.order_id', 'orders.id')
-                        ->whereRaw('LOWER(TRIM(peak_category_products.category)) = ?', [strtolower($category)]);
+                        ->whereRaw(
+                            strcasecmp($category, 'Finished Products') === 0
+                                ? "LOWER(TRIM(peak_category_products.category)) LIKE '%cake%'"
+                                : 'LOWER(TRIM(peak_category_products.category)) = ?',
+                            strcasecmp($category, 'Finished Products') === 0 ? [] : [strtolower($category)]
+                        );
                 });
             } else {
                 $query->whereRaw('1 = 0');

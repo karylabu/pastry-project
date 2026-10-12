@@ -49,7 +49,7 @@ class PeakOrderingTimesTest extends TestCase
             ->assertJsonPath('matrix.0.9', 0);
     }
 
-    public function test_it_filters_peak_times_by_product_category(): void
+    public function test_finished_products_peak_times_include_cake_products(): void
     {
         $cakeId = DB::table('products')->insertGetId(['name' => 'Chocolate Cake', 'category' => 'Cakes']);
         $breadId = DB::table('products')->insertGetId(['name' => 'Bread', 'category' => 'Bread']);
@@ -65,11 +65,24 @@ class PeakOrderingTimesTest extends TestCase
         DB::table('customized_cake_orders')->insert(['order_id' => 3]);
 
         $this->actingAs($this->adminUser)
-            ->getJson('http://localhost/api/admin/reports/peak-ordering-times?start_date=2026-10-12&end_date=2026-10-12&category=Cakes')
+            ->getJson('http://localhost/api/admin/reports/peak-ordering-times?start_date=2026-10-12&end_date=2026-10-12&category=Finished%20Products')
             ->assertSuccessful()
             ->assertJsonPath('total_orders', 1)
             ->assertJsonPath('matrix.1.9', 1)
             ->assertJsonPath('matrix.1.10', 0);
+    }
+
+    public function test_imported_sales_peak_times_exclude_system_orders(): void
+    {
+        $cakeId = DB::table('products')->insertGetId(['name' => 'Chocolate Cake', 'category' => 'Cakes']);
+        DB::table('orders')->insert(['id' => 1, 'created_at' => '2026-10-12 09:15:00']);
+        DB::table('order_items')->insert(['order_id' => 1, 'product_id' => $cakeId]);
+
+        $this->actingAs($this->adminUser)
+            ->getJson('http://localhost/api/admin/reports/peak-ordering-times?start_date=2026-10-12&end_date=2026-10-12&category=Imported%20Sales')
+            ->assertSuccessful()
+            ->assertJsonPath('total_orders', 0)
+            ->assertJsonPath('matrix.1.9', 0);
     }
 
     public function test_it_filters_peak_times_to_customized_cake_orders(): void

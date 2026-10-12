@@ -677,16 +677,7 @@ export default function Reports() {
   }, [completedOrds]);
 
   const cakeProducts = products.filter((product) => String(product.category || '').toLowerCase().includes('cake'));
-  const cakeCategories = [...new Set(cakeProducts.map((product) => product.category).filter(Boolean))];
-  if (!cakeCategories.some((category) => String(category).toLowerCase() === 'customized cakes')) {
-    cakeCategories.push('Customized Cakes');
-  }
-  if (!cakeCategories.some((category) => String(category).toLowerCase() === 'finished products')) {
-    cakeCategories.push('Finished Products');
-  }
-  if (!cakeCategories.some((category) => String(category).toLowerCase() === 'imported sales')) {
-    cakeCategories.push('Imported Sales');
-  }
+  const cakeCategories = ['Customized Cakes', 'Finished Products', 'Imported Sales'];
 
   const allProductSales = useMemo(() => {
     return products.map(p => ({
