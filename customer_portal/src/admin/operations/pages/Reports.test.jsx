@@ -1,4 +1,4 @@
-import { filterImportedTransactions, filterSalesTransactions, getAnalyticsDateRange, groupRevenueByInterval, selectReportIngredients } from "./Reports";
+import { filterImportedTransactions, filterSalesTransactions, getAnalyticsDateRange, groupRevenueByInterval, normalizeReportProducts, selectReportIngredients } from "./Reports";
 
 const sales = [
   { date: "2026-10-05", revenue: 100, orders: 2 },
@@ -81,6 +81,21 @@ describe("selectReportIngredients", () => {
     ], [
       { ingredient_id: 12, ingredient: "Flour", unit: "kg", stock: 8, threshold: 2 },
     ]).map((ingredient) => ingredient.name)).toEqual(["Sugar"]);
+  });
+});
+
+describe("normalizeReportProducts", () => {
+  test("accepts the raw array returned by the staff products API", () => {
+    expect(normalizeReportProducts([{ id: 1, name: "Chocolate Cake" }])).toEqual([
+      { id: 1, name: "Chocolate Cake" },
+    ]);
+  });
+
+  test("accepts a wrapped products response and rejects invalid payloads", () => {
+    expect(normalizeReportProducts({ products: [{ id: 2, name: "Vanilla Cake" }] })).toEqual([
+      { id: 2, name: "Vanilla Cake" },
+    ]);
+    expect(normalizeReportProducts({ products: null })).toBeNull();
   });
 });
 

@@ -83,6 +83,11 @@ export function selectReportIngredients(primaryIngredients, analyticsInventory =
     .filter((ingredient) => ingredient.id > 0 && ingredient.name);
 }
 
+export function normalizeReportProducts(response) {
+  if (Array.isArray(response)) return response;
+  return Array.isArray(response?.products) ? response.products : null;
+}
+
 export function groupRevenueByInterval(rows, interval) {
   const buckets = new Map();
   rows.forEach((row) => {
@@ -449,7 +454,12 @@ export default function Reports() {
     let isCurrentRequest = true;
     const fetchReportData = async (url, label) => {
       const response = await laravelStaffFetch(url);
-      const data = await response.json().catch(() => ({}));
+      let data;
+      try {
+        data = await response.json();
+      } catch {
+        throw new Error(`${label} API returned a non-JSON response (HTTP ${response.status}).`);
+      }
       if (!response.ok || data?.success === false) {
         throw new Error(data?.message || `Unable to load ${label}.`);
       }
@@ -498,10 +508,11 @@ export default function Reports() {
       fetchReportData(`${LARAVEL_BASE}/api/staff/inventory/ingredients`, 'ingredients'),
     ]).then(([productsResponse, ingredientsResponse]) => {
       if (!isCurrentRequest) return;
-      if (!Array.isArray(productsResponse?.products) || !Array.isArray(ingredientsResponse?.ingredients)) {
-        throw new Error('The inventory API returned an invalid response.');
+      const reportProducts = normalizeReportProducts(productsResponse);
+      if (!Array.isArray(reportProducts) || !Array.isArray(ingredientsResponse?.ingredients)) {
+        throw new Error('The product or ingredient API returned an invalid response.');
       }
-      setProducts(productsResponse.products);
+      setProducts(reportProducts);
       setIngredientsRaw(ingredientsResponse.ingredients);
       setCatalogLoadError('');
     }).catch((error) => {
@@ -613,7 +624,12 @@ export default function Reports() {
     let isCurrentRequest = true;
     laravelStaffFetch(`${LARAVEL_BASE}/api/sales/import/history?${params.toString()}`)
       .then(async (response) => {
-        const data = await response.json();
+        let data;
+        try {
+          data = await response.json();
+        } catch {
+          throw new Error(`Sales import history returned a non-JSON response (HTTP ${response.status}).`);
+        }
         if (!response.ok || !data.success) throw new Error(data.message || 'Unable to load imported sales history.');
         if (!isCurrentRequest) return;
         setHistoricalSales(Array.isArray(data.sales) ? data.sales : []);

@@ -477,34 +477,24 @@ class SalesImportController extends Controller
             'sales_type' => $row->sales_type,
             'import_id' => $row->import_id === null ? null : (int) $row->import_id,
         ], $history->items());
-        $imports = DB::table('analytics_imports as imports')
-            ->leftJoinSub(
-                DB::table('analytics_sales_history')
-                    ->select('import_id')
-                    ->selectRaw('COUNT(*) AS records, COALESCE(SUM(units_sold), 0) AS items_sold, COALESCE(SUM(revenue), 0) AS revenue')
-                    ->groupBy('import_id'),
-                'history_totals',
-                'history_totals.import_id',
-                '=',
-                'imports.id'
-            )
-            ->where('imports.source_name', 'POS CSV')
-            ->whereRaw('LOWER(imports.file_name) LIKE ?', ['%.csv'])
-            ->orderByDesc('imports.uploaded_at')
-            ->get([
-                'imports.id',
-                'imports.file_name',
-                'imports.sales_type',
-                'imports.uploaded_at',
-                'imports.status',
-                'imports.rows_received',
-                'imports.rows_processed',
-                'imports.error_message',
-                DB::raw('COALESCE(history_totals.records, 0) AS records'),
-                DB::raw('COALESCE(history_totals.items_sold, 0) AS items_sold'),
-                DB::raw('COALESCE(history_totals.revenue, 0) AS revenue'),
-            ])
-            ->map(static fn ($import) => [
+        $imports = DB::table('analytics_imports')
+            ->where('source_name', 'POS CSV')
+            ->whereRaw('LOWER(file_name) LIKE ?', ['%.csv'])
+            ->orderByDesc('uploaded_at')
+            ->get();
+        $importTotals = $imports->isEmpty()
+            ? collect()
+            : DB::table('analytics_sales_history')
+                ->whereIn('import_id', $imports->pluck('id'))
+                ->select('import_id')
+                ->selectRaw('COUNT(*) AS records, COALESCE(SUM(units_sold), 0) AS items_sold, COALESCE(SUM(revenue), 0) AS revenue')
+                ->groupBy('import_id')
+                ->get()
+                ->keyBy('import_id');
+        $imports = $imports->map(static function ($import) use ($importTotals) {
+            $totals = $importTotals->get($import->id);
+
+            return [
                 'id' => (int) $import->id,
                 'file_name' => $import->file_name,
                 'sales_type' => $import->sales_type,
@@ -513,10 +503,11 @@ class SalesImportController extends Controller
                 'rows_received' => (int) $import->rows_received,
                 'rows_processed' => (int) $import->rows_processed,
                 'error_message' => $import->error_message,
-                'records' => (int) $import->records,
-                'items_sold' => (float) $import->items_sold,
-                'revenue' => (float) $import->revenue,
-            ]);
+                'records' => (int) ($totals->records ?? 0),
+                'items_sold' => (float) ($totals->items_sold ?? 0),
+                'revenue' => (float) ($totals->revenue ?? 0),
+            ];
+        });
 
         return response()->json([
             'success' => true,
