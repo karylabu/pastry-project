@@ -75,4 +75,57 @@
     order: initial;
   }
 
+  .home-sections-layout .home-best-sellers-grid {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+
+  .home-sections-layout .home-curated-grid {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    padding: 0.75rem;
+  }
+
+  .home-sections-layout .home-curated {
+    padding: 0;
+  }
+
+  .home-sections-layout .home-curated-heading {
+    margin: 0;
+    padding: 0.75rem 1rem;
+  }
+
+  .home-sections-layout .home-recommendation-card {
+    min-height: 250px;
+    padding: 0.5rem;
+  }
+
+  .home-sections-layout .home-recommendation-image {
+    height: 124px;
+    padding: 0.5rem;
+  }
+
+  .home-sections-layout .home-recommendation-image img {
+    width: auto !important;
+    height: 112px !important;
+    max-width: 85% !important;
+    max-height: 112px !important;
+  }
+
+  .home-sections-layout .home-recommendation-title {
+    min-height: 2.25rem;
+    font-size: 11px;
+  }
+
+  .home-sections-layout .home-recommendation-price {
+    font-size: 11px;
+  }
+
+  .home-sections-layout .home-recommendation-options button {
+    padding: 0.25rem 0.375rem;
+    font-size: 8px;
+  }
+
+  .home-sections-layout .home-recommendation-add {
+    height: 28px;
+    font-size: 8px;
+  }
 }
