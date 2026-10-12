@@ -162,25 +162,22 @@ foreach (array_merge($historicalRows, array_map(static fn ($row) => $row + ['sou
     $revenueAmount = (float) $historical['revenue'];
     $productIdForSale = 0;
     $salesType = (string) ($historical['sales_type'] ?? 'other');
-    $productCategory = ($historical['source'] ?? '') === 'legacy'
-        ? 'Imported Sales'
-        : match ($salesType) {
-            'customized_cake' => 'Customized Cakes',
-            'finished_product' => 'Finished Products',
-            default => 'Imported Sales',
-        };
+    $matchedProductCategory = '';
     foreach ($productsRows as $productRow) {
         if (strcasecmp(trim((string) $productRow['name']), $name) === 0) {
             $productIdForSale = (int) $productRow['id'];
+            $matchedProductCategory = (string) $productRow['category'];
             break;
         }
     }
+    $isRegularCake = analyticsIsCakeCategory($matchedProductCategory);
+    $productCategory = $salesType === 'customized_cake'
+        ? 'Customized Cakes'
+        : (($salesType === 'finished_product' || $isRegularCake)
+            ? 'Finished Products'
+            : 'Imported Sales');
     if ($productId > 0 && $productIdForSale !== $productId) continue;
-    if (
-        $category !== ''
-        && !(strcasecmp($category, 'Imported Sales') === 0)
-        && strcasecmp($productCategory, $category) !== 0
-    ) continue;
+    if ($category !== '' && strcasecmp($productCategory, $category) !== 0) continue;
 
     $recordCount = (int) ($historical['record_count'] ?? 1);
     $historicalRecords += $recordCount;
