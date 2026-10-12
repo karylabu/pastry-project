@@ -391,6 +391,8 @@ export default function Reports() {
   const [heatmapLoading, setHeatmapLoading] = useState(true);
   const [heatmapError, setHeatmapError] = useState('');
   const [loading,       setLoading]       = useState(true);
+  const [ordersLoadError, setOrdersLoadError] = useState('');
+  const [catalogLoadError, setCatalogLoadError] = useState('');
   const [range,         setRange]         = useState('week');
   const [interval,      setInterval]      = useState('weekly');
   const [dateFilterStart, setDateFilterStart] = useState('');
@@ -427,12 +429,24 @@ export default function Reports() {
   };
 
   useEffect(() => {
-    Promise.all([
-      staffFetch(`${STAFF_BASE}/api_orders.php`).then(r => r.json()).catch(() => []),
-      staffFetch(`${STAFF_BASE}/api_orders.php?custom=1`).then(r => r.json()).catch(() => []),
-      laravelStaffFetch(`${LARAVEL_BASE}/api/staff/products?action=list`).then(r => r.json()).catch(() => []),
-      laravelStaffFetch(`${LARAVEL_BASE}/api/staff/inventory/ingredients`).then(r => r.json()).catch(() => ({ ingredients: [] })),
-    ]).then(([ord, customOrders, prod, ingRes]) => {
+    let isCurrentRequest = true;
+    const fetchReportData = async (url, label) => {
+      const response = await laravelStaffFetch(url);
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || data?.success === false) {
+        throw new Error(data?.message || `Unable to load ${label}.`);
+      }
+      return data;
+    };
+
+    const ordersRequest = Promise.all([
+      fetchReportData(`${LARAVEL_BASE}/api/staff/orders`, 'orders'),
+      fetchReportData(`${LARAVEL_BASE}/api/staff/orders?custom=1`, 'custom cake orders'),
+    ]).then(([ordersResponse, customOrdersResponse]) => {
+      if (!isCurrentRequest) return;
+      if (!Array.isArray(ordersResponse?.orders) || !Array.isArray(customOrdersResponse?.orders)) {
+        throw new Error('The orders API returned an invalid response.');
+      }
       const normalizeOrder = (order, isCustomized = false) => {
         let items = typeof order.items === 'string' ? JSON.parse(order.items) : order.items || [];
         if (isCustomized && items.length === 0) {
@@ -451,14 +465,40 @@ export default function Reports() {
         return { ...order, is_customized: isCustomized, items };
       };
       const parsed = [
-        ...(Array.isArray(ord) ? ord.map((order) => normalizeOrder(order)) : []),
-        ...(Array.isArray(customOrders) ? customOrders.map((order) => normalizeOrder(order, true)) : []),
+        ...ordersResponse.orders.map((order) => normalizeOrder(order)),
+        ...customOrdersResponse.orders.map((order) => normalizeOrder(order, true)),
       ];
       setOrders(parsed);
-      setProducts(Array.isArray(prod) ? prod : []);
-      setIngredientsRaw(Array.isArray(ingRes?.ingredients) ? ingRes.ingredients : []);
-      setLoading(false);
+      setOrdersLoadError('');
+    }).catch((error) => {
+      if (!isCurrentRequest) return;
+      setOrders([]);
+      setOrdersLoadError(error.message || 'Unable to load sales transaction data.');
     });
+
+    const catalogRequest = Promise.all([
+      fetchReportData(`${LARAVEL_BASE}/api/staff/products?action=list`, 'products'),
+      fetchReportData(`${LARAVEL_BASE}/api/staff/inventory/ingredients`, 'ingredients'),
+    ]).then(([productsResponse, ingredientsResponse]) => {
+      if (!isCurrentRequest) return;
+      if (!Array.isArray(productsResponse?.products) || !Array.isArray(ingredientsResponse?.ingredients)) {
+        throw new Error('The inventory API returned an invalid response.');
+      }
+      setProducts(productsResponse.products);
+      setIngredientsRaw(ingredientsResponse.ingredients);
+      setCatalogLoadError('');
+    }).catch((error) => {
+      if (!isCurrentRequest) return;
+      setProducts([]);
+      setIngredientsRaw([]);
+      setCatalogLoadError(error.message || 'Unable to load sales report filters.');
+    });
+
+    Promise.all([ordersRequest, catalogRequest]).finally(() => {
+      if (isCurrentRequest) setLoading(false);
+    });
+
+    return () => { isCurrentRequest = false; };
   }, [orderRefreshKey]);
 
   useEffect(() => {
@@ -541,25 +581,9 @@ export default function Reports() {
   useEffect(() => {
     const params = new URLSearchParams({ page: String(salesPage), per_page: String(REPORT_ROWS_PER_PAGE) });
     if (analyticsCategory) params.set('category', analyticsCategory);
-    if (dateFilterStart && dateFilterEnd) {
-      params.set('start_date', dateFilterStart);
-      params.set('end_date', dateFilterEnd);
-    } else if (range === 'all') {
-      params.set('end_date', new Date().toISOString().slice(0, 10));
-    } else {
-      const start = new Date();
-      if (range === 'today') {
-        // keep today's date
-      } else if (range === 'week') {
-        start.setDate(start.getDate() - ((start.getDay() + 6) % 7));
-      } else if (range === 'month') {
-        start.setDate(1);
-      } else if (range !== 'all') {
-        start.setDate(start.getDate() - Math.max(1, Number(range)) + 1);
-      }
-      params.set('start_date', start.toISOString().slice(0, 10));
-      params.set('end_date', new Date().toISOString().slice(0, 10));
-    }
+    const dateRange = getAnalyticsDateRange(range, dateFilterStart, dateFilterEnd);
+    if (dateRange.start_date) params.set('start_date', dateRange.start_date);
+    params.set('end_date', dateRange.end_date);
 
     let isCurrentRequest = true;
     laravelStaffFetch(`${LARAVEL_BASE}/api/sales/import/history?${params.toString()}`)
@@ -1217,6 +1241,8 @@ export default function Reports() {
                   </div>
                   <span className="text-[11px] text-black/55">{salesTransactionOrders.length + Number(historicalSalesSummary.records || 0)} sales in period</span>
                 </div>
+                {ordersLoadError && <p className="mb-3 rounded-md bg-red-50 px-3 py-2 text-xs text-red-800" role="alert">Unable to load sales transactions: {ordersLoadError}</p>}
+                {catalogLoadError && <p className="mb-3 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-800" role="alert">Some sales filters may be incomplete: {catalogLoadError}</p>}
                 {historicalSalesError && <p className="mb-3 rounded-md bg-red-50 px-3 py-2 text-xs text-red-800" role="alert">{historicalSalesError}</p>}
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm border-separate border-spacing-y-1">
@@ -1232,7 +1258,7 @@ export default function Reports() {
                     </thead>
                     <tbody>
                       {salesTransactionOrders.length === 0 && historicalVisibleSales.length === 0 ? (
-                        <tr><td colSpan={6} className="px-4 py-10 text-center text-black/50">No completed orders match the selected filters.</td></tr>
+                        <tr><td colSpan={6} className="px-4 py-10 text-center text-black/50">{ordersLoadError || historicalSalesError ? "Sales transaction records could not be loaded." : "No completed orders match the selected filters."}</td></tr>
                       ) : <>
                         {salesOrdersOnPage.map((o) => {
                         const itemsText = Array.isArray(o.items) && o.items.length
