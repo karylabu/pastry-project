@@ -1298,19 +1298,20 @@ export default function Dashboard({ onAddToCart, onEnsureShopOpen, hideFloating 
           </div>
 
           <aside className="home-sidebar-stack">
-            <section className="home-rewards rounded-xl border border-[#eadfd8] bg-white p-3 shadow-[0_5px_18px_rgba(91,64,39,0.04)] sm:p-4">
+            <section className="home-rewards relative isolate overflow-hidden rounded-2xl border border-[#e8d5a7] bg-gradient-to-br from-[#fff9e9] via-[#fffdf8] to-[#f8ebc9] p-3 text-[#3c2925] shadow-[0_8px_22px_rgba(91,64,39,0.075)] sm:p-4">
+              <div aria-hidden="true" className="absolute -right-10 -top-12 -z-10 h-28 w-28 rounded-full border-[14px] border-[#e9d69f]/45" />
               <div className="flex min-w-0 items-center gap-2">
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#fff8e9] text-[#a57c38]"><Gift size={18} /></span>
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[#e7d5aa] bg-white/80 text-[#a57c38] shadow-sm"><Gift size={18} /></span>
                 <div className="min-w-0 flex-1">
                   <p className="text-[8px] font-black uppercase tracking-[0.12em] text-[#9b7b3d] sm:text-[9px] sm:tracking-[0.16em]">Pastry Project Rewards</p>
                   <p className="mt-1 text-xs font-black leading-snug text-[#33251e] sm:text-[13px]">Every order comes with a little extra.</p>
                 </div>
-                <button type="button" onClick={() => navigate('/customer/rewards')} className="shrink-0 rounded-lg bg-[#fff8e9] px-2 py-1.5 text-[8px] font-bold text-[#33251e] transition hover:bg-[#111111] hover:text-white sm:px-2.5 sm:text-[9px]">View Rewards</button>
+                <button type="button" onClick={() => navigate('/customer/rewards')} className="shrink-0 rounded-full border border-[#e7d5aa] bg-white/80 px-2.5 py-1.5 text-[8px] font-bold text-[#6d5125] shadow-sm transition hover:-translate-y-0.5 hover:bg-[#33251e] hover:text-white sm:px-3 sm:text-[9px]">View Rewards</button>
               </div>
-              <div className="mt-3 grid grid-cols-3 gap-1 border-t border-[#eadfca] pt-3 text-center sm:gap-2">
-                <div><Star size={15} className="mx-auto text-[#a57c38]" /><p className="mt-1 text-[9px] font-bold text-[#33251e] sm:text-[10px]">10 points</p><p className="text-[8px] text-[#74675f]">per ₱100</p></div>
-                <div><Gift size={15} className="mx-auto text-[#a57c38]" /><p className="mt-1 text-[9px] font-bold text-[#33251e] sm:text-[10px]">1,000 points</p><p className="text-[8px] text-[#74675f]">5% OFF</p></div>
-                <div><Tag size={15} className="mx-auto text-[#a57c38]" /><p className="mt-1 text-[9px] font-bold text-[#33251e] sm:text-[10px]">₱100 max</p><p className="text-[8px] text-[#74675f]">per reward</p></div>
+              <div className="mt-3 grid grid-cols-3 gap-1.5 border-t border-[#e8d9b8] pt-3 text-center sm:gap-2">
+                <div className="rounded-xl border border-white/80 bg-white/65 px-1 py-2"><Star size={15} className="mx-auto text-[#a57c38]" /><p className="mt-1 text-[9px] font-bold text-[#33251e] sm:text-[10px]">10 points</p><p className="text-[8px] text-[#74675f]">per ₱100</p></div>
+                <div className="rounded-xl border border-white/80 bg-white/65 px-1 py-2"><Gift size={15} className="mx-auto text-[#a57c38]" /><p className="mt-1 text-[9px] font-bold text-[#33251e] sm:text-[10px]">1,000 points</p><p className="text-[8px] text-[#74675f]">5% OFF</p></div>
+                <div className="rounded-xl border border-white/80 bg-white/65 px-1 py-2"><Tag size={15} className="mx-auto text-[#a57c38]" /><p className="mt-1 text-[9px] font-bold text-[#33251e] sm:text-[10px]">₱100 max</p><p className="text-[8px] text-[#74675f]">per reward</p></div>
               </div>
             </section>
 
@@ -1341,11 +1342,34 @@ export default function Dashboard({ onAddToCart, onEnsureShopOpen, hideFloating 
               </div>
             </section>
 
-            <section className="home-quick-actions rounded-xl border border-[#eadfd8] bg-white p-4 shadow-[0_5px_18px_rgba(91,64,39,0.04)]"><p className="mb-3 text-[10px] font-black uppercase tracking-[0.22em] text-[#5d4a42]">Quick Actions</p><div className="grid grid-cols-2 gap-2"><button type="button" onClick={() => navigate('/customer/customized-cakes')} className="flex items-center gap-2 rounded-lg bg-[#fff0f0] px-3 py-3 text-left text-[10px] font-bold text-[#5b4540]"><Gift size={18} className="text-[#c36b77]" />Customize Cake</button><button type="button" onClick={handleViewOrders} className="flex items-center gap-2 rounded-lg bg-[#fff8e9] px-3 py-3 text-left text-[10px] font-bold text-[#5b4540]"><ClipboardList size={18} className="text-[#a57c38]" />View Orders</button><button type="button" onClick={() => navigate('/customer/profile')} className="flex items-center gap-2 rounded-lg bg-[#f7f2fb] px-3 py-3 text-left text-[10px] font-bold text-[#5b4540]"><User size={18} className="text-[#87699a]" />My Profile</button><button type="button" onClick={() => navigate('/customer/chat-support')} className="flex items-center gap-2 rounded-lg bg-[#eef7f4] px-3 py-3 text-left text-[10px] font-bold text-[#5b4540]"><MessageCircle size={18} className="text-[#668e83]" />Help Center</button></div></section>
+            <section className="home-quick-actions rounded-2xl border border-[#e8d5a7] bg-gradient-to-br from-[#fff9e9] via-[#fffdf8] to-[#f8ebc9] p-3 text-[#3c2925] shadow-[0_8px_22px_rgba(91,64,39,0.075)] sm:p-4">
+              <div className="mb-3 flex items-center gap-2">
+                <span className="flex h-8 w-8 items-center justify-center rounded-full border border-[#e7d5aa] bg-white/80 text-[#a57c38] shadow-sm"><ClipboardList size={16} /></span>
+                <p className="text-[9px] font-black uppercase tracking-[0.2em] text-[#765d36] sm:text-[10px]">Quick Actions</p>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <button type="button" onClick={() => navigate('/customer/customized-cakes')} className="flex min-h-[52px] items-center gap-2 rounded-xl border border-white/80 bg-white/70 px-2 py-2 text-left text-[9px] font-bold leading-tight text-[#49392f] shadow-sm transition hover:-translate-y-0.5 hover:border-[#d9bd7b] hover:bg-white sm:px-2.5 sm:text-[10px]"><span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#fff4df] text-[#a57c38]"><Gift size={16} /></span>Customize Cake</button>
+                <button type="button" onClick={handleViewOrders} className="flex min-h-[52px] items-center gap-2 rounded-xl border border-white/80 bg-white/70 px-2 py-2 text-left text-[9px] font-bold leading-tight text-[#49392f] shadow-sm transition hover:-translate-y-0.5 hover:border-[#d9bd7b] hover:bg-white sm:px-2.5 sm:text-[10px]"><span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#fff4df] text-[#a57c38]"><ClipboardList size={16} /></span>View Orders</button>
+                <button type="button" onClick={() => navigate('/customer/profile')} className="flex min-h-[52px] items-center gap-2 rounded-xl border border-white/80 bg-white/70 px-2 py-2 text-left text-[9px] font-bold leading-tight text-[#49392f] shadow-sm transition hover:-translate-y-0.5 hover:border-[#d9bd7b] hover:bg-white sm:px-2.5 sm:text-[10px]"><span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#fff4df] text-[#a57c38]"><User size={16} /></span>My Profile</button>
+                <button type="button" onClick={() => navigate('/customer/chat-support')} className="flex min-h-[52px] items-center gap-2 rounded-xl border border-white/80 bg-white/70 px-2 py-2 text-left text-[9px] font-bold leading-tight text-[#49392f] shadow-sm transition hover:-translate-y-0.5 hover:border-[#d9bd7b] hover:bg-white sm:px-2.5 sm:text-[10px]"><span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#fff4df] text-[#a57c38]"><MessageCircle size={16} /></span>Help Center</button>
+              </div>
+            </section>
 
-            <section className="home-order-status rounded-xl border border-[#eadfd8] bg-white p-4 shadow-[0_5px_18px_rgba(91,64,39,0.04)]">
-              <div className="mb-4 flex items-center justify-between"><p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#5d4a42]">Your Order</p><button type="button" onClick={handleViewOrders} className="text-[10px] font-bold text-[#765d50]">View All Orders <ChevronRight size={12} className="inline" /></button></div>
-              <div className="flex items-start justify-between text-center text-[10px] text-[#665b55]"><div className="flex flex-col items-center gap-2"><span className="flex h-10 w-10 items-center justify-center rounded-full border-2 border-[#e7c875] bg-[#fff8e9] text-[#a57c38]"><ClipboardList size={18} /></span><span className="font-semibold">Pending</span><small className="text-[9px] text-[#9b8c83]">Order received</small></div><span className="mt-5 h-px flex-1 bg-[#efd8d4]" /><div className="flex flex-col items-center gap-2"><span className="flex h-10 w-10 items-center justify-center rounded-full border border-[#eadfd8] bg-[#fffaf7] text-[#8e7b70]"><Gift size={18} /></span><span className="font-semibold">Processing</span><small className="text-[9px] text-[#9b8c83]">Baking your cake</small></div><span className="mt-5 h-px flex-1 bg-[#efd8d4]" /><div className="flex flex-col items-center gap-2"><span className="flex h-10 w-10 items-center justify-center rounded-full border border-[#eadfd8] bg-[#fffaf7] text-[#8e7b70]"><ChevronRight size={18} /></span><span className="font-semibold">Delivery</span><small className="text-[9px] text-[#9b8c83]">Almost there!</small></div></div>
+            <section className="home-order-status rounded-2xl border border-[#e8d5a7] bg-gradient-to-br from-[#fff9e9] via-[#fffdf8] to-[#f8ebc9] p-3 text-[#3c2925] shadow-[0_8px_22px_rgba(91,64,39,0.075)] sm:p-4">
+              <div className="mb-4 flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <span className="flex h-8 w-8 items-center justify-center rounded-full border border-[#e7d5aa] bg-white/80 text-[#a57c38] shadow-sm"><ClipboardList size={16} /></span>
+                  <p className="text-[9px] font-black uppercase tracking-[0.2em] text-[#765d36] sm:text-[10px]">Your Order</p>
+                </div>
+                <button type="button" onClick={handleViewOrders} className="inline-flex shrink-0 items-center rounded-full border border-[#e7d5aa] bg-white/80 px-2.5 py-1.5 text-[8px] font-bold text-[#6d5125] shadow-sm transition hover:bg-[#33251e] hover:text-white sm:text-[9px]">View All <ChevronRight size={12} className="ml-0.5" /></button>
+              </div>
+              <div className="flex items-start justify-between rounded-xl border border-white/80 bg-white/55 px-2 py-3 text-center text-[10px] text-[#665b55] sm:px-3">
+                <div className="flex min-w-0 flex-col items-center gap-1.5"><span className="flex h-9 w-9 items-center justify-center rounded-full border-2 border-[#e7c875] bg-[#fff8e9] text-[#a57c38] shadow-sm"><ClipboardList size={16} /></span><span className="font-semibold text-[#49392f]">Pending</span><small className="text-[8px] leading-tight text-[#9b8c83] sm:text-[9px]">Order received</small></div>
+                <span className="mt-5 h-px flex-1 bg-[#e5cf9d]" />
+                <div className="flex min-w-0 flex-col items-center gap-1.5"><span className="flex h-9 w-9 items-center justify-center rounded-full border border-[#e8d9b8] bg-white text-[#a57c38] shadow-sm"><Gift size={16} /></span><span className="font-semibold text-[#49392f]">Processing</span><small className="text-[8px] leading-tight text-[#9b8c83] sm:text-[9px]">Baking your cake</small></div>
+                <span className="mt-5 h-px flex-1 bg-[#e5cf9d]" />
+                <div className="flex min-w-0 flex-col items-center gap-1.5"><span className="flex h-9 w-9 items-center justify-center rounded-full border border-[#e8d9b8] bg-white text-[#a57c38] shadow-sm"><ChevronRight size={16} /></span><span className="font-semibold text-[#49392f]">Delivery</span><small className="text-[8px] leading-tight text-[#9b8c83] sm:text-[9px]">Almost there!</small></div>
+              </div>
             </section>
           </aside>
         </div>
