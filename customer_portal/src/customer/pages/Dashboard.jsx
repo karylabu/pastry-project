@@ -1314,7 +1314,32 @@ export default function Dashboard({ onAddToCart, onEnsureShopOpen, hideFloating 
               </div>
             </section>
 
-            <section className="home-offer relative min-h-[132px] overflow-hidden rounded-xl border border-[#eadfd8] bg-white p-3 text-[#3c2925] shadow-[0_5px_18px_rgba(91,64,39,0.04)]"><div className="absolute -right-7 -top-7 h-28 w-28 rounded-full border-[12px] border-[#f3e3b0]" /><div className="relative z-10 max-w-[220px]"><p className="text-[9px] font-black uppercase tracking-[0.24em] text-[#a57c38]">Special Offer</p><h2 className="mt-1 font-serif text-3xl leading-none">5% OFF</h2><p className="mt-1 text-xs leading-5 text-[#765f3d]">on your first order. Treat yourself to something freshly baked.</p><button type="button" onClick={() => navigate('/customer/menu')} className="mt-2 inline-flex items-center gap-1 rounded-full bg-[#33251e] px-4 py-1.5 text-[10px] font-bold text-white">Shop Now <ChevronRight size={12} /></button></div></section>
+            <section className="home-offer relative isolate min-h-[178px] overflow-hidden rounded-2xl border border-[#e8d5a7] bg-gradient-to-br from-[#fff9e9] via-[#fffdf8] to-[#f8ebc9] p-4 text-[#3c2925] shadow-[0_8px_22px_rgba(91,64,39,0.09)] sm:p-5">
+              <div aria-hidden="true" className="absolute -right-12 -top-14 -z-10 h-40 w-40 rounded-full border-[18px] border-[#e9d69f]/55" />
+              <div aria-hidden="true" className="absolute -bottom-16 right-12 -z-10 h-36 w-36 rounded-full border border-[#e9d69f]/50" />
+              <div aria-hidden="true" className="absolute right-4 top-4 flex h-11 w-11 items-center justify-center rounded-full bg-white/75 text-[#b58a3b] shadow-sm sm:right-5 sm:top-5 sm:h-12 sm:w-12">
+                <Gift size={22} strokeWidth={1.6} />
+              </div>
+              <div className="relative z-10 max-w-[75%] sm:max-w-[78%]">
+                <p className="inline-flex items-center gap-1.5 rounded-full border border-[#e7d5aa] bg-white/75 px-2.5 py-1 text-[8px] font-black uppercase tracking-[0.2em] text-[#9b7435] sm:text-[9px]">
+                  <Star size={11} fill="currentColor" />
+                  Special Offer
+                </p>
+                <h2 className="mt-2 font-serif text-4xl font-bold leading-none tracking-tight text-[#33251e] sm:text-[2.75rem]">
+                  5% <span className="text-[#b58a3b]">OFF</span>
+                </h2>
+                <p className="mt-1.5 max-w-[230px] text-[11px] leading-[1.55] text-[#765f3d] sm:text-xs">
+                  On your first order. Treat yourself to something freshly baked.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => navigate('/customer/menu')}
+                  className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-[#33251e] px-4 py-2 text-[10px] font-bold text-white shadow-[0_4px_10px_rgba(51,37,30,0.18)] transition hover:-translate-y-0.5 hover:bg-[#4d3829] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#b68b43]"
+                >
+                  Shop Now <ChevronRight size={13} />
+                </button>
+              </div>
+            </section>
 
             <section className="home-quick-actions rounded-xl border border-[#eadfd8] bg-white p-4 shadow-[0_5px_18px_rgba(91,64,39,0.04)]"><p className="mb-3 text-[10px] font-black uppercase tracking-[0.22em] text-[#5d4a42]">Quick Actions</p><div className="grid grid-cols-2 gap-2"><button type="button" onClick={() => navigate('/customer/customized-cakes')} className="flex items-center gap-2 rounded-lg bg-[#fff0f0] px-3 py-3 text-left text-[10px] font-bold text-[#5b4540]"><Gift size={18} className="text-[#c36b77]" />Customize Cake</button><button type="button" onClick={handleViewOrders} className="flex items-center gap-2 rounded-lg bg-[#fff8e9] px-3 py-3 text-left text-[10px] font-bold text-[#5b4540]"><ClipboardList size={18} className="text-[#a57c38]" />View Orders</button><button type="button" onClick={() => navigate('/customer/profile')} className="flex items-center gap-2 rounded-lg bg-[#f7f2fb] px-3 py-3 text-left text-[10px] font-bold text-[#5b4540]"><User size={18} className="text-[#87699a]" />My Profile</button><button type="button" onClick={() => navigate('/customer/chat-support')} className="flex items-center gap-2 rounded-lg bg-[#eef7f4] px-3 py-3 text-left text-[10px] font-bold text-[#5b4540]"><MessageCircle size={18} className="text-[#668e83]" />Help Center</button></div></section>
 
