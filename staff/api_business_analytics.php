@@ -170,7 +170,8 @@ foreach (array_merge($historicalRows, array_map(static fn ($row) => $row + ['sou
             break;
         }
     }
-    $isRegularCake = analyticsIsCakeCategory($matchedProductCategory);
+    $isLegacyImport = ($historical['source'] ?? '') === 'legacy';
+    $isRegularCake = !$isLegacyImport && analyticsIsCakeCategory($matchedProductCategory);
     $productCategory = $salesType === 'customized_cake'
         ? 'Customized Cakes'
         : (($salesType === 'finished_product' || $isRegularCake)
