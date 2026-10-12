@@ -377,6 +377,7 @@ class SalesImportController extends Controller
             'search' => ['nullable', 'string', 'max:255'],
             'source' => ['nullable', 'in:imported,legacy'],
             'sales_type' => ['nullable', 'in:customized_cake,finished_product,other'],
+            'category' => ['nullable', 'in:Customized Cakes,Finished Products,Imported Sales'],
             'page' => ['nullable', 'integer', 'min:1'],
             'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
         ]);
@@ -397,6 +398,29 @@ class SalesImportController extends Controller
         $filteredRows = DB::query()->fromSub($historyRows, 'sales_history');
         if (!empty($validated['source'])) $filteredRows->where('source', $validated['source']);
         if (!empty($validated['sales_type'])) $filteredRows->where('sales_type', $validated['sales_type']);
+        if (($validated['category'] ?? '') === 'Customized Cakes') {
+            $filteredRows->where('sales_type', 'customized_cake');
+        } elseif (($validated['category'] ?? '') === 'Finished Products') {
+            $cakeProductNames = Schema::hasTable('products')
+                ? DB::table('products')
+                    ->whereRaw('LOWER(category) LIKE ?', ['%cake%'])
+                    ->pluck('name')
+                    ->map(static fn ($name) => mb_strtolower(trim((string) $name)))
+                    ->all()
+                : [];
+            $filteredRows->where(static function ($query) use ($cakeProductNames) {
+                $query->where('sales_type', 'finished_product')
+                    ->orWhere(static function ($query) use ($cakeProductNames) {
+                        $query->where('source', 'imported')
+                            ->where('sales_type', '!=', 'customized_cake');
+                        if ($cakeProductNames) {
+                            $query->whereIn(DB::raw('LOWER(cake_name)'), $cakeProductNames);
+                        } else {
+                            $query->whereRaw('1 = 0');
+                        }
+                    });
+            });
+        }
         if (!empty($validated['start_date'])) $filteredRows->where('sale_date', '>=', $validated['start_date']);
         if (!empty($validated['end_date'])) $filteredRows->where('sale_date', '<=', $validated['end_date']);
         if (!empty($validated['search'])) $filteredRows->where('cake_name', 'like', '%' . $validated['search'] . '%');

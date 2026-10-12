@@ -102,6 +102,46 @@ export function groupRevenueByInterval(rows, interval) {
     .map(([, bucket]) => bucket);
 }
 
+export function filterSalesTransactions(orders, products, category) {
+  const completedOrders = orders.filter((order) => String(order.status || '').trim().toLowerCase() === 'completed');
+  if (!category) return completedOrders;
+  if (category === 'Imported Sales') return [];
+  if (category === 'Customized Cakes') return completedOrders.filter((order) => order.is_customized);
+  if (category !== 'Finished Products') return completedOrders;
+
+  const productsById = new Map(products.map((product) => [String(product.id), product]));
+  const productsByName = new Map(products.map((product) => [String(product.name || '').trim().toLowerCase(), product]));
+
+  return completedOrders.flatMap((order) => {
+    if (order.is_customized) return [];
+    const items = (Array.isArray(order.items) ? order.items : []).filter((item) => {
+      const product = productsById.get(String(item.product_id || item.id || ''))
+        || productsByName.get(String(item.name || item.product || '').trim().toLowerCase());
+      const itemCategory = String(item.category || product?.category || '').trim().toLowerCase();
+      return itemCategory.includes('cake');
+    });
+    if (items.length === 0) return [];
+
+    return [{
+      ...order,
+      items,
+      total: items.reduce((total, item) => total + Number(item.qty || item.quantity || 0) * Number(item.price || item.unit_price || 0), 0),
+    }];
+  });
+}
+
+export function filterImportedTransactions(sales, products, category) {
+  if (!category || category === 'Imported Sales') return sales;
+  const productsByName = new Map(products.map((product) => [String(product.name || '').trim().toLowerCase(), product]));
+  return sales.filter((sale) => {
+    if (category === 'Customized Cakes') return sale.sales_type === 'customized_cake';
+    if (category !== 'Finished Products' || sale.source === 'legacy') return false;
+    if (sale.sales_type === 'customized_cake') return false;
+    const product = productsByName.get(String(sale.cake_name || '').trim().toLowerCase());
+    return sale.sales_type === 'finished_product' || String(product?.category || '').toLowerCase().includes('cake');
+  });
+}
+
 function recommendationFor(ing) {
   const expiryDays = daysUntil(ing.expiry);
   const expiryNote = expiryDays !== null && expiryDays <= 5
@@ -469,6 +509,7 @@ export default function Reports() {
 
   useEffect(() => {
     const params = new URLSearchParams({ page: String(salesPage), per_page: String(REPORT_ROWS_PER_PAGE) });
+    if (analyticsCategory) params.set('category', analyticsCategory);
     if (dateFilterStart && dateFilterEnd) {
       params.set('start_date', dateFilterStart);
       params.set('end_date', dateFilterEnd);
@@ -507,11 +548,11 @@ export default function Reports() {
       });
 
     return () => { isCurrentRequest = false; };
-  }, [range, dateFilterStart, dateFilterEnd, salesPage, analyticsRefreshKey]);
+  }, [range, dateFilterStart, dateFilterEnd, salesPage, analyticsCategory, analyticsRefreshKey]);
 
   useEffect(() => {
     setSalesPage(1);
-  }, [range, dateFilterStart, dateFilterEnd]);
+  }, [range, dateFilterStart, dateFilterEnd, analyticsCategory]);
 
   useEffect(() => {
     setRevenueDayPage(1);
@@ -587,10 +628,17 @@ export default function Reports() {
   }, [combinedOrders, range, dateFilterStart, dateFilterEnd]);
 
   const completedOrds = useMemo(
-    () => visibleOrders.filter(o => normalizeStatus(o.status) === 'completed'),
+    () => visibleOrders.filter((order) => normalizeStatus(order.status) === 'completed'),
     [visibleOrders]
   );
-  const historicalVisibleSales = historicalSales;
+  const salesTransactionOrders = useMemo(
+    () => filterSalesTransactions(visibleOrders, products, analyticsCategory),
+    [visibleOrders, products, analyticsCategory]
+  );
+  const historicalVisibleSales = useMemo(
+    () => filterImportedTransactions(historicalSales, products, analyticsCategory),
+    [historicalSales, products, analyticsCategory]
+  );
   const cancelledOrds = useMemo(
     () => visibleOrders.filter(o => ['cancelled', 'canceled', 'rejected'].includes(normalizeStatus(o.status))),
     [visibleOrders]
@@ -633,12 +681,12 @@ export default function Reports() {
     : productPerformanceRows.slice(0, 5);
   const salesPageCount = Math.max(
     1,
-    Math.ceil(completedOrds.length / REPORT_ROWS_PER_PAGE),
+    Math.ceil(salesTransactionOrders.length / REPORT_ROWS_PER_PAGE),
     Math.ceil(Number(historicalSalesSummary.records || 0) / REPORT_ROWS_PER_PAGE)
   );
   const visibleSalesPage = Math.min(salesPage, salesPageCount);
   const salesPageStart = (visibleSalesPage - 1) * REPORT_ROWS_PER_PAGE;
-  const salesOrdersOnPage = completedOrds.slice(salesPageStart, salesPageStart + REPORT_ROWS_PER_PAGE);
+  const salesOrdersOnPage = salesTransactionOrders.slice(salesPageStart, salesPageStart + REPORT_ROWS_PER_PAGE);
   const historicalSalesOnPage = historicalVisibleSales;
   const ingredientsPageCount = Math.max(1, Math.ceil(ingredients.length / REPORT_ROWS_PER_PAGE));
   const visibleIngredientsPage = Math.min(ingredientsPage, ingredientsPageCount);
@@ -1140,7 +1188,7 @@ export default function Reports() {
                     <h3 className="text-base font-bold" style={{ color: C.ink }}>Sales Transactions</h3>
                     <p className="mt-1 text-xs text-black/50">Detailed sales records for the selected period or custom date range.</p>
                   </div>
-                  <span className="text-[11px] text-black/55">{completedOrds.length + Number(historicalSalesSummary.records || 0)} sales in period</span>
+                  <span className="text-[11px] text-black/55">{salesTransactionOrders.length + Number(historicalSalesSummary.records || 0)} sales in period</span>
                 </div>
                 {historicalSalesError && <p className="mb-3 rounded-md bg-red-50 px-3 py-2 text-xs text-red-800" role="alert">{historicalSalesError}</p>}
                 <div className="overflow-x-auto">
@@ -1156,7 +1204,7 @@ export default function Reports() {
                       </tr>
                     </thead>
                     <tbody>
-                      {completedOrds.length === 0 && historicalVisibleSales.length === 0 ? (
+                      {salesTransactionOrders.length === 0 && historicalVisibleSales.length === 0 ? (
                         <tr><td colSpan={6} className="px-4 py-10 text-center text-black/50">No completed orders match the selected filters.</td></tr>
                       ) : <>
                         {salesOrdersOnPage.map((o) => {
@@ -1203,7 +1251,7 @@ export default function Reports() {
                     </tbody>
                   </table>
                 </div>
-                <PaginationControls totalItems={Math.max(completedOrds.length, Number(historicalSalesSummary.records || 0))} page={visibleSalesPage} onPageChange={setSalesPage} />
+                <PaginationControls totalItems={Math.max(salesTransactionOrders.length, Number(historicalSalesSummary.records || 0))} page={visibleSalesPage} onPageChange={setSalesPage} />
               </div>
 
               {/* ── OPERATIONAL MATRIX (BA-02, BA-03, BA-05) ── */}

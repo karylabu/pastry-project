@@ -23,6 +23,7 @@ class SalesImportControllerTest extends TestCase
         Schema::dropIfExists('analytics_sales_history');
         Schema::dropIfExists('analytics_imports');
         Schema::dropIfExists('sales');
+        Schema::dropIfExists('products');
         Schema::dropIfExists('users');
 
         Schema::create('users', function (Blueprint $table) {
@@ -66,6 +67,12 @@ class SalesImportControllerTest extends TestCase
             $table->decimal('down_payment', 12, 2);
             $table->decimal('remaining_balance', 12, 2);
             $table->date('sale_date');
+        });
+
+        Schema::create('products', function (Blueprint $table) {
+            $table->id();
+            $table->string('name');
+            $table->string('category');
         });
     }
 
@@ -136,6 +143,40 @@ class SalesImportControllerTest extends TestCase
         $this->assertSame('legacy-1', $payload['sales'][0]['id']);
         $this->assertSame('BENTO - CHARACTER', $payload['sales'][0]['cake_name']);
         $this->assertEquals(420, $payload['sales'][0]['price']);
+    }
+
+    public function test_finished_products_history_excludes_custom_imports_and_legacy_sales(): void
+    {
+        $admin = User::factory()->createOne(['role' => 'admin']);
+        DB::table('products')->insert([
+            ['id' => 1, 'name' => 'Chocolate Cake', 'category' => 'Cakes'],
+        ]);
+        DB::table('analytics_imports')->insert([
+            ['id' => 1, 'file_name' => 'finished.csv', 'sales_type' => 'other', 'uploaded_at' => now(), 'status' => 'completed'],
+            ['id' => 2, 'file_name' => 'customized.csv', 'sales_type' => 'customized_cake', 'uploaded_at' => now(), 'status' => 'completed'],
+            ['id' => 3, 'file_name' => 'tagged-finished.csv', 'sales_type' => 'finished_product', 'uploaded_at' => now(), 'status' => 'completed'],
+        ]);
+        DB::table('analytics_sales_history')->insert([
+            ['import_id' => 1, 'product_name' => 'Chocolate Cake', 'sale_date' => '2026-10-01', 'units_sold' => 1, 'revenue' => 500],
+            ['import_id' => 2, 'product_name' => 'Custom Ocean Cake', 'sale_date' => '2026-10-01', 'units_sold' => 1, 'revenue' => 900],
+            ['import_id' => 3, 'product_name' => 'Cake Box', 'sale_date' => '2026-10-01', 'units_sold' => 1, 'revenue' => 100],
+        ]);
+        DB::table('sales')->insert([
+            'cake_name' => 'Legacy Cake',
+            'price' => 400,
+            'down_payment' => 0,
+            'remaining_balance' => 0,
+            'sale_date' => '2026-10-01',
+        ]);
+
+        $this->actingAs($admin);
+        $response = app(SalesImportController::class)->history(Request::create('/api/sales/import/history?category=Finished%20Products', 'GET'));
+        $payload = $response->getData(true);
+
+        $this->assertSame(200, $response->getStatusCode());
+        $this->assertSame(2, $payload['summary']['records']);
+        $this->assertEquals(600, $payload['summary']['total_sales']);
+        $this->assertSame(['Cake Box', 'Chocolate Cake'], collect($payload['sales'])->pluck('cake_name')->sort()->values()->all());
     }
 
     public function test_csv_upload_is_queued_and_exact_retries_are_rejected(): void

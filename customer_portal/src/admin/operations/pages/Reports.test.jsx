@@ -1,4 +1,4 @@
-import { groupRevenueByInterval } from "./Reports";
+import { filterImportedTransactions, filterSalesTransactions, groupRevenueByInterval } from "./Reports";
 
 const sales = [
   { date: "2026-10-05", revenue: 100, orders: 2 },
@@ -32,6 +32,35 @@ describe("groupRevenueByInterval", () => {
   test("combines all selected sales into one total", () => {
     expect(groupRevenueByInterval(sales, "all")).toEqual([
       { date: "All time", revenue: 500, orders: 9 },
+    ]);
+  });
+});
+
+describe("sales transaction category filters", () => {
+  const products = [
+    { id: 1, name: "Chocolate Cake", category: "Cakes" },
+    { id: 2, name: "Croissant", category: "Pastry" },
+  ];
+
+  test("shows only regular cake live orders in Finished Products", () => {
+    const result = filterSalesTransactions([
+      { id: 1, status: "Completed", items: [{ product_id: 1, name: "Chocolate Cake", qty: 2, price: 500 }], total: 1000 },
+      { id: 2, status: "Completed", is_customized: true, items: [{ name: "Customized Cake", qty: 1, price: 900 }], total: 900 },
+      { id: 3, status: "Completed", items: [{ product_id: 2, name: "Croissant", qty: 1, price: 100 }], total: 100 },
+    ], products, "Finished Products");
+
+    expect(result).toHaveLength(1);
+    expect(result[0].id).toBe(1);
+    expect(result[0].total).toBe(1000);
+  });
+
+  test("keeps imported cake records in Finished Products but excludes customized and legacy imports", () => {
+    expect(filterImportedTransactions([
+      { id: "1", cake_name: "Chocolate Cake", sales_type: "other", source: "imported" },
+      { id: "2", cake_name: "Custom Cake", sales_type: "customized_cake", source: "imported" },
+      { id: "3", cake_name: "Legacy Cake", sales_type: "other", source: "legacy" },
+    ], products, "Finished Products")).toEqual([
+      { id: "1", cake_name: "Chocolate Cake", sales_type: "other", source: "imported" },
     ]);
   });
 });
