@@ -178,7 +178,11 @@ foreach (array_merge($historicalRows, array_map(static fn ($row) => $row + ['sou
             ? 'Finished Products'
             : 'Imported Sales');
     if ($productId > 0 && $productIdForSale !== $productId) continue;
-    $importedRevenueByType[$salesType] = ($importedRevenueByType[$salesType] ?? 0) + $revenueAmount;
+    $summarySalesType = array_key_exists($salesType, $importedRevenueByType) ? $salesType : 'other';
+    if ($summarySalesType === 'other' && $productIdForSale > 0) {
+        $summarySalesType = 'finished_product';
+    }
+    $importedRevenueByType[$summarySalesType] += $revenueAmount;
     if ($category !== '' && strcasecmp($category, 'Imported Sales') !== 0 && strcasecmp($productCategory, $category) !== 0) continue;
 
     $recordCount = (int) ($historical['record_count'] ?? 1);
