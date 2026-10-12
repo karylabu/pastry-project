@@ -4,15 +4,8 @@ import PageShell from '../components/PageShell';
 import { CUSTOMER_BASE, LARAVEL_BASE, ROOT_BASE } from '../../services/config';
 import { getAuthHeaders, safeParseJson } from '../../services/api';
 import { buildCustomizedCakeSubmissionPayload, buildTierSelections } from './customizedCakePayload';
-import {
-  Baby,
-  CakeSlice,
-  CalendarDays,
-  Flower2,
-  Gift,
-  Heart,
-  Sparkles,
-} from 'lucide-react';
+import { CalendarDays } from 'lucide-react';
+import DesignCategoryCards from '../components/DesignCategoryCards';
 
 const CUSTOM_CAKE_DRAFT_KEY = 'customCakeRequestDraft';
 const MAX_REFERENCE_IMAGES = 5;
@@ -702,26 +695,10 @@ export default function CustomizedCakes() {
         </div>
       </section>
 
-      <div aria-label="Cake design categories" className="mb-5 grid grid-cols-6 gap-1 rounded-[18px] border border-[#eadfd8] bg-white p-1.5 shadow-[0_5px_18px_rgba(91,64,39,0.04)] md:gap-3 md:p-2">
-        {[
-          ['Birthday', CakeSlice, '/customer/birthday-designs'],
-          ['Cutesy', Sparkles, '/customer/cutesy-designs'],
-          ['Holidays', Gift, '/customer/holiday-designs'],
-          ['Kids Themes', Baby, '/customer/kids-designs'],
-          ['Wedding', Heart, '/customer/wedding-designs'],
-          ['Floral Designs', Flower2, '/customer/floral-designs'],
-        ].map(([label, Icon, path]) => (
-          <button
-            key={label}
-            type="button"
-            onClick={() => navigate(path)}
-            className="flex min-h-[56px] min-w-0 flex-col items-center justify-center gap-1 rounded-xl border border-[#eee4de] bg-white px-0.5 py-1.5 text-center text-[#5f514a] transition hover:-translate-y-0.5 hover:border-[#e7c875] hover:bg-[#fff8df] hover:text-[#8d6a2e] md:min-h-[68px] md:gap-2 md:px-2 md:py-3"
-          >
-            <Icon size={18} strokeWidth={1.6} className="h-3.5 w-3.5 shrink-0 md:h-[18px] md:w-[18px]" />
-            <span className="w-full break-words text-[8px] font-semibold leading-tight md:text-[10px]">{label}</span>
-          </button>
-        ))}
-      </div>
+      <DesignCategoryCards
+        onSelectCategory={navigate}
+        className="mb-5 rounded-[18px] border border-[#eadfd8] bg-white p-1.5 shadow-[0_5px_18px_rgba(91,64,39,0.04)] md:p-2"
+      />
 
       <div className="mb-6">
         <div className="mb-3 flex items-end justify-between px-1">

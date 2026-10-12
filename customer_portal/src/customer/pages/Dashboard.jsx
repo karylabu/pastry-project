@@ -23,15 +23,12 @@ import {
   Tag,
   Heart,
   ClipboardList,
-  CakeSlice,
-  Baby,
-  Flower2,
-  Sparkles,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 import ProductModal from "../components/ProductModal";
 import CustomCakeModal from "../components/CustomCakeModal";
+import DesignCategoryCards from "../components/DesignCategoryCards";
 import { CUSTOMER_BASE, LARAVEL_BASE, ROOT_BASE } from "../../services/config";
 import { getAuthHeaders, safeParseJson } from "../../services/api";
 import { subscribeRealtime } from "../../services/realtime";
@@ -1275,26 +1272,10 @@ export default function Dashboard({ onAddToCart, onEnsureShopOpen, hideFloating 
       />
 
       <main className="mx-auto max-w-[1380px] px-4 py-5 md:px-10">
-        <div className="mb-3 grid grid-cols-6 gap-1 px-0 py-1 md:gap-3 md:px-1">
-          {[
-            ['Birthday', CakeSlice, '/customer/birthday-designs'],
-            ['Cutesy', Sparkles, '/customer/cutesy-designs'],
-            ['Holidays', Gift, '/customer/holiday-designs'],
-            ['Kids Themes', Baby, '/customer/kids-designs'],
-            ['Wedding', Heart, '/customer/wedding-designs'],
-            ['Floral Designs', Flower2, '/customer/floral-designs'],
-          ].map(([label, Icon, path]) => (
-            <button
-              key={label}
-              type="button"
-              onClick={() => navigate(path)}
-              className="flex min-w-0 flex-col items-center justify-center gap-1.5 rounded-lg border border-[#eee4de] bg-white px-0.5 py-2 text-center text-[#5f514a] transition hover:-translate-y-0.5 hover:border-[#e7c875] hover:bg-[#fff8df] hover:text-[#8d6a2e] md:gap-2 md:rounded-xl md:px-2 md:py-3"
-            >
-              <Icon size={18} strokeWidth={1.6} className="shrink-0 md:h-[22px] md:w-[22px]" />
-              <span className="w-full break-words text-[8px] font-semibold leading-tight md:text-[10px]">{label}</span>
-            </button>
-          ))}
-        </div>
+        <DesignCategoryCards
+          onSelectCategory={navigate}
+          className="mb-3 rounded-xl border border-[#eadfd8] bg-white px-2 py-1 shadow-[0_5px_18px_rgba(91,64,39,0.04)]"
+        />
 
         <SecondaryBanner onOrderNow={() => navigate("/customer/customized-cakes")} />
 
