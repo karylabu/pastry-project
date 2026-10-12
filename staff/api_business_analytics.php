@@ -183,9 +183,7 @@ foreach (array_merge($historicalRows, array_map(static fn ($row) => $row + ['sou
     $recordCount = (int) ($historical['record_count'] ?? 1);
     $historicalRecords += $recordCount;
     $historicalRevenue += $revenueAmount;
-    if (($historical['source'] ?? '') !== 'legacy') {
-        $importedRevenueByType[$salesType] = ($importedRevenueByType[$salesType] ?? 0) + $revenueAmount;
-    }
+    $importedRevenueByType[$salesType] = ($importedRevenueByType[$salesType] ?? 0) + $revenueAmount;
     $date = (string) $historical['sale_date'];
     if (!isset($historicalDaily[$date])) $historicalDaily[$date] = ['date' => $date, 'revenue' => 0, 'orders' => 0];
     $historicalDaily[$date]['revenue'] += $revenueAmount;
