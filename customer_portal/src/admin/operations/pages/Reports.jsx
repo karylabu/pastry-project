@@ -311,6 +311,8 @@ export default function Reports() {
   const [orders,        setOrders]        = useState([]);
   const [products,      setProducts]      = useState([]);
   const [ingredientsRaw, setIngredientsRaw] = useState([]);
+  const [ingredientUsage, setIngredientUsage] = useState(null);
+  const [ingredientUsageError, setIngredientUsageError] = useState('');
   const [loading,       setLoading]       = useState(true);
   const [range,         setRange]         = useState('week');
   const [interval,      setInterval]      = useState('weekly');
@@ -380,6 +382,27 @@ export default function Reports() {
       setLoading(false);
     });
   }, [orderRefreshKey]);
+
+  useEffect(() => {
+    let isCurrentRequest = true;
+    laravelStaffFetch(`${LARAVEL_BASE}/api/staff/inventory/ingredients/usage`)
+      .then(async (response) => {
+        const data = await response.json();
+        if (!response.ok || !data.success) {
+          throw new Error(data.message || 'Unable to load ingredient usage.');
+        }
+        if (!isCurrentRequest) return;
+        setIngredientUsage(data.usage || {});
+        setIngredientUsageError('');
+      })
+      .catch((error) => {
+        if (!isCurrentRequest) return;
+        setIngredientUsage(null);
+        setIngredientUsageError(error.message || 'Unable to load ingredient usage.');
+      });
+
+    return () => { isCurrentRequest = false; };
+  }, []);
 
   useEffect(() => {
     const params = new URLSearchParams({ page: String(salesPage), per_page: String(REPORT_ROWS_PER_PAGE) });
@@ -1145,9 +1168,10 @@ export default function Reports() {
                 <div className="flex items-center justify-between px-6 py-5">
                   <div>
                     <h3 className="text-base font-bold" style={{ color: C.ink }}>Ingredient Consumption &amp; Procurement Matrix</h3>
-                    <p className="mt-0.5 text-xs text-black/50">Stock, threshold, and expiry are live from the ingredients table. Consumption &amp; waste columns need a usage/spoilage log to populate.</p>
+                    <p className="mt-0.5 text-xs text-black/50">Consumption and raw-material waste are actual records from the last seven days.</p>
                   </div>
                 </div>
+                {ingredientUsageError && <p role="alert" className="mx-6 mb-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-800">Unable to load ingredient usage: {ingredientUsageError}</p>}
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
@@ -1182,8 +1206,12 @@ export default function Reports() {
                               </div>
                             </td>
                             <td className="px-5 py-4 font-semibold" style={{ color: C.ink }}>{ing.stock} / {ing.threshold} {ing.unit}</td>
-                            <td className="px-5 py-4 text-black/35 text-xs italic">Not tracked</td>
-                            <td className="px-5 py-4 text-black/35 text-xs italic">Not tracked</td>
+                            <td className="px-5 py-4 text-xs text-black/70">
+                              {ingredientUsageError ? 'Unavailable' : ingredientUsage === null ? 'Loading…' : `${Number(ingredientUsage[ing.id]?.weekly_consumption || 0).toLocaleString(undefined, { maximumFractionDigits: 3 })} ${ing.unit}`}
+                            </td>
+                            <td className="px-5 py-4 text-xs text-black/70">
+                              {ingredientUsageError ? 'Unavailable' : ingredientUsage === null ? 'Loading…' : `${Number(ingredientUsage[ing.id]?.waste_quantity || 0).toLocaleString(undefined, { maximumFractionDigits: 3 })} ${ing.unit} · ₱${Number(ingredientUsage[ing.id]?.waste_loss || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                            </td>
                             <td className="px-5 py-4"><ExpiryTag expiry={ing.expiry} /></td>
                             <td className="px-5 py-4"><PriorityPill status={ing.status} /></td>
                             <td className="px-5 py-4 text-right">

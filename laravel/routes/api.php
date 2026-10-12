@@ -92,6 +92,7 @@ Route::get('admin/reviews', [OrderFeedbackController::class, 'index']);
 // Staff inventory routes
 Route::post('staff/inventory/batches', [IngredientBatchController::class, 'store']);
 Route::get('staff/inventory/ingredients', [IngredientInventoryController::class, 'index']);
+Route::get('staff/inventory/ingredients/usage', [IngredientInventoryController::class, 'usage']);
 Route::get('staff/inventory/batches', [IngredientInventoryController::class, 'allBatches']);
 Route::get('staff/inventory/ingredients/{ingredient}/batches', [IngredientInventoryController::class, 'batches']);
 Route::post('staff/ingredients', [IngredientController::class, 'store']);
