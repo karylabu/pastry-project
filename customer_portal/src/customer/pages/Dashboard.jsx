@@ -66,7 +66,7 @@ function Banner({ onShopNow, onCustomizeNow }) {
   }, [slide, currentSlide]);
 
   return (
-    <div className="relative aspect-[1672/941] w-full bg-white flex items-center justify-center overflow-hidden font-['DM_Sans']">
+    <div className="relative left-1/2 aspect-[1672/941] w-screen max-w-none -translate-x-1/2 bg-white flex items-center justify-center overflow-hidden font-['DM_Sans']">
 
       {/* SLIDES */}
       <AnimatePresence mode="wait">
