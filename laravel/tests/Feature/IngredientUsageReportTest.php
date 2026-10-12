@@ -108,4 +108,43 @@ class IngredientUsageReportTest extends TestCase
             ->assertJsonPath("usage.{$ingredientId}.waste_quantity", 1.75)
             ->assertJsonPath("usage.{$ingredientId}.waste_loss", 30);
     }
+
+    public function test_usage_report_uses_requested_date_range_or_all_history(): void
+    {
+        Carbon::setTestNow('2026-10-12 12:00:00');
+        $ingredientId = DB::table('ingredients')->insertGetId([
+            'name' => 'Sugar',
+            'unit' => 'kg',
+            'stock' => 10,
+            'threshold' => 2,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        DB::table('ingredient_movements')->insert([
+            ['ingredient_id' => $ingredientId, 'action' => 'stock_out', 'qty' => 2, 'reference_type' => 'production', 'created_at' => '2026-10-12 09:00:00'],
+            ['ingredient_id' => $ingredientId, 'action' => 'stock_out', 'qty' => 3, 'reference_type' => 'production', 'created_at' => '2026-10-05 09:00:00'],
+            ['ingredient_id' => $ingredientId, 'action' => 'stock_out', 'qty' => 5, 'reference_type' => 'production', 'created_at' => '2025-10-12 09:00:00'],
+        ]);
+
+        $this->actingAs($this->staffUser)
+            ->getJson('http://localhost/api/staff/inventory/ingredients/usage?start_date=2026-10-12&end_date=2026-10-12')
+            ->assertOk()
+            ->assertJsonPath('period_start', '2026-10-12')
+            ->assertJsonPath("usage.{$ingredientId}.consumption", 2)
+            ->assertJsonPath("usage.{$ingredientId}.weekly_consumption", 2);
+
+        $this->actingAs($this->staffUser)
+            ->getJson('http://localhost/api/staff/inventory/ingredients/usage?start_date=2026-10-01&end_date=2026-10-12')
+            ->assertOk()
+            ->assertJsonPath("usage.{$ingredientId}.consumption", 5)
+            ->assertJsonPath("usage.{$ingredientId}.weekly_consumption", 5);
+
+        $this->actingAs($this->staffUser)
+            ->getJson('http://localhost/api/staff/inventory/ingredients/usage?all=1&end_date=2026-10-12')
+            ->assertOk()
+            ->assertJsonPath('period_start', null)
+            ->assertJsonPath("usage.{$ingredientId}.consumption", 10)
+            ->assertJsonPath("usage.{$ingredientId}.weekly_consumption", 10);
+    }
 }

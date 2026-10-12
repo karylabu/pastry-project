@@ -8,6 +8,7 @@ use App\Services\InventoryService;
 use Illuminate\Database\Query\JoinClause;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
 class IngredientInventoryController extends Controller
@@ -30,15 +31,32 @@ class IngredientInventoryController extends Controller
             return $response;
         }
 
-        $periodEnd = now()->endOfDay();
-        $periodStart = $periodEnd->copy()->startOfDay()->subDays(6);
+        $validated = $request->validate([
+            'start_date' => ['sometimes', 'required', 'date_format:Y-m-d'],
+            'end_date' => ['sometimes', 'required', 'date_format:Y-m-d'],
+        ]);
+
+        $periodEnd = isset($validated['end_date'])
+            ? Carbon::createFromFormat('!Y-m-d', $validated['end_date'])->endOfDay()
+            : now()->endOfDay();
+        $periodStart = isset($validated['start_date'])
+            ? Carbon::createFromFormat('!Y-m-d', $validated['start_date'])->startOfDay()
+            : ($request->boolean('all') ? null : $periodEnd->copy()->startOfDay()->subDays(6));
+
+        if ($periodStart && $periodStart->gt($periodEnd)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'The start date must be on or before the end date.',
+            ], 422);
+        }
 
         $consumption = DB::table('ingredient_movements')
             ->select('ingredient_id')
             ->selectRaw('SUM(qty) as quantity')
             ->where('action', 'stock_out')
             ->where('reference_type', 'production')
-            ->whereBetween('created_at', [$periodStart, $periodEnd])
+            ->when($periodStart, fn ($query) => $query->where('created_at', '>=', $periodStart))
+            ->where('created_at', '<=', $periodEnd)
             ->groupBy('ingredient_id');
 
         $waste = DB::table('waste_log as waste')
@@ -54,7 +72,8 @@ class IngredientInventoryController extends Controller
             ->selectRaw('SUM(waste.qty * waste.unit_cost) as loss')
             ->whereRaw("LOWER(waste.item_type) = 'raw material'")
             ->where('waste.qty', '>', 0)
-            ->whereBetween('waste.datetime', [$periodStart, $periodEnd])
+            ->when($periodStart, fn ($query) => $query->where('waste.datetime', '>=', $periodStart))
+            ->where('waste.datetime', '<=', $periodEnd)
             ->groupByRaw('COALESCE(waste.ingredient_id, matched_ingredient.id)');
 
         $ingredients = DB::table('ingredients as ingredient')
@@ -73,6 +92,7 @@ class IngredientInventoryController extends Controller
             ])
             ->mapWithKeys(fn ($ingredient) => [
                 (int) $ingredient->id => [
+                    'consumption' => (float) $ingredient->weekly_consumption,
                     'weekly_consumption' => (float) $ingredient->weekly_consumption,
                     'waste_quantity' => (float) $ingredient->waste_quantity,
                     'waste_loss' => (float) $ingredient->waste_loss,
@@ -81,7 +101,7 @@ class IngredientInventoryController extends Controller
 
         return response()->json([
             'success' => true,
-            'period_start' => $periodStart->toDateString(),
+            'period_start' => $periodStart?->toDateString(),
             'period_end' => $periodEnd->toDateString(),
             'usage' => $ingredients,
         ]);

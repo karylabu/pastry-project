@@ -503,10 +503,18 @@ export default function Reports() {
 
   useEffect(() => {
     let isCurrentRequest = true;
-    laravelStaffFetch(`${LARAVEL_BASE}/api/staff/inventory/ingredients/usage`)
+    const params = new URLSearchParams();
+    const dateRange = getAnalyticsDateRange(range, dateFilterStart, dateFilterEnd);
+    if (dateRange.all) params.set('all', '1');
+    if (dateRange.start_date) params.set('start_date', dateRange.start_date);
+    params.set('end_date', dateRange.end_date);
+
+    setIngredientUsage(null);
+    setIngredientUsageError('');
+    laravelStaffFetch(`${LARAVEL_BASE}/api/staff/inventory/ingredients/usage?${params.toString()}`)
       .then(async (response) => {
         const data = await response.json();
-        if (!response.ok || !data.success) {
+        if (!response.ok || !data.success || !data.usage || typeof data.usage !== 'object') {
           throw new Error(data.message || 'Unable to load ingredient usage.');
         }
         if (!isCurrentRequest) return;
@@ -520,7 +528,7 @@ export default function Reports() {
       });
 
     return () => { isCurrentRequest = false; };
-  }, []);
+  }, [range, dateFilterStart, dateFilterEnd, orderRefreshKey]);
 
   useEffect(() => {
     let isCurrentRequest = true;
@@ -651,6 +659,9 @@ export default function Reports() {
   }, [range, dateFilterStart, dateFilterEnd, analyticsProductId, analyticsCategory, analyticsIngredientId, analyticsMovementType, analyticsRefreshKey]);
 
   const normalizeStatus = status => String(status || '').trim().toLowerCase();
+  const ingredientUsagePeriodLabel = dateFilterStart && dateFilterEnd
+    ? 'Selected-period'
+    : ({ today: 'Daily', week: 'Weekly', month: 'Monthly', all: 'All-time' }[range] || 'Period');
 
   const combinedOrders = orders;
 
@@ -1312,7 +1323,9 @@ export default function Reports() {
                 <div className="flex items-center justify-between px-6 py-5">
                   <div>
                     <h3 className="text-base font-bold" style={{ color: C.ink }}>Ingredient Consumption &amp; Procurement Matrix</h3>
-                    <p className="mt-0.5 text-xs text-black/50">Consumption and raw-material waste are actual records from the last seven days.</p>
+                    <p className="mt-0.5 text-xs text-black/50">
+                      {`Consumption and raw-material waste for ${dateFilterStart && dateFilterEnd ? 'the selected dates' : ({ today: 'today', week: 'this week', month: 'this month', all: 'all recorded years' }[range] || 'the selected period')}.`}
+                    </p>
                   </div>
                 </div>
                 {ingredientUsageError && <p role="alert" className="mx-6 mb-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-800">Unable to load ingredient usage: {ingredientUsageError}</p>}
@@ -1325,7 +1338,7 @@ export default function Reports() {
                         </th>
                         <th className="px-5 py-3 text-left text-[10px] font-bold uppercase tracking-wider text-black">Ingredient</th>
                         <th className="px-5 py-3 text-left text-[10px] font-bold uppercase tracking-wider text-black">Stock / Threshold</th>
-                        <th className="px-5 py-3 text-left text-[10px] font-bold uppercase tracking-wider text-black">Weekly Consumption</th>
+                        <th className="px-5 py-3 text-left text-[10px] font-bold uppercase tracking-wider text-black">{ingredientUsagePeriodLabel} Consumption</th>
                         <th className="px-5 py-3 text-left text-[10px] font-bold uppercase tracking-wider text-black">Waste Qty / Loss</th>
                         <th className="px-5 py-3 text-left text-[10px] font-bold uppercase tracking-wider text-black">Expiry</th>
                         <th className="px-5 py-3 text-left text-[10px] font-bold uppercase tracking-wider text-black">Priority Status</th>
@@ -1351,7 +1364,7 @@ export default function Reports() {
                             </td>
                             <td className="px-5 py-4 font-semibold" style={{ color: C.ink }}>{ing.stock} / {ing.threshold} {ing.unit}</td>
                             <td className="px-5 py-4 text-xs text-black/70">
-                              {ingredientUsageError ? 'Unavailable' : ingredientUsage === null ? 'Loading…' : `${Number(ingredientUsage[ing.id]?.weekly_consumption || 0).toLocaleString(undefined, { maximumFractionDigits: 3 })} ${ing.unit}`}
+                              {ingredientUsageError ? 'Unavailable' : ingredientUsage === null ? 'Loading…' : `${Number(ingredientUsage[ing.id]?.consumption ?? ingredientUsage[ing.id]?.weekly_consumption ?? 0).toLocaleString(undefined, { maximumFractionDigits: 3 })} ${ing.unit}`}
                             </td>
                             <td className="px-5 py-4 text-xs text-black/70">
                               {ingredientUsageError ? 'Unavailable' : ingredientUsage === null ? 'Loading…' : `${Number(ingredientUsage[ing.id]?.waste_quantity || 0).toLocaleString(undefined, { maximumFractionDigits: 3 })} ${ing.unit} · ₱${Number(ingredientUsage[ing.id]?.waste_loss || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
