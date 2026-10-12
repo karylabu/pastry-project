@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Services\InventoryService;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
@@ -325,10 +326,45 @@ class StaffApiController extends Controller
         }
     }
 
-    public function viewOrderDiscountId(Request $request, int $orderId)
+    public function peakOrderingTimes(Request $request)
     {
         $admin = $this->requireRole($request, 'admin');
         if (!$admin instanceof User) {
+            return $admin;
+        }
+
+        $filters = $request->validate([
+            'start_date' => ['sometimes', 'required_with:end_date', 'date_format:Y-m-d'],
+            'end_date' => ['sometimes', 'required_with:start_date', 'date_format:Y-m-d', 'after_or_equal:start_date'],
+        ]);
+
+        $query = DB::table('orders')->whereNotNull('created_at');
+        if (isset($filters['start_date'], $filters['end_date'])) {
+            $query->whereBetween('created_at', [
+                $filters['start_date'].' 00:00:00',
+                $filters['end_date'].' 23:59:59',
+            ]);
+        }
+
+        $matrix = array_fill(0, 7, array_fill(0, 24, 0));
+        $orderCount = 0;
+        foreach ($query->pluck('created_at') as $createdAt) {
+            $orderTime = Carbon::parse($createdAt);
+            $matrix[$orderTime->dayOfWeek][$orderTime->hour]++;
+            $orderCount++;
+        }
+
+        return $this->corsResponse([
+            'success' => true,
+            'matrix' => $matrix,
+            'total_orders' => $orderCount,
+        ]);
+    }
+
+    public function viewOrderDiscountId(Request $request, int $orderId)
+    {
+        $admin = $this->requireRole($request, 'admin');
+        if (! $admin instanceof User) {
             return $admin;
         }
 

@@ -156,13 +156,17 @@ function StatCard({ title, value, sub, icon: Icon, color, soft, trend, isMock })
 /* ─────────────────────────────────────────
    PEAK TRAFFIC HEATMAP (day x hour)
 ───────────────────────────────────────── */
-function Heatmap({ matrix }) {
+function Heatmap({ matrix, loading, error }) {
   const max = Math.max(...matrix.flat(), 1);
+  const totalOrders = matrix.flat().reduce((total, count) => total + count, 0);
   const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
   const hourLabels = [0, 4, 8, 12, 16, 20];
 
   return (
     <div>
+      {error && <p role="alert" className="mb-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-800">Unable to load peak ordering times: {error}</p>}
+      {!error && loading && <p className="mb-3 text-xs text-black/50">Loading order times…</p>}
+      {!error && !loading && totalOrders === 0 && <p className="mb-3 text-xs text-black/50">No orders found in the selected date range.</p>}
       <div className="flex gap-1">
         <div className="w-9" />
         <div className="flex-1 grid" style={{ gridTemplateColumns: 'repeat(24, 1fr)' }}>
@@ -313,6 +317,9 @@ export default function Reports() {
   const [ingredientsRaw, setIngredientsRaw] = useState([]);
   const [ingredientUsage, setIngredientUsage] = useState(null);
   const [ingredientUsageError, setIngredientUsageError] = useState('');
+  const [heatmapMatrix, setHeatmapMatrix] = useState(() => Array.from({ length: 7 }, () => Array(24).fill(0)));
+  const [heatmapLoading, setHeatmapLoading] = useState(true);
+  const [heatmapError, setHeatmapError] = useState('');
   const [loading,       setLoading]       = useState(true);
   const [range,         setRange]         = useState('week');
   const [interval,      setInterval]      = useState('weekly');
@@ -403,6 +410,61 @@ export default function Reports() {
 
     return () => { isCurrentRequest = false; };
   }, []);
+
+  useEffect(() => {
+    let isCurrentRequest = true;
+    const params = new URLSearchParams();
+    if (dateFilterStart && dateFilterEnd) {
+      params.set('start_date', dateFilterStart);
+      params.set('end_date', dateFilterEnd);
+    } else if (range !== 'all') {
+      const end = new Date();
+      const start = new Date(end);
+      if (range === 'today') {
+        start.setHours(0, 0, 0, 0);
+      } else if (range === 'week') {
+        start.setDate(start.getDate() - ((start.getDay() + 6) % 7));
+      } else if (range === 'month') {
+        start.setDate(1);
+      } else {
+        start.setDate(start.getDate() - Math.max(1, Number(range)) + 1);
+      }
+      const toDateString = (date) => [
+        date.getFullYear(),
+        String(date.getMonth() + 1).padStart(2, '0'),
+        String(date.getDate()).padStart(2, '0'),
+      ].join('-');
+      params.set('start_date', toDateString(start));
+      params.set('end_date', toDateString(end));
+    }
+
+    setHeatmapLoading(true);
+    setHeatmapError('');
+    laravelStaffFetch(`${LARAVEL_BASE}/api/admin/reports/peak-ordering-times?${params.toString()}`)
+      .then(async (response) => {
+        const data = await response.json();
+        if (!response.ok || !data.success) {
+          throw new Error(data.message || 'Unable to load peak ordering times.');
+        }
+        if (!isCurrentRequest) return;
+        const validMatrix = Array.isArray(data.matrix)
+          && data.matrix.length === 7
+          && data.matrix.every((row) => Array.isArray(row) && row.length === 24);
+        if (!validMatrix) throw new Error('The peak ordering times response was invalid.');
+        setHeatmapMatrix(data.matrix);
+        setHeatmapError('');
+      })
+      .catch((error) => {
+        if (!isCurrentRequest) return;
+        setHeatmapMatrix(Array.from({ length: 7 }, () => Array(24).fill(0)));
+        setHeatmapError(error.message || 'Unable to load peak ordering times.');
+      })
+      .finally(() => {
+        if (isCurrentRequest) setHeatmapLoading(false);
+      });
+
+    return () => { isCurrentRequest = false; };
+  }, [range, dateFilterStart, dateFilterEnd, orderRefreshKey]);
 
   useEffect(() => {
     const params = new URLSearchParams({ page: String(salesPage), per_page: String(REPORT_ROWS_PER_PAGE) });
@@ -580,17 +642,6 @@ export default function Reports() {
   const ingredientsPageCount = Math.max(1, Math.ceil(ingredients.length / REPORT_ROWS_PER_PAGE));
   const visibleIngredientsPage = Math.min(ingredientsPage, ingredientsPageCount);
   const ingredientsOnPage = ingredients.slice((visibleIngredientsPage - 1) * REPORT_ROWS_PER_PAGE, visibleIngredientsPage * REPORT_ROWS_PER_PAGE);
-
-  /* ── BA-04: Peak traffic heatmap (day x hour) ── */
-  const heatmapMatrix = useMemo(() => {
-    const m = Array.from({ length: 7 }, () => Array(24).fill(0));
-    visibleOrders.forEach(o => {
-      if (!o.created_at) return;
-      const d = new Date(o.created_at);
-      m[d.getDay()][d.getHours()]++;
-    });
-    return m;
-  }, [visibleOrders]);
 
   /* ── BA-04: Standard vs Rush ratio ── */
   const orderTypeSegments = useMemo(() => {
@@ -1034,7 +1085,7 @@ export default function Reports() {
                     </div>
                     <span className="text-xs font-semibold text-black/50">by hour &amp; day of week</span>
                   </div>
-                  <Heatmap matrix={heatmapMatrix} />
+                  <Heatmap matrix={heatmapMatrix} loading={heatmapLoading} error={heatmapError} />
                 </div>
 
                 <div className="bg-white rounded-2xl border p-6 flex flex-col" style={{ borderColor: C.border }}>
