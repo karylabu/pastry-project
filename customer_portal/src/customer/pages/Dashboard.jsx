@@ -66,7 +66,7 @@ function Banner({ onShopNow, onCustomizeNow }) {
   }, [slide, currentSlide]);
 
   return (
-    <div className="relative left-1/2 aspect-[1672/941] w-screen max-w-none -translate-x-1/2 bg-white flex items-center justify-center overflow-hidden font-['DM_Sans']">
+    <div className="relative w-full overflow-hidden bg-white font-['DM_Sans']">
 
       {/* SLIDES */}
       <AnimatePresence mode="wait">
@@ -76,11 +76,11 @@ function Banner({ onShopNow, onCustomizeNow }) {
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.6 }}
-          className="absolute inset-0"
+          className="w-full"
         >
           {currentSlide?.type === "video" ? (
             <video
-              className="absolute inset-0 w-full h-full object-cover"
+              className="block h-auto w-full object-contain"
               src={currentSlide.src}
               poster={currentSlide.poster}
               autoPlay
@@ -92,7 +92,7 @@ function Banner({ onShopNow, onCustomizeNow }) {
             <img
               src={currentSlide?.src}
               alt="Pastry Project banner"
-              className="absolute inset-0 h-full w-full object-contain"
+              className="block h-auto w-full"
             />
           )}
         </motion.div>
