@@ -66,7 +66,7 @@ function Banner({ onShopNow, onCustomizeNow }) {
   }, [slide, currentSlide]);
 
   return (
-    <div className="relative mx-auto aspect-video w-[92vw] max-w-[1380px] bg-white flex items-center justify-center overflow-hidden font-['DM_Sans']">
+    <div className="relative aspect-[1672/941] w-full bg-white flex items-center justify-center overflow-hidden font-['DM_Sans']">
 
       {/* SLIDES */}
       <AnimatePresence mode="wait">
@@ -92,7 +92,7 @@ function Banner({ onShopNow, onCustomizeNow }) {
             <img
               src={currentSlide?.src}
               alt="Pastry Project banner"
-              className="absolute inset-0 h-full w-full object-cover"
+              className="absolute inset-0 h-full w-full object-contain"
             />
           )}
         </motion.div>
