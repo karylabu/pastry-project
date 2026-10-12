@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Navigate, Routes, Route, Link, useLocation } from 'react-router-dom';
+import { Navigate, Routes, Route, Link, useLocation, useNavigate } from 'react-router-dom';
 
 import { CheckCircle, ChevronRight, ShoppingBag, X } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -57,6 +57,8 @@ function GuestAccountPrompt({ onClose }) {
 
 export default function CustomerApp() {
   const location = useLocation();
+  const navigate = useNavigate();
+  const routeSwipeStart = useRef(null);
   const storageKey = (() => {
     try {
       const storedUser = JSON.parse(window.localStorage.getItem('user') || 'null');
@@ -252,6 +254,63 @@ export default function CustomerApp() {
     }
   };
 
+  const handleRouteSwipeStart = (event) => {
+    routeSwipeStart.current = null;
+    if (!window.matchMedia('(max-width: 767px)').matches || event.touches.length !== 1) return;
+
+    const target = event.target instanceof Element ? event.target : null;
+    if (target?.closest('a, button, input, textarea, select, [role="button"], [role="dialog"], [data-no-page-swipe]')) return;
+
+    const touch = event.touches[0];
+    routeSwipeStart.current = {
+      x: touch.clientX,
+      y: touch.clientY,
+      target,
+    };
+  };
+
+  const handleRouteSwipeEnd = (event) => {
+    const start = routeSwipeStart.current;
+    routeSwipeStart.current = null;
+    if (!start || !window.matchMedia('(max-width: 767px)').matches) return;
+
+    const touch = event.changedTouches[0];
+    if (!touch || start.x < 24 || start.x > window.innerWidth - 24) return;
+
+    const deltaX = touch.clientX - start.x;
+    const deltaY = touch.clientY - start.y;
+    if (Math.abs(deltaX) < 70 || Math.abs(deltaX) < Math.abs(deltaY) * 1.3) return;
+
+    let ancestor = start.target;
+    while (ancestor && ancestor !== event.currentTarget) {
+      const style = window.getComputedStyle(ancestor);
+      const isHorizontallyScrollable = ancestor.scrollWidth > ancestor.clientWidth + 2
+        && /(auto|scroll)/.test(style.overflowX);
+      if (isHorizontallyScrollable) {
+        const canScrollInGestureDirection = deltaX < 0
+          ? ancestor.scrollLeft + ancestor.clientWidth < ancestor.scrollWidth - 1
+          : ancestor.scrollLeft > 1;
+        if (canScrollInGestureDirection) return;
+      }
+      ancestor = ancestor.parentElement;
+    }
+
+    const swipePages = [
+      '/customer',
+      '/customer/menu',
+      '/customer/customized-cakes',
+      ...(hasCustomerAccount() ? ['/customer/orders'] : []),
+    ];
+    const currentPath = location.pathname.replace(/\/+$/, '') || '/customer';
+    const currentIndex = swipePages.indexOf(currentPath);
+    if (currentIndex === -1) return;
+
+    const nextIndex = currentIndex + (deltaX < 0 ? 1 : -1);
+    if (nextIndex >= 0 && nextIndex < swipePages.length) {
+      navigate(swipePages[nextIndex]);
+    }
+  };
+
   const showShopBlockedMessage = () => {
     setToastMessage('Staff and admin accounts cannot add to cart');
     setShowToast(true);
@@ -418,30 +477,32 @@ export default function CustomerApp() {
       {shouldShowNavbar && <Navbar cartCount={cartQuantity} onCartClick={() => setIsCartOpen(true)} />}
 
       {/* ROUTES */}
-      <Routes>
-        <Route index element={<Dashboard onAddToCart={addToCart} onEnsureShopOpen={ensureShopIsOpen} hideFloating={hideDashboardFloaters} />} />
-        <Route path="menu" element={<Menu onAddToCart={addToCart} onEnsureShopOpen={ensureShopIsOpen} />} />
-        <Route path="orders" element={hasCustomerAccount() ? <Orders /> : <Navigate to="/customer/menu" replace />} />
-        <Route path="customized-cakes" element={<CustomizedCakes />} />
-        <Route path="birthday-designs" element={<BirthdayDesigns />} />
-        <Route path="cutesy-designs" element={<CutesyDesigns />} />
-        <Route path="holiday-designs" element={<HolidayDesigns />} />
-        <Route path="kids-designs" element={<KidsDesigns />} />
-        <Route path="wedding-designs" element={<WeddingDesigns />} />
-        <Route path="floral-designs" element={<FloralDesigns />} />
-        <Route path="profile" element={<Profile />} />
-        <Route path="rewards" element={<Rewards />} />
-        <Route path="favorites" element={<Favorites />} />
-        <Route path="saved-addresses" element={<Navigate to="/customer/profile" replace />} />
-        <Route path="account-settings" element={<AccountSettings />} />
-        <Route path="chat-support" element={<ChatSupport />} />
-        <Route path="careers" element={<CareersPage />} />
-        <Route path="about-us" element={<AboutUsPage />} />
-        <Route path="terms" element={<TermsPage />} />
-        <Route path="privacy-policy" element={<PrivacyPage />} />
-        <Route path="cookie-policy" element={<CookiePolicyPage />} />
-        <Route path="credits" element={<CreditsPage />} />
-      </Routes>
+      <div onTouchStart={handleRouteSwipeStart} onTouchEnd={handleRouteSwipeEnd}>
+        <Routes>
+          <Route index element={<Dashboard onAddToCart={addToCart} onEnsureShopOpen={ensureShopIsOpen} hideFloating={hideDashboardFloaters} />} />
+          <Route path="menu" element={<Menu onAddToCart={addToCart} onEnsureShopOpen={ensureShopIsOpen} />} />
+          <Route path="orders" element={hasCustomerAccount() ? <Orders /> : <Navigate to="/customer/menu" replace />} />
+          <Route path="customized-cakes" element={<CustomizedCakes />} />
+          <Route path="birthday-designs" element={<BirthdayDesigns />} />
+          <Route path="cutesy-designs" element={<CutesyDesigns />} />
+          <Route path="holiday-designs" element={<HolidayDesigns />} />
+          <Route path="kids-designs" element={<KidsDesigns />} />
+          <Route path="wedding-designs" element={<WeddingDesigns />} />
+          <Route path="floral-designs" element={<FloralDesigns />} />
+          <Route path="profile" element={<Profile />} />
+          <Route path="rewards" element={<Rewards />} />
+          <Route path="favorites" element={<Favorites />} />
+          <Route path="saved-addresses" element={<Navigate to="/customer/profile" replace />} />
+          <Route path="account-settings" element={<AccountSettings />} />
+          <Route path="chat-support" element={<ChatSupport />} />
+          <Route path="careers" element={<CareersPage />} />
+          <Route path="about-us" element={<AboutUsPage />} />
+          <Route path="terms" element={<TermsPage />} />
+          <Route path="privacy-policy" element={<PrivacyPage />} />
+          <Route path="cookie-policy" element={<CookiePolicyPage />} />
+          <Route path="credits" element={<CreditsPage />} />
+        </Routes>
+      </div>
 
       {/* BOTTOM CART SUMMARY */}
       {showFloatingCart && !floatingFooterApproaching && cartQuantity > 0 && (
