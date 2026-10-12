@@ -63,6 +63,7 @@ Route::post('sales/import-pdf', [SalesImportController::class, 'store']);
 Route::post('sales/import-csv', [SalesImportController::class, 'storeCsv']);
 Route::post('sales/import', [SalesImportController::class, 'storeRows']);
 Route::get('sales/import/history', [SalesImportController::class, 'history']);
+Route::delete('sales/import/{importId}', [SalesImportController::class, 'deleteImport']);
 Route::get('sales/import/{importId}/status', [SalesImportController::class, 'importStatus']);
 Route::post('newsletter/subscribe', [NewsletterController::class, 'subscribe']);
 Route::post('orders', [OrderController::class, 'store']);

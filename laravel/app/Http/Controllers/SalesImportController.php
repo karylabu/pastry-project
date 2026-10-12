@@ -211,6 +211,36 @@ class SalesImportController extends Controller
         ]);
     }
 
+    public function deleteImport(Request $request, int $importId)
+    {
+        $user = $this->requireRole($request, 'admin');
+        if (!$user instanceof User) {
+            return $user;
+        }
+
+        return DB::transaction(function () use ($importId) {
+            $import = DB::table('analytics_imports')
+                ->where('id', $importId)
+                ->lockForUpdate()
+                ->first(['id', 'file_name', 'source_name', 'status']);
+
+            if (!$import) {
+                return response()->json(['success' => false, 'message' => 'Import not found.'], 404);
+            }
+            if ($import->source_name !== 'POS CSV' || strtolower(pathinfo($import->file_name, PATHINFO_EXTENSION)) !== 'csv') {
+                return response()->json(['success' => false, 'message' => 'Only imported CSV files can be deleted here.'], 422);
+            }
+            if (in_array($import->status, ['queued', 'processing'], true)) {
+                return response()->json(['success' => false, 'message' => 'Wait for CSV processing to finish before deleting this import.'], 409);
+            }
+
+            DB::table('analytics_sales_history')->where('import_id', $importId)->delete();
+            DB::table('analytics_imports')->where('id', $importId)->delete();
+
+            return response()->json(['success' => true, 'message' => 'CSV import and its sales records were deleted.']);
+        });
+    }
+
     /**
      * Ordered list of regex patterns tried against each line of extracted
      * text. First match wins. Each pattern must expose named groups:
@@ -332,6 +362,7 @@ class SalesImportController extends Controller
             'sales_type' => ['nullable', 'in:customized_cake,finished_product,other'],
             'rows' => ['required', 'array', 'min:1', 'max:5000'],
             'rows.*.name' => ['required', 'string', 'max:255'],
+            'rows.*.size' => ['nullable', 'string', 'max:120'],
             'rows.*.quantity' => ['required', 'numeric', 'min:0.01'],
             'rows.*.total' => ['required', 'numeric', 'min:0'],
             'rows.*.sale_date' => ['nullable', 'date_format:Y-m-d'],
@@ -339,6 +370,7 @@ class SalesImportController extends Controller
 
         $rows = array_map(static fn (array $row) => [
             'name' => trim($row['name']),
+            'size' => isset($row['size']) ? trim((string) $row['size']) : null,
             'quantity' => (float) $row['quantity'],
             'total' => round((float) $row['total'], 2),
             'sale_date' => $row['sale_date'] ?? now()->toDateString(),
@@ -386,12 +418,12 @@ class SalesImportController extends Controller
         $importedRows = DB::table('analytics_sales_history as history')
             ->join('analytics_imports as imports', 'imports.id', '=', 'history.import_id')
             ->where('imports.status', 'completed')
-            ->selectRaw("history.id AS id, history.product_name AS cake_name, history.sale_date, history.units_sold, history.revenue AS price, imports.sales_type, 0 AS down_payment, 0 AS remaining_balance, 'imported' AS source");
+            ->selectRaw("history.id AS id, history.product_name AS cake_name, history.size, history.sale_date, history.units_sold, history.revenue AS price, imports.sales_type, history.import_id, 0 AS down_payment, 0 AS remaining_balance, 'imported' AS source");
         $historyRows = $importedRows;
 
         if (Schema::hasTable('sales')) {
             $legacyRows = DB::table('sales')
-                ->selectRaw("id AS id, cake_name, sale_date, 1 AS units_sold, price, 'other' AS sales_type, down_payment, remaining_balance, 'legacy' AS source");
+                ->selectRaw("id AS id, cake_name, NULL AS size, sale_date, 1 AS units_sold, price, 'other' AS sales_type, NULL AS import_id, down_payment, remaining_balance, 'legacy' AS source");
             $historyRows = $importedRows->unionAll($legacyRows);
         }
 
@@ -435,6 +467,7 @@ class SalesImportController extends Controller
         $sales = array_map(static fn ($row) => [
             'id' => $row->source === 'legacy' ? 'legacy-' . $row->id : (string) $row->id,
             'cake_name' => $row->cake_name,
+            'size' => $row->size,
             'sale_date' => $row->sale_date,
             'units_sold' => (float) $row->units_sold,
             'price' => (float) $row->price,
@@ -442,11 +475,53 @@ class SalesImportController extends Controller
             'remaining_balance' => (float) $row->remaining_balance,
             'source' => $row->source,
             'sales_type' => $row->sales_type,
+            'import_id' => $row->import_id === null ? null : (int) $row->import_id,
         ], $history->items());
+        $imports = DB::table('analytics_imports as imports')
+            ->leftJoinSub(
+                DB::table('analytics_sales_history')
+                    ->select('import_id')
+                    ->selectRaw('COUNT(*) AS records, COALESCE(SUM(units_sold), 0) AS items_sold, COALESCE(SUM(revenue), 0) AS revenue')
+                    ->groupBy('import_id'),
+                'history_totals',
+                'history_totals.import_id',
+                '=',
+                'imports.id'
+            )
+            ->where('imports.source_name', 'POS CSV')
+            ->whereRaw('LOWER(imports.file_name) LIKE ?', ['%.csv'])
+            ->orderByDesc('imports.uploaded_at')
+            ->get([
+                'imports.id',
+                'imports.file_name',
+                'imports.sales_type',
+                'imports.uploaded_at',
+                'imports.status',
+                'imports.rows_received',
+                'imports.rows_processed',
+                'imports.error_message',
+                DB::raw('COALESCE(history_totals.records, 0) AS records'),
+                DB::raw('COALESCE(history_totals.items_sold, 0) AS items_sold'),
+                DB::raw('COALESCE(history_totals.revenue, 0) AS revenue'),
+            ])
+            ->map(static fn ($import) => [
+                'id' => (int) $import->id,
+                'file_name' => $import->file_name,
+                'sales_type' => $import->sales_type,
+                'uploaded_at' => $import->uploaded_at,
+                'status' => $import->status,
+                'rows_received' => (int) $import->rows_received,
+                'rows_processed' => (int) $import->rows_processed,
+                'error_message' => $import->error_message,
+                'records' => (int) $import->records,
+                'items_sold' => (float) $import->items_sold,
+                'revenue' => (float) $import->revenue,
+            ]);
 
         return response()->json([
             'success' => true,
             'sales' => $sales,
+            'imports' => $imports,
             'pagination' => [
                 'current_page' => $history->currentPage(),
                 'per_page' => $history->perPage(),
@@ -481,6 +556,7 @@ class SalesImportController extends Controller
             $historyRows = array_map(static fn (array $row) => [
                 'import_id' => $importId,
                 'product_name' => $row['name'],
+                'size' => $row['size'] ?? null,
                 'sale_date' => $row['sale_date'] ?? $now->toDateString(),
                 'units_sold' => $row['quantity'],
                 'revenue' => $row['total'],

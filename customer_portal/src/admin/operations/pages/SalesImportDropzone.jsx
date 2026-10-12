@@ -47,10 +47,10 @@ function validateFile(file) {
 }
 
 function downloadCsvTemplate() {
-  const headers = ['sale_date', 'item_name', 'quantity', 'price', 'total_amount'];
+  const headers = ['sale_date', 'item_name', 'size', 'quantity', 'price', 'total_amount'];
   const sample = [
-    ['2026-09-01', 'Chocolate Croissant', '12', '95', '1140'],
-    ['2026-09-02', 'Sourdough Loaf', '6', '180', '1080'],
+    ['2026-09-01', 'Chocolate Cake', '8 inch', '2', '850', '1700'],
+    ['2026-09-02', 'Vanilla Cake', '6 inch', '1', '650', '650'],
   ];
   const csv = [headers, ...sample].map(r => r.join(',')).join('\n');
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });

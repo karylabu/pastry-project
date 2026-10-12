@@ -429,8 +429,11 @@ export default function Reports() {
   const [analyticsRefreshKey, setAnalyticsRefreshKey] = useState(0);
   const [orderRefreshKey, setOrderRefreshKey] = useState(0);
   const [historicalSales, setHistoricalSales] = useState([]);
+  const [historicalImports, setHistoricalImports] = useState([]);
   const [historicalSalesSummary, setHistoricalSalesSummary] = useState({ total_sales: 0, total_down_payments: 0, total_remaining_balance: 0, records: 0 });
   const [historicalSalesError, setHistoricalSalesError] = useState('');
+  const [importDeleteError, setImportDeleteError] = useState('');
+  const [deletingImportId, setDeletingImportId] = useState(null);
 
   const refreshAnalyticsAfterImport = () => {
     setSalesPage(1);
@@ -614,18 +617,41 @@ export default function Reports() {
         if (!response.ok || !data.success) throw new Error(data.message || 'Unable to load imported sales history.');
         if (!isCurrentRequest) return;
         setHistoricalSales(Array.isArray(data.sales) ? data.sales : []);
+        setHistoricalImports(Array.isArray(data.imports) ? data.imports : []);
         setHistoricalSalesSummary(data.summary || { total_sales: 0, total_down_payments: 0, total_remaining_balance: 0, records: 0 });
         setHistoricalSalesError('');
+        setImportDeleteError('');
       })
       .catch((error) => {
         if (!isCurrentRequest) return;
         setHistoricalSales([]);
+        setHistoricalImports([]);
         setHistoricalSalesSummary({ total_sales: 0, total_down_payments: 0, total_remaining_balance: 0, records: 0 });
         setHistoricalSalesError(error.message || 'Unable to load imported sales history.');
       });
 
     return () => { isCurrentRequest = false; };
   }, [range, dateFilterStart, dateFilterEnd, salesPage, analyticsCategory, analyticsRefreshKey]);
+
+  const deleteCsvImport = async (importFile) => {
+    if (!window.confirm(`Delete "${importFile.file_name}" and all ${importFile.records.toLocaleString()} imported sales records? This cannot be undone.`)) return;
+    setDeletingImportId(importFile.id);
+    setImportDeleteError('');
+    try {
+      const response = await laravelStaffFetch(`${LARAVEL_BASE}/api/sales/import/${importFile.id}`, { method: 'DELETE' });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !data.success) {
+        throw new Error(data.message || 'Unable to delete this CSV import.');
+      }
+      setHistoricalImports((imports) => imports.filter((item) => item.id !== importFile.id));
+      setSalesPage(1);
+      setAnalyticsRefreshKey((current) => current + 1);
+    } catch (error) {
+      setImportDeleteError(error.message || 'Unable to delete this CSV import.');
+    } finally {
+      setDeletingImportId(null);
+    }
+  };
 
   useEffect(() => {
     setSalesPage(1);
@@ -1302,6 +1328,36 @@ export default function Reports() {
                 {ordersLoadError && <p className="mb-3 rounded-md bg-red-50 px-3 py-2 text-xs text-red-800" role="alert">Unable to load sales transactions: {ordersLoadError}</p>}
                 {catalogLoadError && <p className="mb-3 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-800" role="alert">Some sales filters may be incomplete: {catalogLoadError}</p>}
                 {historicalSalesError && <p className="mb-3 rounded-md bg-red-50 px-3 py-2 text-xs text-red-800" role="alert">{historicalSalesError}</p>}
+                {importDeleteError && <p className="mb-3 rounded-md bg-red-50 px-3 py-2 text-xs text-red-800" role="alert">{importDeleteError}</p>}
+                <div className="mb-4 rounded-md border border-black/10 bg-[#fffdf8] p-4">
+                  <h4 className="mb-2 text-xs font-bold uppercase tracking-wide text-black/70">Imported CSV files</h4>
+                  {historicalImports.length === 0 ? (
+                    <p className="text-xs text-black/50">No CSV imports found.</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {historicalImports.map((importFile) => (
+                        <div key={importFile.id} className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-black/10 bg-white px-3 py-2">
+                          <div className="min-w-0">
+                            <p className="truncate text-xs font-semibold text-black">{importFile.file_name}</p>
+                            <p className="mt-0.5 text-[10px] text-black/55">
+                              {String(importFile.sales_type || 'other').replace(/_/g, ' ')} · {Number(importFile.records).toLocaleString()} rows · {peso(importFile.revenue)} · {importFile.status}
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => deleteCsvImport(importFile)}
+                            disabled={deletingImportId !== null || ['queued', 'processing'].includes(importFile.status)}
+                            className="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-red-200 px-2.5 py-1.5 text-[10px] font-semibold text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+                            aria-label={`Delete imported CSV ${importFile.file_name}`}
+                            title={['queued', 'processing'].includes(importFile.status) ? 'Wait for this import to finish before deleting it.' : 'Delete this import and its imported sales records'}
+                          >
+                            {deletingImportId === importFile.id ? 'Deleting…' : <><Trash2 size={12} /> Delete</>}
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm border-separate border-spacing-y-1">
                     <thead>
@@ -1352,7 +1408,10 @@ export default function Reports() {
                           <tr key={`historical-${sale.id}`} className="border-b bg-white" style={{ borderColor: C.border }}>
                             <td className="px-4 py-4 text-[13px] text-black/70">{sale.sale_date}</td>
                             <td className="px-4 py-4 font-semibold text-black">Historical</td>
-                            <td className="max-w-[300px] truncate px-4 py-4 text-[13px] text-black/70">{sale.cake_name}</td>
+                            <td className="max-w-[300px] px-4 py-4 text-[13px] text-black/70">
+                              <span className="block truncate">{sale.cake_name}</span>
+                              {sale.sales_type === 'finished_product' && sale.size && <span className="mt-0.5 block text-[10px] text-black/50">Size: {sale.size}</span>}
+                            </td>
                             <td className="px-4 py-4"><span className="inline-flex rounded-md bg-[#fff4cd] px-2.5 py-1 text-[10px] font-semibold text-[#80600a]">{sale.source === 'legacy' ? 'Legacy sale' : sale.sales_type === 'customized_cake' ? 'Customized cake' : sale.sales_type === 'finished_product' ? 'Finished product' : 'Other imported sale'}</span></td>
                             <td className="px-4 py-4 text-right font-semibold text-black">{peso(sale.price)}</td>
                             <td className="px-4 py-4"><span className="inline-flex rounded-md bg-[#fff4cd] px-2.5 py-1 text-[10px] font-semibold text-black">Imported</span></td>

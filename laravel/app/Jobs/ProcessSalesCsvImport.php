@@ -80,6 +80,7 @@ class ProcessSalesCsvImport implements ShouldQueue
                 $batch[] = [
                     'import_id' => $this->importId,
                     'product_name' => $normalized['name'],
+                    'size' => $normalized['size'],
                     'sale_date' => $normalized['sale_date'],
                     'units_sold' => $normalized['quantity'],
                     'revenue' => $normalized['total'],
@@ -142,6 +143,7 @@ class ProcessSalesCsvImport implements ShouldQueue
     {
         $aliases = [
             'name' => ['item_name', 'product_name', 'product', 'item', 'name', 'design'],
+            'size' => ['size', 'cake_size', 'product_size', 'variant_size', 'variant'],
             'quantity' => ['quantity', 'qty', 'units', 'units_sold'],
             'price' => ['price', 'unit_price', 'unit_cost'],
             'total' => ['total_amount', 'total', 'amount', 'line_total', 'gross_amount'],
@@ -195,6 +197,7 @@ class ProcessSalesCsvImport implements ShouldQueue
 
         return [
             'name' => $name,
+            'size' => mb_substr(trim((string) ($row['size'] ?? '')), 0, 120) ?: null,
             'sale_date' => $saleDate,
             'quantity' => $quantity,
             'total' => round($total, 2),

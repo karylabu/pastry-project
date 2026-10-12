@@ -54,6 +54,7 @@ class SalesImportControllerTest extends TestCase
             $table->id();
             $table->unsignedBigInteger('import_id')->nullable();
             $table->string('product_name');
+            $table->string('size', 120)->nullable();
             $table->date('sale_date');
             $table->decimal('units_sold', 10, 2)->default(0);
             $table->decimal('revenue', 10, 2)->default(0);
@@ -322,6 +323,7 @@ class SalesImportControllerTest extends TestCase
     public function test_csv_job_imports_date_design_and_price_as_one_item_per_row(): void
     {
         Storage::fake('local');
+        $admin = User::factory()->createOne(['role' => 'admin']);
         $importId = DB::table('analytics_imports')->insertGetId([
             'file_name' => 'design-sales.csv',
             'source_name' => 'POS CSV',
@@ -332,7 +334,7 @@ class SalesImportControllerTest extends TestCase
         ]);
         Storage::disk('local')->put(
             'sales-imports/design-sales.csv',
-            "\xEF\xBB\xBF\"DATE\",\"DESIGN\",\"PRICE\"\n\"2026-10-01\",\"Chocolate Floral Cake\",\"1,250\"\n"
+            "\xEF\xBB\xBF\"DATE\",\"DESIGN\",\"SIZE\",\"PRICE\"\n\"2026-10-01\",\"Chocolate Floral Cake\",\"8 inch\",\"1,250\"\n"
         );
 
         (new ProcessSalesCsvImport($importId, 'sales-imports/design-sales.csv'))->handle();
@@ -340,6 +342,7 @@ class SalesImportControllerTest extends TestCase
         $this->assertDatabaseHas('analytics_sales_history', [
             'import_id' => $importId,
             'product_name' => 'Chocolate Floral Cake',
+            'size' => '8 inch',
             'sale_date' => '2026-10-01',
             'units_sold' => 1,
             'revenue' => 1250,
@@ -350,6 +353,62 @@ class SalesImportControllerTest extends TestCase
             'rows_received' => 1,
             'rows_processed' => 1,
         ]);
+
+        $this->actingAs($admin)
+            ->getJson('/api/sales/import/history?source=imported')
+            ->assertOk()
+            ->assertJsonPath('sales.0.size', '8 inch')
+            ->assertJsonPath('imports.0.file_name', 'design-sales.csv');
+    }
+
+    public function test_admin_can_delete_a_completed_csv_import_and_its_sales_rows(): void
+    {
+        $admin = User::factory()->createOne(['role' => 'admin']);
+        $importId = DB::table('analytics_imports')->insertGetId([
+            'file_name' => 'cakes.csv',
+            'source_name' => 'POS CSV',
+            'sales_type' => 'finished_product',
+            'uploaded_at' => now(),
+            'status' => 'completed',
+            'rows_received' => 1,
+            'rows_processed' => 1,
+        ]);
+        DB::table('analytics_sales_history')->insert([
+            'import_id' => $importId,
+            'product_name' => 'Chocolate Cake',
+            'size' => '8 inch',
+            'sale_date' => '2026-10-01',
+            'units_sold' => 1,
+            'revenue' => 850,
+        ]);
+
+        $this->actingAs($admin)
+            ->deleteJson("/api/sales/import/{$importId}")
+            ->assertOk()
+            ->assertJsonPath('success', true);
+
+        $this->assertDatabaseMissing('analytics_imports', ['id' => $importId]);
+        $this->assertDatabaseMissing('analytics_sales_history', ['import_id' => $importId]);
+    }
+
+    public function test_csv_import_cannot_be_deleted_while_it_is_processing(): void
+    {
+        $admin = User::factory()->createOne(['role' => 'admin']);
+        $importId = DB::table('analytics_imports')->insertGetId([
+            'file_name' => 'processing.csv',
+            'source_name' => 'POS CSV',
+            'uploaded_at' => now(),
+            'status' => 'processing',
+            'rows_received' => 1,
+            'rows_processed' => 0,
+        ]);
+
+        $this->actingAs($admin)
+            ->deleteJson("/api/sales/import/{$importId}")
+            ->assertStatus(409)
+            ->assertJsonPath('success', false);
+
+        $this->assertDatabaseHas('analytics_imports', ['id' => $importId]);
     }
 
     public function test_history_endpoint_returns_a_filtered_page_and_full_summary(): void
@@ -391,6 +450,8 @@ class SalesImportControllerTest extends TestCase
             ->assertJsonPath('summary.total_sales', 30)
             ->assertJsonPath('pagination.total', 2)
             ->assertJsonPath('pagination.current_page', 2)
-            ->assertJsonPath('sales.0.cake_name', 'Croissant');
+            ->assertJsonPath('sales.0.cake_name', 'Croissant')
+            ->assertJsonPath('sales.0.size', null)
+            ->assertJsonFragment(['file_name' => 'history.csv']);
     }
 }
