@@ -1,5 +1,5 @@
 import React from 'react';
-import { ArrowRight } from 'lucide-react';
+import { ArrowUpRight } from 'lucide-react';
 import { ROOT_BASE } from '../../services/config';
 
 export const DESIGN_CATEGORIES = [
@@ -46,19 +46,24 @@ export default function DesignCategoryCards({ onSelectCategory, className = '' }
           key={label}
           type="button"
           onClick={() => onSelectCategory(path)}
-          className="group flex min-w-0 flex-col items-center justify-center gap-1 rounded-xl px-1 py-2 text-center text-[#5f514a] transition hover:bg-[#fff8df] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#b68b43]"
+          className="group flex min-w-0 flex-col items-center justify-center gap-2 rounded-2xl border border-[#eee5d8] bg-white px-1.5 py-3 text-center text-[#49392f] shadow-[0_3px_12px_rgba(76,53,31,0.045)] transition duration-200 hover:-translate-y-1 hover:border-[#d9bd7b] hover:bg-[#fffdf8] hover:shadow-[0_10px_22px_rgba(76,53,31,0.11)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#b68b43] sm:gap-2.5 sm:rounded-[20px] sm:py-4"
         >
-          <span className="block h-12 w-12 overflow-hidden rounded-full bg-[#f8eee8] sm:h-16 sm:w-16">
+          <span className="block h-14 w-14 rounded-full bg-gradient-to-br from-[#f3e7c9] via-[#fffaf0] to-[#ead7b4] p-[3px] shadow-[0_3px_9px_rgba(91,64,39,0.12)] sm:h-[76px] sm:w-[76px]">
             <img
               src={image}
               alt={`${label} cake design`}
               loading="lazy"
-              className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-110"
+              className="h-full w-full rounded-full border-2 border-white object-cover transition-transform duration-300 group-hover:scale-[1.04]"
             />
           </span>
-          <span className="inline-flex items-center gap-1 text-[9px] font-semibold leading-tight sm:text-[11px]">
-            {label}
-            <ArrowRight aria-hidden="true" size={11} strokeWidth={2} />
+          <span className="flex min-h-5 w-full items-center justify-center gap-1 text-[9px] font-semibold leading-tight tracking-[-0.01em] sm:text-[11px]">
+            <span className="truncate">{label}</span>
+            <ArrowUpRight
+              aria-hidden="true"
+              size={13}
+              strokeWidth={1.8}
+              className="shrink-0 text-[#aa8546] transition-transform duration-200 group-hover:translate-x-0.5 group-hover:-translate-y-0.5"
+            />
           </span>
         </button>
       ))}
