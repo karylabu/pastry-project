@@ -54,7 +54,7 @@ class IngredientInventoryController extends Controller
             ->select('ingredient_id')
             ->selectRaw('SUM(qty) as quantity')
             ->where('action', 'stock_out')
-            ->where('reference_type', 'production')
+            ->whereIn('reference_type', ['production', 'order'])
             ->when($periodStart, fn ($query) => $query->where('created_at', '>=', $periodStart))
             ->where('created_at', '<=', $periodEnd)
             ->groupBy('ingredient_id');

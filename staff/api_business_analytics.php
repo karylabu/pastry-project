@@ -101,6 +101,10 @@ if ($isAllTime) {
     $firstSaleDates = [];
     $firstOrder = analyticsScalar($conn, "SELECT DATE(MIN(created_at)) AS first_sale FROM orders WHERE LOWER(status) = 'completed'");
     if (!empty($firstOrder['first_sale'])) $firstSaleDates[] = (string) $firstOrder['first_sale'];
+    $firstIngredientMovement = analyticsScalar($conn, "SELECT DATE(MIN(created_at)) AS first_sale FROM ingredient_movements WHERE action = 'stock_out' AND reference_type IN ('production', 'order')");
+    if (!empty($firstIngredientMovement['first_sale'])) $firstSaleDates[] = (string) $firstIngredientMovement['first_sale'];
+    $firstIngredientWaste = analyticsScalar($conn, "SELECT DATE(MIN(datetime)) AS first_sale FROM waste_log WHERE LOWER(item_type) = 'raw material' AND qty > 0");
+    if (!empty($firstIngredientWaste['first_sale'])) $firstSaleDates[] = (string) $firstIngredientWaste['first_sale'];
     $firstImport = analyticsScalar($conn, "SELECT MIN(history.sale_date) AS first_sale FROM analytics_sales_history AS history INNER JOIN analytics_imports AS imports ON imports.id = history.import_id WHERE imports.status = 'completed'");
     if (!empty($firstImport['first_sale'])) $firstSaleDates[] = (string) $firstImport['first_sale'];
     if ($hasLegacySales) {

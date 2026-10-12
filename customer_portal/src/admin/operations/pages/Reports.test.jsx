@@ -1,4 +1,4 @@
-import { filterImportedTransactions, filterSalesTransactions, getAnalyticsDateRange, groupRevenueByInterval } from "./Reports";
+import { filterImportedTransactions, filterSalesTransactions, getAnalyticsDateRange, groupRevenueByInterval, selectReportIngredients } from "./Reports";
 
 const sales = [
   { date: "2026-10-05", revenue: 100, orders: 2 },
@@ -63,6 +63,24 @@ describe("getAnalyticsDateRange", () => {
       all: true,
       end_date: "2026-10-12",
     });
+  });
+});
+
+describe("selectReportIngredients", () => {
+  test("uses analytics inventory if the inventory endpoint returns no ingredients", () => {
+    expect(selectReportIngredients([], [
+      { ingredient_id: 12, ingredient: "Flour", unit: "kg", stock: "8", threshold: "2" },
+    ])).toEqual([
+      { id: 12, name: "Flour", unit: "kg", stock: 8, threshold: 2, expiry: null },
+    ]);
+  });
+
+  test("prefers the primary inventory list when it is available", () => {
+    expect(selectReportIngredients([
+      { id: 3, name: "Sugar", unit: "kg", stock: 5, threshold: 1 },
+    ], [
+      { ingredient_id: 12, ingredient: "Flour", unit: "kg", stock: 8, threshold: 2 },
+    ]).map((ingredient) => ingredient.name)).toEqual(["Sugar"]);
   });
 });
 

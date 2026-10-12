@@ -69,6 +69,20 @@ function procurementStatus(ing) {
   return 'Optimal Stock';
 }
 
+export function selectReportIngredients(primaryIngredients, analyticsInventory = []) {
+  const source = primaryIngredients.length ? primaryIngredients : analyticsInventory;
+  return source
+    .map((ingredient) => ({
+      id: Number(ingredient.id ?? ingredient.ingredient_id),
+      name: ingredient.name ?? ingredient.ingredient,
+      unit: ingredient.unit || '',
+      stock: Number(ingredient.stock || 0),
+      threshold: Number(ingredient.threshold || 0),
+      expiry: ingredient.expiry || null,
+    }))
+    .filter((ingredient) => ingredient.id > 0 && ingredient.name);
+}
+
 export function groupRevenueByInterval(rows, interval) {
   const buckets = new Map();
   rows.forEach((row) => {
@@ -723,10 +737,43 @@ export default function Reports() {
   const revenueTrend = prevRevenue > 0 ? Math.round(((totalRevenue - prevRevenue) / prevRevenue) * 100) : 0;
 
   /* ── BA-02 / BA-05: real ingredients + procurement status ── */
-  const ingredients = useMemo(
-    () => ingredientsRaw.map(ing => ({ ...ing, status: procurementStatus(ing) })),
-    [ingredientsRaw]
-  );
+  const ingredients = useMemo(() => selectReportIngredients(
+    ingredientsRaw,
+    analytics?.inventory?.ingredient_inventory || []
+  ).map((ing) => ({ ...ing, status: procurementStatus(ing) })), [ingredientsRaw, analytics]);
+  const ingredientUsageForMatrix = useMemo(() => {
+    if (!analytics && ingredientUsage === null) return null;
+
+    const usage = Object.fromEntries(ingredients.map((ingredient) => {
+      const savedUsage = ingredientUsage?.[ingredient.id] || {};
+      const consumption = Number(savedUsage.consumption ?? savedUsage.weekly_consumption ?? 0);
+      return [
+      ingredient.id,
+      {
+        consumption,
+        weekly_consumption: consumption,
+        waste_quantity: Number(savedUsage.waste_quantity || 0),
+        waste_loss: Number(savedUsage.waste_loss || 0),
+      },
+      ];
+    }));
+    (analytics?.ingredient_consumption || []).forEach((row) => {
+      const id = Number(row.ingredient_id);
+      if (!usage[id]) usage[id] = { consumption: 0, weekly_consumption: 0, waste_quantity: 0, waste_loss: 0 };
+      usage[id].consumption = Number(row.quantity_consumed || 0);
+      usage[id].weekly_consumption = usage[id].consumption;
+    });
+    (analytics?.waste?.by_ingredient || []).forEach((row) => {
+      const id = Number(row.id);
+      if (!usage[id]) return;
+      const savedUsage = ingredientUsage?.[id];
+      if (savedUsage && Object.prototype.hasOwnProperty.call(savedUsage, 'waste_quantity')) return;
+      usage[id].waste_quantity = Number(row.quantity || 0);
+      usage[id].waste_loss = Number(row.cost || 0);
+    });
+    return usage;
+  }, [ingredientUsage, analytics, ingredients]);
+  const ingredientUsageDisplayError = ingredientUsageError && ingredientUsageForMatrix === null;
   const lowStockCount = useMemo(
     () => ingredients.filter(i => i.status === 'Critical Reorder').length,
     [ingredients]
@@ -1328,7 +1375,7 @@ export default function Reports() {
                     </p>
                   </div>
                 </div>
-                {ingredientUsageError && <p role="alert" className="mx-6 mb-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-800">Unable to load ingredient usage: {ingredientUsageError}</p>}
+                {ingredientUsageDisplayError && <p role="alert" className="mx-6 mb-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-800">Unable to load ingredient usage: {ingredientUsageError}</p>}
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
@@ -1364,10 +1411,10 @@ export default function Reports() {
                             </td>
                             <td className="px-5 py-4 font-semibold" style={{ color: C.ink }}>{ing.stock} / {ing.threshold} {ing.unit}</td>
                             <td className="px-5 py-4 text-xs text-black/70">
-                              {ingredientUsageError ? 'Unavailable' : ingredientUsage === null ? 'Loading…' : `${Number(ingredientUsage[ing.id]?.consumption ?? ingredientUsage[ing.id]?.weekly_consumption ?? 0).toLocaleString(undefined, { maximumFractionDigits: 3 })} ${ing.unit}`}
+                              {ingredientUsageDisplayError ? 'Unavailable' : ingredientUsageForMatrix === null ? 'Loading…' : `${Number(ingredientUsageForMatrix[ing.id]?.consumption ?? ingredientUsageForMatrix[ing.id]?.weekly_consumption ?? 0).toLocaleString(undefined, { maximumFractionDigits: 3 })} ${ing.unit}`}
                             </td>
                             <td className="px-5 py-4 text-xs text-black/70">
-                              {ingredientUsageError ? 'Unavailable' : ingredientUsage === null ? 'Loading…' : `${Number(ingredientUsage[ing.id]?.waste_quantity || 0).toLocaleString(undefined, { maximumFractionDigits: 3 })} ${ing.unit} · ₱${Number(ingredientUsage[ing.id]?.waste_loss || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                              {ingredientUsageDisplayError ? 'Unavailable' : ingredientUsageForMatrix === null ? 'Loading…' : `${Number(ingredientUsageForMatrix[ing.id]?.waste_quantity || 0).toLocaleString(undefined, { maximumFractionDigits: 3 })} ${ing.unit} · ₱${Number(ingredientUsageForMatrix[ing.id]?.waste_loss || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
                             </td>
                             <td className="px-5 py-4"><ExpiryTag expiry={ing.expiry} /></td>
                             <td className="px-5 py-4"><PriorityPill status={ing.status} /></td>

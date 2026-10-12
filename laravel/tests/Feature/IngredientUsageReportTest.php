@@ -55,6 +55,13 @@ class IngredientUsageReportTest extends TestCase
             [
                 'ingredient_id' => $ingredientId,
                 'action' => 'stock_out',
+                'qty' => 0.5,
+                'reference_type' => 'order',
+                'created_at' => '2026-10-12 09:00:00',
+            ],
+            [
+                'ingredient_id' => $ingredientId,
+                'action' => 'stock_out',
                 'qty' => 7,
                 'reference_type' => 'manual_adjustment',
                 'created_at' => '2026-10-12 09:00:00',
@@ -104,7 +111,7 @@ class IngredientUsageReportTest extends TestCase
         $this->assertSame(200, $response->status(), $response->getContent());
         $response->assertJsonPath('period_start', '2026-10-06')
             ->assertJsonPath('period_end', '2026-10-12')
-            ->assertJsonPath("usage.{$ingredientId}.weekly_consumption", 2.5)
+            ->assertJsonPath("usage.{$ingredientId}.weekly_consumption", 3)
             ->assertJsonPath("usage.{$ingredientId}.waste_quantity", 1.75)
             ->assertJsonPath("usage.{$ingredientId}.waste_loss", 30);
     }
