@@ -378,9 +378,9 @@ class StaffApiController extends Controller
                         ->whereColumn('peak_category_items.order_id', 'orders.id')
                         ->whereRaw(
                             strcasecmp($category, 'Finished Products') === 0
-                                ? "LOWER(TRIM(peak_category_products.category)) LIKE '%cake%'"
+                                ? 'LOWER(TRIM(peak_category_products.category)) = ?'
                                 : 'LOWER(TRIM(peak_category_products.category)) = ?',
-                            strcasecmp($category, 'Finished Products') === 0 ? [] : [strtolower($category)]
+                            [strtolower(strcasecmp($category, 'Finished Products') === 0 ? 'Cakes' : $category)]
                         );
                 });
             } else {

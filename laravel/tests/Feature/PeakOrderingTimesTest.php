@@ -52,15 +52,18 @@ class PeakOrderingTimesTest extends TestCase
     public function test_finished_products_peak_times_include_cake_products(): void
     {
         $cakeId = DB::table('products')->insertGetId(['name' => 'Chocolate Cake', 'category' => 'Cakes']);
+        $singularCakeId = DB::table('products')->insertGetId(['name' => 'Custom Cake Slice', 'category' => 'Cake']);
         $breadId = DB::table('products')->insertGetId(['name' => 'Bread', 'category' => 'Bread']);
         DB::table('orders')->insert([
             ['id' => 1, 'created_at' => '2026-10-12 09:15:00'],
             ['id' => 2, 'created_at' => '2026-10-12 10:15:00'],
             ['id' => 3, 'created_at' => '2026-10-12 11:15:00'],
+            ['id' => 4, 'created_at' => '2026-10-12 12:15:00'],
         ]);
         DB::table('order_items')->insert([
             ['order_id' => 1, 'product_id' => $cakeId],
             ['order_id' => 2, 'product_id' => $breadId],
+            ['order_id' => 4, 'product_id' => $singularCakeId],
         ]);
         DB::table('customized_cake_orders')->insert(['order_id' => 3]);
 
@@ -69,7 +72,8 @@ class PeakOrderingTimesTest extends TestCase
             ->assertSuccessful()
             ->assertJsonPath('total_orders', 1)
             ->assertJsonPath('matrix.1.9', 1)
-            ->assertJsonPath('matrix.1.10', 0);
+            ->assertJsonPath('matrix.1.10', 0)
+            ->assertJsonPath('matrix.1.12', 0);
     }
 
     public function test_imported_sales_peak_times_exclude_system_orders(): void
