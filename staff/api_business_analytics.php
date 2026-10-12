@@ -178,12 +178,12 @@ foreach (array_merge($historicalRows, array_map(static fn ($row) => $row + ['sou
             ? 'Finished Products'
             : 'Imported Sales');
     if ($productId > 0 && $productIdForSale !== $productId) continue;
-    if ($category !== '' && strcasecmp($productCategory, $category) !== 0) continue;
+    $importedRevenueByType[$salesType] = ($importedRevenueByType[$salesType] ?? 0) + $revenueAmount;
+    if ($category !== '' && strcasecmp($category, 'Imported Sales') !== 0 && strcasecmp($productCategory, $category) !== 0) continue;
 
     $recordCount = (int) ($historical['record_count'] ?? 1);
     $historicalRecords += $recordCount;
     $historicalRevenue += $revenueAmount;
-    $importedRevenueByType[$salesType] = ($importedRevenueByType[$salesType] ?? 0) + $revenueAmount;
     $date = (string) $historical['sale_date'];
     if (!isset($historicalDaily[$date])) $historicalDaily[$date] = ['date' => $date, 'revenue' => 0, 'orders' => 0];
     $historicalDaily[$date]['revenue'] += $revenueAmount;
