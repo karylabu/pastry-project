@@ -530,7 +530,8 @@ export default function Register() {
           .pastry-register footer > div:first-child { gap: 9px; }
           .pastry-register footer img { width: 28px; height: 28px; }
           .pastry-register footer p,
-          .pastry-register footer a { font-size: 11px; }
+          .pastry-register footer a,
+          .pastry-register footer button { font-size: 11px; }
           .pastry-register footer > div:nth-child(2) { gap: 18px; }
         }
 
@@ -565,7 +566,8 @@ export default function Register() {
           .pastry-register footer img { width: 30px; height: 30px; }
           .pastry-register footer p { font-size: 11px; }
           .pastry-register footer > div:nth-child(2) { gap: 12px 18px; }
-          .pastry-register footer a { font-size: 11px; }
+          .pastry-register footer a,
+          .pastry-register footer button { font-size: 11px; }
           .pastry-register > .relative.z-10 { padding: 0 0 10px; }
           .pastry-register main { padding-top: 0; }
           .pastry-register .hero-panel > .mb-6:first-child { margin-bottom: 12px; }
