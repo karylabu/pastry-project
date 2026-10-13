@@ -312,11 +312,11 @@ export default function Login() {
           }
           .pastry-login .login-reference-art {
             position: absolute;
-            inset: 12px;
+            inset: 0;
             display: block;
-            width: calc(100% - 24px);
-            height: calc(100% - 24px);
-            border-radius: 20px;
+            width: 100%;
+            height: 100%;
+            border-radius: 25px 0 0 25px;
             object-fit: cover;
             object-position: left center;
           }
