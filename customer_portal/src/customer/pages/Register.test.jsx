@@ -15,9 +15,11 @@ jest.mock("../../services/firebase", () => ({
 jest.mock("../components/GoogleRecaptcha", () => ({
   __esModule: true,
   default: ({ onProofChange }) => {
-    const React = require("react");
-    React.useEffect(() => onProofChange("verified-captcha-proof"), [onProofChange]);
-    return <div data-testid="google-recaptcha" />;
+    return (
+      <button type="button" onClick={() => onProofChange("verified-captcha-proof")}>
+        Complete robot check
+      </button>
+    );
   },
 }));
 
@@ -66,6 +68,8 @@ describe("Google registration", () => {
 
     render(<Register />);
 
+    expect(screen.getByRole("button", { name: "Sign Up with Google" })).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: "Complete robot check" }));
     fireEvent.click(screen.getByRole("button", { name: "Sign Up with Google" }));
 
     await waitFor(() => {
@@ -103,6 +107,22 @@ describe("Google registration", () => {
     });
   });
 
+  it("keeps regular account creation disabled until the robot check is completed", () => {
+    render(<Register />);
+    fireEvent.change(screen.getByPlaceholderText("Juan Dela Cruz"), { target: { value: "Test Customer" } });
+    fireEvent.change(screen.getByPlaceholderText("name@example.com"), { target: { value: "test@example.com" } });
+    fireEvent.change(screen.getByPlaceholderText("09123456789"), { target: { value: "09123456789" } });
+    fireEvent.change(screen.getAllByPlaceholderText("••••••••")[0], { target: { value: "Strong123" } });
+    fireEvent.change(screen.getAllByPlaceholderText("••••••••")[1], { target: { value: "Strong123" } });
+    screen.getAllByRole("checkbox").forEach((checkbox) => fireEvent.click(checkbox));
+
+    const createAccountButton = screen.getByRole("button", { name: "Create account" });
+    expect(createAccountButton).toBeDisabled();
+
+    fireEvent.click(screen.getByRole("button", { name: "Complete robot check" }));
+    expect(createAccountButton).toBeEnabled();
+  });
+
   it("shows a login message and does not authenticate when the phone is already registered", async () => {
     global.fetch
       .mockResolvedValueOnce({
@@ -120,6 +140,7 @@ describe("Google registration", () => {
       });
 
     render(<Register />);
+    fireEvent.click(screen.getByRole("button", { name: "Complete robot check" }));
     fireEvent.click(screen.getByRole("button", { name: "Sign Up with Google" }));
 
     await waitFor(() => expect(screen.getByDisplayValue("Google Customer")).toHaveAttribute("readonly"));
@@ -143,6 +164,7 @@ describe("Google registration", () => {
     });
 
     render(<Register />);
+    fireEvent.click(screen.getByRole("button", { name: "Complete robot check" }));
     fireEvent.click(screen.getByRole("button", { name: "Sign Up with Google" }));
 
     expect(await screen.findByText(/This account is already registered/)).toBeInTheDocument();
@@ -168,6 +190,7 @@ describe("Google registration", () => {
     });
 
     render(<Register />);
+    fireEvent.click(screen.getByRole("button", { name: "Complete robot check" }));
     fireEvent.click(screen.getByRole("button", { name: "Sign Up with Google" }));
 
     expect(await screen.findByText(/This is an admin account/)).toBeInTheDocument();
@@ -187,6 +210,7 @@ describe("Google registration", () => {
     });
 
     render(<Register />);
+    fireEvent.click(screen.getByRole("button", { name: "Complete robot check" }));
     fireEvent.change(screen.getByPlaceholderText("Juan Dela Cruz"), { target: { value: "Existing Customer" } });
     fireEvent.change(screen.getByPlaceholderText("name@example.com"), { target: { value: "existing@example.com" } });
     fireEvent.change(screen.getByPlaceholderText("09123456789"), { target: { value: "09123456789" } });
@@ -211,6 +235,7 @@ describe("Google registration", () => {
     });
 
     render(<Register />);
+    fireEvent.click(screen.getByRole("button", { name: "Complete robot check" }));
     fireEvent.change(screen.getByPlaceholderText("Juan Dela Cruz"), { target: { value: "Existing Admin" } });
     fireEvent.change(screen.getByPlaceholderText("name@example.com"), { target: { value: "admin@example.com" } });
     fireEvent.change(screen.getByPlaceholderText("09123456789"), { target: { value: "09123456789" } });

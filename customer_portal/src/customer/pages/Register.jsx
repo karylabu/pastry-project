@@ -123,6 +123,11 @@ export default function Register() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!googleSignup && !recaptchaProof) {
+      setError("Please complete the “I’m not a robot” check before creating an account.");
+      return;
+    }
+
     setError("");
     setAccountAlreadyRegistered(false);
     setAdminAccountNotAllowed(false);
@@ -196,6 +201,7 @@ export default function Register() {
           email,
           phone: phone.trim(),
           password,
+          recaptcha_proof: recaptchaProof,
           agree_terms: true,
           agree_privacy: true,
         }),
@@ -992,9 +998,11 @@ export default function Register() {
                   {touched.privacy && errors.privacy && <p className="ml-5 text-[10px] text-[#A8354A]">{errors.privacy}</p>}
                 </div>
 
+                {!googleSignup && <GoogleRecaptcha key={recaptchaWidgetKey} onProofChange={setRecaptchaProof} />}
+
                 <button
                   type="submit"
-                  disabled={loading || !isFormValid}
+                  disabled={loading || !isFormValid || !(googleSignup?.recaptchaProof || recaptchaProof)}
                   className="btn-primary w-full text-sm active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40 sm:col-span-2"
                 >
                   {loading ? "Creating account…" : googleSignup ? "Complete Google Sign Up" : "Create account"}
@@ -1008,7 +1016,6 @@ export default function Register() {
 
                 {!googleSignup ? (
                   <>
-                    <GoogleRecaptcha key={recaptchaWidgetKey} onProofChange={setRecaptchaProof} />
                     <button
                       type="button"
                       onClick={handleGoogleSignup}

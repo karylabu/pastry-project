@@ -101,7 +101,12 @@ export default function GoogleRecaptcha({ onProofChange }) {
 
   return (
     <div className="sm:col-span-2">
-      <div ref={containerRef} />
+      <div className="h-[67px] w-[258px]">
+        <div
+          ref={containerRef}
+          style={{ transform: "scale(0.85)", transformOrigin: "top left", width: "304px" }}
+        />
+      </div>
       {error && <p role="alert" className="mt-2 text-sm text-red-600">{error}</p>}
       {isVerifying && <p role="status" className="mt-2 text-sm text-gray-600">Verifying robot check…</p>}
     </div>

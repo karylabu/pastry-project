@@ -117,6 +117,11 @@ export default function Login() {
 
   const handleLogin = async (e) => {
     e.preventDefault();
+    if (!recaptchaProof) {
+      setError("Please complete the “I’m not a robot” check before logging in.");
+      return;
+    }
+
     setError("");
     setGoogleUserNotFound(false);
     setSuccess("");
@@ -127,7 +132,7 @@ export default function Login() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email, password, recaptcha_proof: recaptchaProof }),
       });
       const data = await safeParseJson(res);
 
@@ -982,9 +987,11 @@ export default function Login() {
                         </button>
                       </div>
 
+                      <GoogleRecaptcha key={recaptchaWidgetKey} onProofChange={setRecaptchaProof} />
+
                       <button
                         type="submit"
-                        disabled={loading}
+                        disabled={loading || !recaptchaProof}
                         className="btn-primary w-full text-lg active:scale-[0.98] disabled:opacity-50"
                       >
                         {loading ? "Logging In..." : "Log In"}
@@ -996,11 +1003,9 @@ export default function Login() {
                         <div className="h-[1px] flex-1 bg-gray-200" />
                       </div>
 
-                      <GoogleRecaptcha key={recaptchaWidgetKey} onProofChange={setRecaptchaProof} />
-
-                        <button
-                          type="button"
-                          onClick={handleGoogleLogin}
+                      <button
+                        type="button"
+                        onClick={handleGoogleLogin}
                         disabled={googleLoading || !recaptchaProof}
                         className="btn-secondary flex w-full items-center justify-center gap-3 text-[15px] font-semibold text-[#171717] active:scale-[0.98] disabled:opacity-50"
                       >
