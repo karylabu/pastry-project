@@ -32,7 +32,8 @@
   order: 6;
 }
 
-@media (min-width: 1024px) and (hover: hover) and (pointer: fine) {
+@media (min-width: 768px) and (orientation: landscape),
+  (min-width: 1024px) and (hover: hover) and (pointer: fine) {
   .home-sections-layout {
     grid-template-columns: minmax(0, 2.1fr) minmax(300px, 0.88fr);
     align-items: start;
@@ -182,5 +183,43 @@
   .home-sections-layout .home-recommendation-add {
     height: 28px;
     font-size: 8px;
+  }
+}
+
+@media (min-width: 768px) and (max-width: 1023px) and (orientation: landscape) {
+  .home-sections-layout {
+    grid-template-columns: minmax(0, 1.65fr) minmax(240px, 0.95fr);
+  }
+
+  .home-sections-layout .home-best-sellers-grid,
+  .home-sections-layout .home-curated-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .home-sections-layout .home-recommendation-card {
+    min-height: 250px;
+  }
+
+  .home-sections-layout .home-recommendation-image {
+    height: 116px;
+  }
+
+  .home-sections-layout .home-recommendation-image img {
+    height: 104px !important;
+    max-height: 104px !important;
+  }
+
+  .home-sections-layout .home-recommendation-title,
+  .home-sections-layout .home-recommendation-price {
+    font-size: 12px;
+  }
+
+  .home-sections-layout .home-recommendation-options button {
+    font-size: 8px;
+  }
+
+  .home-sections-layout .home-recommendation-add {
+    height: 30px;
+    font-size: 9px;
   }
 }
