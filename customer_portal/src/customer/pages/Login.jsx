@@ -318,7 +318,7 @@ export default function Login() {
             height: 100%;
             border-radius: 25px 0 0 25px;
             object-fit: cover;
-            object-position: 10% center;
+            object-position: left center;
           }
           .pastry-login .web-brand-mark {
             position: absolute;
@@ -851,7 +851,7 @@ export default function Login() {
           <div className="hero-panel flex w-full flex-none flex-col justify-center py-3 md:w-[53%] md:flex-1 md:py-0 md:pl-[5.9vw]">
             <img
               className="login-reference-art"
-              src={`${ASSET_BASE}/login.png?v=20261011`}
+              src={`${ASSET_BASE}/login-desktop.png?v=20261012`}
               alt="Bakery made simple and sweet"
             />
             <img className="web-brand-mark" src={LOGO_URL} alt="" aria-hidden="true" />
