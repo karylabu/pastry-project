@@ -21,6 +21,11 @@ const faqGroups = [
           'Browse the available products, select the item you want, add it to your bag, and proceed to checkout. Review your order details and complete the required payment or selected payment process.',
       },
       {
+        question: 'What is the process for ordering finished products?',
+        answer:
+          'Browse the Menu and choose an available finished product. Select the product options and quantity, then add it to your bag. When you are ready, open your bag and continue to checkout, provide your delivery or pickup details, review your order, and submit it using an available payment method.',
+      },
+      {
         question: 'Can I change my order after placing it?',
         answer:
           'Order changes may be requested before the preparation process begins. Once an order is already being prepared, changes may no longer be possible.',
@@ -74,6 +79,11 @@ const faqGroups = [
         question: 'How do I request a customized cake?',
         answer:
           'Select the customization option and provide the required details, such as your preferred design, flavor, size, message, preferred date, and reference image if applicable.',
+      },
+      {
+        question: 'What is the process for ordering a customized cake?',
+        answer:
+          'Open Customize Your Dream Cake, choose the cake type, flavor, and size, then provide the occasion and design details. You can also include your budget, quantity, add-ons, and reference images. Sign in and send your request. The admin will review it within 24 hours and send the final price and decision. Your request is not confirmed until it is accepted.',
       },
       {
         question: 'Can my cake look exactly like my reference image?',
