@@ -13,6 +13,7 @@ on:
       - "includes/db.php"
       - "admin/api/api_predictive_analytics.php"
       - "staff/api_business_analytics.php"
+      - "staff/api_orders.php"
       - "staff/api_product_stock_history.php"
       - "staff/api_update_order_status.php"
       - "uploads/about us.jpg"
@@ -155,6 +156,16 @@ jobs:
             -e "ssh -i ~/.ssh/id_ed25519 -p $SSH_PORT -o IdentitiesOnly=yes -o BatchMode=yes -o ConnectTimeout=20 -o ConnectionAttempts=3" \
             staff/api_update_order_status.php \
             "$SSH_USERNAME@$SSH_HOST:$REMOTE_ROOT/staff/api_update_order_status.php"
+
+      - name: Deploy custom cake quote handler
+        run: |
+          set -eu
+          ssh -i ~/.ssh/id_ed25519 -p "$SSH_PORT" -o IdentitiesOnly=yes -o BatchMode=yes -o ConnectTimeout=20 -o ConnectionAttempts=3 "$SSH_USERNAME@$SSH_HOST" \
+            "mkdir -p '$REMOTE_ROOT/staff'"
+          rsync -az \
+            -e "ssh -i ~/.ssh/id_ed25519 -p $SSH_PORT -o IdentitiesOnly=yes -o BatchMode=yes -o ConnectTimeout=20 -o ConnectionAttempts=3" \
+            staff/api_orders.php \
+            "$SSH_USERNAME@$SSH_HOST:$REMOTE_ROOT/staff/api_orders.php"
 
       - name: Deploy product stock history handler
         run: |
