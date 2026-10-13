@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { Cake, Heart, Leaf, Users, X } from 'lucide-react';
 import { ROOT_BASE } from '../../services/config';
+import BrandName from "./BrandName";
 
 const teamMembers = [
   {
@@ -78,8 +79,8 @@ export default function CreditsModal({ isOpen, onClose }) {
             <p className="text-[8px] font-black uppercase tracking-[0.18em] text-[#9a6a2d] sm:text-[10px] sm:tracking-[0.3em]">
               A little appreciation
             </p>
-            <h2 id="credits-modal-title" className="mt-0.5 font-serif text-[21px] font-bold leading-none tracking-tight text-[#432719] sm:mt-1 sm:text-[34px]">
-              Pastry Project
+            <h2 id="credits-modal-title" className="mt-0.5 text-[21px] leading-none tracking-tight sm:mt-1 sm:text-[34px]">
+              <BrandName />
             </h2>
             <p className="mt-1 text-[10px] font-medium tracking-wide text-[#9a6a2d] sm:mt-1.5 sm:text-sm">
               Credits &amp; Project Team

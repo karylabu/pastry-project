@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Menu as MenuIcon, X } from 'lucide-react';
 import { ROOT_BASE } from '../../services/config';
+import BrandName from '../components/BrandName';
 
 const sections = [
   'Overview',
@@ -78,7 +79,7 @@ export default function CookiePolicyPage() {
             </button>
             <div className="flex items-center gap-3">
               <img src={`${ROOT_BASE}/uploads/logo.png?v=logo-v2`} alt="Pastry Project logo" className="h-9 w-9 object-contain" />
-              <p className="text-base font-black tracking-tight text-[#171717] sm:text-lg">Pastry Project</p>
+              <p className="text-base tracking-tight sm:text-lg"><BrandName /></p>
             </div>
           </div>
         </div>

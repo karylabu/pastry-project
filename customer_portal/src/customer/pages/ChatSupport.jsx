@@ -1,6 +1,7 @@
 import React, { useMemo, useRef, useState } from 'react';
 import { ArrowRight, ChevronDown, Search, MessageCircleMore } from 'lucide-react';
 import { ROOT_BASE } from '../../services/config';
+import BrandName from '../components/BrandName';
 
 const categories = [
   { label: 'Orders', icon: '📦' },
@@ -190,7 +191,7 @@ export default function ChatSupport() {
               className="h-11 w-11 rounded-none bg-transparent object-contain"
             />
             <div>
-              <p className="text-xl font-black tracking-tight text-[#171717]">Pastry Project</p>
+              <p className="text-xl tracking-tight"><BrandName /></p>
             </div>
           </div>
 

@@ -2,6 +2,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight, Cake, Gift, MapPinned, Sparkles, Truck, Star } from 'lucide-react';
 import { ROOT_BASE } from '../../services/config';
+import BrandName from '../components/BrandName';
 
 const offerings = [
   {
@@ -34,7 +35,7 @@ export default function AboutUsPage() {
           <div className="flex flex-col justify-center">
             <div className="mb-4 flex items-center gap-3">
               <img src={`${ROOT_BASE}/uploads/logo.png?v=logo-v2`} alt="Pastry Project logo" className="h-12 w-12 rounded-none bg-transparent object-contain" />
-              <p className="text-2xl font-black tracking-tight text-[#171717]">Pastry Project</p>
+              <p className="text-2xl tracking-tight"><BrandName /></p>
             </div>
 
             <p className="text-xs font-black uppercase tracking-[0.35em] text-[#b18a23]">About Pastry Project</p>
