@@ -344,16 +344,24 @@ export default function Orders() {
         throw new Error(data?.message || 'The orders service returned an invalid response.');
       }
 
-      const parsedOrders = data.orders.map((order) => ({
-        ...order,
-        is_customized: Boolean(order.is_customized),
-        custom_details: order.custom_details || order.custom_cake_details || {},
-        items: normalizeOrderItems(order),
-      }));
+      const parsedOrders = data.orders.map((order) => {
+        const customCakeDetails = order.custom_cake_details || order.customCakeDetails || null;
+        const isCustomized = Boolean(order.is_customized)
+          || String(order.order_type || '').toLowerCase() === 'customized'
+          || Boolean(customCakeDetails)
+          || Boolean(order.customized_cake_details);
+
+        return {
+          ...order,
+          is_customized: isCustomized,
+          custom_details: order.custom_details || order.custom_cake_details || order.customized_cake_details || {},
+          items: normalizeOrderItems(order),
+        };
+      });
       const userOrders = filterUserOrders(parsedOrders);
       const loadedOrders = userOrders.length > 0 || parsedOrders.length === 0 ? userOrders : parsedOrders;
       const visibleOrders = loadedOrders.filter(
-        (order) => String(order.status || '').toLowerCase() !== 'awaiting payment'
+        (order) => String(order.status || '').toLowerCase() !== 'awaiting payment' || order.is_customized
       );
       setOrders(visibleOrders);
       setOrdersLoadError(false);
