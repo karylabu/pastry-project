@@ -213,7 +213,6 @@ export default function Login() {
         .pastry-login .brand-icon-overlay { display: none; }
         .pastry-login .hero-panel { display: none; }
         .pastry-login .login-reference-art { display: none; }
-        .pastry-login .web-brand-mark { display: none; }
         .pastry-login .login-phone-cake { display: none; }
         .pastry-login .login-phone-brand { display: none; }
         .login-decorations { display: none; }
@@ -320,17 +319,7 @@ export default function Login() {
             object-fit: cover;
             object-position: left center;
           }
-          .pastry-login .web-brand-mark {
-            position: absolute;
-            z-index: 2;
-            top: 11%;
-            left: 20%;
-            display: block;
-            width: 44px;
-            height: 44px;
-            object-fit: contain;
-          }
-          .pastry-login .hero-panel > *:not(.login-reference-art):not(.web-brand-mark) { display: none; }
+          .pastry-login .hero-panel > *:not(.login-reference-art) { display: none; }
           .pastry-login .hero-panel > .mb-6:first-child {
             align-items: center;
             gap: 12px;
@@ -854,7 +843,6 @@ export default function Login() {
               src={`${ASSET_BASE}/login-desktop.png?v=20261012`}
               alt="Bakery made simple and sweet"
             />
-            <img className="web-brand-mark" src={LOGO_URL} alt="" aria-hidden="true" />
             {/* Header / Logo */}
             <div className="mb-6 flex items-center gap-1">
               <img src={LOGO_URL} alt="Logo" className="h-14 w-14 object-contain" />
