@@ -43,7 +43,7 @@ class CustomerTwoFactorController extends Controller
         }
 
         $method = (string) $request->input('method', 'authenticator');
-        if (!in_array($method, ['authenticator', 'email', 'sms'], true)) {
+        if ($method !== 'authenticator') {
             return response()->json(['success' => false, 'message' => 'Choose a valid verification method.'], 422);
         }
         if (!$delivery->isConfigured($method)) {

@@ -194,27 +194,26 @@ class CustomerAuthApiTest extends TestCase
         ])->assertUnprocessable()->assertJsonPath('success', false);
     }
 
-    public function test_customer_can_enable_and_sign_in_with_email_codes(): void
+    public function test_existing_email_two_factor_can_sign_in_and_be_disabled(): void
     {
         $this->withoutMiddleware(\Illuminate\Routing\Middleware\ThrottleRequests::class);
         $this->seedCustomer();
         $this->withHeader('X-Auth-Token', 'test-customer-token');
+        DB::table('customer_two_factor')->insert([
+            'user_id' => 7,
+            'method' => 'email',
+            'enabled_at' => now(),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
         config(['mail.default' => 'smtp']);
         $sentCodes = [];
         \Illuminate\Support\Facades\Mail::shouldReceive('html')
-            ->times(3)
+            ->twice()
             ->andReturnUsing(function (string $html) use (&$sentCodes) {
                 preg_match('/>(\d{6})<\/p>/', $html, $matches);
                 $sentCodes[] = $matches[1] ?? null;
             });
-
-        $this->postJson('http://localhost/api/customer/two-factor/setup', ['method' => 'email'])
-            ->assertOk()
-            ->assertJsonPath('method', 'email');
-        $this->postJson('http://localhost/api/customer/two-factor/enable', ['code' => $sentCodes[0]])
-            ->assertOk()
-            ->assertJsonPath('enabled', true)
-            ->assertJsonPath('method', 'email');
 
         $challenge = $this->postJson('http://localhost/api/login', [
             'email' => 'customer@example.com',
@@ -226,50 +225,48 @@ class CustomerAuthApiTest extends TestCase
 
         $login = $this->postJson('http://localhost/api/login/two-factor', [
             'challenge_token' => $challenge->json('challenge_token'),
-            'code' => $sentCodes[1],
+            'code' => $sentCodes[0],
         ])->assertOk()->assertJsonPath('success', true);
         $this->withHeader('X-Auth-Token', $login->json('token'));
 
         $this->postJson('http://localhost/api/customer/two-factor/disable-code')
             ->assertOk()
             ->assertJsonPath('destination', 'c*******@example.com');
-        $this->postJson('http://localhost/api/customer/two-factor/disable', ['code' => $sentCodes[2]])
+        $this->postJson('http://localhost/api/customer/two-factor/disable', ['code' => $sentCodes[1]])
             ->assertOk()
             ->assertJsonPath('enabled', false);
         $this->assertDatabaseMissing('customer_two_factor', ['user_id' => 7]);
     }
 
-    public function test_customer_can_enable_and_sign_in_with_sms_codes(): void
+    public function test_existing_sms_two_factor_can_sign_in_and_be_disabled(): void
     {
         $this->withoutMiddleware(\Illuminate\Routing\Middleware\ThrottleRequests::class);
         $this->seedCustomer();
         DB::table('users')->where('id', 7)->update(['phone' => '09123456789']);
         $this->withHeader('X-Auth-Token', 'test-customer-token');
+        DB::table('customer_two_factor')->insert([
+            'user_id' => 7,
+            'method' => 'sms',
+            'enabled_at' => now(),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
         config(['services.iprogsms.api_token' => 'test-provider-token']);
         $sentCodes = [];
         $delivery = \Mockery::mock(\App\Services\CustomerTwoFactorDelivery::class);
-        $delivery->shouldReceive('isConfigured')->with('sms')->andReturn(true);
+        $delivery->shouldReceive('isConfigured')->with('sms')->once()->andReturn(true);
         $delivery->shouldReceive('send')
-            ->times(3)
+            ->twice()
             ->andReturnUsing(function ($method, $email, $phone, $code, $purpose) use (&$sentCodes) {
                 $this->assertSame('sms', $method);
                 $this->assertSame('09123456789', $phone);
                 $sentCodes[] = $code;
             });
         $delivery->shouldReceive('destination')
-            ->times(3)
+            ->twice()
             ->with('sms', 'customer@example.com', '09123456789')
             ->andReturn('••••6789');
         $this->app->instance(\App\Services\CustomerTwoFactorDelivery::class, $delivery);
-
-        $this->postJson('http://localhost/api/customer/two-factor/setup', ['method' => 'sms'])
-            ->assertOk()
-            ->assertJsonPath('method', 'sms')
-            ->assertJsonPath('destination', '••••6789');
-        $setupCode = $sentCodes[0];
-        $this->postJson('http://localhost/api/customer/two-factor/enable', ['code' => $setupCode])
-            ->assertOk()
-            ->assertJsonPath('enabled', true);
 
         $challenge = $this->postJson('http://localhost/api/login', [
             'email' => 'customer@example.com',
@@ -277,22 +274,36 @@ class CustomerAuthApiTest extends TestCase
         ])
             ->assertOk()
             ->assertJsonPath('two_factor_method', 'sms');
-        $loginCode = $sentCodes[1];
 
         $login = $this->postJson('http://localhost/api/login/two-factor', [
             'challenge_token' => $challenge->json('challenge_token'),
-            'code' => $loginCode,
+            'code' => $sentCodes[0],
         ])->assertOk()->assertJsonPath('success', true);
         $this->withHeader('X-Auth-Token', $login->json('token'));
 
         $this->postJson('http://localhost/api/customer/two-factor/disable-code')
             ->assertOk()
             ->assertJsonPath('destination', '••••6789');
-        $this->postJson('http://localhost/api/customer/two-factor/disable', ['code' => $sentCodes[2]])
+        $this->postJson('http://localhost/api/customer/two-factor/disable', ['code' => $sentCodes[1]])
             ->assertOk()
             ->assertJsonPath('enabled', false);
         $this->assertDatabaseMissing('customer_two_factor', ['user_id' => 7]);
-        $this->assertCount(3, $sentCodes);
+        $this->assertCount(2, $sentCodes);
+    }
+
+    public function test_customer_two_factor_setup_only_accepts_authenticator_method(): void
+    {
+        $this->withoutMiddleware(\Illuminate\Routing\Middleware\ThrottleRequests::class);
+        $this->seedCustomer();
+        $this->withHeader('X-Auth-Token', 'test-customer-token');
+
+        foreach (['email', 'sms'] as $method) {
+            $this->postJson('http://localhost/api/customer/two-factor/setup', ['method' => $method])
+                ->assertUnprocessable()
+                ->assertJsonPath('success', false);
+        }
+
+        $this->assertDatabaseMissing('customer_two_factor', ['user_id' => 7]);
     }
 
     public function test_totp_code_matches_the_rfc_6238_sha1_vector(): void

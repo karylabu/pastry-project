@@ -74,7 +74,6 @@ export default function AccountSettings() {
   const [defaultAddressId, setDefaultAddressId] = useState(null);
   const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
   const [twoFactorMethod, setTwoFactorMethod] = useState('authenticator');
-  const [twoFactorSelectedMethod, setTwoFactorSelectedMethod] = useState('authenticator');
   const [twoFactorDisableCodeSent, setTwoFactorDisableCodeSent] = useState(false);
   const [twoFactorDisableDestination, setTwoFactorDisableDestination] = useState('');
   const [twoFactorSetup, setTwoFactorSetup] = useState(null);
@@ -249,7 +248,6 @@ export default function AccountSettings() {
         if (!cancelled) {
           setTwoFactorEnabled(Boolean(data.enabled));
           setTwoFactorMethod(data.method || 'authenticator');
-          setTwoFactorSelectedMethod(data.method || 'authenticator');
         }
       })
       .catch((error) => {
@@ -482,7 +480,7 @@ export default function AccountSettings() {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
-        body: JSON.stringify({ method: twoFactorSelectedMethod }),
+        body: JSON.stringify({ method: 'authenticator' }),
       });
       const data = await safeParseJson(response);
       if (!response.ok || !data?.success) {
@@ -513,7 +511,7 @@ export default function AccountSettings() {
         throw new Error(data?.message || 'Unable to enable two-factor authentication.');
       }
       setTwoFactorEnabled(true);
-      setTwoFactorMethod(data.method || twoFactorSetup?.method || twoFactorSelectedMethod);
+      setTwoFactorMethod(data.method || twoFactorSetup?.method || 'authenticator');
       setTwoFactorSetup(null);
       setTwoFactorCode('');
       setTwoFactorRecoveryCodes(data.recovery_codes || []);
@@ -862,7 +860,7 @@ export default function AccountSettings() {
                   <span className="block text-xs text-gray-500">
                     {twoFactorEnabled
                       ? `${twoFactorMethod === 'authenticator' ? 'Authenticator app' : twoFactorMethod === 'email' ? 'Email code' : 'SMS code'} protection is on.`
-                      : 'Choose an authenticator app, email code, or SMS code for extra protection.'}
+                      : 'Add an authenticator app for extra protection.'}
                   </span>
                 </span>
               </span>
@@ -879,18 +877,6 @@ export default function AccountSettings() {
 
             {!twoFactorEnabled && !twoFactorSetup && (
               <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-                <label className="block flex-1">
-                  <span className="text-xs font-bold uppercase tracking-[0.12em] text-gray-600">Verification method</span>
-                  <select
-                    value={twoFactorSelectedMethod}
-                    onChange={(event) => setTwoFactorSelectedMethod(event.target.value)}
-                    className="mt-2 w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm outline-none focus:border-[#e7b866]"
-                  >
-                    <option value="authenticator">Authenticator app (recommended)</option>
-                    <option value="email">Email code</option>
-                    <option value="sms">SMS code</option>
-                  </select>
-                </label>
                 <button
                   type="button"
                   onClick={handleTwoFactorSetup}
