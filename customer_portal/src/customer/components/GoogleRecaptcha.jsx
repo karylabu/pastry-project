@@ -101,10 +101,10 @@ export default function GoogleRecaptcha({ onProofChange }) {
 
   return (
     <div className="sm:col-span-2">
-      <div className="h-[67px] w-[258px]">
+      <div className="h-[59px] w-[228px]">
         <div
           ref={containerRef}
-          style={{ transform: "scale(0.85)", transformOrigin: "top left", width: "304px" }}
+          style={{ transform: "scale(0.75)", transformOrigin: "top left", width: "304px" }}
         />
       </div>
       {error && <p role="alert" className="mt-2 text-sm text-red-600">{error}</p>}

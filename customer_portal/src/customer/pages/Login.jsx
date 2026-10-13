@@ -287,13 +287,13 @@ export default function Login() {
             flex: 0 0 auto;
             flex-direction: row;
             width: min(1030px, 100%);
-            height: min(630px, calc(100vh - 80px));
+            height: auto;
             min-height: 560px;
             gap: 0;
             align-items: stretch;
             justify-content: initial;
             padding: 0;
-            overflow: hidden;
+            overflow: visible;
             border: 1px solid rgba(255, 255, 255, 0.9);
             border-radius: 26px;
             background: #fff;
@@ -386,6 +386,7 @@ export default function Login() {
           .pastry-login main > div:not(.hero-panel) {
             flex: 1 1 auto;
             width: 55%;
+            align-items: flex-start;
             justify-content: center;
             padding: 36px clamp(24px, 4vw, 58px);
           }
