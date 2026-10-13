@@ -773,6 +773,10 @@ export default function Login() {
           .pastry-login .login-card { padding-right: 20px; padding-left: 20px; }
           .pastry-login .login-phone-cake { height: 300px; }
         }
+        @media (max-width: 767px) {
+          .pastry-login .login-card > .mb-4 { text-align: center; }
+          .pastry-login .login-card > .mb-4 h2.login-welcome { margin-inline: auto; }
+        }
         @media (min-width: 480px) and (max-width: 1199px) {
           .pastry-login main {
             width: min(100%, 600px);
