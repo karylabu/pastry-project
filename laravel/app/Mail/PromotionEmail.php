@@ -3,6 +3,7 @@
 namespace App\Mail;
 
 use App\Models\Promotion;
+use App\Models\Subscriber;
 use App\Models\User;
 use Illuminate\Bus\Queueable;
 use Illuminate\Mail\Mailable;
@@ -15,9 +16,9 @@ class PromotionEmail extends Mailable
     use Queueable, SerializesModels;
 
     public Promotion $promotion;
-    public User $recipient;
+    public User|Subscriber $recipient;
 
-    public function __construct(Promotion $promotion, User $recipient)
+    public function __construct(Promotion $promotion, User|Subscriber $recipient)
     {
         $this->promotion = $promotion;
         $this->recipient = $recipient;
@@ -25,8 +26,11 @@ class PromotionEmail extends Mailable
 
     public function build()
     {
+        $recipientToken = $this->recipient instanceof Subscriber
+            ? 'subscriber:' . $this->recipient->getKey()
+            : (string) $this->recipient->getKey();
         $unsubscribeUrl = URL::signedRoute('promotions.unsubscribe', [
-            'token' => Crypt::encryptString((string) $this->recipient->getKey()),
+            'token' => Crypt::encryptString($recipientToken),
         ]);
 
         $this->withSymfonyMessage(function ($message) use ($unsubscribeUrl) {

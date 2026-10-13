@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Mail\PromotionEmail;
 use App\Models\Promotion;
 use App\Models\PromotionEmailLog;
+use App\Models\Subscriber;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -149,18 +150,36 @@ class PromotionController extends Controller
 
     private function sendToSubscribers(Promotion $promotion): array
     {
-        $subscribers = User::where('role', 'customer')
+        $recipients = [];
+
+        User::where('role', 'customer')
             ->where('subscribed_promo', true)
-            ->get();
+            ->get()
+            ->each(function (User $user) use (&$recipients): void {
+                $email = strtolower(trim((string) $user->email));
+                if ($email !== '') {
+                    $recipients[$email] = $user;
+                }
+            });
+
+        Subscriber::whereNull('unsubscribed_at')
+            ->get()
+            ->each(function (Subscriber $subscriber) use (&$recipients): void {
+                $email = strtolower(trim((string) $subscriber->email));
+                if ($email !== '' && ! array_key_exists($email, $recipients)) {
+                    $recipients[$email] = $subscriber;
+                }
+            });
+
         $sentCount = 0;
         $failedCount = 0;
 
-        foreach ($subscribers as $subscriber) {
+        foreach ($recipients as $email => $subscriber) {
             $status = 'sent';
             $errorMessage = null;
 
             try {
-                Mail::to($subscriber->email)->send(new PromotionEmail($promotion, $subscriber));
+                Mail::to($email)->send(new PromotionEmail($promotion, $subscriber));
                 $sentCount++;
             } catch (\Throwable $exception) {
                 $status = 'failed';
@@ -170,7 +189,7 @@ class PromotionController extends Controller
 
             PromotionEmailLog::create([
                 'promotion_id' => $promotion->id,
-                'email' => $subscriber->email,
+                'email' => $email,
                 'status' => $status,
                 'error_message' => $errorMessage,
             ]);
@@ -184,7 +203,7 @@ class PromotionController extends Controller
         $promotion->save();
 
         return [
-            'recipient_count' => $subscribers->count(),
+            'recipient_count' => count($recipients),
             'sent_count' => $sentCount,
             'failed_count' => $failedCount,
         ];

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Subscriber;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Crypt;
@@ -17,13 +18,13 @@ class PromotionUnsubscribeController extends Controller
             return $this->page('Link unavailable', 'This unsubscribe link is invalid or has expired.', 403);
         }
 
-        $user = $this->resolveCustomer($request->query('token'));
+        $recipient = $this->resolveRecipient($request->query('token'));
 
-        if (! $user) {
+        if (! $recipient) {
             return $this->page('Link unavailable', 'This unsubscribe link is invalid or has expired.', 404);
         }
 
-        if (! $user->subscribed_promo) {
+        if (! $this->isSubscribed($recipient)) {
             return $this->page('Already unsubscribed', 'You will not receive promotional emails.', 200);
         }
 
@@ -43,21 +44,18 @@ class PromotionUnsubscribeController extends Controller
             return $this->page('Link unavailable', 'This unsubscribe link is invalid or has expired.', 403);
         }
 
-        $user = $this->resolveCustomer($request->query('token'));
+        $recipient = $this->resolveRecipient($request->query('token'));
 
-        if (! $user) {
+        if (! $recipient) {
             return $this->page('Link unavailable', 'This unsubscribe link is invalid or has expired.', 404);
         }
 
-        if ($user->subscribed_promo) {
-            $user->subscribed_promo = false;
-            $user->save();
-        }
+        $this->markUnsubscribed($recipient);
 
         return $this->page('Unsubscribed', 'You will no longer receive promotional emails.', 200);
     }
 
-    private function resolveCustomer(?string $encryptedId): ?User
+    private function resolveRecipient(?string $encryptedId): User|Subscriber|null
     {
         if (! $encryptedId) {
             return null;
@@ -69,9 +67,37 @@ class PromotionUnsubscribeController extends Controller
             return null;
         }
 
+        if (str_starts_with($userId, 'subscriber:')) {
+            return Subscriber::find(substr($userId, strlen('subscriber:')));
+        }
+
         $user = User::find($userId);
 
         return $user && $user->role === 'customer' ? $user : null;
+    }
+
+    private function isSubscribed(User|Subscriber $recipient): bool
+    {
+        return $recipient instanceof Subscriber
+            ? $recipient->unsubscribed_at === null
+            : (bool) $recipient->subscribed_promo;
+    }
+
+    private function markUnsubscribed(User|Subscriber $recipient): void
+    {
+        if ($recipient instanceof Subscriber) {
+            if ($recipient->unsubscribed_at === null) {
+                $recipient->unsubscribed_at = now();
+                $recipient->save();
+            }
+
+            return;
+        }
+
+        if ($recipient->subscribed_promo) {
+            $recipient->subscribed_promo = false;
+            $recipient->save();
+        }
     }
 
     private function page(string $title, string $message, int $status, string $form = ''): Response

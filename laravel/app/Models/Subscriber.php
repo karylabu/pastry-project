@@ -10,4 +10,8 @@ class Subscriber extends Model
     use HasFactory;
 
     protected $fillable = ['email'];
+
+    protected $casts = [
+        'unsubscribed_at' => 'datetime',
+    ];
 }

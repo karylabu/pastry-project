@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Mail\PromotionEmail;
+use App\Models\Subscriber;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
@@ -15,6 +16,8 @@ class PromotionDraftEditingTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        config()->set('app.url', 'http://localhost');
+        URL::forceRootUrl('http://localhost');
 
         Schema::create('users', function ($table) {
             $table->id();
@@ -52,6 +55,12 @@ class PromotionDraftEditingTest extends TestCase
             $table->text('error_message')->nullable();
             $table->timestamp('attempted_at')->useCurrent();
         });
+        Schema::create('subscribers', function ($table) {
+            $table->id();
+            $table->string('email')->unique();
+            $table->timestamp('unsubscribed_at')->nullable();
+            $table->timestamps();
+        });
 
         DB::table('users')->insert([
             'id' => 1,
@@ -71,6 +80,7 @@ class PromotionDraftEditingTest extends TestCase
     {
         Schema::dropIfExists('promotion_email_logs');
         Schema::dropIfExists('promotions');
+        Schema::dropIfExists('subscribers');
         Schema::dropIfExists('user_sessions');
         Schema::dropIfExists('users');
 
@@ -82,7 +92,7 @@ class PromotionDraftEditingTest extends TestCase
         $promotionId = $this->createPromotion('draft');
 
         $this->withHeader('Authorization', 'Bearer admin-token')
-            ->postJson("/api/admin/promotions/{$promotionId}", [
+            ->postJson("http://localhost/api/admin/promotions/{$promotionId}", [
                 'title' => 'Updated draft',
                 'message' => 'New draft copy',
                 'coupon_code' => 'SAVE20',
@@ -109,7 +119,7 @@ class PromotionDraftEditingTest extends TestCase
         $promotionId = $this->createPromotion('sent');
 
         $this->withHeader('Authorization', 'Bearer admin-token')
-            ->postJson("/api/admin/promotions/{$promotionId}", [
+            ->postJson("http://localhost/api/admin/promotions/{$promotionId}", [
                 'title' => 'Changed sent campaign',
                 'message' => 'Updated campaign copy',
                 'starts_at' => '2026-10-10 09:00:00',
@@ -150,7 +160,7 @@ class PromotionDraftEditingTest extends TestCase
         $promotionId = $this->createPromotion('draft');
 
         $this->withHeader('X-Auth-Token', 'admin-token')
-            ->postJson("/api/admin/promotions/{$promotionId}", [
+            ->postJson("http://localhost/api/admin/promotions/{$promotionId}", [
                 'title' => 'Updated draft',
                 'message' => 'New draft copy',
                 'coupon_code' => 'SAVE20',
@@ -181,7 +191,7 @@ class PromotionDraftEditingTest extends TestCase
         ]);
 
         $this->withHeader('X-Auth-Token', 'admin-token')
-            ->postJson("/api/admin/promotions/{$promotionId}/send")
+            ->postJson("http://localhost/api/admin/promotions/{$promotionId}/send")
             ->assertOk()
             ->assertJsonPath('success', true)
             ->assertJsonPath('data.recipient_count', 1)
@@ -205,13 +215,69 @@ class PromotionDraftEditingTest extends TestCase
         ]);
     }
 
+    public function test_admin_sends_promotions_to_active_footer_subscribers_without_duplicate_emails(): void
+    {
+        Mail::fake();
+        $promotionId = $this->createPromotion('draft');
+        DB::table('users')->insert([
+            'id' => 2,
+            'name' => 'Newsletter Customer',
+            'email' => 'reader@example.com',
+            'password' => 'unused',
+            'role' => 'customer',
+            'subscribed_promo' => true,
+        ]);
+        DB::table('subscribers')->insert([
+            [
+                'email' => 'reader@example.com',
+                'unsubscribed_at' => null,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+            [
+                'email' => 'guest@example.com',
+                'unsubscribed_at' => null,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+            [
+                'email' => 'unsubscribed@example.com',
+                'unsubscribed_at' => now(),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+        ]);
+
+        $this->withHeader('X-Auth-Token', 'admin-token')
+            ->postJson("http://localhost/api/admin/promotions/{$promotionId}/send")
+            ->assertOk()
+            ->assertJsonPath('data.recipient_count', 2)
+            ->assertJsonPath('data.sent_count', 2)
+            ->assertJsonPath('data.failed_count', 0);
+
+        Mail::assertSent(PromotionEmail::class, 2);
+        Mail::assertSent(PromotionEmail::class, function (PromotionEmail $mail) {
+            return $mail->recipient instanceof Subscriber
+                && $mail->recipient->email === 'guest@example.com';
+        });
+        $this->assertDatabaseHas('promotion_email_logs', [
+            'promotion_id' => $promotionId,
+            'email' => 'reader@example.com',
+            'status' => 'sent',
+        ]);
+        $this->assertDatabaseMissing('promotion_email_logs', [
+            'promotion_id' => $promotionId,
+            'email' => 'unsubscribed@example.com',
+        ]);
+    }
+
     public function test_admin_cannot_send_a_promotion_that_is_not_a_draft(): void
     {
         Mail::fake();
         $promotionId = $this->createPromotion('sent');
 
         $this->withHeader('X-Auth-Token', 'admin-token')
-            ->postJson("/api/admin/promotions/{$promotionId}/send")
+            ->postJson("http://localhost/api/admin/promotions/{$promotionId}/send")
             ->assertStatus(409)
             ->assertJsonPath('success', false);
 
@@ -258,7 +324,7 @@ class PromotionDraftEditingTest extends TestCase
         Mail::fake();
         $promotionId = $this->createPromotion('draft');
         $this->withHeader('X-Auth-Token', 'admin-token')
-            ->postJson("/api/admin/promotions/{$promotionId}/send")
+            ->postJson("http://localhost/api/admin/promotions/{$promotionId}/send")
             ->assertOk()
             ->assertJsonPath('data.recipient_count', 0)
             ->assertJsonPath('data.sent_count', 0);
@@ -289,6 +355,41 @@ class PromotionDraftEditingTest extends TestCase
             'id' => 2,
             'subscribed_promo' => true,
         ]);
+    }
+
+    public function test_footer_subscriber_can_unsubscribe_from_promotional_emails(): void
+    {
+        $subscriberId = DB::table('subscribers')->insertGetId([
+            'email' => 'reader@example.com',
+            'unsubscribed_at' => null,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $url = URL::signedRoute('promotions.unsubscribe', [
+            'token' => Crypt::encryptString('subscriber:' . $subscriberId),
+        ]);
+
+        $this->get($url)
+            ->assertOk()
+            ->assertSee('Confirm unsubscribe');
+
+        $this->post($url, ['unsubscribe' => '1'])
+            ->assertOk()
+            ->assertSee('You will no longer receive promotional emails.');
+
+        $this->assertDatabaseHas('subscribers', [
+            'id' => $subscriberId,
+        ]);
+        $this->assertNotNull(DB::table('subscribers')->where('id', $subscriberId)->value('unsubscribed_at'));
+
+        Mail::fake();
+        $promotionId = $this->createPromotion('draft');
+        $this->withHeader('X-Auth-Token', 'admin-token')
+            ->postJson("http://localhost/api/admin/promotions/{$promotionId}/send")
+            ->assertOk()
+            ->assertJsonPath('data.recipient_count', 0);
+
+        Mail::assertNothingSent();
     }
 
     private function createPromotion(string $status): int
