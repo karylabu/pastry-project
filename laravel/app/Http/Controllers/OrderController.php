@@ -45,6 +45,10 @@ class OrderController extends Controller
 
         $hasUserId = Schema::hasColumn('orders', 'user_id');
         $hasEmail = Schema::hasColumn('orders', 'email');
+        $hasCustomizedFlag = Schema::hasColumn('orders', 'is_customized');
+        $hasOrderType = Schema::hasColumn('orders', 'order_type');
+        $hasLegacyCustomOrders = Schema::hasTable('custom_cake_orders');
+        $hasRecipeCustomOrders = Schema::hasTable('customized_cake_orders');
         $orders = Order::with($relations)
             ->where(function ($query) use ($user, $hasUserId, $hasEmail) {
                 if ($hasUserId) {
@@ -62,7 +66,30 @@ class OrderController extends Controller
                 $query->whereNull('payment_status')
                     ->orWhereRaw("LOWER(payment_status) <> 'failed'");
             })
-            ->whereRaw("LOWER(COALESCE(status, '')) <> 'awaiting payment'")
+            ->where(function ($query) use ($hasCustomizedFlag, $hasOrderType, $hasLegacyCustomOrders, $hasRecipeCustomOrders) {
+                $query->whereRaw("LOWER(COALESCE(status, '')) <> 'awaiting payment'");
+
+                if ($hasCustomizedFlag) {
+                    $query->orWhere('is_customized', true);
+                }
+                if ($hasOrderType) {
+                    $query->orWhereRaw("LOWER(COALESCE(order_type, '')) = 'customized'");
+                }
+                if ($hasLegacyCustomOrders) {
+                    $query->orWhereExists(function ($customQuery) {
+                        $customQuery->selectRaw('1')
+                            ->from('custom_cake_orders')
+                            ->whereColumn('custom_cake_orders.order_id', 'orders.id');
+                    });
+                }
+                if ($hasRecipeCustomOrders) {
+                    $query->orWhereExists(function ($customQuery) {
+                        $customQuery->selectRaw('1')
+                            ->from('customized_cake_orders')
+                            ->whereColumn('customized_cake_orders.order_id', 'orders.id');
+                    });
+                }
+            })
             ->orderBy('created_at', 'desc')
             ->get();
 
