@@ -50,4 +50,8 @@ return [
         'api_key' => env('FIREBASE_API_KEY') ?: 'AIzaSyDgvJQtM-TmhYb8i1N2TutXYmekSVhRAeg',
     ],
 
+    'recaptcha' => [
+        'secret_key' => env('RECAPTCHA_SECRET_KEY'),
+    ],
+
 ];

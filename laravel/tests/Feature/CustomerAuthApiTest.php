@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
 
@@ -264,6 +265,58 @@ class CustomerAuthApiTest extends TestCase
             ->assertJsonValidationErrors(['phone', 'agree_terms']);
 
         $this->assertDatabaseCount('users', 0);
+    }
+
+    public function test_recaptcha_verification_returns_a_signed_short_lived_proof(): void
+    {
+        config()->set('services.recaptcha.secret_key', 'test-recaptcha-secret');
+        config()->set('app.key', 'test-application-key');
+        Http::fake([
+            'https://www.google.com/recaptcha/api/siteverify' => Http::response([
+                'success' => true,
+                'hostname' => 'localhost',
+            ]),
+        ]);
+
+        $response = $this->postJson('http://localhost/api/recaptcha/verify', [
+            'captcha_token' => 'valid-captcha-response',
+        ]);
+
+        $response->assertOk()->assertJsonPath('success', true);
+        $this->assertIsString($response->json('proof'));
+        Http::assertSent(fn ($request) =>
+            $request->url() === 'https://www.google.com/recaptcha/api/siteverify'
+            && $request['secret'] === 'test-recaptcha-secret'
+            && $request['response'] === 'valid-captcha-response'
+        );
+    }
+
+    public function test_recaptcha_verification_rejects_a_failed_or_unrecognized_hostname(): void
+    {
+        config()->set('services.recaptcha.secret_key', 'test-recaptcha-secret');
+        Http::fake([
+            'https://www.google.com/recaptcha/api/siteverify' => Http::response([
+                'success' => true,
+                'hostname' => 'attacker.example',
+            ]),
+        ]);
+
+        $this->postJson('http://localhost/api/recaptcha/verify', [
+            'captcha_token' => 'valid-captcha-response',
+        ])
+            ->assertUnprocessable()
+            ->assertJsonPath('success', false);
+    }
+
+    public function test_google_login_requires_a_recaptcha_proof(): void
+    {
+        $this->postJson('http://localhost/api/google-login', [
+            'intent' => 'login_or_signup',
+            'id_token' => 'firebase-id-token',
+        ])
+            ->assertUnprocessable()
+            ->assertJsonPath('success', false)
+            ->assertJsonPath('code', 'recaptcha_required');
     }
 
     public function test_google_signup_rejects_phone_already_used_by_an_existing_account(): void

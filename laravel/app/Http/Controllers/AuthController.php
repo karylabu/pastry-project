@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
@@ -69,6 +70,81 @@ class AuthController extends Controller
         return back()->withInput()->with('error', $error);
     }
 
+    public function verifyRecaptcha(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'captcha_token' => ['required', 'string', 'max:4096'],
+        ]);
+
+        if ($validator->fails()) {
+            return $this->googleCorsResponse([
+                'success' => false,
+                'message' => 'Please complete the “I’m not a robot” check.',
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        $secretKey = config('services.recaptcha.secret_key');
+        if (!is_string($secretKey) || trim($secretKey) === '') {
+            return $this->googleCorsResponse([
+                'success' => false,
+                'message' => 'reCAPTCHA is not configured on the server.',
+            ], 503);
+        }
+
+        try {
+            $verification = Http::asForm()
+                ->acceptJson()
+                ->timeout(10)
+                ->post('https://www.google.com/recaptcha/api/siteverify', [
+                    'secret' => $secretKey,
+                    'response' => $request->input('captcha_token'),
+                    'remoteip' => $request->ip(),
+                ]);
+        } catch (ConnectionException $exception) {
+            error_log('Google reCAPTCHA verification connection failed: ' . $exception->getMessage());
+            return $this->googleCorsResponse([
+                'success' => false,
+                'message' => 'The robot check could not be verified right now. Please try again.',
+            ], 503);
+        }
+
+        if (!$verification->successful()) {
+            return $this->googleCorsResponse([
+                'success' => false,
+                'message' => 'The robot check could not be verified right now. Please try again.',
+            ], 503);
+        }
+
+        $result = $verification->json();
+        $hostname = strtolower((string) ($result['hostname'] ?? ''));
+        $allowedHostnames = ['pastryproject.shop', 'www.pastryproject.shop', 'localhost', '127.0.0.1'];
+
+        if (
+            empty($result['success'])
+            || !in_array($hostname, $allowedHostnames, true)
+            || !is_string(config('app.key'))
+            || config('app.key') === ''
+        ) {
+            return $this->googleCorsResponse([
+                'success' => false,
+                'message' => 'Please complete the robot check again.',
+            ], 422);
+        }
+
+        $proofPayload = json_encode([
+            'exp' => now()->addMinutes(20)->timestamp,
+            'nonce' => bin2hex(random_bytes(16)),
+        ], JSON_THROW_ON_ERROR);
+        $encodedPayload = rtrim(strtr(base64_encode($proofPayload), '+/', '-_'), '=');
+        $signature = hash_hmac('sha256', $encodedPayload, config('app.key'));
+
+        return $this->googleCorsResponse([
+            'success' => true,
+            'proof' => $encodedPayload . '.' . $signature,
+        ]);
+    }
+
     public function googleLogin(Request $request)
     {
         if ($request->isMethod('options')) {
@@ -130,6 +206,14 @@ class AuthController extends Controller
 
         if (!$idToken || !is_string($idToken)) {
             return $this->googleCorsResponse(['success' => false, 'message' => 'Firebase ID token is required.'], 422);
+        }
+
+        if (!$this->isValidRecaptchaProof($request->input('recaptcha_proof'))) {
+            return $this->googleCorsResponse([
+                'success' => false,
+                'code' => 'recaptcha_required',
+                'message' => 'Please complete the robot check before continuing with Google.',
+            ], 422);
         }
 
         try {
@@ -300,6 +384,40 @@ class AuthController extends Controller
         session(['auth_token' => $token]);
 
         return $this->googleCorsResponse(['success' => true, 'token' => $token, 'user' => $userData]);
+    }
+
+    private function isValidRecaptchaProof($proof): bool
+    {
+        if (!is_string($proof) || !is_string(config('app.key')) || config('app.key') === '') {
+            return false;
+        }
+
+        $parts = explode('.', $proof);
+        if (count($parts) !== 2) {
+            return false;
+        }
+
+        [$encodedPayload, $providedSignature] = $parts;
+        $expectedSignature = hash_hmac('sha256', $encodedPayload, config('app.key'));
+        if (!hash_equals($expectedSignature, $providedSignature)) {
+            return false;
+        }
+
+        $payloadBase64 = strtr($encodedPayload, '-_', '+/');
+        $payloadBase64 .= str_repeat('=', (4 - strlen($payloadBase64) % 4) % 4);
+        $payloadJson = base64_decode($payloadBase64, true);
+        if (!is_string($payloadJson)) {
+            return false;
+        }
+
+        $payload = json_decode($payloadJson, true);
+
+        return is_array($payload)
+            && is_int($payload['exp'] ?? null)
+            && $payload['exp'] >= now()->timestamp
+            && $payload['exp'] <= now()->addMinutes(20)->timestamp
+            && is_string($payload['nonce'] ?? null)
+            && preg_match('/^[a-f0-9]{32}$/', $payload['nonce']) === 1;
     }
 
     private function firebaseHttpClient()

@@ -3,6 +3,7 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import ForgotPassword from "./ForgotPassword";
 import CreditsModal from "../components/CreditsModal";
+import GoogleRecaptcha from "../components/GoogleRecaptcha";
 import { LARAVEL_BASE, ROOT_BASE } from "../../services/config";
 import { safeParseJson } from '../../services/api';
 import { signInWithGoogle } from "../../services/firebase";
@@ -38,6 +39,8 @@ export default function Login() {
   const [justLoggedUser, setJustLoggedUser] = useState(null);
   const [showForgot, setShowForgot]   = useState(false);
   const [showCredits, setShowCredits] = useState(false);
+  const [recaptchaProof, setRecaptchaProof] = useState("");
+  const [recaptchaWidgetKey, setRecaptchaWidgetKey] = useState(0);
   useEffect(() => {
     localStorage.removeItem('pastry_saved_accounts');
   }, []);
@@ -50,9 +53,17 @@ export default function Login() {
   }, [searchParams]);
 
   const handleGoogleLogin = async () => {
+    if (!recaptchaProof) {
+      setError("Please complete the “I’m not a robot” check before continuing with Google.");
+      return;
+    }
+
+    const verifiedProof = recaptchaProof;
     setError("");
     setGoogleUserNotFound(false);
     setSuccess("");
+    setRecaptchaProof("");
+    setRecaptchaWidgetKey((currentKey) => currentKey + 1);
     setGoogleLoading(true);
 
     try {
@@ -67,7 +78,12 @@ export default function Login() {
         method: "POST",
         headers: { "Content-Type": "application/json", Accept: "application/json" },
         credentials: "include",
-        body: JSON.stringify({ id_token: idToken, intent: "login_or_signup", ...googlePayload }),
+        body: JSON.stringify({
+          id_token: idToken,
+          intent: "login_or_signup",
+          recaptcha_proof: verifiedProof,
+          ...googlePayload,
+        }),
       });
       const data = await safeParseJson(response);
 
@@ -980,10 +996,12 @@ export default function Login() {
                         <div className="h-[1px] flex-1 bg-gray-200" />
                       </div>
 
-                      <button
-                        type="button"
-                        onClick={handleGoogleLogin}
-                        disabled={googleLoading}
+                      <GoogleRecaptcha key={recaptchaWidgetKey} onProofChange={setRecaptchaProof} />
+
+                        <button
+                          type="button"
+                          onClick={handleGoogleLogin}
+                        disabled={googleLoading || !recaptchaProof}
                         className="btn-secondary flex w-full items-center justify-center gap-3 text-[15px] font-semibold text-[#171717] active:scale-[0.98] disabled:opacity-50"
                       >
                         <GoogleIcon />

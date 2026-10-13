@@ -12,6 +12,15 @@ jest.mock("../../services/firebase", () => ({
   signInWithGoogle: jest.fn(),
 }));
 
+jest.mock("../components/GoogleRecaptcha", () => ({
+  __esModule: true,
+  default: ({ onProofChange }) => {
+    const React = require("react");
+    React.useEffect(() => onProofChange("verified-captcha-proof"), [onProofChange]);
+    return <div data-testid="google-recaptcha" />;
+  },
+}));
+
 describe("Google registration", () => {
   const originalFetch = global.fetch;
 
@@ -69,9 +78,9 @@ describe("Google registration", () => {
     expect(global.fetch).toHaveBeenCalledTimes(1);
     expect(JSON.parse(global.fetch.mock.calls[0][1].body)).toMatchObject({
       id_token: "firebase-id-token",
+      recaptcha_proof: "verified-captcha-proof",
       intent: "signup_check",
     });
-
     fireEvent.change(screen.getByPlaceholderText("09123456789"), { target: { value: "09123456789" } });
     screen.getAllByRole("checkbox").forEach((checkbox) => fireEvent.click(checkbox));
 
@@ -82,6 +91,7 @@ describe("Google registration", () => {
     await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(2));
     expect(JSON.parse(global.fetch.mock.calls[1][1].body)).toMatchObject({
       id_token: "firebase-id-token",
+      recaptcha_proof: "verified-captcha-proof",
       intent: "signup",
       phone: "09123456789",
       agree_terms: true,

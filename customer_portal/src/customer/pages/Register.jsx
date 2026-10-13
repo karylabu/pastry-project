@@ -6,6 +6,7 @@ import { CUSTOMER_BASE, LARAVEL_BASE, ROOT_BASE } from "../../services/config";
 import { safeParseJson } from '../../services/api';
 import { signInWithGoogle } from "../../services/firebase";
 import CreditsModal from "../components/CreditsModal";
+import GoogleRecaptcha from "../components/GoogleRecaptcha";
 
 const ASSET_BASE = process.env.NODE_ENV === "production"
   ? `${ROOT_BASE}/customer_portal/build/assets`
@@ -65,6 +66,8 @@ export default function Register() {
   const [adminAccountNotAllowed, setAdminAccountNotAllowed] = useState(false);
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+  const [recaptchaProof, setRecaptchaProof] = useState("");
+  const [recaptchaWidgetKey, setRecaptchaWidgetKey] = useState(0);
   const [showCredits, setShowCredits] = useState(false);
   const [errors, setErrors] = useState({});
   const [touched, setTouched] = useState({
@@ -151,6 +154,7 @@ export default function Register() {
           credentials: "include",
           body: JSON.stringify({
             id_token: googleSignup.idToken,
+            recaptcha_proof: googleSignup.recaptchaProof,
             intent: "signup",
             phone: phone.trim(),
             agree_terms: agreeTerms,
@@ -222,15 +226,24 @@ export default function Register() {
   };
 
   const handleGoogleSignup = async () => {
+    if (!recaptchaProof) {
+      setError("Please complete the “I’m not a robot” check before continuing with Google.");
+      return;
+    }
+
+    const verifiedProof = recaptchaProof;
     setError("");
     setAccountAlreadyRegistered(false);
     setAdminAccountNotAllowed(false);
+    setRecaptchaProof("");
+    setRecaptchaWidgetKey((currentKey) => currentKey + 1);
     setGoogleLoading(true);
 
     try {
       const { idToken, user: googleUser, email, name, photoURL } = await signInWithGoogle();
       const googleProfile = {
         idToken,
+        recaptchaProof: verifiedProof,
         email: email || googleUser?.email || "",
         name: name || googleUser?.displayName || "",
         photoURL: photoURL || googleUser?.photoURL || "",
@@ -242,6 +255,7 @@ export default function Register() {
         credentials: "include",
         body: JSON.stringify({
           id_token: idToken,
+          recaptcha_proof: verifiedProof,
           intent: "signup_check",
           photoUrl: googleProfile.photoURL,
         }),
@@ -992,15 +1006,20 @@ export default function Register() {
                   <div className="h-px flex-1 bg-gray-200" />
                 </div>}
 
-                {!googleSignup ? <button
-                  type="button"
-                  onClick={handleGoogleSignup}
-                  disabled={googleLoading}
-                  className="btn-secondary flex w-full items-center justify-center gap-3 text-sm font-semibold text-[#171717] active:scale-[0.98] disabled:opacity-50 sm:col-span-2"
-                >
-                  <GoogleIcon />
-                  {googleLoading ? "Redirecting…" : "Sign Up with Google"}
-                </button> : (
+                {!googleSignup ? (
+                  <>
+                    <GoogleRecaptcha key={recaptchaWidgetKey} onProofChange={setRecaptchaProof} />
+                    <button
+                      type="button"
+                      onClick={handleGoogleSignup}
+                      disabled={googleLoading || !recaptchaProof}
+                      className="btn-secondary flex w-full items-center justify-center gap-3 text-sm font-semibold text-[#171717] active:scale-[0.98] disabled:opacity-50 sm:col-span-2"
+                    >
+                      <GoogleIcon />
+                      {googleLoading ? "Redirecting…" : "Sign Up with Google"}
+                    </button>
+                  </>
+                ) : (
                   <button
                     type="button"
                     onClick={() => {

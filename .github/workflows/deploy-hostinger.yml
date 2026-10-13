@@ -58,7 +58,13 @@ jobs:
         working-directory: customer_portal
         env:
           CI: "false"
-        run: npm run build
+          REACT_APP_RECAPTCHA_SITE_KEY: ${{ secrets.REACT_APP_RECAPTCHA_SITE_KEY }}
+        run: |
+          if [ -z "$REACT_APP_RECAPTCHA_SITE_KEY" ]; then
+            echo "::error::Missing REACT_APP_RECAPTCHA_SITE_KEY repository secret."
+            exit 1
+          fi
+          npm run build
 
       - name: Set up PHP for Laravel dependencies
         uses: shivammathur/setup-php@v2

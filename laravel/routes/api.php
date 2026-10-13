@@ -50,6 +50,8 @@ Route::post('password/reset', [AuthApiController::class, 'resetPassword'])
 Route::post('password/change', [AuthApiController::class, 'changePassword']);
 Route::post('account/delete', [AuthApiController::class, 'deleteAccount']);
 Route::get('sessions', [AuthApiController::class, 'sessions']);
+Route::post('recaptcha/verify', [AuthController::class, 'verifyRecaptcha'])
+    ->middleware(\Illuminate\Routing\Middleware\ThrottleRequests::class . ':10,1');
 Route::post('google-login', [AuthController::class, 'googleLogin']);
 Route::options('google-login', [AuthController::class, 'googleLogin']);
 Route::get('orders', [OrderController::class, 'index']);
