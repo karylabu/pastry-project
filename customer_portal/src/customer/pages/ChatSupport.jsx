@@ -158,9 +158,15 @@ export default function ChatSupport() {
   const handleSupportAction = () => {
     setSelectedCategory('All');
     setSearchTerm('');
-    setOpenItem(0);
+    setOpenItem('0-0');
     document.getElementById('faq-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     setTimeout(() => searchInputRef.current?.focus(), 250);
+  };
+
+  const handleCategorySelect = (categoryLabel) => {
+    setSelectedCategory(categoryLabel);
+    setOpenItem('0-0');
+    document.getElementById('faq-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
   return (
@@ -213,7 +219,7 @@ export default function ChatSupport() {
                 <button
                   key={categoryLabel}
                   type="button"
-                  onClick={() => setSelectedCategory(categoryLabel)}
+                  onClick={() => handleCategorySelect(categoryLabel)}
                   className={`flex items-center gap-3 rounded-2xl border px-4 py-3 text-left text-sm font-semibold transition ${
                     isActive
                       ? 'border-[#d4af37]/60 bg-[#fffaf0] text-[#171717] shadow-sm'
