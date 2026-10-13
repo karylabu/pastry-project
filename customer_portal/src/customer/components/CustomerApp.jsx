@@ -44,7 +44,7 @@ function GuestAccountPrompt({ onClose }) {
     <div className="fixed inset-0 z-[100000] flex items-center justify-center bg-black/40 p-6 backdrop-blur-sm" onClick={onClose}>
       <div className="w-full max-w-sm rounded-[28px] bg-white p-8 text-center shadow-2xl" onClick={(event) => event.stopPropagation()}>
         <h2 className="text-xl font-black text-gray-900">Account required</h2>
-        <p className="mt-3 text-sm leading-6 text-gray-500">Please log in or create an account before adding items or checking out.</p>
+        <p className="mt-3 text-sm leading-6 text-gray-500">Please log in or create an account before saving favorites, adding items, or checking out.</p>
         <div className="mt-6 flex gap-3">
           <button type="button" onClick={onClose} className="flex-1 rounded-xl border border-gray-200 px-4 py-3 text-xs font-bold uppercase tracking-[0.12em] text-gray-600 hover:bg-gray-50">Close</button>
           <Link to="/customer/login" className="flex-1 rounded-xl bg-black px-4 py-3 text-xs font-bold uppercase tracking-[0.12em] text-white hover:bg-gray-800" onClick={onClose}>Login</Link>

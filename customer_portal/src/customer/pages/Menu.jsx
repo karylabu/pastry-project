@@ -92,12 +92,6 @@ export default function Menu({ onAddToCart, onEnsureShopOpen }) {
   const userId = savedUser?.id || 0;
   const favoritesStorageKey = `favorite_product_ids_${userId || 'guest'}`;
 
-  const saveLocalFavorites = (next) => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem(favoritesStorageKey, JSON.stringify(next));
-    }
-  };
-
   const loadFavorites = async () => {
     if (userId > 0) {
       try {
@@ -113,6 +107,11 @@ export default function Menu({ onAddToCart, onEnsureShopOpen }) {
       } catch (err) {
         console.error('Failed to load server favorites', err);
       }
+    }
+
+    if (userId <= 0) {
+      setFavoriteIds([]);
+      return;
     }
 
     const stored = typeof window !== 'undefined'
@@ -137,6 +136,11 @@ export default function Menu({ onAddToCart, onEnsureShopOpen }) {
   }, [favoritesStorageKey, userId]);
 
   const toggleFavorite = async (product) => {
+    if (userId <= 0) {
+      window.dispatchEvent(new Event('customer:require-account'));
+      return;
+    }
+
     const id = Number(product.id);
     const currentlyFavorite = favoriteIds.includes(id);
     const next = currentlyFavorite
@@ -156,8 +160,6 @@ export default function Menu({ onAddToCart, onEnsureShopOpen }) {
       } catch (err) {
         console.error('Failed to save favorite to server', err);
       }
-    } else {
-      saveLocalFavorites(next);
     }
   };
 

@@ -22,12 +22,6 @@ export default function Favorites() {
   const userId = savedUser?.id || 0;
   const favoritesStorageKey = `favorite_product_ids_${userId || 'guest'}`;
 
-  const saveLocalFavorites = (next) => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem(favoritesStorageKey, JSON.stringify(next));
-    }
-  };
-
   const loadFavorites = async () => {
     if (userId > 0) {
       try {
@@ -47,10 +41,7 @@ export default function Favorites() {
         setFavoriteIds(Array.isArray(stored) ? stored : []);
       }
     } else {
-      const stored = typeof window !== 'undefined'
-        ? JSON.parse(localStorage.getItem(favoritesStorageKey) || '[]')
-        : [];
-      setFavoriteIds(Array.isArray(stored) ? stored : []);
+      setFavoriteIds([]);
     }
   };
 
@@ -69,6 +60,11 @@ export default function Favorites() {
   const favoriteProducts = products.filter((p) => favoriteIds.includes(Number(p.id)));
 
   const toggleFavorite = async (product) => {
+    if (userId <= 0) {
+      window.dispatchEvent(new Event('customer:require-account'));
+      return;
+    }
+
     const id = Number(product.id);
     const currentlyFavorite = favoriteIds.includes(id);
     const next = currentlyFavorite
@@ -88,8 +84,6 @@ export default function Favorites() {
       } catch (err) {
         console.error('Failed to save favorite to server', err);
       }
-    } else {
-      saveLocalFavorites(next);
     }
   };
 
