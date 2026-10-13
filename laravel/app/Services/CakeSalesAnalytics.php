@@ -115,6 +115,7 @@ class CakeSalesAnalytics
 
         if (Schema::hasTable('analytics_sales_history')) {
             $hasImportSalesType = Schema::hasColumn('analytics_imports', 'sales_type');
+            $hasHistorySize = Schema::hasColumn('analytics_sales_history', 'size');
             $importedRows = DB::table('analytics_sales_history as history')
                 ->join('analytics_imports as imports', 'imports.id', '=', 'history.import_id')
                 ->where('imports.status', 'completed')
@@ -123,9 +124,13 @@ class CakeSalesAnalytics
                 ->orderBy('history.sale_date')
                 ->selectRaw(
                     'history.product_name, history.sale_date, ' .
+                    ($hasHistorySize ? 'history.size' : 'NULL AS size') . ', ' .
                     ($hasImportSalesType ? 'imports.sales_type' : "'other' AS sales_type") .
                     ', SUM(history.units_sold) AS units_sold, SUM(history.revenue) AS revenue, COUNT(*) AS record_count'
                 );
+            if ($hasHistorySize) {
+                $importedRows->groupBy('history.size');
+            }
             if ($hasImportSalesType) {
                 $importedRows->groupBy('imports.sales_type');
             }
@@ -143,7 +148,7 @@ class CakeSalesAnalytics
                         'quantity' => $quantity,
                         'revenue' => $revenue,
                         'flavor' => 'Unknown',
-                        'size' => 'Unknown',
+                        'size' => (string) ($row->size ?? 'Unknown'),
                         'design' => trim((string) $row->product_name) ?: 'Historical customized cake',
                         'occasion' => 'Unknown',
                         'imported_record_count' => (int) $row->record_count,
@@ -160,7 +165,7 @@ class CakeSalesAnalytics
                     'product' => $product->name,
                     'category' => $product->category,
                     'image' => $product->image ?? null,
-                    'size' => 'Unknown',
+                    'size' => trim((string) ($row->size ?? 'Unknown')) ?: 'Unknown',
                     'quantity' => $quantity,
                     'price' => $revenue / $quantity,
                     'revenue' => $revenue,
@@ -172,7 +177,7 @@ class CakeSalesAnalytics
         $flavors = $this->rankRegularProducts($regularSales, $customSales);
         $topSellingCakes = $this->topSellingCakes($regularSales);
         $customPreferences = $this->customizedPreferences($start, $end);
-        $sizesBySale = $this->rankDimension($regularSales, $customSales, 'size');
+        $sizesBySale = $this->rankRegularCakeSizes($regularSales);
         $designs = $this->rankDimension([], $customSales, 'design');
         $cakeTypeBreakdown = $this->regularVsCustomized($regularSales, $customSales);
         $summary = $this->summary($regularSales, $customSales);
@@ -364,6 +369,7 @@ class CakeSalesAnalytics
             if ($stored->isNotEmpty()) {
                 $items[$orderId] = $stored->map(fn ($item) => [
                     'product_id' => $item->product_id,
+                    'product_size_id' => $item->product_size_id ?? null,
                     'name' => $item->product,
                     'qty' => $item->qty,
                     'price' => $item->price,
@@ -399,10 +405,37 @@ class CakeSalesAnalytics
 
     private function resolveSize(array $item, Collection $sizes): string
     {
+        $productSizeId = (int) ($item['product_size_id'] ?? 0);
+        if ($productSizeId > 0) {
+            $productSize = $sizes->firstWhere('id', $productSizeId);
+            if ($productSize) return trim((string) $productSize->size);
+        }
+
         $variant = trim((string) ($item['variant'] ?? ''));
         if ($variant !== '') return $variant;
-        $details = is_string($item['details'] ?? null) ? json_decode($item['details'], true) : ($item['details'] ?? []);
+        $details = $item['details'] ?? $item['selectionDetails'] ?? [];
+        $details = is_string($details) ? json_decode($details, true) : $details;
+        if (!is_array($details)) $details = [];
+        if (isset($details['details']) && is_array($details['details'])) {
+            $details = $details['details'];
+        }
         return trim((string) ($details['size'] ?? $details['variant'] ?? 'Unknown')) ?: 'Unknown';
+    }
+
+    private function rankRegularCakeSizes(array $regularSales): array
+    {
+        $sizes = [];
+        foreach ($regularSales as $sale) {
+            $normalized = strtolower(trim((string) ($sale['size'] ?? '')));
+            if (!in_array($normalized, ['big', 'small'], true)) continue;
+
+            $label = ucfirst($normalized);
+            $sizes[$label]['name'] = $label;
+            $sizes[$label]['quantity'] = ($sizes[$label]['quantity'] ?? 0) + $sale['quantity'];
+            $sizes[$label]['revenue'] = ($sizes[$label]['revenue'] ?? 0) + $sale['revenue'];
+        }
+
+        return $this->rankRows(array_values($sizes));
     }
 
     private function summary(array $regular, array $custom): array
