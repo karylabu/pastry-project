@@ -51,7 +51,7 @@ class AuthController extends Controller
                 $error = 'Incorrect password.';
             } elseif (strtolower((string) ($user->role ?? '')) === 'customer'
                 && $twoFactor->isEnabled((int) $user->id)) {
-                $error = 'Two-factor authentication is enabled. Please sign in through the customer portal to verify your authenticator code.';
+                $error = 'Two-factor authentication is enabled. Please sign in through the customer portal to verify your code.';
             } else {
                 $userData = [
                     'id' => $user->id,
@@ -149,7 +149,7 @@ class AuthController extends Controller
         ]);
     }
 
-    public function googleLogin(Request $request, CustomerTwoFactor $twoFactor)
+    public function googleLogin(Request $request, CustomerTwoFactor $twoFactor, \App\Services\CustomerTwoFactorDelivery $delivery)
     {
         if ($request->isMethod('options')) {
             return $this->googleCorsResponse(['success' => true]);
@@ -360,10 +360,23 @@ class AuthController extends Controller
         }
 
         if (strtolower((string) ($user->role ?? '')) === 'customer' && $twoFactor->isEnabled((int) $user->id)) {
+            try {
+                $challenge = $twoFactor->createLoginChallenge((int) $user->id, $delivery);
+            } catch (\RuntimeException $exception) {
+                \Illuminate\Support\Facades\Log::warning('Customer two-factor login code delivery failed.', ['user_id' => $user->id]);
+
+                return $this->googleCorsResponse([
+                    'success' => false,
+                    'message' => $exception->getMessage(),
+                ], 503);
+            }
+
             return $this->googleCorsResponse([
                 'success' => true,
                 'requires_two_factor' => true,
-                'challenge_token' => $twoFactor->createLoginChallenge((int) $user->id),
+                'challenge_token' => $challenge['token'],
+                'two_factor_method' => $challenge['method'],
+                'delivery_destination' => $challenge['destination'],
             ]);
         }
 

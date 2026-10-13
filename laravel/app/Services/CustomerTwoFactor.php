@@ -4,7 +4,10 @@ namespace App\Services;
 
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Schema;
+use RuntimeException;
 
 class CustomerTwoFactor
 {
@@ -23,22 +26,99 @@ class CustomerTwoFactor
         return DB::table('customer_two_factor')
             ->where('user_id', $userId)
             ->whereNotNull('enabled_at')
-            ->whereNotNull('secret')
+            ->where(function ($query) {
+                $query->whereNotNull('secret')->orWhereIn('method', ['email', 'sms']);
+            })
             ->exists();
     }
 
-    public function createLoginChallenge(int $userId): string
+    public function methodFor(int $userId): string
     {
+        $method = DB::table('customer_two_factor')->where('user_id', $userId)->value('method');
+
+        return in_array($method, ['authenticator', 'email', 'sms'], true) ? $method : 'authenticator';
+    }
+
+    public function createLoginChallenge(int $userId, CustomerTwoFactorDelivery $delivery): array
+    {
+        $user = \App\Models\User::find($userId);
+        $factor = DB::table('customer_two_factor')
+            ->where('user_id', $userId)
+            ->whereNotNull('enabled_at')
+            ->first();
+        if (!$user || !$factor) {
+            throw new RuntimeException('Two-factor authentication is unavailable for this account.');
+        }
+
+        $method = in_array($factor->method ?? 'authenticator', ['authenticator', 'email', 'sms'], true)
+            ? ($factor->method ?? 'authenticator')
+            : 'authenticator';
+        $otp = $method === 'authenticator' ? null : $this->generateCode();
+        $codeHash = $otp === null ? null : Hash::make($otp);
         $token = bin2hex(random_bytes(32));
 
-        DB::table('customer_two_factor_login_challenges')->insert([
+        $challengeId = DB::table('customer_two_factor_login_challenges')->insertGetId([
             'user_id' => $userId,
             'token_hash' => hash('sha256', $token),
             'expires_at' => now()->addMinutes(5),
+            'code_hash' => $codeHash,
             'created_at' => now(),
         ]);
 
-        return $token;
+        if ($otp !== null) {
+            try {
+                $this->sendOtp($user, $method, $otp, 'sign-in', $delivery);
+            } catch (\Throwable $exception) {
+                DB::table('customer_two_factor_login_challenges')->where('id', $challengeId)->delete();
+                throw $exception;
+            }
+        }
+
+        return [
+            'token' => $token,
+            'method' => $method,
+            'destination' => $otp === null ? null : $delivery->destination(
+                $method,
+                $user->email,
+                $user->phone ?? $user->phone_number ?? null
+            ),
+        ];
+    }
+
+    public function sendOtp(
+        \App\Models\User $user,
+        string $method,
+        string $code,
+        string $purpose,
+        CustomerTwoFactorDelivery $delivery
+    ): void {
+        $key = 'customer-two-factor:' . $user->id . ':' . $purpose;
+        if (RateLimiter::tooManyAttempts($key, 1)) {
+            throw new RuntimeException('Please wait before requesting another verification code.');
+        }
+        RateLimiter::hit($key, 60);
+
+        try {
+            $delivery->send(
+                $method,
+                $user->email,
+                $user->phone ?? $user->phone_number ?? null,
+                $code,
+                $purpose
+            );
+        } catch (\Throwable $exception) {
+            throw new RuntimeException('The verification code could not be delivered. Please try again later.', 0, $exception);
+        }
+    }
+
+    public function generateCode(): string
+    {
+        return str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
+    }
+
+    public function maskDestination(string $method, \App\Models\User $user, CustomerTwoFactorDelivery $delivery): string
+    {
+        return $delivery->destination($method, $user->email, $user->phone ?? $user->phone_number ?? null);
     }
 
     public function generateSecret(): string

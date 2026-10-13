@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\User;
 use App\Services\CustomerTwoFactor;
+use App\Services\CustomerTwoFactorDelivery;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
@@ -130,7 +131,7 @@ class AuthApiController extends Controller
     /**
      * Login compatible with both Laravel and legacy systems.
      */
-    public function login(Request $request, CustomerTwoFactor $twoFactor)
+    public function login(Request $request, CustomerTwoFactor $twoFactor, CustomerTwoFactorDelivery $delivery)
     {
         $email = strtolower(trim((string) $request->input('email', '')));
         $password = (string) $request->input('password', '');
@@ -184,10 +185,23 @@ class AuthApiController extends Controller
         }
 
         if (strtolower((string) $user->role) === 'customer' && $twoFactor->isEnabled((int) $user->id)) {
+            try {
+                $challenge = $twoFactor->createLoginChallenge((int) $user->id, $delivery);
+            } catch (\RuntimeException $exception) {
+                Log::warning('Customer two-factor login code delivery failed.', ['user_id' => $user->id]);
+
+                return response()->json([
+                    'success' => false,
+                    'message' => $exception->getMessage(),
+                ], 503);
+            }
+
             return response()->json([
                 'success' => true,
                 'requires_two_factor' => true,
-                'challenge_token' => $twoFactor->createLoginChallenge((int) $user->id),
+                'challenge_token' => $challenge['token'],
+                'two_factor_method' => $challenge['method'],
+                'delivery_destination' => $challenge['destination'],
             ]);
         }
 

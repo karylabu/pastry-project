@@ -49,6 +49,8 @@ Route::post('customer/two-factor/enable', [CustomerTwoFactorController::class, '
     ->middleware(\Illuminate\Routing\Middleware\ThrottleRequests::class . ':5,1');
 Route::post('customer/two-factor/disable', [CustomerTwoFactorController::class, 'disable'])
     ->middleware(\Illuminate\Routing\Middleware\ThrottleRequests::class . ':5,1');
+Route::post('customer/two-factor/disable-code', [CustomerTwoFactorController::class, 'sendDisableCode'])
+    ->middleware(\Illuminate\Routing\Middleware\ThrottleRequests::class . ':3,1');
 Route::get('auth/status', [AuthApiController::class, 'status']);
 Route::post('register', [AuthApiController::class, 'register']);
 Route::post('profile', [AuthApiController::class, 'updateProfile']);

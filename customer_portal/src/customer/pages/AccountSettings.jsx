@@ -73,6 +73,10 @@ export default function AccountSettings() {
   const profilePhotoInputRef = useRef(null);
   const [defaultAddressId, setDefaultAddressId] = useState(null);
   const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
+  const [twoFactorMethod, setTwoFactorMethod] = useState('authenticator');
+  const [twoFactorSelectedMethod, setTwoFactorSelectedMethod] = useState('authenticator');
+  const [twoFactorDisableCodeSent, setTwoFactorDisableCodeSent] = useState(false);
+  const [twoFactorDisableDestination, setTwoFactorDisableDestination] = useState('');
   const [twoFactorSetup, setTwoFactorSetup] = useState(null);
   const [twoFactorCode, setTwoFactorCode] = useState('');
   const [twoFactorRecoveryCodes, setTwoFactorRecoveryCodes] = useState([]);
@@ -242,7 +246,11 @@ export default function AccountSettings() {
         if (!response.ok || !data?.success) {
           throw new Error(data?.message || 'Unable to load two-factor settings.');
         }
-        if (!cancelled) setTwoFactorEnabled(Boolean(data.enabled));
+        if (!cancelled) {
+          setTwoFactorEnabled(Boolean(data.enabled));
+          setTwoFactorMethod(data.method || 'authenticator');
+          setTwoFactorSelectedMethod(data.method || 'authenticator');
+        }
       })
       .catch((error) => {
         if (!cancelled) setTwoFactorError(error.message || 'Unable to load two-factor settings.');
@@ -474,7 +482,7 @@ export default function AccountSettings() {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
-        body: JSON.stringify({}),
+        body: JSON.stringify({ method: twoFactorSelectedMethod }),
       });
       const data = await safeParseJson(response);
       if (!response.ok || !data?.success) {
@@ -505,11 +513,36 @@ export default function AccountSettings() {
         throw new Error(data?.message || 'Unable to enable two-factor authentication.');
       }
       setTwoFactorEnabled(true);
+      setTwoFactorMethod(data.method || twoFactorSetup?.method || twoFactorSelectedMethod);
       setTwoFactorSetup(null);
       setTwoFactorCode('');
       setTwoFactorRecoveryCodes(data.recovery_codes || []);
     } catch (error) {
       setTwoFactorError(error.message || 'Network error. Please try again.');
+    } finally {
+      setTwoFactorBusy(false);
+    }
+  };
+
+  const handleTwoFactorSendDisableCode = async () => {
+    setTwoFactorBusy(true);
+    setTwoFactorError('');
+    setTwoFactorCode('');
+    try {
+      const response = await fetch(`${BASE}/api/customer/two-factor/disable-code`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+        body: JSON.stringify({}),
+      });
+      const data = await safeParseJson(response);
+      if (!response.ok || !data?.success) {
+        throw new Error(data?.message || 'Unable to send a verification code.');
+      }
+      setTwoFactorDisableCodeSent(true);
+      setTwoFactorDisableDestination(data.destination || '');
+    } catch (error) {
+      setTwoFactorError(error.message || 'Unable to send a verification code.');
     } finally {
       setTwoFactorBusy(false);
     }
@@ -532,8 +565,11 @@ export default function AccountSettings() {
         throw new Error(data?.message || 'Unable to disable two-factor authentication.');
       }
       setTwoFactorEnabled(false);
+      setTwoFactorMethod('authenticator');
       setTwoFactorCode('');
       setTwoFactorRecoveryCodes([]);
+      setTwoFactorDisableCodeSent(false);
+      setTwoFactorDisableDestination('');
       showAlert('Two-factor authentication has been turned off.', 'success');
     } catch (error) {
       setTwoFactorError(error.message || 'Network error. Please try again.');
@@ -824,7 +860,9 @@ export default function AccountSettings() {
                 <span>
                   <span className="block text-[15px] font-semibold text-gray-900">Two-factor authentication</span>
                   <span className="block text-xs text-gray-500">
-                    {twoFactorEnabled ? 'Authenticator app protection is on.' : 'Add an authenticator app for extra protection.'}
+                    {twoFactorEnabled
+                      ? `${twoFactorMethod === 'authenticator' ? 'Authenticator app' : twoFactorMethod === 'email' ? 'Email code' : 'SMS code'} protection is on.`
+                      : 'Choose an authenticator app, email code, or SMS code for extra protection.'}
                   </span>
                 </span>
               </span>
@@ -840,27 +878,50 @@ export default function AccountSettings() {
             )}
 
             {!twoFactorEnabled && !twoFactorSetup && (
-              <button
-                type="button"
-                onClick={handleTwoFactorSetup}
-                disabled={twoFactorBusy}
-                className="rounded-full bg-[#e7b866] px-5 py-3 text-sm font-bold text-[#4a2b20] transition hover:bg-[#f1cf72] disabled:opacity-50"
-              >
-                {twoFactorBusy ? 'Preparing...' : 'Set up authenticator app'}
-              </button>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+                <label className="block flex-1">
+                  <span className="text-xs font-bold uppercase tracking-[0.12em] text-gray-600">Verification method</span>
+                  <select
+                    value={twoFactorSelectedMethod}
+                    onChange={(event) => setTwoFactorSelectedMethod(event.target.value)}
+                    className="mt-2 w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm outline-none focus:border-[#e7b866]"
+                  >
+                    <option value="authenticator">Authenticator app (recommended)</option>
+                    <option value="email">Email code</option>
+                    <option value="sms">SMS code</option>
+                  </select>
+                </label>
+                <button
+                  type="button"
+                  onClick={handleTwoFactorSetup}
+                  disabled={twoFactorBusy}
+                  className="rounded-full bg-[#e7b866] px-5 py-3 text-sm font-bold text-[#4a2b20] transition hover:bg-[#f1cf72] disabled:opacity-50"
+                >
+                  {twoFactorBusy ? 'Preparing...' : 'Set up two-factor authentication'}
+                </button>
+              </div>
             )}
 
             {twoFactorSetup && !twoFactorEnabled && (
               <form onSubmit={handleTwoFactorEnable} className="space-y-4">
-                <div className="rounded-xl bg-[#fffaf3] p-4 text-sm leading-6 text-gray-700">
-                  <p>In your authenticator app, add an account manually using this setup key:</p>
-                  <code className="mt-2 block break-all rounded-lg border border-[#ead8c5] bg-white px-3 py-2 font-mono text-base font-bold tracking-wider text-[#4a2b20]">
-                    {twoFactorSetup.secret}
-                  </code>
-                  <p className="mt-2 text-xs text-gray-500">Account: {user?.email} · Time-based code (TOTP)</p>
-                </div>
+                {twoFactorSetup.method === 'authenticator' ? (
+                  <div className="rounded-xl bg-[#fffaf3] p-4 text-sm leading-6 text-gray-700">
+                    <p>In your authenticator app, add an account manually using this setup key:</p>
+                    <code className="mt-2 block break-all rounded-lg border border-[#ead8c5] bg-white px-3 py-2 font-mono text-base font-bold tracking-wider text-[#4a2b20]">
+                      {twoFactorSetup.secret}
+                    </code>
+                    <p className="mt-2 text-xs text-gray-500">Account: {user?.email} · Time-based code (TOTP)</p>
+                  </div>
+                ) : (
+                  <div className="rounded-xl bg-[#fffaf3] p-4 text-sm leading-6 text-gray-700">
+                    <p>We sent a verification code to {twoFactorSetup.destination || (twoFactorSetup.method === 'email' ? 'your email' : 'your phone')}.</p>
+                    <p className="mt-1 text-xs text-gray-500">The code expires in 10 minutes.</p>
+                  </div>
+                )}
                 <label className="block">
-                  <span className="text-xs font-bold uppercase tracking-[0.12em] text-gray-600">Authenticator code</span>
+                  <span className="text-xs font-bold uppercase tracking-[0.12em] text-gray-600">
+                    {twoFactorSetup.method === 'authenticator' ? 'Authenticator code' : 'Verification code'}
+                  </span>
                   <input
                     type="text"
                     inputMode="numeric"
@@ -888,7 +949,7 @@ export default function AccountSettings() {
             {twoFactorRecoveryCodes.length > 0 && (
               <div className="space-y-3 rounded-xl border border-amber-200 bg-amber-50 p-4">
                 <p className="text-sm font-bold text-amber-900">Save these recovery codes somewhere safe</p>
-                <p className="text-xs leading-5 text-amber-800">Each code works once if you cannot access your authenticator. They will not be shown again.</p>
+                <p className="text-xs leading-5 text-amber-800">Each code works once if you cannot access your selected verification method. They will not be shown again.</p>
                 <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
                   {twoFactorRecoveryCodes.map((code) => (
                     <code key={code} className="rounded-lg bg-white px-2 py-2 text-center font-mono text-xs font-semibold text-gray-800">{code}</code>
@@ -901,26 +962,41 @@ export default function AccountSettings() {
             )}
 
             {twoFactorEnabled && twoFactorRecoveryCodes.length === 0 && (
-              <form onSubmit={handleTwoFactorDisable} className="flex flex-col gap-3 sm:flex-row sm:items-end">
-                <label className="block flex-1">
-                  <span className="text-xs font-bold uppercase tracking-[0.12em] text-gray-600">Authenticator code to turn off 2FA</span>
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    autoComplete="one-time-code"
-                    pattern="[0-9]{6}"
-                    maxLength={6}
-                    value={twoFactorCode}
-                    onChange={(event) => setTwoFactorCode(event.target.value.replace(/\D/g, '').slice(0, 6))}
-                    placeholder="6-digit code"
-                    required
-                    className="mt-2 w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-center font-mono text-lg tracking-[0.35em] outline-none focus:border-[#e7b866]"
-                  />
-                </label>
-                <button type="submit" disabled={twoFactorBusy || twoFactorCode.length !== 6} className="rounded-full border border-red-200 px-5 py-3 text-sm font-bold text-red-700 disabled:opacity-50">
-                  {twoFactorBusy ? 'Verifying...' : 'Turn off'}
+              twoFactorMethod === 'authenticator' || twoFactorDisableCodeSent ? (
+                <form onSubmit={handleTwoFactorDisable} className="flex flex-col gap-3 sm:flex-row sm:items-end">
+                  <label className="block flex-1">
+                    <span className="text-xs font-bold uppercase tracking-[0.12em] text-gray-600">
+                      {twoFactorMethod === 'authenticator'
+                        ? 'Authenticator code to turn off 2FA'
+                        : `Verification code sent to ${twoFactorDisableDestination || 'your contact'}`}
+                    </span>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      autoComplete="one-time-code"
+                      pattern="[0-9]{6}"
+                      maxLength={6}
+                      value={twoFactorCode}
+                      onChange={(event) => setTwoFactorCode(event.target.value.replace(/\D/g, '').slice(0, 6))}
+                      placeholder="6-digit code"
+                      required
+                      className="mt-2 w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-center font-mono text-lg tracking-[0.35em] outline-none focus:border-[#e7b866]"
+                    />
+                  </label>
+                  <button type="submit" disabled={twoFactorBusy || twoFactorCode.length !== 6} className="rounded-full border border-red-200 px-5 py-3 text-sm font-bold text-red-700 disabled:opacity-50">
+                    {twoFactorBusy ? 'Verifying...' : 'Turn off'}
+                  </button>
+                </form>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleTwoFactorSendDisableCode}
+                  disabled={twoFactorBusy}
+                  className="rounded-full border border-red-200 px-5 py-3 text-sm font-bold text-red-700 disabled:opacity-50"
+                >
+                  {twoFactorBusy ? 'Sending code...' : 'Send a code to turn off 2FA'}
                 </button>
-              </form>
+              )
             )}
           </div>
         </div>

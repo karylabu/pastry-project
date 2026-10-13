@@ -43,6 +43,8 @@ export default function Login() {
   const [recaptchaWidgetKey, setRecaptchaWidgetKey] = useState(0);
   const [twoFactorChallenge, setTwoFactorChallenge] = useState("");
   const [twoFactorCode, setTwoFactorCode] = useState("");
+  const [twoFactorMethod, setTwoFactorMethod] = useState("authenticator");
+  const [twoFactorDestination, setTwoFactorDestination] = useState("");
   useEffect(() => {
     localStorage.removeItem('pastry_saved_accounts');
   }, []);
@@ -91,6 +93,8 @@ export default function Login() {
 
       if (data?.requires_two_factor && data.challenge_token) {
         setTwoFactorChallenge(data.challenge_token);
+        setTwoFactorMethod(data.two_factor_method || "authenticator");
+        setTwoFactorDestination(data.delivery_destination || "");
         setError("");
         return;
       }
@@ -146,6 +150,8 @@ export default function Login() {
 
       if (data?.requires_two_factor && data.challenge_token) {
         setTwoFactorChallenge(data.challenge_token);
+        setTwoFactorMethod(data.two_factor_method || "authenticator");
+        setTwoFactorDestination(data.delivery_destination || "");
         setTwoFactorCode("");
         setError("");
         return;
@@ -998,19 +1004,26 @@ export default function Login() {
                     {twoFactorChallenge ? (
                       <form onSubmit={handleTwoFactorLogin} className="space-y-4">
                         <div className="space-y-2">
-                          <label htmlFor="customer-two-factor-code" className="text-sm font-bold text-[#171717]">Authenticator or recovery code</label>
+                          <label htmlFor="customer-two-factor-code" className="text-sm font-bold text-[#171717]">
+                            {twoFactorMethod === "authenticator" ? "Authenticator or recovery code" : "Verification or recovery code"}
+                          </label>
+                          {twoFactorMethod !== "authenticator" && (
+                            <p className="text-xs leading-5 text-gray-500">
+                              We sent a one-time code to {twoFactorDestination || (twoFactorMethod === "email" ? "your email" : "your phone")}.
+                            </p>
+                          )}
                           <input
                             id="customer-two-factor-code"
                             type="text"
-                            inputMode="numeric"
+                            inputMode={twoFactorMethod === "authenticator" ? "numeric" : "text"}
                             autoComplete="one-time-code"
                             value={twoFactorCode}
                             onChange={(event) => setTwoFactorCode(event.target.value)}
-                            placeholder="6-digit code"
+                            placeholder={twoFactorMethod === "authenticator" ? "6-digit code or recovery code" : "6-digit code or recovery code"}
                             required
                             className="login-input w-full text-center font-mono tracking-[0.3em]"
                           />
-                          <p className="text-xs leading-5 text-gray-500">You can enter a one-time recovery code instead of an authenticator code.</p>
+                          <p className="text-xs leading-5 text-gray-500">You can use a one-time recovery code if needed.</p>
                         </div>
                         <button
                           type="submit"
@@ -1024,6 +1037,7 @@ export default function Login() {
                           onClick={() => {
                             setTwoFactorChallenge("");
                             setTwoFactorCode("");
+                            setTwoFactorDestination("");
                             setError("");
                           }}
                           className="w-full py-2 text-sm font-semibold text-gray-500 hover:text-gray-800"

@@ -45,6 +45,10 @@ return [
         'secret' => env('PAYMONGO_SECRET'),
     ],
 
+    'iprogsms' => [
+        'api_token' => env('IPROGSMS_API_TOKEN'),
+    ],
+
     'firebase' => [
         'project_id' => env('FIREBASE_PROJECT_ID', 'pastry-project-e864e'),
         'api_key' => env('FIREBASE_API_KEY') ?: 'AIzaSyDgvJQtM-TmhYb8i1N2TutXYmekSVhRAeg',

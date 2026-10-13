@@ -1246,9 +1246,17 @@ class OrderController extends Controller
                 default => "status is now {$status}",
             };
             $message = "Pastry Project: Your order #{$order->id} {$statusMessage}.";
+            $apiToken = config('services.iprogsms.api_token');
+            if (!is_string($apiToken) || trim($apiToken) === '') {
+                Log::warning("iProgSMS token is not configured; order status SMS was not sent.", [
+                    'order_id' => $order->id,
+                ]);
+
+                return;
+            }
 
             $payload = [
-                "api_token"    => "3e0c021fc064ea07bb524064e62125caf19f511e",
+                "api_token"    => $apiToken,
                 "phone_number" => $phone,
                 "message"      => $message
             ];

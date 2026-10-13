@@ -4,9 +4,11 @@ namespace App\Http\Controllers;
 
 use App\Models\User;
 use App\Services\CustomerTwoFactor;
+use App\Services\CustomerTwoFactorDelivery;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 
 class CustomerTwoFactorController extends Controller
 {
@@ -21,14 +23,16 @@ class CustomerTwoFactorController extends Controller
 
         return response()->json([
             'success' => true,
-            'enabled' => $factor && $factor->enabled_at !== null && $factor->secret !== null,
+            'enabled' => $factor && $factor->enabled_at !== null
+                && ($factor->secret !== null || in_array($factor->method ?? '', ['email', 'sms'], true)),
+            'method' => $factor->method ?? 'authenticator',
             'recovery_codes_remaining' => DB::table('customer_two_factor_recovery_codes')
                 ->where('user_id', $user->id)
                 ->count(),
         ]);
     }
 
-    public function setup(Request $request, CustomerTwoFactor $twoFactor)
+    public function setup(Request $request, CustomerTwoFactor $twoFactor, CustomerTwoFactorDelivery $delivery)
     {
         $user = $this->customer($request);
         if (!$user) {
@@ -38,24 +42,60 @@ class CustomerTwoFactorController extends Controller
             return response()->json(['success' => false, 'message' => 'Two-factor authentication is already enabled.'], 409);
         }
 
-        $secret = $twoFactor->generateSecret();
+        $method = (string) $request->input('method', 'authenticator');
+        if (!in_array($method, ['authenticator', 'email', 'sms'], true)) {
+            return response()->json(['success' => false, 'message' => 'Choose a valid verification method.'], 422);
+        }
+        if (!$delivery->isConfigured($method)) {
+            return response()->json([
+                'success' => false,
+                'message' => $method === 'sms'
+                    ? 'SMS verification is not configured. Please contact support or choose another method.'
+                    : 'Email verification is not configured. Please contact support or choose another method.',
+            ], 503);
+        }
+
+        if ($method === 'sms' && trim((string) ($user->phone ?? $user->phone_number ?? '')) === '') {
+            return response()->json(['success' => false, 'message' => 'Add a phone number to your profile before choosing SMS verification.'], 422);
+        }
+
+        $secret = $method === 'authenticator' ? $twoFactor->generateSecret() : null;
+        $pendingCode = $method === 'authenticator' ? null : $twoFactor->generateCode();
         DB::table('customer_two_factor')->updateOrInsert(
             ['user_id' => $user->id],
             [
-                'pending_secret' => $twoFactor->encryptSecret($secret),
+                'pending_secret' => $secret === null ? null : $twoFactor->encryptSecret($secret),
                 'pending_expires_at' => now()->addMinutes(10),
+                'pending_method' => $method,
+                'pending_code_hash' => $pendingCode === null ? null : Hash::make($pendingCode),
                 'secret' => null,
                 'enabled_at' => null,
                 'last_counter' => null,
+                'method' => $method,
                 'updated_at' => now(),
                 'created_at' => now(),
             ]
         );
 
+        if ($pendingCode !== null) {
+            try {
+                $twoFactor->sendOtp($user, $method, $pendingCode, 'setup', $delivery);
+            } catch (\Throwable $exception) {
+                DB::table('customer_two_factor')
+                    ->where('user_id', $user->id)
+                    ->update(['pending_code_hash' => null, 'pending_expires_at' => null]);
+                Log::warning('Customer two-factor setup code delivery failed.', ['user_id' => $user->id]);
+
+                return response()->json(['success' => false, 'message' => $exception->getMessage()], 503);
+            }
+        }
+
         return response()->json([
             'success' => true,
+            'method' => $method,
             'secret' => $secret,
-            'otpauth_url' => $twoFactor->provisioningUri($secret, $user->email),
+            'otpauth_url' => $secret === null ? null : $twoFactor->provisioningUri($secret, $user->email),
+            'destination' => $pendingCode === null ? null : $twoFactor->maskDestination($method, $user, $delivery),
         ]);
     }
 
@@ -73,25 +113,38 @@ class CustomerTwoFactorController extends Controller
                 ->where('user_id', $user->id)
                 ->lockForUpdate()
                 ->first();
-            if (!$factor || !$factor->pending_secret || !$factor->pending_expires_at
+            if (!$factor || !$factor->pending_expires_at
                 || now()->greaterThan($factor->pending_expires_at)) {
                 return 'expired';
             }
 
-            $secret = $twoFactor->decryptSecret($factor->pending_secret);
-            $counter = $twoFactor->matchingCounter($secret, $code);
-            if ($counter === null) {
+            $method = $factor->pending_method ?? 'authenticator';
+            if (($method === 'authenticator' && !$factor->pending_secret)
+                || ($method !== 'authenticator' && !$factor->pending_code_hash)) {
+                return 'expired';
+            }
+            $secret = $factor->pending_secret ? $twoFactor->decryptSecret($factor->pending_secret) : null;
+            $counter = $method === 'authenticator' && $secret !== null
+                ? $twoFactor->matchingCounter($secret, $code)
+                : null;
+            $codeValid = $method === 'authenticator'
+                ? $counter !== null
+                : ($factor->pending_code_hash && Hash::check($code, $factor->pending_code_hash));
+            if (!$codeValid) {
                 return 'invalid_code';
             }
 
             DB::table('customer_two_factor')
                 ->where('user_id', $user->id)
                 ->update([
-                    'secret' => $twoFactor->encryptSecret($secret),
+                    'secret' => $secret === null ? null : $twoFactor->encryptSecret($secret),
                     'pending_secret' => null,
                     'pending_expires_at' => null,
+                    'pending_method' => null,
+                    'pending_code_hash' => null,
                     'enabled_at' => now(),
                     'last_counter' => null,
+                    'method' => $method,
                     'updated_at' => now(),
                 ]);
 
@@ -111,13 +164,57 @@ class CustomerTwoFactorController extends Controller
             return response()->json(['success' => false, 'message' => 'Authenticator setup expired. Start setup again.'], 422);
         }
         if ($result === 'invalid_code') {
-            return response()->json(['success' => false, 'message' => 'That code is invalid or expired. Check your authenticator app and try again.'], 422);
+            return response()->json(['success' => false, 'message' => 'That verification code is invalid or expired. Request a new code or try again.'], 422);
         }
 
         return response()->json([
             'success' => true,
             'enabled' => true,
+            'method' => DB::table('customer_two_factor')->where('user_id', $user->id)->value('method'),
             'recovery_codes' => $recoveryCodes,
+        ]);
+    }
+
+    public function sendDisableCode(Request $request, CustomerTwoFactor $twoFactor, CustomerTwoFactorDelivery $delivery)
+    {
+        $user = $this->customer($request);
+        if (!$user) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+
+        $factor = DB::table('customer_two_factor')
+            ->where('user_id', $user->id)
+            ->whereNotNull('enabled_at')
+            ->first();
+        $method = $factor->method ?? 'authenticator';
+        if (!$factor || !in_array($method, ['email', 'sms'], true)) {
+            return response()->json(['success' => false, 'message' => 'A delivery code is not needed for this method.'], 409);
+        }
+        if (!$delivery->isConfigured($method)) {
+            return response()->json(['success' => false, 'message' => 'Code delivery is not configured. Please contact support.'], 503);
+        }
+
+        $code = $twoFactor->generateCode();
+        DB::table('customer_two_factor')->where('user_id', $user->id)->update([
+            'management_code_hash' => Hash::make($code),
+            'management_code_expires_at' => now()->addMinutes(10),
+        ]);
+
+        try {
+            $twoFactor->sendOtp($user, $method, $code, 'disable', $delivery);
+        } catch (\Throwable $exception) {
+            DB::table('customer_two_factor')->where('user_id', $user->id)->update([
+                'management_code_hash' => null,
+                'management_code_expires_at' => null,
+            ]);
+            Log::warning('Customer two-factor disable code delivery failed.', ['user_id' => $user->id]);
+
+            return response()->json(['success' => false, 'message' => $exception->getMessage()], 503);
+        }
+
+        return response()->json([
+            'success' => true,
+            'destination' => $delivery->destination($method, $user->email, $user->phone ?? $user->phone_number ?? null),
         ]);
     }
 
@@ -133,16 +230,24 @@ class CustomerTwoFactorController extends Controller
                 ->where('user_id', $user->id)
                 ->lockForUpdate()
                 ->first();
-            if (!$factor || !$factor->secret || !$factor->enabled_at) {
+            if (!$factor || !$factor->enabled_at
+                || (($factor->method ?? 'authenticator') === 'authenticator' && !$factor->secret)) {
                 return 'not_enabled';
             }
 
-            $counter = $twoFactor->matchingCounter(
-                $twoFactor->decryptSecret($factor->secret),
-                trim((string) $request->input('code', '')),
-                $factor->last_counter === null ? null : (int) $factor->last_counter
-            );
-            if ($counter === null) {
+            $method = $factor->method ?? 'authenticator';
+            $code = trim((string) $request->input('code', ''));
+            $valid = $method === 'authenticator'
+                ? $twoFactor->matchingCounter(
+                    $twoFactor->decryptSecret($factor->secret),
+                    $code,
+                    $factor->last_counter === null ? null : (int) $factor->last_counter
+                ) !== null
+                : ($factor->management_code_hash
+                    && $factor->management_code_expires_at
+                    && now()->lessThanOrEqualTo($factor->management_code_expires_at)
+                    && Hash::check($code, $factor->management_code_hash));
+            if (!$valid) {
                 return 'invalid_code';
             }
 
@@ -189,18 +294,23 @@ class CustomerTwoFactorController extends Controller
                 ->where('user_id', $user->id)
                 ->lockForUpdate()
                 ->first();
-            if (!$factor || !$factor->enabled_at || !$factor->secret) {
+            if (!$factor || !$factor->enabled_at
+                || (($factor->method ?? 'authenticator') === 'authenticator' && !$factor->secret)) {
                 return ['error' => 'challenge_expired'];
             }
 
-            $verifiedCounter = $twoFactor->matchingCounter(
-                $twoFactor->decryptSecret($factor->secret),
-                $code,
-                $factor->last_counter === null ? null : (int) $factor->last_counter
-            );
+            $method = $factor->method ?? 'authenticator';
+            $verifiedCounter = $method === 'authenticator' && $factor->secret
+                ? $twoFactor->matchingCounter(
+                    $twoFactor->decryptSecret($factor->secret),
+                    $code,
+                    $factor->last_counter === null ? null : (int) $factor->last_counter
+                )
+                : null;
+            $verifiedDeliveryCode = $challenge->code_hash && Hash::check($code, $challenge->code_hash);
             $recoveryCodeId = null;
 
-            if ($verifiedCounter === null) {
+            if ($verifiedCounter === null && !$verifiedDeliveryCode) {
                 $normalizedCode = $twoFactor->normalizeRecoveryCode($code);
                 if (strlen($normalizedCode) >= 10 && strlen($normalizedCode) <= 20) {
                     $recoveryCodes = DB::table('customer_two_factor_recovery_codes')
@@ -216,7 +326,7 @@ class CustomerTwoFactorController extends Controller
                 }
             }
 
-            if ($verifiedCounter === null && $recoveryCodeId === null) {
+            if ($verifiedCounter === null && !$verifiedDeliveryCode && $recoveryCodeId === null) {
                 $attempts = (int) $challenge->attempts + 1;
                 DB::table('customer_two_factor_login_challenges')
                     ->where('id', $challenge->id)

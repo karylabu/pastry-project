@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Models\User;
 use App\Services\CustomerTwoFactor;
+use App\Services\CustomerTwoFactorDelivery;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
@@ -233,7 +234,7 @@ class CustomerApiController extends Controller
         return $this->corsResponse(['success' => false, 'message' => 'Invalid product action.'], 400);
     }
 
-    public function login(Request $request, CustomerTwoFactor $twoFactor)
+    public function login(Request $request, CustomerTwoFactor $twoFactor, CustomerTwoFactorDelivery $delivery)
     {
         try {
             if ($request->isMethod('options')) {
@@ -280,10 +281,23 @@ class CustomerApiController extends Controller
             }
 
             if (strtolower((string) $user->role) === 'customer' && $twoFactor->isEnabled((int) $user->id)) {
+                try {
+                    $challenge = $twoFactor->createLoginChallenge((int) $user->id, $delivery);
+                } catch (\RuntimeException $exception) {
+                    Log::warning('Customer two-factor login code delivery failed.', ['user_id' => $user->id]);
+
+                    return $this->corsResponse([
+                        'success' => false,
+                        'message' => $exception->getMessage(),
+                    ], 503);
+                }
+
                 return $this->corsResponse([
                     'success' => true,
                     'requires_two_factor' => true,
-                    'challenge_token' => $twoFactor->createLoginChallenge((int) $user->id),
+                    'challenge_token' => $challenge['token'],
+                    'two_factor_method' => $challenge['method'],
+                    'delivery_destination' => $challenge['destination'],
                 ]);
             }
 
