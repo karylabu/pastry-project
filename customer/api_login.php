@@ -60,6 +60,49 @@ try {
         exit;
     }
 
+    if (strtolower(trim((string) ($user['role'] ?? ''))) === 'customer') {
+        $factorTable = mysqli_query(
+            $conn,
+            "SELECT 1 FROM information_schema.tables
+             WHERE table_schema = DATABASE() AND table_name = 'customer_two_factor' LIMIT 1"
+        );
+        if (!$factorTable || mysqli_num_rows($factorTable) === 0) {
+            http_response_code(503);
+            echo json_encode(["success" => false, "message" => "Customer sign-in is temporarily unavailable. Please try again later."]);
+            exit;
+        }
+
+        $factorStatement = mysqli_prepare(
+            $conn,
+            "SELECT user_id FROM customer_two_factor
+             WHERE user_id = ? AND enabled_at IS NOT NULL AND secret IS NOT NULL LIMIT 1"
+        );
+        if (!$factorStatement) {
+            http_response_code(503);
+            echo json_encode(["success" => false, "message" => "Customer sign-in is temporarily unavailable. Please try again later."]);
+            exit;
+        }
+        $userId = (int) $user['id'];
+        mysqli_stmt_bind_param($factorStatement, 'i', $userId);
+        if (!mysqli_stmt_execute($factorStatement)) {
+            mysqli_stmt_close($factorStatement);
+            http_response_code(503);
+            echo json_encode(["success" => false, "message" => "Customer sign-in is temporarily unavailable. Please try again later."]);
+            exit;
+        }
+        $enabledFactor = mysqli_stmt_get_result($factorStatement);
+        mysqli_stmt_close($factorStatement);
+        if ($enabledFactor && mysqli_num_rows($enabledFactor) > 0) {
+            http_response_code(401);
+            echo json_encode([
+                "success" => false,
+                "code" => "two_factor_required",
+                "message" => "Please sign in through the customer portal to verify your authenticator code.",
+            ]);
+            exit;
+        }
+    }
+
     $accountStatus = strtolower(trim((string) ($user['status'] ?? 'active')));
 
     session_regenerate_id(true);

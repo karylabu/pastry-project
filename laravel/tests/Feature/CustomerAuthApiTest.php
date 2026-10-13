@@ -6,6 +6,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Schema;
+use App\Services\CustomerTwoFactor;
 use Tests\TestCase;
 
 class CustomerAuthApiTest extends TestCase
@@ -13,6 +14,8 @@ class CustomerAuthApiTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+
+        config(['app.key' => 'base64:' . base64_encode(str_repeat('k', 32))]);
 
         Schema::create('users', function ($table) {
             $table->id();
@@ -48,12 +51,39 @@ class CustomerAuthApiTest extends TestCase
             $table->string('action_url')->nullable();
             $table->timestamp('created_at')->nullable();
         });
+        Schema::create('customer_two_factor', function ($table) {
+            $table->unsignedBigInteger('user_id')->primary();
+            $table->text('secret')->nullable();
+            $table->text('pending_secret')->nullable();
+            $table->timestamp('pending_expires_at')->nullable();
+            $table->timestamp('enabled_at')->nullable();
+            $table->unsignedBigInteger('last_counter')->nullable();
+            $table->timestamps();
+        });
+        Schema::create('customer_two_factor_recovery_codes', function ($table) {
+            $table->id();
+            $table->unsignedBigInteger('user_id')->index();
+            $table->string('code_hash');
+            $table->timestamp('created_at')->nullable();
+        });
+        Schema::create('customer_two_factor_login_challenges', function ($table) {
+            $table->id();
+            $table->unsignedBigInteger('user_id')->index();
+            $table->char('token_hash', 64)->unique();
+            $table->timestamp('expires_at')->index();
+            $table->unsignedTinyInteger('attempts')->default(0);
+            $table->timestamp('used_at')->nullable();
+            $table->timestamp('created_at')->nullable();
+        });
     }
 
     protected function tearDown(): void
     {
         Schema::dropIfExists('password_resets');
         Schema::dropIfExists('notifications');
+        Schema::dropIfExists('customer_two_factor_login_challenges');
+        Schema::dropIfExists('customer_two_factor_recovery_codes');
+        Schema::dropIfExists('customer_two_factor');
         Schema::dropIfExists('user_sessions');
         Schema::dropIfExists('users');
 
@@ -86,6 +116,152 @@ class CustomerAuthApiTest extends TestCase
         $storedPassword = DB::table('users')->where('id', 7)->value('password');
         $this->assertTrue(Hash::check('legacy-password', $storedPassword));
         $this->assertDatabaseHas('user_sessions', ['user_id' => 7]);
+    }
+
+    public function test_customer_login_requires_totp_and_prevents_reusing_a_recovery_code(): void
+    {
+        [, $recoveryCodes] = $this->enableTwoFactorForCustomer();
+
+        $challengeResponse = $this->postJson('http://localhost/api/login', [
+            'email' => 'customer@example.com',
+            'password' => 'current-password',
+        ])
+            ->assertOk()
+            ->assertJsonPath('requires_two_factor', true)
+            ->assertJsonMissingPath('token');
+        $challengeToken = $challengeResponse->json('challenge_token');
+        $this->assertDatabaseCount('user_sessions', 1);
+
+        $statusResponse = $this->getJson('http://localhost/api/customer/two-factor')
+            ->assertOk()
+            ->assertJsonPath('recovery_codes_remaining', 10);
+        $oneTimeCode = $recoveryCodes[0];
+        $this->postJson('http://localhost/api/login/two-factor', [
+            'challenge_token' => $challengeToken,
+            'code' => $oneTimeCode,
+        ])
+            ->assertOk()
+            ->assertJsonPath('success', true);
+
+        $this->assertDatabaseCount('customer_two_factor_recovery_codes', 9);
+
+        $nextChallenge = $this->postJson('http://localhost/api/login', [
+            'email' => 'customer@example.com',
+            'password' => 'current-password',
+        ])->json('challenge_token');
+
+        $this->postJson('http://localhost/api/login/two-factor', [
+            'challenge_token' => $nextChallenge,
+            'code' => $oneTimeCode,
+        ])
+            ->assertUnprocessable()
+            ->assertJsonPath('success', false);
+    }
+
+    public function test_customer_can_login_with_totp_but_cannot_replay_a_code(): void
+    {
+        [$secret] = $this->enableTwoFactorForCustomer();
+        $code = $this->totpCode($secret, intdiv(time(), 30));
+
+        $challengeToken = $this->postJson('http://localhost/api/login', [
+            'email' => 'customer@example.com',
+            'password' => 'current-password',
+        ])
+            ->assertOk()
+            ->json('challenge_token');
+        $this->postJson('http://localhost/api/login/two-factor', [
+            'challenge_token' => $challengeToken,
+            'code' => $code,
+        ])->assertOk()->assertJsonPath('success', true);
+
+        $replayChallenge = $this->postJson('http://localhost/api/login', [
+            'email' => 'customer@example.com',
+            'password' => 'current-password',
+        ])->json('challenge_token');
+        $this->postJson('http://localhost/api/login/two-factor', [
+            'challenge_token' => $replayChallenge,
+            'code' => $code,
+        ])->assertUnprocessable()->assertJsonPath('success', false);
+    }
+
+    public function test_totp_code_matches_the_rfc_6238_sha1_vector(): void
+    {
+        $this->assertSame(
+            '287082',
+            $this->totpCode('GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ', 1)
+        );
+    }
+
+    public function test_admin_cannot_manage_customer_two_factor_settings(): void
+    {
+        DB::table('users')->insert([
+            'id' => 89,
+            'name' => 'Test Admin',
+            'email' => 'admin@example.com',
+            'password' => Hash::make('admin-password'),
+            'role' => 'admin',
+            'status' => 'active',
+        ]);
+        DB::table('user_sessions')->insert([
+            'user_id' => 89,
+            'token' => 'test-admin-token',
+            'expires_at' => now()->addHour(),
+        ]);
+
+        $this->withHeader('X-Auth-Token', 'test-admin-token')
+            ->getJson('http://localhost/api/customer/two-factor')
+            ->assertUnauthorized();
+        $this->postJson('http://localhost/api/customer/two-factor/setup')
+            ->assertUnauthorized();
+    }
+
+    public function test_login_challenge_expires_after_five_invalid_codes(): void
+    {
+        $this->seedCustomer();
+        $twoFactor = new CustomerTwoFactor();
+        DB::table('customer_two_factor')->insert([
+            'user_id' => 7,
+            'secret' => $twoFactor->encryptSecret($twoFactor->generateSecret()),
+            'enabled_at' => now(),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $challengeToken = $twoFactor->createLoginChallenge(7);
+
+        for ($attempt = 1; $attempt <= 5; $attempt++) {
+            $response = $this->postJson('http://localhost/api/login/two-factor', [
+                'challenge_token' => $challengeToken,
+                'code' => 'invalid',
+            ]);
+            $response->assertStatus($attempt === 5 ? 401 : 422);
+        }
+
+        $this->assertDatabaseHas('customer_two_factor_login_challenges', [
+            'user_id' => 7,
+            'attempts' => 5,
+        ]);
+    }
+
+    public function test_expired_login_challenge_is_rejected(): void
+    {
+        $this->seedCustomer();
+        $twoFactor = new CustomerTwoFactor();
+        DB::table('customer_two_factor')->insert([
+            'user_id' => 7,
+            'secret' => $twoFactor->encryptSecret($twoFactor->generateSecret()),
+            'enabled_at' => now(),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $challengeToken = $twoFactor->createLoginChallenge(7);
+        DB::table('customer_two_factor_login_challenges')
+            ->where('token_hash', hash('sha256', $challengeToken))
+            ->update(['expires_at' => now()->subMinute()]);
+
+        $this->postJson('http://localhost/api/login/two-factor', [
+            'challenge_token' => $challengeToken,
+            'code' => 'invalid',
+        ])->assertUnauthorized();
     }
 
     public function test_inactive_customer_cannot_log_in(): void
@@ -500,5 +676,35 @@ class CustomerAuthApiTest extends TestCase
             'device_name' => 'Browser',
             'ip_address' => '127.0.0.1',
         ]);
+    }
+
+    private function totpCode(string $secret, int $counter): string
+    {
+        $method = new \ReflectionMethod(CustomerTwoFactor::class, 'totpCode');
+        $method->setAccessible(true);
+
+        return $method->invoke(new CustomerTwoFactor(), $secret, $counter);
+    }
+
+    private function enableTwoFactorForCustomer(): array
+    {
+        $this->seedCustomer();
+        $this->withHeader('X-Auth-Token', 'test-customer-token');
+
+        $setup = $this->postJson('http://localhost/api/customer/two-factor/setup')
+            ->assertOk()
+            ->assertJsonPath('success', true);
+        $secret = $setup->json('secret');
+        $this->assertStringContainsString('otpauth://totp/', $setup->json('otpauth_url'));
+
+        $enableResponse = $this->postJson('http://localhost/api/customer/two-factor/enable', [
+            'code' => $this->totpCode($secret, intdiv(time(), 30)),
+        ])
+            ->assertOk()
+            ->assertJsonPath('enabled', true);
+        $recoveryCodes = $enableResponse->json('recovery_codes');
+        $this->assertCount(10, $recoveryCodes);
+
+        return [$secret, $recoveryCodes];
     }
 }

@@ -41,6 +41,8 @@ export default function Login() {
   const [showCredits, setShowCredits] = useState(false);
   const [recaptchaProof, setRecaptchaProof] = useState("");
   const [recaptchaWidgetKey, setRecaptchaWidgetKey] = useState(0);
+  const [twoFactorChallenge, setTwoFactorChallenge] = useState("");
+  const [twoFactorCode, setTwoFactorCode] = useState("");
   useEffect(() => {
     localStorage.removeItem('pastry_saved_accounts');
   }, []);
@@ -86,6 +88,12 @@ export default function Login() {
         }),
       });
       const data = await safeParseJson(response);
+
+      if (data?.requires_two_factor && data.challenge_token) {
+        setTwoFactorChallenge(data.challenge_token);
+        setError("");
+        return;
+      }
 
       if (!response.ok || !data?.success) {
         if (response.status === 404 && data?.code === "user_not_found") {
@@ -136,6 +144,13 @@ export default function Login() {
       });
       const data = await safeParseJson(res);
 
+      if (data?.requires_two_factor && data.challenge_token) {
+        setTwoFactorChallenge(data.challenge_token);
+        setTwoFactorCode("");
+        setError("");
+        return;
+      }
+
       if (data?.success) {
         if (!isCustomerRole(data.user?.role)) {
           setError('Staff and admin accounts must use the staff or admin login.');
@@ -156,6 +171,43 @@ export default function Login() {
       }
     } catch {
       setError("Network error. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleTwoFactorLogin = async (event) => {
+    event.preventDefault();
+    if (!twoFactorChallenge) return;
+
+    setError("");
+    setLoading(true);
+    try {
+      const response = await fetch(`${LARAVEL_BASE}/api/login/two-factor`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ challenge_token: twoFactorChallenge, code: twoFactorCode }),
+      });
+      const data = await safeParseJson(response);
+      if (!response.ok || !data?.success) {
+        throw new Error(data?.message || "Unable to verify the authenticator code.");
+      }
+
+      if (!isCustomerRole(data.user?.role)) {
+        throw new Error("Only customer accounts can use customer login.");
+      }
+
+      const account = {
+        ...data.user,
+        avatar: data.user.avatar || data.user.profile_picture || data.user.profile_image || "",
+        token: data.token || "",
+      };
+      localStorage.setItem("user", JSON.stringify(account));
+      setJustLoggedUser(account);
+      setShowLoginSuccess(true);
+    } catch (error) {
+      setError(error.message || "Unable to verify the authenticator code.");
     } finally {
       setLoading(false);
     }
@@ -902,7 +954,9 @@ export default function Login() {
                     <path d="M18 19c-7-7 2-14 7-7 5-7 14 0 7 7l-7 7Z" />
                   </svg>
                 </h2>
-                <p className="mt-1 text-sm text-[#171717] opacity-60">Login to your account to continue</p>
+                <p className="mt-1 text-sm text-[#171717] opacity-60">
+                  {twoFactorChallenge ? "Enter your authenticator or recovery code to continue." : "Login to your account to continue"}
+                </p>
               </div>
 
               <AnimatePresence mode="wait">
@@ -941,6 +995,43 @@ export default function Login() {
                       </div>
                     )}
 
+                    {twoFactorChallenge ? (
+                      <form onSubmit={handleTwoFactorLogin} className="space-y-4">
+                        <div className="space-y-2">
+                          <label htmlFor="customer-two-factor-code" className="text-sm font-bold text-[#171717]">Authenticator or recovery code</label>
+                          <input
+                            id="customer-two-factor-code"
+                            type="text"
+                            inputMode="numeric"
+                            autoComplete="one-time-code"
+                            value={twoFactorCode}
+                            onChange={(event) => setTwoFactorCode(event.target.value)}
+                            placeholder="6-digit code"
+                            required
+                            className="login-input w-full text-center font-mono tracking-[0.3em]"
+                          />
+                          <p className="text-xs leading-5 text-gray-500">You can enter a one-time recovery code instead of an authenticator code.</p>
+                        </div>
+                        <button
+                          type="submit"
+                          disabled={loading || !twoFactorCode.trim()}
+                          className="btn-primary w-full text-lg active:scale-[0.98] disabled:opacity-50"
+                        >
+                          {loading ? "Verifying..." : "Verify and Log In"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setTwoFactorChallenge("");
+                            setTwoFactorCode("");
+                            setError("");
+                          }}
+                          className="w-full py-2 text-sm font-semibold text-gray-500 hover:text-gray-800"
+                        >
+                          Back to login
+                        </button>
+                      </form>
+                    ) : (
                     <form onSubmit={handleLogin} className="space-y-4">
                       <div className="space-y-2">
                         <label className="text-sm font-bold text-[#171717]">Email or phone number</label>
@@ -1019,6 +1110,7 @@ export default function Login() {
                         <span>Continue with Google</span>
                       </button>
                     </form>
+                    )}
 
                     <p className="mt-8 text-center text-sm text-[#171717] opacity-80">
                       Don't have an account?{" "}

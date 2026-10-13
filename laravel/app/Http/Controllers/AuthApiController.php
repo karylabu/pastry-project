@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
+use App\Services\CustomerTwoFactor;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
@@ -129,7 +130,7 @@ class AuthApiController extends Controller
     /**
      * Login compatible with both Laravel and legacy systems.
      */
-    public function login(Request $request)
+    public function login(Request $request, CustomerTwoFactor $twoFactor)
     {
         $email = strtolower(trim((string) $request->input('email', '')));
         $password = (string) $request->input('password', '');
@@ -180,6 +181,14 @@ class AuthApiController extends Controller
             DB::table('users')
                 ->where('id', $user->id)
                 ->update(['password' => Hash::make($password)]);
+        }
+
+        if (strtolower((string) $user->role) === 'customer' && $twoFactor->isEnabled((int) $user->id)) {
+            return response()->json([
+                'success' => true,
+                'requires_two_factor' => true,
+                'challenge_token' => $twoFactor->createLoginChallenge((int) $user->id),
+            ]);
         }
 
         try {

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use App\Models\User;
+use App\Services\CustomerTwoFactor;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
@@ -232,7 +233,7 @@ class CustomerApiController extends Controller
         return $this->corsResponse(['success' => false, 'message' => 'Invalid product action.'], 400);
     }
 
-    public function login(Request $request)
+    public function login(Request $request, CustomerTwoFactor $twoFactor)
     {
         try {
             if ($request->isMethod('options')) {
@@ -275,6 +276,14 @@ class CustomerApiController extends Controller
             if ($isLegacyPassword) {
                 DB::table('users')->where('id', $user->id)->update([
                     'password' => Hash::make($password),
+                ]);
+            }
+
+            if (strtolower((string) $user->role) === 'customer' && $twoFactor->isEnabled((int) $user->id)) {
+                return $this->corsResponse([
+                    'success' => true,
+                    'requires_two_factor' => true,
+                    'challenge_token' => $twoFactor->createLoginChallenge((int) $user->id),
                 ]);
             }
 

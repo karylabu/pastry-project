@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\CustomerTwoFactor;
 use Illuminate\Http\Request;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\DB;
@@ -27,7 +28,7 @@ class AuthController extends Controller
         ]);
     }
 
-    public function login(Request $request)
+    public function login(Request $request, CustomerTwoFactor $twoFactor)
     {
         $email = trim($request->input('email', ''));
         $password = trim($request->input('password', ''));
@@ -48,6 +49,9 @@ class AuthController extends Controller
                 $error = 'This account is deactivated.';
             } elseif (!Hash::check($password, $user->password)) {
                 $error = 'Incorrect password.';
+            } elseif (strtolower((string) ($user->role ?? '')) === 'customer'
+                && $twoFactor->isEnabled((int) $user->id)) {
+                $error = 'Two-factor authentication is enabled. Please sign in through the customer portal to verify your authenticator code.';
             } else {
                 $userData = [
                     'id' => $user->id,
@@ -145,7 +149,7 @@ class AuthController extends Controller
         ]);
     }
 
-    public function googleLogin(Request $request)
+    public function googleLogin(Request $request, CustomerTwoFactor $twoFactor)
     {
         if ($request->isMethod('options')) {
             return $this->googleCorsResponse(['success' => true]);
@@ -353,6 +357,14 @@ class AuthController extends Controller
         }
         if (strtolower(trim((string) ($user->status ?? 'active'))) !== 'active') {
             return $this->googleCorsResponse(['success' => false, 'message' => 'This account is deactivated.'], 403);
+        }
+
+        if (strtolower((string) ($user->role ?? '')) === 'customer' && $twoFactor->isEnabled((int) $user->id)) {
+            return $this->googleCorsResponse([
+                'success' => true,
+                'requires_two_factor' => true,
+                'challenge_token' => $twoFactor->createLoginChallenge((int) $user->id),
+            ]);
         }
 
         $token = bin2hex(random_bytes(32));

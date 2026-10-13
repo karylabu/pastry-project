@@ -28,6 +28,7 @@ use App\Http\Controllers\CustomerLoyaltyController;
 use App\Http\Controllers\StaffApiController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\AuthApiController;
+use App\Http\Controllers\CustomerTwoFactorController;
 
 Route::options('{any}', fn () => response()->noContent())->where('any', '.*');
 
@@ -37,7 +38,17 @@ Route::get('shop/status', [CustomerApiController::class, 'shopStatus']);
 Route::match(['get', 'post'], 'customer/products', [CustomerApiController::class, 'products']);
 Route::match(['get', 'options'], 'staff/dashboard', [StaffApiController::class, 'getDashboard']);
 Route::get('staff/products', [ProductController::class, 'staffIndex']);
-Route::post('login', [AuthApiController::class, 'login']);
+Route::post('login', [AuthApiController::class, 'login'])
+    ->middleware(\Illuminate\Routing\Middleware\ThrottleRequests::class . ':10,1');
+Route::post('login/two-factor', [CustomerTwoFactorController::class, 'verifyLogin'])
+    ->middleware(\Illuminate\Routing\Middleware\ThrottleRequests::class . ':5,1');
+Route::get('customer/two-factor', [CustomerTwoFactorController::class, 'status']);
+Route::post('customer/two-factor/setup', [CustomerTwoFactorController::class, 'setup'])
+    ->middleware(\Illuminate\Routing\Middleware\ThrottleRequests::class . ':5,1');
+Route::post('customer/two-factor/enable', [CustomerTwoFactorController::class, 'enable'])
+    ->middleware(\Illuminate\Routing\Middleware\ThrottleRequests::class . ':5,1');
+Route::post('customer/two-factor/disable', [CustomerTwoFactorController::class, 'disable'])
+    ->middleware(\Illuminate\Routing\Middleware\ThrottleRequests::class . ':5,1');
 Route::get('auth/status', [AuthApiController::class, 'status']);
 Route::post('register', [AuthApiController::class, 'register']);
 Route::post('profile', [AuthApiController::class, 'updateProfile']);
