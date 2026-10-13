@@ -133,6 +133,7 @@ class CustomizedCakeOrderSubmissionTest extends TestCase
             ->postJson('http://localhost/api/customized-cakes/order', [
                 'cake_type' => 'single',
                 'tiers' => [['flavor_id' => 1, 'size_id' => 1]],
+                'payment_method' => 'MariBank',
                 'notes' => '{"occasion":"Birthday"}',
                 'reference_image' => json_encode([
                     'type' => 'example',
@@ -153,6 +154,7 @@ class CustomizedCakeOrderSubmissionTest extends TestCase
             'id' => 1,
             'order_type' => 'Customized',
             'is_customized' => true,
+            'payment' => 'MariBank',
         ]);
         $this->assertDatabaseHas('notifications', [
             'user_id' => 2,
@@ -163,7 +165,30 @@ class CustomizedCakeOrderSubmissionTest extends TestCase
         $this->getJson('/api/orders')
             ->assertOk()
             ->assertJsonPath('orders.0.custom_details.reference_image.url', 'https://pastryproject.shop/uploads/holiday(2).jpg')
+            ->assertJsonPath('orders.0.custom_details.payment_method', 'MariBank')
             ->assertJsonPath('orders.0.is_customized', true);
+    }
+
+    public function test_customer_custom_cake_request_rejects_an_unsupported_payment_method(): void
+    {
+        $customer = new User();
+        $customer->id = 1;
+        $customer->name = 'Customer';
+        $customer->email = 'customer@example.test';
+        $customer->role = 'customer';
+        $customer->status = 'active';
+
+        $this->actingAs($customer)
+            ->postJson('http://localhost/api/customized-cakes/order', [
+                'cake_type' => 'single',
+                'tiers' => [['flavor_id' => 1, 'size_id' => 1]],
+                'payment_method' => 'Bitcoin',
+            ])
+            ->assertStatus(422)
+            ->assertJsonPath('message', 'Choose a valid payment method.');
+
+        $this->assertDatabaseCount('orders', 0);
+        $this->assertDatabaseCount('customized_cake_orders', 0);
     }
 
     public function test_customer_custom_cake_request_saves_all_uploaded_reference_images(): void

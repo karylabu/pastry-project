@@ -56,6 +56,14 @@ $addons = json_decode(trim($_POST['addons'] ?? '[]'), true) ?: [];
 $estimatedPrice = trim($_POST['estimated_price'] ?? '');
 $quantity = intval($_POST['quantity'] ?? 1);
 $totalAmount = trim($_POST['total_amount'] ?? '');
+$payment = trim($_POST['payment_method'] ?? 'QR Ph');
+$allowedPaymentMethods = ['GCash', 'Maya', 'QR Ph', 'MariBank', 'Visa/Mastercard', 'Online Banking'];
+
+if (!in_array($payment, $allowedPaymentMethods, true)) {
+    http_response_code(422);
+    echo json_encode(['success' => false, 'message' => 'Choose a valid payment method.']);
+    exit;
+}
 
 if ($name === '') {
     echo json_encode(['success' => false, 'message' => 'Name is required.']);
@@ -138,7 +146,6 @@ $itemsJson = json_encode([[
 ]]);
 
 $method  = $deliveryMethod ?: 'Pickup';
-$payment = 'QRPh';     // payment is collected after the quote is confirmed
 $status  = 'Pending';
 
 $customDetails = [
@@ -161,6 +168,7 @@ $customDetails = [
     'special_instructions' => $specialInstructions,
     'addons' => $addons,
     'estimated_price' => $estimatedPrice,
+    'payment_method' => $payment,
     'quantity' => $quantity,
     'total_amount' => $totalAmount,
     'details' => $details,

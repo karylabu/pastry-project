@@ -11,6 +11,7 @@ import {
   isCustomCakeOrder,
   resolveCustomCakeImageUrl,
 } from './customCakeImages';
+import { getCustomCakePaymentBreakdown } from '../utils/customCakePayment';
 
 // ── Cancel Confirmation Dialog ───────────────────────────────────────────────
 function CancelDialog({ order, onConfirm, onDismiss, isLoading }) {
@@ -516,7 +517,7 @@ export default function Orders() {
     }
   };
 
-  const handlePayCustomizedDownpayment = async (order, amount, paymentType = 'downpayment') => {
+  const handlePayCustomizedDownpayment = async (order, paymentType = 'downpayment') => {
     setPayingOrderId(order.id);
     setActionError(null);
     try {
@@ -524,7 +525,7 @@ export default function Orders() {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json', Accept: 'application/json', ...getAuthHeaders() },
-        body: JSON.stringify({ order_id: order.id, amount, payment_method: 'QRPh', payment_type: paymentType }),
+        body: JSON.stringify({ order_id: order.id, payment_type: paymentType }),
       });
       const paymentData = await safeParseJson(response);
       if (!response.ok) {
@@ -1193,6 +1194,9 @@ export default function Orders() {
                   ? quotedDownpayment
                   : Number((Number(order.total || 0) * downpaymentPercent / 100).toFixed(2));
                 const customBalanceAmount = Math.max(0, Number((Number(order.total || 0) - customDownpaymentAmount).toFixed(2)));
+                const customPaymentMethod = order.payment || customPaymentDetails.payment_method || 'QR Ph';
+                const downpaymentBreakdown = getCustomCakePaymentBreakdown(customDownpaymentAmount, customPaymentMethod);
+                const balanceBreakdown = getCustomCakePaymentBreakdown(customBalanceAmount, customPaymentMethod);
                 const productImage = getProductThumbnail(order, primaryItem);
 
                 const paymentHint = isCancelled
@@ -1290,8 +1294,18 @@ export default function Orders() {
 
                     {/* Payment */}
                     <div>
-                      <p className="text-sm text-gray-700">{order.payment || order.method || '—'}</p>
+                      <p className="text-sm text-gray-700">{isCustomized ? customPaymentMethod : order.payment || order.method || '—'}</p>
                       <p className={`text-xs mt-0.5 ${isCancelled ? 'text-slate-500' : isCompleted ? 'text-slate-500' : 'text-gray-400'}`}>{paymentHint}</p>
+                      {isCustomized && isAwaitingPayment && customDownpaymentAmount > 0 && (
+                        <p className="mt-1 text-[10px] leading-4 text-gray-500">
+                          Downpayment fee: ₱{downpaymentBreakdown.fee.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </p>
+                      )}
+                      {isCustomized && isAwaitingBalancePayment && customBalanceAmount > 0 && (
+                        <p className="mt-1 text-[10px] leading-4 text-gray-500">
+                          Balance fee: ₱{balanceBreakdown.fee.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </p>
+                      )}
                     </div>
 
                     {/* Actions */}
@@ -1301,13 +1315,13 @@ export default function Orders() {
                           {isCustomized && !hasPaymentProof && (
                             <button
                               type="button"
-                              onClick={() => handlePayCustomizedDownpayment(order, customDownpaymentAmount)}
+                              onClick={() => handlePayCustomizedDownpayment(order)}
                               disabled={payingOrderId === order.id || customDownpaymentAmount <= 0}
-                              title={customDownpaymentAmount <= 0 ? 'Ask Admin to enter a downpayment amount.' : 'Pay the custom order downpayment with PayMongo'}
+                              title={customDownpaymentAmount <= 0 ? 'Ask Admin to enter a downpayment amount.' : `Pay the ₱${customDownpaymentAmount.toFixed(2)} downpayment plus ₱${downpaymentBreakdown.fee.toFixed(2)} ${customPaymentMethod} fee`}
                               className="inline-flex items-center gap-1.5 rounded-lg bg-amber-500 px-3.5 py-2 text-[12px] font-semibold text-slate-950 transition-colors hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-50"
                             >
                               <CreditCard size={14} />
-                              {payingOrderId === order.id ? 'Opening…' : `Pay ₱${customDownpaymentAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                              {payingOrderId === order.id ? 'Opening…' : `Pay ₱${downpaymentBreakdown.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
                             </button>
                           )}
                           {hasPaymentProof
@@ -1325,13 +1339,13 @@ export default function Orders() {
                           {!hasPaymentProof && (
                             <button
                               type="button"
-                              onClick={() => handlePayCustomizedDownpayment(order, customBalanceAmount, 'balance')}
+                              onClick={() => handlePayCustomizedDownpayment(order, 'balance')}
                               disabled={payingOrderId === order.id || customBalanceAmount <= 0}
-                              title={customBalanceAmount <= 0 ? 'The order has no remaining balance.' : 'Pay the remaining custom cake balance with PayMongo'}
+                              title={customBalanceAmount <= 0 ? 'The order has no remaining balance.' : `Pay the ₱${customBalanceAmount.toFixed(2)} balance plus ₱${balanceBreakdown.fee.toFixed(2)} ${customPaymentMethod} fee`}
                               className="inline-flex items-center gap-1.5 rounded-lg bg-amber-500 px-3.5 py-2 text-[12px] font-semibold text-slate-950 transition-colors hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-50"
                             >
                               <CreditCard size={14} />
-                              {payingOrderId === order.id ? 'Opening…' : `Pay balance ₱${customBalanceAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                              {payingOrderId === order.id ? 'Opening…' : `Pay balance ₱${balanceBreakdown.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
                             </button>
                           )}
                           {hasPaymentProof

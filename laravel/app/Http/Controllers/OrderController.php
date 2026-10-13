@@ -515,7 +515,17 @@ class OrderController extends Controller
             return response()->json(['success' => false, 'message' => 'Order not found.'], 404);
         }
 
-        if (!in_array(strtolower((string) $order->payment), ['gcash', 'qrph'], true)
+        $isCustomCake = (bool) ($order->is_customized ?? false)
+            || strcasecmp((string) ($order->order_type ?? ''), 'Customized') === 0;
+        if (!$isCustomCake && Schema::hasTable('custom_cake_orders')) {
+            $isCustomCake = CustomCakeOrder::query()->where('order_id', $orderId)->exists();
+        }
+        $paymentMethodKey = strtolower((string) preg_replace('/[^a-z0-9]/i', '', (string) $order->payment));
+        $supportedPaymentMethod = $isCustomCake
+            ? in_array($paymentMethodKey, ['gcash', 'maya', 'qrph', 'maribank', 'visamastercard', 'onlinebanking'], true)
+            : in_array($paymentMethodKey, ['gcash', 'qrph'], true);
+
+        if (!$supportedPaymentMethod
             || !in_array($order->status, ['Awaiting Payment', 'Awaiting Balance Payment'], true)
             || in_array(strtolower((string) $order->payment_status), ['failed', 'paid', 'proof_submitted'], true)) {
             return response()->json(['success' => false, 'message' => 'This order is not awaiting a QR payment.'], 409);

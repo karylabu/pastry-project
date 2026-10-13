@@ -212,6 +212,21 @@ class CustomizedCakeController extends Controller
 
         $payload = $request->all();
         $payload['user_id'] = (int) $user->id;
+        $paymentMethod = trim((string) ($payload['payment_method'] ?? 'QR Ph'));
+        $allowedPaymentMethods = ['GCash', 'Maya', 'QR Ph', 'MariBank', 'Visa/Mastercard', 'Online Banking'];
+        if (!in_array($paymentMethod, $allowedPaymentMethods, true)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Choose a valid payment method.',
+            ], 422);
+        }
+
+        $notes = json_decode((string) ($payload['notes'] ?? ''), true);
+        if (is_array($notes)) {
+            $notes['payment_method'] = $paymentMethod;
+            $payload['notes'] = json_encode($notes);
+        }
+
         $cakeType = $payload['cake_type'] ?? 'single';
         $tiers = $payload['tiers'] ?? [];
         if (is_string($tiers)) {
@@ -346,7 +361,7 @@ class CustomizedCakeController extends Controller
                 $uploadedImages[] = $referenceImage;
             }
 
-            $customizedCakeOrderId = DB::transaction(function () use ($cakeType, $tiers, $payload, $uploadedImages, $user) {
+            $customizedCakeOrderId = DB::transaction(function () use ($cakeType, $tiers, $payload, $uploadedImages, $user, $paymentMethod) {
                 $orderId = !empty($payload['order_id']) ? (int) $payload['order_id'] : null;
                 if (!$orderId && Schema::hasTable('orders')) {
                     $orderAttributes = [
@@ -362,7 +377,7 @@ class CustomizedCakeController extends Controller
                         'method' => 'Pickup',
                         'delivery_date' => null,
                         'delivery_time' => null,
-                        'payment' => 'QRPh',
+                        'payment' => $paymentMethod,
                         'address' => '',
                         'phone' => $user->phone ?? '',
                         'customer' => $user->name,
