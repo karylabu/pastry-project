@@ -318,13 +318,13 @@ export default function Login() {
             height: 100%;
             border-radius: 25px 0 0 25px;
             object-fit: cover;
-            object-position: right center;
+            object-position: left center;
           }
           .pastry-login .web-brand-mark {
             position: absolute;
             z-index: 2;
             top: 11%;
-            left: 10%;
+            left: 20%;
             display: block;
             width: 44px;
             height: 44px;
