@@ -100,7 +100,7 @@ export default function GoogleRecaptcha({ onProofChange }) {
   }, [onProofChange]);
 
   return (
-    <div className="sm:col-span-2">
+    <div className="flex w-full justify-center sm:col-span-2">
       <div className="h-[59px] w-[228px]">
         <div
           ref={containerRef}
