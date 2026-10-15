@@ -108,53 +108,95 @@ export default function StaffAdminLogin() {
         }
         @media (min-width: 600px) and (orientation: portrait) {
           .pastry-login main {
+            width: min(100%, 640px);
+            min-height: 100vh;
             justify-content: flex-start;
-            gap: .75rem;
-            padding-top: 1rem;
-            padding-bottom: 1rem;
+            align-items: center;
+            gap: .5rem;
+            padding: 1rem 1.5rem 15rem;
+          }
+          .pastry-login .admin-hero {
+            width: 100%;
+            align-items: center;
+            padding: .75rem 1rem;
+            border-radius: 1.25rem;
+            background: linear-gradient(135deg, #fff9e9 0%, #fff6df 100%);
+            text-align: center;
+          }
+          .pastry-login .admin-hero > div:first-child {
+            margin-bottom: .5rem;
+          }
+          .pastry-login .admin-hero > div:first-child img {
+            width: 3rem;
+            height: 3rem;
+          }
+          .pastry-login .admin-hero > div:first-child p:first-child {
+            font-family: 'Playfair Display', Georgia, serif;
+            font-size: 1.5rem;
+            font-style: italic;
+          }
+          .pastry-login .admin-hero-headline {
+            display: block;
+          }
+          .pastry-login .admin-hero-headline h1 {
+            font-family: 'Playfair Display', Georgia, serif;
+            font-size: clamp(1.5rem, 4vw, 2rem);
+            line-height: 1.12;
+          }
+          .pastry-login .admin-hero-headline p {
+            margin-top: .35rem;
+            font-size: .85rem;
+            line-height: 1.35rem;
           }
           .pastry-login .portrait-login-form-section {
+            width: 100%;
             flex: 0 0 auto;
-            align-self: stretch;
+            justify-content: center;
+            padding: 0;
           }
           .pastry-login .tablet-login-panel {
+            width: 100%;
             height: max-content;
             min-height: 0;
             flex: 0 0 auto;
-            padding-top: .5rem;
-            padding-bottom: .5rem;
+            padding: 1.25rem clamp(1.25rem, 5vw, 2rem);
+            border: 1px solid #eadfc8;
+            border-radius: 1.25rem;
+            background: rgba(255, 255, 255, .96);
+            box-shadow: 0 18px 55px rgba(83, 62, 24, .12);
           }
           .pastry-login .tablet-login-header {
-            margin-bottom: .65rem;
+            margin-bottom: 1rem;
+            text-align: center;
           }
           .pastry-login .tablet-login-header > div:first-child {
-            margin-bottom: .35rem;
+            margin-bottom: .5rem;
           }
           .pastry-login .tablet-login-header h2 {
-            font-size: 2rem;
-            line-height: 1.1;
+            font-size: 2.25rem;
+            line-height: 1.12;
           }
           .pastry-login .tablet-login-header p {
-            font-size: .8rem;
-            line-height: 1.25rem;
+            font-size: .9rem;
+            line-height: 1.4rem;
           }
           .pastry-login .tablet-login-form {
             display: flex;
             flex-direction: column;
-            gap: .5rem;
+            gap: .75rem;
           }
           .pastry-login .tablet-login-form > :not([hidden]) ~ :not([hidden]) {
             margin-top: 0;
           }
           .pastry-login .tablet-login-field > :not([hidden]) ~ :not([hidden]) {
-            margin-top: .2rem;
+            margin-top: .35rem;
           }
           .pastry-login .tablet-login-field label {
-            font-size: .8rem;
+            font-size: .875rem;
           }
           .pastry-login .tablet-login-control,
           .pastry-login .tablet-login-submit {
-            height: 38px;
+            height: 46px;
           }
           .pastry-login .portrait-login-cake {
             display: none;
@@ -192,7 +234,7 @@ export default function StaffAdminLogin() {
             </div>
           </div>
 
-          <div className="hidden md:block">
+          <div className="admin-hero-headline hidden md:block">
             <h1 className="font-serif text-4xl font-semibold leading-tight xl:text-5xl">
               A little sweetness,<br />
               <span className="text-[#F0B94D]">baked fresh daily.</span>
