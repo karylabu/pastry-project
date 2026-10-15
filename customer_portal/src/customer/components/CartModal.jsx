@@ -118,44 +118,11 @@ export default function CartModal({ isOpen, onClose, items = [], setItems, onChe
         exit={{ opacity: 0 }}
         className="fixed inset-0 z-[60000] overflow-hidden bg-black/40 backdrop-blur-sm flex items-center justify-center p-4"
       >
-        <style>{`
-          @media (min-width: 600px) and (max-width: 1023px) and (orientation: portrait) {
-            .customer-cart-modal {
-              width: min(calc(100vw - 2rem), 760px);
-              height: min(88dvh, 900px);
-              max-height: 88dvh;
-              flex-direction: column;
-            }
-            .customer-cart-items {
-              min-height: 0;
-              flex: 1 1 0%;
-            }
-            .customer-cart-divider {
-              display: none;
-            }
-            .customer-cart-summary {
-              width: 100%;
-              max-height: 36%;
-              min-height: 175px;
-              overflow-y: auto;
-              padding: 1rem 1.25rem;
-            }
-            .customer-cart-summary-items {
-              display: block;
-              flex: 0 0 auto;
-              max-height: 96px;
-            }
-            .customer-cart-summary-total {
-              margin-top: .75rem;
-              padding-top: .75rem;
-            }
-          }
-        `}</style>
         <motion.div
           initial={{ scale: 0.95, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           exit={{ scale: 0.95, opacity: 0 }}
-          className="customer-cart-modal relative flex w-full max-w-[900px] max-h-[88dvh] min-h-0 flex-col overflow-hidden overscroll-contain rounded-2xl bg-white font-['DM_Sans'] shadow-xl md:flex-row"
+          className="relative flex w-full max-w-[900px] max-h-[88dvh] min-h-0 flex-col overflow-hidden overscroll-contain rounded-2xl bg-white font-['DM_Sans'] shadow-xl md:flex-row"
         >
           <button
             onClick={onClose}
@@ -164,7 +131,7 @@ export default function CartModal({ isOpen, onClose, items = [], setItems, onChe
             <X size={18} />
           </button>
           {/* ── Left Basket ── */}
-          <div className="customer-cart-items min-h-0 flex-1 overflow-y-auto overscroll-contain p-5 font-['DM_Sans'] md:p-7">
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-5 font-['DM_Sans'] md:p-7">
             <div className="mb-5 flex items-center justify-between gap-3 pr-12">
               <div>
                 <h2 className="text-xl font-bold text-[#33251e] md:text-2xl">Your Basket</h2>
@@ -343,13 +310,13 @@ export default function CartModal({ isOpen, onClose, items = [], setItems, onChe
           </div>
 
           {/* Divider */}
-          <div className="customer-cart-divider hidden w-px bg-[#eee5db] md:my-8 md:block" />
+          <div className="hidden w-px bg-[#eee5db] md:my-8 md:block" />
 
           {/* ── Right Summary ── */}
-          <div className="customer-cart-summary flex w-full flex-shrink-0 flex-col bg-[#faf8f2] p-5 md:w-[310px] md:p-7">
+          <div className="flex w-full flex-shrink-0 flex-col bg-[#faf8f2] p-5 md:w-[310px] md:p-7">
             <p className="mb-4 text-xs font-bold uppercase tracking-[0.16em] text-[#8d7a6e]">Order Summary</p>
 
-            <div className="customer-cart-summary-items hidden flex-1 space-y-4 overflow-y-auto pr-1 md:block">
+            <div className="hidden flex-1 space-y-4 overflow-y-auto pr-1 md:block">
               {selectedGroups.map((item) => (
                 <div key={item._key} className="flex items-center gap-3">
                   <img
@@ -370,7 +337,7 @@ export default function CartModal({ isOpen, onClose, items = [], setItems, onChe
             </div>
 
             {/* Total */}
-            <div className="customer-cart-summary-total mt-4 border-t border-[#e9dfd2] pt-4 md:mt-auto md:pt-6">
+            <div className="mt-4 border-t border-[#e9dfd2] pt-4 md:mt-auto md:pt-6">
               <div className="mb-4 flex items-end justify-between gap-3 md:mb-6">
                 <span className="text-sm font-semibold uppercase tracking-[0.12em] text-[#8d6a2e]">Total</span>
                 <div className="text-right">

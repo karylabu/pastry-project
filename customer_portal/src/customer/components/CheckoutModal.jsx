@@ -834,44 +834,17 @@ export default function CheckoutModal({
 
   return (
     <AnimatePresence>
+
       <motion.div
         className="fixed inset-0 z-[60000] flex min-h-dvh items-center justify-center overflow-y-auto bg-black/40 p-4 backdrop-blur-sm"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
       >
-        <style>{`
-          @media (min-width: 600px) and (max-width: 1023px) and (orientation: portrait) {
-            .customer-checkout-modal {
-              height: calc(100dvh - 2rem);
-              max-height: calc(100dvh - 2rem);
-              flex-direction: column;
-            }
-            .customer-checkout-details {
-              min-height: 0;
-              flex: 1 1 0%;
-              overflow-y: auto;
-              padding: 1.25rem;
-            }
-            .customer-checkout-summary {
-              width: 100%;
-              min-height: 0;
-              max-height: 42%;
-              flex: 0 1 auto;
-              overflow-y: auto;
-              border-top: 1px solid #eee5db;
-              border-left: 0;
-              padding: 1rem 1.25rem;
-            }
-            .customer-checkout-summary-items {
-              max-height: 96px;
-            }
-          }
-        `}</style>
 
         <motion.div
           ref={modalScrollRef}
-          className="customer-checkout-modal relative my-auto flex max-h-[calc(100dvh-2rem)] w-full max-w-[960px] flex-col overflow-y-auto overscroll-contain overflow-x-hidden rounded-[24px] bg-white font-['DM_Sans'] shadow-2xl md:h-[calc(100dvh-2rem)] md:min-h-0 md:overflow-hidden md:flex-row"
+          className="relative my-auto flex max-h-[calc(100dvh-2rem)] w-full max-w-[960px] flex-col overflow-y-auto overscroll-contain overflow-x-hidden rounded-[24px] bg-white font-['DM_Sans'] shadow-2xl md:h-[calc(100dvh-2rem)] md:min-h-0 md:overflow-hidden md:flex-row"
           initial={{ scale: 0.98 }}
           animate={{ scale: 1 }}
         >
@@ -887,7 +860,7 @@ export default function CheckoutModal({
           </button>
 
           {/* LEFT SIDE */}
-          <div className="customer-checkout-details relative min-w-0 flex-1 p-5 pb-8 pointer-events-auto sm:p-7 md:min-h-0 md:overflow-y-auto md:overscroll-contain md:p-8 md:pb-10">
+          <div className="relative min-w-0 flex-1 p-5 pb-8 pointer-events-auto sm:p-7 md:min-h-0 md:overflow-y-auto md:overscroll-contain md:p-8 md:pb-10">
 
             <div className="mb-6 border-b border-[#eee5db] pb-4 pr-10">
               <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#a77b26]">Checkout</p>
@@ -1241,7 +1214,7 @@ export default function CheckoutModal({
           </div>
 
           {/* RIGHT SIDE */}
-          <div className="customer-checkout-summary flex w-full shrink-0 flex-col border-t border-[#eee5db] bg-[#faf8f2] p-5 sm:p-6 md:min-h-0 md:w-[340px] md:overflow-y-auto md:overscroll-contain md:border-l md:border-t-0 md:p-7">
+          <div className="flex w-full shrink-0 flex-col border-t border-[#eee5db] bg-[#faf8f2] p-5 sm:p-6 md:min-h-0 md:w-[340px] md:overflow-y-auto md:overscroll-contain md:border-l md:border-t-0 md:p-7">
 
             <div className="mb-5 flex items-center justify-between gap-3">
               <div>
@@ -1252,7 +1225,7 @@ export default function CheckoutModal({
             </div>
 
             {/* ITEMS */}
-            <div className="customer-checkout-summary-items overflow-y-auto space-y-3 max-h-[200px]">
+            <div className="overflow-y-auto space-y-3 max-h-[200px]">
 
               {groupedItems.map((item, idx) => {
 
