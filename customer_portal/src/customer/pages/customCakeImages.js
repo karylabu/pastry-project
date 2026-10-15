@@ -36,7 +36,7 @@ export const getCustomCakeReferenceSources = (order, details = getCustomCakeDeta
     order?.customized_inspo_images,
   ];
 
-  return values.flatMap((value) => {
+  const sources = values.flatMap((value) => {
     if (!value) return [];
     if (typeof value === 'string') {
       try {
@@ -47,6 +47,27 @@ export const getCustomCakeReferenceSources = (order, details = getCustomCakeDeta
       }
     }
     return Array.isArray(value) ? value : [value];
+  });
+
+  const seen = new Set();
+  return sources.filter((source) => {
+    const imageSource = typeof source === 'string'
+      ? source
+      : source?.url || source?.src || source?.path || source?.image;
+    const normalizedSource = String(imageSource || JSON.stringify(source) || '').trim();
+    if (!normalizedSource) return false;
+
+    let deduplicationKey = normalizedSource;
+    try {
+      const parsedUrl = new URL(normalizedSource);
+      deduplicationKey = `${parsedUrl.origin}${parsedUrl.pathname}`;
+    } catch {
+      deduplicationKey = normalizedSource.split(/[?#]/, 1)[0];
+    }
+
+    if (seen.has(deduplicationKey)) return false;
+    seen.add(deduplicationKey);
+    return true;
   });
 };
 

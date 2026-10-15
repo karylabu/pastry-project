@@ -26,6 +26,31 @@ describe('custom cake order images', () => {
     });
   });
 
+  it('returns one image when the same reference is stored in both single and multiple fields', () => {
+    const reference = { type: 'example', url: 'https://pastryproject.shop/uploads/cake.jpg' };
+    const order = {
+      custom_details: {
+        reference_image: reference,
+        reference_images: [reference],
+      },
+    };
+
+    expect(getCustomCakeReferenceSources(order)).toEqual([reference]);
+  });
+
+  it('returns every distinct reference image once', () => {
+    const first = { type: 'example', url: 'https://pastryproject.shop/uploads/first.jpg' };
+    const second = { type: 'upload', url: 'https://pastryproject.shop/uploads/second.jpg' };
+    const order = {
+      custom_details: {
+        reference_image: first,
+        reference_images: [first, second],
+      },
+    };
+
+    expect(getCustomCakeReferenceSources(order)).toEqual([first, second]);
+  });
+
   it('resolves legacy uploaded cake reference paths from the Laravel customer directory', () => {
     expect(resolveCustomCakeImageUrl(
       'uploads/custom_cake/cake.jpg',

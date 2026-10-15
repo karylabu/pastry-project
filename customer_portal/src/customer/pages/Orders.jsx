@@ -12,6 +12,7 @@ import {
   resolveCustomCakeImageUrl,
 } from './customCakeImages';
 import { getCustomCakePaymentBreakdown } from '../utils/customCakePayment';
+import { getReceiptItemTotal, getReceiptTotal } from '../utils/orderReceipt';
 
 // ── Cancel Confirmation Dialog ───────────────────────────────────────────────
 function CancelDialog({ order, onConfirm, onDismiss, isLoading }) {
@@ -646,15 +647,17 @@ export default function Orders() {
       const receiptDetailsHtml = receiptDetails.map(([label, value]) => `
         <tr><th style="width:32%;padding:7px;border:1px solid #eee;text-align:left;vertical-align:top">${escapeReceiptHtml(label)}</th><td style="padding:7px;border:1px solid #eee;white-space:pre-wrap">${escapeReceiptHtml(value)}</td></tr>
       `).join('');
+      const receiptTotal = getReceiptTotal(o, rawCustomDetails, isCustomized);
       const itemsHtml = (o.items || []).map(it => {
         const variant = formatReceiptValue(it.variant);
-        const selectionDetails = formatReceiptValue(it.selectionDetails || it.details);
+        const selectionDetails = isCustomized ? '' : formatReceiptValue(it.selectionDetails || it.details);
         const itemDetails = [variant, selectionDetails].filter(Boolean).join(' · ');
+        const itemTotal = getReceiptItemTotal(it, o, rawCustomDetails, isCustomized);
         return `
         <tr>
           <td style="padding:8px;border:1px solid #eee">${escapeReceiptHtml(it.name || '')}${itemDetails ? `<div style="margin-top:4px;font-size:12px;color:#555">${escapeReceiptHtml(itemDetails)}</div>` : ''}</td>
           <td style="padding:8px;border:1px solid #eee;text-align:center">${escapeReceiptHtml(it.qty ?? '')}</td>
-          <td style="padding:8px;border:1px solid #eee;text-align:right">₱${(Number(it.price) * Number(it.qty)).toLocaleString()}</td>
+          <td style="padding:8px;border:1px solid #eee;text-align:right">₱${itemTotal.toLocaleString()}</td>
         </tr>
       `;
       }).join('');
@@ -696,7 +699,7 @@ export default function Orders() {
             <tr>
               <td style="padding:8px;border:1px solid #eee"></td>
               <td style="padding:8px;border:1px solid #eee;text-align:right;font-weight:bold">Grand Total</td>
-              <td style="padding:8px;border:1px solid #eee;text-align:right;font-weight:bold">₱${Number(o.total || 0).toLocaleString()}</td>
+              <td style="padding:8px;border:1px solid #eee;text-align:right;font-weight:bold">₱${receiptTotal.toLocaleString()}</td>
             </tr>
           </tfoot>
         </table>
@@ -809,7 +812,6 @@ export default function Orders() {
       ['Add-ons', formatCustomValue(rawCustomDetails.addons)],
       ['Estimated price', formatCustomValue(rawCustomDetails.estimated_price)],
       ['Quantity', formatCustomValue(rawCustomDetails.quantity)],
-      ['Details', formatCustomValue(rawCustomDetails.details)],
     ].filter(([, value]) => value);
 
     const customReferenceImages = getCustomCakeReferenceSources(order, rawCustomDetails).map((reference) => {
