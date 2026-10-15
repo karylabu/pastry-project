@@ -271,11 +271,11 @@ class CakeSalesAnalyticsTest extends TestCase
             ['name' => 'Small', 'quantity' => 2.0, 'revenue' => 640.0, 'rank' => 2, 'percentage' => 40.0],
         ], $report['sizes']);
         $this->assertSame([
-            ['name' => 'Big', 'quantity' => 3.0],
-            ['name' => 'Small', 'quantity' => 2.0],
+            ['name' => 'Big', 'quantity' => 3.0, 'percentage' => 60.0],
+            ['name' => 'Small', 'quantity' => 2.0, 'percentage' => 40.0],
         ], $report['cakeTypeBreakdown']['regular']['sizes']);
         $this->assertSame([
-            ['name' => 'Small', 'quantity' => 1.0],
+            ['name' => 'Small', 'quantity' => 1.0, 'percentage' => 100.0],
         ], $report['cakeTypeBreakdown']['customized']['sizes']);
     }
 }

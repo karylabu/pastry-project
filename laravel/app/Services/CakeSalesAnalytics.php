@@ -603,6 +603,11 @@ class CakeSalesAnalytics
         }
 
         $rows = array_values($sizes);
+        $total = array_sum(array_column($rows, 'quantity')) ?: 1;
+        foreach ($rows as &$row) {
+            $row['percentage'] = round(($row['quantity'] / $total) * 100, 2);
+        }
+        unset($row);
         usort($rows, static fn ($a, $b) => $b['quantity'] <=> $a['quantity']);
         return $rows;
     }

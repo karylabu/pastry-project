@@ -207,6 +207,7 @@ export default function Dashboard() {
   const [analyticsError, setAnalyticsError] = useState("");
   const [analyticsPreset, setAnalyticsPreset] = useState("last_7_days");
   const [trendMetric, setTrendMetric] = useState("revenue");
+  const [salesMixType, setSalesMixType] = useState("regular");
   const [analyticsRefreshVersion, setAnalyticsRefreshVersion] = useState(0);
 
   const fetchDashboardData = useCallback(async () => {
@@ -433,8 +434,8 @@ export default function Dashboard() {
 
                 <div className="grid items-stretch gap-3 lg:grid-cols-2">
                   <Panel eyebrow="Customized Cakes" title="Best-selling cake designs" className="flex h-full min-h-[190px] min-w-0 flex-col overflow-hidden lg:h-[190px]"><div className="lg:max-h-[110px] lg:overflow-y-auto"><RankedList rows={analytics.designs} /></div></Panel>
-                  <Panel eyebrow="Sales Mix" title="Regular vs. customized cakes" className="flex h-full min-h-[190px] flex-col overflow-hidden lg:h-[190px]">
-                    <div className="space-y-4 p-5 lg:max-h-[110px] lg:overflow-y-auto lg:p-2">
+                  <Panel eyebrow="Sales Mix" title="Regular vs. customized cakes" className="flex h-full min-h-[190px] flex-col overflow-hidden">
+                    <div className="space-y-4 p-5 lg:p-4">
                       {Object.entries(regularVsCustomized).map(([type, row]) => (
                         <div key={type}>
                           <div className="mb-1 flex items-center justify-between gap-3">
@@ -444,13 +445,39 @@ export default function Dashboard() {
                           <div className="h-2 overflow-hidden rounded-full bg-[#f4ece6]">
                             <div className={`h-full rounded-full ${type === 'regular' ? 'bg-[#a57c38]' : 'bg-[#d6c66f]'}`} style={{ width: `${Math.min(100, Number(row.percentage || 0))}%` }} />
                           </div>
-                          {Array.isArray(row.sizes) && row.sizes.length > 0 && (
-                            <p className="mt-1.5 text-[10px] leading-4 text-[#74675f]">
-                              Sizes: {row.sizes.map((size) => `${size.name} (${Number(size.quantity || 0).toLocaleString()})`).join(' · ')}
-                            </p>
-                          )}
                         </div>
                       ))}
+                      <div>
+                        <div className="mb-2 flex gap-2" role="group" aria-label="Choose cake type for popular size breakdown">
+                          {["regular", "customized"].map((type) => (
+                            <button
+                              key={type}
+                              type="button"
+                              aria-pressed={salesMixType === type}
+                              onClick={() => setSalesMixType(type)}
+                              className={`rounded-full border px-3 py-1.5 text-[10px] font-semibold capitalize transition-colors ${salesMixType === type ? "border-[#33251e] bg-[#33251e] text-white" : "border-[#eadfd8] bg-white text-[#765d50] hover:bg-[#fff8df]"}`}
+                            >
+                              {type}
+                            </button>
+                          ))}
+                        </div>
+                        <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#9b8c83]">
+                          Popular {salesMixType} cake sizes
+                        </p>
+                        {Array.isArray(regularVsCustomized[salesMixType]?.sizes) && regularVsCustomized[salesMixType].sizes.length > 0 ? (
+                          <div className="space-y-2">
+                            {regularVsCustomized[salesMixType].sizes.map((size) => (
+                              <div key={size.name} className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-2 text-[11px]">
+                                <span className="truncate font-medium text-[#5f514a]">{size.name}</span>
+                                <span className="text-[#74675f]">{Number(size.quantity || 0).toLocaleString()} sold</span>
+                                <span className="w-10 text-right font-semibold text-[#33251e]">{Number(size.percentage || 0).toFixed(0)}%</span>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-[11px] text-[#9b8c83]">No size sales recorded for this cake type.</p>
+                        )}
+                      </div>
                     </div>
                   </Panel>
                 </div>
