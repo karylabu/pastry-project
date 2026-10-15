@@ -78,9 +78,31 @@ export default function StaffAdminLogin() {
           box-shadow: 0 0 0 4px rgba(240,185,77,.12);
           outline: none;
         }
-        @media (min-width: 1024px) {
+        @media (min-width: 768px) {
           .pastry-login .admin-hero {
             background: transparent;
+          }
+        }
+        @media (min-width: 768px) and (max-width: 1023px) {
+          .pastry-login .tablet-login-panel {
+            padding-top: 1rem;
+            padding-bottom: 1rem;
+          }
+          .pastry-login .tablet-login-header {
+            margin-bottom: 1rem;
+          }
+          .pastry-login .tablet-login-form {
+            gap: .75rem;
+          }
+          .pastry-login .tablet-login-form > :not([hidden]) ~ :not([hidden]) {
+            margin-top: 0;
+          }
+          .pastry-login .tablet-login-field > :not([hidden]) ~ :not([hidden]) {
+            margin-top: .25rem;
+          }
+          .pastry-login .tablet-login-control,
+          .pastry-login .tablet-login-submit {
+            height: 42px;
           }
         }
       `}</style>
@@ -91,8 +113,8 @@ export default function StaffAdminLogin() {
         <span className="absolute bottom-10 left-1/3 text-7xl opacity-[.08]">🧁</span>
       </div>
 
-      <main className="relative z-10 mx-auto flex min-h-screen w-full max-w-[1440px] flex-col items-center justify-center gap-4 px-4 py-5 lg:flex-row lg:gap-0 lg:px-8">
-        <section className="admin-hero flex w-full flex-col items-center rounded-3xl px-5 py-5 sm:px-8 lg:w-[53%] lg:items-start lg:bg-transparent lg:px-12 lg:py-10">
+      <main className="relative z-10 mx-auto flex min-h-screen w-full max-w-[1440px] flex-col items-center justify-center gap-4 px-4 py-5 md:flex-row md:gap-0 md:px-8">
+        <section className="admin-hero flex w-full flex-col items-center rounded-3xl px-5 py-5 sm:px-8 md:w-[53%] md:items-start md:bg-transparent md:px-12 md:py-10">
           <div className="mb-3 flex items-center gap-2">
             <img src={LOGO_URL} alt="Pastry Project logo" className="h-12 w-12 object-contain sm:h-14 sm:w-14" />
             <div>
@@ -103,7 +125,7 @@ export default function StaffAdminLogin() {
             </div>
           </div>
 
-          <div className="hidden lg:block">
+          <div className="hidden md:block">
             <h1 className="font-serif text-4xl font-semibold leading-tight xl:text-5xl">
               A little sweetness,<br />
               <span className="text-[#F0B94D]">baked fresh daily.</span>
@@ -115,12 +137,12 @@ export default function StaffAdminLogin() {
           <img
             src={`${ROOT_BASE}/uploads/login_cake.png?v=login-cake-20261010-v2`}
             alt="Decorated cake"
-            className="mt-2 hidden h-[310px] w-full max-w-[440px] object-contain drop-shadow-xl lg:block"
+            className="mt-2 hidden h-[310px] w-full max-w-[440px] object-contain drop-shadow-xl md:block"
           />
         </section>
 
-        <section className="flex w-full flex-1 justify-center lg:w-[47%] lg:justify-end lg:pr-[4vw]">
-          <div className="w-full max-w-[456px] rounded-2xl border border-[#eadfc8] bg-white/90 px-6 py-7 shadow-[0_18px_55px_rgba(83,62,24,.09)] sm:px-10 sm:py-9 lg:border-0 lg:bg-transparent lg:px-6 lg:shadow-none">
+        <section className="flex w-full flex-1 justify-center md:w-[47%] md:justify-end md:pr-[4vw]">
+          <div className="tablet-login-panel w-full max-w-[456px] rounded-2xl border border-[#eadfc8] bg-white/90 px-6 py-7 shadow-[0_18px_55px_rgba(83,62,24,.09)] sm:px-10 sm:py-9 md:border-0 md:bg-transparent md:px-6 md:shadow-none">
             <AnimatePresence mode="wait">
               {showForgot ? (
                 <motion.div
@@ -138,7 +160,7 @@ export default function StaffAdminLogin() {
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -12 }}
                 >
-                  <div className="mb-6">
+                  <div className="tablet-login-header mb-6">
                     <div className="mb-3 inline-flex items-center gap-1.5 rounded-full border border-[#F0B94D]/40 bg-[#F0B94D]/10 px-3 py-1 text-[10px] font-bold uppercase tracking-[.15em] text-[#92620d]">
                       <ShieldCheck size={13} />
                       Admin access
@@ -158,10 +180,10 @@ export default function StaffAdminLogin() {
                     </div>
                   )}
 
-                  <form onSubmit={handleSubmit} className="space-y-4">
-                    <div className="space-y-2">
+                  <form onSubmit={handleSubmit} className="tablet-login-form space-y-4">
+                    <div className="tablet-login-field space-y-2">
                       <label htmlFor="admin-email" className="text-sm font-bold">Email address</label>
-                      <div className="flex h-[46px] items-center gap-2 rounded-lg border border-black/15 bg-white px-3">
+                      <div className="tablet-login-control flex h-[46px] items-center gap-2 rounded-lg border border-black/15 bg-white px-3">
                         <Mail size={17} className="shrink-0 text-gray-400" />
                         <input
                           id="admin-email"
@@ -176,9 +198,9 @@ export default function StaffAdminLogin() {
                       </div>
                     </div>
 
-                    <div className="space-y-2">
+                    <div className="tablet-login-field space-y-2">
                       <label htmlFor="admin-password" className="text-sm font-bold">Password</label>
-                      <div className="flex h-[46px] items-center gap-2 rounded-lg border border-black/15 bg-white px-3">
+                      <div className="tablet-login-control flex h-[46px] items-center gap-2 rounded-lg border border-black/15 bg-white px-3">
                         <Lock size={17} className="shrink-0 text-gray-400" />
                         <input
                           id="admin-password"
@@ -214,7 +236,7 @@ export default function StaffAdminLogin() {
                     <button
                       type="submit"
                       disabled={loading}
-                      className="h-[46px] w-full rounded-lg bg-[#f0b94d] px-4 text-sm font-bold text-[#171717] transition hover:bg-[#e5ae3d] disabled:cursor-not-allowed disabled:opacity-60"
+                      className="tablet-login-submit h-[46px] w-full rounded-lg bg-[#f0b94d] px-4 text-sm font-bold text-[#171717] transition hover:bg-[#e5ae3d] disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       {loading ? "Signing in..." : "Sign in"}
                     </button>
