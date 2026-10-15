@@ -277,7 +277,7 @@ export default function Orders() {
         id: item?.id ?? item?.product_id ?? `${order?.id ?? 'order'}-${index}`,
         name: item?.name || item?.product || item?.title || 'Unnamed item',
         product: item?.product || item?.name || item?.title || 'Unnamed item',
-        variant: item?.variant || '',
+        variant: item?.variant || item?.size || item?.variant_size || item?.size_name || '',
         qty: Number(item?.qty || item?.quantity || 1),
         price: Number(item?.price || item?.unit_price || 0),
         image: item?.image || item?.photo || item?.thumbnail || item?.img || '',
@@ -292,7 +292,7 @@ export default function Orders() {
           id: item?.id ?? item?.product_id ?? `${order?.id ?? 'order'}-${index}`,
           name: item?.name || item?.product || item?.title || 'Unnamed item',
           product: item?.product || item?.name || item?.title || 'Unnamed item',
-          variant: item?.variant || '',
+          variant: item?.variant || item?.size || item?.variant_size || item?.size_name || '',
           qty: Number(item?.qty || item?.quantity || 1),
           price: Number(item?.price || item?.unit_price || 0),
           image: item?.image || item?.photo || item?.thumbnail || item?.img || '',
@@ -1188,7 +1188,9 @@ export default function Orders() {
                   String(order.type || '').toLowerCase() === 'customized' ||
                   items.some((item) => String(item.name || '').toLowerCase().includes('custom'))
                 );
-                const cakeSize = isCustomized ? getCustomCakeDetails(order).cake_size : '';
+                const cakeSize = isCustomized
+                  ? getCustomCakeDetails(order).cake_size
+                  : primaryItem?.variant || primaryItem?.selectionDetails?.size || primaryItem?.selectionDetails?.variant || '';
                 const cakeSizeLabel = Array.isArray(cakeSize)
                   ? cakeSize.filter(Boolean).join(', ')
                   : cakeSize && typeof cakeSize === 'object'
@@ -1265,7 +1267,7 @@ export default function Orders() {
                           Qty {primaryItem?.qty ?? '-'}{isCustomized ? ' · Customized' : ''}
                         </p>
                         {cakeSizeLabel && (
-                          <p className="mt-0.5 text-xs font-medium text-gray-600">Cake size: {cakeSizeLabel}</p>
+                          <p className="mt-0.5 text-xs font-medium text-gray-600">{isCustomized ? 'Cake size' : 'Size'}: {cakeSizeLabel}</p>
                         )}
                         {extraCount > 0 && (
                           <button
