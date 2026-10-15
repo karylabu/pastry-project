@@ -67,4 +67,41 @@ describe("OrderHistory", () => {
       );
     });
   });
+
+  test("includes all matching historical import rows in the completed count", async () => {
+    global.fetch.mockImplementation((url) => {
+      if (String(url).includes("/api/staff/orders")) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            success: true,
+            orders: [{
+              id: 31,
+              status: "Completed",
+              customer: "Mila Customer",
+              total: 850,
+              items: [{ name: "Ube Cake", qty: 1, price: 850 }],
+            }],
+          }),
+        });
+      }
+
+      return Promise.resolve({
+        ok: true,
+        json: async () => ({
+          success: true,
+          sales: [],
+          summary: { records: 12, total_sales: 24000 },
+          pagination: { current_page: 1, last_page: 1, total: 12 },
+        }),
+      });
+    });
+
+    render(<OrderHistory />);
+
+    await waitFor(() => {
+      expect(screen.getByText("13")).toBeInTheDocument();
+    });
+    expect(screen.getByText("Completed / received")).toBeInTheDocument();
+  });
 });

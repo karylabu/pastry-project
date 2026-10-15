@@ -169,7 +169,10 @@ export default function OrderHistory() {
   }, [orders, importedSales, query, orderTypeFilter, statusFilter, timeRange, startDate, endDate]);
 
   const summaryMetrics = useMemo(() => {
-    const completedCount = filteredOrders.filter((order) => order.status === "Completed").length;
+    const completedLiveCount = filteredOrders.filter((order) => order.status === "Completed" && !order.isImportedSales).length;
+    const includeImportedCompleted = (orderTypeFilter === "All" || orderTypeFilter === "Imported Sales")
+      && (statusFilter === "All" || statusFilter === "Imported");
+    const completedCount = completedLiveCount + (includeImportedCompleted ? Number(importHistorySummary.records || 0) : 0);
     const cancelledCount = filteredOrders.filter((order) => order.status === "Cancelled").length;
     const liveOrderRevenue = filteredOrders.filter((order) => !order.isImportedSales).reduce((sum, order) => sum + Number(order.total || 0), 0);
     const includeImportedSales = orderTypeFilter === "All" || orderTypeFilter === "Imported Sales";
@@ -183,7 +186,7 @@ export default function OrderHistory() {
       cancelledCount,
       cancellationRate,
     };
-  }, [filteredOrders, importHistorySummary, orderTypeFilter]);
+  }, [filteredOrders, importHistorySummary, orderTypeFilter, statusFilter]);
 
   const getOrderTypeMeta = (order) => {
     if (order?.isImportedSales) return { label: "Imported Sales", isCustomCake: false, isUrgent: false };
