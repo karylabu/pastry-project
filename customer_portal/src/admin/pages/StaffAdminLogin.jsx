@@ -107,6 +107,42 @@ export default function StaffAdminLogin() {
           }
         }
         @media (min-width: 600px) and (orientation: portrait) {
+          .pastry-login .tablet-login-panel {
+            padding-top: .5rem;
+            padding-bottom: .5rem;
+          }
+          .pastry-login .tablet-login-header {
+            margin-bottom: .65rem;
+          }
+          .pastry-login .tablet-login-header > div:first-child {
+            margin-bottom: .35rem;
+          }
+          .pastry-login .tablet-login-header h2 {
+            font-size: 2rem;
+            line-height: 1.1;
+          }
+          .pastry-login .tablet-login-header p {
+            font-size: .8rem;
+            line-height: 1.25rem;
+          }
+          .pastry-login .tablet-login-form {
+            display: flex;
+            flex-direction: column;
+            gap: .5rem;
+          }
+          .pastry-login .tablet-login-form > :not([hidden]) ~ :not([hidden]) {
+            margin-top: 0;
+          }
+          .pastry-login .tablet-login-field > :not([hidden]) ~ :not([hidden]) {
+            margin-top: .2rem;
+          }
+          .pastry-login .tablet-login-field label {
+            font-size: .8rem;
+          }
+          .pastry-login .tablet-login-control,
+          .pastry-login .tablet-login-submit {
+            height: 38px;
+          }
           .pastry-login .portrait-login-cake {
             display: none;
           }
