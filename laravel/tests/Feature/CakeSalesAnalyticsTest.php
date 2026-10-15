@@ -256,6 +256,12 @@ class CakeSalesAnalyticsTest extends TestCase
             'created_at' => $saleDate . ' 10:00:00',
             'updated_at' => $saleDate . ' 10:00:00',
         ]);
+        DB::table('custom_cake_orders')->insert([
+            'order_id' => 1,
+            'quantity' => 2,
+            'estimated_price' => 1200,
+            'cake_size' => null,
+        ]);
         DB::table('cake_sizes')->insert([
             'id' => 1,
             'label' => '4 x 2 inch',

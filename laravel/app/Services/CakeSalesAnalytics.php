@@ -63,13 +63,21 @@ class CakeSalesAnalytics
             }
 
             foreach ($newCustomRows as $custom) {
+                $tierSizes = trim((string) $tierSizesByOrder->get($custom->id, ''));
                 if ($customByOrder->has($custom->order_id)) {
+                    $legacyCustom = $customByOrder->get($custom->order_id);
+                    $legacySize = trim((string) ($legacyCustom->cake_size ?? ''));
+                    if (
+                        $tierSizes !== ''
+                        && ($legacySize === '' || in_array(strtolower($legacySize), ['unknown', 'size not recorded'], true))
+                    ) {
+                        $legacyCustom->cake_size = $tierSizes;
+                    }
                     continue;
                 }
 
                 $details = json_decode((string) ($custom->notes ?? ''), true);
                 $details = is_array($details) ? $details : [];
-                $tierSizes = trim((string) $tierSizesByOrder->get($custom->id, ''));
                 $customByOrder->put($custom->order_id, (object) [
                     'order_id' => $custom->order_id,
                     'quantity' => $details['quantity'] ?? 1,
