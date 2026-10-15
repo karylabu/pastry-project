@@ -158,6 +158,11 @@ class CakeSalesAnalytics
 
                 $product = $productsByName->get($this->nameKey($row->product_name));
                 if (!$product) continue;
+                $unitPrice = $revenue / $quantity;
+                $size = trim((string) ($row->size ?? ''));
+                if ($size === '' || strtolower($size) === 'unknown') {
+                    $size = $this->resolveSizeFromPrice($unitPrice, $sizes->get($product->id, collect()));
+                }
                 $regularSales[] = [
                     'order_id' => 'import-' . $row->product_name . '-' . $row->sale_date,
                     'date' => (string) $row->sale_date,
@@ -165,9 +170,9 @@ class CakeSalesAnalytics
                     'product' => $product->name,
                     'category' => $product->category,
                     'image' => $product->image ?? null,
-                    'size' => trim((string) ($row->size ?? 'Unknown')) ?: 'Unknown',
+                    'size' => $size !== '' ? $size : 'Unknown',
                     'quantity' => $quantity,
-                    'price' => $revenue / $quantity,
+                    'price' => $unitPrice,
                     'revenue' => $revenue,
                     'imported_record_count' => (int) $row->record_count,
                 ];
@@ -451,7 +456,23 @@ class CakeSalesAnalytics
             $size = trim((string) ($details['size'] ?? $details['variant'] ?? ''));
             if ($size !== '') return $size;
         }
-        return 'Unknown';
+        return $this->resolveSizeFromPrice(
+            (float) ($item['price'] ?? $item['unit_price'] ?? 0),
+            $sizes
+        ) ?: 'Unknown';
+    }
+
+    private function resolveSizeFromPrice(float $price, Collection $sizes): string
+    {
+        if ($price <= 0 || $sizes->isEmpty()) return '';
+
+        $matches = $sizes->filter(
+            static fn ($size) => abs((float) $size->price - $price) < 0.01
+        );
+
+        return $matches->count() === 1
+            ? trim((string) $matches->first()->size)
+            : '';
     }
 
     private function rankRegularCakeSizes(array $regularSales): array
@@ -627,7 +648,9 @@ class CakeSalesAnalytics
         $sizes = [];
         foreach ($sales as $sale) {
             $label = trim((string) ($sale['size'] ?? ''));
-            if ($label === '' || strtolower($label) === 'unknown') continue;
+            if ($label === '' || strtolower($label) === 'unknown') {
+                $label = 'Size not recorded';
+            }
 
             $key = strtolower($label);
             $sizes[$key]['name'] = $sizes[$key]['name'] ?? ucfirst($label);
@@ -635,7 +658,7 @@ class CakeSalesAnalytics
         }
 
         $rows = array_values($sizes);
-        $total = array_sum(array_column($rows, 'quantity')) ?: 1;
+        $total = array_sum(array_column($sales, 'quantity')) ?: 1;
         foreach ($rows as &$row) {
             $row['percentage'] = round(($row['quantity'] / $total) * 100, 2);
         }

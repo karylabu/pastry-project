@@ -199,6 +199,7 @@ class CakeSalesAnalyticsTest extends TestCase
         DB::table('analytics_sales_history')->insert([
             'import_id' => 1,
             'product_name' => 'Historical custom design',
+            'size' => '10 inches',
             'sale_date' => $saleDate,
             'units_sold' => 3,
             'revenue' => 1200,
@@ -215,6 +216,14 @@ class CakeSalesAnalyticsTest extends TestCase
         $this->assertSame(1.0, $report['cakeTypeBreakdown']['regular']['quantity']);
         $this->assertSame('Historical custom design', $report['designs'][0]['name']);
         $this->assertSame(3.0, $report['designs'][0]['quantity']);
+        $this->assertContains(
+            ['name' => '10 inches', 'quantity' => 3.0, 'percentage' => 50.0],
+            $report['cakeTypeBreakdown']['customized']['sizes']
+        );
+        $this->assertSame(
+            $report['cakeTypeBreakdown']['customized']['quantity'],
+            array_sum(array_column($report['cakeTypeBreakdown']['customized']['sizes'], 'quantity'))
+        );
     }
 
     public function test_best_selling_sizes_only_ranks_big_and_small_regular_cakes(): void
@@ -225,6 +234,10 @@ class CakeSalesAnalyticsTest extends TestCase
             'name' => 'Regular Cake',
             'category' => 'Cake',
         ]);
+        DB::table('product_sizes')->insert([
+            ['id' => 11, 'product_id' => 1, 'size' => 'Big', 'price' => 500],
+            ['id' => 12, 'product_id' => 1, 'size' => 'Small', 'price' => 320],
+        ]);
         DB::table('orders')->insert([
             'id' => 1,
             'status' => 'Completed',
@@ -234,21 +247,7 @@ class CakeSalesAnalyticsTest extends TestCase
             'items' => json_encode([['name' => 'Regular Cake', 'qty' => 1, 'price' => 500, 'selectionDetails' => ['size' => 'Big']]]),
         ]);
         DB::table('orders')->insert([
-            [
-                'id' => 2,
-                'status' => 'Completed',
-                'created_at' => $saleDate . ' 11:00:00',
-                'subtotal' => 640,
-                'total' => 640,
-                'items' => json_encode([[
-                    'product_id' => 1,
-                    'name' => 'Regular Cake',
-                    'qty' => 2,
-                    'price' => 320,
-                    'variant' => 'Small',
-                    'selectionDetails' => ['size' => 'Small'],
-                ]]),
-            ],
+            ['id' => 2, 'status' => 'Completed', 'created_at' => $saleDate . ' 11:00:00', 'subtotal' => 640, 'total' => 640, 'items' => null],
             ['id' => 3, 'status' => 'Completed', 'created_at' => $saleDate . ' 12:00:00', 'subtotal' => 900, 'total' => 900, 'items' => null],
         ]);
         DB::table('order_items')->insert([
@@ -282,15 +281,19 @@ class CakeSalesAnalyticsTest extends TestCase
         ]);
 
         $this->assertSame([
-            ['name' => 'Big', 'quantity' => 3.0, 'revenue' => 1500.0, 'rank' => 1, 'percentage' => 60.0],
-            ['name' => 'Small', 'quantity' => 2.0, 'revenue' => 640.0, 'rank' => 2, 'percentage' => 40.0],
+            ['name' => 'Big', 'quantity' => 8424.0, 'revenue' => 4212000.0, 'rank' => 1, 'percentage' => 99.98],
+            ['name' => 'Small', 'quantity' => 2.0, 'revenue' => 640.0, 'rank' => 2, 'percentage' => 0.02],
         ], $report['sizes']);
         $this->assertSame([
-            ['name' => 'Big', 'quantity' => 3.0, 'percentage' => 60.0],
-            ['name' => 'Small', 'quantity' => 2.0, 'percentage' => 40.0],
+            ['name' => 'Big', 'quantity' => 8424.0, 'percentage' => 99.98],
+            ['name' => 'Small', 'quantity' => 2.0, 'percentage' => 0.02],
         ], $report['cakeTypeBreakdown']['regular']['sizes']);
         $this->assertSame([
             ['name' => 'Small', 'quantity' => 1.0, 'percentage' => 100.0],
         ], $report['cakeTypeBreakdown']['customized']['sizes']);
+        $this->assertSame(
+            $report['cakeTypeBreakdown']['regular']['quantity'],
+            array_sum(array_column($report['cakeTypeBreakdown']['regular']['sizes'], 'quantity'))
+        );
     }
 }
