@@ -37,11 +37,30 @@ class CakeSalesAnalytics
                 ->whereRaw('LOWER(orders.status) = ?', ['completed'])
                 ->whereBetween('orders.created_at', [$start . ' 00:00:00', $end . ' 23:59:59'])
                 ->get([
+                    'custom.id',
                     'custom.order_id',
                     'custom.notes',
                     'orders.subtotal',
                     'orders.total',
                 ]);
+
+            $tierSizesByOrder = collect();
+            if (
+                $newCustomRows->isNotEmpty()
+                && Schema::hasTable('customized_cake_tiers')
+                && Schema::hasTable('cake_sizes')
+            ) {
+                $tierSizesByOrder = DB::table('customized_cake_tiers as tier')
+                    ->join('cake_sizes as size', 'size.id', '=', 'tier.size_id')
+                    ->whereIn('tier.customized_cake_order_id', $newCustomRows->pluck('id'))
+                    ->orderBy('tier.tier_number')
+                    ->get([
+                        'tier.customized_cake_order_id',
+                        'size.label',
+                    ])
+                    ->groupBy('customized_cake_order_id')
+                    ->map(fn ($tiers) => $tiers->pluck('label')->filter()->implode(' / '));
+            }
 
             foreach ($newCustomRows as $custom) {
                 if ($customByOrder->has($custom->order_id)) {
@@ -50,12 +69,13 @@ class CakeSalesAnalytics
 
                 $details = json_decode((string) ($custom->notes ?? ''), true);
                 $details = is_array($details) ? $details : [];
+                $tierSizes = trim((string) $tierSizesByOrder->get($custom->id, ''));
                 $customByOrder->put($custom->order_id, (object) [
                     'order_id' => $custom->order_id,
                     'quantity' => $details['quantity'] ?? 1,
                     'estimated_price' => $details['estimated_price'] ?? $details['total_amount'] ?? 0,
                     'flavor' => $details['cake_flavor'] ?? $details['flavor'] ?? 'Unknown',
-                    'cake_size' => $details['cake_size'] ?? 'Unknown',
+                    'cake_size' => $tierSizes ?: ($details['cake_size'] ?? 'Unknown'),
                     'theme_design' => $details['cake_style'] ?? $details['theme'] ?? 'Unknown',
                     'occasion' => $details['occasion'] ?? 'Unknown',
                     'subtotal' => $custom->subtotal,

@@ -136,7 +136,9 @@ class CakeSalesAnalyticsTest extends TestCase
             'ingredients',
             'analytics_sales_history',
             'analytics_imports',
+            'customized_cake_tiers',
             'customized_cake_orders',
+            'cake_sizes',
             'custom_cake_orders',
             'order_items',
             'product_sizes',
@@ -223,6 +225,55 @@ class CakeSalesAnalyticsTest extends TestCase
         $this->assertSame(
             $report['cakeTypeBreakdown']['customized']['quantity'],
             array_sum(array_column($report['cakeTypeBreakdown']['customized']['sizes'], 'quantity'))
+        );
+    }
+
+    public function test_customized_sales_use_size_labels_from_normalized_tiers_when_notes_have_no_size(): void
+    {
+        Schema::create('cake_sizes', function ($table) {
+            $table->id();
+            $table->string('label');
+        });
+        Schema::create('customized_cake_tiers', function ($table) {
+            $table->id();
+            $table->unsignedBigInteger('customized_cake_order_id');
+            $table->unsignedInteger('tier_number');
+            $table->unsignedBigInteger('size_id');
+        });
+
+        $saleDate = now()->subDay()->toDateString();
+        DB::table('orders')->insert([
+            'id' => 1,
+            'status' => 'Completed',
+            'created_at' => $saleDate . ' 10:00:00',
+            'subtotal' => 1200,
+            'total' => 1200,
+        ]);
+        DB::table('customized_cake_orders')->insert([
+            'id' => 1,
+            'order_id' => 1,
+            'notes' => json_encode(['quantity' => 2, 'cake_flavor' => 'Vanilla']),
+            'created_at' => $saleDate . ' 10:00:00',
+            'updated_at' => $saleDate . ' 10:00:00',
+        ]);
+        DB::table('cake_sizes')->insert([
+            'id' => 1,
+            'label' => '4 x 2 inch',
+        ]);
+        DB::table('customized_cake_tiers')->insert([
+            'customized_cake_order_id' => 1,
+            'tier_number' => 1,
+            'size_id' => 1,
+        ]);
+
+        $report = app(CakeSalesAnalytics::class)->report([
+            'start_date' => $saleDate,
+            'end_date' => $saleDate,
+        ]);
+
+        $this->assertSame(
+            [['name' => '4 x 2 inch', 'quantity' => 2.0, 'percentage' => 100.0]],
+            $report['cakeTypeBreakdown']['customized']['sizes']
         );
     }
 
