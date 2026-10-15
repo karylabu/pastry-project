@@ -234,7 +234,21 @@ class CakeSalesAnalyticsTest extends TestCase
             'items' => json_encode([['name' => 'Regular Cake', 'qty' => 1, 'price' => 500, 'selectionDetails' => ['size' => 'Big']]]),
         ]);
         DB::table('orders')->insert([
-            ['id' => 2, 'status' => 'Completed', 'created_at' => $saleDate . ' 11:00:00', 'subtotal' => 640, 'total' => 640, 'items' => null],
+            [
+                'id' => 2,
+                'status' => 'Completed',
+                'created_at' => $saleDate . ' 11:00:00',
+                'subtotal' => 640,
+                'total' => 640,
+                'items' => json_encode([[
+                    'product_id' => 1,
+                    'name' => 'Regular Cake',
+                    'qty' => 2,
+                    'price' => 320,
+                    'variant' => 'Small',
+                    'selectionDetails' => ['size' => 'Small'],
+                ]]),
+            ],
             ['id' => 3, 'status' => 'Completed', 'created_at' => $saleDate . ' 12:00:00', 'subtotal' => 900, 'total' => 900, 'items' => null],
         ]);
         DB::table('order_items')->insert([
@@ -243,7 +257,8 @@ class CakeSalesAnalyticsTest extends TestCase
             'product' => 'Regular Cake',
             'qty' => 2,
             'price' => 320,
-            'variant' => 'small',
+            'variant' => null,
+            'details' => null,
         ]);
         DB::table('custom_cake_orders')->insert([
             'order_id' => 3,

@@ -367,7 +367,7 @@ class CakeSalesAnalytics
         foreach ($orderIds as $orderId) {
             $stored = $rows->get($orderId, collect());
             if ($stored->isNotEmpty()) {
-                $items[$orderId] = $stored->map(fn ($item) => [
+                $storedItems = $stored->map(fn ($item) => [
                     'product_id' => $item->product_id,
                     'product_size_id' => $item->product_size_id ?? null,
                     'name' => $item->product,
@@ -376,6 +376,35 @@ class CakeSalesAnalytics
                     'variant' => $item->variant,
                     'details' => $item->details,
                 ])->all();
+                $snapshot = json_decode(
+                    (string) DB::table('orders')->where('id', $orderId)->value('items'),
+                    true
+                );
+                $snapshotItems = is_array($snapshot) ? array_values($snapshot) : [];
+
+                $items[$orderId] = [];
+                foreach ($storedItems as $index => $item) {
+                    $snapshotItem = $snapshotItems[$index] ?? [];
+                    $itemIdentity = $this->nameKey($item['name'] ?? '');
+                    if (
+                        is_array($snapshotItem) &&
+                        $snapshotItem &&
+                        $itemIdentity !== '' &&
+                        $itemIdentity !== $this->nameKey($snapshotItem['name'] ?? $snapshotItem['product'] ?? '')
+                    ) {
+                        $snapshotItem = collect($snapshotItems)->first(
+                            fn ($candidate) => is_array($candidate) &&
+                                $itemIdentity === $this->nameKey($candidate['name'] ?? $candidate['product'] ?? '')
+                        ) ?? [];
+                    }
+
+                    foreach (['product_id', 'product_size_id', 'variant', 'selectionDetails'] as $field) {
+                        if (empty($item[$field])) {
+                            $item[$field] = $snapshotItem[$field] ?? null;
+                        }
+                    }
+                    $items[$orderId][] = $item;
+                }
                 continue;
             }
             $order = DB::table('orders')->where('id', $orderId)->value('items');
@@ -413,13 +442,16 @@ class CakeSalesAnalytics
 
         $variant = trim((string) ($item['variant'] ?? ''));
         if ($variant !== '') return $variant;
-        $details = $item['details'] ?? $item['selectionDetails'] ?? [];
-        $details = is_string($details) ? json_decode($details, true) : $details;
-        if (!is_array($details)) $details = [];
-        if (isset($details['details']) && is_array($details['details'])) {
-            $details = $details['details'];
+        foreach ([$item['details'] ?? null, $item['selectionDetails'] ?? null] as $details) {
+            $details = is_string($details) ? json_decode($details, true) : $details;
+            if (!is_array($details)) continue;
+            if (isset($details['details']) && is_array($details['details'])) {
+                $details = $details['details'];
+            }
+            $size = trim((string) ($details['size'] ?? $details['variant'] ?? ''));
+            if ($size !== '') return $size;
         }
-        return trim((string) ($details['size'] ?? $details['variant'] ?? 'Unknown')) ?: 'Unknown';
+        return 'Unknown';
     }
 
     private function rankRegularCakeSizes(array $regularSales): array
