@@ -1352,7 +1352,7 @@ export default function Reports() {
                   ) : (
                     <div className="space-y-2">
                       {historicalImports.map((importFile) => (
-                        <div key={importFile.id} className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-black/10 bg-white px-3 py-2">
+                        <div key={importFile.id} className="admin-static-card flex flex-wrap items-center justify-between gap-3 rounded-md border border-black/10 bg-white px-3 py-2">
                           <div className="min-w-0">
                             <p className="truncate text-xs font-semibold text-black">{importFile.file_name}</p>
                             <p className="mt-0.5 text-[10px] text-black/55">
