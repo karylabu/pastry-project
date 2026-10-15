@@ -83,7 +83,8 @@ export default function StaffAdminLogin() {
             background: transparent;
           }
         }
-        @media (min-width: 768px) and (max-width: 1023px) {
+        @media (min-width: 600px) and (max-width: 1023px),
+               (min-width: 600px) and (orientation: portrait) {
           .pastry-login .tablet-login-panel {
             padding-top: 1rem;
             padding-bottom: 1rem;
