@@ -409,6 +409,7 @@ class SalesImportController extends Controller
             'search' => ['nullable', 'string', 'max:255'],
             'source' => ['nullable', 'in:imported,legacy'],
             'sales_type' => ['nullable', 'in:customized_cake,finished_product,other'],
+            'import_id' => ['nullable', 'integer', 'min:1'],
             'category' => ['nullable', 'in:Customized Cakes,Finished Products,Imported Sales'],
             'page' => ['nullable', 'integer', 'min:1'],
             'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
@@ -430,6 +431,7 @@ class SalesImportController extends Controller
         $filteredRows = DB::query()->fromSub($historyRows, 'sales_history');
         if (!empty($validated['source'])) $filteredRows->where('source', $validated['source']);
         if (!empty($validated['sales_type'])) $filteredRows->where('sales_type', $validated['sales_type']);
+        if (!empty($validated['import_id'])) $filteredRows->where('import_id', $validated['import_id']);
         if (($validated['category'] ?? '') === 'Customized Cakes') {
             $filteredRows->where('sales_type', 'customized_cake');
         } elseif (($validated['category'] ?? '') === 'Finished Products') {

@@ -391,6 +391,56 @@ class SalesImportControllerTest extends TestCase
         $this->assertDatabaseMissing('analytics_sales_history', ['import_id' => $importId]);
     }
 
+    public function test_admin_can_filter_imported_history_to_one_csv_file(): void
+    {
+        $admin = User::factory()->createOne(['role' => 'admin']);
+        $firstImportId = DB::table('analytics_imports')->insertGetId([
+            'file_name' => 'first.csv',
+            'source_name' => 'POS CSV',
+            'uploaded_at' => now(),
+            'status' => 'completed',
+        ]);
+        $secondImportId = DB::table('analytics_imports')->insertGetId([
+            'file_name' => 'second.csv',
+            'source_name' => 'POS CSV',
+            'uploaded_at' => now(),
+            'status' => 'completed',
+        ]);
+        DB::table('analytics_sales_history')->insert([
+            [
+                'import_id' => $firstImportId,
+                'product_name' => 'Chocolate Cake',
+                'size' => '8 inch',
+                'sale_date' => '2026-10-01',
+                'units_sold' => 1,
+                'revenue' => 850,
+            ],
+            [
+                'import_id' => $secondImportId,
+                'product_name' => 'Vanilla Cake',
+                'size' => '6 inch',
+                'sale_date' => '2026-10-02',
+                'units_sold' => 2,
+                'revenue' => 1200,
+            ],
+        ]);
+
+        $this->actingAs($admin);
+        $response = app(SalesImportController::class)->history(Request::create(
+            '/api/sales/import/history',
+            'GET',
+            ['source' => 'imported', 'import_id' => $firstImportId, 'per_page' => 10],
+        ));
+        $payload = $response->getData(true);
+
+        $this->assertSame(200, $response->getStatusCode());
+        $this->assertSame(1, $payload['summary']['records']);
+        $this->assertSame(1, $payload['pagination']['total']);
+        $this->assertCount(1, $payload['sales']);
+        $this->assertSame('Chocolate Cake', $payload['sales'][0]['cake_name']);
+        $this->assertSame($firstImportId, $payload['sales'][0]['import_id']);
+    }
+
     public function test_csv_import_cannot_be_deleted_while_it_is_processing(): void
     {
         $admin = User::factory()->createOne(['role' => 'admin']);

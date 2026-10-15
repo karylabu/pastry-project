@@ -439,6 +439,12 @@ export default function Reports() {
   const [historicalSalesError, setHistoricalSalesError] = useState('');
   const [importDeleteError, setImportDeleteError] = useState('');
   const [deletingImportId, setDeletingImportId] = useState(null);
+  const [previewImport, setPreviewImport] = useState(null);
+  const [previewSales, setPreviewSales] = useState([]);
+  const [previewPage, setPreviewPage] = useState(1);
+  const [previewPagination, setPreviewPagination] = useState({ current_page: 1, last_page: 1, total: 0 });
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewError, setPreviewError] = useState('');
 
   const refreshAnalyticsAfterImport = () => {
     setSalesPage(1);
@@ -649,6 +655,40 @@ export default function Reports() {
     return () => { isCurrentRequest = false; };
   }, [range, dateFilterStart, dateFilterEnd, salesPage, analyticsCategory, analyticsRefreshKey]);
 
+  useEffect(() => {
+    if (!previewImport) return undefined;
+
+    let isCurrentRequest = true;
+    const params = new URLSearchParams({
+      source: 'imported',
+      import_id: String(previewImport.id),
+      page: String(previewPage),
+      per_page: '10',
+    });
+    setPreviewLoading(true);
+    setPreviewError('');
+    laravelStaffFetch(`${LARAVEL_BASE}/api/sales/import/history?${params.toString()}`)
+      .then(async (response) => {
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok || !data.success) {
+          throw new Error(data.message || 'Unable to load this CSV preview.');
+        }
+        if (!isCurrentRequest) return;
+        setPreviewSales(Array.isArray(data.sales) ? data.sales : []);
+        setPreviewPagination(data.pagination || { current_page: 1, last_page: 1, total: 0 });
+      })
+      .catch((error) => {
+        if (!isCurrentRequest) return;
+        setPreviewSales([]);
+        setPreviewError(error.message || 'Unable to load this CSV preview.');
+      })
+      .finally(() => {
+        if (isCurrentRequest) setPreviewLoading(false);
+      });
+
+    return () => { isCurrentRequest = false; };
+  }, [previewImport, previewPage]);
+
   const deleteCsvImport = async (importFile) => {
     if (!window.confirm(`Delete "${importFile.file_name}" and all ${importFile.records.toLocaleString()} imported sales records? This cannot be undone.`)) return;
     setDeletingImportId(importFile.id);
@@ -660,6 +700,7 @@ export default function Reports() {
         throw new Error(data.message || 'Unable to delete this CSV import.');
       }
       setHistoricalImports((imports) => imports.filter((item) => item.id !== importFile.id));
+      if (previewImport?.id === importFile.id) setPreviewImport(null);
       setSalesPage(1);
       setAnalyticsRefreshKey((current) => current + 1);
     } catch (error) {
@@ -1047,6 +1088,7 @@ export default function Reports() {
   };
 
   return (
+    <>
     <div className="min-h-screen font-['DM_Sans']" style={{ background: C.bg, "--admin-card-accent": "#c9a94f" }}>
 
       <div className="lg:pl-[260px] pt-[72px]">
@@ -1354,7 +1396,21 @@ export default function Reports() {
                       {historicalImports.map((importFile) => (
                         <div key={importFile.id} className="admin-static-card flex flex-wrap items-center justify-between gap-3 rounded-md border border-black/10 bg-white px-3 py-2">
                           <div className="min-w-0">
-                            <p className="truncate text-xs font-semibold text-black">{importFile.file_name}</p>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setPreviewImport(importFile);
+                                setPreviewPage(1);
+                                setPreviewSales([]);
+                                setPreviewPagination({ current_page: 1, last_page: 1, total: 0 });
+                              }}
+                              disabled={importFile.status !== 'completed'}
+                              className="block max-w-full truncate text-left text-xs font-semibold text-black underline-offset-2 hover:underline disabled:cursor-not-allowed disabled:no-underline"
+                              aria-label={`Preview imported CSV ${importFile.file_name}`}
+                              title={importFile.status === 'completed' ? 'Preview imported sales records' : 'Preview is available after this import completes'}
+                            >
+                              {importFile.file_name}
+                            </button>
                             <p className="mt-0.5 text-[10px] text-black/55">
                               {String(importFile.sales_type || 'other').replace(/_/g, ' ')} · {Number(importFile.records).toLocaleString()} rows · {peso(importFile.revenue)} · {importFile.status}
                             </p>
@@ -1530,5 +1586,94 @@ export default function Reports() {
         </div>
       </div>
     </div>
+    {previewImport && (
+      <div
+        className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-3 sm:p-6"
+        onClick={(event) => {
+          if (event.target === event.currentTarget) setPreviewImport(null);
+        }}
+      >
+        <section
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="csv-preview-title"
+          className="max-h-[90vh] w-full max-w-4xl overflow-hidden rounded-xl bg-white shadow-2xl"
+        >
+          <div className="flex items-start justify-between gap-4 border-b border-black/10 px-5 py-4">
+            <div className="min-w-0">
+              <h2 id="csv-preview-title" className="truncate text-base font-bold text-black">{previewImport.file_name}</h2>
+              <p className="mt-1 text-xs text-black/55">
+                {Number(previewPagination.total || previewImport.records || 0).toLocaleString()} imported rows
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setPreviewImport(null)}
+              className="rounded-md p-1 text-black/60 hover:bg-black/5"
+              aria-label="Close CSV preview"
+            >
+              <XCircle size={20} />
+            </button>
+          </div>
+          <div className="max-h-[calc(90vh-105px)] overflow-auto p-5">
+            {previewError && <p className="mb-3 rounded-md bg-red-50 px-3 py-2 text-sm text-red-800" role="alert">{previewError}</p>}
+            {previewLoading ? (
+              <p className="py-8 text-center text-sm text-black/55">Loading CSV preview…</p>
+            ) : previewSales.length === 0 ? (
+              <p className="py-8 text-center text-sm text-black/55">{previewError ? 'Preview could not be loaded.' : 'This CSV import has no sales rows to preview.'}</p>
+            ) : (
+              <>
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[620px] text-left text-sm">
+                    <thead className="bg-[#f7f4ef] text-[10px] uppercase tracking-wide text-black/65">
+                      <tr>
+                        <th className="px-3 py-2">Date</th>
+                        <th className="px-3 py-2">Item</th>
+                        <th className="px-3 py-2">Size</th>
+                        <th className="px-3 py-2 text-right">Quantity</th>
+                        <th className="px-3 py-2 text-right">Revenue</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {previewSales.map((sale) => (
+                        <tr key={sale.id} className="border-b border-black/10 last:border-0">
+                          <td className="px-3 py-2 text-black/70">{sale.sale_date || '—'}</td>
+                          <td className="px-3 py-2 font-medium text-black">{sale.cake_name || '—'}</td>
+                          <td className="px-3 py-2 text-black/70">{sale.size || '—'}</td>
+                          <td className="px-3 py-2 text-right text-black/70">{fmt(sale.units_sold)}</td>
+                          <td className="px-3 py-2 text-right font-medium text-black">{peso(sale.price)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="mt-4 flex items-center justify-between gap-3 text-xs text-black/60">
+                  <span>Page {previewPagination.current_page} of {previewPagination.last_page}</span>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setPreviewPage((page) => Math.max(1, page - 1))}
+                      disabled={previewLoading || previewPage <= 1}
+                      className="rounded-md border border-black/15 px-3 py-1.5 disabled:opacity-40"
+                    >
+                      Previous
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPreviewPage((page) => Math.min(previewPagination.last_page, page + 1))}
+                      disabled={previewLoading || previewPage >= previewPagination.last_page}
+                      className="rounded-md border border-black/15 px-3 py-1.5 disabled:opacity-40"
+                    >
+                      Next
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        </section>
+      </div>
+    )}
+    </>
   );
 }
