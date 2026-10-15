@@ -107,7 +107,20 @@ export default function StaffAdminLogin() {
           }
         }
         @media (min-width: 600px) and (orientation: portrait) {
+          .pastry-login main {
+            justify-content: flex-start;
+            gap: .75rem;
+            padding-top: 1rem;
+            padding-bottom: 1rem;
+          }
+          .pastry-login .portrait-login-form-section {
+            flex: 0 0 auto;
+            align-self: stretch;
+          }
           .pastry-login .tablet-login-panel {
+            height: max-content;
+            min-height: 0;
+            flex: 0 0 auto;
             padding-top: .5rem;
             padding-bottom: .5rem;
           }
@@ -195,7 +208,7 @@ export default function StaffAdminLogin() {
           />
         </section>
 
-        <section className="flex w-full flex-1 justify-center md:w-[47%] md:justify-end md:pr-[4vw]">
+        <section className="portrait-login-form-section flex w-full flex-1 justify-center md:w-[47%] md:justify-end md:pr-[4vw]">
           <div className="tablet-login-panel w-full max-w-[456px] rounded-2xl border border-[#eadfc8] bg-white/90 px-6 py-7 shadow-[0_18px_55px_rgba(83,62,24,.09)] sm:px-10 sm:py-9 md:border-0 md:bg-transparent md:px-6 md:shadow-none">
             <AnimatePresence mode="wait">
               {showForgot ? (
