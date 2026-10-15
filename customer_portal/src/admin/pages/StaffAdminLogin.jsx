@@ -105,6 +105,12 @@ export default function StaffAdminLogin() {
           .pastry-login .tablet-login-submit {
             height: 42px;
           }
+          .pastry-login .portrait-login-cake {
+            display: block;
+            height: clamp(120px, 18vh, 180px);
+            max-width: 320px;
+            margin-top: 0;
+          }
         }
       `}</style>
 
@@ -138,7 +144,7 @@ export default function StaffAdminLogin() {
           <img
             src={`${ROOT_BASE}/uploads/login_cake.png?v=login-cake-20261010-v2`}
             alt="Decorated cake"
-            className="mt-2 hidden h-[310px] w-full max-w-[440px] object-contain drop-shadow-xl md:block"
+            className="portrait-login-cake mt-2 hidden h-[310px] w-full max-w-[440px] object-contain drop-shadow-xl md:block"
           />
         </section>
 
