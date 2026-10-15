@@ -49,7 +49,7 @@ export default function AdminLayout({ children }) {
           background: #fbfaf5 !important;
         }
 
-        .admin-page-surface :is(div, section, article, a)[class*="rounded-"][class*="border"][class*="p-"]:not([class*="border-dashed"]):not(.admin-product-card):not(.admin-product-card *) {
+        .admin-page-surface :is(div, section, article, a)[class*="rounded-"][class*="border"][class*="p-"]:not([class*="border-dashed"]):not(.admin-product-card):not(.admin-product-card *):not(.admin-static-card) {
           border-right-color: var(--admin-card-border) !important;
           border-bottom-color: var(--admin-card-border) !important;
           border-left-color: var(--admin-card-border) !important;
@@ -58,13 +58,13 @@ export default function AdminLayout({ children }) {
           transition: transform 180ms ease, box-shadow 180ms ease;
         }
 
-        .admin-page-surface :is(div, section, article, a)[class*="rounded-"][class*="border"][class*="p-"]:not([class*="border-dashed"]):not(.admin-product-card):not(.admin-product-card *):not([class*="border-t-"]) {
+        .admin-page-surface :is(div, section, article, a)[class*="rounded-"][class*="border"][class*="p-"]:not([class*="border-dashed"]):not(.admin-product-card):not(.admin-product-card *):not(.admin-static-card):not([class*="border-t-"]) {
           border-top-color: var(--admin-card-accent) !important;
           border-top-style: solid !important;
           border-top-width: 3px !important;
         }
 
-        .admin-page-surface :is(div, section, article, a)[class*="rounded-"][class*="border"][class*="p-"]:not([class*="border-dashed"]):not(.admin-product-card):not(.admin-product-card *):hover {
+        .admin-page-surface :is(div, section, article, a)[class*="rounded-"][class*="border"][class*="p-"]:not([class*="border-dashed"]):not(.admin-product-card):not(.admin-product-card *):not(.admin-static-card):hover {
           outline: none !important;
           box-shadow: var(--admin-card-hover-shadow) !important;
           transform: translateY(-2px);

@@ -1345,7 +1345,7 @@ export default function Reports() {
                 {catalogLoadError && <p className="mb-3 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-800" role="alert">Some sales filters may be incomplete: {catalogLoadError}</p>}
                 {historicalSalesError && <p className="mb-3 rounded-md bg-red-50 px-3 py-2 text-xs text-red-800" role="alert">{historicalSalesError}</p>}
                 {importDeleteError && <p className="mb-3 rounded-md bg-red-50 px-3 py-2 text-xs text-red-800" role="alert">{importDeleteError}</p>}
-                <div className="mb-4 rounded-md border border-black/10 bg-[#fffdf8] p-4">
+                <div className="admin-static-card mb-4 rounded-md border border-black/10 bg-[#fffdf8] p-4">
                   <h4 className="mb-2 text-xs font-bold uppercase tracking-wide text-black/70">Imported CSV files</h4>
                   {historicalImports.length === 0 ? (
                     <p className="text-xs text-black/50">No CSV imports found.</p>
