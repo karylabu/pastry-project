@@ -270,5 +270,12 @@ class CakeSalesAnalyticsTest extends TestCase
             ['name' => 'Big', 'quantity' => 3.0, 'revenue' => 1500.0, 'rank' => 1, 'percentage' => 60.0],
             ['name' => 'Small', 'quantity' => 2.0, 'revenue' => 640.0, 'rank' => 2, 'percentage' => 40.0],
         ], $report['sizes']);
+        $this->assertSame([
+            ['name' => 'Big', 'quantity' => 3.0],
+            ['name' => 'Small', 'quantity' => 2.0],
+        ], $report['cakeTypeBreakdown']['regular']['sizes']);
+        $this->assertSame([
+            ['name' => 'Small', 'quantity' => 1.0],
+        ], $report['cakeTypeBreakdown']['customized']['sizes']);
     }
 }

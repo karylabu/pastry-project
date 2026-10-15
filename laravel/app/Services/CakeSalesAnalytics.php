@@ -578,10 +578,32 @@ class CakeSalesAnalytics
             $quantity = array_sum(array_column($sales, 'quantity'));
             $revenue = array_sum(array_column($sales, 'revenue'));
             $recordCount = $this->salesRecordCount($sales);
-            $rows[$type] = ['quantity' => $quantity, 'revenue' => $revenue, 'average_order_value' => $recordCount ? $revenue / $recordCount : 0];
+            $rows[$type] = [
+                'quantity' => $quantity,
+                'revenue' => $revenue,
+                'average_order_value' => $recordCount ? $revenue / $recordCount : 0,
+                'sizes' => $this->rankSizeSales($sales),
+            ];
         }
         $total = $rows['regular']['quantity'] + $rows['customized']['quantity'] ?: 1;
         foreach ($rows as &$row) $row['percentage'] = round(($row['quantity'] / $total) * 100, 2);
+        return $rows;
+    }
+
+    private function rankSizeSales(array $sales): array
+    {
+        $sizes = [];
+        foreach ($sales as $sale) {
+            $label = trim((string) ($sale['size'] ?? ''));
+            if ($label === '' || strtolower($label) === 'unknown') continue;
+
+            $key = strtolower($label);
+            $sizes[$key]['name'] = $sizes[$key]['name'] ?? ucfirst($label);
+            $sizes[$key]['quantity'] = ($sizes[$key]['quantity'] ?? 0) + (float) ($sale['quantity'] ?? 0);
+        }
+
+        $rows = array_values($sizes);
+        usort($rows, static fn ($a, $b) => $b['quantity'] <=> $a['quantity']);
         return $rows;
     }
 

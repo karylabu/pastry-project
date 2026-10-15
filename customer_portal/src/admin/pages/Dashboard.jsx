@@ -434,7 +434,7 @@ export default function Dashboard() {
                 <div className="grid items-stretch gap-3 lg:grid-cols-2">
                   <Panel eyebrow="Customized Cakes" title="Best-selling cake designs" className="flex h-full min-h-[190px] min-w-0 flex-col overflow-hidden lg:h-[190px]"><div className="lg:max-h-[110px] lg:overflow-y-auto"><RankedList rows={analytics.designs} /></div></Panel>
                   <Panel eyebrow="Sales Mix" title="Regular vs. customized cakes" className="flex h-full min-h-[190px] flex-col overflow-hidden lg:h-[190px]">
-                    <div className="space-y-4 p-5 lg:max-h-[70px] lg:overflow-y-auto lg:p-2">
+                    <div className="space-y-4 p-5 lg:max-h-[110px] lg:overflow-y-auto lg:p-2">
                       {Object.entries(regularVsCustomized).map(([type, row]) => (
                         <div key={type}>
                           <div className="mb-1 flex items-center justify-between gap-3">
@@ -444,6 +444,11 @@ export default function Dashboard() {
                           <div className="h-2 overflow-hidden rounded-full bg-[#f4ece6]">
                             <div className={`h-full rounded-full ${type === 'regular' ? 'bg-[#a57c38]' : 'bg-[#d6c66f]'}`} style={{ width: `${Math.min(100, Number(row.percentage || 0))}%` }} />
                           </div>
+                          {Array.isArray(row.sizes) && row.sizes.length > 0 && (
+                            <p className="mt-1.5 text-[10px] leading-4 text-[#74675f]">
+                              Sizes: {row.sizes.map((size) => `${size.name} (${Number(size.quantity || 0).toLocaleString()})`).join(' · ')}
+                            </p>
+                          )}
                         </div>
                       ))}
                     </div>
