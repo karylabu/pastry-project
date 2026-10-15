@@ -286,16 +286,22 @@ export default function Dashboard() {
 
   const mostSoldItems = Array.isArray(analytics?.topSellingCakes) ? analytics.topSellingCakes : [];
 
+  const analyticsSummary = analytics?.summary || {};
   const totalSalesToday = Number(dashboardSummary.sales_today || 0);
+  const allTimeSalesSelected = analyticsPreset === "all";
+  const completedCount = allTimeSalesSelected
+    ? analyticsSummary.total_cake_sales
+    : dashboardSummary.completed_orders_total;
+  const completedLoading = dashboardLoading || (allTimeSalesSelected && analyticsLoading);
+  const completedError = dashboardError || (allTimeSalesSelected && analyticsError);
   const stats = [
     { label: "Orders Today", value: dashboardLoading ? "…" : dashboardError ? "—" : Number(dashboardSummary.orders_today || 0).toLocaleString(), hint: "Orders placed today", icon: ShoppingCart, iconTone: "bg-[#fff4cd] text-[#9b7810]", tone: "text-[#33251e]", accent: "#d4af37", to: "/admin/orders" },
     { label: "Pending", value: dashboardLoading ? "…" : dashboardError ? "—" : Number(dashboardSummary.pending_orders_total || 0).toLocaleString(), hint: "Awaiting confirmation", icon: Clock3, iconTone: "bg-[#fff4cd] text-[#9b7810]", tone: "text-[#33251e]", accent: "#c87954", to: "/admin/orders" },
     { label: "Preparing", value: dashboardLoading ? "…" : dashboardError ? "—" : Number(dashboardSummary.preparing_orders_total || 0).toLocaleString(), hint: "In production", icon: ChefHat, iconTone: "bg-[#fff4cd] text-[#9b7810]", tone: "text-[#33251e]", accent: "#c9a94f", to: "/admin/orders" },
-    { label: "Completed", value: dashboardLoading ? "…" : dashboardError ? "—" : Number(dashboardSummary.completed_orders_total || 0).toLocaleString(), hint: "Delivered / picked up", icon: CircleCheck, iconTone: "bg-[#eef5e9] text-[#68815d]", tone: "text-[#33251e]", accent: "#81906c", to: "/admin/orders/history" },
+    { label: "Completed", value: completedLoading ? "…" : completedError ? "—" : Number(completedCount || 0).toLocaleString(), hint: allTimeSalesSelected ? "Completed cake sales · incl. history" : "Delivered / picked up", icon: CircleCheck, iconTone: "bg-[#eef5e9] text-[#68815d]", tone: "text-[#33251e]", accent: "#81906c", to: "/admin/orders/history" },
     { label: "Sales Today", value: dashboardLoading ? "…" : dashboardError ? "—" : `₱${totalSalesToday.toLocaleString()}`, hint: "Completed revenue today", icon: TrendingUp, iconTone: "bg-[#fff4cd] text-[#9b7810]", tone: "text-[#33251e]", accent: "#d4af37", to: "/admin/reports" },
   ];
 
-  const analyticsSummary = analytics?.summary || {};
   const reviewAnalytics = analytics?.reviewAnalytics || {};
   const trendRows = analyticsPreset === "all"
     ? analytics?.salesTrend?.monthly || []
