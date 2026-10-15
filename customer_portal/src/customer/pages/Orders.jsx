@@ -1188,6 +1188,12 @@ export default function Orders() {
                   String(order.type || '').toLowerCase() === 'customized' ||
                   items.some((item) => String(item.name || '').toLowerCase().includes('custom'))
                 );
+                const cakeSize = isCustomized ? getCustomCakeDetails(order).cake_size : '';
+                const cakeSizeLabel = Array.isArray(cakeSize)
+                  ? cakeSize.filter(Boolean).join(', ')
+                  : cakeSize && typeof cakeSize === 'object'
+                    ? Object.values(cakeSize).filter(Boolean).join(', ')
+                    : String(cakeSize || '').trim();
                 const customPaymentDetails = order.custom_details && typeof order.custom_details === 'string'
                   ? (() => { try { return JSON.parse(order.custom_details); } catch { return {}; } })()
                   : (order.custom_details || order.custom_cake_details || {});
@@ -1258,6 +1264,9 @@ export default function Orders() {
                         <p className="text-xs text-gray-400">
                           Qty {primaryItem?.qty ?? '-'}{isCustomized ? ' · Customized' : ''}
                         </p>
+                        {cakeSizeLabel && (
+                          <p className="mt-0.5 text-xs font-medium text-gray-600">Cake size: {cakeSizeLabel}</p>
+                        )}
                         {extraCount > 0 && (
                           <button
                             onClick={(e) => { e.stopPropagation(); toggleExpanded(order.id); }}
