@@ -110,7 +110,7 @@ class OrderController extends Controller
 
         return response()->json([
             'success' => true,
-            'eligible' => !Order::query()->where('user_id', $user->id)->exists(),
+            'eligible' => !$this->hasNonFailedOrder((int) $user->id),
         ]);
     }
 
@@ -129,7 +129,7 @@ class OrderController extends Controller
             return DB::transaction(function () use ($request, $user, &$discountIdPath) {
                 $canonicalItems = [];
                 $subtotal = 0.0;
-                $hasExistingOrder = Order::query()->where('user_id', $user->id)->exists();
+                $hasExistingOrder = $this->hasNonFailedOrder((int) $user->id);
 
                 $productQuantities = [];
                 foreach ($request->items as $item) {
@@ -744,6 +744,17 @@ class OrderController extends Controller
         });
 
         return $hasUnresolvedPayment ? 'processing' : 'unpaid';
+    }
+
+    private function hasNonFailedOrder(int $userId): bool
+    {
+        return Order::query()
+            ->where('user_id', $userId)
+            ->where(function ($query) {
+                $query->whereNull('payment_status')
+                    ->orWhereRaw("LOWER(payment_status) <> 'failed'");
+            })
+            ->exists();
     }
 
     private function resolveLegacyProductPrice(Product $product, string $variant): ?float

@@ -6,6 +6,7 @@ use App\Http\Controllers\OrderController;
 use App\Http\Requests\StoreOrderRequest;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Http\Request;
 use Tests\TestCase;
 
 class RewardCodeCheckoutTest extends TestCase
@@ -296,10 +297,7 @@ class RewardCodeCheckoutTest extends TestCase
 
     public function test_first_order_discount_is_applied_once_and_reported_by_eligibility_endpoint(): void
     {
-        $this->withToken('test-customer-token')
-            ->getJson('/api/orders/first-order-discount')
-            ->assertOk()
-            ->assertJsonPath('eligible', true);
+        $this->assertTrue($this->firstOrderDiscountEligibility()['eligible']);
 
         $forgedDiscount = $this->placeOrder('', 'first_order_5_percent');
         $this->assertSame(422, $forgedDiscount->getStatusCode());
@@ -311,14 +309,29 @@ class RewardCodeCheckoutTest extends TestCase
         $this->assertSame(150.0, (float) $firstOrder['discount']);
         $this->assertSame(2850.0, (float) $firstOrder['total']);
 
-        $this->withToken('test-customer-token')
-            ->getJson('/api/orders/first-order-discount')
-            ->assertOk()
-            ->assertJsonPath('eligible', false);
+        $this->assertFalse($this->firstOrderDiscountEligibility()['eligible']);
 
         $secondOrder = $this->placeOrder('', 'none')->getData(true);
         $this->assertSame('none', $secondOrder['discount_type']);
         $this->assertSame(0.0, (float) $secondOrder['discount']);
+    }
+
+    public function test_failed_payment_does_not_consume_first_order_discount(): void
+    {
+        DB::table('orders')->insert([
+            'user_id' => 7,
+            'status' => 'Cancelled',
+            'payment_status' => 'failed',
+            'discount_type' => 'first_order_5_percent',
+            'discount' => 150,
+        ]);
+
+        $this->assertTrue($this->firstOrderDiscountEligibility()['eligible']);
+
+        $nextOrder = $this->placeOrder('', 'none')->getData(true);
+
+        $this->assertSame('first_order_5_percent', $nextOrder['discount_type']);
+        $this->assertSame(150.0, (float) $nextOrder['discount']);
     }
 
     public function test_checkout_rejects_more_than_twenty_units_of_a_product(): void
@@ -410,5 +423,17 @@ class RewardCodeCheckoutTest extends TestCase
         ]);
 
         return app(OrderController::class)->store($request);
+    }
+
+    private function firstOrderDiscountEligibility(): array
+    {
+        $request = Request::create('/api/orders/first-order-discount', 'GET', [], [], [], [
+            'HTTP_AUTHORIZATION' => 'Bearer test-customer-token',
+        ]);
+        $response = app(OrderController::class)->firstOrderDiscountEligibility($request);
+
+        $this->assertSame(200, $response->getStatusCode());
+
+        return $response->getData(true);
     }
 }
