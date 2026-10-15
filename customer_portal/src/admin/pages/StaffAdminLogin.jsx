@@ -165,8 +165,8 @@ export default function StaffAdminLogin() {
             bottom: 0;
             left: 0;
             display: block;
-            width: clamp(220px, 38vw, 360px);
-            height: clamp(150px, 22vh, 240px);
+            width: clamp(300px, 55vw, 520px);
+            height: clamp(220px, 34vh, 360px);
             object-fit: contain;
             object-position: left bottom;
             pointer-events: none;
