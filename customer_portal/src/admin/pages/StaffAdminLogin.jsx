@@ -105,11 +105,22 @@ export default function StaffAdminLogin() {
           .pastry-login .tablet-login-submit {
             height: 42px;
           }
+        }
+        @media (min-width: 600px) and (orientation: portrait) {
           .pastry-login .portrait-login-cake {
+            display: none;
+          }
+          .pastry-login .portrait-login-cake-bottom {
+            position: absolute;
+            z-index: 1;
+            bottom: 0;
+            left: 0;
             display: block;
-            height: clamp(120px, 18vh, 180px);
-            max-width: 320px;
-            margin-top: 0;
+            width: clamp(220px, 38vw, 360px);
+            height: clamp(150px, 22vh, 240px);
+            object-fit: contain;
+            object-position: left bottom;
+            pointer-events: none;
           }
         }
       `}</style>
@@ -254,6 +265,12 @@ export default function StaffAdminLogin() {
           </div>
         </section>
       </main>
+      <img
+        src={`${ROOT_BASE}/uploads/login_cake.png?v=login-cake-20261010-v2`}
+        alt=""
+        aria-hidden="true"
+        className="portrait-login-cake-bottom hidden"
+      />
     </div>
   );
 }
