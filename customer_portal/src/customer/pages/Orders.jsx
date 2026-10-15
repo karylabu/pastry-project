@@ -662,17 +662,17 @@ export default function Orders() {
       `;
       }).join('');
       const customizationHtml = isCustomized ? `
-        <section style="margin-top:20px;page-break-inside:avoid">
-          <h2 style="font-size:15px;margin:0 0 8px">Customization Details</h2>
-          ${customDetailEntries.length ? `<table><tbody>${customDetailEntries.map(([label, value]) => `
+        <section class="receipt-customization">
+          <h2>Customization Details</h2>
+          ${customDetailEntries.length ? `<table class="receipt-details"><tbody>${customDetailEntries.map(([label, value]) => `
             <tr><th style="width:32%;padding:7px;border:1px solid #eee;text-align:left;vertical-align:top">${escapeReceiptHtml(label)}</th><td style="padding:7px;border:1px solid #eee;white-space:pre-wrap">${escapeReceiptHtml(value)}</td></tr>
           `).join('')}</tbody></table>` : '<p>No customization details were attached to this order.</p>'}
-          ${customReferenceImages.length ? `<h3 style="font-size:13px;margin:16px 0 8px">Reference images</h3><div style="display:flex;flex-wrap:wrap;gap:8px">${customReferenceImages.map((src, index) => `<img src="${escapeReceiptHtml(src)}" alt="Customer reference ${index + 1}" style="max-width:180px;max-height:180px;object-fit:contain;border:1px solid #eee;padding:4px">`).join('')}</div>` : ''}
+          ${customReferenceImages.length ? `<h3>Reference images</h3><div class="receipt-reference-images">${customReferenceImages.map((src, index) => `<img src="${escapeReceiptHtml(src)}" alt="Customer reference ${index + 1}">`).join('')}</div>` : ''}
         </section>
       ` : '';
       const orderDetailsHtml = isCustomized
         ? customizationHtml
-        : `<h2 style="font-size:15px;margin:18px 0 8px">Order Details</h2><table><tbody>${receiptDetailsHtml}</tbody></table>`;
+        : `<h2 style="font-size:15px;margin:18px 0 8px">Order Details</h2><table class="receipt-details"><tbody>${receiptDetailsHtml}</tbody></table>`;
       const deliveryAddressHtml = isCustomized ? '' : `
         <div style="margin-top:18px;font-size:13px;color:#333">
           <strong>Delivery Address</strong>
@@ -680,7 +680,7 @@ export default function Orders() {
         </div>
       `;
 
-      return `<!doctype html><html><head><meta charset="utf-8"><title>Receipt #${escapeReceiptHtml(o.id)}</title><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{font-family:Arial,Helvetica,sans-serif;color:#111;padding:20px}.brand{text-align:center;margin:0 auto 22px}.brand img{display:block;width:68px;height:68px;object-fit:contain;margin:0 auto 6px}.brand-name{font-family:Georgia,'Times New Roman',serif;font-size:25px;font-weight:bold;font-style:italic}.brand-name span{color:#b58b19}.tagline{margin-top:4px;font-size:9px;letter-spacing:3px;text-transform:uppercase;color:#777}h1{font-size:18px}table{width:100%;border-collapse:collapse;margin-top:12px}th{background:#f7f7f7;border:1px solid #eee;padding:8px;text-align:left}td{padding:8px;border:1px solid #eee}.meta{margin-top:8px;font-size:13px;color:#444}@media print{body{padding:0}section,table,img{break-inside:avoid}}</style></head><body>
+      return `<!doctype html><html><head><meta charset="utf-8"><title>Receipt #${escapeReceiptHtml(o.id)}</title><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{font-family:Arial,Helvetica,sans-serif;color:#111;padding:20px}.brand{text-align:center;margin:0 auto 16px}.brand img{display:block;width:56px;height:56px;object-fit:contain;margin:0 auto 4px}.brand-name{font-family:Georgia,'Times New Roman',serif;font-size:23px;font-weight:bold;font-style:italic}.brand-name span{color:#b58b19}.tagline{margin-top:3px;font-size:8px;letter-spacing:3px;text-transform:uppercase;color:#777}h1{font-size:17px;margin:12px 0 6px}.meta{margin-top:6px;font-size:12px;color:#444}table{width:100%;border-collapse:collapse;margin-top:8px}th{background:#f7f7f7;border:1px solid #eee;padding:5px;text-align:left}td{padding:5px;border:1px solid #eee}.receipt-customization{margin-top:12px}.receipt-customization h2{font-size:13px;margin:0 0 5px}.receipt-customization h3{font-size:11px;margin:9px 0 5px}.receipt-details{font-size:10px;line-height:1.2}.receipt-details th,.receipt-details td{padding:3px 5px!important}.receipt-reference-images{display:flex;flex-wrap:wrap;gap:5px}.receipt-reference-images img{max-width:110px;max-height:90px;object-fit:contain;border:1px solid #eee;padding:3px}@media print{body{padding:0}.brand,h1,.meta,h2,h3{break-after:avoid}.receipt-customization{break-inside:auto}.receipt-details,.receipt-items{break-inside:auto}.receipt-details tr,.receipt-items tr,.receipt-items tfoot{break-inside:avoid}.receipt-details th,.receipt-details td{padding:3px 5px!important;font-size:9px;line-height:1.15}.receipt-items th,.receipt-items td{padding:4px!important;font-size:10px}img{break-inside:avoid}}</style></head><body>
         <header class="brand">
           <img src="${escapeReceiptHtml(`${ROOT_BASE}/uploads/logo.png?v=logo-v2`)}" alt="Pastry Project logo">
           <div class="brand-name">Pastry <span>Project</span></div>
@@ -690,7 +690,7 @@ export default function Orders() {
         <div class="meta">Date: ${escapeReceiptHtml(o.created_at || '')}</div>
         ${orderDetailsHtml}
         <h2 style="font-size:15px;margin:18px 0 8px">Items</h2>
-        <table>
+        <table class="receipt-items">
           <thead><tr><th>Item</th><th style="width:80px">Qty</th><th style="width:120px">Total</th></tr></thead>
           <tbody>
             ${itemsHtml}
