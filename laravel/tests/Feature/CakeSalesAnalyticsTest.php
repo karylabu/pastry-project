@@ -51,6 +51,7 @@ class CakeSalesAnalyticsTest extends TestCase
             $table->decimal('estimated_price', 10, 2)->default(0);
             $table->string('flavor')->nullable();
             $table->string('cake_size')->nullable();
+            $table->text('tiers')->nullable();
             $table->string('theme_design')->nullable();
             $table->string('occasion')->nullable();
         });
@@ -279,6 +280,47 @@ class CakeSalesAnalyticsTest extends TestCase
 
         $this->assertSame(
             [['name' => '4 x 2 inch', 'quantity' => 2.0, 'percentage' => 100.0]],
+            $report['cakeTypeBreakdown']['customized']['sizes']
+        );
+    }
+
+    public function test_customized_sales_use_size_labels_from_legacy_tier_details(): void
+    {
+        Schema::create('cake_sizes', function ($table) {
+            $table->id();
+            $table->string('label');
+        });
+
+        $saleDate = now()->subDay()->toDateString();
+        DB::table('orders')->insert([
+            'id' => 1,
+            'status' => 'Completed',
+            'created_at' => $saleDate . ' 10:00:00',
+            'subtotal' => 1200,
+            'total' => 1200,
+        ]);
+        DB::table('custom_cake_orders')->insert([
+            'order_id' => 1,
+            'quantity' => 2,
+            'estimated_price' => 1200,
+            'cake_size' => null,
+            'tiers' => json_encode([
+                ['tier' => 'Top tier', 'size' => '4 x 2 inch'],
+                ['tier' => 'Bottom tier', 'size' => '6 x 3 inch'],
+            ]),
+        ]);
+        DB::table('cake_sizes')->insert([
+            ['id' => 1, 'label' => '4 x 2 inch'],
+            ['id' => 2, 'label' => '6 x 3 inch'],
+        ]);
+
+        $report = app(CakeSalesAnalytics::class)->report([
+            'start_date' => $saleDate,
+            'end_date' => $saleDate,
+        ]);
+
+        $this->assertSame(
+            [['name' => '4 x 2 inch / 6 x 3 inch', 'quantity' => 2.0, 'percentage' => 100.0]],
             $report['cakeTypeBreakdown']['customized']['sizes']
         );
     }

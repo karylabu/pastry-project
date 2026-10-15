@@ -30,6 +30,15 @@ class CakeSalesAnalytics
                 ->whereBetween('orders.created_at', [$start . ' 00:00:00', $end . ' 23:59:59'])
                 ->get();
         }
+        if ($customRows->isNotEmpty() && Schema::hasTable('cake_sizes')) {
+            $sizeLabelsById = DB::table('cake_sizes')->pluck('label', 'id')->all();
+            foreach ($customRows as $custom) {
+                $size = trim((string) ($custom->cake_size ?? ''));
+                if ($size === '' || in_array(strtolower($size), ['unknown', 'size not recorded'], true)) {
+                    $custom->cake_size = $this->resolveLegacyTierSize($custom->tiers ?? null, $sizeLabelsById) ?: $custom->cake_size;
+                }
+            }
+        }
         $customByOrder = $customRows->keyBy('order_id');
         if (Schema::hasTable('customized_cake_orders')) {
             $newCustomRows = DB::table('customized_cake_orders as custom')
@@ -669,6 +678,50 @@ class CakeSalesAnalytics
         $total = $rows['regular']['quantity'] + $rows['customized']['quantity'] ?: 1;
         foreach ($rows as &$row) $row['percentage'] = round(($row['quantity'] / $total) * 100, 2);
         return $rows;
+    }
+
+    private function resolveLegacyTierSize(mixed $tiers, array $sizeLabelsById): string
+    {
+        $raw = trim((string) ($tiers ?? ''));
+        if ($raw === '') {
+            return '';
+        }
+
+        $values = [$raw];
+        $decoded = json_decode($raw, true);
+        if (is_array($decoded)) {
+            $values = [];
+            $collect = function (array $items) use (&$collect, &$values, $sizeLabelsById): void {
+                foreach ($items as $key => $value) {
+                    if (is_array($value)) {
+                        $collect($value);
+                    } elseif (is_scalar($value)) {
+                        if ($key === 'size_id' && isset($sizeLabelsById[(int) $value])) {
+                            $values[] = (string) $sizeLabelsById[(int) $value];
+                        } elseif (in_array(strtolower((string) $key), ['size', 'size_label', 'cake_size', 'label'], true)) {
+                            $values[] = trim((string) $value);
+                        }
+                    }
+                }
+            };
+            $collect($decoded);
+        }
+
+        $labels = array_values(array_unique(array_filter(array_map('strval', $sizeLabelsById))));
+        usort($labels, static fn ($a, $b) => strlen($b) <=> strlen($a));
+        $matched = [];
+        foreach ($values as $value) {
+            foreach ($labels as $label) {
+                if ($label !== '' && stripos($value, $label) !== false && !in_array($label, $matched, true)) {
+                    $matched[] = $label;
+                }
+            }
+            if (in_array($value, $labels, true) && !in_array($value, $matched, true)) {
+                $matched[] = $value;
+            }
+        }
+
+        return implode(' / ', $matched);
     }
 
     private function rankSizeSales(array $sales): array
