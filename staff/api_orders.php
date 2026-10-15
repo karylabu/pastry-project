@@ -2,6 +2,7 @@
 require_once __DIR__ . '/../includes/api_auth.php';
 
 requireInventoryRead();
+require_once __DIR__ . '/../includes/db.php';
 
 /* ================= DATABASE CONNECTION ================= */
 /*
@@ -10,9 +11,9 @@ requireInventoryRead();
 | ALTER TABLE / CREATE TABLE statements at request time.
 */
 
-$conn = new mysqli("localhost", "root", "", "pastry_db");
-
-if ($conn->connect_error) {
+if (!($conn instanceof mysqli)) {
+    error_log('Staff orders API database connection failed: ' . ($db_error ?: 'connection unavailable'));
+    http_response_code(500);
     echo json_encode([
         "status" => "error",
         "message" => "Database connection failed"
@@ -226,30 +227,65 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $stmt = $hasDownpayment
         ? $conn->prepare("UPDATE orders SET total = ?, downpayment_amount = ? WHERE id = ?")
         : $conn->prepare("UPDATE orders SET total = ? WHERE id = ?");
+    if (!$stmt) {
+        error_log('Staff orders API quote update could not be prepared: ' . $conn->error);
+        http_response_code(500);
+        echo json_encode([
+            "status" => "error",
+            "message" => "Unable to prepare the quote update"
+        ]);
+        exit;
+    }
     if ($hasDownpayment) {
         $stmt->bind_param("ddi", $total, $quotedDownpayment, $id);
     } else {
         $stmt->bind_param("di", $total, $id);
     }
-    if ($stmt->execute()) {
-        echo json_encode([
-            "status" => "success"
-        ]);
-    } else {
+    if (!$stmt->execute()) {
+        error_log('Staff orders API quote update failed: ' . $stmt->error);
+        http_response_code(500);
+        $stmt->close();
         echo json_encode([
             "status" => "error",
-            "message" => "Update failed"
+            "message" => "Unable to save the quote"
         ]);
+        exit;
     }
     $stmt->close();
 
     if ($hasDownpayment) {
-        $detailsStmt = $conn->prepare("SELECT notes FROM custom_cake_orders WHERE order_id = ? LIMIT 1");
-        if ($detailsStmt) {
+        foreach (['custom_cake_orders', 'customized_cake_orders'] as $customTable) {
+            $tableResult = $conn->query("SHOW TABLES LIKE '{$customTable}'");
+            if (!$tableResult || $tableResult->num_rows === 0) {
+                continue;
+            }
+
+            $detailsStmt = $conn->prepare("SELECT notes FROM `{$customTable}` WHERE order_id = ? LIMIT 1");
+            if (!$detailsStmt) {
+                error_log("Staff orders API could not prepare custom quote lookup for {$customTable}: " . $conn->error);
+                http_response_code(500);
+                echo json_encode([
+                    "status" => "error",
+                    "message" => "Unable to save the quote details"
+                ]);
+                exit;
+            }
             $detailsStmt->bind_param('i', $id);
-            $detailsStmt->execute();
+            if (!$detailsStmt->execute()) {
+                error_log("Staff orders API custom quote lookup failed for {$customTable}: " . $detailsStmt->error);
+                $detailsStmt->close();
+                http_response_code(500);
+                echo json_encode([
+                    "status" => "error",
+                    "message" => "Unable to save the quote details"
+                ]);
+                exit;
+            }
             $detailsRow = $detailsStmt->get_result()->fetch_assoc();
             $detailsStmt->close();
+            if (!$detailsRow) {
+                continue;
+            }
 
             $details = json_decode($detailsRow['notes'] ?? '', true);
             if (!is_array($details)) {
@@ -260,15 +296,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $details['downpayment_amount'] = $quotedDownpayment;
             $updatedNotes = json_encode($details);
 
-            $notesStmt = $conn->prepare("UPDATE custom_cake_orders SET notes = ? WHERE order_id = ?");
-            if ($notesStmt) {
-                $notesStmt->bind_param('si', $updatedNotes, $id);
-                $notesStmt->execute();
-                $notesStmt->close();
+            $notesStmt = $conn->prepare("UPDATE `{$customTable}` SET notes = ? WHERE order_id = ?");
+            if (!$notesStmt) {
+                error_log("Staff orders API could not prepare custom quote update for {$customTable}: " . $conn->error);
+                http_response_code(500);
+                echo json_encode([
+                    "status" => "error",
+                    "message" => "Unable to save the quote details"
+                ]);
+                exit;
             }
+            $notesStmt->bind_param('si', $updatedNotes, $id);
+            if (!$notesStmt->execute()) {
+                error_log("Staff orders API custom quote update failed for {$customTable}: " . $notesStmt->error);
+                $notesStmt->close();
+                http_response_code(500);
+                echo json_encode([
+                    "status" => "error",
+                    "message" => "Unable to save the quote details"
+                ]);
+                exit;
+            }
+            $notesStmt->close();
         }
     }
 
+    echo json_encode([
+        "status" => "success"
+    ]);
     exit;
 }
 

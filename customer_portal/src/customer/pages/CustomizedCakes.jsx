@@ -6,6 +6,7 @@ import { getAuthHeaders, safeParseJson } from '../../services/api';
 import { buildCustomizedCakeSubmissionPayload, buildTierSelections } from './customizedCakePayload';
 import { CalendarDays } from 'lucide-react';
 import DesignCategoryCards from '../components/DesignCategoryCards';
+import { CUSTOM_CAKE_PAYMENT_METHODS } from '../utils/customCakePayment';
 
 const CUSTOM_CAKE_DRAFT_KEY = 'customCakeRequestDraft';
 const MAX_REFERENCE_IMAGES = 5;
@@ -110,6 +111,7 @@ export default function CustomizedCakes() {
   const [addons, setAddons] = useState(() => formDraft?.addons || []);
   const [cupcakeQuantity, setCupcakeQuantity] = useState(() => formDraft?.cupcakeQuantity || 12);
   const [budget, setBudget] = useState(() => formDraft?.budget || '');
+  const [paymentMethod, setPaymentMethod] = useState(() => formDraft?.paymentMethod || 'QR Ph');
   const [quantity, setQuantity] = useState(() => formDraft?.quantity || 1);
   const [files, setFiles] = useState(() => location.state?.referenceFiles || []);
   const [galleryReferences, setGalleryReferences] = useState(() => location.state?.selectedReferenceImages || []);
@@ -172,6 +174,7 @@ export default function CustomizedCakes() {
         addons,
         cupcakeQuantity,
         budget,
+        paymentMethod,
         quantity,
       }));
     } catch (error) {
@@ -182,7 +185,7 @@ export default function CustomizedCakes() {
     deliveryService, deliveryAddress, cakeType, singleSizeId, twoTierPreset,
     flavorId, occasion, customOccasion, cakeStyle, packaging, customTheme,
     cakeColor, customMessage, specialInstructions, addons, cupcakeQuantity,
-    budget, quantity,
+    budget, paymentMethod, quantity,
   ]);
 
   useEffect(() => {
@@ -553,6 +556,7 @@ export default function CustomizedCakes() {
         addons,
         cupcake_quantity: addons.includes('Cupcakes') ? Number(cupcakeQuantity) : 0,
         budget,
+        payment_method: paymentMethod,
         estimated_price: budget,
         quantity,
         reference_image: referenceImage ? {
@@ -571,6 +575,7 @@ export default function CustomizedCakes() {
       laravelForm.append('order_id', '');
       laravelForm.append('notes', orderNotes);
       laravelForm.append('delivery_service', deliveryMethod === 'Delivery' ? deliveryService : '');
+      laravelForm.append('payment_method', paymentMethod);
       laravelForm.append('reference_image', JSON.stringify(referenceImage ? {
         type: referenceImage.type,
         id: referenceImage.id,
@@ -624,6 +629,7 @@ export default function CustomizedCakes() {
       fd.append('addons', JSON.stringify(addons));
       fd.append('cupcake_quantity', String(customizationDetails.cupcake_quantity));
       fd.append('budget', budget);
+      fd.append('payment_method', paymentMethod);
       fd.append('estimated_price', budget);
       fd.append('total_amount', budget);
       fd.append('quantity', String(quantity));
@@ -1181,6 +1187,17 @@ export default function CustomizedCakes() {
                   <label className="mb-1 block text-xs font-semibold text-[#6b4f1d]" htmlFor="custom-cake-quantity">Quantity</label>
                   <input id="custom-cake-quantity" value={quantity} onChange={(event) => setQuantity(Number(event.target.value) || 1)} placeholder="Enter quantity" type="number" min={1} className="w-full rounded-lg border border-[#eadfd8] bg-white px-3 py-2.5 text-[13px] text-[#6b4f1d] outline-none focus:border-[#e5bd45] focus:ring-2 focus:ring-[#fff1bd]" />
                 </div>
+                <div>
+                  <label className="mb-1 block text-xs font-semibold text-[#6b4f1d]" htmlFor="custom-cake-payment-method">Payment method</label>
+                  <select id="custom-cake-payment-method" value={paymentMethod} onChange={(event) => setPaymentMethod(event.target.value)} className="w-full rounded-lg border border-[#eadfd8] bg-white px-3 py-2.5 text-[13px] text-[#6b4f1d] outline-none focus:border-[#e5bd45] focus:ring-2 focus:ring-[#fff1bd]">
+                    {CUSTOM_CAKE_PAYMENT_METHODS.map(({ value, label, feeLabel }) => (
+                      <option key={value} value={value}>{label} — {feeLabel}</option>
+                    ))}
+                  </select>
+                  <p className="mt-1.5 text-[11px] leading-relaxed text-[#8d7a6e]">
+                    A transaction fee based on this method will be added separately to your 50% downpayment and remaining balance after the final price is approved.
+                  </p>
+                </div>
                 <div className="rounded-lg border border-[#eadfd8] bg-[#fffaf0] p-3">
                   <div className="flex items-center justify-between text-[12px] text-[#6b4f1d]">
                     <span>Your budget</span>
@@ -1195,7 +1212,7 @@ export default function CustomizedCakes() {
                 </div>
               )}
               <div className="mt-4 flex justify-end gap-2 border-t border-[#f3ece6] pt-3">
-                <button type="button" onClick={() => { setCakeType('single'); setSingleSizeId(sizeCatalog[0] ? String(sizeCatalog[0].id) : ''); setTwoTierPreset('standard'); setFlavorId(flavorCatalog[0] ? String(flavorCatalog[0].id) : ''); setCakeStyle(''); setPackaging('Standard'); setAddons([]); setCupcakeQuantity(12); setBudget(''); setFiles([]); setGalleryReferences([]); setReferenceImage(null); window.sessionStorage.removeItem(referenceStorageKey); window.sessionStorage.removeItem('customCakeReferenceImage'); setMessage(''); }} className="rounded-xl border border-[#f0d98a] bg-white px-4 py-2 text-sm font-semibold text-[#6b4f1d] hover:border-[#e5bd45]">
+                <button type="button" onClick={() => { setCakeType('single'); setSingleSizeId(sizeCatalog[0] ? String(sizeCatalog[0].id) : ''); setTwoTierPreset('standard'); setFlavorId(flavorCatalog[0] ? String(flavorCatalog[0].id) : ''); setCakeStyle(''); setPackaging('Standard'); setAddons([]); setCupcakeQuantity(12); setBudget(''); setPaymentMethod('QR Ph'); setFiles([]); setGalleryReferences([]); setReferenceImage(null); window.sessionStorage.removeItem(referenceStorageKey); window.sessionStorage.removeItem('customCakeReferenceImage'); setMessage(''); }} className="rounded-xl border border-[#f0d98a] bg-white px-4 py-2 text-sm font-semibold text-[#6b4f1d] hover:border-[#e5bd45]">
                   Reset
                 </button>
                 {userId > 0 ? (

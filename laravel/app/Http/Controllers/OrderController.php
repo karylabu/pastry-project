@@ -45,6 +45,10 @@ class OrderController extends Controller
 
         $hasUserId = Schema::hasColumn('orders', 'user_id');
         $hasEmail = Schema::hasColumn('orders', 'email');
+        $hasCustomizedFlag = Schema::hasColumn('orders', 'is_customized');
+        $hasOrderType = Schema::hasColumn('orders', 'order_type');
+        $hasLegacyCustomOrders = Schema::hasTable('custom_cake_orders');
+        $hasRecipeCustomOrders = Schema::hasTable('customized_cake_orders');
         $orders = Order::with($relations)
             ->where(function ($query) use ($user, $hasUserId, $hasEmail) {
                 if ($hasUserId) {
@@ -62,7 +66,30 @@ class OrderController extends Controller
                 $query->whereNull('payment_status')
                     ->orWhereRaw("LOWER(payment_status) <> 'failed'");
             })
-            ->whereRaw("LOWER(COALESCE(status, '')) <> 'awaiting payment'")
+            ->where(function ($query) use ($hasCustomizedFlag, $hasOrderType, $hasLegacyCustomOrders, $hasRecipeCustomOrders) {
+                $query->whereRaw("LOWER(COALESCE(status, '')) <> 'awaiting payment'");
+
+                if ($hasCustomizedFlag) {
+                    $query->orWhere('is_customized', true);
+                }
+                if ($hasOrderType) {
+                    $query->orWhereRaw("LOWER(COALESCE(order_type, '')) = 'customized'");
+                }
+                if ($hasLegacyCustomOrders) {
+                    $query->orWhereExists(function ($customQuery) {
+                        $customQuery->selectRaw('1')
+                            ->from('custom_cake_orders')
+                            ->whereColumn('custom_cake_orders.order_id', 'orders.id');
+                    });
+                }
+                if ($hasRecipeCustomOrders) {
+                    $query->orWhereExists(function ($customQuery) {
+                        $customQuery->selectRaw('1')
+                            ->from('customized_cake_orders')
+                            ->whereColumn('customized_cake_orders.order_id', 'orders.id');
+                    });
+                }
+            })
             ->orderBy('created_at', 'desc')
             ->get();
 
@@ -515,7 +542,17 @@ class OrderController extends Controller
             return response()->json(['success' => false, 'message' => 'Order not found.'], 404);
         }
 
-        if (!in_array(strtolower((string) $order->payment), ['gcash', 'qrph'], true)
+        $isCustomCake = (bool) ($order->is_customized ?? false)
+            || strcasecmp((string) ($order->order_type ?? ''), 'Customized') === 0;
+        if (!$isCustomCake && Schema::hasTable('custom_cake_orders')) {
+            $isCustomCake = CustomCakeOrder::query()->where('order_id', $orderId)->exists();
+        }
+        $paymentMethodKey = strtolower((string) preg_replace('/[^a-z0-9]/i', '', (string) $order->payment));
+        $supportedPaymentMethod = $isCustomCake
+            ? in_array($paymentMethodKey, ['gcash', 'maya', 'qrph', 'maribank', 'visamastercard', 'onlinebanking'], true)
+            : in_array($paymentMethodKey, ['gcash', 'qrph'], true);
+
+        if (!$supportedPaymentMethod
             || !in_array($order->status, ['Awaiting Payment', 'Awaiting Balance Payment'], true)
             || in_array(strtolower((string) $order->payment_status), ['failed', 'paid', 'proof_submitted'], true)) {
             return response()->json(['success' => false, 'message' => 'This order is not awaiting a QR payment.'], 409);

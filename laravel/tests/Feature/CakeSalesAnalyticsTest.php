@@ -69,6 +69,7 @@ class CakeSalesAnalyticsTest extends TestCase
             $table->id();
             $table->unsignedBigInteger('import_id');
             $table->string('product_name');
+            $table->string('size', 120)->nullable();
             $table->date('sale_date');
             $table->decimal('units_sold', 10, 2)->default(0);
             $table->decimal('revenue', 10, 2)->default(0);
@@ -214,5 +215,60 @@ class CakeSalesAnalyticsTest extends TestCase
         $this->assertSame(1.0, $report['cakeTypeBreakdown']['regular']['quantity']);
         $this->assertSame('Historical custom design', $report['designs'][0]['name']);
         $this->assertSame(3.0, $report['designs'][0]['quantity']);
+    }
+
+    public function test_best_selling_sizes_only_ranks_big_and_small_regular_cakes(): void
+    {
+        $saleDate = now()->subDay()->toDateString();
+        DB::table('products')->insert([
+            'id' => 1,
+            'name' => 'Regular Cake',
+            'category' => 'Cake',
+        ]);
+        DB::table('orders')->insert([
+            'id' => 1,
+            'status' => 'Completed',
+            'created_at' => $saleDate . ' 10:00:00',
+            'subtotal' => 500,
+            'total' => 500,
+            'items' => json_encode([['name' => 'Regular Cake', 'qty' => 1, 'price' => 500, 'selectionDetails' => ['size' => 'Big']]]),
+        ]);
+        DB::table('orders')->insert([
+            ['id' => 2, 'status' => 'Completed', 'created_at' => $saleDate . ' 11:00:00', 'subtotal' => 640, 'total' => 640, 'items' => null],
+            ['id' => 3, 'status' => 'Completed', 'created_at' => $saleDate . ' 12:00:00', 'subtotal' => 900, 'total' => 900, 'items' => null],
+        ]);
+        DB::table('order_items')->insert([
+            'order_id' => 2,
+            'product_id' => 1,
+            'product' => 'Regular Cake',
+            'qty' => 2,
+            'price' => 320,
+            'variant' => 'small',
+        ]);
+        DB::table('custom_cake_orders')->insert([
+            'order_id' => 3,
+            'quantity' => 1,
+            'estimated_price' => 900,
+            'cake_size' => 'Small',
+        ]);
+        DB::table('analytics_imports')->insert([
+            'id' => 1,
+            'status' => 'completed',
+            'sales_type' => 'other',
+        ]);
+        DB::table('analytics_sales_history')->insert([
+            ['import_id' => 1, 'product_name' => 'Regular Cake', 'size' => 'BIG', 'sale_date' => $saleDate, 'units_sold' => 2, 'revenue' => 1000],
+            ['import_id' => 1, 'product_name' => 'Regular Cake', 'size' => null, 'sale_date' => $saleDate, 'units_sold' => 8421, 'revenue' => 4210500],
+        ]);
+
+        $report = app(CakeSalesAnalytics::class)->report([
+            'start_date' => $saleDate,
+            'end_date' => $saleDate,
+        ]);
+
+        $this->assertSame([
+            ['name' => 'Big', 'quantity' => 3.0, 'revenue' => 1500.0, 'rank' => 1, 'percentage' => 60.0],
+            ['name' => 'Small', 'quantity' => 2.0, 'revenue' => 640.0, 'rank' => 2, 'percentage' => 40.0],
+        ], $report['sizes']);
     }
 }

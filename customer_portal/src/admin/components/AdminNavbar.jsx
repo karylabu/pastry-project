@@ -21,6 +21,8 @@ import {
   User,
   Users,
   X,
+  AlertTriangle,
+  Gift,
 } from "lucide-react";
 import { BASE, LARAVEL_BASE } from "../../services/config";
 import { getAuthHeaders } from "../../services/api";
@@ -94,6 +96,7 @@ export default function AdminNavbar({ onSidebarChange }) {
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [notificationsLoading, setNotificationsLoading] = useState(false);
+  const [notifFilter, setNotifFilter] = useState("All");
   const [accountOpen, setAccountOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState(() => getStoredUser());
   const [currentDateTime, setCurrentDateTime] = useState(() => new Date());
@@ -197,6 +200,31 @@ export default function AdminNavbar({ onSidebarChange }) {
       // Keep the unread state when the request fails.
     }
   };
+
+  const getNotificationCategory = (notification) => {
+    // Determine a category for admin-focused filters
+    if (notification.tag === "inventory" || /stock|ingredient|inventory/i.test(notification.title + notification.message)) return "Inventory";
+    if (/order|sale|transaction|payment/i.test(notification.title + notification.message)) return "Orders";
+    if (/analytics|import|report/i.test(notification.title + notification.message)) return "Analytics";
+    if (/system|error|failed|exception/i.test(notification.title + notification.message)) return "System";
+    return "Other";
+  };
+
+  const getNotificationIcon = (notification) => {
+    const cat = getNotificationCategory(notification);
+    switch (cat) {
+      case "Inventory": return Package;
+      case "Orders": return ClipboardList;
+      case "Analytics": return BarChart2;
+      case "System": return AlertTriangle;
+      default: return Gift;
+    }
+  };
+
+  const filteredNotifications = React.useMemo(() => {
+    if (notifFilter === "All") return notifications;
+    return notifications.filter((n) => getNotificationCategory(n) === notifFilter);
+  }, [notifications, notifFilter]);
 
   const handleSearchSubmit = (event) => {
     event.preventDefault();
@@ -335,26 +363,55 @@ export default function AdminNavbar({ onSidebarChange }) {
               {unreadCount > 0 && <span className="absolute right-2 top-2 h-2.5 w-2.5 rounded-full bg-[#c36b77] shadow-sm" />}
             </button>
             {notificationsOpen && (
-              <section className="absolute right-0 top-[48px] z-[10001] max-h-[70vh] w-[min(360px,calc(100vw-2rem))] overflow-y-auto rounded-lg border border-[#e9e1d9] bg-white shadow-xl" aria-label="Notifications">
+              <section className="absolute right-0 top-[48px] z-[10001] max-h-[70vh] w-[min(420px,calc(100vw-2rem))] overflow-hidden rounded-lg border border-[#e9e1d9] bg-white shadow-xl" aria-label="Notifications">
                 <div className="flex items-center justify-between gap-3 border-b border-[#f0e9e2] px-4 py-3">
                   <div>
                     <h2 className="text-[13px] font-semibold text-[#33251e]">Notifications</h2>
                     <p className="text-[10px] text-[#8f8076]">{unreadCount} unread</p>
                   </div>
-                  {unreadCount > 0 && <button type="button" onClick={markAllNotificationsRead} className="text-[10px] font-semibold text-[#80600a] hover:underline">Mark all read</button>}
+                  <div className="flex items-center gap-3">
+                    <div className="hidden sm:flex items-center gap-2">
+                      {['All','Orders','Inventory','Analytics','System'].map((f) => (
+                        <button key={f} type="button" onClick={() => setNotifFilter(f)} className={`rounded-full px-3 py-1 text-[11px] ${notifFilter===f? 'bg-[#fff4cd] text-[#9b7810]':'text-[#6f6056] hover:bg-[#fff8df]'}`}>
+                          {f}
+                        </button>
+                      ))}
+                    </div>
+                    {unreadCount > 0 && <button type="button" onClick={markAllNotificationsRead} className="text-[10px] font-semibold text-[#80600a] hover:underline">Mark all read</button>}
+                  </div>
                 </div>
-                {notificationsLoading ? <p className="px-4 py-8 text-center text-[12px] text-[#8f8076]">Loading notifications...</p> : notifications.length === 0 ? <p className="px-4 py-8 text-center text-[12px] text-[#8f8076]">You’re all caught up.</p> : (
-                  <div className="divide-y divide-[#f0e9e2]">
-                    {notifications.map((notification) => (
-                      <button key={notification.id} type="button" onClick={() => { markNotificationRead(notification.id); if (notification.action_url?.startsWith("/admin/")) navigate(notification.action_url); setNotificationsOpen(false); }} className="block w-full px-4 py-3 text-left transition hover:bg-[#fffaf0]">
-                        <span className="flex items-start justify-between gap-3">
-                          <span className="text-[12px] font-semibold text-[#33251e]">{notification.title || "Notification"}</span>
-                          {!notification.is_read && <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-[#c36b77]" />}
-                        </span>
-                        <span className="mt-1 block text-[11px] leading-4 text-[#74675f]">{notification.message || "You have a new update."}</span>
-                        <span className="mt-1.5 block text-[10px] text-[#9b8c83]">{notification.created_at ? new Date(notification.created_at).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "Just now"}</span>
-                      </button>
-                    ))}
+
+                {notificationsLoading ? (
+                  <div className="px-4 py-8 text-center text-[12px] text-[#8f8076]">Loading notifications...</div>
+                ) : filteredNotifications.length === 0 ? (
+                  <div className="px-4 py-8 text-center text-[12px] text-[#8f8076]">No notifications for this filter.</div>
+                ) : (
+                  <div className="overflow-y-auto max-h-[62vh] px-2 py-3">
+                    <div className="space-y-2">
+                      {filteredNotifications.map((n) => {
+                        const Icon = getNotificationIcon(n);
+                        return (
+                          <div key={n.id} className={`flex items-start gap-3 rounded-lg px-3 py-2 transition ${!n.is_read? 'bg-[#fff7f6]':'hover:bg-[#fffaf0]'}`}>
+                            <div className="flex h-9 w-9 items-center justify-center rounded-md bg-[#fff4f4] text-[#b85a63]">
+                              <Icon size={16} />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-start justify-between gap-3">
+                                <div className="truncate text-[12px] font-semibold text-[#33251e]">{n.title || 'Notification'}</div>
+                                <div className="shrink-0 text-[10px] text-[#9b8c83]">{n.created_at ? new Date(n.created_at).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Just now'}</div>
+                              </div>
+                              <div className="mt-1 truncate text-[11px] text-[#74675f]">{n.message}</div>
+                              <div className="mt-2 flex items-center gap-2">
+                                {!n.is_read && <span className="inline-flex items-center gap-1 rounded-full bg-[#c36b77] px-2 py-0.5 text-[10px] font-semibold text-white">New</span>}
+                                {n.action_url && n.action_url.startsWith('/admin/') && (
+                                  <button type="button" onClick={() => { markNotificationRead(n.id); navigate(n.action_url); setNotificationsOpen(false); }} className="ml-auto text-[11px] font-semibold text-[#80600a]">Open</button>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
                 )}
               </section>

@@ -42,7 +42,9 @@ class CustomerOrdersApiTest extends TestCase
             $table->decimal('lat', 10, 7)->nullable();
             $table->decimal('lng', 10, 7)->nullable();
             $table->string('status');
+            $table->string('payment_status')->nullable();
             $table->boolean('is_customized')->default(false);
+            $table->string('order_type')->nullable();
             $table->timestamp('created_at')->nullable();
         });
         Schema::create('order_items', function ($table) {
@@ -114,6 +116,41 @@ class CustomerOrdersApiTest extends TestCase
             ->assertJsonPath('success', true)
             ->assertJsonCount(1, 'orders')
             ->assertJsonPath('orders.0.items.0.name', 'Vanilla Cake');
+    }
+
+    public function test_customer_sees_custom_cake_awaiting_payment_but_not_standard_unpaid_orders(): void
+    {
+        DB::table('orders')->insert([
+            'id' => 207,
+            'user_id' => 7,
+            'email' => 'customer@example.com',
+            'items' => json_encode([['name' => 'Customized Cake', 'qty' => 1, 'price' => 2]]),
+            'total' => 2,
+            'payment' => 'QR Ph',
+            'status' => 'Awaiting Payment',
+            'payment_status' => 'pending',
+            'is_customized' => true,
+            'order_type' => 'Customized',
+            'created_at' => now(),
+        ]);
+        DB::table('orders')->insert([
+            'id' => 208,
+            'user_id' => 7,
+            'email' => 'customer@example.com',
+            'status' => 'Awaiting Payment',
+            'payment_status' => 'pending',
+            'is_customized' => false,
+            'order_type' => 'Standard',
+            'created_at' => now(),
+        ]);
+        DB::table('custom_cake_orders')->insert(['order_id' => 207]);
+
+        $this->withToken('test-customer-token')
+            ->getJson('/api/orders')
+            ->assertOk()
+            ->assertJsonCount(1, 'orders')
+            ->assertJsonPath('orders.0.id', 207)
+            ->assertJsonPath('orders.0.status', 'Awaiting Payment');
     }
 
     public function test_customer_can_cancel_their_pending_order(): void

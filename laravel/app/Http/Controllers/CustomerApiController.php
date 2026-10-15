@@ -1541,23 +1541,42 @@ PROMPT;
             $customOrder = DB::table('customized_cake_orders')->where('order_id', $orderId)->exists();
         }
         $downpaymentAmount = (float) ($order->downpayment_amount ?? 0);
-        if ($customOrder && $downpaymentAmount <= 0 && Schema::hasTable('custom_cake_orders')) {
+        $customPaymentDetails = [];
+        if ($customOrder && Schema::hasTable('custom_cake_orders')) {
             $quoteNotes = DB::table('custom_cake_orders')->where('order_id', $orderId)->value('notes');
-            $quoteDetails = is_string($quoteNotes) ? json_decode($quoteNotes, true) : [];
-            if (is_array($quoteDetails)) {
-                $downpaymentAmount = (float) ($quoteDetails['downpayment_amount'] ?? 0);
-                if ($downpaymentAmount <= 0 && (float) ($quoteDetails['downpayment_percent'] ?? 0) > 0) {
-                    $downpaymentAmount = round((float) $order->total * (float) $quoteDetails['downpayment_percent'] / 100, 2);
+            $customPaymentDetails = is_string($quoteNotes) ? json_decode($quoteNotes, true) : [];
+            if (!is_array($customPaymentDetails)) {
+                $customPaymentDetails = [];
+            }
+            if ($downpaymentAmount <= 0) {
+                $downpaymentAmount = (float) ($customPaymentDetails['downpayment_amount'] ?? 0);
+                if ($downpaymentAmount <= 0 && (float) ($customPaymentDetails['downpayment_percent'] ?? 0) > 0) {
+                    $downpaymentAmount = round((float) $order->total * (float) $customPaymentDetails['downpayment_percent'] / 100, 2);
                 }
                 if ($downpaymentAmount > 0) {
                     DB::table('orders')->where('id', $orderId)->update(['downpayment_amount' => $downpaymentAmount]);
                 }
             }
         }
+        $customPaymentMethods = [
+            'gcash' => ['type' => 'gcash', 'rate' => 0.0223],
+            'maya' => ['type' => 'paymaya', 'rate' => 0.0179],
+            'qrph' => ['type' => 'qrph', 'rate' => 0.0134],
+            'maribank' => ['type' => 'qrph', 'rate' => 0.017],
+            'visamastercard' => ['type' => 'card', 'rate' => 0.03125, 'fixed' => 13.39],
+            'onlinebanking' => ['type' => 'dob', 'rate' => 0.0071, 'minimum' => 13.39],
+        ];
+        $customPaymentMethodKey = strtolower((string) preg_replace('/[^a-z0-9]/i', '', (string) $order->payment));
+        $customPaymentMethod = $customPaymentMethods[$customPaymentMethodKey] ?? null;
         $paymentStatus = strtolower((string) ($order->payment_status ?? 'pending'));
-        if (!in_array(strtolower((string) $order->payment), ['qrph', 'gcash'], true)
+        $supportedOrderPayment = $customOrder
+            ? $customPaymentMethod !== null
+            : in_array(strtolower((string) $order->payment), ['qrph', 'gcash'], true);
+        $currentStageAlreadyPaid = $order->status === 'Awaiting Payment'
+            && in_array($paymentStatus, ['paid', 'proof_submitted'], true);
+        if (!$supportedOrderPayment
             || !in_array($order->status, ['Awaiting Payment', 'Awaiting Balance Payment'], true)
-            || in_array($paymentStatus, ['paid', 'proof_submitted'], true)) {
+            || $currentStageAlreadyPaid) {
             return $this->corsResponse(['error' => 'This order is not awaiting a payment.'], 409);
         }
 
@@ -1600,22 +1619,73 @@ PROMPT;
             return $this->corsResponse(['error' => 'Payment amount must be at least PHP 1.00.'], 400);
         }
 
-        $payload = [
-            'amount' => $amountCents,
-            'currency' => 'PHP',
-            'description' => 'Pastry Order #' . $orderId . ($paymentType === 'balance' ? ' Remaining Balance' : ''),
-            'remarks' => $paymentType === 'balance' ? 'Custom cake order remaining balance' : 'Pastry Shop Order',
-        ];
+        $checkoutAmountCents = $amountCents;
+        if ($customOrder && $customPaymentMethod) {
+            $baseAmount = $amountCents / 100;
+            $rate = $customPaymentMethod['rate'];
+            if (isset($customPaymentMethod['fixed'])) {
+                $checkoutAmount = ($baseAmount + $customPaymentMethod['fixed']) / (1 - $rate);
+            } elseif (isset($customPaymentMethod['minimum'])) {
+                $checkoutAmount = max(
+                    $baseAmount / (1 - $rate),
+                    $baseAmount + $customPaymentMethod['minimum']
+                );
+            } else {
+                $checkoutAmount = $baseAmount / (1 - $rate);
+            }
+            $checkoutAmountCents = (int) ceil(($checkoutAmount * 100) - 1e-8);
+        }
+
+        $description = 'Pastry Order #' . $orderId . ($paymentType === 'balance' ? ' Remaining Balance' : ' Downpayment');
+        if ($customOrder) {
+            $appUrl = parse_url((string) config('app.url'));
+            $portalOrigin = isset($appUrl['scheme'], $appUrl['host'])
+                ? $appUrl['scheme'] . '://' . $appUrl['host'] . (isset($appUrl['port']) ? ':' . $appUrl['port'] : '')
+                : 'https://pastryproject.shop';
+            $ordersUrl = $portalOrigin . '/customer/orders';
+            $payload = [
+                'data' => [
+                    'attributes' => [
+                        'line_items' => [[
+                            'name' => $description,
+                            'amount' => $checkoutAmountCents,
+                            'currency' => 'PHP',
+                            'quantity' => 1,
+                        ]],
+                        'payment_method_types' => [$customPaymentMethod['type']],
+                        'success_url' => $ordersUrl . '?custom_payment=success&order_id=' . rawurlencode((string) $orderId),
+                        'cancel_url' => $ordersUrl . '?custom_payment=cancelled&order_id=' . rawurlencode((string) $orderId),
+                        'reference_number' => 'CUSTOM-' . $orderId . '-' . $paymentType . '-' . now()->timestamp,
+                        'metadata' => [
+                            'order_id' => (string) $orderId,
+                            'payment_type' => $paymentType,
+                            'payment_method' => (string) $order->payment,
+                            'base_amount' => number_format($amount, 2, '.', ''),
+                            'fee_amount' => number_format(($checkoutAmountCents / 100) - $amount, 2, '.', ''),
+                        ],
+                    ],
+                ],
+            ];
+            $paymentEndpoint = 'https://api.paymongo.com/v2/checkout_sessions';
+        } else {
+            $payload = [
+                'amount' => $amountCents,
+                'currency' => 'PHP',
+                'description' => $description,
+                'remarks' => $paymentType === 'balance' ? 'Custom cake order remaining balance' : 'Pastry Shop Order',
+            ];
+            $paymentEndpoint = 'https://api.paymongo.com/v1/payment_links';
+        }
 
         if (class_exists(\GuzzleHttp\HandlerStack::class)) {
             $response = Http::withBasicAuth($secretKey, '')->withHeaders([
                 'accept' => 'application/json',
                 'content-type' => 'application/json',
-            ])->post('https://api.paymongo.com/v1/payment_links', $payload);
+            ])->post($paymentEndpoint, $payload);
             $responsePayload = $response->json() ?? [];
             $responseStatus = $response->status();
         } else {
-            $curl = curl_init('https://api.paymongo.com/v1/payment_links');
+            $curl = curl_init($paymentEndpoint);
             if ($curl === false) {
                 return $this->corsResponse(['error' => 'Unable to initialize the payment gateway request.'], 500);
             }
@@ -1652,7 +1722,7 @@ PROMPT;
         }
 
         $paymentData = $responsePayload['data'] ?? [];
-        $paymentUrl = $paymentData['url'] ?? '';
+        $paymentUrl = $paymentData['url'] ?? $paymentData['attributes']['checkout_url'] ?? '';
         $paymentReference = $paymentData['id'] ?? '';
         if ($responseStatus >= 200 && $responseStatus < 300 && $paymentUrl !== '' && $paymentReference !== '') {
             DB::table('orders')->where('id', $orderId)->update([

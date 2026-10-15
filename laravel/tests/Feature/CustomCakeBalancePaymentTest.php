@@ -47,8 +47,11 @@ class CustomCakeBalancePaymentTest extends TestCase
 
         config(['services.paymongo.secret' => 'sk_test_balance_flow']);
         Http::fake([
-            'https://api.paymongo.com/v1/payment_links' => Http::response([
-                'data' => ['id' => 'plink_balance_test', 'url' => 'https://checkout.example.test/balance'],
+            'https://api.paymongo.com/v2/checkout_sessions' => Http::response([
+                'data' => [
+                    'id' => 'cs_balance_test',
+                    'attributes' => ['checkout_url' => 'https://checkout.example.test/balance'],
+                ],
             ], 200),
         ]);
     }
@@ -72,7 +75,7 @@ class CustomCakeBalancePaymentTest extends TestCase
             'total' => 2000,
             'downpayment_amount' => 1250,
             'payment' => 'QRPh',
-            'payment_status' => 'pending',
+            'payment_status' => 'paid',
             'is_customized' => true,
             'order_type' => 'Customized',
         ]);
@@ -90,12 +93,13 @@ class CustomCakeBalancePaymentTest extends TestCase
                 'payment_method' => 'QRPh',
             ])
             ->assertOk()
-            ->assertJsonPath('data.url', 'https://checkout.example.test/balance');
+            ->assertJsonPath('data.attributes.checkout_url', 'https://checkout.example.test/balance');
 
         Http::assertSent(fn (ClientRequest $request) =>
-            $request->url() === 'https://api.paymongo.com/v1/payment_links'
-            && $request['amount'] === 75000
-            && str_contains($request['description'], 'Remaining Balance')
+            $request->url() === 'https://api.paymongo.com/v2/checkout_sessions'
+            && $request['data']['attributes']['line_items'][0]['amount'] === 76019
+            && $request['data']['attributes']['payment_method_types'] === ['qrph']
+            && str_contains($request['data']['attributes']['line_items'][0]['name'], 'Remaining Balance')
         );
     }
 
@@ -151,7 +155,107 @@ class CustomCakeBalancePaymentTest extends TestCase
             ->assertOk();
 
         $this->assertDatabaseHas('orders', ['id' => 26, 'downpayment_amount' => 1250]);
-        Http::assertSent(fn (ClientRequest $request) => $request['amount'] === 75000);
+        Http::assertSent(fn (ClientRequest $request) =>
+            $request->url() === 'https://api.paymongo.com/v2/checkout_sessions'
+            && $request['data']['attributes']['line_items'][0]['amount'] === 76019
+        );
+    }
+
+    public function test_custom_cake_checkout_uses_selected_method_and_server_calculated_card_fee(): void
+    {
+        \Illuminate\Support\Facades\DB::table('orders')->insert([
+            'id' => 29,
+            'user_id' => 9,
+            'status' => 'Awaiting Payment',
+            'total' => 2000,
+            'downpayment_amount' => 1000,
+            'payment' => 'Visa/Mastercard',
+            'payment_status' => 'pending',
+            'is_customized' => true,
+            'order_type' => 'Customized',
+        ]);
+        \Illuminate\Support\Facades\DB::table('custom_cake_orders')->insert(['order_id' => 29]);
+
+        $customer = new User();
+        $customer->id = 9;
+        $customer->role = 'customer';
+
+        $this->actingAs($customer)
+            ->postJson('/create_payment.php', [
+                'order_id' => 29,
+                'payment_type' => 'downpayment',
+                'payment_method' => 'GCash',
+            ])
+            ->assertOk()
+            ->assertJsonPath('data.attributes.checkout_url', 'https://checkout.example.test/balance');
+
+        Http::assertSent(fn (ClientRequest $request) =>
+            $request->url() === 'https://api.paymongo.com/v2/checkout_sessions'
+            && $request['data']['attributes']['line_items'][0]['amount'] === 104608
+            && $request['data']['attributes']['payment_method_types'] === ['card']
+            && $request['data']['attributes']['metadata']['fee_amount'] === '46.08'
+        );
+    }
+
+    public function test_custom_cake_checkout_maps_maribank_to_qrph_with_its_fee_rate(): void
+    {
+        \Illuminate\Support\Facades\DB::table('orders')->insert([
+            'id' => 30,
+            'user_id' => 9,
+            'status' => 'Awaiting Payment',
+            'total' => 2000,
+            'downpayment_amount' => 1000,
+            'payment' => 'MariBank',
+            'payment_status' => 'pending',
+            'is_customized' => true,
+            'order_type' => 'Customized',
+        ]);
+        \Illuminate\Support\Facades\DB::table('custom_cake_orders')->insert(['order_id' => 30]);
+
+        $customer = new User();
+        $customer->id = 9;
+        $customer->role = 'customer';
+
+        $this->actingAs($customer)
+            ->postJson('/create_payment.php', ['order_id' => 30, 'payment_type' => 'downpayment'])
+            ->assertOk();
+
+        Http::assertSent(fn (ClientRequest $request) =>
+            $request->url() === 'https://api.paymongo.com/v2/checkout_sessions'
+            && $request['data']['attributes']['line_items'][0]['amount'] === 101730
+            && $request['data']['attributes']['payment_method_types'] === ['qrph']
+            && $request['data']['attributes']['metadata']['payment_method'] === 'MariBank'
+        );
+    }
+
+    public function test_custom_cake_online_banking_uses_the_higher_minimum_fee(): void
+    {
+        \Illuminate\Support\Facades\DB::table('orders')->insert([
+            'id' => 31,
+            'user_id' => 9,
+            'status' => 'Awaiting Payment',
+            'total' => 2000,
+            'downpayment_amount' => 1000,
+            'payment' => 'Online Banking',
+            'payment_status' => 'pending',
+            'is_customized' => true,
+            'order_type' => 'Customized',
+        ]);
+        \Illuminate\Support\Facades\DB::table('custom_cake_orders')->insert(['order_id' => 31]);
+
+        $customer = new User();
+        $customer->id = 9;
+        $customer->role = 'customer';
+
+        $this->actingAs($customer)
+            ->postJson('/create_payment.php', ['order_id' => 31, 'payment_type' => 'downpayment'])
+            ->assertOk();
+
+        Http::assertSent(fn (ClientRequest $request) =>
+            $request->url() === 'https://api.paymongo.com/v2/checkout_sessions'
+            && $request['data']['attributes']['line_items'][0]['amount'] === 101339
+            && $request['data']['attributes']['payment_method_types'] === ['dob']
+        );
     }
 
     public function test_returning_from_an_unpaid_paymongo_link_marks_payment_failed(): void
