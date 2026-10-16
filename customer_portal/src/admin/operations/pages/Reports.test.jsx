@@ -1,4 +1,4 @@
-import { fetchAllReportHistory, filterImportedTransactions, filterSalesTransactions, formatOrderItemSizes, getAnalyticsDateRange, getReportPeriodLabel, getReportSellerRows, groupRevenueByInterval, normalizeReportProducts, selectReportIngredients } from "./Reports";
+import { buildBusinessAnalyticsCsv, fetchAllReportHistory, filterImportedTransactions, filterSalesTransactions, formatOrderItemSizes, getAnalyticsDateRange, getReportPeriodLabel, getReportSellerRows, groupRevenueByInterval, normalizeReportProducts, selectReportIngredients } from "./Reports";
 
 const sales = [
   { date: "2026-10-05", revenue: 100, orders: 2 },
@@ -71,6 +71,55 @@ describe("getAnalyticsDateRange", () => {
 });
 
 describe("all-time report exports", () => {
+  test("includes the complete summary, seller, and sales transaction sections in CSV", () => {
+    const csv = buildBusinessAnalyticsCsv({
+      period: "All time",
+      generatedAt: "10/16/2026, 8:00:00 PM",
+      totalRevenue: 2350,
+      totalOrdersProcessed: 3,
+      averageOrderValue: 783.33,
+      orderFulfillmentText: "3 completed · 1 cancelled",
+      sellerRows: [{ name: "Chocolate Cake", qty: 3, revenue: 2550 }],
+      salesTransactionOrders: [{
+        created_at: "2026-10-16T10:00:00.000Z",
+        id: 101,
+        items: [{ name: "Chocolate Cake", qty: 2 }],
+        total: 1700,
+        status: "Completed",
+        order_type: "Rush",
+      }],
+      historicalSales: [
+        { sale_date: "2026-09-01", cake_name: "Vanilla Cake", size: "6 inch", price: 650, source: "imported", sales_type: "finished_product" },
+        { sale_date: "2026-09-02", cake_name: "Legacy Bread", price: 25, source: "legacy" },
+      ],
+    });
+
+    expect(csv).toContain('"All time"');
+    expect(csv).toContain('"Total Revenue","2350"');
+    expect(csv).toContain('"Chocolate Cake","3","2550"');
+    expect(csv).toContain('"101"');
+    expect(csv).toContain('"2x Chocolate Cake"');
+    expect(csv).toContain('"Vanilla Cake"');
+    expect(csv).toContain('"Legacy Bread"');
+    expect(csv).not.toContain("sales-import-template");
+  });
+
+  test("escapes CSV cells and prevents formula execution from text values", () => {
+    const csv = buildBusinessAnalyticsCsv({
+      period: "All time",
+      generatedAt: "now",
+      totalRevenue: 0,
+      totalOrdersProcessed: 0,
+      averageOrderValue: 0,
+      orderFulfillmentText: "",
+      sellerRows: [{ name: '=HYPERLINK("https://example.com")', qty: 1, revenue: 1 }],
+      salesTransactionOrders: [],
+      historicalSales: [],
+    });
+
+    expect(csv).toContain(`"'=HYPERLINK(""https://example.com"")"`);
+  });
+
   test("uses every ranked seller in the all-time export", () => {
     const analytics = {
       sales: {

@@ -262,6 +262,82 @@ export async function fetchAllReportHistory(fetchPage) {
   return sales;
 }
 
+function csvCell(value) {
+  const text = value == null ? '' : String(value);
+  const safeText = typeof value === 'number' || !/^[\t\r ]*[=+\-@]/.test(text)
+    ? text
+    : `'${text}`;
+  return `"${safeText.replace(/"/g, '""')}"`;
+}
+
+export function buildBusinessAnalyticsCsv({
+  period,
+  generatedAt,
+  totalRevenue,
+  totalOrdersProcessed,
+  averageOrderValue,
+  orderFulfillmentText,
+  sellerRows,
+  salesTransactionOrders,
+  historicalSales,
+}) {
+  const rows = [
+    ['Business Analytics Report'],
+    ['Period', period],
+    ['Generated', generatedAt],
+    [],
+    ['Summary'],
+    ['Metric', 'Value'],
+    ['Total Revenue', totalRevenue],
+    ['Orders Processed', totalOrdersProcessed],
+    ['Average Order Value', averageOrderValue],
+    ['Order Fulfillment', orderFulfillmentText],
+    [],
+    ['Top / Bottom Sellers'],
+    ['Rank', 'Product', 'Units Sold', 'Revenue'],
+    ...sellerRows.map((seller, index) => [
+      index + 1,
+      seller.name,
+      seller.qty,
+      seller.revenue,
+    ]),
+    [],
+    ['Sales Transactions'],
+    ['Date / Time', 'Order Ref', 'Items Sold', 'Size', 'Order Type', 'Gross Amount', 'Status'],
+    ...salesTransactionOrders.map((order) => [
+      order.created_at ? new Date(order.created_at).toLocaleString() : '—',
+      order.id || order.order_ref || 'N/A',
+      Array.isArray(order.items) && order.items.length
+        ? order.items.map((item) => `${Number(item.qty || 0)}x ${item.name || 'Item'}`).join('; ')
+        : '—',
+      formatOrderItemSizes(order.items),
+      order.order_type || 'Standard',
+      Number(order.total || 0),
+      order.status || 'Unknown',
+    ]),
+    ...historicalSales.map((sale) => {
+      const type = sale.source === 'legacy'
+        ? 'Legacy sale'
+        : sale.sales_type === 'customized_cake'
+          ? 'Customized cake'
+          : sale.sales_type === 'finished_product'
+            ? 'Finished product'
+            : 'Other imported sale';
+      return [
+        sale.sale_date || '—',
+        'Historical',
+        sale.cake_name || '—',
+        sale.size || '—',
+        type,
+        Number(sale.price || 0),
+        'Imported',
+      ];
+    }),
+  ];
+
+  return rows.map((row) => row.map(csvCell).join(',')).join('\r\n');
+}
+
 function recommendationFor(ing) {
   const expiryDays = daysUntil(ing.expiry);
   const expiryNote = expiryDays !== null && expiryDays <= 5
@@ -1054,6 +1130,69 @@ export default function Reports() {
       ? `${dateFilterStart} to ${dateFilterEnd}`
       : ({ today: 'Today', week: 'This week', month: 'This month' }[range] || `Last ${range} days`);
 
+  const exportCsvReport = async () => {
+    try {
+      if (loading || analyticsLoading || !analytics) {
+        throw new Error('Wait for the report data to finish loading before exporting.');
+      }
+      if (ordersLoadError || analyticsError) {
+        throw new Error('The report cannot be exported because some report data failed to load.');
+      }
+      if (range === 'all' && !Array.isArray(analytics.sales?.all_selling_products)) {
+        throw new Error('Complete all-time seller data is unavailable. Please refresh the report and try again.');
+      }
+
+      const params = new URLSearchParams({ per_page: '100' });
+      if (analyticsCategory) params.set('category', analyticsCategory);
+      if (range !== 'all') {
+        const dateRange = getAnalyticsDateRange(range, dateFilterStart, dateFilterEnd);
+        if (dateRange.start_date) params.set('start_date', dateRange.start_date);
+        if (dateRange.end_date) params.set('end_date', dateRange.end_date);
+      }
+      const historicalSales = filterImportedTransactions(
+        await fetchAllReportHistory(async (page) => {
+          params.set('page', String(page));
+          const response = await laravelStaffFetch(`${LARAVEL_BASE}/api/sales/import/history?${params.toString()}`);
+          const payload = await response.json().catch(() => ({}));
+          if (!response.ok || !payload.success) {
+            throw new Error(payload.message || `Unable to load imported sales history page ${page}.`);
+          }
+          return payload;
+        }),
+        products,
+        analyticsCategory
+      );
+
+      const csv = buildBusinessAnalyticsCsv({
+        period: getReportPeriodLabel(range, dateFilterStart, dateFilterEnd),
+        generatedAt: new Date().toLocaleString(),
+        totalRevenue,
+        totalOrdersProcessed,
+        averageOrderValue: avgOrderValue,
+        orderFulfillmentText,
+        sellerRows: getReportSellerRows(analytics, leaderTab, range === 'all'),
+        salesTransactionOrders,
+        historicalSales,
+      });
+      const blob = new Blob(['\uFEFF', csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      const filePeriod = getReportPeriodLabel(range, dateFilterStart, dateFilterEnd)
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-|-$/g, '');
+      link.href = url;
+      link.download = `business-analytics-report-${filePeriod || 'selected-period'}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 0);
+    } catch (error) {
+      console.error('Unable to create the business analytics CSV report:', error);
+      window.alert(error.message || 'Unable to create the business analytics CSV report.');
+    }
+  };
+
   const exportReport = () => {
     const w = window.open('', '_blank');
     if (!w) return alert('Unable to open print preview. Please allow popups for this site.');
@@ -1362,6 +1501,7 @@ export default function Reports() {
                 range={range}
                 dateFilterStart={dateFilterStart}
                 dateFilterEnd={dateFilterEnd}
+                onDownloadCsvReport={exportCsvReport}
                 onImportComplete={refreshAnalyticsAfterImport}
               />
               <button

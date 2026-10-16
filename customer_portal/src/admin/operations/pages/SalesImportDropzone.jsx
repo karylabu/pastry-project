@@ -114,6 +114,7 @@ export default function SalesImportDropzone({
   range = 'all',
   dateFilterStart = '',
   dateFilterEnd = '',
+  onDownloadCsvReport,
 }) {
   const [isDragging, setIsDragging] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -278,9 +279,13 @@ export default function SalesImportDropzone({
           {isProcessing ? <Loader2 size={14} className="animate-spin" /> : <UploadCloud size={14} />}
           {isProcessing ? 'Importing report...' : 'Import Finished Product Sales'}
         </button>
-        <button type="button" onClick={() => downloadCsvTemplate(range, dateFilterStart, dateFilterEnd)} className="inline-flex h-10 min-w-[150px] flex-1 items-center justify-center gap-2 rounded-md bg-black px-3 text-[11px] font-semibold text-white transition hover:bg-black/85">
+        <button
+          type="button"
+          onClick={onDownloadCsvReport || (() => downloadCsvTemplate(range, dateFilterStart, dateFilterEnd))}
+          className="inline-flex h-10 min-w-[150px] flex-1 items-center justify-center gap-2 rounded-md bg-black px-3 text-[11px] font-semibold text-white transition hover:bg-black/85"
+        >
           <Download size={14} />
-          Download CSV template
+          {onDownloadCsvReport ? 'Download CSV Report' : 'Download CSV template'}
         </button>
         <AnimatePresence>
           {toast && (
