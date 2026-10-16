@@ -6,6 +6,7 @@ use App\Services\InventoryService;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
@@ -222,14 +223,35 @@ class StaffApiController extends Controller
             $customizedByOrder = collect();
 
             if ($orders->isNotEmpty() && Schema::hasTable('order_items')) {
-                $itemsByOrder = DB::table('order_items as oi')
+                $itemsQuery = DB::table('order_items as oi')
                     ->leftJoin('products as p', 'p.id', '=', 'oi.product_id')
                     ->whereIn('oi.order_id', $orders->pluck('id'))
-                    ->select('oi.order_id', 'oi.product', 'oi.qty', 'oi.price', 'p.category')
+                    ->select('oi.order_id', 'oi.product', 'oi.qty', 'oi.price', 'p.category');
+
+                if (Schema::hasColumn('order_items', 'product_size_id')) {
+                    $itemsQuery->addSelect('oi.product_size_id');
+                    if (Schema::hasTable('product_sizes')) {
+                        $itemsQuery
+                            ->leftJoin('product_sizes as ps', 'ps.id', '=', 'oi.product_size_id')
+                            ->addSelect('ps.size');
+                    }
+                }
+                if (Schema::hasColumn('order_items', 'variant')) {
+                    $itemsQuery->addSelect('oi.variant');
+                }
+                if (Schema::hasColumn('order_items', 'details')) {
+                    $itemsQuery->addSelect('oi.details');
+                }
+
+                $itemsByOrder = $itemsQuery
                     ->orderBy('oi.id')
                     ->get()
                     ->groupBy('order_id');
             }
+
+            $productSizesById = Schema::hasTable('product_sizes')
+                ? DB::table('product_sizes')->pluck('size', 'id')
+                : collect();
 
             if ($orders->isNotEmpty()) {
                 $orderIds = $orders->pluck('id');
@@ -247,24 +269,43 @@ class StaffApiController extends Controller
                 }
             }
 
-            $orders = $orders->map(function ($order) use ($orderNumbers, $itemsByOrder, $legacyCustomByOrder, $customizedByOrder) {
+            $orders = $orders->map(function ($order) use ($orderNumbers, $itemsByOrder, $productSizesById, $legacyCustomByOrder, $customizedByOrder) {
                 $rawItems = json_decode((string) ($order->items ?? '[]'), true);
                 $items = $itemsByOrder->get($order->id, collect())
-                    ->map(fn ($item) => [
-                        'name' => $item->product ?: 'Item',
-                        'qty' => (int) ($item->qty ?? 1),
-                        'price' => (float) ($item->price ?? 0),
-                        'category' => $item->category ?? '',
-                    ])
+                    ->map(function ($item) use ($productSizesById) {
+                        $normalized = [
+                            'name' => $item->product ?: 'Item',
+                            'qty' => (int) ($item->qty ?? 1),
+                            'price' => (float) ($item->price ?? 0),
+                            'category' => $item->category ?? '',
+                            'size' => $item->size ?? null,
+                            'variant' => $item->variant ?? null,
+                            'product_size_id' => $item->product_size_id ?? null,
+                            'details' => $item->details ?? null,
+                        ];
+                        $normalized['size'] = $this->resolveOrderItemSize($normalized, $productSizesById);
+
+                        return $normalized;
+                    })
                     ->values();
 
                 if ($items->isEmpty() && is_array($rawItems)) {
-                    $items = collect($rawItems)->map(fn ($item) => [
-                        'name' => $item['name'] ?? $item['product'] ?? 'Item',
-                        'qty' => (int) ($item['qty'] ?? $item['quantity'] ?? 1),
-                        'price' => (float) ($item['price'] ?? 0),
-                        'category' => $item['category'] ?? '',
-                    ])->values();
+                    $items = collect($rawItems)->map(function ($item) use ($productSizesById) {
+                        $item = is_array($item) ? $item : [];
+                        $normalized = [
+                            'name' => $item['name'] ?? $item['product'] ?? 'Item',
+                            'qty' => (int) ($item['qty'] ?? $item['quantity'] ?? 1),
+                            'price' => (float) ($item['price'] ?? 0),
+                            'category' => $item['category'] ?? '',
+                            'size' => $item['size'] ?? null,
+                            'variant' => $item['variant'] ?? null,
+                            'product_size_id' => $item['product_size_id'] ?? null,
+                            'details' => $item['selectionDetails'] ?? $item['details'] ?? null,
+                        ];
+                        $normalized['size'] = $this->resolveOrderItemSize($normalized, $productSizesById);
+
+                        return $normalized;
+                    })->values();
                 }
 
                 $legacyCustom = $legacyCustomByOrder->get($order->id);
@@ -324,6 +365,40 @@ class StaffApiController extends Controller
             Log::error('Staff order list query failed', ['exception' => $e]);
             return $this->corsResponse(['success' => false, 'message' => $e->getMessage()], 500);
         }
+    }
+
+    private function resolveOrderItemSize(array $item, Collection $productSizesById): ?string
+    {
+        foreach (['size', 'variant', 'size_name', 'variant_size', 'product_size'] as $field) {
+            $size = trim((string) ($item[$field] ?? ''));
+            if ($size !== '') {
+                return $size;
+            }
+        }
+
+        $details = $item['details'] ?? null;
+        $details = is_string($details) ? json_decode($details, true) : $details;
+        if (is_array($details)) {
+            if (isset($details['details']) && is_array($details['details'])) {
+                $details = $details['details'];
+            }
+            foreach (['size', 'variant', 'product_size'] as $field) {
+                $size = trim((string) ($details[$field] ?? ''));
+                if ($size !== '') {
+                    return $size;
+                }
+            }
+        }
+
+        $productSizeId = (int) ($item['product_size_id'] ?? 0);
+        if ($productSizeId > 0) {
+            $size = trim((string) $productSizesById->get($productSizeId, ''));
+            if ($size !== '') {
+                return $size;
+            }
+        }
+
+        return null;
     }
 
     public function peakOrderingTimes(Request $request)

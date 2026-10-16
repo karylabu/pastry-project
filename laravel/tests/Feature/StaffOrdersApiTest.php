@@ -2,6 +2,8 @@
 
 namespace Tests\Feature;
 
+use App\Http\Controllers\StaffApiController;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
@@ -47,13 +49,21 @@ class StaffOrdersApiTest extends TestCase
             $table->id();
             $table->string('category')->nullable();
         });
+        Schema::create('product_sizes', function ($table) {
+            $table->id();
+            $table->unsignedBigInteger('product_id');
+            $table->string('size');
+        });
         Schema::create('order_items', function ($table) {
             $table->id();
             $table->unsignedBigInteger('order_id');
             $table->unsignedBigInteger('product_id')->nullable();
+            $table->unsignedBigInteger('product_size_id')->nullable();
             $table->string('product')->nullable();
+            $table->string('variant')->nullable();
             $table->integer('qty')->default(1);
             $table->decimal('price', 10, 2)->default(0);
+            $table->text('details')->nullable();
         });
         Schema::create('custom_cake_orders', function ($table) {
             $table->id();
@@ -102,6 +112,7 @@ class StaffOrdersApiTest extends TestCase
         Schema::dropIfExists('order_items');
         Schema::dropIfExists('customized_cake_orders');
         Schema::dropIfExists('custom_cake_orders');
+        Schema::dropIfExists('product_sizes');
         Schema::dropIfExists('products');
         Schema::dropIfExists('orders');
         Schema::dropIfExists('user_sessions');
@@ -128,9 +139,15 @@ class StaffOrdersApiTest extends TestCase
             'created_at' => now(),
         ]);
         DB::table('products')->insert(['id' => 3, 'category' => 'Cakes']);
+        DB::table('product_sizes')->insert([
+            'id' => 7,
+            'product_id' => 3,
+            'size' => 'Big',
+        ]);
         DB::table('order_items')->insert([
             'order_id' => 21,
             'product_id' => 3,
+            'product_size_id' => 7,
             'product' => 'Chocolate Cake',
             'qty' => 2,
             'price' => 225,
@@ -153,7 +170,46 @@ class StaffOrdersApiTest extends TestCase
             ->assertJsonPath('orders.0.order_number', 1)
             ->assertJsonPath('orders.0.has_payment_proof', true)
             ->assertJsonPath('orders.0.items.0.name', 'Chocolate Cake')
-            ->assertJsonPath('orders.0.items.0.qty', 2);
+            ->assertJsonPath('orders.0.items.0.qty', 2)
+            ->assertJsonPath('orders.0.items.0.size', 'Big');
+    }
+
+    public function test_order_items_return_selected_size_for_sales_report_table(): void
+    {
+        DB::table('orders')->insert([
+            'id' => 41,
+            'items' => '[]',
+            'status' => 'Completed',
+            'payment' => 'Cash',
+            'payment_status' => 'paid',
+            'created_at' => now(),
+        ]);
+        DB::table('products')->insert(['id' => 4, 'category' => 'Cakes']);
+        DB::table('product_sizes')->insert([
+            'id' => 12,
+            'product_id' => 4,
+            'size' => 'Small',
+        ]);
+        DB::table('order_items')->insert([
+            'order_id' => 41,
+            'product_id' => 4,
+            'product_size_id' => 12,
+            'product' => 'Chocolate Cake',
+            'qty' => 1,
+            'price' => 490,
+        ]);
+
+        $response = app(StaffApiController::class)->getOrders(Request::create(
+            '/api/staff/orders',
+            'GET',
+            [],
+            [],
+            [],
+            ['HTTP_AUTHORIZATION' => 'Bearer test-admin-token'],
+        ));
+
+        $this->assertSame(200, $response->getStatusCode());
+        $this->assertSame('Small', $response->getData(true)['orders'][0]['items'][0]['size']);
     }
 
     public function test_admin_can_fetch_legacy_and_new_custom_cake_request_details(): void
