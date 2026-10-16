@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight, ArrowLeft, X, CalendarDays } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { STAFF_BASE } from "../../services/config";
+import { LARAVEL_BASE, STAFF_BASE } from "../../services/config";
 import { getAuthHeaders } from "../../services/api";
 
 const staffFetch = (url, options = {}) => fetch(url, {
@@ -88,6 +88,7 @@ export default function Schedule() {
   const [selectedDay, setSelectedDay] = useState(null);
   const [month, setMonth] = useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1));
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
   const [todayKey, setTodayKey] = useState(() => getDateKey(new Date()));
   const [pickupSubmitting, setPickupSubmitting] = useState(false);
   const [pickupActionError, setPickupActionError] = useState("");
@@ -98,10 +99,19 @@ export default function Schedule() {
   }, []);
 
   useEffect(() => {
-    staffFetch(`${STAFF_BASE}/api_orders.php?custom=1`)
-      .then((response) => response.json())
-      .then((data) => setOrders(Array.isArray(data) ? data : []))
-      .catch(() => setOrders([]))
+    staffFetch(`${LARAVEL_BASE}/api/staff/orders?custom=1`)
+      .then(async (response) => {
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok || !data?.success || !Array.isArray(data.orders)) {
+          throw new Error(data?.message || "Unable to load scheduled orders.");
+        }
+        setOrders(data.orders);
+        setLoadError("");
+      })
+      .catch((error) => {
+        setOrders([]);
+        setLoadError(error.message || "Unable to load scheduled orders.");
+      })
       .finally(() => setLoading(false));
   }, []);
 
@@ -198,6 +208,12 @@ export default function Schedule() {
             </button>
           </div>
         </div>
+
+        {loadError && (
+          <p role="alert" className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-[12px] text-red-800">
+            Schedule could not load orders: {loadError}
+          </p>
+        )}
 
         {upcomingOrders.length > 0 && (
           <section role="alert" className="mb-4 rounded-lg border border-[#e7d58f] bg-[#fff8e1] px-4 py-3 text-[#55451c]">
