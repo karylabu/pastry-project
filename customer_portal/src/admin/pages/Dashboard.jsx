@@ -443,7 +443,7 @@ export default function Dashboard() {
                   <Panel
                     eyebrow="Sales Mix"
                     title="Regular vs. customized cakes"
-                    className="flex h-full min-h-[190px] flex-col overflow-hidden"
+                    className="flex h-full min-h-[190px] min-w-0 flex-col overflow-hidden lg:h-[190px]"
                     action={
                       <div className="flex shrink-0 gap-1.5" role="group" aria-label="Filter sales mix by cake type">
                         {["regular", "customized"].map((type) => (
@@ -460,7 +460,7 @@ export default function Dashboard() {
                       </div>
                     }
                   >
-                    <div className="p-5 lg:p-4">
+                    <div className="min-h-0 flex-1 overflow-y-auto p-5 lg:p-4">
                       {salesMixType ? (
                         <div>
                           <p className="mb-3 text-[11px] font-semibold capitalize text-[#5f514a]">
