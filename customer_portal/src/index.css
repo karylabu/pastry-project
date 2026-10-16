@@ -250,4 +250,8 @@ input.admin-password-input::-ms-clear {
   .waste-summary-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
   }
+
+  .admin-user-management-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
 }

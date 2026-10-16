@@ -382,7 +382,7 @@ export default function UserManagement() {
             </button>
           </div>
 
-          <section className="mb-5 grid gap-2.5 sm:grid-cols-2 xl:grid-cols-4">
+          <section className="admin-user-management-metrics mb-5 grid gap-2.5 sm:grid-cols-2 xl:grid-cols-4">
             {metrics.map((item) => (
               <MetricCard key={item.label} label={item.label} value={item.value} tone={item.tone} />
             ))}
