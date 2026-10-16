@@ -34,6 +34,39 @@ function authHeaders(extraHeaders = {}) {
 
 const ACCEPTED_EXTENSIONS = ['.csv', '.pdf'];
 
+function formatDate(date) {
+  return [
+    date.getFullYear(),
+    String(date.getMonth() + 1).padStart(2, '0'),
+    String(date.getDate()).padStart(2, '0'),
+  ].join('-');
+}
+
+export function getCsvTemplateSampleDates(range, startDate = '', endDate = '', now = new Date()) {
+  if (startDate && endDate) return [startDate, endDate];
+
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  if (range === 'today') {
+    return [formatDate(today), formatDate(today)];
+  }
+  if (range === 'week') {
+    const monday = new Date(today);
+    monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7));
+    const wednesday = new Date(monday);
+    wednesday.setDate(wednesday.getDate() + 2);
+    return [formatDate(monday), formatDate(wednesday > today ? today : wednesday)];
+  }
+  if (range === 'month') {
+    const first = new Date(today.getFullYear(), today.getMonth(), 1);
+    const midpoint = new Date(today.getFullYear(), today.getMonth(), Math.min(15, today.getDate()));
+    return [formatDate(first), formatDate(midpoint)];
+  }
+
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+  return [formatDate(yesterday), formatDate(today)];
+}
+
 function validateFile(file) {
   const ext = `.${file.name.split('.').pop().toLowerCase()}`;
   if (!ACCEPTED_EXTENSIONS.includes(ext)) {
@@ -46,13 +79,18 @@ function validateFile(file) {
   return null;
 }
 
-function downloadCsvTemplate() {
+export function buildCsvTemplate(range, startDate = '', endDate = '', now = new Date()) {
   const headers = ['sale_date', 'item_name', 'size', 'quantity', 'price', 'total_amount'];
+  const [firstDate, secondDate] = getCsvTemplateSampleDates(range, startDate, endDate, now);
   const sample = [
-    ['2026-09-01', 'Chocolate Cake', '8 inch', '2', '850', '1700'],
-    ['2026-09-02', 'Vanilla Cake', '6 inch', '1', '650', '650'],
+    [firstDate, 'Chocolate Cake', '8 inch', '2', '850', '1700'],
+    [secondDate, 'Vanilla Cake', '6 inch', '1', '650', '650'],
   ];
-  const csv = [headers, ...sample].map(r => r.join(',')).join('\n');
+  return [headers, ...sample].map(r => r.join(',')).join('\n');
+}
+
+function downloadCsvTemplate(range, startDate, endDate) {
+  const csv = buildCsvTemplate(range, startDate, endDate);
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -70,7 +108,13 @@ function downloadCsvTemplate() {
    CSV files are uploaded unchanged and processed by the server queue.
    PDF parsing remains synchronous.
 ───────────────────────────────────────── */
-export default function SalesImportDropzone({ onImportComplete, compact = false }) {
+export default function SalesImportDropzone({
+  onImportComplete,
+  compact = false,
+  range = 'all',
+  dateFilterStart = '',
+  dateFilterEnd = '',
+}) {
   const [isDragging, setIsDragging] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [salesType, setSalesType] = useState('other');
@@ -234,7 +278,7 @@ export default function SalesImportDropzone({ onImportComplete, compact = false 
           {isProcessing ? <Loader2 size={14} className="animate-spin" /> : <UploadCloud size={14} />}
           {isProcessing ? 'Importing report...' : 'Import Finished Product Sales'}
         </button>
-        <button type="button" onClick={downloadCsvTemplate} className="inline-flex h-10 min-w-[150px] flex-1 items-center justify-center gap-2 rounded-md bg-black px-3 text-[11px] font-semibold text-white transition hover:bg-black/85">
+        <button type="button" onClick={() => downloadCsvTemplate(range, dateFilterStart, dateFilterEnd)} className="inline-flex h-10 min-w-[150px] flex-1 items-center justify-center gap-2 rounded-md bg-black px-3 text-[11px] font-semibold text-white transition hover:bg-black/85">
           <Download size={14} />
           Download CSV template
         </button>
@@ -259,7 +303,7 @@ export default function SalesImportDropzone({ onImportComplete, compact = false 
           <p className="text-xs mt-0.5" style={{ color: C.sub }}>Upload a CSV or PDF report to add dated sales to shared reports and forecasts.</p>
         </div>
         <button
-          onClick={downloadCsvTemplate}
+          onClick={() => downloadCsvTemplate(range, dateFilterStart, dateFilterEnd)}
           className="inline-flex items-center justify-center gap-1.5 rounded-md border border-[#d4af37]/50 bg-[#fff4cd] px-3 py-2 text-[11px] font-semibold text-black transition hover:bg-[#d4af37]"
         >
           <Download size={13} />

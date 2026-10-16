@@ -1357,7 +1357,13 @@ export default function Reports() {
               <p className="mt-1.5 text-[13px] text-black/60">Revenue, demand, inventory movement, and procurement.</p>
             </div>
             <div className="admin-sales-report-actions flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-start">
-              <SalesImportDropzone compact onImportComplete={refreshAnalyticsAfterImport} />
+              <SalesImportDropzone
+                compact
+                range={range}
+                dateFilterStart={dateFilterStart}
+                dateFilterEnd={dateFilterEnd}
+                onImportComplete={refreshAnalyticsAfterImport}
+              />
               <button
                 type="button"
                 onClick={exportReport}
