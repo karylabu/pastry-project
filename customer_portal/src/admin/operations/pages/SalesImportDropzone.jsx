@@ -224,7 +224,7 @@ export default function SalesImportDropzone({ onImportComplete, compact = false 
 
   if (compact) {
     return (
-      <div className="flex flex-wrap gap-2">
+      <div className="admin-sales-import-buttons flex flex-wrap gap-2">
         <input ref={inputRef} type="file" accept=".csv,.pdf" className="hidden" onChange={onInputChange} />
         <button type="button" onClick={() => { chooseSalesType('customized_cake'); inputRef.current?.click(); }} disabled={isProcessing} className="inline-flex h-10 min-w-[150px] flex-1 items-center justify-center gap-2 rounded-md bg-black px-3 text-[11px] font-semibold text-white transition hover:bg-black/85 disabled:cursor-wait disabled:opacity-60">
           {isProcessing ? <Loader2 size={14} className="animate-spin" /> : <UploadCloud size={14} />}
@@ -240,7 +240,7 @@ export default function SalesImportDropzone({ onImportComplete, compact = false 
         </button>
         <AnimatePresence>
           {toast && (
-            <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} className="flex basis-full items-start gap-2 rounded-md px-3 py-2 text-[10px]" style={{ background: toast.type === 'success' ? C.emeraldSoft : C.redSoft, color: '#000000' }}>
+            <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} className="admin-sales-import-toast flex basis-full items-start gap-2 rounded-md px-3 py-2 text-[10px]" style={{ background: toast.type === 'success' ? C.emeraldSoft : C.redSoft, color: '#000000' }}>
               {toast.type === 'success' ? <CheckCircle2 size={14} className="mt-0.5 shrink-0" /> : <AlertCircle size={14} className="mt-0.5 shrink-0" />}
               <span className="flex-1">{toast.message}</span>
               <button type="button" onClick={() => setToast(null)} aria-label="Dismiss import message"><X size={13} /></button>

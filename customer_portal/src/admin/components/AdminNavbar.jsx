@@ -364,20 +364,20 @@ export default function AdminNavbar({ onSidebarChange }) {
             </button>
             {notificationsOpen && (
               <section className="absolute right-0 top-[48px] z-[10001] max-h-[70vh] w-[min(420px,calc(100vw-2rem))] overflow-hidden rounded-lg border border-[#e9e1d9] bg-white shadow-xl" aria-label="Notifications">
-                <div className="flex items-center justify-between gap-3 border-b border-[#f0e9e2] px-4 py-3">
-                  <div>
-                    <h2 className="text-[13px] font-semibold text-[#33251e]">Notifications</h2>
-                    <p className="text-[10px] text-[#8f8076]">{unreadCount} unread</p>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <div className="hidden sm:flex items-center gap-2">
-                      {['All','Orders','Inventory','Analytics','System'].map((f) => (
-                        <button key={f} type="button" onClick={() => setNotifFilter(f)} className={`rounded-full px-3 py-1 text-[11px] ${notifFilter===f? 'bg-[#fff4cd] text-[#9b7810]':'text-[#6f6056] hover:bg-[#fff8df]'}`}>
-                          {f}
-                        </button>
-                      ))}
+                <div className="flex flex-col gap-2 border-b border-[#f0e9e2] px-4 py-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <h2 className="text-[13px] font-semibold text-[#33251e]">Notifications</h2>
+                      <p className="text-[10px] text-[#8f8076]">{unreadCount} unread</p>
                     </div>
-                    {unreadCount > 0 && <button type="button" onClick={markAllNotificationsRead} className="text-[10px] font-semibold text-[#80600a] hover:underline">Mark all read</button>}
+                    {unreadCount > 0 && <button type="button" onClick={markAllNotificationsRead} className="shrink-0 text-[10px] font-semibold text-[#80600a] hover:underline">Mark all read</button>}
+                  </div>
+                  <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="Filter notifications">
+                    {['All','Orders','Inventory','Analytics','System'].map((f) => (
+                      <button key={f} type="button" onClick={() => setNotifFilter(f)} aria-pressed={notifFilter === f} className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] ${notifFilter===f? 'bg-[#fff4cd] text-[#9b7810]':'text-[#6f6056] hover:bg-[#fff8df]'}`}>
+                        {f}
+                      </button>
+                    ))}
                   </div>
                 </div>
 

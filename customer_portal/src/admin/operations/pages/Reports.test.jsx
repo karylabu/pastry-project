@@ -1,4 +1,4 @@
-import { filterImportedTransactions, filterSalesTransactions, formatOrderItemSizes, getAnalyticsDateRange, groupRevenueByInterval, normalizeReportProducts, selectReportIngredients } from "./Reports";
+import { fetchAllReportHistory, filterImportedTransactions, filterSalesTransactions, formatOrderItemSizes, getAnalyticsDateRange, getReportPeriodLabel, getReportSellerRows, groupRevenueByInterval, normalizeReportProducts, selectReportIngredients } from "./Reports";
 
 const sales = [
   { date: "2026-10-05", revenue: 100, orders: 2 },
@@ -63,6 +63,71 @@ describe("getAnalyticsDateRange", () => {
       all: true,
       end_date: "2026-10-12",
     });
+    expect(getAnalyticsDateRange("all", "2026-10-01", "2026-10-10", now)).toEqual({
+      all: true,
+      end_date: "2026-10-12",
+    });
+  });
+});
+
+describe("all-time report exports", () => {
+  test("uses every ranked seller in the all-time export", () => {
+    const analytics = {
+      sales: {
+        best_selling_products: [{ product: "Cake A", sold: 9, revenue: 900 }],
+        all_selling_products: [
+          { product: "Cake A", sold: 9, revenue: 900 },
+          { product: "Cake B", sold: 4, revenue: 500 },
+          { product: "Cake C", sold: 2, revenue: 250 },
+        ],
+      },
+      product_performance: [
+        { product: "Cake A", sold: 9 },
+        { product: "Cake B", sold: 4 },
+        { product: "Cake C", sold: 2 },
+      ],
+    };
+
+    expect(getReportSellerRows(analytics, "top")).toHaveLength(1);
+    expect(getReportSellerRows(analytics, "top", true)).toEqual([
+      { name: "Cake A", qty: 9, revenue: 900 },
+      { name: "Cake B", qty: 4, revenue: 500 },
+      { name: "Cake C", qty: 2, revenue: 250 },
+    ]);
+    expect(getReportSellerRows(analytics, "bottom", true)).toHaveLength(3);
+  });
+
+  test("fetches all historical transaction pages and surfaces invalid pages", async () => {
+    const fetchPage = jest.fn(async (page) => ({
+      sales: [{ id: page }],
+      pagination: { last_page: 3 },
+    }));
+
+    await expect(fetchAllReportHistory(fetchPage)).resolves.toEqual([
+      { id: 1 },
+      { id: 2 },
+      { id: 3 },
+    ]);
+    expect(fetchPage).toHaveBeenCalledTimes(3);
+    await expect(fetchAllReportHistory(async () => ({ sales: [], pagination: {} }))).rejects.toThrow(
+      "Sales import history returned invalid pagination data."
+    );
+  });
+});
+
+describe("getReportPeriodLabel", () => {
+  test("shows All time even when stale custom dates are present", () => {
+    expect(getReportPeriodLabel("all", "2026-10-01", "2026-10-16")).toBe("All time");
+  });
+
+  test("uses a selected custom date range", () => {
+    expect(getReportPeriodLabel("month", "2026-10-01", "2026-10-16")).toBe("2026-10-01 to 2026-10-16");
+  });
+
+  test("uses readable labels for standard periods", () => {
+    expect(getReportPeriodLabel("week")).toBe("This week");
+    expect(getReportPeriodLabel("month")).toBe("This month");
+    expect(getReportPeriodLabel("30")).toBe("Last 30 days");
   });
 });
 

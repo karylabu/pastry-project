@@ -372,7 +372,7 @@ export default function Dashboard() {
 
             {analyticsLoading ? <div className="rounded-xl border border-[#eadfd8] bg-white px-6 py-7 text-center text-[13px] text-[#9b8c83]">Loading cake sales analytics...</div> : analyticsError ? <div className="flex flex-wrap items-center justify-center gap-3 rounded-xl border border-[#efd8d4] bg-[#fff0f0] px-6 py-7 text-center text-[13px] text-[#8d5357]" role="alert"><span>Unable to load cake sales analytics: {analyticsError}</span><button type="button" onClick={() => setAnalyticsRefreshVersion((version) => version + 1)} className="rounded-lg border border-[#d9aaa5] bg-white px-3 py-1.5 font-semibold hover:bg-[#fff8f7]">Retry</button></div> : (
               <>
-                <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
+                <div className="admin-dashboard-analytics-cards grid gap-2.5 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
                   <AnalyticsCard label="Total Cake Sales" value={Number(analyticsSummary.total_cake_sales || 0).toLocaleString()} icon={CakeSlice} />
                   <AnalyticsCard label="Cakes Sold" value={Number(analyticsSummary.cakes_sold || 0).toLocaleString()} icon={Package} accent="blue" />
                   <AnalyticsCard label="Cake Revenue" value={`₱${Number(analyticsSummary.cake_revenue || 0).toLocaleString()}`} icon={TrendingUp} />

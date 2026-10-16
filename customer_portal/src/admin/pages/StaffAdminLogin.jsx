@@ -1,10 +1,13 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Eye, EyeOff, Lock, Mail, ShieldCheck } from "lucide-react";
+import { Eye, EyeOff, Lock, Mail } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import ForgotPassword from "../../customer/pages/ForgotPassword";
 import { LARAVEL_BASE, ROOT_BASE } from "../../services/config";
 
+const ASSET_BASE = process.env.NODE_ENV === "production"
+  ? `${ROOT_BASE}/customer_portal/build/assets`
+  : "/assets";
 const LOGO_URL = process.env.NODE_ENV === "production"
   ? `${ROOT_BASE}/uploads/logo.png`
   : "/assets/logo.png";
@@ -60,159 +63,366 @@ export default function StaffAdminLogin() {
   };
 
   return (
-    <div className="pastry-login relative min-h-screen overflow-hidden bg-[#FBF6EC] text-[#171717]">
+    <div className="pastry-admin-login relative min-h-screen w-full overflow-x-hidden bg-[#faf8f1] font-['DM_Sans'] text-[#171717]">
       <style>{`
-        .pastry-login {
+        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=Pacifico&family=Playfair+Display:wght@600;700&display=swap');
+
+        .pastry-admin-login {
           background:
-            radial-gradient(ellipse at 12% 8%, rgba(255,255,255,.92), transparent 35%),
-            #fbf6ec;
+            radial-gradient(circle at 8% 20%, rgba(255, 228, 153, .5), transparent 22%),
+            radial-gradient(circle at 92% 88%, rgba(255, 218, 112, .45), transparent 20%),
+            #faf8f1;
         }
-        .pastry-login .admin-hero {
-          background: linear-gradient(135deg, #fff9e9 0%, #fff6df 100%);
+        .pastry-admin-login .admin-login-input {
+          height: 52px;
+          border: 1px solid #d8d5cf;
+          border-radius: 12px;
+          padding-left: 44px;
+          font-size: 15px;
+          transition: border-color .2s, box-shadow .2s;
         }
-        .pastry-login .admin-welcome {
-          font-family: 'Pacifico', cursive;
-        }
-        .pastry-login .admin-input:focus {
+        .pastry-admin-login .admin-login-input:focus {
           border-color: #f0b94d;
-          box-shadow: 0 0 0 4px rgba(240,185,77,.12);
+          box-shadow: 0 0 0 4px rgba(240, 185, 77, .12);
           outline: none;
         }
-        @media (min-width: 768px) {
-          .pastry-login .admin-hero {
-            background: transparent;
-          }
+        .pastry-admin-login .admin-login-submit {
+          height: 48px;
+          border-radius: 12px;
+          background: #f0b94d;
+          transition: background .2s, transform .2s;
         }
-        @media (min-width: 600px) and (max-width: 1023px),
-               (min-width: 600px) and (orientation: portrait) {
-          .pastry-login .tablet-login-panel {
-            padding-top: 1rem;
-            padding-bottom: 1rem;
-          }
-          .pastry-login .tablet-login-header {
-            margin-bottom: 1rem;
-          }
-          .pastry-login .tablet-login-form {
-            gap: .75rem;
-          }
-          .pastry-login .tablet-login-form > :not([hidden]) ~ :not([hidden]) {
-            margin-top: 0;
-          }
-          .pastry-login .tablet-login-field > :not([hidden]) ~ :not([hidden]) {
-            margin-top: .25rem;
-          }
-          .pastry-login .tablet-login-control,
-          .pastry-login .tablet-login-submit {
-            height: 42px;
-          }
-        }
-        @media (min-width: 600px) and (orientation: portrait) {
-          .pastry-login main {
-            width: min(100%, 640px);
+        .pastry-admin-login .admin-login-submit:hover { background: #e5ae3d; }
+        .pastry-admin-login .admin-login-submit:active { transform: scale(.98); }
+        .pastry-admin-login .admin-login-phone-brand,
+        .pastry-admin-login .admin-login-tablet-brand { display: none; }
+        .pastry-admin-login .admin-login-art { display: none; }
+        .pastry-admin-login .admin-login-tablet-tagline { display: none; }
+        .pastry-admin-login .admin-login-tablet-cake { display: none; }
+        .pastry-admin-login .admin-login-heading-heart { display: none; }
+
+        @media (min-width: 1200px) {
+          .pastry-admin-login .admin-login-main {
             min-height: 100vh;
-            justify-content: flex-start;
             align-items: center;
-            gap: .5rem;
-            padding: 1rem 1.5rem 15rem;
+            justify-content: center;
+            padding: 20px clamp(10px, 1.5vw, 20px);
           }
-          .pastry-login .admin-hero {
-            width: 100%;
-            align-items: center;
-            padding: .75rem 1rem;
-            border-radius: 1.25rem;
-            background: linear-gradient(135deg, #fff9e9 0%, #fff6df 100%);
-            text-align: center;
+          .pastry-admin-login .admin-login-card {
+            display: flex;
+            flex-direction: row;
+            width: min(1340px, 100%);
+            min-height: 700px;
+            overflow: hidden;
+            border: 1px solid rgba(255, 255, 255, .9);
+            border-radius: 26px;
+            background: #fff;
+            box-shadow: 0 18px 42px rgba(100, 78, 28, .16);
           }
-          .pastry-login .admin-hero > div:first-child {
-            margin-bottom: .5rem;
-          }
-          .pastry-login .admin-hero > div:first-child img {
-            width: 3rem;
-            height: 3rem;
-          }
-          .pastry-login .admin-hero > div:first-child p:first-child {
-            font-family: 'Playfair Display', Georgia, serif;
-            font-size: 1.5rem;
-            font-style: italic;
-          }
-          .pastry-login .admin-hero-headline {
+          .pastry-admin-login .admin-login-hero {
+            position: relative;
             display: block;
+            flex: 0 0 45%;
+            overflow: hidden;
+            background: #fff9e9;
+            border-right: 1px solid #f4ead2;
           }
-          .pastry-login .admin-hero-headline h1 {
+          .pastry-admin-login .admin-login-brand-mark {
+            position: absolute;
+            z-index: 2;
+            top: 11%;
+            left: 12%;
+            display: block;
+            width: 44px;
+            height: 44px;
+            object-fit: contain;
+          }
+          .pastry-admin-login .admin-login-art {
+            position: absolute;
+            inset: 0;
+            display: block;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            object-position: left center;
+          }
+          .pastry-admin-login .admin-login-form-section {
+            display: flex;
+            flex: 1 1 55%;
+            align-items: center;
+            justify-content: center;
+            padding: 42px clamp(28px, 4vw, 58px);
+          }
+          .pastry-admin-login .admin-login-panel {
+            width: 100%;
+            max-width: 500px;
+          }
+          .pastry-admin-login .admin-login-header { margin-bottom: 30px; }
+          .pastry-admin-login .admin-login-header h2 {
+            position: relative;
+            width: fit-content;
+            font-family: 'Pacifico', cursive;
+            font-size: 48px;
+            font-weight: 400;
+            line-height: 1.1;
+            color: #edaf39;
+          }
+          .pastry-admin-login .admin-login-heading-heart {
+            position: absolute;
+            top: 1px;
+            right: -42px;
+            display: block;
+            width: 38px;
+            height: 36px;
+            fill: none;
+            stroke: #edaf39;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+            stroke-width: 1.7;
+          }
+          .pastry-admin-login .admin-login-header > p {
+            margin-top: 4px;
+            font-size: 15px;
+            color: #89909c;
+          }
+          .pastry-admin-login .admin-login-input,
+          .pastry-admin-login .admin-login-submit { height: 46px; border-radius: 9px; }
+          .pastry-admin-login .admin-login-footer {
+            width: min(1340px, 100%);
+            min-height: 36px;
+            margin: 8px auto 0;
+            padding: 0 18px;
+          }
+        }
+
+        @media (max-width: 1199px) {
+          .pastry-admin-login {
+            display: flex;
+            flex-direction: column;
+          }
+          .pastry-admin-login .admin-login-main {
+            width: 100%;
+            max-width: none;
+            min-height: 100vh;
+            flex: 1 0 auto;
+            align-items: stretch;
+            justify-content: flex-start;
+            margin-inline: 0;
+            padding: 0;
+          }
+          .pastry-admin-login .admin-login-card {
+            display: flex;
+            width: 100%;
+            max-width: none;
+            flex-direction: column;
+            overflow: visible;
+            border: 0;
+            border-radius: 0;
+            background: transparent;
+            box-shadow: none;
+            margin-inline: 0;
+          }
+          .pastry-admin-login .admin-login-hero { display: none; }
+          .pastry-admin-login .admin-login-art,
+          .pastry-admin-login .admin-login-brand-mark { display: none; }
+          .pastry-admin-login .admin-login-tablet-brand,
+          .pastry-admin-login .admin-login-tablet-tagline { display: none; }
+          .pastry-admin-login .admin-login-phone-brand {
+            display: flex;
+            align-items: center;
+            gap: 9px;
+            margin-bottom: 18px;
+          }
+          .pastry-admin-login .admin-login-phone-brand img {
+            width: 34px;
+            height: 34px;
+            object-fit: contain;
+            opacity: .86;
+          }
+          .pastry-admin-login .admin-login-phone-brand h1 {
             font-family: 'Playfair Display', Georgia, serif;
-            font-size: clamp(1.5rem, 4vw, 2rem);
-            line-height: 1.12;
+            font-size: 19px;
+            font-style: italic;
+            font-weight: 700;
+            line-height: 1;
+            color: #edaf39;
           }
-          .pastry-login .admin-hero-headline p {
-            margin-top: .35rem;
-            font-size: .85rem;
-            line-height: 1.35rem;
+          .pastry-admin-login .admin-login-phone-brand h1 span { color: #25211a; }
+          .pastry-admin-login .admin-login-phone-brand p {
+            margin-top: 4px;
+            font-size: 6px;
+            font-weight: 700;
+            letter-spacing: .32em;
+            color: #171717;
           }
-          .pastry-login .portrait-login-form-section {
+          .pastry-admin-login .admin-login-form-section {
             width: 100%;
             flex: 0 0 auto;
             justify-content: center;
             padding: 0;
           }
-          .pastry-login .tablet-login-panel {
+          .pastry-admin-login .admin-login-panel {
             width: 100%;
-            height: max-content;
-            min-height: 0;
-            flex: 0 0 auto;
-            padding: 1.25rem clamp(1.25rem, 5vw, 2rem);
-            border: 1px solid #eadfc8;
-            border-radius: 1.25rem;
-            background: rgba(255, 255, 255, .96);
-            box-shadow: 0 18px 55px rgba(83, 62, 24, .12);
+            max-width: 560px;
+            margin: 0 auto;
+            padding: 24px clamp(20px, 5vw, 38px) 26px;
+            border: 0;
+            border-radius: 0;
+            background: transparent;
+            box-shadow: none;
+            backdrop-filter: none;
           }
-          .pastry-login .tablet-login-header {
-            margin-bottom: 1rem;
-            text-align: center;
-          }
-          .pastry-login .tablet-login-header > div:first-child {
-            margin-bottom: .5rem;
-          }
-          .pastry-login .tablet-login-header h2 {
-            font-size: 2.25rem;
+          .pastry-admin-login .admin-login-header { margin-bottom: 20px; text-align: center; }
+          .pastry-admin-login .admin-login-header h2 {
+            width: fit-content;
+            font-family: 'Pacifico', cursive;
+            margin-inline: auto;
+            font-size: 42px;
+            font-weight: 400;
             line-height: 1.12;
+            color: #edaf39;
           }
-          .pastry-login .tablet-login-header p {
-            font-size: .9rem;
-            line-height: 1.4rem;
+          .pastry-admin-login .admin-login-heading-heart { display: none; }
+          .pastry-admin-login .admin-login-header > p { margin-top: 2px; font-size: 15px; color: #89909c; }
+          .pastry-admin-login .admin-login-input { height: 54px; border-radius: 11px; font-size: 14px; }
+          .pastry-admin-login .admin-login-submit { height: 52px; border-radius: 11px; background: #ffbf2f; }
+          .pastry-admin-login .admin-login-form > :not([hidden]) ~ :not([hidden]) { margin-top: 12px; }
+          .pastry-admin-login .admin-login-field > :not([hidden]) ~ :not([hidden]) { margin-top: 3px; }
+          .pastry-admin-login .admin-login-footer {
+            justify-content: center;
+            border-top: 0;
+            padding: 10px 0 19px;
           }
-          .pastry-login .tablet-login-form {
+          .pastry-admin-login .admin-login-footer img { width: 30px; height: 30px; }
+          .pastry-admin-login .admin-login-footer p { font-size: 11px; line-height: 1.25; }
+          .pastry-admin-login .admin-login-tablet-cake {
+            position: relative;
             display: flex;
-            flex-direction: column;
-            gap: .75rem;
+            width: 100%;
+            max-width: none;
+            min-height: clamp(180px, 30vh, 300px);
+            flex: 1 0 clamp(180px, 30vh, 300px);
+            align-self: center;
+            overflow: hidden;
+            background: #fbf8ed;
           }
-          .pastry-login .tablet-login-form > :not([hidden]) ~ :not([hidden]) {
-            margin-top: 0;
-          }
-          .pastry-login .tablet-login-field > :not([hidden]) ~ :not([hidden]) {
-            margin-top: .35rem;
-          }
-          .pastry-login .tablet-login-field label {
-            font-size: .875rem;
-          }
-          .pastry-login .tablet-login-control,
-          .pastry-login .tablet-login-submit {
-            height: 46px;
-          }
-          .pastry-login .portrait-login-cake {
-            display: none;
-          }
-          .pastry-login .portrait-login-cake-bottom {
+          .pastry-admin-login .admin-login-tablet-cake img {
             position: absolute;
-            z-index: 1;
             bottom: 0;
-            left: 0;
+            left: 50%;
             display: block;
-            width: clamp(300px, 55vw, 520px);
-            height: clamp(220px, 34vh, 360px);
-            object-fit: contain;
-            object-position: left bottom;
-            pointer-events: none;
+            width: 894px;
+            max-width: none;
+            height: min(300px, 100%);
+            object-fit: cover;
+            object-position: center bottom;
+            transform: translateX(-50%);
           }
+        }
+
+        @media (min-width: 600px) and (max-width: 1199px) and (orientation: landscape) {
+          .pastry-admin-login .admin-login-main {
+            min-height: calc(100vh - 60px);
+            align-items: center;
+            justify-content: center;
+            padding: 12px;
+          }
+          .pastry-admin-login .admin-login-card {
+            display: flex;
+            width: 100%;
+            height: min(620px, calc(100vh - 110px));
+            flex-direction: row;
+            overflow: hidden;
+            border: 1px solid rgba(255, 255, 255, .9);
+            border-radius: 24px;
+            background: #fff;
+            box-shadow: 0 18px 42px rgba(100, 78, 28, .16);
+          }
+          .pastry-admin-login .admin-login-hero {
+            position: relative;
+            display: block;
+            width: auto;
+            min-height: 0;
+            flex: 0 0 45%;
+            padding: 0;
+            overflow: hidden;
+            border-right: 1px solid #f4ead2;
+            background: #fff9e9;
+          }
+          .pastry-admin-login .admin-login-art {
+            position: absolute;
+            inset: 0;
+            display: block;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            object-position: left center;
+          }
+          .pastry-admin-login .admin-login-brand-mark {
+            position: absolute;
+            z-index: 2;
+            top: 11%;
+            left: 12%;
+            display: block;
+            width: 44px;
+            height: 44px;
+            object-fit: contain;
+          }
+          .pastry-admin-login .admin-login-form-section {
+            display: flex;
+            width: auto;
+            min-width: 0;
+            flex: 1 1 55%;
+            align-items: center;
+            justify-content: center;
+            padding: 22px clamp(20px, 4vw, 44px);
+          }
+          .pastry-admin-login .admin-login-panel {
+            width: 100%;
+            max-width: 500px;
+            padding: 0;
+          }
+          .pastry-admin-login .admin-login-phone-brand { display: none; }
+          .pastry-admin-login .admin-login-header {
+            margin-bottom: 20px;
+            text-align: left;
+          }
+          .pastry-admin-login .admin-login-header h2 {
+            margin-inline: 0;
+            font-size: 40px;
+          }
+          .pastry-admin-login .admin-login-heading-heart { display: none; }
+          .pastry-admin-login .admin-login-header > p { font-size: 13px; }
+          .pastry-admin-login .admin-login-input,
+          .pastry-admin-login .admin-login-submit { height: 44px; }
+          .pastry-admin-login .admin-login-tablet-cake { display: none; }
+          .pastry-admin-login .admin-login-footer {
+            width: 100%;
+            min-height: 36px;
+            margin: 0 auto;
+            padding: 0 18px;
+          }
+          .pastry-admin-login .admin-login-footer img { width: 28px; height: 28px; }
+          .pastry-admin-login .admin-login-footer p { font-size: 11px; }
+        }
+
+        @media (max-width: 767px) {
+          .pastry-admin-login .admin-login-header { text-align: center; }
+          .pastry-admin-login .admin-login-header h2 { margin-inline: auto; }
+        }
+        @media (max-width: 399px) {
+          .pastry-admin-login .admin-login-main { width: 100%; padding: 0; }
+          .pastry-admin-login .admin-login-panel { padding-right: 18px; padding-left: 18px; }
+        }
+        @media (min-width: 1200px) and (max-height: 850px) {
+          .pastry-admin-login .admin-login-main {
+            min-height: 100vh;
+            justify-content: center;
+            padding: 12px clamp(10px, 1.5vw, 20px);
+          }
+          .pastry-admin-login .admin-login-card { min-height: min(560px, calc(100vh - 180px)); }
+          .pastry-admin-login .admin-login-form-section { padding-top: 28px; padding-bottom: 28px; }
+          .pastry-admin-login .admin-login-header { margin-bottom: 20px; }
         }
       `}</style>
 
@@ -222,146 +432,156 @@ export default function StaffAdminLogin() {
         <span className="absolute bottom-10 left-1/3 text-7xl opacity-[.08]">🧁</span>
       </div>
 
-      <main className="relative z-10 mx-auto flex min-h-screen w-full max-w-[1440px] flex-col items-center justify-center gap-4 px-4 py-5 md:flex-row md:gap-0 md:px-8">
-        <section className="admin-hero flex w-full flex-col items-center rounded-3xl px-5 py-5 sm:px-8 md:w-[53%] md:items-start md:bg-transparent md:px-12 md:py-10">
-          <div className="mb-3 flex items-center gap-2">
-            <img src={LOGO_URL} alt="Pastry Project logo" className="h-12 w-12 object-contain sm:h-14 sm:w-14" />
-            <div>
-              <p className="font-serif text-xl font-bold leading-tight sm:text-2xl">
-                Pastry <span className="text-[#F0B94D]">Project</span>
-              </p>
-              <p className="text-[9px] font-bold uppercase tracking-[.3em] text-[#171717]/70">Sweetening moments</p>
+      <div className="admin-login-main relative z-10 mx-auto flex w-full flex-col items-center justify-center">
+        <main className="admin-login-card">
+          <section className="admin-login-hero" aria-label="Pastry Project bakery">
+            <div className="admin-login-tablet-brand">
+              <img src={LOGO_URL} alt="Pastry Project logo" />
+              <div>
+                <h1>Pastry <span>Project</span></h1>
+                <p>BAKED FRESH DAILY</p>
+              </div>
             </div>
-          </div>
-
-          <div className="admin-hero-headline hidden md:block">
-            <h1 className="font-serif text-4xl font-semibold leading-tight xl:text-5xl">
+            <h2 className="admin-login-tablet-tagline">
               A little sweetness,<br />
-              <span className="text-[#F0B94D]">baked fresh daily.</span>
-            </h1>
-            <p className="mt-4 max-w-md text-base leading-7 text-[#171717]/65">
-              Sign in to manage your bakery operations and keep every order running smoothly.
-            </p>
-          </div>
-          <img
-            src={`${ROOT_BASE}/uploads/login_cake.png?v=login-cake-20261010-v2`}
-            alt="Decorated cake"
-            className="portrait-login-cake mt-2 hidden h-[310px] w-full max-w-[440px] object-contain drop-shadow-xl md:block"
-          />
-        </section>
+              <span>baked fresh daily.</span>
+            </h2>
+            <img
+              className="admin-login-art"
+              src={`${ASSET_BASE}/login.png?v=20261013`}
+              alt="Bakery made simple and sweet"
+            />
+            <img className="admin-login-brand-mark" src={LOGO_URL} alt="" aria-hidden="true" />
+          </section>
 
-        <section className="portrait-login-form-section flex w-full flex-1 justify-center md:w-[47%] md:justify-end md:pr-[4vw]">
-          <div className="tablet-login-panel w-full max-w-[456px] rounded-2xl border border-[#eadfc8] bg-white/90 px-6 py-7 shadow-[0_18px_55px_rgba(83,62,24,.09)] sm:px-10 sm:py-9 md:border-0 md:bg-transparent md:px-6 md:shadow-none">
-            <AnimatePresence mode="wait">
-              {showForgot ? (
-                <motion.div
-                  key="forgot"
-                  initial={{ opacity: 0, y: 12 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -12 }}
-                >
-                  <ForgotPassword onBack={() => setShowForgot(false)} />
-                </motion.div>
-              ) : (
-                <motion.div
-                  key="login"
-                  initial={{ opacity: 0, y: 12 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -12 }}
-                >
-                  <div className="tablet-login-header mb-6">
-                    <div className="mb-3 inline-flex items-center gap-1.5 rounded-full border border-[#F0B94D]/40 bg-[#F0B94D]/10 px-3 py-1 text-[10px] font-bold uppercase tracking-[.15em] text-[#92620d]">
-                      <ShieldCheck size={13} />
-                      Admin access
-                    </div>
-                    <h2 className="admin-welcome text-4xl font-normal leading-tight text-[#edaf39]">Welcome</h2>
-                    <p className="mt-1 text-sm text-[#89909c]">Sign in to continue to your admin dashboard.</p>
-                  </div>
+          <section className="admin-login-form-section">
+            <div className="admin-login-panel">
+              <div className="admin-login-phone-brand">
+                <img src={LOGO_URL} alt="" />
+                <div>
+                  <h1>Pastry <span>Project</span></h1>
+                  <p>Sweetening moments</p>
+                </div>
+              </div>
 
-                  {error && (
-                    <div role="alert" className="mb-4 rounded-xl border border-red-100 bg-red-50 p-3 text-sm text-red-700">
-                      {error}
+              <AnimatePresence mode="wait">
+                {showForgot ? (
+                  <motion.div
+                    key="forgot"
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -20 }}
+                  >
+                    <ForgotPassword onBack={() => setShowForgot(false)} />
+                  </motion.div>
+                ) : (
+                  <motion.div
+                    key="login"
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -20 }}
+                  >
+                    <div className="admin-login-header">
+                      <h2>
+                        Welcome
+                        <svg className="admin-login-heading-heart" viewBox="0 0 40 36" aria-hidden="true">
+                          <path d="M2 29c9 0 12-2 17-8" />
+                          <path d="M18 19c-7-7 2-14 7-7 5-7 14 0 7 7l-7 7Z" />
+                        </svg>
+                      </h2>
+                      <p>Sign in to your admin account to continue.</p>
                     </div>
-                  )}
-                  {success && (
-                    <div role="status" className="mb-4 rounded-xl border border-green-100 bg-green-50 p-3 text-sm text-green-700">
-                      {success}
-                    </div>
-                  )}
 
-                  <form onSubmit={handleSubmit} className="tablet-login-form space-y-4">
-                    <div className="tablet-login-field space-y-2">
-                      <label htmlFor="admin-email" className="text-sm font-bold">Email address</label>
-                      <div className="tablet-login-control flex h-[46px] items-center gap-2 rounded-lg border border-black/15 bg-white px-3">
-                        <Mail size={17} className="shrink-0 text-gray-400" />
-                        <input
-                          id="admin-email"
-                          type="email"
-                          autoComplete="username"
-                          value={email}
-                          onChange={(event) => setEmail(event.target.value)}
-                          required
-                          placeholder="name@example.com"
-                          className="admin-input h-full w-full bg-transparent text-sm"
-                        />
+                    {error && (
+                      <div role="alert" className="mb-5 rounded-xl border border-red-100 bg-red-50 p-4 text-sm text-red-600">
+                        {error}
                       </div>
-                    </div>
+                    )}
+                    {success && (
+                      <div role="status" className="mb-5 rounded-xl border border-green-100 bg-green-50 p-4 text-sm text-green-600">
+                        {success}
+                      </div>
+                    )}
 
-                    <div className="tablet-login-field space-y-2">
-                      <label htmlFor="admin-password" className="text-sm font-bold">Password</label>
-                      <div className="tablet-login-control flex h-[46px] items-center gap-2 rounded-lg border border-black/15 bg-white px-3">
-                        <Lock size={17} className="shrink-0 text-gray-400" />
-                        <input
-                          id="admin-password"
-                          type={showPassword ? "text" : "password"}
-                          autoComplete="current-password"
-                          value={password}
-                          onChange={(event) => setPassword(event.target.value)}
-                          required
-                          placeholder="Enter your password"
-                          className="admin-input admin-password-input h-full w-full bg-transparent text-sm"
-                        />
+                    <form onSubmit={handleSubmit} className="admin-login-form space-y-4">
+                      <div className="admin-login-field space-y-2">
+                        <label htmlFor="admin-email" className="text-sm font-bold text-[#171717]">Email address</label>
+                        <div className="relative">
+                          <Mail aria-hidden="true" className="absolute left-3 top-1/2 z-10 h-5 w-5 -translate-y-1/2 text-[#777]" strokeWidth={1.5} />
+                          <input
+                            id="admin-email"
+                            type="email"
+                            autoComplete="username"
+                            value={email}
+                            onChange={(event) => setEmail(event.target.value)}
+                            placeholder="name@example.com"
+                            required
+                            className="admin-login-input w-full bg-white"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="admin-login-field space-y-2">
+                        <label htmlFor="admin-password" className="text-sm font-bold text-[#171717]">Password</label>
+                        <div className="relative">
+                          <Lock aria-hidden="true" className="absolute left-3 top-1/2 z-10 h-5 w-5 -translate-y-1/2 text-[#777]" strokeWidth={1.5} />
+                          <input
+                            id="admin-password"
+                            type={showPassword ? "text" : "password"}
+                            autoComplete="current-password"
+                            value={password}
+                            onChange={(event) => setPassword(event.target.value)}
+                            placeholder="••••••••"
+                            required
+                            className="admin-login-input w-full bg-white"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowPassword((current) => !current)}
+                            className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                            aria-label={showPassword ? "Hide password" : "Show password"}
+                          >
+                            {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="flex justify-end">
                         <button
                           type="button"
-                          onClick={() => setShowPassword((current) => !current)}
-                          className="text-gray-400 hover:text-gray-700"
-                          aria-label={showPassword ? "Hide password" : "Show password"}
+                          onClick={() => { setError(""); setSuccess(""); setShowForgot(true); }}
+                          className="text-xs font-bold text-[#b87808] hover:underline"
                         >
-                          {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
+                          Forgot password?
                         </button>
                       </div>
-                    </div>
 
-                    <div className="flex justify-end">
                       <button
-                        type="button"
-                        onClick={() => { setError(""); setSuccess(""); setShowForgot(true); }}
-                        className="text-xs font-semibold text-[#b87808] hover:underline"
+                        type="submit"
+                        disabled={loading}
+                        className="admin-login-submit w-full text-lg font-bold text-[#171717] disabled:cursor-not-allowed disabled:opacity-50"
                       >
-                        Forgot password?
+                        {loading ? "Signing In..." : "Log In"}
                       </button>
-                    </div>
+                    </form>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          </section>
+        </main>
 
-                    <button
-                      type="submit"
-                      disabled={loading}
-                      className="tablet-login-submit h-[46px] w-full rounded-lg bg-[#f0b94d] px-4 text-sm font-bold text-[#171717] transition hover:bg-[#e5ae3d] disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                      {loading ? "Signing in..." : "Sign in"}
-                    </button>
-                  </form>
-                </motion.div>
-              )}
-            </AnimatePresence>
+        <div className="admin-login-tablet-cake" aria-hidden="true">
+          <img src={`${ASSET_BASE}/login.png?v=20261011`} alt="" />
+        </div>
+
+        <footer className="admin-login-footer relative z-10 flex w-full flex-col items-center border-t border-gray-200 px-5 py-3 md:flex-row md:px-8">
+          <div className="flex items-center gap-3">
+            <img src={LOGO_URL} alt="Logo" className="h-10 w-10 opacity-80" />
+            <p className="text-sm text-gray-500">© 2017 Pastry Project. All rights reserved.</p>
           </div>
-        </section>
-      </main>
-      <img
-        src={`${ROOT_BASE}/uploads/login_cake.png?v=login-cake-20261010-v2`}
-        alt=""
-        aria-hidden="true"
-        className="portrait-login-cake-bottom hidden"
-      />
+        </footer>
+      </div>
     </div>
   );
 }

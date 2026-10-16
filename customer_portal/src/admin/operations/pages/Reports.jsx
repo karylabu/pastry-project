@@ -6,7 +6,7 @@ import {
   UploadCloud, FileSpreadsheet, CheckCircle2, AlertCircle
 } from 'lucide-react';
 import SalesImportDropzone from './SalesImportDropzone';
-import { BASE, STAFF_BASE, LARAVEL_BASE } from '../../../services/config';
+import { ROOT_BASE, STAFF_BASE, LARAVEL_BASE } from '../../../services/config';
 import { subscribeRealtime } from '../../../services/realtime';
 
 const staffFetch = (url, options = {}) => {
@@ -128,15 +128,15 @@ export function getAnalyticsDateRange(range, startDate = '', endDate = '', now =
     String(date.getDate()).padStart(2, '0'),
   ].join('-');
 
+  if (range === 'all') {
+    return { all: true, end_date: formatDate(now) };
+  }
   if (startDate && endDate) {
     return { start_date: startDate, end_date: endDate };
   }
 
   const end = new Date(now);
   const start = new Date(now);
-  if (range === 'all') {
-    return { all: true, end_date: formatDate(end) };
-  }
   if (range === 'today') {
     return { start_date: formatDate(start), end_date: formatDate(end) };
   }
@@ -199,6 +199,67 @@ export function formatOrderItemSizes(items) {
     .filter(Boolean))];
 
   return sizes.length ? sizes.join(', ') : '—';
+}
+
+export function getReportPeriodLabel(range, startDate = '', endDate = '') {
+  if (range === 'all') return 'All time';
+  if (startDate && endDate) return `${startDate} to ${endDate}`;
+  if (range === 'today') return 'Today';
+  if (range === 'week') return 'This week';
+  if (range === 'month') return 'This month';
+  return `Last ${range} days`;
+}
+
+export function getReportSellerRows(analytics, leaderTab, includeAll = false) {
+  if (!includeAll) {
+    const sellers = leaderTab === 'top'
+      ? (analytics?.sales?.best_selling_products || []).map((item) => ({
+        name: item.product,
+        qty: Number(item.sold),
+        revenue: Number(item.revenue),
+      }))
+      : [...(analytics?.product_performance || [])]
+        .sort((a, b) => Number(a.sold) - Number(b.sold))
+        .map((item) => ({ name: item.product, qty: Number(item.sold), revenue: 0 }));
+    return sellers.slice(0, 5);
+  }
+
+  const sales = analytics?.sales?.all_selling_products || [];
+  if (leaderTab === 'top') {
+    return [...sales]
+      .map((item) => ({ name: item.product, qty: Number(item.sold), revenue: Number(item.revenue) }))
+      .sort((a, b) => b.qty - a.qty);
+  }
+
+  const revenueByProduct = new Map(sales.map((item) => [String(item.product || '').trim().toLowerCase(), Number(item.revenue)]));
+  return [...(analytics?.product_performance || [])]
+    .sort((a, b) => Number(a.sold) - Number(b.sold))
+    .map((item) => ({
+      name: item.product,
+      qty: Number(item.sold),
+      revenue: revenueByProduct.get(String(item.product || '').trim().toLowerCase()) || 0,
+    }));
+}
+
+export async function fetchAllReportHistory(fetchPage) {
+  const firstPage = await fetchPage(1);
+  if (!Array.isArray(firstPage?.sales)) {
+    throw new Error('Sales import history returned an invalid sales list.');
+  }
+  const lastPage = Number(firstPage?.pagination?.last_page);
+  if (!Number.isInteger(lastPage) || lastPage < 1) {
+    throw new Error('Sales import history returned invalid pagination data.');
+  }
+
+  const sales = [...firstPage.sales];
+  for (let page = 2; page <= lastPage; page += 1) {
+    const payload = await fetchPage(page);
+    if (!Array.isArray(payload?.sales)) {
+      throw new Error(`Sales import history returned an invalid sales list for page ${page}.`);
+    }
+    sales.push(...payload.sales);
+  }
+  return sales;
 }
 
 function recommendationFor(ing) {
@@ -577,7 +638,7 @@ export default function Reports() {
   useEffect(() => {
     let isCurrentRequest = true;
     const params = new URLSearchParams();
-    if (dateFilterStart && dateFilterEnd) {
+    if (range !== 'all' && dateFilterStart && dateFilterEnd) {
       params.set('start_date', dateFilterStart);
       params.set('end_date', dateFilterEnd);
     } else if (range !== 'all') {
@@ -674,6 +735,20 @@ export default function Reports() {
 
     return () => window.clearInterval(intervalId);
   }, [historicalImports]);
+
+  useEffect(() => {
+    if (!previewImport) return undefined;
+
+    const previousBodyOverflow = document.body.style.overflow;
+    const previousDocumentOverflow = document.documentElement.style.overflow;
+    document.body.style.overflow = 'hidden';
+    document.documentElement.style.overflow = 'hidden';
+
+    return () => {
+      document.body.style.overflow = previousBodyOverflow;
+      document.documentElement.style.overflow = previousDocumentOverflow;
+    };
+  }, [previewImport]);
 
   useEffect(() => {
     if (!previewImport) return undefined;
@@ -785,13 +860,16 @@ export default function Reports() {
   }, [range, dateFilterStart, dateFilterEnd, analyticsProductId, analyticsCategory, analyticsIngredientId, analyticsMovementType, analyticsRefreshKey]);
 
   const normalizeStatus = status => String(status || '').trim().toLowerCase();
-  const ingredientUsagePeriodLabel = dateFilterStart && dateFilterEnd
-    ? 'Selected-period'
-    : ({ today: 'Daily', week: 'Weekly', month: 'Monthly', all: 'All-time' }[range] || 'Period');
+  const ingredientUsagePeriodLabel = range === 'all'
+    ? 'All-time'
+    : dateFilterStart && dateFilterEnd
+      ? 'Selected-period'
+      : ({ today: 'Daily', week: 'Weekly', month: 'Monthly' }[range] || 'Period');
 
   const combinedOrders = orders;
 
   const visibleOrders = useMemo(() => {
+    if (range === 'all') return combinedOrders;
     if (dateFilterStart && dateFilterEnd) {
       const start = new Date(dateFilterStart);
       start.setHours(0, 0, 0, 0);
@@ -970,20 +1048,101 @@ export default function Reports() {
     (visibleRevenueDayPage - 1) * REVENUE_DAYS_PER_PAGE,
     visibleRevenueDayPage * REVENUE_DAYS_PER_PAGE
   );
-  const revenuePeriodLabel = dateFilterStart && dateFilterEnd
-    ? `${dateFilterStart} to ${dateFilterEnd}`
-    : ({ today: 'Today', week: 'This week', month: 'This month', all: 'All time' }[range] || `Last ${range} days`);
+  const revenuePeriodLabel = range === 'all'
+    ? 'All time'
+    : dateFilterStart && dateFilterEnd
+      ? `${dateFilterStart} to ${dateFilterEnd}`
+      : ({ today: 'Today', week: 'This week', month: 'This month' }[range] || `Last ${range} days`);
 
   const exportReport = () => {
+    const w = window.open('', '_blank');
+    if (!w) return alert('Unable to open print preview. Please allow popups for this site.');
+
+    const renderExportStatus = (message, isError = false) => {
+      if (w.closed) return;
+      w.document.open();
+      w.document.write('<!doctype html><html><head><meta charset="utf-8"><title>Business Analytics Report</title><style>body{font:16px Arial,sans-serif;color:#33251e;display:grid;min-height:90vh;place-items:center;margin:0}.status{max-width:480px;padding:32px;text-align:center;line-height:1.6}.error{color:#a12622}</style></head><body><main class="status"></main></body></html>');
+      w.document.close();
+      const status = w.document.querySelector('.status');
+      if (status) {
+        status.textContent = message;
+        if (isError) status.classList.add('error');
+      }
+    };
+
+    renderExportStatus('Preparing your Business Analytics Report…');
+
+    const prepareReport = async () => {
+      const exportSellerRows = getReportSellerRows(analytics, leaderTab, range === 'all');
+      let exportHistoricalSales = historicalVisibleSales;
+      if (range === 'all') {
+        if (loading || analyticsLoading || !analytics) {
+          throw new Error('Wait for the all-time analytics and order data to finish loading before exporting.');
+        }
+        if (ordersLoadError || analyticsError) {
+          throw new Error('The complete all-time report cannot be exported because some report data failed to load.');
+        }
+        if (!Array.isArray(analytics.sales?.all_selling_products)) {
+          throw new Error('Complete all-time seller data is unavailable. Please refresh the report and try again.');
+        }
+        const params = new URLSearchParams({ per_page: '100' });
+        if (analyticsCategory) params.set('category', analyticsCategory);
+        exportHistoricalSales = await fetchAllReportHistory(async (page) => {
+          params.set('page', String(page));
+          const response = await laravelStaffFetch(`${LARAVEL_BASE}/api/sales/import/history?${params.toString()}`);
+          const payload = await response.json().catch(() => ({}));
+          if (!response.ok || !payload.success) {
+            throw new Error(payload.message || `Unable to load imported sales history page ${page}.`);
+          }
+          return payload;
+        });
+        exportHistoricalSales = filterImportedTransactions(exportHistoricalSales, products, analyticsCategory);
+      }
+
+      return { exportSellerRows, exportHistoricalSales };
+    };
+
+    void prepareReport().then(async ({ exportSellerRows, exportHistoricalSales }) => {
+    if (w.closed) return;
     const title = 'Pastry Project - Business Analytics Report';
     const printedAt = new Date().toLocaleString();
-    const period = dateFilterStart && dateFilterEnd
-      ? `${dateFilterStart} to ${dateFilterEnd}`
-      : (range === 'all' ? 'All time' : `${range} days`);
+    const period = getReportPeriodLabel(range, dateFilterStart, dateFilterEnd);
 
     const esc = (s) => String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const svgEsc = (s) => String(s || '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&apos;');
+    const logoUrl = `${ROOT_BASE}/uploads/logo.png?v=logo-v2`;
+    const logoResponse = await fetch(logoUrl);
+    if (!logoResponse.ok) {
+      throw new Error('Unable to load the Pastry Project logo for the report.');
+    }
+    const logoBlob = await logoResponse.blob();
+    const logoDataUrl = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        if (typeof reader.result === 'string') {
+          resolve(reader.result);
+        } else {
+          reject(new Error('Unable to read the Pastry Project logo for the report.'));
+        }
+      };
+      reader.onerror = () => reject(reader.error || new Error('Unable to read the Pastry Project logo for the report.'));
+      reader.readAsDataURL(logoBlob);
+    });
+    const headerSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="600" height="140" viewBox="0 0 600 140">
+      <image href="${logoDataUrl}" x="278" y="-4" width="44" height="46" preserveAspectRatio="xMidYMid meet" />
+      <text x="300" y="62" text-anchor="middle" font-family="Georgia, serif" font-size="24" font-style="italic" font-weight="700" fill="#111">Pastry <tspan fill="#b58b19">Project</tspan></text>
+      <text x="300" y="80" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" letter-spacing="3" fill="#777">BAKED FRESH DAILY</text>
+      <text x="300" y="108" text-anchor="middle" font-family="Arial, sans-serif" font-size="16" font-weight="700" fill="#111">Business Analytics Report</text>
+      <text x="300" y="130" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#444">Period: ${svgEsc(period)} · Generated: ${svgEsc(printedAt)}</text>
+    </svg>`;
+    const headerSvgDataUri = `data:image/svg+xml,${encodeURIComponent(headerSvg)}`;
 
-    const leaderRows = leaderList.map((p, i) => (
+    const leaderRows = exportSellerRows.map((p, i) => (
       `<tr>
         <td style="padding:6px;border:1px solid #e6e9ef;text-align:center">${i + 1}</td>
         <td style="padding:6px;border:1px solid #e6e9ef">${esc(p.name)}</td>
@@ -992,7 +1151,8 @@ export default function Reports() {
       </tr>`
     )).join('');
 
-    const orderRows = completedOrds.map(o => {
+    const orderRows = [
+      ...salesTransactionOrders.map((o) => {
       const itemsText = Array.isArray(o.items) && o.items.length
         ? esc(o.items.map(it => `${Number(it.qty||0)}x ${it.name||'Item'}`).join('; '))
         : '—';
@@ -1011,7 +1171,26 @@ export default function Reports() {
         <td style="padding:6px;border:1px solid #e6e9ef;text-align:right">${total}</td>
         <td style="padding:6px;border:1px solid #e6e9ef">${status}</td>
       </tr>`;
-    }).join('');
+      }),
+      ...exportHistoricalSales.map((sale) => {
+        const type = sale.source === 'legacy'
+          ? 'Legacy sale'
+          : sale.sales_type === 'customized_cake'
+            ? 'Customized cake'
+            : sale.sales_type === 'finished_product'
+              ? 'Finished product'
+              : 'Other imported sale';
+        return `<tr>
+          <td style="padding:6px;border:1px solid #e6e9ef">${esc(sale.sale_date || '—')}</td>
+          <td style="padding:6px;border:1px solid #e6e9ef">Historical</td>
+          <td style="padding:6px;border:1px solid #e6e9ef">${esc(sale.cake_name || '—')}</td>
+          <td style="padding:6px;border:1px solid #e6e9ef">${esc(sale.size || '—')}</td>
+          <td style="padding:6px;border:1px solid #e6e9ef">${esc(type)}</td>
+          <td style="padding:6px;border:1px solid #e6e9ef;text-align:right">${esc(peso(sale.price))}</td>
+          <td style="padding:6px;border:1px solid #e6e9ef">Imported</td>
+        </tr>`;
+      }),
+    ].join('');
 
     const html = `<!doctype html>
       <html>
@@ -1019,27 +1198,67 @@ export default function Reports() {
         <meta charset="utf-8" />
         <title>${esc(title)}</title>
         <style>
-          body { font-family: Arial, Helvetica, sans-serif; color: #111827; margin: 32px; }
-          .header { text-align: center; margin-bottom: 20px; }
-          .logo { display:block; width:42px; height:42px; object-fit:contain; margin:0 auto 6px; }
-          .title { font-size: 22px; font-weight:700; }
-          .subtitle { font-size: 13px; color: #6b7280; margin-bottom: 14px }
-          .meta { font-size: 12px; color:#6b7280; margin-bottom: 24px }
-          .cards { display:flex; gap:12px; margin-bottom:18px }
+          @page {
+            size: A4 portrait;
+            margin: 55mm 10mm 18mm;
+            @top-center {
+              content: url("${headerSvgDataUri}");
+              width: 600px;
+              height: 140px;
+              vertical-align: top;
+              margin-top: 6mm;
+            }
+            @bottom-left {
+              content: "Pastry Project | Business Analytics Report";
+              font: italic bold 8px Georgia, 'Times New Roman', serif;
+              color: #555;
+              border-top: 1px solid #ddd;
+              padding-top: 2mm;
+              margin-bottom: 4mm;
+              vertical-align: bottom;
+            }
+            @bottom-right {
+              content: "Page " counter(page) " of " counter(pages);
+              font-family: Arial, Helvetica, sans-serif;
+              font-size: 8px;
+              color: #555;
+              border-top: 1px solid #ddd;
+              padding-top: 2mm;
+              margin-bottom: 4mm;
+              vertical-align: bottom;
+            }
+          }
+          body { font-family: Arial, Helvetica, sans-serif; color: #111; padding: 20px; }
+          .header { text-align: center; margin: 0 auto 16px; }
+          .logo { display:block; width:48px; height:48px; object-fit:contain; margin:0 auto 4px; }
+          .brand-name { font-family: Georgia, 'Times New Roman', serif; font-size:24px; font-weight:bold; font-style:italic; }
+          .brand-name span { color:#b58b19; }
+          .tagline { margin-top:3px; font-size:8px; letter-spacing:3px; text-transform:uppercase; color:#777; }
+          .report-title { font-size:18px; font-weight:700; color:#111; margin:12px 0 14px; }
+          .meta { margin-top:6px; font-size:12px; color:#444; margin-bottom:24px; }
+          .cards { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:8px; margin-bottom:18px }
           .card { flex:1; border:1px solid #e6e9ef; padding:12px; border-radius:6px; background:#fff }
           table { border-collapse: collapse; width:100%; font-size:12px; }
+          thead { display:table-header-group; }
           th { text-align:left; padding:8px; font-size:11px; color:#6b7280; border-bottom:1px solid #e6e9ef }
           td { padding:6px; vertical-align:top }
+          .cards { break-inside:avoid; page-break-inside:avoid; }
+          .report-table tbody tr { break-inside:avoid; page-break-inside:avoid; }
           .section-title { font-size:16px; margin:14px 0 8px; font-weight:700 }
-          .footer { margin-top:28px; font-size:11px; color:#6b7280 }
-          @media print { .cards { page-break-inside: avoid } }
+          .footer { display:flex; justify-content:space-between; align-items:center; margin-top:18px; padding-top:7px; border-top:1px solid #ddd; font-family:Georgia, 'Times New Roman', serif; font-size:8px; font-weight:bold; font-style:italic; color:#555; }
+          @media print {
+            body { padding:0; }
+            .header, .footer { display:none; }
+            img { break-inside:avoid; }
+          }
         </style>
       </head>
       <body>
         <div class="header">
-          <img class="logo" src="${esc(`${BASE}/uploads/logo.jpg`)}" alt="Pastry Project logo" />
-          <div class="title">Pastry Project</div>
-          <div class="subtitle">Business Analytics Report</div>
+          <img class="logo" src="${esc(`${ROOT_BASE}/uploads/logo.png?v=logo-v2`)}" alt="Pastry Project logo" />
+          <div class="brand-name">Pastry <span>Project</span></div>
+          <div class="tagline">Baked fresh daily</div>
+          <h1 class="report-title">Business Analytics Report</h1>
           <div class="meta">Period: ${esc(period)} · Generated: ${esc(printedAt)}</div>
         </div>
 
@@ -1064,7 +1283,7 @@ export default function Reports() {
 
         <div>
           <div class="section-title">Top / Bottom Sellers</div>
-          <table style="margin-bottom:14px">
+          <table class="report-table" style="margin-bottom:14px">
             <thead>
               <tr>
                 <th style="width:38px">#</th>
@@ -1081,7 +1300,7 @@ export default function Reports() {
 
         <div>
           <div class="section-title">Sales Transactions</div>
-          <table style="border:1px solid #e6e9ef">
+          <table class="report-table transactions-table" style="border:1px solid #e6e9ef">
             <thead>
               <tr>
                 <th>Date / Time</th>
@@ -1099,16 +1318,21 @@ export default function Reports() {
           </table>
         </div>
 
-        <div class="footer">Pastry Project · Business Analytics · Generated on ${esc(printedAt)}</div>
+        <footer class="footer">
+          <span>Pastry Project | Business Analytics Report</span>
+        </footer>
       </body>
       </html>`;
 
-    const w = window.open('', '_blank');
-    if (!w) return alert('Unable to open print preview. Please allow popups for this site.');
+    w.document.open();
     w.document.write(html);
     w.document.close();
     w.focus();
     setTimeout(() => w.print(), 600);
+    }).catch((error) => {
+      console.error('Unable to create the business analytics report:', error);
+      renderExportStatus(error.message || 'Unable to create the business analytics report.', true);
+    });
   };
 
   const toggleCheck = id => setChecked(c => ({ ...c, [id]: !c[id] }));
@@ -1126,18 +1350,18 @@ export default function Reports() {
       <div className="lg:pl-[260px] pt-[72px]">
         <div className="mx-auto max-w-[1400px] px-4 py-5 sm:px-6 md:px-8 lg:px-10 lg:py-7">
 
-          <div className="mb-5 flex flex-col gap-4 border-b border-[#e8dfd4] pb-5 sm:flex-row sm:items-end sm:justify-between">
+          <div className="admin-sales-report-header mb-5 flex flex-col gap-4 border-b border-[#e8dfd4] pb-5 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.24em] text-[#92701e]">Business analytics</p>
               <h1 className="text-[26px] font-bold leading-tight text-black sm:text-[30px]">Sales Reports</h1>
               <p className="mt-1.5 text-[13px] text-black/60">Revenue, demand, inventory movement, and procurement.</p>
             </div>
-            <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-start">
+            <div className="admin-sales-report-actions flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-start">
               <SalesImportDropzone compact onImportComplete={refreshAnalyticsAfterImport} />
               <button
                 type="button"
                 onClick={exportReport}
-                className="inline-flex h-10 min-w-[150px] flex-1 items-center justify-center gap-2 rounded-md bg-black px-3 text-[11px] font-semibold text-white transition hover:bg-black/85"
+                className="admin-sales-report-pdf-button inline-flex h-10 min-w-[150px] flex-1 items-center justify-center gap-2 rounded-md bg-black px-3 text-[11px] font-semibold text-white transition hover:bg-black/85"
               >
                 <Download size={15} />
                 Download PDF Report
@@ -1145,7 +1369,7 @@ export default function Reports() {
             </div>
           </div>
 
-          <div className="mb-5 grid grid-cols-1 gap-2.5 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="admin-sales-report-summary grid grid-cols-1 gap-2.5 sm:grid-cols-2 xl:grid-cols-4 mb-5">
             <StatCard
               title="Total Revenue" icon={DollarSign} color={C.violet} soft={C.violetSoft}
               value={analyticsLoading ? '…' : analytics ? peso(analytics.summary.revenue) : '—'}
@@ -1534,7 +1758,7 @@ export default function Reports() {
                   <div>
                     <h3 className="text-base font-bold" style={{ color: C.ink }}>Ingredient Consumption &amp; Procurement Matrix</h3>
                     <p className="mt-0.5 text-xs text-black/50">
-                      {`Consumption and raw-material waste for ${dateFilterStart && dateFilterEnd ? 'the selected dates' : ({ today: 'today', week: 'this week', month: 'this month', all: 'all recorded years' }[range] || 'the selected period')}.`}
+                      {`Consumption and raw-material waste for ${range === 'all' ? 'all recorded years' : dateFilterStart && dateFilterEnd ? 'the selected dates' : ({ today: 'today', week: 'this week', month: 'this month' }[range] || 'the selected period')}.`}
                     </p>
                   </div>
                 </div>
@@ -1620,7 +1844,8 @@ export default function Reports() {
     </div>
     {previewImport && (
       <div
-        className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-3 sm:p-6"
+        className="csv-preview-overlay fixed inset-0 z-[9997] flex items-center justify-center bg-transparent pl-5 pr-3 sm:pl-8 sm:pr-6 lg:pl-[280px]"
+        style={{ backgroundColor: "transparent" }}
         onClick={(event) => {
           if (event.target === event.currentTarget) setPreviewImport(null);
         }}
@@ -1629,9 +1854,9 @@ export default function Reports() {
           role="dialog"
           aria-modal="true"
           aria-labelledby="csv-preview-title"
-          className="max-h-[90vh] w-full max-w-4xl overflow-hidden rounded-xl bg-white shadow-2xl"
+          className="csv-preview-dialog flex max-h-[90vh] w-full max-w-none flex-col overflow-hidden rounded-xl bg-white shadow-2xl"
         >
-          <div className="flex items-start justify-between gap-4 border-b border-black/10 px-5 py-4">
+          <div className="csv-preview-header sticky top-0 z-10 flex shrink-0 items-start justify-between gap-4 border-b border-black/10 bg-white px-5 py-4">
             <div className="min-w-0">
               <h2 id="csv-preview-title" className="truncate text-base font-bold text-black">{previewImport.file_name}</h2>
               <p className="mt-1 text-xs text-black/55">
@@ -1647,7 +1872,7 @@ export default function Reports() {
               <XCircle size={20} />
             </button>
           </div>
-          <div className="max-h-[calc(90vh-105px)] overflow-auto p-5">
+          <div className="min-h-0 flex-1 overflow-auto p-5">
             {previewError && <p className="mb-3 rounded-md bg-red-50 px-3 py-2 text-sm text-red-800" role="alert">{previewError}</p>}
             {previewLoading ? (
               <p className="py-8 text-center text-sm text-black/55">Loading CSV preview…</p>
@@ -1655,8 +1880,8 @@ export default function Reports() {
               <p className="py-8 text-center text-sm text-black/55">{previewError ? 'Preview could not be loaded.' : 'This CSV import has no sales rows to preview.'}</p>
             ) : (
               <>
-                <div className="overflow-x-auto">
-                  <table className="w-full min-w-[620px] text-left text-sm">
+                <div className="csv-preview-table-container mt-3 overflow-x-auto">
+                  <table className="csv-preview-table w-full min-w-[620px] text-left text-sm">
                     <thead className="bg-[#f7f4ef] text-[10px] uppercase tracking-wide text-black/65">
                       <tr>
                         <th className="px-3 py-2">Date</th>
