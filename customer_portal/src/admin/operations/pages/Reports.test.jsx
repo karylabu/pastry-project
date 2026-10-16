@@ -1,4 +1,4 @@
-import { filterImportedTransactions, filterSalesTransactions, getAnalyticsDateRange, groupRevenueByInterval, normalizeReportProducts, selectReportIngredients } from "./Reports";
+import { filterImportedTransactions, filterSalesTransactions, formatOrderItemSizes, getAnalyticsDateRange, groupRevenueByInterval, normalizeReportProducts, selectReportIngredients } from "./Reports";
 
 const sales = [
   { date: "2026-10-05", revenue: 100, orders: 2 },
@@ -115,6 +115,20 @@ describe("sales transaction category filters", () => {
     expect(result).toHaveLength(1);
     expect(result[0].id).toBe(1);
     expect(result[0].total).toBe(1000);
+  });
+
+  describe("formatOrderItemSizes", () => {
+    test("shows distinct sizes from order items", () => {
+      expect(formatOrderItemSizes([
+        { variant: "6x3" },
+        { size: "8 inch" },
+        { variant: "6x3" },
+      ])).toBe("6x3, 8 inch");
+    });
+
+    test("shows a dash when order items have no size", () => {
+      expect(formatOrderItemSizes([{ name: "Croissant" }])).toBe("—");
+    });
   });
 
   test("keeps imported cake records in Finished Products but excludes customized and legacy imports", () => {

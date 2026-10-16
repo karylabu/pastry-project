@@ -191,6 +191,16 @@ export function filterImportedTransactions(sales, products, category) {
   });
 }
 
+export function formatOrderItemSizes(items) {
+  if (!Array.isArray(items)) return '—';
+
+  const sizes = [...new Set(items
+    .map((item) => String(item?.variant || item?.size || item?.size_name || item?.variant_size || item?.product_size || '').trim())
+    .filter(Boolean))];
+
+  return sizes.length ? sizes.join(', ') : '—';
+}
+
 function recommendationFor(ing) {
   const expiryDays = daysUntil(ing.expiry);
   const expiryNote = expiryDays !== null && expiryDays <= 5
@@ -967,6 +977,7 @@ export default function Reports() {
       const itemsText = Array.isArray(o.items) && o.items.length
         ? esc(o.items.map(it => `${Number(it.qty||0)}x ${it.name||'Item'}`).join('; '))
         : '—';
+      const sizesText = esc(formatOrderItemSizes(o.items));
       const dt = o.created_at ? new Date(o.created_at).toLocaleString() : '—';
       const ref = esc(o.id || o.order_ref || 'N/A');
       const type = esc(String(o.order_type || 'Standard'));
@@ -976,6 +987,7 @@ export default function Reports() {
         <td style="padding:6px;border:1px solid #e6e9ef">${dt}</td>
         <td style="padding:6px;border:1px solid #e6e9ef">${ref}</td>
         <td style="padding:6px;border:1px solid #e6e9ef">${itemsText}</td>
+        <td style="padding:6px;border:1px solid #e6e9ef">${sizesText}</td>
         <td style="padding:6px;border:1px solid #e6e9ef">${type}</td>
         <td style="padding:6px;border:1px solid #e6e9ef;text-align:right">${total}</td>
         <td style="padding:6px;border:1px solid #e6e9ef">${status}</td>
@@ -1056,6 +1068,7 @@ export default function Reports() {
                 <th>Date / Time</th>
                 <th>Order Ref</th>
                 <th>Items Sold</th>
+                <th>Size</th>
                 <th>Order Type</th>
                 <th style="text-align:right">Gross Amount</th>
                 <th>Status</th>
@@ -1437,6 +1450,7 @@ export default function Reports() {
                         <th className="px-4 py-3 text-left">Date / Time</th>
                         <th className="px-4 py-3 text-left">Order Ref</th>
                         <th className="px-4 py-3 text-left">Items Sold</th>
+                        <th className="px-4 py-3 text-left">Size</th>
                         <th className="px-4 py-3 text-left">Order Type</th>
                         <th className="px-4 py-3 text-right">Gross Amount</th>
                         <th className="px-4 py-3 text-left">Status</th>
@@ -1444,7 +1458,7 @@ export default function Reports() {
                     </thead>
                     <tbody>
                       {salesTransactionOrders.length === 0 && historicalVisibleSales.length === 0 ? (
-                        <tr><td colSpan={6} className="px-4 py-10 text-center text-black/50">{ordersLoadError || historicalSalesError ? "Sales transaction records could not be loaded." : "No completed orders match the selected filters."}</td></tr>
+                        <tr><td colSpan={7} className="px-4 py-10 text-center text-black/50">{ordersLoadError || historicalSalesError ? "Sales transaction records could not be loaded." : "No completed orders match the selected filters."}</td></tr>
                       ) : <>
                         {salesOrdersOnPage.map((o) => {
                         const itemsText = Array.isArray(o.items) && o.items.length
@@ -1462,6 +1476,7 @@ export default function Reports() {
                             <td className="px-4 py-4 text-[13px] text-black/70">{o.created_at ? new Date(o.created_at).toLocaleString() : '—'}</td>
                             <td className="px-4 py-4 font-semibold text-black">#{o.id || o.order_ref || 'N/A'}</td>
                             <td className="px-4 py-4 text-[13px] text-black/70 max-w-[300px] truncate">{itemsText}</td>
+                            <td className="px-4 py-4 text-[13px] text-black/70">{formatOrderItemSizes(o.items)}</td>
                             <td className="px-4 py-4">
                               <span className="inline-flex rounded-md bg-[#f7f4ef] px-2.5 py-1 text-[10px] font-semibold text-[#65574d]">
                                 {orderTypeLabel}
@@ -1480,10 +1495,8 @@ export default function Reports() {
                           <tr key={`historical-${sale.id}`} className="border-b bg-white" style={{ borderColor: C.border }}>
                             <td className="px-4 py-4 text-[13px] text-black/70">{sale.sale_date}</td>
                             <td className="px-4 py-4 font-semibold text-black">Historical</td>
-                            <td className="max-w-[300px] px-4 py-4 text-[13px] text-black/70">
-                              <span className="block truncate">{sale.cake_name}</span>
-                              {sale.sales_type === 'finished_product' && sale.size && <span className="mt-0.5 block text-[10px] text-black/50">Size: {sale.size}</span>}
-                            </td>
+                            <td className="max-w-[300px] px-4 py-4 text-[13px] text-black/70"><span className="block truncate">{sale.cake_name}</span></td>
+                            <td className="px-4 py-4 text-[13px] text-black/70">{sale.size || '—'}</td>
                             <td className="px-4 py-4"><span className="inline-flex rounded-md bg-[#fff4cd] px-2.5 py-1 text-[10px] font-semibold text-[#80600a]">{sale.source === 'legacy' ? 'Legacy sale' : sale.sales_type === 'customized_cake' ? 'Customized cake' : sale.sales_type === 'finished_product' ? 'Finished product' : 'Other imported sale'}</span></td>
                             <td className="px-4 py-4 text-right font-semibold text-black">{peso(sale.price)}</td>
                             <td className="px-4 py-4"><span className="inline-flex rounded-md bg-[#fff4cd] px-2.5 py-1 text-[10px] font-semibold text-black">Imported</span></td>
