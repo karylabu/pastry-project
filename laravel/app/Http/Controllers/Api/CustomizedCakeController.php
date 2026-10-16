@@ -212,8 +212,8 @@ class CustomizedCakeController extends Controller
 
         $payload = $request->all();
         $payload['user_id'] = (int) $user->id;
-        $paymentMethod = trim((string) ($payload['payment_method'] ?? 'GCash'));
-        $allowedPaymentMethods = ['GCash'];
+        $paymentMethod = trim((string) ($payload['payment_method'] ?? 'QR Ph'));
+        $allowedPaymentMethods = ['QR Ph'];
         if (!in_array($paymentMethod, $allowedPaymentMethods, true)) {
             return response()->json([
                 'success' => false,

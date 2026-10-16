@@ -133,7 +133,7 @@ class CustomizedCakeOrderSubmissionTest extends TestCase
             ->postJson('http://localhost/api/customized-cakes/order', [
                 'cake_type' => 'single',
                 'tiers' => [['flavor_id' => 1, 'size_id' => 1]],
-                'payment_method' => 'GCash',
+                'payment_method' => 'QR Ph',
                 'notes' => '{"occasion":"Birthday"}',
                 'reference_image' => json_encode([
                     'type' => 'example',
@@ -154,7 +154,7 @@ class CustomizedCakeOrderSubmissionTest extends TestCase
             'id' => 1,
             'order_type' => 'Customized',
             'is_customized' => true,
-            'payment' => 'GCash',
+            'payment' => 'QR Ph',
         ]);
         $this->assertDatabaseHas('notifications', [
             'user_id' => 2,
@@ -165,7 +165,7 @@ class CustomizedCakeOrderSubmissionTest extends TestCase
         $this->getJson('/api/orders')
             ->assertOk()
             ->assertJsonPath('orders.0.custom_details.reference_image.url', 'https://pastryproject.shop/uploads/holiday(2).jpg')
-            ->assertJsonPath('orders.0.custom_details.payment_method', 'GCash')
+            ->assertJsonPath('orders.0.custom_details.payment_method', 'QR Ph')
             ->assertJsonPath('orders.0.is_customized', true);
     }
 
@@ -191,7 +191,7 @@ class CustomizedCakeOrderSubmissionTest extends TestCase
         $this->assertDatabaseCount('customized_cake_orders', 0);
     }
 
-    public function test_customer_custom_cake_request_rejects_qrph_payment_method(): void
+    public function test_customer_custom_cake_request_rejects_gcash_payment_method(): void
     {
         $customer = new User();
         $customer->id = 1;
@@ -204,7 +204,7 @@ class CustomizedCakeOrderSubmissionTest extends TestCase
             ->postJson('http://localhost/api/customized-cakes/order', [
                 'cake_type' => 'single',
                 'tiers' => [['flavor_id' => 1, 'size_id' => 1]],
-                'payment_method' => 'QR Ph',
+                'payment_method' => 'GCash',
             ])
             ->assertStatus(422)
             ->assertJsonPath('message', 'Choose a valid payment method.');

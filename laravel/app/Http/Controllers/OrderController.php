@@ -893,7 +893,7 @@ class OrderController extends Controller
                     'delivery_fee' => 0,
                     'status' => 'Pending',
                     'total' => floatval($request->input('total', $request->input('estimated_price', 0))),
-                    'payment' => 'GCash',
+                    'payment' => 'QRPh',
                     'address' => $request->input('address', ''),
                     'method' => $request->input('method', 'Pickup'),
                     'delivery_date' => $request->input('date'),

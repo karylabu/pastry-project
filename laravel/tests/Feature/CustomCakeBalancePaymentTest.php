@@ -98,11 +98,11 @@ class CustomCakeBalancePaymentTest extends TestCase
         Http::assertSent(fn (ClientRequest $request) =>
             $request->url() === 'https://api.paymongo.com/v2/checkout_sessions'
             && $request['data']['attributes']['line_items'][0]['amount'] === 76711
-            && $request['data']['attributes']['payment_method_types'] === ['gcash']
-            && $request['data']['attributes']['metadata']['payment_method'] === 'GCash'
+            && $request['data']['attributes']['payment_method_types'] === ['qrph']
+            && $request['data']['attributes']['metadata']['payment_method'] === 'QR Ph'
             && str_contains($request['data']['attributes']['line_items'][0]['name'], 'Remaining Balance')
         );
-        $this->assertDatabaseHas('orders', ['id' => 24, 'payment' => 'GCash']);
+        $this->assertDatabaseHas('orders', ['id' => 24, 'payment' => 'QRPh']);
     }
 
     public function test_balance_link_is_rejected_outside_balance_payment_status(): void
@@ -160,11 +160,11 @@ class CustomCakeBalancePaymentTest extends TestCase
         Http::assertSent(fn (ClientRequest $request) =>
             $request->url() === 'https://api.paymongo.com/v2/checkout_sessions'
             && $request['data']['attributes']['line_items'][0]['amount'] === 76711
-            && $request['data']['attributes']['payment_method_types'] === ['gcash']
+            && $request['data']['attributes']['payment_method_types'] === ['qrph']
         );
     }
 
-    public function test_custom_cake_checkout_uses_fixed_gcash_fee_even_for_legacy_card_orders(): void
+    public function test_custom_cake_checkout_uses_qrph_and_fixed_fee_for_legacy_card_orders(): void
     {
         \Illuminate\Support\Facades\DB::table('orders')->insert([
             'id' => 29,
@@ -187,7 +187,7 @@ class CustomCakeBalancePaymentTest extends TestCase
             ->postJson('/create_payment.php', [
                 'order_id' => 29,
                 'payment_type' => 'downpayment',
-                'payment_method' => 'GCash',
+                'payment_method' => 'QR Ph',
             ])
             ->assertOk()
             ->assertJsonPath('data.attributes.checkout_url', 'https://checkout.example.test/balance');
@@ -195,12 +195,12 @@ class CustomCakeBalancePaymentTest extends TestCase
         Http::assertSent(fn (ClientRequest $request) =>
             $request->url() === 'https://api.paymongo.com/v2/checkout_sessions'
             && $request['data']['attributes']['line_items'][0]['amount'] === 102281
-            && $request['data']['attributes']['payment_method_types'] === ['gcash']
+            && $request['data']['attributes']['payment_method_types'] === ['qrph']
             && $request['data']['attributes']['metadata']['fee_amount'] === '22.81'
         );
     }
 
-    public function test_custom_cake_checkout_migrates_legacy_qrph_orders_to_gcash(): void
+    public function test_custom_cake_checkout_keeps_legacy_custom_orders_on_qrph(): void
     {
         \Illuminate\Support\Facades\DB::table('orders')->insert([
             'id' => 30,
@@ -226,13 +226,13 @@ class CustomCakeBalancePaymentTest extends TestCase
         Http::assertSent(fn (ClientRequest $request) =>
             $request->url() === 'https://api.paymongo.com/v2/checkout_sessions'
             && $request['data']['attributes']['line_items'][0]['amount'] === 102281
-            && $request['data']['attributes']['payment_method_types'] === ['gcash']
-            && $request['data']['attributes']['metadata']['payment_method'] === 'GCash'
+            && $request['data']['attributes']['payment_method_types'] === ['qrph']
+            && $request['data']['attributes']['metadata']['payment_method'] === 'QR Ph'
         );
-        $this->assertDatabaseHas('orders', ['id' => 30, 'payment' => 'GCash']);
+        $this->assertDatabaseHas('orders', ['id' => 30, 'payment' => 'QRPh']);
     }
 
-    public function test_custom_cake_checkout_uses_fixed_fee_for_legacy_online_banking_orders(): void
+    public function test_custom_cake_checkout_uses_qrph_and_fixed_fee_for_legacy_online_banking_orders(): void
     {
         \Illuminate\Support\Facades\DB::table('orders')->insert([
             'id' => 31,
@@ -258,7 +258,7 @@ class CustomCakeBalancePaymentTest extends TestCase
         Http::assertSent(fn (ClientRequest $request) =>
             $request->url() === 'https://api.paymongo.com/v2/checkout_sessions'
             && $request['data']['attributes']['line_items'][0]['amount'] === 102281
-            && $request['data']['attributes']['payment_method_types'] === ['gcash']
+            && $request['data']['attributes']['payment_method_types'] === ['qrph']
         );
     }
 

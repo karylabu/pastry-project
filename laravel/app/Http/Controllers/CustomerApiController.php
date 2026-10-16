@@ -179,7 +179,7 @@ class CustomerApiController extends Controller
                     'user_id' => $user->id,
                     'status' => 'Pending',
                     'total' => floatval($form['total'] ?? $form['estimated_price'] ?? 0),
-                    'payment' => 'GCash',
+                    'payment' => 'QRPh',
                     'address' => $form['address'] ?? '',
                     'method' => $method,
                     'order_type' => 'Customized',
@@ -1558,7 +1558,7 @@ PROMPT;
                 }
             }
         }
-        $customCheckoutPaymentType = 'gcash';
+        $customCheckoutPaymentType = 'qrph';
         $customPaymentFeeRate = 0.0223;
         $paymentStatus = strtolower((string) ($order->payment_status ?? 'pending'));
         $supportedOrderPayment = $customOrder
@@ -1640,7 +1640,7 @@ PROMPT;
                         'metadata' => [
                             'order_id' => (string) $orderId,
                             'payment_type' => $paymentType,
-                            'payment_method' => $customOrder ? 'GCash' : (string) $order->payment,
+                            'payment_method' => $customOrder ? 'QR Ph' : (string) $order->payment,
                             'base_amount' => number_format($amount, 2, '.', ''),
                             'fee_amount' => number_format(($checkoutAmountCents / 100) - $amount, 2, '.', ''),
                         ],
@@ -1712,7 +1712,7 @@ PROMPT;
                 'payment_link' => $paymentUrl,
             ];
             if ($customOrder) {
-                $orderPaymentUpdates['payment'] = 'GCash';
+                $orderPaymentUpdates['payment'] = 'QRPh';
             }
             DB::table('orders')->where('id', $orderId)->update($orderPaymentUpdates);
             app(\App\Services\RealtimeEventPublisher::class)->orderUpdated((int) $user->id, (int) $orderId);

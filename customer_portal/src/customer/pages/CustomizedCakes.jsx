@@ -552,7 +552,7 @@ export default function CustomizedCakes() {
         addons,
         cupcake_quantity: addons.includes('Cupcakes') ? Number(cupcakeQuantity) : 0,
         budget,
-        payment_method: 'GCash',
+        payment_method: 'QR Ph',
         estimated_price: budget,
         quantity,
         reference_image: referenceImage ? {
@@ -571,7 +571,7 @@ export default function CustomizedCakes() {
       laravelForm.append('order_id', '');
       laravelForm.append('notes', orderNotes);
       laravelForm.append('delivery_service', deliveryMethod === 'Delivery' ? deliveryService : '');
-      laravelForm.append('payment_method', 'GCash');
+      laravelForm.append('payment_method', 'QR Ph');
       laravelForm.append('reference_image', JSON.stringify(referenceImage ? {
         type: referenceImage.type,
         id: referenceImage.id,
@@ -625,7 +625,7 @@ export default function CustomizedCakes() {
       fd.append('addons', JSON.stringify(addons));
       fd.append('cupcake_quantity', String(customizationDetails.cupcake_quantity));
       fd.append('budget', budget);
-      fd.append('payment_method', 'GCash');
+      fd.append('payment_method', 'QR Ph');
       fd.append('estimated_price', budget);
       fd.append('total_amount', budget);
       fd.append('quantity', String(quantity));

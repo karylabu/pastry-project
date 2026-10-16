@@ -56,8 +56,8 @@ $addons = json_decode(trim($_POST['addons'] ?? '[]'), true) ?: [];
 $estimatedPrice = trim($_POST['estimated_price'] ?? '');
 $quantity = intval($_POST['quantity'] ?? 1);
 $totalAmount = trim($_POST['total_amount'] ?? '');
-$payment = trim($_POST['payment_method'] ?? 'GCash');
-$allowedPaymentMethods = ['GCash'];
+$payment = trim($_POST['payment_method'] ?? 'QR Ph');
+$allowedPaymentMethods = ['QR Ph'];
 
 if (!in_array($payment, $allowedPaymentMethods, true)) {
     http_response_code(422);

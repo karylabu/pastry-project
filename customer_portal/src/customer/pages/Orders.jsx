@@ -1215,7 +1215,7 @@ export default function Orders() {
                   ? quotedDownpayment
                   : Number((Number(order.total || 0) * downpaymentPercent / 100).toFixed(2));
                 const customBalanceAmount = Math.max(0, Number((Number(order.total || 0) - customDownpaymentAmount).toFixed(2)));
-                const customPaymentMethod = isCustomized ? 'GCash' : (order.payment || customPaymentDetails.payment_method || '—');
+                const customPaymentMethod = isCustomized ? 'QR Ph' : (order.payment || customPaymentDetails.payment_method || '—');
                 const downpaymentBreakdown = getCustomCakePaymentBreakdown(customDownpaymentAmount);
                 const balanceBreakdown = getCustomCakePaymentBreakdown(customBalanceAmount);
                 const productImage = getProductThumbnail(order, primaryItem);
