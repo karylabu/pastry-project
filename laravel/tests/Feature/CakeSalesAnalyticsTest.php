@@ -229,6 +229,60 @@ class CakeSalesAnalyticsTest extends TestCase
         );
     }
 
+    public function test_customized_sales_mix_infers_multiple_imported_sizes_and_percentages(): void
+    {
+        $saleDate = now()->subDay()->toDateString();
+        DB::table('analytics_imports')->insert([
+            'id' => 1,
+            'status' => 'completed',
+            'sales_type' => 'customized_cake',
+        ]);
+        DB::table('analytics_sales_history')->insert([
+            [
+                'import_id' => 1,
+                'product_name' => '6x3 - Floral Cake',
+                'size' => null,
+                'sale_date' => $saleDate,
+                'units_sold' => 2,
+                'revenue' => 2400,
+            ],
+            [
+                'import_id' => 1,
+                'product_name' => '8x5 - Floral Cake',
+                'size' => null,
+                'sale_date' => $saleDate,
+                'units_sold' => 1,
+                'revenue' => 1800,
+            ],
+            [
+                'import_id' => 1,
+                'product_name' => 'Topper',
+                'size' => null,
+                'sale_date' => $saleDate,
+                'units_sold' => 10,
+                'revenue' => 2000,
+            ],
+            [
+                'import_id' => 1,
+                'product_name' => 'Cake without size details',
+                'size' => 'Size not recorded',
+                'sale_date' => $saleDate,
+                'units_sold' => 5,
+                'revenue' => 2500,
+            ],
+        ]);
+
+        $report = app(CakeSalesAnalytics::class)->report([
+            'start_date' => $saleDate,
+            'end_date' => $saleDate,
+        ]);
+
+        $this->assertSame([
+            ['name' => '6x3', 'quantity' => 2.0, 'percentage' => 66.67],
+            ['name' => '8x5', 'quantity' => 1.0, 'percentage' => 33.33],
+        ], $report['cakeTypeBreakdown']['customized']['sizes']);
+    }
+
     public function test_customized_sales_use_size_labels_from_normalized_tiers_when_notes_have_no_size(): void
     {
         Schema::create('cake_sizes', function ($table) {

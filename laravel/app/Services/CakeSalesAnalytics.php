@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Support\SalesItemSize;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Collection;
@@ -179,13 +180,17 @@ class CakeSalesAnalytics
 
                 $revenue = (float) $row->revenue;
                 if (($row->sales_type ?? 'other') === 'customized_cake') {
+                    $size = trim((string) ($row->size ?? ''));
+                    if ($size === '' || strtolower($size) === 'unknown') {
+                        $size = SalesItemSize::fromProductName((string) $row->product_name) ?? 'Unknown';
+                    }
                     $customSales[] = [
                         'order_id' => 'import-' . $row->product_name . '-' . $row->sale_date,
                         'date' => (string) $row->sale_date,
                         'quantity' => $quantity,
                         'revenue' => $revenue,
                         'flavor' => 'Unknown',
-                        'size' => (string) ($row->size ?? 'Unknown'),
+                        'size' => $size,
                         'design' => trim((string) $row->product_name) ?: 'Historical customized cake',
                         'occasion' => 'Unknown',
                         'imported_record_count' => (int) $row->record_count,
@@ -729,8 +734,8 @@ class CakeSalesAnalytics
         $sizes = [];
         foreach ($sales as $sale) {
             $label = trim((string) ($sale['size'] ?? ''));
-            if ($label === '' || strtolower($label) === 'unknown') {
-                $label = 'Size not recorded';
+            if ($label === '' || in_array(strtolower($label), ['unknown', 'size not recorded'], true)) {
+                continue;
             }
 
             $key = strtolower($label);
@@ -739,7 +744,7 @@ class CakeSalesAnalytics
         }
 
         $rows = array_values($sizes);
-        $total = array_sum(array_column($sales, 'quantity')) ?: 1;
+        $total = array_sum(array_column($rows, 'quantity')) ?: 1;
         foreach ($rows as &$row) {
             $row['percentage'] = round(($row['quantity'] / $total) * 100, 2);
         }

@@ -473,7 +473,7 @@ export default function Dashboard() {
                                   <div className="mb-1 flex items-center justify-between gap-3 text-[11px]">
                                     <span className="truncate font-medium text-[#5f514a]">{size.name}</span>
                                     <span className="shrink-0 text-[#74675f]">
-                                      {Number(size.quantity || 0).toLocaleString()} sold · {Number(size.percentage || 0).toFixed(0)}%
+                                      {Number(size.quantity || 0).toLocaleString()} sold · {Number(size.percentage || 0).toFixed(1)}%
                                     </span>
                                   </div>
                                   <div className="h-2 overflow-hidden rounded-full bg-[#f4ece6]">
