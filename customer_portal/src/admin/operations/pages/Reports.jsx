@@ -1431,10 +1431,10 @@ export default function Reports() {
                           <button
                             type="button"
                             onClick={() => deleteCsvImport(importFile)}
-                            disabled={deletingImportId !== null || ['queued', 'processing'].includes(importFile.status)}
+                            disabled={deletingImportId !== null || importFile.status === 'processing'}
                             className="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-red-200 px-2.5 py-1.5 text-[10px] font-semibold text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
                             aria-label={`Delete imported CSV ${importFile.file_name}`}
-                            title={['queued', 'processing'].includes(importFile.status) ? 'Wait for this import to finish before deleting it.' : 'Delete this import and its imported sales records'}
+                            title={importFile.status === 'processing' ? 'Wait for this import to finish before deleting it.' : 'Delete this import and its imported sales records'}
                           >
                             {deletingImportId === importFile.id ? 'Deleting…' : <><Trash2 size={12} /> Delete</>}
                           </button>

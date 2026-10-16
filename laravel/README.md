@@ -60,7 +60,7 @@ The Laravel framework is open-sourced software licensed under the [MIT license](
 
 ## Sales CSV imports
 
-CSV sales reports are stored privately and processed by the database queue in batches of 1,000 rows. Exact file retries are rejected by a SHA-256 fingerprint. Each file is limited to 50 MB and 250,000 data rows; split larger reports before uploading. The import status endpoint reports queued/processing/completed/failed state and row progress.
+CSV sales reports are stored privately and processed by the database queue in batches of 1,000 rows. Queued imports can be deleted before processing starts; processing imports must finish before they can be deleted. Exact file retries are rejected by a SHA-256 fingerprint. Each file is limited to 50 MB and 250,000 data rows; split larger reports before uploading. The import status endpoint reports queued/processing/completed/failed state and row progress.
 
 Run migrations, configure `QUEUE_CONNECTION=database`, and keep a queue worker running:
 

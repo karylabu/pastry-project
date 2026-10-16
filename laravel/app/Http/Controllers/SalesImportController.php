@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Controllers\Controller;
 use App\Jobs\ProcessSalesCsvImport;
 use App\Models\User;
+use App\Support\SalesItemSize;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -112,6 +113,7 @@ class SalesImportController extends Controller
                         'error_message' => null,
                         'uploaded_at' => now(),
                         'sales_type' => $salesType,
+                        'stored_path' => $storedPath,
                     ]);
                 if (!$updated) {
                     Storage::disk('local')->delete($storedPath);
@@ -134,6 +136,7 @@ class SalesImportController extends Controller
                     'rows_received' => 0,
                     'rows_processed' => 0,
                     'source_hash' => $sourceHash,
+                    'stored_path' => $storedPath,
                 ]);
             }
 
@@ -222,7 +225,7 @@ class SalesImportController extends Controller
             $import = DB::table('analytics_imports')
                 ->where('id', $importId)
                 ->lockForUpdate()
-                ->first(['id', 'file_name', 'source_name', 'status']);
+                ->first(['id', 'file_name', 'source_name', 'status', 'stored_path']);
 
             if (!$import) {
                 return response()->json(['success' => false, 'message' => 'Import not found.'], 404);
@@ -230,8 +233,17 @@ class SalesImportController extends Controller
             if ($import->source_name !== 'POS CSV' || strtolower(pathinfo($import->file_name, PATHINFO_EXTENSION)) !== 'csv') {
                 return response()->json(['success' => false, 'message' => 'Only imported CSV files can be deleted here.'], 422);
             }
-            if (in_array($import->status, ['queued', 'processing'], true)) {
+            if ($import->status === 'processing') {
                 return response()->json(['success' => false, 'message' => 'Wait for CSV processing to finish before deleting this import.'], 409);
+            }
+
+            if ($import->stored_path && !Storage::disk('local')->delete($import->stored_path)) {
+                Log::warning('Unable to delete stored sales CSV during import deletion.', [
+                    'import_id' => $importId,
+                    'stored_path' => $import->stored_path,
+                ]);
+
+                return response()->json(['success' => false, 'message' => 'Unable to delete the stored CSV file. Please try again.'], 500);
             }
 
             DB::table('analytics_sales_history')->where('import_id', $importId)->delete();
@@ -466,19 +478,26 @@ class SalesImportController extends Controller
             ->orderByDesc('sale_date')
             ->orderByDesc('id')
             ->paginate($pageSize);
-        $sales = array_map(static fn ($row) => [
-            'id' => $row->source === 'legacy' ? 'legacy-' . $row->id : (string) $row->id,
-            'cake_name' => $row->cake_name,
-            'size' => $row->size,
-            'sale_date' => $row->sale_date,
-            'units_sold' => (float) $row->units_sold,
-            'price' => (float) $row->price,
-            'down_payment' => (float) $row->down_payment,
-            'remaining_balance' => (float) $row->remaining_balance,
-            'source' => $row->source,
-            'sales_type' => $row->sales_type,
-            'import_id' => $row->import_id === null ? null : (int) $row->import_id,
-        ], $history->items());
+        $sales = array_map(static function ($row) {
+            $size = $row->size;
+            if ($row->source === 'imported' && trim((string) $size) === '') {
+                $size = SalesItemSize::fromProductName((string) $row->cake_name);
+            }
+
+            return [
+                'id' => $row->source === 'legacy' ? 'legacy-' . $row->id : (string) $row->id,
+                'cake_name' => $row->cake_name,
+                'size' => $size,
+                'sale_date' => $row->sale_date,
+                'units_sold' => (float) $row->units_sold,
+                'price' => (float) $row->price,
+                'down_payment' => (float) $row->down_payment,
+                'remaining_balance' => (float) $row->remaining_balance,
+                'source' => $row->source,
+                'sales_type' => $row->sales_type,
+                'import_id' => $row->import_id === null ? null : (int) $row->import_id,
+            ];
+        }, $history->items());
         $imports = DB::table('analytics_imports')
             ->where('source_name', 'POS CSV')
             ->whereRaw('LOWER(file_name) LIKE ?', ['%.csv'])

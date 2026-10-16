@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Support\SalesItemSize;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -34,6 +35,35 @@ class ProcessSalesCsvImport implements ShouldQueue
 
     public function handle(): void
     {
+        $claimed = DB::transaction(function () {
+            $import = DB::table('analytics_imports')
+                ->where('id', $this->importId)
+                ->lockForUpdate()
+                ->first(['status']);
+
+            if (!$import || $import->status !== 'queued') {
+                return false;
+            }
+
+            return DB::table('analytics_imports')
+                ->where('id', $this->importId)
+                ->where('status', 'queued')
+                ->update([
+                    'status' => 'processing',
+                    'rows_received' => 0,
+                    'rows_processed' => 0,
+                    'error_message' => null,
+                ]) === 1;
+        });
+
+        if (!$claimed) {
+            if (!DB::table('analytics_imports')->where('id', $this->importId)->exists()) {
+                Storage::disk('local')->delete($this->storedPath);
+            }
+
+            return;
+        }
+
         $handle = Storage::disk('local')->readStream($this->storedPath);
         if (!is_resource($handle)) {
             throw new RuntimeException('The uploaded CSV file could not be opened.');
@@ -51,12 +81,6 @@ class ProcessSalesCsvImport implements ShouldQueue
             }
 
             DB::table('analytics_sales_history')->where('import_id', $this->importId)->delete();
-            DB::table('analytics_imports')->where('id', $this->importId)->update([
-                'status' => 'processing',
-                'rows_received' => 0,
-                'rows_processed' => 0,
-                'error_message' => null,
-            ]);
 
             $batch = [];
             $rowsReceived = 0;
@@ -197,7 +221,11 @@ class ProcessSalesCsvImport implements ShouldQueue
 
         return [
             'name' => $name,
-            'size' => mb_substr(trim((string) ($row['size'] ?? '')), 0, 120) ?: null,
+            'size' => mb_substr(
+                trim((string) ($row['size'] ?? '')) ?: (SalesItemSize::fromProductName($name) ?? ''),
+                0,
+                120
+            ) ?: null,
             'sale_date' => $saleDate,
             'quantity' => $quantity,
             'total' => round($total, 2),
