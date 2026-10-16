@@ -466,7 +466,7 @@ export default function WasteTracking() {
                             })}
                           </td>
                           <td className="px-5 py-4">
-                            <div className="font-semibold flex items-center gap-2" style={{ color: C.ink }}>
+                            <div className="flex items-center gap-2 text-[11px] font-semibold" style={{ color: C.ink }}>
                               {e.item}
                               {flagged && (
                                 <span title="Frequent waste item — review safety stock">
