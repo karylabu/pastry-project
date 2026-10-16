@@ -403,6 +403,7 @@ export default function AdminNavbar({ onSidebarChange }) {
                               <div className="mt-1 truncate text-[11px] text-[#74675f]">{n.message}</div>
                               <div className="mt-2 flex items-center gap-2">
                                 {!n.is_read && <span className="inline-flex items-center gap-1 rounded-full bg-[#c36b77] px-2 py-0.5 text-[10px] font-semibold text-white">New</span>}
+                                {n.is_read && <span className="inline-flex items-center gap-1 rounded-full bg-[#f1eee9] px-2 py-0.5 text-[10px] font-medium text-[#74675f]">Read</span>}
                                 {n.action_url && n.action_url.startsWith('/admin/') && (
                                   <button type="button" onClick={() => { markNotificationRead(n.id); navigate(n.action_url); setNotificationsOpen(false); }} className="ml-auto text-[11px] font-semibold text-[#80600a]">Open</button>
                                 )}

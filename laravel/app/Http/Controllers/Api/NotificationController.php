@@ -39,7 +39,6 @@ class NotificationController extends Controller
         $this->syncInventoryNotifications($user);
 
         $notifications = AdminNotification::forUser($user->id)
-            ->unread()
             ->orderByDesc('created_at')
             ->limit(10)
             ->get([
