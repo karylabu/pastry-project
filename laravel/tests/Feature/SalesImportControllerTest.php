@@ -493,23 +493,66 @@ class SalesImportControllerTest extends TestCase
             'source_name' => 'POS CSV',
             'uploaded_at' => now(),
             'status' => 'completed',
-            'rows_received' => 1,
-            'rows_processed' => 1,
+            'rows_received' => 6,
+            'rows_processed' => 6,
         ]);
         DB::table('analytics_sales_history')->insert([
-            'import_id' => $importId,
-            'product_name' => '6x3 Chocolate Floral Cake',
-            'sale_date' => '2026-10-01',
-            'units_sold' => 1,
-            'revenue' => 1250,
+            [
+                'import_id' => $importId,
+                'product_name' => '6x3 Chocolate Floral Cake',
+                'sale_date' => '2026-10-01',
+                'units_sold' => 1,
+                'revenue' => 1250,
+            ],
+            [
+                'import_id' => $importId,
+                'product_name' => 'Bento - Floral',
+                'sale_date' => '2026-10-02',
+                'units_sold' => 1,
+                'revenue' => 500,
+            ],
+            [
+                'import_id' => $importId,
+                'product_name' => 'Mini 2-Tier Cake',
+                'sale_date' => '2026-10-03',
+                'units_sold' => 1,
+                'revenue' => 1700,
+            ],
+            [
+                'import_id' => $importId,
+                'product_name' => 'Mini Two Tier Cake',
+                'sale_date' => '2026-10-04',
+                'units_sold' => 1,
+                'revenue' => 1800,
+            ],
+            [
+                'import_id' => $importId,
+                'product_name' => 'Topper',
+                'sale_date' => '2026-10-05',
+                'units_sold' => 1,
+                'revenue' => 200,
+            ],
+            [
+                'import_id' => $importId,
+                'product_name' => 'Dog Cake',
+                'sale_date' => '2026-10-06',
+                'units_sold' => 1,
+                'revenue' => 500,
+            ],
         ]);
 
         $this->actingAs($admin);
-        $response = app(SalesImportController::class)->history(Request::create('/api/sales/import/history?source=imported', 'GET'));
+        $response = app(SalesImportController::class)->history(Request::create('/api/sales/import/history?source=imported&per_page=10', 'GET'));
         $payload = $response->getData(true);
+        $sizesByName = collect($payload['sales'])->pluck('size', 'cake_name');
 
         $this->assertSame(200, $response->getStatusCode());
-        $this->assertSame('6x3', $payload['sales'][0]['size']);
+        $this->assertSame('6x3', $sizesByName['6x3 Chocolate Floral Cake']);
+        $this->assertSame('Bento', $sizesByName['Bento - Floral']);
+        $this->assertSame('Two Tier', $sizesByName['Mini 2-Tier Cake']);
+        $this->assertSame('Two Tier', $sizesByName['Mini Two Tier Cake']);
+        $this->assertNull($sizesByName['Topper']);
+        $this->assertSame('Other', $sizesByName['Dog Cake']);
     }
 
     public function test_admin_can_delete_a_completed_csv_import_and_its_sales_rows(): void
