@@ -22,6 +22,8 @@ class SalesImportControllerTest extends TestCase
 
         Schema::dropIfExists('analytics_sales_history');
         Schema::dropIfExists('analytics_imports');
+        Schema::dropIfExists('jobs');
+        Schema::dropIfExists('failed_jobs');
         Schema::dropIfExists('sales');
         Schema::dropIfExists('products');
         Schema::dropIfExists('users');
@@ -48,11 +50,33 @@ class SalesImportControllerTest extends TestCase
             $table->integer('rows_processed')->default(0);
             $table->text('error_message')->nullable();
             $table->char('source_hash', 64)->nullable()->unique();
+            $table->string('stored_path')->nullable();
+            $table->unsignedBigInteger('queue_job_id')->nullable();
+        });
+
+        Schema::create('jobs', function (Blueprint $table) {
+            $table->bigIncrements('id');
+            $table->string('queue')->index();
+            $table->longText('payload');
+            $table->unsignedTinyInteger('attempts')->default(0);
+            $table->unsignedInteger('reserved_at')->nullable();
+            $table->unsignedInteger('available_at')->default(0);
+            $table->unsignedInteger('created_at')->default(0);
+        });
+
+        Schema::create('failed_jobs', function (Blueprint $table) {
+            $table->bigIncrements('id');
+            $table->string('uuid')->unique();
+            $table->text('connection');
+            $table->text('queue');
+            $table->longText('payload');
+            $table->longText('exception');
+            $table->timestamp('failed_at')->useCurrent();
         });
 
         Schema::create('analytics_sales_history', function (Blueprint $table) {
             $table->id();
-            $table->unsignedBigInteger('import_id')->nullable();
+            $table->foreignId('import_id')->nullable()->constrained('analytics_imports')->cascadeOnDelete();
             $table->string('product_name');
             $table->string('size', 120)->nullable();
             $table->date('sale_date');
@@ -187,26 +211,78 @@ class SalesImportControllerTest extends TestCase
         $admin = User::factory()->createOne(['role' => 'admin']);
         $contents = "sale_date,product,quantity,price,total\n2021-01-01,Croissant,2,50,100\n";
 
-        $this->actingAs($admin)
-            ->post('/api/sales/import-csv', ['file' => UploadedFile::fake()->createWithContent('history.csv', $contents), 'sales_type' => 'customized_cake'])
-            ->assertAccepted()
-            ->assertJsonPath('status', 'queued');
+        $this->actingAs($admin);
+        $response = app(SalesImportController::class)->storeCsv(Request::create(
+            '/api/sales/import-csv',
+            'POST',
+            ['sales_type' => 'customized_cake'],
+            [],
+            ['file' => UploadedFile::fake()->createWithContent('history.csv', $contents)],
+            ['HTTP_ACCEPT' => 'application/json'],
+        ));
+        $this->assertSame(202, $response->getStatusCode());
+        $this->assertSame('queued', $response->getData(true)['status']);
 
         Queue::assertPushed(ProcessSalesCsvImport::class, 1);
         $this->assertDatabaseHas('analytics_imports', ['file_name' => 'history.csv', 'sales_type' => 'customized_cake']);
-        $this->actingAs($admin)
-            ->post('/api/sales/import-csv', ['file' => UploadedFile::fake()->createWithContent('history.csv', $contents), 'sales_type' => 'customized_cake'])
-            ->assertStatus(409)
-            ->assertJsonPath('duplicate', true);
+        $duplicate = app(SalesImportController::class)->storeCsv(Request::create(
+            '/api/sales/import-csv',
+            'POST',
+            ['sales_type' => 'customized_cake'],
+            [],
+            ['file' => UploadedFile::fake()->createWithContent('history.csv', $contents)],
+            ['HTTP_ACCEPT' => 'application/json'],
+        ));
+        $this->assertSame(409, $duplicate->getStatusCode());
+        $this->assertTrue($duplicate->getData(true)['duplicate']);
 
         $correctedContents = "sale_date,product,quantity,price,total\n2021-01-02,Croissant,3,50,150\n";
-        $this->actingAs($admin)
-            ->post('/api/sales/import-csv', ['file' => UploadedFile::fake()->createWithContent('history.csv', $correctedContents), 'sales_type' => 'customized_cake'])
-            ->assertAccepted()
-            ->assertJsonPath('status', 'queued');
+        $corrected = app(SalesImportController::class)->storeCsv(Request::create(
+            '/api/sales/import-csv',
+            'POST',
+            ['sales_type' => 'customized_cake'],
+            [],
+            ['file' => UploadedFile::fake()->createWithContent('history.csv', $correctedContents)],
+            ['HTTP_ACCEPT' => 'application/json'],
+        ));
+        $this->assertSame(202, $corrected->getStatusCode());
+        $this->assertSame('queued', $corrected->getData(true)['status']);
 
         $this->assertDatabaseCount('analytics_imports', 2);
         Queue::assertPushed(ProcessSalesCsvImport::class, 2);
+    }
+
+    public function test_direct_csv_upload_persists_the_database_queue_job_id_and_processes_normally(): void
+    {
+        Storage::fake('local');
+        $admin = User::factory()->createOne(['role' => 'admin']);
+        $file = UploadedFile::fake()->createWithContent(
+            'normal.csv',
+            "sale_date,product,quantity,price,total\n2026-10-01,Croissant,2,50,100\n",
+        );
+        $request = Request::create(
+            '/api/sales/import-csv',
+            'POST',
+            [],
+            [],
+            ['file' => $file],
+            ['HTTP_ACCEPT' => 'application/json'],
+        );
+
+        $this->actingAs($admin);
+        $response = app(SalesImportController::class)->storeCsv($request);
+        $payload = $response->getData(true);
+        $import = DB::table('analytics_imports')->where('id', $payload['import_id'])->first();
+
+        $this->assertSame(202, $response->getStatusCode());
+        $this->assertNotNull($import->queue_job_id);
+        $this->assertDatabaseHas('jobs', ['id' => $import->queue_job_id]);
+
+        (new ProcessSalesCsvImport((int) $import->id, $import->stored_path))->handle();
+
+        $this->assertDatabaseHas('analytics_imports', ['id' => $import->id, 'status' => 'completed', 'rows_processed' => 1]);
+        $this->assertDatabaseHas('analytics_sales_history', ['import_id' => $import->id, 'product_name' => 'Croissant']);
+        DB::table('jobs')->where('id', $import->queue_job_id)->delete();
     }
 
     public function test_completed_duplicate_csv_can_be_reprocessed_under_a_new_sales_type(): void
@@ -233,18 +309,29 @@ class SalesImportControllerTest extends TestCase
             'revenue' => 500,
         ]);
 
-        $this->actingAs($admin)
-            ->post('/api/sales/import-csv', [
-                'file' => UploadedFile::fake()->createWithContent('history.csv', $contents),
-                'sales_type' => 'customized_cake',
-            ])
-            ->assertAccepted()
-            ->assertJsonPath('status', 'queued')
-            ->assertJsonPath('import_id', $importId);
+        $request = Request::create(
+            '/api/sales/import-csv',
+            'POST',
+            ['sales_type' => 'customized_cake'],
+            [],
+            ['file' => UploadedFile::fake()->createWithContent('history.csv', $contents)],
+            ['HTTP_ACCEPT' => 'application/json'],
+        );
+        $this->actingAs($admin);
+        $response = app(SalesImportController::class)->storeCsv($request);
+        $this->assertSame(202, $response->getStatusCode());
+        $this->assertSame('queued', $response->getData(true)['status']);
+        $this->assertSame($importId, $response->getData(true)['import_id']);
 
         $this->assertDatabaseHas('analytics_imports', ['id' => $importId, 'sales_type' => 'customized_cake', 'status' => 'queued']);
         $this->assertDatabaseCount('analytics_sales_history', 1);
         Queue::assertPushed(ProcessSalesCsvImport::class, 1);
+
+        Queue::pushed(ProcessSalesCsvImport::class)->first()->handle();
+
+        $this->assertDatabaseHas('analytics_imports', ['id' => $importId, 'status' => 'completed', 'sales_type' => 'customized_cake']);
+        $this->assertDatabaseCount('analytics_sales_history', 1);
+        $this->assertDatabaseHas('analytics_sales_history', ['import_id' => $importId, 'revenue' => 500]);
     }
 
     public function test_failed_exact_csv_import_can_be_retried_without_creating_another_import(): void
@@ -263,13 +350,16 @@ class SalesImportControllerTest extends TestCase
             'source_hash' => hash('sha256', $contents),
         ]);
 
-        $this->actingAs($admin)
-            ->post('/api/sales/import-csv', [
-                'file' => UploadedFile::fake()->createWithContent('history.csv', $contents),
-                'retry_failed' => true,
-            ])
-            ->assertAccepted()
-            ->assertJsonPath('import_id', $importId);
+        $this->actingAs($admin);
+        $response = app(SalesImportController::class)->storeCsv(Request::create(
+            '/api/sales/import-csv',
+            'POST',
+            ['retry_failed' => true],
+            [],
+            ['file' => UploadedFile::fake()->createWithContent('history.csv', $contents)],
+        ));
+        $this->assertSame(202, $response->getStatusCode());
+        $this->assertSame($importId, $response->getData(true)['import_id']);
 
         $this->assertDatabaseCount('analytics_imports', 1);
         $this->assertDatabaseHas('analytics_imports', ['id' => $importId, 'status' => 'queued', 'sales_type' => 'other']);
@@ -354,11 +444,72 @@ class SalesImportControllerTest extends TestCase
             'rows_processed' => 1,
         ]);
 
-        $this->actingAs($admin)
-            ->getJson('/api/sales/import/history?source=imported')
-            ->assertOk()
-            ->assertJsonPath('sales.0.size', '8 inch')
-            ->assertJsonPath('imports.0.file_name', 'design-sales.csv');
+        $this->actingAs($admin);
+        $response = app(SalesImportController::class)->history(Request::create('/api/sales/import/history?source=imported', 'GET'));
+        $payload = $response->getData(true);
+
+        $this->assertSame(200, $response->getStatusCode());
+        $this->assertSame('8 inch', $payload['sales'][0]['size']);
+        $this->assertSame('design-sales.csv', $payload['imports'][0]['file_name']);
+    }
+
+    public function test_csv_job_uses_dimensions_in_product_name_when_size_is_missing(): void
+    {
+        Storage::fake('local');
+        $admin = User::factory()->createOne(['role' => 'admin']);
+        $importId = DB::table('analytics_imports')->insertGetId([
+            'file_name' => 'dimension-sales.csv',
+            'source_name' => 'POS CSV',
+            'uploaded_at' => now(),
+            'status' => 'queued',
+            'rows_received' => 0,
+            'rows_processed' => 0,
+        ]);
+        Storage::disk('local')->put(
+            'sales-imports/dimension-sales.csv',
+            "DATE,DESIGN,SIZE,PRICE\n2026-10-01,6 x 3 Chocolate Floral Cake,,1250\n"
+        );
+
+        (new ProcessSalesCsvImport($importId, 'sales-imports/dimension-sales.csv'))->handle();
+
+        $this->assertDatabaseHas('analytics_sales_history', [
+            'import_id' => $importId,
+            'product_name' => '6 x 3 Chocolate Floral Cake',
+            'size' => '6x3',
+        ]);
+        $this->actingAs($admin);
+        $response = app(SalesImportController::class)->history(Request::create('/api/sales/import/history?source=imported', 'GET'));
+        $payload = $response->getData(true);
+
+        $this->assertSame(200, $response->getStatusCode());
+        $this->assertSame('6x3', $payload['sales'][0]['size']);
+    }
+
+    public function test_history_infers_dimensions_for_existing_imported_rows_without_a_size(): void
+    {
+        $admin = User::factory()->createOne(['role' => 'admin']);
+        $importId = DB::table('analytics_imports')->insertGetId([
+            'file_name' => 'older-cakes.csv',
+            'source_name' => 'POS CSV',
+            'uploaded_at' => now(),
+            'status' => 'completed',
+            'rows_received' => 1,
+            'rows_processed' => 1,
+        ]);
+        DB::table('analytics_sales_history')->insert([
+            'import_id' => $importId,
+            'product_name' => '6x3 Chocolate Floral Cake',
+            'sale_date' => '2026-10-01',
+            'units_sold' => 1,
+            'revenue' => 1250,
+        ]);
+
+        $this->actingAs($admin);
+        $response = app(SalesImportController::class)->history(Request::create('/api/sales/import/history?source=imported', 'GET'));
+        $payload = $response->getData(true);
+
+        $this->assertSame(200, $response->getStatusCode());
+        $this->assertSame('6x3', $payload['sales'][0]['size']);
     }
 
     public function test_admin_can_delete_a_completed_csv_import_and_its_sales_rows(): void
@@ -381,14 +532,110 @@ class SalesImportControllerTest extends TestCase
             'units_sold' => 1,
             'revenue' => 850,
         ]);
+        $otherImportId = DB::table('analytics_imports')->insertGetId([
+            'file_name' => 'preserve.csv',
+            'source_name' => 'POS CSV',
+            'uploaded_at' => now(),
+            'status' => 'completed',
+        ]);
+        DB::table('analytics_sales_history')->insert([
+            'import_id' => $otherImportId,
+            'product_name' => 'Retained Cake',
+            'sale_date' => '2026-10-01',
+            'units_sold' => 1,
+            'revenue' => 100,
+        ]);
+        DB::table('sales')->insert([
+            'cake_name' => 'Customer Order',
+            'price' => 100,
+            'down_payment' => 50,
+            'remaining_balance' => 50,
+            'sale_date' => '2026-10-01',
+        ]);
 
-        $this->actingAs($admin)
-            ->deleteJson("/api/sales/import/{$importId}")
-            ->assertOk()
-            ->assertJsonPath('success', true);
+        $this->actingAs($admin);
+        $response = app(SalesImportController::class)->deleteImport(
+            Request::create("/api/sales/import/{$importId}", 'DELETE'),
+            $importId,
+        );
+        $this->assertSame(200, $response->getStatusCode());
+        $this->assertTrue($response->getData(true)['success']);
 
         $this->assertDatabaseMissing('analytics_imports', ['id' => $importId]);
         $this->assertDatabaseMissing('analytics_sales_history', ['import_id' => $importId]);
+        $this->assertDatabaseHas('analytics_sales_history', ['import_id' => $otherImportId, 'product_name' => 'Retained Cake']);
+        $this->assertDatabaseHas('sales', ['cake_name' => 'Customer Order']);
+    }
+
+    public function test_admin_can_delete_a_queued_csv_import_and_its_stored_file(): void
+    {
+        Storage::fake('local');
+        $admin = User::factory()->createOne(['role' => 'admin']);
+        $storedPath = 'sales-imports/queued.csv';
+        Storage::disk('local')->put($storedPath, 'queued,csv');
+        $payload = json_encode(['data' => ['command' => serialize(new ProcessSalesCsvImport(1, $storedPath))]]);
+        $queueJobId = DB::table('jobs')->insertGetId([
+            'queue' => 'default',
+            'payload' => $payload,
+            'available_at' => time(),
+            'created_at' => time(),
+        ]);
+        $importId = DB::table('analytics_imports')->insertGetId([
+            'file_name' => 'queued.csv',
+            'source_name' => 'POS CSV',
+            'uploaded_at' => now(),
+            'status' => 'queued',
+            'stored_path' => $storedPath,
+            'queue_job_id' => $queueJobId,
+        ]);
+        $payload = json_encode(['data' => ['command' => serialize(new ProcessSalesCsvImport($importId, $storedPath))]]);
+        DB::table('jobs')->where('id', $queueJobId)->update(['payload' => $payload]);
+
+        $this->actingAs($admin);
+        $response = app(SalesImportController::class)->deleteImport(
+            Request::create("/api/sales/import/{$importId}", 'DELETE'),
+            $importId,
+        );
+        $this->assertSame(200, $response->getStatusCode());
+        $this->assertTrue($response->getData(true)['success']);
+
+        $this->assertDatabaseMissing('analytics_imports', ['id' => $importId]);
+        $this->assertDatabaseMissing('jobs', ['id' => $queueJobId]);
+        Storage::disk('local')->assertMissing($storedPath);
+
+        (new ProcessSalesCsvImport($importId, $storedPath))->handle();
+        $this->assertDatabaseMissing('analytics_sales_history', ['import_id' => $importId]);
+    }
+
+    public function test_legacy_queued_import_without_stored_path_cleans_its_matching_job_and_file(): void
+    {
+        Storage::fake('local');
+        $admin = User::factory()->createOne(['role' => 'admin']);
+        $storedPath = 'sales-imports/legacy-queued.csv';
+        Storage::disk('local')->put($storedPath, 'legacy queued file');
+        $importId = DB::table('analytics_imports')->insertGetId([
+            'file_name' => 'legacy-queued.csv',
+            'source_name' => 'POS CSV',
+            'uploaded_at' => now(),
+            'status' => 'queued',
+        ]);
+        $queueJobId = DB::table('jobs')->insertGetId([
+            'queue' => 'default',
+            'payload' => json_encode(['data' => ['command' => serialize(new ProcessSalesCsvImport($importId, $storedPath))]]),
+            'available_at' => time(),
+            'created_at' => time(),
+        ]);
+
+        $this->actingAs($admin);
+        $response = app(SalesImportController::class)->deleteImport(
+            Request::create("/api/sales/import/{$importId}", 'DELETE'),
+            $importId,
+        );
+
+        $this->assertSame(200, $response->getStatusCode());
+        $this->assertDatabaseMissing('jobs', ['id' => $queueJobId]);
+        $this->assertDatabaseMissing('analytics_imports', ['id' => $importId]);
+        Storage::disk('local')->assertMissing($storedPath);
     }
 
     public function test_admin_can_filter_imported_history_to_one_csv_file(): void
@@ -441,9 +688,12 @@ class SalesImportControllerTest extends TestCase
         $this->assertSame($firstImportId, $payload['sales'][0]['import_id']);
     }
 
-    public function test_csv_import_cannot_be_deleted_while_it_is_processing(): void
+    public function test_processing_csv_import_can_be_cancelled_and_only_its_sales_rows_are_removed(): void
     {
+        Storage::fake('local');
         $admin = User::factory()->createOne(['role' => 'admin']);
+        $storedPath = 'sales-imports/processing.csv';
+        Storage::disk('local')->put($storedPath, "product,quantity,total\nCake,1,10\n");
         $importId = DB::table('analytics_imports')->insertGetId([
             'file_name' => 'processing.csv',
             'source_name' => 'POS CSV',
@@ -451,12 +701,180 @@ class SalesImportControllerTest extends TestCase
             'status' => 'processing',
             'rows_received' => 1,
             'rows_processed' => 0,
+            'stored_path' => $storedPath,
+        ]);
+        $otherImportId = DB::table('analytics_imports')->insertGetId([
+            'file_name' => 'other.csv',
+            'source_name' => 'POS CSV',
+            'uploaded_at' => now(),
+            'status' => 'completed',
+        ]);
+        DB::table('analytics_sales_history')->insert([
+            ['import_id' => $importId, 'product_name' => 'Partial Cake', 'sale_date' => '2026-10-01', 'units_sold' => 1, 'revenue' => 10],
+            ['import_id' => $otherImportId, 'product_name' => 'Other Cake', 'sale_date' => '2026-10-01', 'units_sold' => 1, 'revenue' => 20],
+        ]);
+        DB::table('sales')->insert([
+            'cake_name' => 'Customer Order',
+            'price' => 100,
+            'down_payment' => 50,
+            'remaining_balance' => 50,
+            'sale_date' => '2026-10-01',
         ]);
 
-        $this->actingAs($admin)
-            ->deleteJson("/api/sales/import/{$importId}")
-            ->assertStatus(409)
-            ->assertJsonPath('success', false);
+        $this->actingAs($admin);
+        $response = app(SalesImportController::class)->deleteImport(
+            Request::create("/api/sales/import/{$importId}", 'DELETE'),
+            $importId,
+        );
+        $this->assertSame(202, $response->getStatusCode());
+        $this->assertTrue($response->getData(true)['success']);
+        $this->assertSame('cancellation_requested', $response->getData(true)['status']);
+
+        $this->assertDatabaseHas('analytics_imports', ['id' => $importId, 'status' => 'cancellation_requested']);
+        $repeatResponse = app(SalesImportController::class)->deleteImport(
+            Request::create("/api/sales/import/{$importId}", 'DELETE'),
+            $importId,
+        );
+        $this->assertSame(202, $repeatResponse->getStatusCode());
+
+        (new ProcessSalesCsvImport($importId, $storedPath))->handle();
+
+        $this->assertDatabaseMissing('analytics_imports', ['id' => $importId]);
+        $this->assertDatabaseMissing('analytics_sales_history', ['import_id' => $importId]);
+        $this->assertDatabaseHas('analytics_sales_history', ['import_id' => $otherImportId, 'product_name' => 'Other Cake']);
+        $this->assertDatabaseHas('sales', ['cake_name' => 'Customer Order']);
+        Storage::disk('local')->assertMissing($storedPath);
+    }
+
+    public function test_failed_csv_import_can_be_deleted_without_deleting_another_imports_sales(): void
+    {
+        $admin = User::factory()->createOne(['role' => 'admin']);
+        $failedImportId = DB::table('analytics_imports')->insertGetId([
+            'file_name' => 'failed.csv',
+            'source_name' => 'POS CSV',
+            'uploaded_at' => now(),
+            'status' => 'failed',
+        ]);
+        $otherImportId = DB::table('analytics_imports')->insertGetId([
+            'file_name' => 'completed.csv',
+            'source_name' => 'POS CSV',
+            'uploaded_at' => now(),
+            'status' => 'completed',
+        ]);
+        DB::table('failed_jobs')->insert([
+            [
+                'uuid' => (string) \Illuminate\Support\Str::uuid(),
+                'connection' => 'database',
+                'queue' => 'default',
+                'payload' => json_encode(['data' => ['command' => serialize(new ProcessSalesCsvImport($failedImportId, 'sales-imports/failed.csv'))]]),
+                'exception' => 'CSV failed',
+            ],
+            [
+                'uuid' => (string) \Illuminate\Support\Str::uuid(),
+                'connection' => 'database',
+                'queue' => 'default',
+                'payload' => json_encode(['data' => ['command' => serialize(new ProcessSalesCsvImport($otherImportId, 'sales-imports/other.csv'))]]),
+                'exception' => 'Other CSV failed',
+            ],
+        ]);
+        DB::table('analytics_sales_history')->insert([
+            ['import_id' => $failedImportId, 'product_name' => 'Failed File Row', 'sale_date' => '2026-10-01', 'units_sold' => 1, 'revenue' => 10],
+            ['import_id' => $otherImportId, 'product_name' => 'Retained Row', 'sale_date' => '2026-10-01', 'units_sold' => 1, 'revenue' => 20],
+        ]);
+
+        $this->actingAs($admin);
+        $response = app(SalesImportController::class)->deleteImport(
+            Request::create("/api/sales/import/{$failedImportId}", 'DELETE'),
+            $failedImportId,
+        );
+
+        $this->assertSame(200, $response->getStatusCode());
+        $this->assertDatabaseMissing('analytics_imports', ['id' => $failedImportId]);
+        $this->assertDatabaseMissing('analytics_sales_history', ['import_id' => $failedImportId]);
+        $this->assertDatabaseHas('analytics_sales_history', ['import_id' => $otherImportId, 'product_name' => 'Retained Row']);
+        $this->assertDatabaseMissing('failed_jobs', ['exception' => 'CSV failed']);
+        $this->assertDatabaseHas('failed_jobs', ['exception' => 'Other CSV failed']);
+    }
+
+    public function test_worker_does_not_process_a_cancelled_queued_import(): void
+    {
+        Storage::fake('local');
+        $cancelledImportId = DB::table('analytics_imports')->insertGetId([
+            'file_name' => 'cancelled.csv',
+            'source_name' => 'POS CSV',
+            'uploaded_at' => now(),
+            'status' => 'cancellation_requested',
+        ]);
+        $storedPath = 'sales-imports/cancelled.csv';
+        Storage::disk('local')->put($storedPath, "product,quantity,total\nCake,1,10\n");
+
+        (new ProcessSalesCsvImport($cancelledImportId, $storedPath))->handle();
+
+        $this->assertDatabaseMissing('analytics_imports', ['id' => $cancelledImportId]);
+        $this->assertDatabaseMissing('analytics_sales_history', ['import_id' => $cancelledImportId]);
+        Storage::disk('local')->assertMissing($storedPath);
+    }
+
+    public function test_worker_stops_at_a_batch_checkpoint_if_cancellation_races_with_processing(): void
+    {
+        Storage::fake('local');
+        $importId = DB::table('analytics_imports')->insertGetId([
+            'file_name' => 'race.csv',
+            'source_name' => 'POS CSV',
+            'uploaded_at' => now(),
+            'status' => 'queued',
+        ]);
+        $storedPath = 'sales-imports/race.csv';
+        $lines = ['product,quantity,total'];
+        for ($row = 1; $row <= 1001; $row++) {
+            $lines[] = "Cake {$row},1,10";
+        }
+        Storage::disk('local')->put($storedPath, implode("\n", $lines));
+        $cancellationRequested = false;
+        DB::listen(function (\Illuminate\Database\Events\QueryExecuted $query) use ($importId, &$cancellationRequested): void {
+            if (
+                !$cancellationRequested
+                && str_starts_with(strtolower($query->sql), 'insert into')
+                && str_contains($query->sql, 'analytics_sales_history')
+                && in_array((string) $importId, array_map('strval', array_filter($query->bindings, 'is_scalar')), true)
+            ) {
+                $cancellationRequested = true;
+                DB::table('analytics_imports')
+                    ->where('id', $importId)
+                    ->update(['status' => 'cancellation_requested']);
+            }
+        });
+
+        (new ProcessSalesCsvImport($importId, $storedPath))->handle();
+
+        $this->assertTrue($cancellationRequested);
+        $this->assertDatabaseMissing('analytics_imports', ['id' => $importId]);
+        $this->assertDatabaseMissing('analytics_sales_history', ['import_id' => $importId]);
+        Storage::disk('local')->assertMissing($storedPath);
+    }
+
+    public function test_delete_rejects_unauthorized_and_invalid_import_ids(): void
+    {
+        $importId = DB::table('analytics_imports')->insertGetId([
+            'file_name' => 'protected.csv',
+            'source_name' => 'POS CSV',
+            'uploaded_at' => now(),
+            'status' => 'queued',
+        ]);
+
+        $unauthorized = app(SalesImportController::class)->deleteImport(
+            Request::create("/api/sales/import/{$importId}", 'DELETE'),
+            $importId,
+        );
+        $this->assertSame(401, $unauthorized->getStatusCode());
+
+        $admin = User::factory()->createOne(['role' => 'admin']);
+        $this->actingAs($admin);
+        $missing = app(SalesImportController::class)->deleteImport(
+            Request::create('/api/sales/import/999999', 'DELETE'),
+            999999,
+        );
+        $this->assertSame(404, $missing->getStatusCode());
 
         $this->assertDatabaseHas('analytics_imports', ['id' => $importId]);
     }

@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 use Smalot\PdfParser\Parser as PdfParser;
@@ -101,46 +102,66 @@ class SalesImportController extends Controller
         }
 
         try {
-            if ($retryImportId !== null) {
-                $updated = DB::table('analytics_imports')
-                    ->where('id', $retryImportId)
-                    ->whereIn('status', ['failed', 'completed'])
-                    ->update([
+            $importId = DB::transaction(function () use ($retryImportId, $file, $salesType, $sourceHash, $storedPath): ?int {
+                if ($retryImportId !== null) {
+                    $import = DB::table('analytics_imports')
+                        ->where('id', $retryImportId)
+                        ->lockForUpdate()
+                        ->first(['status']);
+                    if (!$import || !in_array($import->status, ['failed', 'completed'], true)) {
+                        return null;
+                    }
+
+                    DB::table('analytics_imports')
+                        ->where('id', $retryImportId)
+                        ->update([
+                            'file_name' => basename($file->getClientOriginalName()),
+                            'status' => 'queued',
+                            'rows_received' => 0,
+                            'rows_processed' => 0,
+                            'error_message' => null,
+                            'uploaded_at' => now(),
+                            'sales_type' => $salesType,
+                            'stored_path' => $storedPath,
+                            'queue_job_id' => null,
+                        ]);
+                    $importId = $retryImportId;
+                } else {
+                    $importId = (int) DB::table('analytics_imports')->insertGetId([
                         'file_name' => basename($file->getClientOriginalName()),
+                        'source_name' => 'POS CSV',
+                        'sales_type' => $salesType,
+                        'uploaded_at' => now(),
                         'status' => 'queued',
                         'rows_received' => 0,
                         'rows_processed' => 0,
-                        'error_message' => null,
-                        'uploaded_at' => now(),
-                        'sales_type' => $salesType,
+                        'source_hash' => $sourceHash,
                         'stored_path' => $storedPath,
                     ]);
-                if (!$updated) {
-                    Storage::disk('local')->delete($storedPath);
-                    return response()->json([
-                        'success' => false,
-                        'duplicate' => true,
-                        'import_id' => $retryImportId,
-                        'status' => 'processing',
-                        'message' => 'This CSV is already being retried.',
-                    ], 409);
                 }
-                $importId = $retryImportId;
-            } else {
-                $importId = (int) DB::table('analytics_imports')->insertGetId([
-                    'file_name' => basename($file->getClientOriginalName()),
-                    'source_name' => 'POS CSV',
-                    'sales_type' => $salesType,
-                    'uploaded_at' => now(),
-                    'status' => 'queued',
-                    'rows_received' => 0,
-                    'rows_processed' => 0,
-                    'source_hash' => $sourceHash,
-                    'stored_path' => $storedPath,
-                ]);
-            }
 
-            ProcessSalesCsvImport::dispatch($importId, $storedPath)->onConnection('database');
+                $queueJobId = Queue::connection('database')->pushOn(
+                    (string) config('queue.connections.database.queue', 'default'),
+                    new ProcessSalesCsvImport($importId, $storedPath),
+                );
+                DB::table('analytics_imports')->where('id', $importId)->update([
+                    'queue_job_id' => $queueJobId,
+                ]);
+
+                return $importId;
+            });
+
+            if ($importId === null) {
+                Storage::disk('local')->delete($storedPath);
+
+                return response()->json([
+                    'success' => false,
+                    'duplicate' => true,
+                    'import_id' => $retryImportId,
+                    'status' => 'processing',
+                    'message' => 'This CSV is already being retried or is no longer eligible for retry.',
+                ], 409);
+            }
         } catch (\Illuminate\Database\QueryException $exception) {
             Storage::disk('local')->delete($storedPath);
             $existing = DB::table('analytics_imports')->where('source_hash', $sourceHash)->first();
@@ -221,36 +242,137 @@ class SalesImportController extends Controller
             return $user;
         }
 
-        return DB::transaction(function () use ($importId) {
+        $result = DB::transaction(function () use ($importId) {
             $import = DB::table('analytics_imports')
                 ->where('id', $importId)
                 ->lockForUpdate()
-                ->first(['id', 'file_name', 'source_name', 'status', 'stored_path']);
+                ->first(['id', 'file_name', 'source_name', 'status', 'stored_path', 'queue_job_id']);
 
             if (!$import) {
-                return response()->json(['success' => false, 'message' => 'Import not found.'], 404);
+                return ['response' => response()->json(['success' => false, 'message' => 'Import not found.'], 404)];
             }
             if ($import->source_name !== 'POS CSV' || strtolower(pathinfo($import->file_name, PATHINFO_EXTENSION)) !== 'csv') {
-                return response()->json(['success' => false, 'message' => 'Only imported CSV files can be deleted here.'], 422);
+                return ['response' => response()->json(['success' => false, 'message' => 'Only imported CSV files can be deleted here.'], 422)];
             }
-            if ($import->status === 'processing') {
-                return response()->json(['success' => false, 'message' => 'Wait for CSV processing to finish before deleting this import.'], 409);
+            if (in_array($import->status, ['processing', 'cancellation_requested'], true)) {
+                if ($import->status === 'processing') {
+                    DB::table('analytics_imports')->where('id', $importId)->update([
+                        'status' => 'cancellation_requested',
+                    ]);
+                }
+
+                return [
+                    'response' => response()->json([
+                        'success' => true,
+                        'status' => 'cancellation_requested',
+                        'message' => 'Cancellation requested. The active worker will remove this import at its next safe checkpoint.',
+                    ], 202),
+                ];
             }
 
-            if ($import->stored_path && !Storage::disk('local')->delete($import->stored_path)) {
+            $storedPath = $import->stored_path;
+            $queuedJob = null;
+            if ($import->status === 'queued') {
+                $queuedJob = $this->findQueuedImportJob($importId);
+                $storedPath = $storedPath ?: ($queuedJob['stored_path'] ?? null);
+            }
+
+            if ($storedPath && !Storage::disk('local')->delete($storedPath)) {
                 Log::warning('Unable to delete stored sales CSV during import deletion.', [
                     'import_id' => $importId,
-                    'stored_path' => $import->stored_path,
+                    'stored_path' => $storedPath,
                 ]);
 
-                return response()->json(['success' => false, 'message' => 'Unable to delete the stored CSV file. Please try again.'], 500);
+                return ['response' => response()->json(['success' => false, 'message' => 'Unable to delete the stored CSV file. Please try again.'], 500)];
+            }
+            if ($import->status === 'queued') {
+                $this->removeQueuedImportJob($queuedJob, $import->queue_job_id);
+            } elseif ($import->status === 'failed') {
+                $this->removeFailedImportJobs($importId);
             }
 
             DB::table('analytics_sales_history')->where('import_id', $importId)->delete();
             DB::table('analytics_imports')->where('id', $importId)->delete();
 
-            return response()->json(['success' => true, 'message' => 'CSV import and its sales records were deleted.']);
+            return [
+                'response' => response()->json([
+                    'success' => true,
+                    'status' => 'deleted',
+                    'message' => 'CSV import and its associated sales records were deleted.',
+                ]),
+            ];
         });
+
+        return $result['response'];
+    }
+
+    private function removeQueuedImportJob(?array $queuedJob, $queueJobId): void
+    {
+        if (!$queuedJob || ($queueJobId !== null && (int) $queuedJob['id'] !== (int) $queueJobId)) {
+            return;
+        }
+
+        $connection = config('queue.connections.database.connection');
+        $table = config('queue.connections.database.table', 'jobs');
+        $queue = config('queue.connections.database.queue', 'default');
+        DB::connection($connection)->table($table)
+            ->where('queue', $queue)
+            ->where('id', $queuedJob['id'])
+            ->delete();
+    }
+
+    private function findQueuedImportJob(int $importId): ?array
+    {
+        $connection = config('queue.connections.database.connection');
+        $table = config('queue.connections.database.table', 'jobs');
+        $queue = config('queue.connections.database.queue', 'default');
+        $jobs = DB::connection($connection)
+            ->table($table)
+            ->where('queue', $queue)
+            ->where('payload', 'like', '%ProcessSalesCsvImport%')
+            ->get(['id', 'payload']);
+
+        foreach ($jobs as $job) {
+            $decoded = json_decode($job->payload, true);
+            $command = $decoded['data']['command'] ?? '';
+            if (
+                !is_string($command)
+                || !preg_match('/importId";i:(\\d+);/s', $command, $idMatches)
+                || (int) $idMatches[1] !== $importId
+            ) {
+                continue;
+            }
+
+            preg_match('/storedPath";s:\\d+:"(sales-imports\\/[A-Za-z0-9._-]+\\.csv)";/s', $command, $pathMatches);
+
+            return [
+                'id' => (int) $job->id,
+                'stored_path' => $pathMatches[1] ?? null,
+            ];
+        }
+
+        return null;
+    }
+
+    private function removeFailedImportJobs(int $importId): void
+    {
+        $connection = config('queue.failed.database');
+        $table = config('queue.failed.table', 'failed_jobs');
+        $jobs = DB::connection($connection)->table($table)
+            ->where('payload', 'like', '%ProcessSalesCsvImport%')
+            ->get(['id', 'payload']);
+
+        foreach ($jobs as $job) {
+            $decoded = json_decode($job->payload, true);
+            $command = $decoded['data']['command'] ?? '';
+            if (
+                is_string($command)
+                && preg_match('/importId";i:(\\d+);/s', $command, $matches)
+                && (int) $matches[1] === $importId
+            ) {
+                DB::connection($connection)->table($table)->where('id', $job->id)->delete();
+            }
+        }
     }
 
     /**

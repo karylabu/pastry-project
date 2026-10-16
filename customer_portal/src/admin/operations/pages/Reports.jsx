@@ -666,6 +666,16 @@ export default function Reports() {
   }, [range, dateFilterStart, dateFilterEnd, salesPage, analyticsCategory, analyticsRefreshKey]);
 
   useEffect(() => {
+    if (!historicalImports.some((item) => item.status === 'cancellation_requested')) return undefined;
+
+    const intervalId = window.setInterval(() => {
+      setAnalyticsRefreshKey((current) => current + 1);
+    }, 3000);
+
+    return () => window.clearInterval(intervalId);
+  }, [historicalImports]);
+
+  useEffect(() => {
     if (!previewImport) return undefined;
 
     let isCurrentRequest = true;
@@ -700,7 +710,10 @@ export default function Reports() {
   }, [previewImport, previewPage]);
 
   const deleteCsvImport = async (importFile) => {
-    if (!window.confirm(`Delete "${importFile.file_name}" and all ${importFile.records.toLocaleString()} imported sales records? This cannot be undone.`)) return;
+    const confirmation = importFile.status === 'processing'
+      ? `Cancel "${importFile.file_name}" and remove any rows imported from this file? The worker will stop at its next safe checkpoint.`
+      : `Delete "${importFile.file_name}" and its associated imported sales records? This cannot be undone.`;
+    if (!window.confirm(confirmation)) return;
     setDeletingImportId(importFile.id);
     setImportDeleteError('');
     try {
@@ -709,8 +722,14 @@ export default function Reports() {
       if (!response.ok || !data.success) {
         throw new Error(data.message || 'Unable to delete this CSV import.');
       }
-      setHistoricalImports((imports) => imports.filter((item) => item.id !== importFile.id));
-      if (previewImport?.id === importFile.id) setPreviewImport(null);
+      if (data.status === 'cancellation_requested') {
+        setHistoricalImports((imports) => imports.map((item) => (
+          item.id === importFile.id ? { ...item, status: 'cancellation_requested' } : item
+        )));
+      } else {
+        setHistoricalImports((imports) => imports.filter((item) => item.id !== importFile.id));
+        if (previewImport?.id === importFile.id) setPreviewImport(null);
+      }
       setSalesPage(1);
       setAnalyticsRefreshKey((current) => current + 1);
     } catch (error) {
@@ -1425,18 +1444,18 @@ export default function Reports() {
                               {importFile.file_name}
                             </button>
                             <p className="mt-0.5 text-[10px] text-black/55">
-                              {String(importFile.sales_type || 'other').replace(/_/g, ' ')} · {Number(importFile.records).toLocaleString()} rows · {peso(importFile.revenue)} · {importFile.status}
+                              {String(importFile.sales_type || 'other').replace(/_/g, ' ')} · {Number(importFile.records).toLocaleString()} rows · {peso(importFile.revenue)} · {importFile.status === 'cancellation_requested' ? 'cancellation pending' : importFile.status}
                             </p>
                           </div>
                           <button
                             type="button"
                             onClick={() => deleteCsvImport(importFile)}
-                            disabled={deletingImportId !== null || importFile.status === 'processing'}
+                            disabled={deletingImportId !== null || importFile.status === 'cancellation_requested'}
                             className="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-red-200 px-2.5 py-1.5 text-[10px] font-semibold text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
                             aria-label={`Delete imported CSV ${importFile.file_name}`}
-                            title={importFile.status === 'processing' ? 'Wait for this import to finish before deleting it.' : 'Delete this import and its imported sales records'}
+                            title={importFile.status === 'cancellation_requested' ? 'Cancellation pending; waiting for the worker to stop safely.' : 'Delete this import and its imported sales records'}
                           >
-                            {deletingImportId === importFile.id ? 'Deleting…' : <><Trash2 size={12} /> Delete</>}
+                            {deletingImportId === importFile.id ? 'Deleting…' : importFile.status === 'cancellation_requested' ? 'Cancelling…' : <><Trash2 size={12} /> Delete</>}
                           </button>
                         </div>
                       ))}

@@ -21,11 +21,14 @@ class AnalyticsImport extends Model
         'status',
         'rows_received',
         'rows_processed',
+        'stored_path',
+        'queue_job_id',
     ];
 
     protected $casts = [
         'uploaded_at' => 'datetime',
         'rows_received' => 'int',
         'rows_processed' => 'int',
+        'queue_job_id' => 'int',
     ];
 }

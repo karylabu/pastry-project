@@ -35,17 +35,28 @@ class ProcessSalesCsvImport implements ShouldQueue
 
     public function handle(): void
     {
-        $claimed = DB::transaction(function () {
+        $claim = DB::transaction(function () {
             $import = DB::table('analytics_imports')
                 ->where('id', $this->importId)
                 ->lockForUpdate()
-                ->first(['status']);
+                ->first(['status', 'stored_path']);
 
-            if (!$import || $import->status !== 'queued') {
-                return false;
+            if (!$import) {
+                return 'missing';
             }
 
-            return DB::table('analytics_imports')
+            if ($import->status === 'cancellation_requested') {
+                $this->deleteImportDataAndRecord();
+
+                return 'cancelled';
+            }
+            if ($import->status !== 'queued') {
+                return 'ignored';
+            }
+
+            DB::table('analytics_sales_history')->where('import_id', $this->importId)->delete();
+
+            $claimed = DB::table('analytics_imports')
                 ->where('id', $this->importId)
                 ->where('status', 'queued')
                 ->update([
@@ -53,14 +64,16 @@ class ProcessSalesCsvImport implements ShouldQueue
                     'rows_received' => 0,
                     'rows_processed' => 0,
                     'error_message' => null,
+                    'queue_job_id' => null,
                 ]) === 1;
+
+            return $claimed ? 'claimed' : 'ignored';
         });
 
-        if (!$claimed) {
-            if (!DB::table('analytics_imports')->where('id', $this->importId)->exists()) {
+        if ($claim !== 'claimed') {
+            if ($claim === 'missing' || $claim === 'cancelled') {
                 Storage::disk('local')->delete($this->storedPath);
             }
-
             return;
         }
 
@@ -80,11 +93,10 @@ class ProcessSalesCsvImport implements ShouldQueue
                 throw new RuntimeException('CSV needs a product name and either a total amount or a price column.');
             }
 
-            DB::table('analytics_sales_history')->where('import_id', $this->importId)->delete();
-
             $batch = [];
             $rowsReceived = 0;
             $rowsProcessed = 0;
+            $cancelled = false;
             $now = now();
 
             while (($values = fgetcsv($handle)) !== false) {
@@ -92,6 +104,10 @@ class ProcessSalesCsvImport implements ShouldQueue
                 $rowsReceived++;
                 if ($rowsReceived > self::MAX_ROWS) {
                     throw new RuntimeException('CSV exceeds the 250,000-row limit. Split it into smaller files.');
+                }
+                if ($rowsReceived % self::BATCH_SIZE === 0 && !$this->isImportProcessing()) {
+                    $cancelled = true;
+                    break;
                 }
 
                 $row = [];
@@ -112,28 +128,20 @@ class ProcessSalesCsvImport implements ShouldQueue
                 ];
 
                 if (count($batch) >= self::BATCH_SIZE) {
-                    DB::table('analytics_sales_history')->insert($batch);
-                    $rowsProcessed += count($batch);
+                    $nextRowsProcessed = $rowsProcessed + count($batch);
+                    if (!$this->persistBatch($batch, $rowsReceived, $nextRowsProcessed)) {
+                        $cancelled = true;
+                        break;
+                    }
+                    $rowsProcessed = $nextRowsProcessed;
                     $batch = [];
-                    $this->updateProgress($rowsReceived, $rowsProcessed);
                 }
             }
 
-            if ($batch) {
-                DB::table('analytics_sales_history')->insert($batch);
-                $rowsProcessed += count($batch);
+            if (!$cancelled) {
+                $result = $this->finishImport($batch, $rowsReceived, $rowsProcessed);
+                $cancelled = $result !== 'completed';
             }
-
-            if ($rowsProcessed === 0) {
-                throw new RuntimeException('The CSV did not contain any valid sales rows.');
-            }
-
-            DB::table('analytics_imports')->where('id', $this->importId)->update([
-                'status' => 'completed',
-                'rows_received' => $rowsReceived,
-                'rows_processed' => $rowsProcessed,
-                'error_message' => null,
-            ]);
         } finally {
             fclose($handle);
         }
@@ -143,11 +151,29 @@ class ProcessSalesCsvImport implements ShouldQueue
 
     public function failed(Throwable $exception): void
     {
-        DB::table('analytics_sales_history')->where('import_id', $this->importId)->delete();
-        DB::table('analytics_imports')->where('id', $this->importId)->update([
-            'status' => 'failed',
-            'error_message' => 'CSV import failed. Check the file format and try again.',
-        ]);
+        DB::transaction(function () {
+            $import = DB::table('analytics_imports')
+                ->where('id', $this->importId)
+                ->lockForUpdate()
+                ->first(['status']);
+            if (!$import) {
+                return;
+            }
+
+            if ($import->status === 'cancellation_requested') {
+                $this->deleteImportDataAndRecord();
+
+                return;
+            }
+
+            DB::table('analytics_sales_history')->where('import_id', $this->importId)->delete();
+            DB::table('analytics_imports')->where('id', $this->importId)->update([
+                'status' => 'failed',
+                'error_message' => 'CSV import failed. Check the file format and try again.',
+                'stored_path' => null,
+                'queue_job_id' => null,
+            ]);
+        });
         Storage::disk('local')->delete($this->storedPath);
         Log::error('Sales CSV import job failed.', [
             'import_id' => $this->importId,
@@ -155,12 +181,97 @@ class ProcessSalesCsvImport implements ShouldQueue
         ]);
     }
 
-    private function updateProgress(int $rowsReceived, int $rowsProcessed): void
+    private function isImportProcessing(): bool
     {
-        DB::table('analytics_imports')->where('id', $this->importId)->update([
-            'rows_received' => $rowsReceived,
-            'rows_processed' => $rowsProcessed,
-        ]);
+        return DB::transaction(function (): bool {
+            $import = DB::table('analytics_imports')
+                ->where('id', $this->importId)
+                ->lockForUpdate()
+                ->first(['status']);
+
+            if (!$import || $import->status !== 'processing') {
+                if ($import && $import->status === 'cancellation_requested') {
+                    $this->deleteImportDataAndRecord();
+                }
+
+                return false;
+            }
+
+            return true;
+        });
+    }
+
+    private function persistBatch(array $batch, int $rowsReceived, int $rowsProcessed): bool
+    {
+        return DB::transaction(function () use ($batch, $rowsReceived, $rowsProcessed): bool {
+            $import = DB::table('analytics_imports')
+                ->where('id', $this->importId)
+                ->lockForUpdate()
+                ->first(['status']);
+
+            if (!$import || $import->status !== 'processing') {
+                if ($import && $import->status === 'cancellation_requested') {
+                    $this->deleteImportDataAndRecord();
+                }
+
+                return false;
+            }
+
+            DB::table('analytics_sales_history')->insert($batch);
+            DB::table('analytics_imports')->where('id', $this->importId)->update([
+                'rows_received' => $rowsReceived,
+                'rows_processed' => $rowsProcessed,
+            ]);
+
+            return true;
+        });
+    }
+
+    private function finishImport(array $batch, int $rowsReceived, int $rowsProcessed): string
+    {
+        return DB::transaction(function () use ($batch, $rowsReceived, $rowsProcessed): string {
+            $import = DB::table('analytics_imports')
+                ->where('id', $this->importId)
+                ->lockForUpdate()
+                ->first(['status']);
+
+            if (!$import) {
+                return 'missing';
+            }
+            if ($import->status === 'cancellation_requested') {
+                $this->deleteImportDataAndRecord();
+
+                return 'cancelled';
+            }
+            if ($import->status !== 'processing') {
+                return 'stopped';
+            }
+
+            $rowsProcessed += count($batch);
+            if ($rowsProcessed === 0) {
+                throw new RuntimeException('The CSV did not contain any valid sales rows.');
+            }
+            if ($batch) {
+                DB::table('analytics_sales_history')->insert($batch);
+            }
+
+            DB::table('analytics_imports')->where('id', $this->importId)->update([
+                'status' => 'completed',
+                'rows_received' => $rowsReceived,
+                'rows_processed' => $rowsProcessed,
+                'error_message' => null,
+                'stored_path' => null,
+                'queue_job_id' => null,
+            ]);
+
+            return 'completed';
+        });
+    }
+
+    private function deleteImportDataAndRecord(): void
+    {
+        DB::table('analytics_sales_history')->where('import_id', $this->importId)->delete();
+        DB::table('analytics_imports')->where('id', $this->importId)->delete();
     }
 
     private function mapHeaders(array $headers): array
