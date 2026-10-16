@@ -359,7 +359,7 @@ export default function WasteTracking() {
             </div>
           </div>
 
-          <div className="mb-4 grid grid-cols-1 gap-2.5 sm:grid-cols-2 2xl:grid-cols-4">
+          <div className="waste-summary-grid mb-4 grid grid-cols-1 gap-2.5 sm:grid-cols-2 2xl:grid-cols-4">
             <div className="rounded-lg border border-t-[3px] bg-white p-4" style={{ borderColor: C.border, borderTopColor: C.gold }}>
               <div className="flex items-center justify-between gap-2"><p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-black/55">Total waste quantity</p><Trash2 size={16} className="text-[#9b7810]" /></div>
               <p className="mt-3 text-[24px] font-bold leading-none text-black">{wasteByType['Raw Material'].toFixed(1)} <span className="text-[12px] font-medium">kg</span></p>
