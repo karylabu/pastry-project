@@ -193,6 +193,13 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
   }, [location.search]);
 
   useEffect(() => {
+    const productId = new URLSearchParams(location.search).get("product_id");
+    if (!productId || !/^\d+$/.test(productId)) return;
+    const product = products.find((item) => String(item.id) === productId);
+    if (product) setSearchTerm(product.name || "");
+  }, [location.search, products]);
+
+  useEffect(() => {
     if (!allowCatalogManagement) return;
     const requestedCategory = new URLSearchParams(location.search).get("category");
     const nextCategory = ["Cakes", "Small Cakes"].includes(requestedCategory) ? requestedCategory : catalogCategory;

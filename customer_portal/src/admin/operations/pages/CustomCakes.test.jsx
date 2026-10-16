@@ -13,6 +13,7 @@ jest.mock("../../../services/realtime", () => ({
 }));
 
 jest.mock("react-router-dom", () => ({
+  useLocation: () => ({ search: globalThis.location.search }),
   useNavigate: () => jest.fn(),
 }));
 
@@ -46,6 +47,7 @@ describe("CustomCakes", () => {
 
   afterEach(() => {
     window.localStorage.clear();
+    window.history.pushState({}, "", "/");
     jest.restoreAllMocks();
   });
 
@@ -65,5 +67,12 @@ describe("CustomCakes", () => {
         }),
       );
     });
+  });
+
+  test("opens the requested cake order directly from its notification link", async () => {
+    window.history.pushState({}, "", "/admin/custom-cakes?order_id=31");
+    render(<CustomCakes />);
+
+    expect(await screen.findByRole("heading", { name: "Order #31" })).toBeInTheDocument();
   });
 });

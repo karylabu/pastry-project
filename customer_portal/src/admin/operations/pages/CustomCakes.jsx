@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { jsPDF } from "jspdf";
 import { ArrowRight, CalendarDays, CircleCheck, Clock3, CreditCard, Eye, PackageCheck, RefreshCw, Search, X } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 
 import { ROOT_BASE, STAFF_BASE, LARAVEL_BASE } from "../../../services/config";
 import { subscribeRealtime } from "../../../services/realtime";
@@ -55,6 +55,7 @@ function Toast({ toasts }) {
 }
 
 export default function CustomCakes() {
+  const location = useLocation();
   const navigate = useNavigate();
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -270,6 +271,17 @@ export default function CustomCakes() {
       if (event.type === "order.updated") fetchOrders(true);
     });
   }, []);
+
+  useEffect(() => {
+    const orderId = new URLSearchParams(location.search).get("order_id");
+    if (!orderId || !/^\d+$/.test(orderId)) return;
+    const order = orders.find((item) => String(item.id) === orderId);
+    if (!order) return;
+    setStatusFilter("All");
+    setSearchId(orderId);
+    setCurrentPage(1);
+    setSelectedOrder(order);
+  }, [location.search, orders]);
 
   const displayedOrders = orders
     .filter(order => {

@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { useLocation } from "react-router-dom";
 import { AlertTriangle, CalendarDays, Package, PackagePlus, Plus, Search } from "lucide-react";
 import { LARAVEL_BASE, STAFF_BASE } from "../../../services/config";
 
@@ -36,6 +37,7 @@ export default function Ingredients({
   pageContainerClassName = "lg:pl-[260px] pt-[72px]",
   contentClassName = "max-w-[1400px] mx-auto px-6 md:px-10 py-8",
 }) {
+  const location = useLocation();
   const [ingredients, setIngredients] = useState([]);
   const [allBatches, setAllBatches] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -68,6 +70,13 @@ export default function Ingredients({
   const [selectedCakeFlavor, setSelectedCakeFlavor] = useState(null);
   const currentUser = (() => { try { return JSON.parse(window.localStorage.getItem('user') || 'null'); } catch (e) { return null; } })();
   const canApproveDiscard = String(currentUser?.role || '').toLowerCase() === 'admin';
+
+  useEffect(() => {
+    const ingredientId = new URLSearchParams(location.search).get("ingredient_id");
+    if (!ingredientId || !/^\d+$/.test(ingredientId)) return;
+    const ingredient = ingredients.find((item) => String(item.id) === ingredientId);
+    if (ingredient) setQuery(ingredient.name || "");
+  }, [ingredients, location.search]);
 
   useEffect(() => {
     (async () => {

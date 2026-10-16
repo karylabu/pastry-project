@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import { BASE, LARAVEL_BASE } from "../../services/config";
 import { getAuthHeaders } from "../../services/api";
+import { getAdminNotificationTarget } from "./notificationNavigation";
 
 const NAV_GROUPS = [
   { label: "Overview", items: [{ name: "Dashboard", path: "/admin/dashboard" }] },
@@ -405,7 +406,7 @@ export default function AdminNavbar({ onSidebarChange }) {
                                 {!n.is_read && <span className="inline-flex items-center gap-1 rounded-full bg-[#c36b77] px-2 py-0.5 text-[10px] font-semibold text-white">New</span>}
                                 {n.is_read && <span className="inline-flex items-center gap-1 rounded-full bg-[#f1eee9] px-2 py-0.5 text-[10px] font-medium text-[#74675f]">Read</span>}
                                 {n.action_url && n.action_url.startsWith('/admin/') && (
-                                  <button type="button" onClick={() => { markNotificationRead(n.id); navigate(n.action_url); setNotificationsOpen(false); }} className="ml-auto text-[11px] font-semibold text-[#80600a]">Open</button>
+                                  <button type="button" onClick={() => { markNotificationRead(n.id); navigate(getAdminNotificationTarget(n) || n.action_url); setNotificationsOpen(false); }} className="ml-auto text-[11px] font-semibold text-[#80600a]">Open</button>
                                 )}
                               </div>
                             </div>

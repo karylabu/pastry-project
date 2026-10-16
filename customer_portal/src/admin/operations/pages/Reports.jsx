@@ -8,6 +8,7 @@ import {
 import SalesImportDropzone from './SalesImportDropzone';
 import { ROOT_BASE, STAFF_BASE, LARAVEL_BASE } from '../../../services/config';
 import { subscribeRealtime } from '../../../services/realtime';
+import { useLocation } from 'react-router-dom';
 
 const staffFetch = (url, options = {}) => {
   let token = '';
@@ -548,6 +549,7 @@ function PaginationControls({ totalItems, page, pageSize = REPORT_ROWS_PER_PAGE,
    MAIN REPORTS PAGE
 ───────────────────────────────────────── */
 export default function Reports() {
+  const location = useLocation();
   const [orders,        setOrders]        = useState([]);
   const [products,      setProducts]      = useState([]);
   const [ingredientsRaw, setIngredientsRaw] = useState([]);
@@ -801,6 +803,17 @@ export default function Reports() {
 
     return () => { isCurrentRequest = false; };
   }, [range, dateFilterStart, dateFilterEnd, salesPage, analyticsCategory, analyticsRefreshKey]);
+
+  useEffect(() => {
+    const importId = new URLSearchParams(location.search).get('import_id');
+    if (!importId || !/^\d+$/.test(importId)) return;
+    const importFile = historicalImports.find((item) => String(item.id) === importId);
+    if (!importFile || importFile.status !== 'completed') return;
+    setPreviewImport(importFile);
+    setPreviewPage(1);
+    setPreviewSales([]);
+    setPreviewPagination({ current_page: 1, last_page: 1, total: 0 });
+  }, [historicalImports, location.search]);
 
   useEffect(() => {
     if (!historicalImports.some((item) => item.status === 'cancellation_requested')) return undefined;

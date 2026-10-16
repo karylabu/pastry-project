@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { AlertTriangle, Clock3, PackageCheck, RefreshCw, Search, ShoppingBag, X } from "lucide-react";
+import { useLocation } from "react-router-dom";
 
 /* STAFF NAVBAR */
 import { STAFF_BASE, LARAVEL_BASE } from "../../../services/config";
@@ -82,6 +83,7 @@ function Toast({ toasts }) {
 }
 
 export default function Orders() {
+  const location = useLocation();
   const [orders, setOrders] = useState([]);
   const [ingredients, setIngredients] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -317,6 +319,15 @@ export default function Orders() {
   useEffect(() => {
     if (currentPage > pageCount) setCurrentPage(pageCount);
   }, [currentPage, pageCount]);
+
+  useEffect(() => {
+    const orderId = new URLSearchParams(location.search).get("order_id");
+    if (!orderId || !/^\d+$/.test(orderId)) return;
+    setStatusFilter("All");
+    setSearchQuery(orderId);
+    setExpandedOrderId(Number(orderId));
+    setCurrentPage(1);
+  }, [location.search]);
 
   const requestSort = (column) => {
     if (sortBy === column) {
