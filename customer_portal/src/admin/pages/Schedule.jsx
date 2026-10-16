@@ -9,13 +9,14 @@ const staffFetch = (url, options = {}) => fetch(url, {
   ...options,
   headers: { ...getAuthHeaders(), ...(options.headers || {}) },
 });
+const ACCEPTED_ORDER_STATUSES = new Set(["confirmed", "preparing", "ready for pickup", "completed"]);
+
 function getDateKey(date) {
   return [date.getFullYear(), String(date.getMonth() + 1).padStart(2, "0"), String(date.getDate()).padStart(2, "0")].join("-");
 }
 
-function isSchedulableOrder(order) {
-  const status = String(order?.status || "").trim().toLowerCase();
-  return status !== "" && status !== "cancelled" && status !== "canceled";
+function isAcceptedOrder(order) {
+  return ACCEPTED_ORDER_STATUSES.has(String(order?.status || "").trim().toLowerCase());
 }
 
 function getDaysUntil(date, todayKey) {
@@ -115,7 +116,7 @@ export default function Schedule() {
   }, []);
 
   const scheduledOrders = useMemo(() => orders.filter((order) => {
-    if (!isSchedulableOrder(order)) return false;
+    if (!isAcceptedOrder(order)) return false;
     const scheduledDate = getSchedule(order).date;
     return scheduledDate && scheduledDate >= todayKey;
   }), [orders, todayKey]);
@@ -217,7 +218,7 @@ export default function Schedule() {
         {upcomingOrders.length > 0 && (
           <section role="alert" className="mb-4 rounded-lg border border-[#e7d58f] bg-[#fff8e1] px-4 py-3 text-[#55451c]">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-              <div><h2 className="text-[12px] font-semibold">Upcoming pickup schedules</h2><p className="mt-0.5 text-[11px] text-[#766332]">{upcomingOrders.length} {upcomingOrders.length === 1 ? "order is" : "orders are"} scheduled within the next 2 days.</p></div>
+              <div><h2 className="text-[12px] font-semibold">Upcoming pickup schedules</h2><p className="mt-0.5 text-[11px] text-[#766332]">{upcomingOrders.length} accepted {upcomingOrders.length === 1 ? "order is" : "orders are"} scheduled within the next 2 days.</p></div>
               <ul className="flex flex-wrap gap-1.5">
               {upcomingOrders.map((order) => {
                 const schedule = getSchedule(order);
@@ -317,7 +318,7 @@ export default function Schedule() {
                   );
                 })}
               </ul>
-            ) : <div className="py-6 text-center"><CalendarDays size={20} className="mx-auto text-[#b7a69c]" /><p className="mt-2 text-[11px] font-medium text-[#65574d]">Nothing scheduled</p><p className="mt-1 text-[10px] text-[#9b8c83]">Orders with pickup dates will appear here. Cancelled orders are hidden.</p></div>}
+            ) : <div className="py-6 text-center"><CalendarDays size={20} className="mx-auto text-[#b7a69c]" /><p className="mt-2 text-[11px] font-medium text-[#65574d]">Nothing scheduled</p><p className="mt-1 text-[10px] text-[#9b8c83]">Accepted orders with pickup dates will appear here.</p></div>}
           </div>
           <div className="mt-4 border-t border-[#eee6de] pt-3 xl:mt-auto">
             <p className="text-[9px] font-bold uppercase tracking-[0.14em] text-[#8f8076]">Next 48 hours</p>

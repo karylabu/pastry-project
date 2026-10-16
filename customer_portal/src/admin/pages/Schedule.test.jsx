@@ -28,6 +28,10 @@ describe("Schedule", () => {
           { id: 31, status: "Pending", custom_details: { pickup_date: dateFromToday(1) }, name: "Pending Cake" },
           { id: 32, status: "Awaiting Payment", custom_details: { pickup_date: dateFromToday(1) }, name: "Payment Cake" },
           { id: 33, status: "Cancelled", custom_details: { pickup_date: dateFromToday(1) }, name: "Cancelled Cake" },
+          { id: 34, status: "Confirmed", custom_details: { pickup_date: dateFromToday(1) }, name: "Confirmed Cake" },
+          { id: 35, status: "Preparing", custom_details: { pickup_date: dateFromToday(1) }, name: "Preparing Cake" },
+          { id: 36, status: "Ready for Pickup", custom_details: { pickup_date: dateFromToday(1) }, name: "Ready Cake" },
+          { id: 37, status: "Completed", custom_details: { pickup_date: dateFromToday(1) }, name: "Completed Cake" },
         ],
       }),
     });
@@ -38,11 +42,15 @@ describe("Schedule", () => {
     jest.restoreAllMocks();
   });
 
-  test("shows dated non-cancelled orders and hides cancelled orders", async () => {
+  test("shows accepted dated orders and hides orders that are pending review or cancelled", async () => {
     render(<Schedule />);
 
-    expect((await screen.findAllByText("Pending Cake")).length).toBeGreaterThan(0);
-    expect(screen.getAllByText("Payment Cake").length).toBeGreaterThan(0);
+    expect((await screen.findAllByText("Confirmed Cake")).length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Preparing Cake").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Ready Cake").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Completed Cake").length).toBeGreaterThan(0);
+    expect(screen.queryByText("Pending Cake")).not.toBeInTheDocument();
+    expect(screen.queryByText("Payment Cake")).not.toBeInTheDocument();
     expect(screen.queryByText("Cancelled Cake")).not.toBeInTheDocument();
   });
 });
