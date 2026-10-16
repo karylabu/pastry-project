@@ -1171,8 +1171,10 @@ export default function Orders() {
             <div className="divide-y divide-gray-100">
               {sortedOrders.map((order, idx) => {
                 const isCancelled  = order.status === "Cancelled";
-                const isAwaitingPayment = order.status === 'Awaiting Payment' && ['gcash', 'qrph'].includes(String(order.payment || '').toLowerCase());
-                const isAwaitingBalancePayment = order.status === 'Awaiting Balance Payment' && ['gcash', 'qrph'].includes(String(order.payment || '').toLowerCase());
+                const isAwaitingPayment = order.status === 'Awaiting Payment'
+                  && (Boolean(order.is_customized) || ['gcash', 'qrph'].includes(String(order.payment || '').toLowerCase()));
+                const isAwaitingBalancePayment = order.status === 'Awaiting Balance Payment'
+                  && (Boolean(order.is_customized) || ['gcash', 'qrph'].includes(String(order.payment || '').toLowerCase()));
                 const hasPaymentProof = String(order.payment_status || '').toLowerCase() === 'proof_submitted';
                 const isPending    = order.status === "Pending";
                 const isToReceive  = order.status === "Ready for Pickup";
@@ -1213,9 +1215,9 @@ export default function Orders() {
                   ? quotedDownpayment
                   : Number((Number(order.total || 0) * downpaymentPercent / 100).toFixed(2));
                 const customBalanceAmount = Math.max(0, Number((Number(order.total || 0) - customDownpaymentAmount).toFixed(2)));
-                const customPaymentMethod = order.payment || customPaymentDetails.payment_method || 'QR Ph';
-                const downpaymentBreakdown = getCustomCakePaymentBreakdown(customDownpaymentAmount, customPaymentMethod);
-                const balanceBreakdown = getCustomCakePaymentBreakdown(customBalanceAmount, customPaymentMethod);
+                const customPaymentMethod = isCustomized ? 'GCash' : (order.payment || customPaymentDetails.payment_method || '—');
+                const downpaymentBreakdown = getCustomCakePaymentBreakdown(customDownpaymentAmount);
+                const balanceBreakdown = getCustomCakePaymentBreakdown(customBalanceAmount);
                 const productImage = getProductThumbnail(order, primaryItem);
 
                 const paymentHint = isCancelled

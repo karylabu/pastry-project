@@ -10,17 +10,12 @@ describe('getCustomCakePaymentBreakdown', () => {
     });
   });
 
-  test('adds both local card percentage and fixed transaction fee', () => {
-    expect(getCustomCakePaymentBreakdown(1000, 'Visa/Mastercard').total).toBe(1046.08);
+  test('applies the same 2.23% fee regardless of any legacy saved payment method', () => {
+    expect(getCustomCakePaymentBreakdown(1000, 'QR Ph').total).toBe(1022.81);
+    expect(getCustomCakePaymentBreakdown(1000, 'Visa/Mastercard').total).toBe(1022.81);
   });
 
-  test('uses the greater online banking minimum or percentage fee', () => {
-    expect(getCustomCakePaymentBreakdown(1000, 'Online Banking').total).toBe(1013.39);
-    expect(getCustomCakePaymentBreakdown(5000, 'Online Banking').total).toBe(5035.76);
-  });
-
-  test('treats invalid amounts as zero and defaults unknown methods to QR Ph', () => {
-    expect(getCustomCakePaymentBreakdown(-1, 'GCash').total).toBe(0);
-    expect(getCustomCakePaymentBreakdown(1000, 'unknown').method.value).toBe('QR Ph');
+  test('treats invalid amounts as zero', () => {
+    expect(getCustomCakePaymentBreakdown(-1).total).toBe(0);
   });
 });

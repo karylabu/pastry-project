@@ -158,7 +158,7 @@ $itemsJson = json_encode([[
 ]]);
 
 $method  = $deliveryMethod ?: 'Pickup';
-$payment = 'QRPh';     // payment is collected after the quote is confirmed
+$payment = 'GCash';    // custom cake installments use the fixed 2.23% payment fee
 $status  = 'Pending';
 
 $customDetails = [

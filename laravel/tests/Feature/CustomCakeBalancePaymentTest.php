@@ -97,10 +97,12 @@ class CustomCakeBalancePaymentTest extends TestCase
 
         Http::assertSent(fn (ClientRequest $request) =>
             $request->url() === 'https://api.paymongo.com/v2/checkout_sessions'
-            && $request['data']['attributes']['line_items'][0]['amount'] === 76019
-            && $request['data']['attributes']['payment_method_types'] === ['qrph']
+            && $request['data']['attributes']['line_items'][0]['amount'] === 76711
+            && $request['data']['attributes']['payment_method_types'] === ['gcash']
+            && $request['data']['attributes']['metadata']['payment_method'] === 'GCash'
             && str_contains($request['data']['attributes']['line_items'][0]['name'], 'Remaining Balance')
         );
+        $this->assertDatabaseHas('orders', ['id' => 24, 'payment' => 'GCash']);
     }
 
     public function test_balance_link_is_rejected_outside_balance_payment_status(): void
@@ -157,11 +159,12 @@ class CustomCakeBalancePaymentTest extends TestCase
         $this->assertDatabaseHas('orders', ['id' => 26, 'downpayment_amount' => 1250]);
         Http::assertSent(fn (ClientRequest $request) =>
             $request->url() === 'https://api.paymongo.com/v2/checkout_sessions'
-            && $request['data']['attributes']['line_items'][0]['amount'] === 76019
+            && $request['data']['attributes']['line_items'][0]['amount'] === 76711
+            && $request['data']['attributes']['payment_method_types'] === ['gcash']
         );
     }
 
-    public function test_custom_cake_checkout_uses_selected_method_and_server_calculated_card_fee(): void
+    public function test_custom_cake_checkout_uses_fixed_gcash_fee_even_for_legacy_card_orders(): void
     {
         \Illuminate\Support\Facades\DB::table('orders')->insert([
             'id' => 29,
@@ -191,13 +194,13 @@ class CustomCakeBalancePaymentTest extends TestCase
 
         Http::assertSent(fn (ClientRequest $request) =>
             $request->url() === 'https://api.paymongo.com/v2/checkout_sessions'
-            && $request['data']['attributes']['line_items'][0]['amount'] === 104608
-            && $request['data']['attributes']['payment_method_types'] === ['card']
-            && $request['data']['attributes']['metadata']['fee_amount'] === '46.08'
+            && $request['data']['attributes']['line_items'][0]['amount'] === 102281
+            && $request['data']['attributes']['payment_method_types'] === ['gcash']
+            && $request['data']['attributes']['metadata']['fee_amount'] === '22.81'
         );
     }
 
-    public function test_custom_cake_checkout_maps_maribank_to_qrph_with_its_fee_rate(): void
+    public function test_custom_cake_checkout_migrates_legacy_qrph_orders_to_gcash(): void
     {
         \Illuminate\Support\Facades\DB::table('orders')->insert([
             'id' => 30,
@@ -222,13 +225,14 @@ class CustomCakeBalancePaymentTest extends TestCase
 
         Http::assertSent(fn (ClientRequest $request) =>
             $request->url() === 'https://api.paymongo.com/v2/checkout_sessions'
-            && $request['data']['attributes']['line_items'][0]['amount'] === 101730
-            && $request['data']['attributes']['payment_method_types'] === ['qrph']
-            && $request['data']['attributes']['metadata']['payment_method'] === 'MariBank'
+            && $request['data']['attributes']['line_items'][0]['amount'] === 102281
+            && $request['data']['attributes']['payment_method_types'] === ['gcash']
+            && $request['data']['attributes']['metadata']['payment_method'] === 'GCash'
         );
+        $this->assertDatabaseHas('orders', ['id' => 30, 'payment' => 'GCash']);
     }
 
-    public function test_custom_cake_online_banking_uses_the_higher_minimum_fee(): void
+    public function test_custom_cake_checkout_uses_fixed_fee_for_legacy_online_banking_orders(): void
     {
         \Illuminate\Support\Facades\DB::table('orders')->insert([
             'id' => 31,
@@ -253,8 +257,8 @@ class CustomCakeBalancePaymentTest extends TestCase
 
         Http::assertSent(fn (ClientRequest $request) =>
             $request->url() === 'https://api.paymongo.com/v2/checkout_sessions'
-            && $request['data']['attributes']['line_items'][0]['amount'] === 101339
-            && $request['data']['attributes']['payment_method_types'] === ['dob']
+            && $request['data']['attributes']['line_items'][0]['amount'] === 102281
+            && $request['data']['attributes']['payment_method_types'] === ['gcash']
         );
     }
 
@@ -382,6 +386,8 @@ class CustomCakeBalancePaymentTest extends TestCase
                 'total' => 850,
                 'payment' => 'QRPh',
                 'payment_status' => 'failed',
+                'is_customized' => false,
+                'order_type' => 'Standard',
                 'created_at' => now(),
                 'updated_at' => now(),
             ],
@@ -392,6 +398,8 @@ class CustomCakeBalancePaymentTest extends TestCase
                 'total' => 850,
                 'payment' => 'COD',
                 'payment_status' => 'pending',
+                'is_customized' => false,
+                'order_type' => 'Standard',
                 'created_at' => now(),
                 'updated_at' => now(),
             ],
@@ -402,6 +410,8 @@ class CustomCakeBalancePaymentTest extends TestCase
                 'total' => 1200,
                 'payment' => 'QRPh',
                 'payment_status' => 'pending',
+                'is_customized' => false,
+                'order_type' => 'Standard',
                 'created_at' => now(),
                 'updated_at' => now(),
             ],

@@ -179,7 +179,7 @@ class CustomerApiController extends Controller
                     'user_id' => $user->id,
                     'status' => 'Pending',
                     'total' => floatval($form['total'] ?? $form['estimated_price'] ?? 0),
-                    'payment' => 'QRPh',
+                    'payment' => 'GCash',
                     'address' => $form['address'] ?? '',
                     'method' => $method,
                     'order_type' => 'Customized',
@@ -1558,20 +1558,11 @@ PROMPT;
                 }
             }
         }
-        $customPaymentMethods = [
-            'gcash' => ['type' => 'gcash', 'rate' => 0.0223],
-            'maya' => ['type' => 'paymaya', 'rate' => 0.0179],
-            'qrph' => ['type' => 'qrph', 'rate' => 0.0134],
-            'maribank' => ['type' => 'qrph', 'rate' => 0.017],
-            'visamastercard' => ['type' => 'card', 'rate' => 0.03125, 'fixed' => 13.39],
-            'onlinebanking' => ['type' => 'dob', 'rate' => 0.0071, 'minimum' => 13.39],
-        ];
-        $customPaymentMethodKey = strtolower((string) preg_replace('/[^a-z0-9]/i', '', (string) $order->payment));
-        $customPaymentMethod = $customPaymentMethods[$customPaymentMethodKey] ?? null;
+        $customCheckoutPaymentType = 'gcash';
+        $customPaymentFeeRate = 0.0223;
         $paymentStatus = strtolower((string) ($order->payment_status ?? 'pending'));
         $supportedOrderPayment = $customOrder
-            ? $customPaymentMethod !== null
-            : in_array(strtolower((string) $order->payment), ['qrph', 'gcash'], true);
+            || in_array(strtolower((string) $order->payment), ['qrph', 'gcash'], true);
         $currentStageAlreadyPaid = $order->status === 'Awaiting Payment'
             && in_array($paymentStatus, ['paid', 'proof_submitted'], true);
         if (!$supportedOrderPayment
@@ -1620,19 +1611,9 @@ PROMPT;
         }
 
         $checkoutAmountCents = $amountCents;
-        if ($customOrder && $customPaymentMethod) {
+        if ($customOrder) {
             $baseAmount = $amountCents / 100;
-            $rate = $customPaymentMethod['rate'];
-            if (isset($customPaymentMethod['fixed'])) {
-                $checkoutAmount = ($baseAmount + $customPaymentMethod['fixed']) / (1 - $rate);
-            } elseif (isset($customPaymentMethod['minimum'])) {
-                $checkoutAmount = max(
-                    $baseAmount / (1 - $rate),
-                    $baseAmount + $customPaymentMethod['minimum']
-                );
-            } else {
-                $checkoutAmount = $baseAmount / (1 - $rate);
-            }
+            $checkoutAmount = $baseAmount / (1 - $customPaymentFeeRate);
             $checkoutAmountCents = (int) ceil(($checkoutAmount * 100) - 1e-8);
         }
 
@@ -1652,14 +1633,14 @@ PROMPT;
                             'currency' => 'PHP',
                             'quantity' => 1,
                         ]],
-                        'payment_method_types' => [$customPaymentMethod['type']],
+                        'payment_method_types' => [$customCheckoutPaymentType],
                         'success_url' => $ordersUrl . '?custom_payment=success&order_id=' . rawurlencode((string) $orderId),
                         'cancel_url' => $ordersUrl . '?custom_payment=cancelled&order_id=' . rawurlencode((string) $orderId),
                         'reference_number' => 'CUSTOM-' . $orderId . '-' . $paymentType . '-' . now()->timestamp,
                         'metadata' => [
                             'order_id' => (string) $orderId,
                             'payment_type' => $paymentType,
-                            'payment_method' => (string) $order->payment,
+                            'payment_method' => $customOrder ? 'GCash' : (string) $order->payment,
                             'base_amount' => number_format($amount, 2, '.', ''),
                             'fee_amount' => number_format(($checkoutAmountCents / 100) - $amount, 2, '.', ''),
                         ],
@@ -1725,11 +1706,15 @@ PROMPT;
         $paymentUrl = $paymentData['url'] ?? $paymentData['attributes']['checkout_url'] ?? '';
         $paymentReference = $paymentData['id'] ?? '';
         if ($responseStatus >= 200 && $responseStatus < 300 && $paymentUrl !== '' && $paymentReference !== '') {
-            DB::table('orders')->where('id', $orderId)->update([
+            $orderPaymentUpdates = [
                 'payment_status' => 'pending',
                 'payment_reference' => $paymentReference,
                 'payment_link' => $paymentUrl,
-            ]);
+            ];
+            if ($customOrder) {
+                $orderPaymentUpdates['payment'] = 'GCash';
+            }
+            DB::table('orders')->where('id', $orderId)->update($orderPaymentUpdates);
             app(\App\Services\RealtimeEventPublisher::class)->orderUpdated((int) $user->id, (int) $orderId);
         }
 
