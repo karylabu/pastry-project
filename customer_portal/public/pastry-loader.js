@@ -30,6 +30,7 @@
     'padding:env(safe-area-inset-top,0px) 0 env(safe-area-inset-bottom,0px);box-sizing:border-box}',
     '#pl-root.pl-out{opacity:0;pointer-events:none}',
     '#pl-root .pl-box{width:100%;max-width:440px;padding:24px;text-align:center;box-sizing:border-box}',
+    '#pl-root .pl-logo{width:76px;height:76px;object-fit:contain;display:block;margin:0 auto 12px}',
     '#pl-root .pl-brand{font-family:"Playfair Display",Georgia,serif;font-style:italic;font-weight:700;font-size:clamp(34px,9vw,44px);line-height:1;margin:0}',
     '#pl-root .pl-brand span{color:#c4a032}',
     '#pl-root .pl-tag{font-size:11px;letter-spacing:.32em;color:#8d857e;margin:8px 0 18px;text-transform:uppercase}',
@@ -56,6 +57,7 @@
   root.setAttribute('aria-label', 'Loading');
   root.innerHTML =
     '<div class="pl-box">' +
+    '<img class="pl-logo" src="/uploads/logo.png?v=logo-v2" alt="Pastry Project logo">' +
     '<p class="pl-brand">Pastry <span>Project</span></p>' +
     '<p class="pl-tag">Baked fresh daily</p>' +
     '<svg viewBox="0 0 400 290" aria-hidden="true">' +
