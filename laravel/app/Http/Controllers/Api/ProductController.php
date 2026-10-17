@@ -6,10 +6,26 @@ use App\Http\Controllers\Controller;
 use App\Models\Product;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 use App\Services\ProductionService;
+use Throwable;
 
 class ProductController extends Controller
 {
+    private function removeFailedProductImage(?string $imageName, int $productId): void
+    {
+        if ($imageName === null) {
+            return;
+        }
+
+        $path = base_path('../uploads/' . $imageName);
+        if (is_file($path) && !unlink($path)) {
+            Log::warning('Unable to remove an uncommitted product image.', ['product_id' => $productId, 'image' => $imageName]);
+        }
+    }
+
     public function staffIndex(Request $request, ProductionService $production): JsonResponse
     {
         $admin = $this->requireRole($request, 'admin');
@@ -48,6 +64,81 @@ class ProductController extends Controller
             ->values();
 
         return response()->json($products);
+    }
+
+    public function updateStaff(Request $request, Product $product): JsonResponse
+    {
+        $admin = $this->requireRole($request, 'admin');
+        if (!$admin instanceof \App\Models\User) {
+            return $admin;
+        }
+
+        $data = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'category' => ['required', 'string', 'max:100'],
+            'description' => ['nullable', 'string'],
+            'price_size' => ['nullable', 'in:small,big'],
+            'price' => ['required', 'numeric', 'gt:0'],
+            'image' => ['nullable', 'image', 'mimes:jpg,jpeg,png,gif', 'max:5120'],
+        ]);
+
+        $image = $request->file('image');
+        $imageName = null;
+        if ($image) {
+            $uploadDirectory = base_path('../uploads');
+            if (!is_dir($uploadDirectory) && !mkdir($uploadDirectory, 0755, true) && !is_dir($uploadDirectory)) {
+                return response()->json(['success' => false, 'message' => 'Unable to create the product image directory.'], 500);
+            }
+
+            $imageName = 'p' . Str::uuid() . '.' . $image->extension();
+            try {
+                $image->move($uploadDirectory, $imageName);
+            } catch (Throwable $exception) {
+                Log::error('Product image upload failed.', ['product_id' => $product->id, 'exception' => $exception]);
+                return response()->json(['success' => false, 'message' => 'Unable to save the product image.'], 500);
+            }
+        }
+
+        try {
+            DB::transaction(function () use ($data, $product, $imageName) {
+                $priceSize = strtolower((string) ($data['price_size'] ?? ''));
+                if ($priceSize !== '') {
+                    $size = DB::table('product_sizes')
+                        ->where('product_id', $product->id)
+                        ->whereRaw('LOWER(TRIM(size)) = ?', [$priceSize])
+                        ->first();
+
+                    if (!$size) {
+                        throw new \InvalidArgumentException('This cake size has no saved price row.');
+                    }
+
+                    DB::table('product_sizes')->where('id', $size->id)->update([
+                        'price' => $data['price'],
+                        'updated_at' => now(),
+                    ]);
+                }
+
+                $product->name = $data['name'];
+                $product->category = $data['category'];
+                $product->description = $data['description'] ?? null;
+                if ($priceSize === 'big' || $priceSize === '') {
+                    $product->price = $data['price'];
+                }
+                if ($imageName !== null) {
+                    $product->image = $imageName;
+                }
+                $product->save();
+            });
+        } catch (\InvalidArgumentException $exception) {
+            $this->removeFailedProductImage($imageName, (int) $product->id);
+            return response()->json(['success' => false, 'message' => $exception->getMessage()], 422);
+        } catch (Throwable $exception) {
+            $this->removeFailedProductImage($imageName, (int) $product->id);
+            Log::error('Product update failed.', ['product_id' => $product->id, 'exception' => $exception]);
+            return response()->json(['success' => false, 'message' => 'Unable to update the product.'], 500);
+        }
+
+        return response()->json(['success' => true, 'product_id' => (int) $product->id]);
     }
 
     public function index(Request $request): JsonResponse

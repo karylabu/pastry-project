@@ -184,6 +184,65 @@ class StaffProductCatalogTest extends TestCase
             ->assertJsonMissingPath('0.sizes.2');
     }
 
+    public function test_admin_can_update_product_details_and_big_size_price_without_changing_stock(): void
+    {
+        $admin = new User();
+        $admin->role = 'admin';
+        $admin->status = 'active';
+
+        $this->actingAs($admin)
+            ->postJson('/api/staff/products/1', [
+                'name' => 'Pistachio Dream',
+                'category' => 'Small Cakes',
+                'description' => 'Pistachio cake',
+                'price_size' => 'big',
+                'price' => 525,
+            ])
+            ->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('product_id', 1);
+
+        $this->assertDatabaseHas('products', [
+            'id' => 1,
+            'name' => 'Pistachio Dream',
+            'category' => 'Small Cakes',
+            'description' => 'Pistachio cake',
+            'price' => 525,
+            'stock' => 5,
+        ]);
+        $this->assertDatabaseHas('product_sizes', ['product_id' => 1, 'size' => 'Big', 'price' => 525]);
+        $this->assertDatabaseHas('product_sizes', ['product_id' => 1, 'size' => 'Small', 'price' => 320]);
+    }
+
+    public function test_admin_can_update_small_size_price_without_changing_base_price(): void
+    {
+        $admin = new User();
+        $admin->role = 'admin';
+        $admin->status = 'active';
+
+        $this->actingAs($admin)
+            ->postJson('/api/staff/products/1', [
+                'name' => 'Chocolate Cake',
+                'category' => 'Cakes',
+                'description' => '',
+                'price_size' => 'small',
+                'price' => 350,
+            ])
+            ->assertOk();
+
+        $this->assertDatabaseHas('products', ['id' => 1, 'price' => 450, 'description' => '']);
+        $this->assertDatabaseHas('product_sizes', ['product_id' => 1, 'size' => 'Small', 'price' => 350]);
+    }
+
+    public function test_product_update_requires_admin_authorization(): void
+    {
+        $this->postJson('/api/staff/products/1', [
+            'name' => 'Updated Cake',
+            'category' => 'Cakes',
+            'price' => 500,
+        ])->assertUnauthorized();
+    }
+
     public function test_stock_migration_sets_confirmed_big_and_small_counts_for_all_cakes(): void
     {
         $migration = require database_path('migrations/2026_10_10_000002_set_confirmed_cake_stock_by_size.php');

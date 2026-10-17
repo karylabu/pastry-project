@@ -10,7 +10,7 @@ import Products from './Products';
 
 describe('Products admin catalog', () => {
   beforeEach(() => {
-    localStorage.setItem('user', JSON.stringify({ role: 'admin' }));
+    localStorage.setItem('user', JSON.stringify({ role: 'admin', token: 'test-admin-token' }));
 
     global.fetch = jest.fn((url) => {
       if (String(url).includes('action=list')) {
@@ -261,8 +261,8 @@ describe('Products admin catalog', () => {
       expect(screen.queryByRole('heading', { name: 'Edit Product' })).not.toBeInTheDocument();
     });
 
-    const updateCall = global.fetch.mock.calls.find(([url]) =>
-      String(url).includes('api_products.php?action=update')
+    const updateCall = global.fetch.mock.calls.find(([url, options]) =>
+      String(url).endsWith('/api/staff/products/1') && options?.method === 'POST'
     );
     expect(updateCall).toBeDefined();
     const formData = updateCall[1].body;
@@ -272,6 +272,10 @@ describe('Products admin catalog', () => {
     expect(formData.get('price')).toBe('525');
     expect(formData.get('price_size')).toBe('big');
     expect(formData.has('stock')).toBe(false);
+    expect(updateCall[1].headers).toEqual({
+      Accept: 'application/json',
+      Authorization: 'Bearer test-admin-token',
+    });
     expect(global.fetch).toHaveBeenCalledWith(
       expect.stringContaining('/api/staff/products/1/recipe'),
       expect.objectContaining({ method: 'PUT' }),

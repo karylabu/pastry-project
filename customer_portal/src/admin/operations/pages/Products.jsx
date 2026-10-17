@@ -4,14 +4,29 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { Search, Trash2, History, RefreshCw } from "lucide-react";
 import { BASE, LARAVEL_BASE, STAFF_BASE } from "../../../services/config";
 
-const staffFetch = (url, options = {}) => fetch(url, { credentials: "include", ...options });
-const laravelStaffFetch = (url, options = {}) => {
+const getStaffAuthHeaders = () => {
   let token = '';
-  try { token = JSON.parse(localStorage.getItem('user') || 'null')?.token || ''; } catch (_) { /* no-op */ }
+  try {
+    token = JSON.parse(localStorage.getItem('user') || 'null')?.token
+      || localStorage.getItem('auth_token')
+      || '';
+  } catch (_) {
+    token = localStorage.getItem('auth_token') || '';
+  }
+
+  return token ? { Authorization: `Bearer ${token}` } : {};
+};
+
+const staffFetch = (url, options = {}) => fetch(url, {
+  credentials: "include",
+  ...options,
+  headers: { ...(options.headers || {}), ...getStaffAuthHeaders() },
+});
+const laravelStaffFetch = (url, options = {}) => {
   return fetch(url, {
     credentials: 'include',
     ...options,
-    headers: { ...(options.headers || {}), ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+    headers: { ...(options.headers || {}), ...getStaffAuthHeaders() },
   });
 };
 
@@ -1491,9 +1506,10 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
                         formData.append('description', (editProduct.description || '').toString());
                         if (editImage) formData.append('image', editImage);
 
-                        const res = await staffFetch(`${STAFF_BASE}/api_products.php?action=update`, {
+                        const res = await laravelStaffFetch(`${LARAVEL_BASE}/api/staff/products/${editProduct.id}`, {
                           method: 'POST',
-                          body: formData
+                          headers: { Accept: 'application/json' },
+                          body: formData,
                         });
                         const data = await res.json().catch(() => ({}));
                         if (!res.ok) throw new Error(data.error || data.message || 'Product update failed.');
