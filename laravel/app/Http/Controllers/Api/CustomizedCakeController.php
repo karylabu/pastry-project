@@ -9,6 +9,7 @@ use App\Models\CakeSize;
 use App\Models\CakeRecipe;
 use App\Models\CakeRecipeIngredient;
 use App\Services\CustomizedCakeService;
+use App\Services\CustomCakeRequestSetting;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -18,10 +19,39 @@ use RuntimeException;
 class CustomizedCakeController extends Controller
 {
     private CustomizedCakeService $service;
+    private CustomCakeRequestSetting $requestSetting;
 
-    public function __construct(CustomizedCakeService $service)
+    public function __construct(CustomizedCakeService $service, CustomCakeRequestSetting $requestSetting)
     {
         $this->service = $service;
+        $this->requestSetting = $requestSetting;
+    }
+
+    public function requestStatus(): JsonResponse
+    {
+        try {
+            return response()->json([
+                'success' => true,
+                'enabled' => $this->requestSetting->enabled(),
+            ]);
+        } catch (RuntimeException $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 503);
+        }
+    }
+
+    public function updateRequestStatus(Request $request): JsonResponse
+    {
+        if ($response = $this->authorizeAdmin($request)) return $response;
+
+        $data = $request->validate(['enabled' => 'required|boolean']);
+        try {
+            return response()->json([
+                'success' => true,
+                'enabled' => $this->requestSetting->update((bool) $data['enabled']),
+            ]);
+        } catch (RuntimeException $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 503);
+        }
     }
 
     public function flavors(): JsonResponse
@@ -209,6 +239,16 @@ class CustomizedCakeController extends Controller
         if (strtolower((string) $user->role) !== 'customer') {
             return response()->json(['success' => false, 'message' => 'Customer authorization required.'], 403);
         }
+        try {
+            if (!$this->requestSetting->enabled()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Custom cake requests are temporarily closed.',
+                ], 423);
+            }
+        } catch (RuntimeException $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 503);
+        }
 
         $payload = $request->all();
         $payload['user_id'] = (int) $user->id;
@@ -362,6 +402,10 @@ class CustomizedCakeController extends Controller
             }
 
             $customizedCakeOrderId = DB::transaction(function () use ($cakeType, $tiers, $payload, $uploadedImages, $user, $paymentMethod) {
+                if (!$this->requestSetting->enabled(true)) {
+                    return null;
+                }
+
                 $orderId = !empty($payload['order_id']) ? (int) $payload['order_id'] : null;
                 if (!$orderId && Schema::hasTable('orders')) {
                     $orderAttributes = [
@@ -436,6 +480,13 @@ class CustomizedCakeController extends Controller
 
                 return $customizedCakeOrderId;
             });
+
+            if ($customizedCakeOrderId === null) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Custom cake requests are temporarily closed.',
+                ], 423);
+            }
 
             $linkedOrderId = DB::table('customized_cake_orders')->where('id', $customizedCakeOrderId)->value('order_id');
             if ($linkedOrderId && Schema::hasTable('notifications')) {

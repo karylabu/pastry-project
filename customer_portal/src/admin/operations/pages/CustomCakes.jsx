@@ -68,6 +68,8 @@ export default function CustomCakes() {
   const [updatingId, setUpdatingId] = useState(null);
   const [toasts, setToasts] = useState([]);
   const [lastRefreshed, setLastRefreshed] = useState(null);
+  const [customerRequestsEnabled, setCustomerRequestsEnabled] = useState(null);
+  const [customerRequestsSaving, setCustomerRequestsSaving] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [quoteOrder, setQuoteOrder] = useState(null);
   const [quoteTotal, setQuoteTotal] = useState("");
@@ -265,8 +267,47 @@ export default function CustomCakes() {
       .finally(() => { if (!silent) setLoading(false); });
   };
 
+  const fetchCustomerRequestSetting = async () => {
+    try {
+      const response = await laravelStaffFetch(`${LARAVEL_BASE}/api/customized-cakes/request-status`, {
+        headers: { Accept: "application/json" },
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || typeof data?.enabled !== "boolean") {
+        throw new Error(data?.message || "Unable to load custom cake request availability.");
+      }
+      setCustomerRequestsEnabled(data.enabled);
+    } catch (error) {
+      setCustomerRequestsEnabled(null);
+      addToast(error.message || "Unable to load custom cake request availability.", "error");
+    }
+  };
+
+  const toggleCustomerRequests = async () => {
+    if (typeof customerRequestsEnabled !== "boolean" || customerRequestsSaving) return;
+    setCustomerRequestsSaving(true);
+    try {
+      const response = await laravelStaffFetch(`${LARAVEL_BASE}/api/staff/customized-cakes/request-status`, {
+        method: "PATCH",
+        headers: { Accept: "application/json", "Content-Type": "application/json" },
+        body: JSON.stringify({ enabled: !customerRequestsEnabled }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || typeof data?.enabled !== "boolean") {
+        throw new Error(data?.message || "Unable to update custom cake request availability.");
+      }
+      setCustomerRequestsEnabled(data.enabled);
+      addToast(data.enabled ? "Custom cake requests are now ON." : "Custom cake requests are now OFF.");
+    } catch (error) {
+      addToast(error.message || "Unable to update custom cake request availability.", "error");
+    } finally {
+      setCustomerRequestsSaving(false);
+    }
+  };
+
   useEffect(() => {
     fetchOrders();
+    fetchCustomerRequestSetting();
     return subscribeRealtime((event) => {
       if (event.type === "order.updated") fetchOrders(true);
     });
@@ -725,6 +766,27 @@ export default function CustomCakes() {
                 <span className="h-2 w-2 rounded-full bg-[#72865e]" />
                 Live · push updates enabled
                 {lastRefreshed && <span className="text-[#8f8076]">· {lastRefreshed.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>}
+              </div>
+              <div className="flex items-center justify-between gap-3 rounded-lg border border-[#e8dfd4] bg-white px-3 py-2">
+                <div>
+                  <p className="text-[11px] font-semibold text-[#33251e]">Customer custom cake requests</p>
+                  <p className={`text-[10px] ${customerRequestsEnabled ? "text-[#61734f]" : "text-[#8f8076]"}`}>
+                    {customerRequestsEnabled === null
+                      ? "Checking availability..."
+                      : customerRequestsEnabled ? "ON · Customers can submit requests" : "OFF · Customer form is blocked"}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-label="Allow customer custom cake requests"
+                  aria-checked={customerRequestsEnabled === true}
+                  onClick={toggleCustomerRequests}
+                  disabled={customerRequestsEnabled === null || customerRequestsSaving}
+                  className={`relative inline-flex h-7 w-[50px] shrink-0 items-center rounded-full p-1 transition-colors disabled:cursor-wait disabled:opacity-50 ${customerRequestsEnabled ? "bg-[#72865e]" : "bg-[#a9a39c]"}`}
+                >
+                  <span className={`h-5 w-5 rounded-full bg-white shadow transition-transform ${customerRequestsEnabled ? "translate-x-[22px]" : "translate-x-0"}`} />
+                </button>
               </div>
               <div className="flex flex-wrap gap-2">
                 <button type="button" onClick={() => navigate("/admin/schedule")} className="inline-flex h-10 flex-1 items-center justify-center gap-2 rounded-lg border border-[#e8dfd4] bg-white px-3 text-[11px] font-semibold text-[#65574d] transition hover:bg-[#faf7f2]"><CalendarDays size={14} /> Schedule</button>

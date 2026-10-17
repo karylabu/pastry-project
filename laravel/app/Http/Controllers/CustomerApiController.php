@@ -143,6 +143,12 @@ class CustomerApiController extends Controller
             if (!$user instanceof User) {
                 return $user;
             }
+            if (!app(\App\Services\CustomCakeRequestSetting::class)->enabled()) {
+                return $this->corsResponse([
+                    'success' => false,
+                    'message' => 'Custom cake requests are temporarily closed.',
+                ], 423);
+            }
 
             try {
                 $form = array_merge($request->all(), $this->parseJson($request));

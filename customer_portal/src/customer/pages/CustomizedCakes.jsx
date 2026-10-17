@@ -132,6 +132,49 @@ export default function CustomizedCakes() {
   const [showSavedAddressSuggestions, setShowSavedAddressSuggestions] = useState(false);
   const [flavorCatalog, setFlavorCatalog] = useState([]);
   const [sizeCatalog, setSizeCatalog] = useState([]);
+  const [customCakeRequestsEnabled, setCustomCakeRequestsEnabled] = useState(null);
+  const [customCakeStatusUnavailable, setCustomCakeStatusUnavailable] = useState(false);
+  const requestFormDisabled = customCakeRequestsEnabled !== true || loading;
+
+  useEffect(() => {
+    let isActive = true;
+    let requestInFlight = false;
+
+    const refreshRequestStatus = async () => {
+      if (requestInFlight) return;
+      requestInFlight = true;
+      try {
+        const response = await fetch(`${LARAVEL_BASE}/api/customized-cakes/request-status`, {
+          headers: { Accept: 'application/json' },
+        });
+        const data = await safeParseJson(response);
+        if (!response.ok || typeof data?.enabled !== 'boolean') {
+          throw new Error(data?.message || `Failed to check custom cake availability (${response.status}).`);
+        }
+        if (isActive) {
+          setCustomCakeRequestsEnabled(data.enabled);
+          setCustomCakeStatusUnavailable(false);
+        }
+      } catch (error) {
+        if (isActive) {
+          setCustomCakeRequestsEnabled(false);
+          setCustomCakeStatusUnavailable(true);
+        }
+        console.error('Could not check custom cake request availability:', error);
+      } finally {
+        requestInFlight = false;
+      }
+    };
+
+    refreshRequestStatus();
+    const interval = window.setInterval(refreshRequestStatus, 30000);
+    window.addEventListener('focus', refreshRequestStatus);
+    return () => {
+      isActive = false;
+      window.clearInterval(interval);
+      window.removeEventListener('focus', refreshRequestStatus);
+    };
+  }, []);
 
   useEffect(() => {
     if (!location.state?.scrollToRequestForm) return undefined;
@@ -478,6 +521,12 @@ export default function CustomizedCakes() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (customCakeRequestsEnabled !== true) {
+      setMessage(customCakeStatusUnavailable
+        ? 'Custom cake requests are temporarily unavailable. Please try again later.'
+        : 'Custom cake requests are currently closed.');
+      return;
+    }
     if (files.length + galleryReferences.length > MAX_REFERENCE_IMAGES) {
       setMessage(`You can select up to ${MAX_REFERENCE_IMAGES} reference images in one request.`);
       return;
@@ -804,6 +853,19 @@ export default function CustomizedCakes() {
         onSubmit={handleSubmit}
         className="rounded-2xl border border-[#eadfd8] bg-[#fffdf9] p-4 shadow-[0_8px_22px_rgba(91,64,39,0.05)] sm:rounded-3xl sm:p-6"
       >
+        {customCakeRequestsEnabled !== true && (
+          <div
+            role="status"
+            aria-live="polite"
+            className="mb-4 rounded-xl border border-[#d8d1c8] bg-[#efede9] px-4 py-3 text-sm text-[#655f58]"
+          >
+            {customCakeStatusUnavailable
+              ? 'Custom cake requests are temporarily unavailable. The form is disabled; please try again later.'
+              : customCakeRequestsEnabled === null
+                ? 'Checking custom cake request availability...'
+                : 'Custom cake requests are currently closed. The form is disabled.'}
+          </div>
+        )}
         <div className="mb-4 border-b border-[#f0e6dc] pb-3 sm:mb-5">
           <div>
             <p className="text-[9px] font-black uppercase tracking-[0.24em] text-[#9b7b3d]">Your custom order</p>
@@ -813,6 +875,7 @@ export default function CustomizedCakes() {
           </div>
         </div>
 
+        <fieldset disabled={requestFormDisabled} className="min-w-0 border-0 p-0 disabled:opacity-50">
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2 md:items-start md:gap-4">
           <div className="contents md:flex md:flex-col md:gap-3">
             <div data-custom-card="1" style={{ order: 1 }} className="rounded-2xl border border-[#eee4de] bg-white p-4 shadow-[0_3px_12px_rgba(91,64,39,0.04)] sm:p-5">
@@ -1207,7 +1270,7 @@ export default function CustomizedCakes() {
                   Reset
                 </button>
                 {userId > 0 ? (
-                  <button disabled={loading} type="submit" className="rounded-xl border border-[#e5bd45] bg-[#ffe89a] px-4 py-2 text-sm font-semibold text-[#6b4f1d] transition hover:bg-[#ffedb5] disabled:opacity-50">
+                  <button disabled={requestFormDisabled} type="submit" className="rounded-xl border border-[#e5bd45] bg-[#ffe89a] px-4 py-2 text-sm font-semibold text-[#6b4f1d] transition hover:bg-[#ffedb5] disabled:cursor-not-allowed disabled:opacity-50">
                     {loading ? 'Sending...' : 'Send Request'}
                   </button>
                 ) : (
@@ -1228,6 +1291,7 @@ export default function CustomizedCakes() {
           </div>
 
         </div>
+        </fieldset>
       </form>
 
       {isReferencePreviewOpen && referenceImage && (

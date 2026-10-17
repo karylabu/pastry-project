@@ -93,6 +93,11 @@ class CustomizedCakeOrderSubmissionTest extends TestCase
             $table->unsignedBigInteger('size_id');
             $table->timestamps();
         });
+        Schema::create('custom_cake_request_settings', function ($table) {
+            $table->unsignedTinyInteger('id')->primary();
+            $table->boolean('enabled')->default(true);
+            $table->timestamps();
+        });
 
         DB::table('users')->insert([
             ['id' => 1, 'name' => 'Customer', 'email' => 'customer@example.test', 'role' => 'customer', 'status' => 'active'],
@@ -100,6 +105,12 @@ class CustomizedCakeOrderSubmissionTest extends TestCase
         ]);
         DB::table('cake_flavors')->insert(['id' => 1, 'name' => 'Chocolate', 'slug' => 'chocolate', 'active' => true]);
         DB::table('cake_sizes')->insert(['id' => 1, 'code' => '6x3', 'label' => '6 x 3 inch', 'active' => true]);
+        DB::table('custom_cake_request_settings')->insert([
+            'id' => 1,
+            'enabled' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
     }
 
     protected function tearDown(): void
@@ -107,6 +118,7 @@ class CustomizedCakeOrderSubmissionTest extends TestCase
         foreach ([
             'customized_cake_tiers',
             'customized_cake_orders',
+            'custom_cake_request_settings',
             'cake_sizes',
             'cake_flavors',
             'notifications',
@@ -189,6 +201,64 @@ class CustomizedCakeOrderSubmissionTest extends TestCase
 
         $this->assertDatabaseCount('orders', 0);
         $this->assertDatabaseCount('customized_cake_orders', 0);
+    }
+
+    public function test_admin_can_turn_off_custom_cake_requests_and_customers_are_blocked(): void
+    {
+        $admin = new User();
+        $admin->id = 2;
+        $admin->name = 'Admin';
+        $admin->email = 'admin@example.test';
+        $admin->role = 'admin';
+        $admin->status = 'active';
+
+        $this->actingAs($admin)
+            ->patchJson('/api/staff/customized-cakes/request-status', ['enabled' => false])
+            ->assertOk()
+            ->assertJsonPath('enabled', false);
+
+        $customer = new User();
+        $customer->id = 1;
+        $customer->name = 'Customer';
+        $customer->email = 'customer@example.test';
+        $customer->role = 'customer';
+        $customer->status = 'active';
+
+        $this->actingAs($customer)
+            ->getJson('/api/customized-cakes/request-status')
+            ->assertOk()
+            ->assertJsonPath('enabled', false);
+
+        $this->postJson('/api/customized-cakes/order', [
+            'cake_type' => 'single',
+            'tiers' => [['flavor_id' => 1, 'size_id' => 1]],
+            'payment_method' => 'QR Ph',
+        ])
+            ->assertStatus(423)
+            ->assertJsonPath('message', 'Custom cake requests are temporarily closed.');
+
+        $this->postJson('/api/customer/products?action=customize', ['occasion' => 'Birthday'])
+            ->assertStatus(423)
+            ->assertJsonPath('message', 'Custom cake requests are temporarily closed.');
+
+        $this->assertDatabaseCount('orders', 0);
+        $this->assertDatabaseCount('customized_cake_orders', 0);
+    }
+
+    public function test_customers_cannot_change_custom_cake_request_availability(): void
+    {
+        $customer = new User();
+        $customer->id = 1;
+        $customer->name = 'Customer';
+        $customer->email = 'customer@example.test';
+        $customer->role = 'customer';
+        $customer->status = 'active';
+
+        $this->actingAs($customer)
+            ->patchJson('/api/staff/customized-cakes/request-status', ['enabled' => false])
+            ->assertForbidden();
+
+        $this->assertDatabaseHas('custom_cake_request_settings', ['id' => 1, 'enabled' => true]);
     }
 
     public function test_customer_custom_cake_request_rejects_gcash_payment_method(): void

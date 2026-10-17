@@ -10,6 +10,7 @@ use App\Models\Promotion;
 use App\Models\Product;
 use App\Http\Requests\StoreOrderRequest;
 use App\Services\CustomizedCakeService;
+use App\Services\CustomCakeRequestSetting;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
@@ -865,9 +866,22 @@ class OrderController extends Controller
         if (!$user) {
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
         }
+        if (!app(CustomCakeRequestSetting::class)->enabled()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Custom cake requests are temporarily closed.',
+            ], 423);
+        }
 
         try {
             return DB::transaction(function () use ($request, $user) {
+                if (!app(CustomCakeRequestSetting::class)->enabled(true)) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Custom cake requests are temporarily closed.',
+                    ], 423);
+                }
+
                 $uploadedImages = [];
                 if ($request->hasFile('inspo_images')) {
                     foreach ($request->file('inspo_images') as $index => $file) {

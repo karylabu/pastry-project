@@ -1,4 +1,21 @@
+import React from 'react';
+import { render, screen, waitFor } from '@testing-library/react';
 import { buildCustomizedCakeSubmissionPayload, buildTierSelections } from './customizedCakePayload';
+import CustomizedCakes from './CustomizedCakes';
+
+jest.mock('react-router-dom', () => ({
+  useLocation: () => ({ pathname: '/customized-cakes', state: null }),
+  useNavigate: () => jest.fn(),
+}));
+
+jest.mock('../components/PageShell', () => ({ children }) => <div>{children}</div>);
+jest.mock('../components/DesignCategoryCards', () => () => null);
+
+jest.mock('../../services/config', () => ({
+  CUSTOMER_BASE: 'https://example.test/customer',
+  LARAVEL_BASE: 'https://example.test/laravel',
+  ROOT_BASE: 'https://example.test',
+}));
 
 describe('buildCustomizedCakeSubmissionPayload', () => {
   it('maps a legacy form selection to a single-tier Laravel payload', () => {
@@ -84,5 +101,43 @@ describe('buildCustomizedCakeSubmissionPayload', () => {
 
     expect(payload.reference_images).toEqual(referenceImages);
     expect(payload.uploaded_reference_images).toEqual(uploadedReferenceImages);
+  });
+});
+
+describe('CustomizedCakes availability', () => {
+  beforeEach(() => {
+    window.localStorage.setItem('user', JSON.stringify({ id: 5, name: 'Customer' }));
+    global.fetch = jest.fn(async (url) => ({
+      ok: true,
+      text: async () => JSON.stringify((() => {
+        if (url.includes('/customized-cakes/request-status')) return { enabled: false };
+        if (url.includes('/customized-cakes/flavors')) return { flavors: [] };
+        if (url.includes('/customized-cakes/sizes')) return { sizes: [] };
+        if (url.includes('/api/addresses')) return { status: 'success', addresses: [] };
+        if (url.includes('/api/user')) return { id: 5, name: 'Customer' };
+        return {};
+      })()),
+    }));
+  });
+
+  afterEach(() => {
+    window.localStorage.clear();
+    jest.restoreAllMocks();
+  });
+
+  it('disables and greys the request form when customer requests are off', async () => {
+    render(<CustomizedCakes />);
+
+    expect(await screen.findByText('Custom cake requests are currently closed. The form is disabled.')).toBeInTheDocument();
+
+    const form = screen.getByRole('button', { name: 'Send Request' }).closest('form');
+    expect(form.querySelector('fieldset')).toBeDisabled();
+    expect(form.querySelector('fieldset')).toHaveClass('disabled:opacity-50');
+    expect(screen.getByPlaceholderText('Enter full name')).toBeDisabled();
+
+    await waitFor(() => expect(global.fetch).toHaveBeenCalledWith(
+      'https://example.test/laravel/api/customized-cakes/request-status',
+      expect.objectContaining({ headers: { Accept: 'application/json' } }),
+    ));
   });
 });
