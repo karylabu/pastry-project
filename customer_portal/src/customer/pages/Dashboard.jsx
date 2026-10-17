@@ -30,7 +30,7 @@ import ProductModal from "../components/ProductModal";
 import CustomCakeModal from "../components/CustomCakeModal";
 import DesignCategoryCards from "../components/DesignCategoryCards";
 import { CUSTOMER_BASE, LARAVEL_BASE, ROOT_BASE } from "../../services/config";
-import { getAuthHeaders, safeParseJson } from "../../services/api";
+import { getAuthHeaders, safeFetchJson, safeParseJson } from "../../services/api";
 import { subscribeRealtime } from "../../services/realtime";
 
 /* =========================
@@ -1160,12 +1160,13 @@ export default function Dashboard({ onAddToCart, onEnsureShopOpen, hideFloating 
   useEffect(() => {
     const fetchProducts = async () => {
       try {
-        const res  = await fetch(`${CUSTOMER_BASE}/api/customer/products?action=list`);
-        const data = await safeParseJson(res);
-        if (Array.isArray(data)) setProducts(data);
+        const data = await safeFetchJson(`${CUSTOMER_BASE}/api/customer/products?action=list`);
+        if (!Array.isArray(data)) throw new Error("Invalid product list response.");
+        setProducts(data);
       } catch (err) {
         console.error("Failed to load products:", err);
         setProducts([]);
+        window.PastryLoader?.fail("We couldn’t load the menu. Please try again.");
       }
     };
 

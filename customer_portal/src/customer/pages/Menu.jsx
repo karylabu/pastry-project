@@ -4,7 +4,7 @@ import PageShell from '../components/PageShell';
 import { useLocation } from 'react-router-dom';
 import ProductModal from '../components/ProductModal';
 import { CUSTOMER_BASE } from '../../services/config';
-import { getAuthHeaders, safeParseJson } from '../../services/api';
+import { getAuthHeaders, safeFetchJson, safeParseJson } from '../../services/api';
 import { Check, ChevronDown } from 'lucide-react';
 
 const SORT_OPTIONS = [
@@ -123,15 +123,17 @@ export default function Menu({ onAddToCart, onEnsureShopOpen }) {
   useEffect(() => {
     loadFavorites();
 
-    fetch(`${CUSTOMER_BASE}/api/customer/products?action=list`)
-      .then(res => safeParseJson(res))
+    safeFetchJson(`${CUSTOMER_BASE}/api/customer/products?action=list`)
       .then(data => {
-        if (Array.isArray(data)) {
-          const filtered = data.filter((product) =>
-            product.name?.toLowerCase() !== 'cake customization' && hasMenuImage(product)
-          );
-          setProducts(filtered);
-        }
+        if (!Array.isArray(data)) throw new Error('Invalid product list response.');
+        const filtered = data.filter((product) =>
+          product.name?.toLowerCase() !== 'cake customization' && hasMenuImage(product)
+        );
+        setProducts(filtered);
+      })
+      .catch((error) => {
+        console.error('Failed to load menu products:', error);
+        window.PastryLoader?.fail('We couldn’t load the menu. Please try again.');
       });
   }, [favoritesStorageKey, userId]);
 
