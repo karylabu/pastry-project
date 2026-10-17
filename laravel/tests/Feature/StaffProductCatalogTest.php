@@ -243,6 +243,35 @@ class StaffProductCatalogTest extends TestCase
         ])->assertUnauthorized();
     }
 
+    public function test_migration_corrects_only_blueberry_big_cream_cheese_recipe_set_to_ten_kilograms(): void
+    {
+        DB::table('products')->where('id', 1)->update(['name' => 'Blueberry Cheesecake']);
+        DB::table('ingredients')->insert(['id' => 2, 'name' => 'Cream Cheese', 'unit' => 'kg']);
+        DB::table('product_recipes')->insert([
+            ['product_id' => 1, 'product_size_id' => 1, 'ingredient_id' => 2, 'qty' => 10, 'active' => true],
+            ['product_id' => 1, 'product_size_id' => 2, 'ingredient_id' => 2, 'qty' => 10, 'active' => true],
+        ]);
+
+        $migration = require database_path(
+            'migrations/2026_10_17_000001_correct_blueberry_cheesecake_cream_cheese_quantity.php'
+        );
+        $migration->up();
+        $migration->up();
+
+        $this->assertDatabaseHas('product_recipes', [
+            'product_id' => 1,
+            'product_size_id' => 1,
+            'ingredient_id' => 2,
+            'qty' => 0.680,
+        ]);
+        $this->assertDatabaseHas('product_recipes', [
+            'product_id' => 1,
+            'product_size_id' => 2,
+            'ingredient_id' => 2,
+            'qty' => 10,
+        ]);
+    }
+
     public function test_stock_migration_sets_confirmed_big_and_small_counts_for_all_cakes(): void
     {
         $migration = require database_path('migrations/2026_10_10_000002_set_confirmed_cake_stock_by_size.php');
