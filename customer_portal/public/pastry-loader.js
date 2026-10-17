@@ -13,10 +13,7 @@
 #pl-root.pl-out{opacity:0;pointer-events:none}
 #pl-root .pl-box{text-align:center;padding:24px;transition:transform .6s ease}
 #pl-root.pl-out .pl-box{transform:scale(1.05)}
-#pl-root svg.pl-logo{display:block;margin:0 auto 10px;width:120px;height:130px;overflow:visible}
-#pl-root .d{stroke-dasharray:1;stroke-dashoffset:1}
-#pl-root.pl-go .d{animation:pl-draw .8s ease forwards;animation-delay:var(--d)}
-@keyframes pl-draw{to{stroke-dashoffset:0}}
+#pl-root img.pl-logo{display:block;margin:0 auto 10px;width:120px;height:130px;object-fit:contain}
 #pl-root .pl-name{font-family:"Playfair Display",Georgia,serif;font-style:italic;font-weight:700;font-size:clamp(34px,10vw,46px);line-height:1.1;white-space:nowrap}
 #pl-root .pl-name .pj{color:#c4a032}
 #pl-root .pl-name .gap{display:inline-block;width:.28em}
@@ -26,10 +23,7 @@
 #pl-root .pl-tag{opacity:0;font-size:11px;letter-spacing:.32em;color:#8d857e;margin:8px 0 18px;text-transform:uppercase}
 #pl-root.pl-go .pl-tag{animation:pl-fade .6s ease 1.6s forwards}
 @keyframes pl-fade{to{opacity:1}}
-#pl-root .sp{opacity:0;transform-box:fill-box;transform-origin:center}
-#pl-root.pl-go .sp{animation:pl-pop 1.8s ease-out infinite;animation-delay:calc(1s + var(--s))}
-@keyframes pl-pop{0%{opacity:0;transform:scale(0)}25%{opacity:1;transform:scale(1)}60%,100%{opacity:0;transform:scale(1.6)}}
-#pl-root.pl-go svg.pl-logo{animation:pl-float 3s ease-in-out 1.6s infinite}
+#pl-root.pl-go img.pl-logo{animation:pl-float 3s ease-in-out 1.6s infinite}
 @keyframes pl-float{50%{transform:translateY(-5px)}}
 #pl-root .pl-track{width:160px;height:2px;background:#efe3d6;margin:0 auto;border-radius:2px;overflow:hidden}
 #pl-root .pl-bar{height:100%;width:0;background:#c4a032}
@@ -37,7 +31,7 @@
 #pl-root .pl-retry{display:none;margin-top:14px;font:inherit;font-size:12px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:#1f1a17;background:#fcf1c6;border:1px solid #c4a032;border-radius:999px;padding:11px 28px;cursor:pointer}
 #pl-root.pl-fail .pl-retry{display:inline-block}
 #pl-root .pl-retry:focus-visible{outline:3px solid #1f1a17;outline-offset:3px}
-@media (prefers-reduced-motion:reduce){#pl-root *{animation:none!important}#pl-root,#pl-root .pl-box{transition:none}#pl-root .d{stroke-dashoffset:0}#pl-root .ch,#pl-root .pl-tag{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){#pl-root *{animation:none!important}#pl-root,#pl-root .pl-box{transition:none}#pl-root .ch,#pl-root .pl-tag{opacity:1;transform:none}}
 `;
 
   var style = document.createElement('style');
@@ -51,17 +45,7 @@
   root.setAttribute('aria-label', 'Loading');
   root.innerHTML = `
 <div class="pl-box">
-<svg class="pl-logo" viewBox="0 0 120 130" fill="none" stroke="#1f1a17" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-<path class="d" pathLength="1" style="--d:0s" d="M60 24C58 16 64 12 69 14"/>
-<path class="d" pathLength="1" style="--d:.1s" d="M46 38C46 28 56 24 62 24C70 24 76 30 74 38"/>
-<path class="d" pathLength="1" style="--d:.25s" d="M34 54C32 44 42 38 50 38L72 38C82 38 90 44 86 54"/>
-<path class="d" pathLength="1" style="--d:.4s" d="M24 70C20 58 30 52 38 54L84 54C94 52 102 60 96 70"/>
-<path class="d" pathLength="1" style="--d:.55s" d="M26 70H94L84 112H36Z"/>
-<path class="d" pathLength="1" style="--d:.7s" d="M46 74L50 112M60 74V112M74 74L70 112"/>
-<circle class="sp" style="--s:0s" cx="20" cy="30" r="3" fill="#c4a032" stroke="none"/>
-<circle class="sp" style="--s:.6s" cx="100" cy="24" r="3.5" fill="#c4a032" stroke="none"/>
-<circle class="sp" style="--s:1.1s" cx="104" cy="82" r="2.5" fill="#c4a032" stroke="none"/>
-</svg>
+<img class="pl-logo" src="/uploads/logo.png?v=logo-v2" alt="Pastry Project" />
 <div class="pl-name"><span class="a"></span><span class="gap"></span><span class="pj"></span></div>
 <div class="pl-tag">Baked fresh daily</div>
 <div class="pl-track"><div class="pl-bar"></div></div>
