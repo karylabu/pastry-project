@@ -73,6 +73,10 @@ function getRouterBasename() {
 function App() {
   const basename = getRouterBasename();
 
+  useEffect(() => {
+    window.PastryLoader?.appReady?.();
+  }, []);
+
   return (
     <Router basename={basename}>
       <GoogleAuthBootstrap />

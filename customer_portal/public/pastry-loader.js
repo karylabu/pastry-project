@@ -85,7 +85,7 @@
   var barEl = root.querySelector('.pl-bar');
   var msgEl = root.querySelector('.pl-msg');
   var retryEl = root.querySelector('.pl-retry');
-  var st = { dcl: false, fonts: false, load: false };
+  var st = { dcl: false, fonts: false, load: false, app: false };
 
   if (document.readyState !== 'loading') st.dcl = true;
   else document.addEventListener('DOMContentLoaded', function () { st.dcl = true; });
@@ -95,13 +95,13 @@
   else st.fonts = true;
 
   var run = CFG;
-  var p = 0, t0 = 0, last = 0, raf = 0, shownAt = 0, startedAt = 0, lastEv = 0;
+  var p = 0, t0 = 0, last = 0, raf = 0, shownAt = 0, startedAt = 0;
   var active = false, finishing = false, forced = false, failed = false;
   var total = 0, done = 0, pending = 0, timers = [];
   var API = {};
 
-  function isReady(now) {
-    return forced || (st.dcl && st.fonts && st.load && pending === 0 && now - lastEv >= 250);
+  function isReady() {
+    return forced || (st.dcl && st.fonts && st.load && st.app && pending === 0);
   }
 
   function targetPct() {
@@ -143,7 +143,7 @@
     last = timestamp;
     var elapsed = timestamp - t0;
 
-    var ready = isReady(performance.now());
+    var ready = isReady();
     if (!shownAt && elapsed >= run.delay) {
       if (ready) { end(true); return; }
       reveal(timestamp);
@@ -170,7 +170,7 @@
     cancelAnimationFrame(raf);
     run = Object.assign({}, CFG, options || {});
     p = 0; t0 = 0; last = 0; shownAt = 0; startedAt = performance.now();
-    total = 0; done = 0; pending = 0; lastEv = performance.now();
+    total = 0; done = 0; pending = 0;
     active = true; finishing = false; forced = false; failed = false;
     root.classList.remove('pl-out', 'pl-fail', 'pl-go');
     root.classList.add('pl-hold');
@@ -182,13 +182,15 @@
 
   API.task = function () {
     if (!active || finishing) return function () {};
-    total++; pending++; lastEv = performance.now();
+    total++; pending++;
     var settled = false;
     return function () {
       if (settled) return;
-      settled = true; pending--; done++; lastEv = performance.now();
+      settled = true; pending--; done++;
     };
   };
+
+  API.appReady = function () { st.app = true; };
 
   API.hide = function () { forced = true; };
 
