@@ -5,7 +5,14 @@
 (function () {
   if (window.PastryLoader) return;
 
-  var CFG = Object.assign({ delay: 300, minVisible: 2400, slowMs: 8000, maxMs: 20000 }, window.PASTRY_LOADER_CONFIG || {});
+  var isAdminRoute = /^\/admin(?:\/|$)/i.test(window.location.pathname);
+  var CFG = Object.assign({
+    delay: isAdminRoute ? 0 : 300,
+    minVisible: 2400,
+    slowMs: 8000,
+    maxMs: 20000,
+    showOnFastLoad: isAdminRoute
+  }, window.PASTRY_LOADER_CONFIG || {});
 
   var css = `
 #pl-root{position:fixed;inset:0;z-index:2147483000;background:#fdf9f4;display:flex;align-items:center;justify-content:center;opacity:1;transition:opacity .6s ease;font-family:"DM Sans",system-ui,sans-serif;color:#1f1a17;padding:env(safe-area-inset-top,0px) 0 env(safe-area-inset-bottom,0px);box-sizing:border-box}
@@ -146,7 +153,7 @@
 
     var ready = isReady();
     if (!shownAt && elapsed >= run.delay) {
-      if (ready) { end(true); return; }
+      if (ready && !run.showOnFastLoad) { end(true); return; }
       reveal(timestamp);
     }
     if (!finishing && (ready || elapsed >= run.maxMs)) {
