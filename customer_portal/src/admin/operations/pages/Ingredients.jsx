@@ -154,8 +154,6 @@ export default function Ingredients({
     setModalIngredient(ingredient);
     setModalQty('');
     setModalNote('');
-    setModalAdjustQty('');
-    setModalAdjustNote('');
     if (ingredient) {
       setModalName(ingredient.name || '');
       setModalUnit(ingredient.unit || '');
@@ -231,8 +229,6 @@ export default function Ingredients({
     setModalIngredient(null);
     setModalQty('');
     setModalNote('');
-    setModalAdjustQty('');
-    setModalAdjustNote('');
     setHistoryEntries([]);
   };
 
@@ -344,39 +340,6 @@ export default function Ingredients({
   const expiryInPast = expiryDate ? expiryDate < new Date() : false;
   const canSaveEdit = modalName.trim().length > 0 && thresholdValid;
   const canSaveCreate = modalName.trim().length > 0 && thresholdValid;
-
-  const [modalAdjustQty, setModalAdjustQty] = useState('');
-  const [modalAdjustNote, setModalAdjustNote] = useState('');
-
-  const performStockAdjust = async (action) => {
-    if (!modalIngredient) return;
-    const qty = Number(modalAdjustQty || 0);
-    if (qty <= 0) {
-      alert('Quantity must be greater than zero.');
-      return;
-    }
-    if (action === 'stock_out' && qty > Number(modalIngredient.stock || 0)) {
-      alert('Cannot stock out more than current balance.');
-      return;
-    }
-    const payload = { action, qty, note: modalAdjustNote };
-    try {
-      const res = await laravelStaffFetch(`${LARAVEL_BASE}/api/staff/ingredients/${encodeURIComponent(modalIngredient.id)}/adjust-stock`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-      const j = await res.json().catch(() => ({}));
-      if (j.success || res.ok) {
-        await loadIngredients();
-        setModalAdjustQty('');
-        setModalAdjustNote('');
-        return;
-      }
-      alert(j.message || 'Failed to adjust stock');
-    } catch (e) {
-      alert('Network error while adjusting stock');
-    }
-  };
 
   const deleteIngredient = async (id) => {
     if (!window.confirm('Delete this ingredient? This cannot be undone.')) return false;
@@ -777,20 +740,6 @@ export default function Ingredients({
                     {thresholdValue <= 0 && (
                       <p className="text-xs text-red-600">Threshold must be greater than 0 to enable alerts and avoid silent low-stock conditions.</p>
                     )}
-                    <label className="text-xs text-gray-600">Expiry (optional)</label>
-                    <input type="date" value={modalExpiry} onChange={(e) => setModalExpiry(e.target.value)} className="rounded-xl border px-2 py-1 text-xs" />
-                    {expiryInPast && (
-                      <p className="text-xs text-red-600">This expiry date is in the past and will mark the ingredient as expired.</p>
-                    )}
-                    <div className="mt-4 border-t pt-3">
-                      <div className="text-xs text-gray-600 font-semibold">Quick stock adjust</div>
-                      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                        <input type="number" min="0" placeholder="Qty" value={modalAdjustQty} onChange={(e) => setModalAdjustQty(e.target.value)} className="rounded-xl border px-2 py-1 text-xs w-full sm:w-28" />
-                        <input type="text" placeholder="Note" value={modalAdjustNote} onChange={(e) => setModalAdjustNote(e.target.value)} className="rounded-xl border px-2 py-1 text-xs flex-1" />
-                        <button onClick={() => performStockAdjust('stock_in')} className="rounded-md bg-black text-white px-2 py-1 text-xs">Stock In</button>
-                        <button onClick={() => performStockAdjust('stock_out')} className="rounded-md bg-black text-white px-2 py-1 text-xs">Stock Out</button>
-                      </div>
-                    </div>
                     <div className="flex items-center gap-2 justify-between mt-4">
                       <button onClick={async () => { const deleted = await deleteIngredient(modalIngredient.id); if (deleted) closeModal(); }} className="px-2 py-1 rounded-md bg-black text-white text-xs">Delete</button>
                       <div className="flex items-center gap-2">

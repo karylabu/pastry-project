@@ -38,44 +38,66 @@ function StatsStrip({ stats }) {
   );
 }
 
-const ORDER_STATUS_COLORS = ["#d4af37", "#c98f6b", "#829b7d", "#c4ad52", "#d6c66f"];
+// Fixed color per status so the chart matches the badges in "Live orders".
+const ORDER_STATUS_COLORS = {
+  Pending: "#e0b93f",
+  Preparing: "#c98f6b",
+  "Ready for Pickup": "#a3b07a",
+  Completed: "#6f9a74",
+  Cancelled: "#c8785f",
+};
+const FALLBACK_STATUS_COLOR = "#d6c66f";
 
 function OrderStatusBreakdown({ rows }) {
-  const total = rows.reduce((sum, row) => sum + row.value, 0);
-  if (!total) return <AnalyticsEmpty compact />;
+  const total = rows.reduce((sum, row) => sum + Number(row.value || 0), 0);
+  if (!total) return <AnalyticsEmpty compact title="No orders yet." description="Order status counts will show here." />;
+  const colorOf = (name) => ORDER_STATUS_COLORS[name] || FALLBACK_STATUS_COLOR;
 
   return (
-    <div className="grid items-center gap-3 p-4 sm:grid-cols-[150px_minmax(0,1fr)] sm:gap-4 lg:max-h-[100px] lg:overflow-y-auto lg:p-2">
-      <div className="relative mx-auto h-[148px] w-[148px] lg:h-[92px] lg:w-[92px]">
+    <div className="grid flex-1 items-center gap-5 p-5 sm:grid-cols-[170px_minmax(0,1fr)]">
+      <div className="relative mx-auto h-[170px] w-[170px]">
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
-            <Pie data={rows} dataKey="value" nameKey="name" innerRadius={47} outerRadius={65} paddingAngle={2} stroke="#fffdfa" strokeWidth={2}>
-              {rows.map((row, index) => <Cell key={row.name} fill={ORDER_STATUS_COLORS[index % ORDER_STATUS_COLORS.length]} />)}
+            <Pie data={rows} dataKey="value" nameKey="name" innerRadius={56} outerRadius={78} paddingAngle={2} stroke="#fffdfa" strokeWidth={2}>
+              {rows.map((row) => <Cell key={row.name} fill={colorOf(row.name)} />)}
             </Pie>
             <Tooltip contentStyle={{ borderRadius: 10, borderColor: "#eee4de", backgroundColor: "#fffdfa", fontSize: 11 }} />
           </PieChart>
         </ResponsiveContainer>
-        <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center">
-          <span className="text-[21px] font-bold leading-none text-[#33251e]">{total}</span>
-          <span className="mt-1 text-[9px] text-[#9b8c83]">Total Orders</span>
+        <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+          <span className="text-[26px] font-bold leading-none text-[#33251e]">{total}</span>
+          <span className="mt-1 text-[10px] uppercase tracking-[0.14em] text-[#9b8c83]">Total Orders</span>
         </div>
       </div>
-      <div className="space-y-1.5 lg:max-h-[88px] lg:overflow-y-auto">
-        {rows.map((row, index) => (
-          <div key={row.name} className="grid grid-cols-[minmax(0,1fr)_34px_42px] items-center gap-2 rounded-lg border border-[#f1e9e3] px-2.5 py-2 text-[10px] transition hover:border-[#c9a94f] hover:ring-1 hover:ring-[#d4af37]/20">
-            <span className="flex min-w-0 items-center gap-2 text-[#6a5a50]"><span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: ORDER_STATUS_COLORS[index % ORDER_STATUS_COLORS.length] }} /><span className="truncate">{row.name}</span></span>
-            <span className="text-right font-semibold text-[#33251e]">{row.value}</span>
-            <span className="text-right text-[#9b8c83]">{Math.round(row.value / total * 100)}%</span>
-          </div>
-        ))}
-      </div>
+
+      <ul className="space-y-2">
+        {rows.map((row) => {
+          const pct = Math.round((Number(row.value || 0) / total) * 100);
+          return (
+            <li key={row.name} className="rounded-lg border border-[#f1e9e3] px-3 py-2 transition hover:border-[#c9a94f] hover:ring-1 hover:ring-[#d4af37]/20">
+              <div className="flex items-center justify-between gap-3 text-[12px]">
+                <span className="flex min-w-0 items-center gap-2 text-[#6a5a50]">
+                  <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: colorOf(row.name) }} />
+                  <span className="truncate">{row.name}</span>
+                </span>
+                <span className="shrink-0 font-semibold text-[#33251e]">
+                  {row.value} <span className="font-normal text-[#9b8c83]">· {pct}%</span>
+                </span>
+              </div>
+              <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-[#f4ece6]">
+                <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: colorOf(row.name) }} />
+              </div>
+            </li>
+          );
+        })}
+      </ul>
     </div>
   );
 }
 
 function TopSellingTable({ rows }) {
   return (
-    <div className="overflow-x-auto p-3 lg:max-h-[100px] lg:overflow-y-auto lg:p-2">
+    <div className="overflow-x-auto p-3">
       <table className="w-full min-w-[440px] border-collapse text-left">
         <thead>
           <tr className="bg-[#fbf7f2] text-[9px] uppercase tracking-[0.13em] text-[#9b8c83]">
@@ -126,11 +148,12 @@ function Panel({ eyebrow, title, action, children, className = "" }) {
 
 function AnalyticsEmpty({
   compact = false,
+  className = "",
   title = "No cake sales data yet.",
   description = "Sales analytics will appear here once completed cake orders are recorded.",
 }) {
   return (
-    <div className={`px-6 text-center ${compact ? "py-7" : "py-10"}`}>
+    <div className={`px-6 text-center ${compact ? "py-7" : "py-10"} ${className}`}>
       <p className="text-[13px] font-semibold text-[#5f514a]">{title}</p>
       <p className="mt-1 text-[12px] text-[#9b8c83]">{description}</p>
     </div>
@@ -423,12 +446,12 @@ export default function Dashboard() {
                   <Panel
                     eyebrow={null}
                     title="Top Selling Cakes"
-                    className="flex h-full min-h-[190px] min-w-0 flex-col overflow-hidden lg:h-[190px]"
+                    className="flex h-full min-w-0 flex-col"
                     action={<Link to="/admin/products" aria-label="View all cakes in Products" className="group inline-flex items-center gap-1 rounded-md px-2 py-1 text-[10px] font-semibold text-[#876a19] transition hover:bg-[#fff8df] hover:text-[#5d470e] hover:outline hover:outline-1 hover:outline-[#d4af37] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d4af37] focus-visible:ring-offset-2">View All <ArrowRight size={12} className="transition-transform group-hover:translate-x-0.5" /></Link>}
                   >
                     <TopSellingTable rows={mostSoldItems} />
                   </Panel>
-                  <Panel eyebrow={null} title="Order Status Breakdown" className="flex h-full min-h-[190px] flex-col overflow-hidden lg:h-[190px]">
+                  <Panel eyebrow={null} title="Order Status Breakdown" className="flex h-full min-w-0 flex-col">
                     <OrderStatusBreakdown rows={orderStatusBreakdown} />
                   </Panel>
                 </div>
@@ -505,8 +528,8 @@ export default function Dashboard() {
                   </Panel>
                 </div>
 
-                <div className="grid gap-6 lg:grid-cols-2">
-                  <Panel eyebrow="Business Insights" title="What the data suggests">
+                <div className="grid items-stretch gap-3 lg:grid-cols-2">
+                  <Panel eyebrow="Business Insights" title="What the data suggests" className="flex h-full flex-col">
                     <div className="space-y-2 p-4">
                       {businessInsights.map((insight, index) => (
                         <div key={`${insight.type}-${index}`} className={`flex gap-3 rounded-lg p-3 ${['high_demand_low_stock', 'ingredient_demand', 'waste_risk'].includes(insight.type) ? 'bg-[#fff8e9] text-[#765d50]' : insight.type === 'limited_data' ? 'bg-[#fbfaf5] text-[#74675f]' : 'bg-[#fff8df] text-[#5f514a]'}`}>
@@ -518,19 +541,76 @@ export default function Dashboard() {
                       ))}
                     </div>
                   </Panel>
-                  <Panel eyebrow="Ingredient & Waste Analytics" title="Waste and ingredient loss insights">
-                    {Number(wasteAnalytics.records || 0) === 0 ? <div className="px-6 py-7 text-center text-[13px] text-[#74675f]">No waste recorded for this period.</div> : <div className="space-y-6 p-4">
-                      <div className="grid gap-3 sm:grid-cols-3">
-                        <div className="rounded-lg border border-[#eadfd8] p-4 transition hover:border-[#c9a94f] hover:ring-1 hover:ring-[#d4af37]/20"><p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#9b8c83]">Waste Records</p><p className="mt-2 text-xl font-bold text-[#33251e]">{Number(wasteAnalytics.records).toLocaleString()}</p></div>
-                        <div className="rounded-lg border border-[#eadfd8] p-4 transition hover:border-[#c9a94f] hover:ring-1 hover:ring-[#d4af37]/20"><p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#9b8c83]">Waste Value</p><p className="mt-2 text-xl font-bold text-[#33251e]">₱{Number(wasteAnalytics.waste_value || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</p></div>
-                        <div className="rounded-lg border border-[#eadfd8] p-4 transition hover:border-[#c9a94f] hover:ring-1 hover:ring-[#d4af37]/20"><p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#9b8c83]">Waste Quantity</p><p className="mt-2 text-sm font-semibold text-[#5f514a]">{(wasteAnalytics.total_by_unit || []).map((item) => `${Number(item.quantity).toLocaleString()} ${item.unit}`).join(' · ')}</p></div>
+
+                  <Panel eyebrow="Ingredient & Waste Analytics" title="Waste and ingredient loss insights" className="flex h-full flex-col">
+                    {Number(wasteAnalytics.records || 0) === 0 ? (
+                      <AnalyticsEmpty compact title="No waste recorded." description="Nothing was logged as wasted in this period." />
+                    ) : (
+                      <div className="space-y-4 p-4">
+                        <div className="grid gap-3 sm:grid-cols-2">
+                          <div className="rounded-lg border border-[#eadfd8] p-4 transition hover:border-[#c9a94f] hover:ring-1 hover:ring-[#d4af37]/20">
+                            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#9b8c83]">Waste Records</p>
+                            <p className="mt-2 text-[22px] font-bold leading-none text-[#33251e]">{Number(wasteAnalytics.records).toLocaleString()}</p>
+                          </div>
+                          <div className="rounded-lg border border-[#eadfd8] p-4 transition hover:border-[#c9a94f] hover:ring-1 hover:ring-[#d4af37]/20">
+                            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#9b8c83]">Waste Value</p>
+                            <p className="mt-2 text-[22px] font-bold leading-none text-[#33251e]">₱{Number(wasteAnalytics.waste_value || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+                          </div>
+                        </div>
+
+                        {(wasteAnalytics.total_by_unit || []).length > 0 && (
+                          <div className="rounded-lg border border-[#eadfd8] p-4">
+                            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#9b8c83]">Waste Quantity</p>
+                            <div className="mt-2 flex flex-wrap gap-2">
+                              {wasteAnalytics.total_by_unit.map((item) => (
+                                <span key={item.unit} className="rounded-full bg-[#fff4cd] px-3 py-1 text-[12px] font-semibold text-[#80600a]">
+                                  {Number(item.quantity).toLocaleString()} {item.unit}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {(() => {
+                          const reasons = wasteAnalytics.by_reason || [];
+                          const maxQty = Math.max(1, ...reasons.map((r) => Number(r.quantity || 0)));
+                          return (
+                            <div className="rounded-lg border border-[#eadfd8] p-4">
+                              <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#9b8c83]">Waste reasons</p>
+                              <div className="mt-3 space-y-3">
+                                {reasons.map((reason) => (
+                                  <div key={reason.reason || "unspecified"}>
+                                    <div className="mb-1 flex items-center justify-between text-[12px]">
+                                      <span className="text-[#5f514a]">{reason.reason || "Unspecified"}</span>
+                                      <span className="font-semibold text-[#33251e]">{Number(reason.quantity).toLocaleString()}</span>
+                                    </div>
+                                    <div className="h-1.5 overflow-hidden rounded-full bg-[#f4ece6]">
+                                      <div className="h-full rounded-full bg-[#c87954]" style={{ width: `${(Number(reason.quantity || 0) / maxQty) * 100}%` }} />
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          );
+                        })()}
+
+                        {(wasteAnalytics.high_waste_low_stock || []).length > 0 && (
+                          <div>
+                            <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-[#9b8c83]">High waste + low stock</p>
+                            <div className="grid gap-2 sm:grid-cols-2">
+                              {wasteAnalytics.high_waste_low_stock.slice(0, 4).map((item) => (
+                                <div key={item.name} className="rounded-lg border border-[#eadfca] bg-[#fff8e9] p-3 transition hover:border-[#c9a94f] hover:ring-1 hover:ring-[#d4af37]/20">
+                                  <p className="text-[13px] font-semibold text-[#5f514a]">{item.name}</p>
+                                  <p className="mt-1 text-[12px] text-[#8d6a2e]">
+                                    {Number(item.quantity).toLocaleString()} {item.unit} wasted · {Number(item.current_stock).toLocaleString()} {item.unit} left
+                                  </p>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
                       </div>
-                      <div className="space-y-2 rounded-lg border border-[#eadfd8] p-4 transition hover:border-[#c9a94f] hover:ring-1 hover:ring-[#d4af37]/20">
-                        <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#9b8c83]">Waste reasons</p>
-                        {(wasteAnalytics.by_reason || []).map((reason) => <div key={reason.reason} className="flex items-center justify-between text-[13px]"><span className="text-[#5f514a]">{reason.reason || 'Unspecified'}</span><span className="font-semibold text-[#33251e]">{Number(reason.quantity).toLocaleString()}</span></div>)}
-                      </div>
-                      {(wasteAnalytics.high_waste_low_stock || []).length > 0 && <div className="grid gap-2 sm:grid-cols-2">{wasteAnalytics.high_waste_low_stock.slice(0, 4).map((item) => <div key={item.name} className="rounded-lg border border-[#eadfca] bg-[#fff8e9] p-3 transition hover:border-[#c9a94f] hover:ring-1 hover:ring-[#d4af37]/20"><p className="text-[13px] font-semibold text-[#5f514a]">{item.name}</p><p className="mt-1 text-[12px] text-[#8d6a2e]">{Number(item.quantity).toLocaleString()} {item.unit} wasted · {Number(item.current_stock).toLocaleString()} {item.unit} remaining</p></div>)}</div>}
-                    </div>}
+                    )}
                   </Panel>
                 </div>
 
@@ -565,20 +645,20 @@ export default function Dashboard() {
                   </Panel>
                   <Panel eyebrow="Ingredient Analytics" title="Estimated ingredient consumption">
                     <div className="space-y-2 p-4">
-                      {mostUsedIngredients.length ? mostUsedIngredients.slice(0, 5).map((ingredient) => <div key={ingredient.id || ingredient.name} className="rounded-lg px-3 py-2.5 hover:bg-[#fff8df]"><div className="flex items-center justify-between gap-3"><div><p className="text-[13px] text-[#5f514a]">{ingredient.name || ingredient.ingredient}</p><p className="mt-1 text-[11px] text-[#9b8c83]">Current: {Number(ingredient.current_stock || 0).toLocaleString()} {ingredient.unit || ''}</p></div><span className="text-right text-[12px] font-semibold text-[#33251e]">{Number(ingredient.quantity || ingredient.quantity_consumed || 0).toLocaleString()} {ingredient.unit || ''}<span className="block text-[10px] font-normal text-[#9b8c83]">estimated usage</span></span></div><div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[#f4ece6]"><div className="h-full rounded-full bg-[#a57c38]" style={{ width: `${Math.min(100, Number(ingredient.percentage || 0))}%` }} /></div>{ingredient.estimated_days_remaining !== null && <p className="mt-1 text-[10px] text-[#9b8c83]">Estimated remaining: {ingredient.estimated_days_remaining} days</p>}</div>) : <AnalyticsEmpty />}
+                      {mostUsedIngredients.length ? mostUsedIngredients.slice(0, 5).map((ingredient) => <div key={ingredient.id || ingredient.name} className="rounded-lg px-3 py-2.5 hover:bg-[#fff8df]"><div className="flex items-center justify-between gap-3"><div><p className="text-[13px] text-[#5f514a]">{ingredient.name || ingredient.ingredient}</p><p className="mt-1 text-[11px] text-[#9b8c83]">Current: {Number(ingredient.current_stock || 0).toLocaleString()} {ingredient.unit || ''}</p></div><span className="text-right text-[12px] font-semibold text-[#33251e]">{Number(ingredient.quantity || ingredient.quantity_consumed || 0).toLocaleString()} {ingredient.unit || ''}<span className="block text-[10px] font-normal text-[#9b8c83]">estimated usage</span></span></div><div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[#f4ece6]"><div className="h-full rounded-full bg-[#a57c38]" style={{ width: `${Math.min(100, Number(ingredient.percentage || 0))}%` }} /></div>{ingredient.estimated_days_remaining !== null && <p className="mt-1 text-[10px] text-[#9b8c83]">Estimated remaining: {ingredient.estimated_days_remaining} days</p>}</div>) : <AnalyticsEmpty compact title="No ingredient usage yet." description="Estimated usage appears once completed orders are recorded." />}
                     </div>
                   </Panel>
                 </div>
 
                 <Panel eyebrow="Inventory" title="Low-stock ingredients">
                   <div className="grid gap-2 p-4 sm:grid-cols-2 lg:grid-cols-3">
-                    {lowStockIngredients.length ? lowStockIngredients.slice(0, 6).map((ingredient) => <div key={ingredient.id || ingredient.ingredient_id} className="rounded-lg border border-[#eadfca] bg-[#fff8e9] p-3 transition hover:border-[#c9a94f] hover:ring-1 hover:ring-[#d4af37]/20"><p className="text-[13px] font-semibold text-[#5f514a]">{ingredient.name || ingredient.ingredient}</p><p className="mt-1 text-[12px] text-[#8d6a2e]">{ingredient.stock} {ingredient.unit} available · threshold {ingredient.threshold}</p></div>) : <AnalyticsEmpty />}
+                    {lowStockIngredients.length ? lowStockIngredients.slice(0, 6).map((ingredient) => <div key={ingredient.id || ingredient.ingredient_id} className="rounded-lg border border-[#eadfca] bg-[#fff8e9] p-3 transition hover:border-[#c9a94f] hover:ring-1 hover:ring-[#d4af37]/20"><p className="text-[13px] font-semibold text-[#5f514a]">{ingredient.name || ingredient.ingredient}</p><p className="mt-1 text-[12px] text-[#8d6a2e]">{ingredient.stock} {ingredient.unit} available · threshold {ingredient.threshold}</p></div>) : <AnalyticsEmpty className="col-span-full" compact title="All ingredients are well stocked." description="Nothing is below its threshold right now." />}
                   </div>
                 </Panel>
 
                 <Panel eyebrow="Ingredient Risk" title="High-demand cakes using low-stock ingredients">
                   <div className="grid gap-3 p-4 md:grid-cols-2">
-                    {analytics.ingredientAnalytics?.high_demand_cakes?.length ? analytics.ingredientAnalytics.high_demand_cakes.slice(0, 6).map((risk, index) => <div key={`${risk.cake}-${risk.ingredient}-${index}`} className="rounded-lg border border-[#eadfca] bg-[#fff8e9] p-4 transition hover:border-[#c9a94f] hover:ring-1 hover:ring-[#d4af37]/20"><p className="text-[13px] font-semibold text-[#5f514a]">{risk.cake}</p><p className="mt-1 text-[11px] text-[#74675f]">Estimated demand usage: {Number(risk.estimated_quantity || 0).toLocaleString()} {risk.unit}</p><p className="mt-2 text-[12px] font-semibold text-[#8d6a2e]">⚠ {risk.ingredient} is low stock</p></div>) : <AnalyticsEmpty />}
+                    {analytics.ingredientAnalytics?.high_demand_cakes?.length ? analytics.ingredientAnalytics.high_demand_cakes.slice(0, 6).map((risk, index) => <div key={`${risk.cake}-${risk.ingredient}-${index}`} className="rounded-lg border border-[#eadfca] bg-[#fff8e9] p-4 transition hover:border-[#c9a94f] hover:ring-1 hover:ring-[#d4af37]/20"><p className="text-[13px] font-semibold text-[#5f514a]">{risk.cake}</p><p className="mt-1 text-[11px] text-[#74675f]">Estimated demand usage: {Number(risk.estimated_quantity || 0).toLocaleString()} {risk.unit}</p><p className="mt-2 text-[12px] font-semibold text-[#8d6a2e]">⚠ {risk.ingredient} is low stock</p></div>) : <AnalyticsEmpty className="col-span-full" compact title="No at-risk cakes." description="None of your best-selling cakes depend on low-stock ingredients." />}
                   </div>
                 </Panel>
 
