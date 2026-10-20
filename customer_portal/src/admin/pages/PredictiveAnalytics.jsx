@@ -15,6 +15,26 @@ import { LARAVEL_BASE, ROOT_BASE } from "../../services/config";
 import { getAuthHeaders } from "../../services/api";
 
 // ---------------------------------------------------------------------------
+// Shared card shell — every card uses this so padding, header height and
+// stretching behaviour are identical across rows.
+// ---------------------------------------------------------------------------
+
+function Card({ eyebrow, title, action, children, className = "" }) {
+  return (
+    <section className={`flex h-full min-w-0 flex-col rounded-[24px] border border-black/10 bg-white p-5 shadow-sm ${className}`}>
+      <header className="mb-4 flex min-h-[52px] items-start justify-between gap-3">
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.25em] text-black/50">{eyebrow}</p>
+          <h2 className="text-lg font-semibold leading-snug text-black">{title}</h2>
+        </div>
+        {action}
+      </header>
+      <div className="flex min-h-0 flex-1 flex-col">{children}</div>
+    </section>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Forecast chart — historical actuals rendered as a solid area, forecast
 // rendered as a dashed projection, with a hoverable readout of exact values.
 // ---------------------------------------------------------------------------
@@ -32,69 +52,179 @@ function niceMax(value) {
   return step * magnitude;
 }
 
-function ValidationMetricsChart({ metrics }) {
-  const [selectedMetric, setSelectedMetric] = useState("wape");
-  const metricOptions = {
-    wape: { label: "WAPE", suffix: "%", description: "Weighted error across all held-out sales." },
-    mae: { label: "MAE", suffix: " units", description: "Average absolute error per held-out day." },
-    rmse: { label: "RMSE", suffix: " units", description: "Penalizes larger errors more heavily." },
-    mape: { label: "MAPE", suffix: "%", description: "Average percentage error on non-zero sales days." },
-  };
-  const methods = [
-    { key: "linear", label: "Linear trend", color: "#b4901f" },
-    { key: "zero", label: "Predict zero", color: "#8a8a8a" },
-    { key: "yesterday", label: "Same as yesterday", color: "#718096" },
-    { key: "same_weekday_last_week", label: "Same weekday last week", color: "#81906c" },
+// ---------------------------------------------------------------------------
+// Validation metrics — KPI tiles + method comparison with a predict-zero
+// reference line, a "Best" badge and a plain-language verdict.
+// ---------------------------------------------------------------------------
+
+const METRIC_OPTIONS = {
+  wape: { label: "WAPE", suffix: "%", description: "Total error divided by total actual sales." },
+  mae: { label: "MAE", suffix: " units", description: "Average miss per day." },
+  rmse: { label: "RMSE", suffix: " units", description: "Punishes large misses more heavily." },
+  mape: { label: "MAPE", suffix: "%", description: "Only counts days with sales, so it can be noisy." },
+};
+
+const VALIDATION_METHODS = [
+  { key: "linear", label: "Linear trend (model)", color: "#b4901f" },
+  { key: "moving_average_7", label: "7-day average", color: "#6b8f71" },
+  { key: "same_weekday_last_week", label: "Same weekday last week", color: "#81906c" },
+  { key: "yesterday", label: "Last known day", color: "#718096" },
+  { key: "zero", label: "Predict zero", color: "#9a9a9a" },
+];
+
+const formatMetric = (value, suffix) =>
+  value == null || !Number.isFinite(Number(value)) ? "—" : `${Number(value)}${suffix}`;
+
+function ValidationMetrics({ model }) {
+  const [selected, setSelected] = useState("wape");
+  const [scope, setScope] = useState("aggregate");
+
+  const hasAggregate = Boolean(
+    model?.aggregate_validation_metrics && Object.keys(model.aggregate_validation_metrics).length
+  );
+  const activeScope = hasAggregate ? scope : "product";
+  const metrics =
+    (activeScope === "aggregate" ? model?.aggregate_validation_metrics : model?.validation_metrics) || {};
+  const option = METRIC_OPTIONS[selected];
+  const linearMetrics = metrics.linear || {};
+
+  const rows = VALIDATION_METHODS.map((method) => {
+    const raw = metrics[method.key]?.[selected];
+    const records = metrics[method.key]?.records ?? 0;
+    const available = raw != null && Number.isFinite(Number(raw)) && records > 0;
+    return { ...method, value: available ? Number(raw) : null, records };
+  });
+  const availableRows = rows.filter((row) => row.value != null);
+  const maxValue = Math.max(...availableRows.map((row) => row.value), 0);
+  const best = availableRows.length
+    ? availableRows.reduce((winner, row) => (row.value < winner.value ? row : winner))
+    : null;
+  const linear = rows.find((row) => row.key === "linear");
+  const zero = rows.find((row) => row.key === "zero");
+  const zeroPosition = zero?.value != null && maxValue > 0 ? (zero.value / maxValue) * 100 : null;
+  const modelLoses = linear?.value != null && best && best.key !== "linear";
+
+  const tiles = [
+    ["MAE", formatMetric(linearMetrics.mae, "")],
+    ["RMSE", formatMetric(linearMetrics.rmse, "")],
+    ["MAPE", formatMetric(linearMetrics.mape, "%")],
+    ["WAPE", formatMetric(linearMetrics.wape, "%")],
   ];
-  const option = metricOptions[selectedMetric];
-  const rows = methods.map((method) => ({
-    ...method,
-    value: metrics?.[method.key]?.[selectedMetric],
-    records: metrics?.[method.key]?.records ?? 0,
-  }));
-  const maxValue = Math.max(...rows.map((row) => Number.isFinite(Number(row.value)) ? Number(row.value) : 0), 0);
+
+  const scopeButtons = [
+    ["aggregate", "Shop total"],
+    ["product", "Per product"],
+  ];
 
   return (
-    <div className="mt-4 rounded-xl border border-black/10 bg-[#fafaf8] p-3" role="group" aria-label="Validation metric comparison chart">
-      <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
+    <div className="flex flex-1 flex-col gap-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-xs text-black/55">
+          {model?.name || "—"} · {model?.records ?? 0} records
+          {model?.validation_products != null ? ` · ${model.validation_products} products tested` : ""}
+        </p>
+        {hasAggregate && (
+          <div className="inline-flex rounded-lg border border-black/10 bg-white p-0.5" role="group" aria-label="Validation scope">
+            {scopeButtons.map(([key, label]) => (
+              <button
+                key={key}
+                type="button"
+                aria-pressed={activeScope === key}
+                onClick={() => setScope(key)}
+                className={`rounded-md px-2.5 py-1 text-[11px] font-semibold ${activeScope === key ? "bg-[#33251e] text-white" : "text-black/60 hover:bg-black/5"}`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        {tiles.map(([label, value]) => (
+          <div key={label} className="rounded-xl border border-black/10 bg-[#fafaf8] px-3 py-2.5">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-black/50">{label}</p>
+            <p className="mt-1 text-lg font-bold tabular-nums text-black">{value}</p>
+          </div>
+        ))}
+      </div>
+
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <p className="text-xs font-semibold text-black">{option.label} by forecast method</p>
-          <p className="mt-0.5 text-[10px] text-black/55">{option.description} Lower is better.</p>
+          <p className="text-sm font-semibold text-black">{option.label} by method</p>
+          <p className="text-[11px] text-black/55">{option.description} Lower is better.</p>
         </div>
-        <div className="inline-flex rounded-md border border-black/10 bg-white p-0.5" aria-label="Select validation metric">
-          {Object.entries(metricOptions).map(([key, metric]) => (
+        <div className="inline-flex rounded-lg border border-black/10 bg-white p-0.5" role="group" aria-label="Select validation metric">
+          {Object.entries(METRIC_OPTIONS).map(([key, metric]) => (
             <button
               key={key}
               type="button"
-              aria-pressed={selectedMetric === key}
-              onClick={() => setSelectedMetric(key)}
-              className={`rounded px-2 py-1 text-[10px] font-semibold ${selectedMetric === key ? "bg-[#33251e] text-white" : "text-black/60 hover:bg-black/5"}`}
+              aria-pressed={selected === key}
+              onClick={() => setSelected(key)}
+              className={`rounded-md px-2.5 py-1 text-[11px] font-semibold ${selected === key ? "bg-[#33251e] text-white" : "text-black/60 hover:bg-black/5"}`}
             >
               {metric.label}
             </button>
           ))}
         </div>
       </div>
+
       {maxValue > 0 ? (
-        <div className="space-y-3">
-          {rows.map((row) => {
-            const available = Number.isFinite(Number(row.value)) && row.records > 0;
-            const value = available ? Number(row.value) : 0;
-            return (
-              <div key={row.key} className="grid grid-cols-[125px_minmax(0,1fr)_72px] items-center gap-2">
-                <span className="truncate text-[10px] font-medium text-black/70" title={row.label}>{row.label}</span>
-                <div className="h-3 overflow-hidden rounded-full bg-black/5" role="img" aria-label={`${row.label}: ${available ? `${value}${option.suffix}` : "not available"}`}>
-                  {available && <div className="h-full rounded-full transition-[width]" style={{ width: `${Math.max((value / maxValue) * 100, value > 0 ? 1 : 0)}%`, backgroundColor: row.color }} />}
-                </div>
-                <span className="text-right text-[10px] tabular-nums text-black/70">{available ? `${value}${option.suffix}` : "—"}</span>
+        <div className="space-y-2.5">
+          {rows.map((row) => (
+            <div key={row.key} className="grid grid-cols-[150px_minmax(0,1fr)_76px] items-center gap-3">
+              <span className="flex items-center gap-1.5 truncate text-[11px] font-medium text-black/75" title={row.label}>
+                <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: row.color }} />
+                {row.label}
+              </span>
+              <div
+                className="relative h-3 rounded-full bg-black/5"
+                role="img"
+                aria-label={`${row.label}: ${formatMetric(row.value, option.suffix)}`}
+              >
+                {row.value != null && (
+                  <div
+                    className="h-full rounded-full transition-[width] duration-500"
+                    style={{
+                      width: `${Math.max((row.value / maxValue) * 100, row.value > 0 ? 1 : 0)}%`,
+                      backgroundColor: row.color,
+                    }}
+                  />
+                )}
+                {zeroPosition != null && zeroPosition < 100 && (
+                  <span
+                    className="absolute -top-1 bottom-[-4px] w-px bg-black/40"
+                    style={{ left: `${zeroPosition}%` }}
+                    title="Predict-zero baseline"
+                  />
+                )}
               </div>
-            );
-          })}
+              <span className="flex items-center justify-end gap-1 text-right text-[11px] font-semibold tabular-nums text-black/80">
+                {formatMetric(row.value, option.suffix)}
+                {best?.key === row.key && (
+                  <span className="rounded bg-[#e4f0e8] px-1 text-[9px] text-[#2c6244]">Best</span>
+                )}
+              </span>
+            </div>
+          ))}
         </div>
       ) : (
-        <p className="rounded-lg border border-dashed border-black/10 px-3 py-4 text-center text-xs text-black/55">Validation metrics will appear when there are enough historical sales days.</p>
+        <p className="rounded-lg border border-dashed border-black/10 px-3 py-4 text-center text-xs text-black/55">
+          Validation metrics will appear when there are enough historical sales days.
+        </p>
       )}
-      <p className="mt-3 text-[10px] text-black/45">Based on a chronological seven-day holdout. Same-weekday results require at least one prior matching week.</p>
+
+      {modelLoses && (
+        <p className="rounded-lg bg-[#fff4cd] px-3 py-2 text-[11px] leading-5 text-[#33251e]">
+          The linear model is not the best method on {option.label}. “{best.label}” performs better. Sparse sales data can cause this.
+        </p>
+      )}
+
+      <p className="mt-auto text-[10px] text-black/45">
+        Chronological 7-day holdout, products with 14+ days of history.
+        {activeScope === "aggregate" ? " Shop total adds up all products per day." : " Per-product errors are pooled together."}{" "}
+        The thin line marks the predict-zero baseline.
+      </p>
     </div>
   );
 }
@@ -327,34 +457,37 @@ function CoverageBars({ products }) {
   );
 }
 
+// Pagination sits at the bottom of its card (mt-auto) so paired cards line up.
 function ListPagination({ page, pageCount, total, onPageChange, label }) {
   return (
-    <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-black/10 pt-4">
-      <span className="text-xs text-black/55">
-        Showing {total ? (page - 1) * 5 + 1 : 0}-{Math.min(page * 5, total)} of {total} {label}
-      </span>
-      <div className="flex items-center gap-2">
-        <span className="mr-1 text-xs text-black/55">Page {page} of {pageCount}</span>
-        <button
-          type="button"
-          onClick={() => onPageChange((current) => Math.max(1, current - 1))}
-          disabled={page <= 1}
-          aria-label={`Previous ${label} page`}
-          className="inline-flex h-9 items-center gap-1 rounded-lg border border-black/10 bg-white px-3 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-40"
-        >
-          <ChevronLeft size={15} />
-          Previous
-        </button>
-        <button
-          type="button"
-          onClick={() => onPageChange((current) => Math.min(pageCount, current + 1))}
-          disabled={page >= pageCount}
-          aria-label={`Next ${label} page`}
-          className="inline-flex h-9 items-center gap-1 rounded-lg border border-black/10 bg-white px-3 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-40"
-        >
-          Next
-          <ChevronRight size={15} />
-        </button>
+    <div className="mt-auto pt-4">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-black/10 pt-4">
+        <span className="text-xs text-black/55">
+          Showing {total ? (page - 1) * 5 + 1 : 0}-{Math.min(page * 5, total)} of {total} {label}
+        </span>
+        <div className="flex items-center gap-2">
+          <span className="mr-1 text-xs text-black/55">Page {page} of {pageCount}</span>
+          <button
+            type="button"
+            onClick={() => onPageChange((current) => Math.max(1, current - 1))}
+            disabled={page <= 1}
+            aria-label={`Previous ${label} page`}
+            className="inline-flex h-9 items-center gap-1 rounded-lg border border-black/10 bg-white px-3 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            <ChevronLeft size={15} />
+            Previous
+          </button>
+          <button
+            type="button"
+            onClick={() => onPageChange((current) => Math.min(pageCount, current + 1))}
+            disabled={page >= pageCount}
+            aria-label={`Next ${label} page`}
+            className="inline-flex h-9 items-center gap-1 rounded-lg border border-black/10 bg-white px-3 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            Next
+            <ChevronRight size={15} />
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -372,6 +505,7 @@ export default function PredictiveAnalytics() {
   const [preparationPage, setPreparationPage] = useState(1);
   const [actionsPage, setActionsPage] = useState(1);
   const [coveragePage, setCoveragePage] = useState(1);
+  const [reorderPage, setReorderPage] = useState(1);
   const [overlapMode, setOverlapMode] = useState("deduplicate_live");
   const [aliases, setAliases] = useState([]);
   const [aliasProducts, setAliasProducts] = useState([]);
@@ -500,12 +634,19 @@ export default function PredictiveAnalytics() {
     Number(a.coverageRatio || 0) - Number(b.coverageRatio || 0)
     || a.product.localeCompare(b.product)
   ), [forecast.products]);
+  const sortedRecommendations = useMemo(() => [...(forecast.recommendations || [])].sort((a, b) =>
+    (a.priority === "High" ? 0 : 1) - (b.priority === "High" ? 0 : 1)
+    || Number(b.qty || 0) - Number(a.qty || 0)
+    || String(a.product || "").localeCompare(String(b.product || ""))
+  ), [forecast.recommendations]);
   const preparationPageCount = Math.max(1, Math.ceil(preparationProducts.length / 5));
   const actionsPageCount = Math.max(1, Math.ceil(sortedActions.length / 5));
   const coveragePageCount = Math.max(1, Math.ceil(sortedCoverageProducts.length / 5));
+  const reorderPageCount = Math.max(1, Math.ceil(sortedRecommendations.length / 5));
   const paginatedPreparationProducts = preparationProducts.slice((preparationPage - 1) * 5, preparationPage * 5);
   const paginatedActions = sortedActions.slice((actionsPage - 1) * 5, actionsPage * 5);
   const paginatedCoverageProducts = sortedCoverageProducts.slice((coveragePage - 1) * 5, coveragePage * 5);
+  const paginatedRecommendations = sortedRecommendations.slice((reorderPage - 1) * 5, reorderPage * 5);
   const chartHistory = useMemo(() => (forecast.history || []).map((row) => Number(row.demand || 0)), [forecast.history]);
   const chartForecast = useMemo(() => (forecast.daily || []).map((row) => Number(row.forecast || 0)), [forecast.daily]);
 
@@ -521,7 +662,8 @@ export default function PredictiveAnalytics() {
   useEffect(() => {
     setActionsPage(1);
     setCoveragePage(1);
-  }, [forecast.actions, forecast.products]);
+    setReorderPage(1);
+  }, [forecast.actions, forecast.products, forecast.recommendations]);
 
   const handleFileUpload = async (event) => {
     const file = event.target.files?.[0];
@@ -640,29 +782,24 @@ export default function PredictiveAnalytics() {
             </div>
           </div>
 
-          <div className="mb-6 grid gap-4 xl:grid-cols-[1.25fr_0.75fr]">
-            <div className="rounded-[24px] border border-black/10 bg-white p-5 shadow-sm">
-              <div className="mb-4 flex items-center justify-between">
-                <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.25em] text-black/50">Demand Forecast</p>
-                  <h2 className="text-lg font-semibold text-black">7-day production outlook</h2>
-                </div>
-                <div className="rounded-full bg-[#f7f2e8] px-3 py-1 text-xs font-semibold text-[#8b6a12]">Live demand model</div>
-              </div>
+          {/* Row 1: chart + alerts */}
+          <div className="mb-6 grid items-stretch gap-4 xl:grid-cols-[1.25fr_0.75fr]">
+            <Card
+              eyebrow="Demand Forecast"
+              title={`${period}-day production outlook`}
+              action={<div className="rounded-full bg-[#f7f2e8] px-3 py-1 text-xs font-semibold text-[#8b6a12]">Live demand model</div>}
+            >
               {chartHistory.length && chartForecast.length ? (
                 <ForecastChart historical={chartHistory} forecast={chartForecast} />
               ) : (
                 <div className="rounded-2xl border border-dashed border-black/10 p-6 text-sm text-black/60">Insufficient historical data for reliable forecasting.</div>
               )}
-            </div>
-            <div className="rounded-[24px] border border-black/10 bg-white p-5 shadow-sm">
-              <div className="mb-4 flex items-center justify-between">
-                <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.25em] text-black/50">Priority Alerts</p>
-                  <h2 className="text-lg font-semibold text-black">Procurement pressure</h2>
-                </div>
-                <AlertTriangle size={18} className="text-[#D4AF37]" />
-              </div>
+            </Card>
+            <Card
+              eyebrow="Priority Alerts"
+              title="Procurement pressure"
+              action={<AlertTriangle size={18} className="text-[#D4AF37]" />}
+            >
               <div className="space-y-3">
                 {forecast.alerts?.length ? (
                   forecast.alerts.map((alert) => (
@@ -677,152 +814,152 @@ export default function PredictiveAnalytics() {
                   </div>
                 )}
               </div>
-            </div>
+            </Card>
           </div>
 
-          <div className="mb-6 rounded-[24px] border border-black/10 bg-white p-5 shadow-sm">
-            <div className="mb-4 flex items-center justify-between">
-              <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.25em] text-black/50">Forecast Insights</p>
-                <h2 className="text-lg font-semibold text-black">What the model is seeing</h2>
+          {/* Insights */}
+          <div className="mb-6">
+            <Card
+              eyebrow="Forecast Insights"
+              title="What the model is seeing"
+              action={<span className="text-xs text-black/45">{forecast.model?.records || 0} records used</span>}
+            >
+              {forecast.insights?.length ? (
+                <div className="grid gap-3 md:grid-cols-3">
+                  {forecast.insights.map((insight) => (
+                    <div key={insight} className="rounded-2xl bg-[#fffaf0] p-4 text-sm leading-6 text-black/70">{insight}</div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-black/55">Insufficient historical data for reliable insights.</p>
+              )}
+            </Card>
+          </div>
+
+          {/* CSV aliases */}
+          <div className="mb-6">
+            <section className="rounded-[24px] border border-black/10 bg-white p-5 shadow-sm">
+              <div className="mb-3">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.25em] text-black/50">CSV data quality</p>
+                <h2 className="text-lg font-semibold text-black">Product name aliases</h2>
+                <p className="mt-1 text-sm leading-6 text-black/60">Map alternate CSV labels to a cake or customized cake catalog product. These mappings apply to imported sales in forecasts; they do not rename products.</p>
               </div>
-              <span className="text-xs text-black/45">{forecast.model?.records || 0} records used</span>
-            </div>
-            {forecast.insights?.length ? <div className="grid gap-3 md:grid-cols-3">{forecast.insights.map((insight) => <div key={insight} className="rounded-2xl bg-[#fffaf0] p-4 text-sm leading-6 text-black/70">{insight}</div>)}</div> : <p className="text-sm text-black/55">Insufficient historical data for reliable insights.</p>}
-            <div className="mt-5 border-t border-black/10 pt-4">
-              <h3 className="text-sm font-semibold text-black">Holdout accuracy vs. simple baselines</h3>
-              <p className="mt-1 text-xs text-black/55">Seven most recent days held out chronologically. Lower WAPE is better; baselines are reference comparisons.</p>
-              <div className="mt-3 overflow-x-auto">
-                <table className="w-full min-w-[560px] text-left text-xs">
-                  <thead><tr className="border-b border-black/10 text-[10px] uppercase tracking-wider text-black/50"><th className="py-2 pr-3">Method</th><th className="py-2 pr-3">WAPE</th><th className="py-2 pr-3">MAE</th><th className="py-2 pr-3">RMSE</th><th className="py-2">Observations</th></tr></thead>
+              <form onSubmit={saveProductAlias} className="grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
+                <input aria-label="Alternate CSV product name" value={aliasName} onChange={(event) => setAliasName(event.target.value)} maxLength={191} required placeholder="e.g. Choco Cake" className="h-10 rounded-lg border border-black/15 px-3 text-sm" />
+                <select aria-label="Catalog product for alias" value={aliasProductId} onChange={(event) => setAliasProductId(event.target.value)} required className="h-10 rounded-lg border border-black/15 px-3 text-sm">
+                  {aliasProducts.map((product) => <option key={product.id} value={product.id}>{product.name}</option>)}
+                </select>
+                <button type="submit" disabled={savingAlias || !aliasProducts.length} className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-[#33251e] px-4 text-xs font-semibold text-white disabled:opacity-50"><Plus size={14} />{savingAlias ? "Saving..." : "Add mapping"}</button>
+              </form>
+              {aliasError && <p role="alert" className="mt-2 rounded-md bg-[#fff4cd] px-3 py-2 text-xs text-[#33251e]">{aliasError}</p>}
+              {aliases.length > 0 && (
+                <ul className="mt-3 divide-y divide-black/5 rounded-lg border border-black/10">
+                  {aliases.map((alias) => (
+                    <li key={alias.id} className="flex items-center justify-between gap-3 px-3 py-2 text-xs">
+                      <span><strong>{alias.alias_name}</strong><span className="mx-2 text-black/40">→</span>{alias.product_name}</span>
+                      <button type="button" onClick={() => removeProductAlias(alias.id)} aria-label={`Remove alias ${alias.alias_name}`} className="rounded p-1 text-black/50 hover:bg-black/5 hover:text-black"><Trash2 size={14} /></button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+          </div>
+
+          {/* Estimated sales table */}
+          <div className="mb-6">
+            <section className="rounded-[24px] border border-black/10 bg-white p-5 shadow-sm">
+              <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.25em] text-black/50">Estimated Sales</p>
+                  <h2 className="text-lg font-semibold text-black">How many items might we sell?</h2>
+                  <p className="mt-1 max-w-2xl text-sm leading-6 text-black/60">
+                    This estimate uses past sales to help you prepare products. It is a guide, not a guaranteed number.
+                  </p>
+                </div>
+                <div className="grid w-full shrink-0 grid-cols-2 gap-2 md:w-[320px]">
+                  <select aria-label="Filter by product" value={productFilter} onChange={(event) => setProductFilter(event.target.value)} className="h-10 w-full min-w-0 rounded-xl border border-black/10 px-3 text-xs"><option value="">All products</option>{forecast.products.map((product) => <option key={product.product} value={product.product}>{product.product}</option>)}</select>
+                  <select aria-label="Filter by category" value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)} className="h-10 w-full min-w-0 rounded-xl border border-black/10 px-3 text-xs"><option value="">All categories</option>{[...new Set(forecast.products.map((product) => product.category))].map((category) => <option key={category} value={category}>{category}</option>)}</select>
+                </div>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="min-w-[1020px] text-left text-sm">
+                  <thead>
+                    <tr className="border-b border-black/10 text-[10px] uppercase tracking-[0.16em] text-black/50">
+                      <th className="py-3 pr-4">Product</th>
+                      <th className="py-3 pr-4">Recent daily sales</th>
+                      {Array.from({ length: period }, (_, index) => (
+                        <th key={index} className="py-3 pr-4">
+                          {index === 0 ? "Tomorrow" : `In ${index + 1} days`}
+                        </th>
+                      ))}
+                      <th className="py-3 pr-4">Estimated total</th>
+                      <th className="py-3 pr-4">Extra to prepare</th>
+                      <th className="whitespace-nowrap py-3">Action</th>
+                    </tr>
+                  </thead>
                   <tbody>
-                    {[
-                      ["Linear trend", "linear"],
-                      ["Predict zero", "zero"],
-                      ["Same as yesterday", "yesterday"],
-                      ["Same weekday last week", "same_weekday_last_week"],
-                    ].map(([label, key]) => {
-                      const metric = forecast.model?.validation_metrics?.[key];
-                      return <tr key={key} className="border-b border-black/5 last:border-0"><td className="py-2 pr-3 font-medium">{label}</td><td className="py-2 pr-3">{metric?.wape == null ? "—" : `${metric.wape}%`}</td><td className="py-2 pr-3">{metric?.mae ?? "—"}</td><td className="py-2 pr-3">{metric?.rmse ?? "—"}</td><td className="py-2">{metric?.records ?? 0}</td></tr>;
-                    })}
+                    {filteredProducts.length ? paginatedProducts.map((product) => (
+                      <tr key={product.product} className="border-b border-black/10 last:border-0 hover:bg-[#fafaf8]">
+                        <td className="py-3 pr-4 font-semibold text-black">{product.product}</td>
+                        <td className="py-3 pr-4 text-black/70">{product.recentDemand}</td>
+                        {product.forecast.map((value, index) => (
+                          <td key={index} className="py-3 pr-4 text-black/70">{value}</td>
+                        ))}
+                        <td className="py-3 pr-4 font-semibold">{product.totalForecast}</td>
+                        <td className="py-3 pr-4 font-semibold">{product.recommendedPreorderQuantity ?? 0}</td>
+                        <td className="whitespace-nowrap py-3">
+                          <span className="inline-flex whitespace-nowrap rounded-full bg-[#f7f2e8] px-2.5 py-1 text-[10px] font-semibold">
+                            {({ High: "Prepare first", Medium: "Plan ahead", Low: "Stock is enough" })[product.priority] || product.priority}
+                          </span>
+                        </td>
+                      </tr>
+                    )) : (
+                      <tr>
+                        <td colSpan={period + 5} className="py-6 text-center text-sm text-black/50">
+                          There is not enough sales data to estimate product demand yet.
+                        </td>
+                      </tr>
+                    )}
                   </tbody>
                 </table>
               </div>
-            </div>
+              <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-black/10 pt-4">
+                <span className="text-xs text-black/55">
+                  Showing {sortedFilteredProducts.length ? (salesPage - 1) * 5 + 1 : 0}-
+                  {Math.min(salesPage * 5, sortedFilteredProducts.length)} of {sortedFilteredProducts.length} products
+                </span>
+                <div className="flex items-center gap-2">
+                  <span className="mr-1 text-xs text-black/55">Page {salesPage} of {salesPageCount}</span>
+                  <button
+                    type="button"
+                    onClick={() => setSalesPage((page) => Math.max(1, page - 1))}
+                    disabled={salesPage <= 1}
+                    aria-label="Previous estimated sales page"
+                    className="inline-flex h-9 items-center gap-1 rounded-lg border border-black/10 bg-white px-3 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    <ChevronLeft size={15} />
+                    Previous
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSalesPage((page) => Math.min(salesPageCount, page + 1))}
+                    disabled={salesPage >= salesPageCount}
+                    aria-label="Next estimated sales page"
+                    className="inline-flex h-9 items-center gap-1 rounded-lg border border-black/10 bg-white px-3 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    Next
+                    <ChevronRight size={15} />
+                  </button>
+                </div>
+              </div>
+            </section>
           </div>
 
-          <div className="mb-6 rounded-[24px] border border-black/10 bg-white p-5 shadow-sm">
-            <div className="mb-3">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.25em] text-black/50">CSV data quality</p>
-              <h2 className="text-lg font-semibold text-black">Product name aliases</h2>
-              <p className="mt-1 text-sm leading-6 text-black/60">Map alternate CSV labels to the exact catalog product. These mappings apply to imported sales in forecasts; they do not rename products.</p>
-            </div>
-            <form onSubmit={saveProductAlias} className="grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
-              <input aria-label="Alternate CSV product name" value={aliasName} onChange={(event) => setAliasName(event.target.value)} maxLength={191} required placeholder="e.g. Choco Cake" className="h-10 rounded-lg border border-black/15 px-3 text-sm" />
-              <select aria-label="Catalog product for alias" value={aliasProductId} onChange={(event) => setAliasProductId(event.target.value)} required className="h-10 rounded-lg border border-black/15 px-3 text-sm">
-                {aliasProducts.map((product) => <option key={product.id} value={product.id}>{product.name}</option>)}
-              </select>
-              <button type="submit" disabled={savingAlias || !aliasProducts.length} className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-[#33251e] px-4 text-xs font-semibold text-white disabled:opacity-50"><Plus size={14} />{savingAlias ? "Saving..." : "Add mapping"}</button>
-            </form>
-            {aliasError && <p role="alert" className="mt-2 rounded-md bg-[#fff4cd] px-3 py-2 text-xs text-[#33251e]">{aliasError}</p>}
-            {aliases.length > 0 && <ul className="mt-3 divide-y divide-black/5 rounded-lg border border-black/10">
-              {aliases.map((alias) => <li key={alias.id} className="flex items-center justify-between gap-3 px-3 py-2 text-xs"><span><strong>{alias.alias_name}</strong><span className="mx-2 text-black/40">→</span>{alias.product_name}</span><button type="button" onClick={() => removeProductAlias(alias.id)} aria-label={`Remove alias ${alias.alias_name}`} className="rounded p-1 text-black/50 hover:bg-black/5 hover:text-black"><Trash2 size={14} /></button></li>)}
-            </ul>}
-          </div>
-
-          <div className="mb-6 rounded-[24px] border border-black/10 bg-white p-5 shadow-sm">
-            <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-              <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.25em] text-black/50">Estimated Sales</p>
-                <h2 className="text-lg font-semibold text-black">How many items might we sell?</h2>
-                <p className="mt-1 max-w-2xl text-sm leading-6 text-black/60">
-                  This estimate uses past sales to help you prepare products. It is a guide, not a guaranteed number.
-                </p>
-              </div>
-              <div className="grid w-full shrink-0 grid-cols-2 gap-2 md:w-[320px]">
-                <select aria-label="Filter by product" value={productFilter} onChange={(event) => setProductFilter(event.target.value)} className="h-10 w-full min-w-0 rounded-xl border border-black/10 px-3 text-xs"><option value="">All products</option>{forecast.products.map((product) => <option key={product.product} value={product.product}>{product.product}</option>)}</select>
-                <select aria-label="Filter by category" value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)} className="h-10 w-full min-w-0 rounded-xl border border-black/10 px-3 text-xs"><option value="">All categories</option>{[...new Set(forecast.products.map((product) => product.category))].map((category) => <option key={category} value={category}>{category}</option>)}</select>
-              </div>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="min-w-[1020px] text-left text-sm">
-                <thead>
-                  <tr className="border-b border-black/10 text-[10px] uppercase tracking-[0.16em] text-black/50">
-                    <th className="py-3 pr-4">Product</th>
-                    <th className="py-3 pr-4">Recent daily sales</th>
-                    {Array.from({ length: period }, (_, index) => (
-                      <th key={index} className="py-3 pr-4">
-                        {index === 0 ? "Tomorrow" : `In ${index + 1} days`}
-                      </th>
-                    ))}
-                    <th className="py-3 pr-4">Estimated total</th>
-                    <th className="py-3 pr-4">Extra to prepare</th>
-                    <th className="whitespace-nowrap py-3">Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredProducts.length ? paginatedProducts.map((product) => (
-                    <tr key={product.product} className="border-b border-black/10 last:border-0 hover:bg-[#fafaf8]">
-                      <td className="py-3 pr-4 font-semibold text-black">{product.product}</td>
-                      <td className="py-3 pr-4 text-black/70">{product.recentDemand}</td>
-                      {product.forecast.map((value, index) => (
-                        <td key={index} className="py-3 pr-4 text-black/70">{value}</td>
-                      ))}
-                      <td className="py-3 pr-4 font-semibold">{product.totalForecast}</td>
-                      <td className="py-3 pr-4 font-semibold">{product.recommendedPreorderQuantity ?? 0}</td>
-                      <td className="whitespace-nowrap py-3">
-                        <span className="inline-flex whitespace-nowrap rounded-full bg-[#f7f2e8] px-2.5 py-1 text-[10px] font-semibold">
-                          {({ High: "Prepare first", Medium: "Plan ahead", Low: "Stock is enough" })[product.priority] || product.priority}
-                        </span>
-                      </td>
-                    </tr>
-                  )) : (
-                    <tr>
-                      <td colSpan={period + 5} className="py-6 text-center text-sm text-black/50">
-                        There is not enough sales data to estimate product demand yet.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-            <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-black/10 pt-4">
-              <span className="text-xs text-black/55">
-                Showing {sortedFilteredProducts.length ? (salesPage - 1) * 5 + 1 : 0}-
-                {Math.min(salesPage * 5, sortedFilteredProducts.length)} of {sortedFilteredProducts.length} products
-              </span>
-              <div className="flex items-center gap-2">
-                <span className="mr-1 text-xs text-black/55">Page {salesPage} of {salesPageCount}</span>
-                <button
-                  type="button"
-                  onClick={() => setSalesPage((page) => Math.max(1, page - 1))}
-                  disabled={salesPage <= 1}
-                  aria-label="Previous estimated sales page"
-                  className="inline-flex h-9 items-center gap-1 rounded-lg border border-black/10 bg-white px-3 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-40"
-                >
-                  <ChevronLeft size={15} />
-                  Previous
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setSalesPage((page) => Math.min(salesPageCount, page + 1))}
-                  disabled={salesPage >= salesPageCount}
-                  aria-label="Next estimated sales page"
-                  className="inline-flex h-9 items-center gap-1 rounded-lg border border-black/10 bg-white px-3 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-40"
-                >
-                  Next
-                  <ChevronRight size={15} />
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <div className="mb-6 grid gap-4 xl:grid-cols-2">
-            <div className="rounded-[24px] border border-black/10 bg-white p-5 shadow-sm">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.25em] text-black/50">Preparation Guide</p>
-              <h2 className="mb-1 text-lg font-semibold text-black">Products that may need more stock</h2>
-              <p className="mb-4 text-sm text-black/60">The suggested amount is the estimated demand not covered by current stock.</p>
-              <div className="space-y-2">
+          {/* Row 2: preparation + top products */}
+          <div className="mb-6 grid items-stretch gap-4 xl:grid-cols-2">
+            <Card eyebrow="Preparation Guide" title="Products that may need more stock">
+              <p className="mb-3 text-sm text-black/60">The suggested amount is the estimated demand not covered by current stock.</p>
+              <div className="flex-1 space-y-2">
                 {preparationProducts.length ? paginatedPreparationProducts.map((product) => (
                   <div key={product.product} className="flex items-center justify-between border-b border-black/10 py-3 text-sm">
                     <span className="font-semibold">{product.product}</span>
@@ -842,16 +979,59 @@ export default function PredictiveAnalytics() {
                 onPageChange={setPreparationPage}
                 label="products"
               />
-            </div>
-            <div className="rounded-[24px] border border-black/10 bg-white p-5 shadow-sm"><p className="text-[11px] font-semibold uppercase tracking-[0.25em] text-black/50">Top Forecasted Products</p><h2 className="mb-4 text-lg font-semibold text-black">Highest projected demand</h2><div className="space-y-3">{[...forecast.products].sort((a, b) => b.totalForecast - a.totalForecast).slice(0, 5).map((product) => <div key={product.product}><div className="mb-1 flex justify-between text-xs"><span>{product.product}</span><b>{product.totalForecast}</b></div><div className="h-2 rounded-full bg-slate-100"><div className="h-2 rounded-full bg-[#D4AF37] transition-[width] duration-500" style={{ width: `${Math.min(100, product.totalForecast / Math.max(...forecast.products.map((item) => item.totalForecast), 1) * 100)}%` }} /></div></div>)}</div></div>
+            </Card>
+            <Card eyebrow="Top Forecasted Products" title="Highest projected demand">
+              <div className="space-y-4">
+                {[...forecast.products].sort((a, b) => b.totalForecast - a.totalForecast).slice(0, 5).map((product) => (
+                  <div key={product.product}>
+                    <div className="mb-1 flex justify-between gap-3 text-xs">
+                      <span className="truncate">{product.product}</span>
+                      <b className="tabular-nums">{product.totalForecast}</b>
+                    </div>
+                    <div className="h-2 rounded-full bg-slate-100">
+                      <div
+                        className="h-2 rounded-full bg-[#D4AF37] transition-[width] duration-500"
+                        style={{ width: `${Math.min(100, product.totalForecast / Math.max(...forecast.products.map((item) => item.totalForecast), 1) * 100)}%` }}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </Card>
           </div>
 
-          <div className="mb-6 grid gap-4 xl:grid-cols-2">
-            <div className="rounded-[24px] border border-black/10 bg-white p-5 shadow-sm"><p className="text-[11px] font-semibold uppercase tracking-[0.25em] text-black/50">Ingredient Demand Forecast</p><h2 className="mb-4 text-lg font-semibold text-black">Recipe-based consumption and risk</h2><div className="overflow-x-auto"><table className="min-w-[680px] text-left text-sm"><thead><tr className="border-b border-black/10 text-[10px] uppercase tracking-[0.16em] text-black/50"><th className="py-3">Ingredient</th><th className="py-3">Stock</th><th className="py-3">Consumption</th><th className="py-3">Remaining</th><th className="py-3">Risk</th></tr></thead><tbody>{forecast.ingredients?.length ? forecast.ingredients.map((item) => <tr key={item.ingredient} className="border-b border-black/10 last:border-0 hover:bg-[#fafaf8]"><td className="py-3 font-semibold">{item.ingredient}</td><td className="py-3">{item.currentStock} {item.unit}</td><td className="py-3">{item.forecastConsumption} {item.unit}</td><td className="py-3">{item.projectedRemaining} {item.unit}</td><td className="py-3"><span className="rounded-full bg-[#f7f2e8] px-2 py-1 text-[10px] font-semibold">{item.riskStatus}</span></td></tr>) : <tr><td colSpan={5} className="py-5 text-black/50">No recipe-linked ingredient demand is available.</td></tr>}</tbody></table></div></div>
-            <div className="rounded-[24px] border border-black/10 bg-white p-5 shadow-sm">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.25em] text-black/50">Recommended Actions</p>
-              <h2 className="mb-4 text-lg font-semibold text-black">Next operational steps</h2>
-              <div className="space-y-2">
+          {/* Row 3: ingredient demand + actions */}
+          <div className="mb-6 grid items-stretch gap-4 xl:grid-cols-2">
+            <Card eyebrow="Ingredient Demand Forecast" title="Recipe-based consumption and risk">
+              <div className="overflow-x-auto">
+                <table className="min-w-[680px] text-left text-sm">
+                  <thead>
+                    <tr className="border-b border-black/10 text-[10px] uppercase tracking-[0.16em] text-black/50">
+                      <th className="py-3">Ingredient</th>
+                      <th className="py-3">Stock</th>
+                      <th className="py-3">Consumption</th>
+                      <th className="py-3">Remaining</th>
+                      <th className="py-3">Risk</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {forecast.ingredients?.length ? forecast.ingredients.map((item) => (
+                      <tr key={item.ingredient} className="border-b border-black/10 last:border-0 hover:bg-[#fafaf8]">
+                        <td className="py-3 font-semibold">{item.ingredient}</td>
+                        <td className="py-3">{item.currentStock} {item.unit}</td>
+                        <td className="py-3">{item.forecastConsumption} {item.unit}</td>
+                        <td className="py-3">{item.projectedRemaining} {item.unit}</td>
+                        <td className="py-3"><span className="rounded-full bg-[#f7f2e8] px-2 py-1 text-[10px] font-semibold">{item.riskStatus}</span></td>
+                      </tr>
+                    )) : (
+                      <tr><td colSpan={5} className="py-5 text-black/50">No recipe-linked ingredient demand is available.</td></tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </Card>
+            <Card eyebrow="Recommended Actions" title="Next operational steps">
+              <div className="flex-1 space-y-2">
                 {sortedActions.length ? paginatedActions.map((action, index) => (
                   <div key={`${action.type}-${action.product}-${index}`} className="rounded-2xl border border-black/10 bg-[#fffdf8] p-3 text-sm text-black/70">
                     {action.message}
@@ -867,36 +1047,49 @@ export default function PredictiveAnalytics() {
                 onPageChange={setActionsPage}
                 label="actions"
               />
-            </div>
+            </Card>
           </div>
 
-          <div className="mb-6 grid gap-4 xl:grid-cols-2">
-            <div className="rounded-[24px] border border-black/10 bg-white p-5 shadow-sm"><p className="text-[11px] font-semibold uppercase tracking-[0.25em] text-black/50">Forecast Drivers</p><h2 className="mb-3 text-lg font-semibold text-black">Factors used by this model</h2><div className="flex flex-wrap gap-2">{(forecast.drivers || []).map((driver) => <span key={driver} className="rounded-full bg-[#f7f2e8] px-3 py-2 text-xs text-black/70">{driver}</span>)}</div></div>
-            <div className="rounded-[24px] border border-black/10 bg-white p-5 shadow-sm">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.25em] text-black/50">Forecast Model Performance</p>
-              <h2 className="mb-3 text-lg font-semibold text-black">Validation metrics</h2>
-              <div className="grid grid-cols-2 gap-3 text-sm">
-                <p>Model: <b>{forecast.model?.name || "—"}</b></p>
-                <p>Records: <b>{forecast.model?.records || 0}</b></p>
-                <p>MAE: <b>{forecast.model?.mae == null ? "Not available" : forecast.model.mae}</b></p>
-                <p>RMSE: <b>{forecast.model?.rmse == null ? "Not available" : forecast.model.rmse}</b></p>
-                <p>MAPE: <b>{forecast.model?.mape == null ? "Not available" : `${forecast.model.mape}%`}</b></p>
-                <p>Validation observations: <b>{forecast.model?.validation_records || 0}</b></p>
+          {/* Row 4: drivers + validation metrics */}
+          <div className="mb-6 grid items-stretch gap-4 xl:grid-cols-2">
+            <Card eyebrow="Forecast Drivers" title="Factors used by this model">
+              <div className="flex flex-wrap gap-2">
+                {(forecast.drivers || []).map((driver) => (
+                  <span key={driver} className="rounded-full bg-[#f7f2e8] px-3 py-2 text-xs text-black/70">{driver}</span>
+                ))}
               </div>
-              <ValidationMetricsChart metrics={forecast.model?.validation_metrics} />
-            </div>
-          </div>
-
-          <div className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
-            <div className="rounded-[24px] border border-black/10 bg-white p-5 shadow-sm">
-              <div className="mb-4 flex items-center justify-between">
+              <dl className="mt-5 grid grid-cols-2 gap-3 border-t border-black/10 pt-4 text-xs">
                 <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.25em] text-black/50">Reorder Recommendations</p>
-                  <h2 className="text-lg font-semibold text-black">Exact ingredient quantities needed</h2>
+                  <dt className="text-black/50">Training window</dt>
+                  <dd className="mt-0.5 font-semibold text-black">{forecast.model?.training_start || "—"} to {forecast.model?.training_end || "—"}</dd>
                 </div>
-                <Package2 size={18} className="text-[#D4AF37]" />
-              </div>
-              <div className="overflow-x-auto">
+                <div>
+                  <dt className="text-black/50">Latest data</dt>
+                  <dd className="mt-0.5 font-semibold text-black">{forecast.dataAgeDays == null ? "—" : `${forecast.dataAgeDays} day(s) old`}</dd>
+                </div>
+                <div>
+                  <dt className="text-black/50">Trend window</dt>
+                  <dd className="mt-0.5 font-semibold text-black">28 days, damped</dd>
+                </div>
+                <div>
+                  <dt className="text-black/50">Holdout</dt>
+                  <dd className="mt-0.5 font-semibold text-black">Last 7 days</dd>
+                </div>
+              </dl>
+            </Card>
+            <Card eyebrow="Forecast Model Performance" title="Validation metrics">
+              <ValidationMetrics model={forecast.model} />
+            </Card>
+          </div>
+
+          {/* Row 5: reorder recommendations + coverage */}
+          <div className="grid items-stretch gap-4 xl:grid-cols-2">
+            <Card
+              eyebrow="Reorder Recommendations"
+              title="Exact ingredient quantities needed"
+              action={<Package2 size={18} className="text-[#D4AF37]" />}
+            >
+              <div className="flex-1 overflow-x-auto">
                 <table className="min-w-full text-left text-sm">
                   <thead>
                     <tr className="border-b border-black/10 text-[11px] uppercase tracking-[0.2em] text-black/50">
@@ -907,12 +1100,12 @@ export default function PredictiveAnalytics() {
                     </tr>
                   </thead>
                   <tbody>
-                    {forecast.recommendations?.length ? (
-                      forecast.recommendations.map((item, index) => (
+                    {sortedRecommendations.length ? (
+                      paginatedRecommendations.map((item, index) => (
                         <tr key={`${item.product}-${item.ingredient}-${index}`} className="border-b border-black/10 last:border-0 hover:bg-[#fafaf8]">
                           <td className="py-3 pr-4 text-black">{item.product}</td>
                           <td className="py-3 pr-4 text-black/70">{item.ingredient}</td>
-                          <td className="py-3 pr-4 text-black/70">{item.qty.toFixed(2)} kg</td>
+                          <td className="py-3 pr-4 text-black/70">{Number(item.qty || 0).toFixed(2)} kg</td>
                           <td className="py-3">
                             <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${item.priority === "High" ? "bg-amber-100 text-amber-800" : "bg-slate-100 text-slate-700"}`}>
                               {item.priority}
@@ -930,19 +1123,25 @@ export default function PredictiveAnalytics() {
                   </tbody>
                 </table>
               </div>
-            </div>
+              <ListPagination
+                page={reorderPage}
+                pageCount={reorderPageCount}
+                total={sortedRecommendations.length}
+                onPageChange={setReorderPage}
+                label="recommendations"
+              />
+            </Card>
 
-            <div className="rounded-[24px] border border-black/10 bg-white p-5 shadow-sm">
-              <div className="mb-4 flex items-center justify-between">
-                <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.25em] text-black/50">Inventory Coverage</p>
-                  <h2 className="text-lg font-semibold text-black">Stock safety view</h2>
-                </div>
-                <TrendingUp size={18} className="text-[#D4AF37]" />
-              </div>
+            <Card
+              eyebrow="Inventory Coverage"
+              title="Stock safety view"
+              action={<TrendingUp size={18} className="text-[#D4AF37]" />}
+            >
               {forecast.products?.length ? (
                 <>
-                  <CoverageBars products={paginatedCoverageProducts} />
+                  <div className="flex-1">
+                    <CoverageBars products={paginatedCoverageProducts} />
+                  </div>
                   <ListPagination
                     page={coveragePage}
                     pageCount={coveragePageCount}
@@ -954,7 +1153,7 @@ export default function PredictiveAnalytics() {
               ) : (
                 <div className="rounded-2xl border border-dashed border-black/10 p-3 text-sm text-black/60">Coverage data will appear once forecasts are generated.</div>
               )}
-            </div>
+            </Card>
           </div>
         </div>
       </div>

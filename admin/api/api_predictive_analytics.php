@@ -24,6 +24,7 @@ function getProductAliasMap(mysqli $conn): array {
         SELECT aliases.normalized_alias, products.name AS product_name
         FROM analytics_product_aliases AS aliases
         INNER JOIN products ON products.id = aliases.product_id
+        WHERE LOWER(TRIM(products.category)) IN ('cake', 'cakes', 'customized cake', 'customized cakes')
     ");
     if (!$result) {
         error_log('Predictive analytics product alias query failed: ' . mysqli_error($conn));
@@ -45,6 +46,10 @@ function getProductAliasMap(mysqli $conn): array {
 
 function normalizeAliasKey(string $value): string {
     return mb_strtolower(normalizeProductName($value), 'UTF-8');
+}
+
+function emptyValidationMetrics(): array {
+    return ['absolute' => [], 'squared' => [], 'percentage' => [], 'actual' => []];
 }
 
 function recordValidationError(array &$metrics, float $actual, float $predicted): void {
@@ -533,13 +538,20 @@ function buildDetailedForecastPayload(array $history, array $products, array $in
 
     $forecastProducts = [];
     $previousEquivalentTotal = 0;
-    $emptyMetrics = ['absolute' => [], 'squared' => [], 'percentage' => [], 'actual' => []];
-    $validation = [
-        'linear' => $emptyMetrics,
-        'zero' => $emptyMetrics,
-        'yesterday' => $emptyMetrics,
-        'same_weekday_last_week' => $emptyMetrics,
-    ];
+
+    // Validation: every method is scored on the same chronological 7-day holdout.
+    // - $validation: errors pooled per product-day
+    // - $aggActual / $aggPred: shop-level daily totals (what the bakery actually plans for)
+    $validationMethods = ['linear', 'zero', 'yesterday', 'same_weekday_last_week', 'moving_average_7'];
+    $validation = [];
+    foreach ($validationMethods as $method) {
+        $validation[$method] = emptyValidationMetrics();
+    }
+    $aggActual = [];
+    $aggPred = [];
+    $minTrainDays = 14;          // products need this much history before the holdout
+    $evaluatedProducts = 0;
+
     $forecastDayTotals = [];
     $historicalDayTotals = [];
     $ingredientTotals = [];
@@ -593,28 +605,39 @@ function buildDetailedForecastPayload(array $history, array $products, array $in
             $forecastDayTotals[$day] = ($forecastDayTotals[$day] ?? 0) + $value;
         }
 
-        // Compare the model with simple rolling and seasonal baselines on the
-        // same chronological seven-day holdout.
-        if (count($values) > 7) {
+        // Compare the model with simple baselines on the same chronological
+        // seven-day holdout. Only products with enough history and some recent
+        // activity are scored, so dormant all-zero series don't dilute the results.
+        if (count($values) >= $minTrainDays + 7) {
             $trainingValues = array_slice($values, 0, -7);
-            $trainFit = fitTrend($trainingValues);
-            $holdoutOffset = count($trainingValues);
-            foreach (array_slice($values, -7) as $i => $actual) {
-                $targetIndex = $holdoutOffset + $i;
-                recordValidationError($validation['linear'], (float) $actual, forecastAt($trainFit, $i + 1));
-                recordValidationError($validation['zero'], (float) $actual, 0);
-                recordValidationError(
-                    $validation['yesterday'],
-                    (float) $actual,
-                    (float) ($trainingValues[count($trainingValues) - 1] ?? 0)
-                );
-                $sameWeekdayIndex = $targetIndex - 7;
-                if ($sameWeekdayIndex >= 0) {
-                    recordValidationError(
-                        $validation['same_weekday_last_week'],
-                        (float) $actual,
-                        (float) $values[$sameWeekdayIndex]
-                    );
+            $holdout = array_slice($values, -7);
+            $isActive = array_sum(array_slice($trainingValues, -28)) > 0 || array_sum($holdout) > 0;
+
+            if ($isActive) {
+                $evaluatedProducts++;
+                $trainFit = fitTrend($trainingValues);
+                $holdoutOffset = count($trainingValues);
+                $movingAverage7 = array_sum(array_slice($trainingValues, -7)) / 7;
+                $lastKnownValue = (float) $trainingValues[count($trainingValues) - 1];
+
+                foreach ($holdout as $i => $actual) {
+                    $targetIndex = $holdoutOffset + $i;
+                    // Always >= 0 because products have at least $minTrainDays of training data.
+                    $sameWeekdayIndex = $targetIndex - 7;
+
+                    $predictions = [
+                        'linear' => forecastAt($trainFit, $i + 1),
+                        'zero' => 0.0,
+                        'yesterday' => $lastKnownValue,
+                        'same_weekday_last_week' => (float) $values[$sameWeekdayIndex],
+                        'moving_average_7' => (float) $movingAverage7,
+                    ];
+
+                    foreach ($predictions as $method => $predicted) {
+                        recordValidationError($validation[$method], (float) $actual, $predicted);
+                        $aggPred[$method][$i] = ($aggPred[$method][$i] ?? 0) + max(0, $predicted);
+                    }
+                    $aggActual[$i] = ($aggActual[$i] ?? 0) + (float) $actual;
                 }
             }
         }
@@ -665,6 +688,17 @@ function buildDetailedForecastPayload(array $history, array $products, array $in
     }
 
     $validationMetrics = array_map('summarizeValidationMetrics', $validation);
+
+    // Shop-level metrics: add up every evaluated product per holdout day, then score the totals.
+    $aggregateValidationMetrics = [];
+    foreach ($aggPred as $method => $predictedByDay) {
+        $aggregateMetrics = emptyValidationMetrics();
+        foreach ($aggActual as $i => $actual) {
+            recordValidationError($aggregateMetrics, (float) $actual, (float) ($predictedByDay[$i] ?? 0));
+        }
+        $aggregateValidationMetrics[$method] = summarizeValidationMetrics($aggregateMetrics);
+    }
+
     $linearMetrics = $validationMetrics['linear'];
     $totalForecast = array_sum(array_column($forecastProducts, 'totalForecast'));
     $trendPercent = $previousEquivalentTotal > 0
@@ -688,10 +722,12 @@ function buildDetailedForecastPayload(array $history, array $products, array $in
             'mape' => $linearMetrics['mape'],
             'wape' => $linearMetrics['wape'],
             'validation_metrics' => $validationMetrics,
+            'aggregate_validation_metrics' => $aggregateValidationMetrics,
             'records' => array_sum(array_map(static fn($entry) => (int) ($entry['record_count'] ?? 1), $history)),
             'training_start' => $historicalStart?->format('Y-m-d'),
             'training_end' => $historicalEnd->format('Y-m-d'),
             'validation_records' => $linearMetrics['records'],
+            'validation_products' => $evaluatedProducts,
         ],
         'drivers' => ['Historical product demand', 'Recent sales average', 'Linear demand trend'],
         'insights' => array_values(array_filter([ $trendPercent !== null ? 'Expected demand is ' . ($trendPercent >= 0 ? 'increasing' : 'decreasing') . ' by ' . abs($trendPercent) . '% compared with the previous equivalent period.' : null, !empty($forecastProducts) ? $forecastProducts[array_search(max(array_column($forecastProducts, 'totalForecast')), array_column($forecastProducts, 'totalForecast'), true)]['product'] . ' has the highest projected demand.' : null, !empty($risks) && count(array_filter($risks, static fn($item) => $item['riskStatus'] === 'HIGH')) ? 'One or more ingredients may run out based on projected consumption.' : null])),

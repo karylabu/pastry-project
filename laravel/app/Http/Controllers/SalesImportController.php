@@ -49,6 +49,18 @@ class SalesImportController extends Controller
     private const MAX_CSV_KB = 50 * 1024; // 50MB
     private const HISTORY_PAGE_SIZE = 50;
 
+    private function cakeAliasProducts()
+    {
+        return DB::table('products')->where(static function ($query) {
+            $query->whereIn(DB::raw('LOWER(TRIM(category))'), [
+                'cake',
+                'cakes',
+                'customized cake',
+                'customized cakes',
+            ]);
+        });
+    }
+
     public function productAliases(Request $request)
     {
         $user = $this->requireRole($request, 'admin');
@@ -58,9 +70,10 @@ class SalesImportController extends Controller
 
         return response()->json([
             'success' => true,
-            'products' => DB::table('products')->orderBy('name')->get(['id', 'name']),
+            'products' => $this->cakeAliasProducts()->orderBy('name')->get(['id', 'name']),
             'aliases' => DB::table('analytics_product_aliases as aliases')
                 ->join('products', 'products.id', '=', 'aliases.product_id')
+                ->whereIn('aliases.product_id', $this->cakeAliasProducts()->select('id'))
                 ->orderBy('aliases.alias_name')
                 ->get(['aliases.id', 'aliases.alias_name', 'aliases.product_id', 'products.name as product_name']),
         ]);
@@ -77,6 +90,13 @@ class SalesImportController extends Controller
             'alias_name' => ['required', 'string', 'max:191'],
             'product_id' => ['required', 'integer', 'exists:products,id'],
         ]);
+        if (!$this->cakeAliasProducts()->where('id', (int) $validated['product_id'])->exists()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Product aliases can only be mapped to cakes or customized cakes.',
+            ], 422);
+        }
+
         $aliasName = trim(preg_replace('/\s+/', ' ', $validated['alias_name']));
         $normalizedAlias = mb_strtolower($aliasName, 'UTF-8');
         if (DB::table('products')->whereRaw('LOWER(name) = ?', [$normalizedAlias])->exists()) {

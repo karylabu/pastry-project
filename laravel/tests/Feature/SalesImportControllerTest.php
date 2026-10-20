@@ -264,7 +264,9 @@ class SalesImportControllerTest extends TestCase
     public function test_admin_can_map_and_remove_case_insensitive_product_aliases(): void
     {
         $admin = User::factory()->createOne(['role' => 'admin']);
-        $productId = DB::table('products')->insertGetId(['name' => 'Chocolate Ganache Cake', 'category' => 'Cake']);
+        $productId = DB::table('products')->insertGetId(['name' => 'Chocolate Ganache Cake', 'category' => 'Cakes']);
+        $customCakeId = DB::table('products')->insertGetId(['name' => 'Customized Cake', 'category' => 'Customized Cakes']);
+        $coffeeId = DB::table('products')->insertGetId(['name' => 'Iced Coffee', 'category' => 'Drinks']);
 
         $created = $this->actingAs($admin)->postJson('/api/admin/sales/product-aliases', [
             'alias_name' => '  Choco   Cake ',
@@ -273,15 +275,33 @@ class SalesImportControllerTest extends TestCase
         $created->assertJsonPath('alias.alias_name', 'Choco Cake')
             ->assertJsonPath('alias.product_name', 'Chocolate Ganache Cake');
 
+        DB::table('analytics_product_aliases')->insert([
+            'alias_name' => 'Iced Coffee',
+            'normalized_alias' => 'iced coffee',
+            'product_id' => $coffeeId,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
         $this->getJson('/api/admin/sales/product-aliases')
             ->assertOk()
             ->assertJsonPath('aliases.0.alias_name', 'Choco Cake')
-            ->assertJsonPath('aliases.0.product_id', $productId);
+            ->assertJsonPath('aliases.0.product_id', $productId)
+            ->assertJsonCount(2, 'products')
+            ->assertJsonFragment(['id' => $customCakeId, 'name' => 'Customized Cake'])
+            ->assertJsonMissing(['name' => 'Iced Coffee'])
+            ->assertJsonCount(1, 'aliases');
 
         $this->postJson('/api/admin/sales/product-aliases', [
             'alias_name' => 'CHOCO CAKE',
             'product_id' => $productId,
         ])->assertUnprocessable();
+
+        $this->postJson('/api/admin/sales/product-aliases', [
+            'alias_name' => 'Coffee',
+            'product_id' => $coffeeId,
+        ])->assertUnprocessable()
+            ->assertJsonPath('message', 'Product aliases can only be mapped to cakes or customized cakes.');
 
         $this->deleteJson('/api/admin/sales/product-aliases/' . $created->json('alias.id'))
             ->assertOk()
