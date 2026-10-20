@@ -223,8 +223,11 @@ export default function AdminNavbar({ onSidebarChange }) {
   };
 
   const filteredNotifications = React.useMemo(() => {
-    if (notifFilter === "All") return notifications;
-    return notifications.filter((n) => getNotificationCategory(n) === notifFilter);
+    const ordered = [...notifications].sort(
+      (a, b) => Number(Boolean(a.is_read)) - Number(Boolean(b.is_read))
+    );
+    if (notifFilter === "All") return ordered;
+    return ordered.filter((n) => getNotificationCategory(n) === notifFilter);
   }, [notifications, notifFilter]);
 
   const handleSearchSubmit = (event) => {
