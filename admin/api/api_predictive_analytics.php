@@ -13,6 +13,93 @@ function normalizeProductName(mixed $value): string {
     return trim(preg_replace('/\s+/', ' ', (string) $value));
 }
 
+function getProductAliasMap(mysqli $conn): array {
+    $table = mysqli_query($conn, "SHOW TABLES LIKE 'analytics_product_aliases'");
+    if (!$table || mysqli_num_rows($table) === 0) {
+        return [];
+    }
+    mysqli_free_result($table);
+
+    $result = mysqli_query($conn, "
+        SELECT aliases.normalized_alias, products.name AS product_name
+        FROM analytics_product_aliases AS aliases
+        INNER JOIN products ON products.id = aliases.product_id
+    ");
+    if (!$result) {
+        error_log('Predictive analytics product alias query failed: ' . mysqli_error($conn));
+        return [];
+    }
+
+    $aliases = [];
+    while ($row = mysqli_fetch_assoc($result)) {
+        $alias = normalizeAliasKey((string) ($row['normalized_alias'] ?? ''));
+        $product = normalizeProductName($row['product_name'] ?? '');
+        if ($alias !== '' && $product !== '') {
+            $aliases[$alias] = $product;
+        }
+    }
+    mysqli_free_result($result);
+
+    return $aliases;
+}
+
+function normalizeAliasKey(string $value): string {
+    return mb_strtolower(normalizeProductName($value), 'UTF-8');
+}
+
+function recordValidationError(array &$metrics, float $actual, float $predicted): void {
+    $error = $actual - max(0, $predicted);
+    $metrics['absolute'][] = abs($error);
+    $metrics['squared'][] = $error * $error;
+    $metrics['actual'][] = abs($actual);
+    if ($actual != 0) {
+        $metrics['percentage'][] = abs($error) / abs($actual) * 100;
+    }
+}
+
+function summarizeValidationMetrics(array $metrics): array {
+    $count = count($metrics['absolute']);
+    $actualTotal = array_sum($metrics['actual']);
+
+    return [
+        'mae' => $count ? round(array_sum($metrics['absolute']) / $count, 2) : null,
+        'rmse' => $count ? round(sqrt(array_sum($metrics['squared']) / $count), 2) : null,
+        'mape' => count($metrics['percentage']) ? round(array_sum($metrics['percentage']) / count($metrics['percentage']), 2) : null,
+        'wape' => $actualTotal > 0 ? round(array_sum($metrics['absolute']) / $actualTotal * 100, 2) : null,
+        'records' => $count,
+    ];
+}
+
+/**
+ * Fit a straight line (least squares) through the most recent $window values.
+ * Far steadier than comparing only the first and last day.
+ */
+function fitTrend(array $values, int $window = 28): array {
+    $values = array_values(array_slice($values, -$window));
+    $n = count($values);
+    if ($n === 0) return ['intercept' => 0, 'slope' => 0, 'n' => 0];
+    $meanX = ($n - 1) / 2;
+    $meanY = array_sum($values) / $n;
+    $num = 0;
+    $den = 0;
+    foreach ($values as $x => $y) {
+        $num += ($x - $meanX) * ($y - $meanY);
+        $den += ($x - $meanX) ** 2;
+    }
+    $slope = $den > 0 ? $num / $den : 0;
+    return ['intercept' => $meanY - $slope * $meanX, 'slope' => $slope, 'n' => $n];
+}
+
+/**
+ * Forecast $h days after the end of the fitted window.
+ * $damping stops a short-term slope from growing unrealistically on long horizons.
+ */
+function forecastAt(array $fit, int $h, float $damping = 0.5): float {
+    if ($fit['n'] === 0) return 0;
+    $endLevel = $fit['intercept'] + $fit['slope'] * ($fit['n'] - 1);
+    return max(0, $endLevel + $fit['slope'] * $damping * $h);
+}
+
 function getSalesHistory(mysqli $conn): array {
     $history = [];
 
@@ -84,25 +171,54 @@ function getSalesHistory(mysqli $conn): array {
         $history = array_values($dailyHistory);
     }
 
+    // Live-order keys use canonical names so aliases still participate in deduping.
+    $seen = [];
+    foreach ($history as $h) {
+        $seen[$h['date'] . '|' . normalizeAliasKey($h['product'])] = true;
+    }
+
+    $productAliases = getProductAliasMap($conn);
     $historyTable = mysqli_query($conn, "SHOW TABLES LIKE 'analytics_sales_history'");
     if ($historyTable && mysqli_num_rows($historyTable) > 0) {
+        $overlapColumn = mysqli_query($conn, "SHOW COLUMNS FROM analytics_imports LIKE 'overlap_mode'");
+        if ($overlapColumn === false) {
+            error_log('Predictive analytics overlap-mode schema check failed: ' . mysqli_error($conn));
+        }
+        $hasOverlapMode = $overlapColumn && mysqli_num_rows($overlapColumn) > 0;
+        if ($overlapColumn) {
+            mysqli_free_result($overlapColumn);
+        }
+        $overlapSelect = $hasOverlapMode ? 'imports.overlap_mode' : "'deduplicate_live' AS overlap_mode";
+        $overlapGroupBy = $hasOverlapMode ? ', imports.overlap_mode' : '';
         $importedResult = mysqli_query($conn, "
-            SELECT history.product_name, history.sale_date, SUM(history.units_sold) AS units_sold, COUNT(*) AS record_count
+            SELECT history.product_name, history.sale_date, {$overlapSelect},
+                   SUM(history.units_sold) AS units_sold, COUNT(*) AS record_count
             FROM analytics_sales_history AS history
             INNER JOIN analytics_imports AS imports ON imports.id = history.import_id
             WHERE imports.status = 'completed' AND history.units_sold > 0
-            GROUP BY history.product_name, history.sale_date
+            GROUP BY history.product_name, history.sale_date{$overlapGroupBy}
             ORDER BY history.sale_date ASC, history.product_name ASC
         ");
         if ($importedResult) {
+            $importedDaily = [];
             while ($row = mysqli_fetch_assoc($importedResult)) {
-                $product = normalizeProductName($row['product_name'] ?? '');
+                $sourceProduct = normalizeProductName($row['product_name'] ?? '');
+                $product = $productAliases[normalizeAliasKey($sourceProduct)] ?? $sourceProduct;
                 $date = (string) ($row['sale_date'] ?? '');
                 $quantity = max(0, (float) ($row['units_sold'] ?? 0));
                 if ($date !== '' && $product !== '' && $quantity > 0) {
-                    $history[] = ['date' => $date, 'product' => $product, 'quantity' => $quantity, 'record_count' => (int) $row['record_count']];
+                    $key = $date . '|' . normalizeAliasKey($product);
+                    $overlapMode = (string) ($row['overlap_mode'] ?? 'deduplicate_live');
+                    if ($overlapMode !== 'supplement' && isset($seen[$key])) {
+                        continue;
+                    }
+                    $importedDaily[$key]['date'] = $date;
+                    $importedDaily[$key]['product'] = $product;
+                    $importedDaily[$key]['quantity'] = ($importedDaily[$key]['quantity'] ?? 0) + $quantity;
+                    $importedDaily[$key]['record_count'] = ($importedDaily[$key]['record_count'] ?? 0) + (int) $row['record_count'];
                 }
             }
+            $history = array_merge($history, array_values($importedDaily));
             mysqli_free_result($importedResult);
         }
         mysqli_free_result($historyTable);
@@ -416,7 +532,13 @@ function buildDetailedForecastPayload(array $history, array $products, array $in
     foreach ($products as $product) $productByName[strtolower($product['name'])] = $product;
 
     $forecastProducts = [];
-    $validation = ['absolute' => [], 'squared' => [], 'percentage' => []];
+    $emptyMetrics = ['absolute' => [], 'squared' => [], 'percentage' => [], 'actual' => []];
+    $validation = [
+        'linear' => $emptyMetrics,
+        'zero' => $emptyMetrics,
+        'yesterday' => $emptyMetrics,
+        'same_weekday_last_week' => $emptyMetrics,
+    ];
     $forecastDayTotals = [];
     $historicalDayTotals = [];
     $ingredientTotals = [];
@@ -445,7 +567,9 @@ function buildDetailedForecastPayload(array $history, array $products, array $in
     foreach ($historyByProduct as $productName => $daily) {
         $dateKeys = array_keys($daily);
         $firstDate = new DateTimeImmutable(min($dateKeys));
-        $lastDate = new DateTimeImmutable(max($dateKeys));
+        // Fill zeros up to the latest date in the whole dataset (not this product's
+        // last sale) so products that stopped selling show their recent zero days.
+        $lastDate = $historicalEnd;
         for ($date = $firstDate; $date <= $lastDate; $date = $date->modify('+1 day')) {
             $daily[$date->format('Y-m-d')] = $daily[$date->format('Y-m-d')] ?? 0;
         }
@@ -454,27 +578,44 @@ function buildDetailedForecastPayload(array $history, array $products, array $in
         foreach ($daily as $date => $quantity) {
             $historicalDayTotals[$date] = ($historicalDayTotals[$date] ?? 0) + $quantity;
         }
-        $trainingValues = count($values) > 7 ? array_slice($values, 0, -7) : $values;
+
         $recentValues = array_slice($values, -min(7, count($values)));
         $recentDemand = count($recentValues) ? array_sum($recentValues) / count($recentValues) : 0;
-        $average = count($trainingValues) ? array_sum($trainingValues) / count($trainingValues) : $recentDemand;
-        $first = $trainingValues[0] ?? $average;
-        $last = $trainingValues[count($trainingValues) - 1] ?? $average;
-        $trend = count($trainingValues) > 1 ? ($last - $first) / (count($trainingValues) - 1) : 0;
+
+        // Real forecast: trained on ALL available data (regression over the last 28 days).
+        $fullFit = fitTrend($values);
+        $trend = $fullFit['slope'];
         $forecastSeries = [];
         for ($day = 1; $day <= $period; $day++) {
-            $value = max(0, round($average + ($trend * $day), 2));
+            $value = round(forecastAt($fullFit, $day), 2);
             $forecastSeries[] = $value;
             $forecastDayTotals[$day] = ($forecastDayTotals[$day] ?? 0) + $value;
         }
 
-        $holdout = count($values) > 7 ? array_slice($values, -7) : [];
-        foreach ($holdout as $actual) {
-            $predicted = max(0, $average);
-            $error = $actual - $predicted;
-            $validation['absolute'][] = abs($error);
-            $validation['squared'][] = $error * $error;
-            if ($actual != 0) $validation['percentage'][] = abs($error) / abs($actual) * 100;
+        // Compare the model with simple rolling and seasonal baselines on the
+        // same chronological seven-day holdout.
+        if (count($values) > 7) {
+            $trainingValues = array_slice($values, 0, -7);
+            $trainFit = fitTrend($trainingValues);
+            $holdoutOffset = count($trainingValues);
+            foreach (array_slice($values, -7) as $i => $actual) {
+                $targetIndex = $holdoutOffset + $i;
+                recordValidationError($validation['linear'], (float) $actual, forecastAt($trainFit, $i + 1));
+                recordValidationError($validation['zero'], (float) $actual, 0);
+                recordValidationError(
+                    $validation['yesterday'],
+                    (float) $actual,
+                    (float) ($trainingValues[count($trainingValues) - 1] ?? 0)
+                );
+                $sameWeekdayIndex = $targetIndex - 7;
+                if ($sameWeekdayIndex >= 0) {
+                    recordValidationError(
+                        $validation['same_weekday_last_week'],
+                        (float) $actual,
+                        (float) $values[$sameWeekdayIndex]
+                    );
+                }
+            }
         }
 
         $catalogue = $productByName[strtolower($productName)] ?? ['name' => $productName, 'category' => 'Unknown', 'stock' => 0, 'minimum_stock' => 0];
@@ -509,6 +650,9 @@ function buildDetailedForecastPayload(array $history, array $products, array $in
         ];
     }
 
+    // Keys were inserted product by product, so sort by date before taking the last 7 days.
+    ksort($historicalDayTotals);
+
     foreach ($ingredientTotals as $ingredient) {
         $remaining = round($ingredient['stock'] - $ingredient['consumption'], 2);
         $reorder = max(0, round($ingredient['threshold'] - $remaining, 2));
@@ -518,23 +662,62 @@ function buildDetailedForecastPayload(array $history, array $products, array $in
         if ($reorder > 0) $actions[] = ['type' => 'ingredient', 'product' => $ingredient['name'], 'message' => "Reorder {$reorder} {$ingredient['unit']} of {$ingredient['name']}.", 'priority' => $risk];
     }
 
-    $mae = count($validation['absolute']) ? array_sum($validation['absolute']) / count($validation['absolute']) : null;
-    $rmse = count($validation['squared']) ? sqrt(array_sum($validation['squared']) / count($validation['squared'])) : null;
-    $mape = count($validation['percentage']) ? array_sum($validation['percentage']) / count($validation['percentage']) : null;
+    $validationMetrics = array_map('summarizeValidationMetrics', $validation);
+    $linearMetrics = $validationMetrics['linear'];
     $totalForecast = array_sum(array_column($forecastProducts, 'totalForecast'));
     $previousTotal = 0;
     foreach ($forecastProducts as $product) if ($product['trendPercent'] !== null) $previousTotal += $product['totalForecast'] / (1 + ($product['trendPercent'] / 100));
     $trendPercent = $previousTotal > 0 ? round((($totalForecast - $previousTotal) / $previousTotal) * 100, 2) : null;
 
+    // How stale the data is: forecast day 1 is the day after the last day with data.
+    $dataAgeDays = max(0, (int) $historicalEnd->diff($today)->format('%r%a'));
+
     return [
         'period' => $period, 'products' => $forecastProducts, 'ingredients' => array_values($risks), 'risks' => $risks, 'actions' => $actions, 'alerts' => [], 'recommendations' => [],
+        'dataEndDate' => $historicalEnd->format('Y-m-d'),
+        'dataAgeDays' => $dataAgeDays,
         'history' => array_map(static fn($date, $demand) => ['date' => $date, 'demand' => round($demand, 2)], array_slice(array_keys($historicalDayTotals), -7), array_slice(array_values($historicalDayTotals), -7)),
-        'daily' => array_map(static fn($day, $value) => ['day' => $day, 'date' => $today->modify("+{$day} days")->format('Y-m-d'), 'forecast' => round($value, 2)], array_keys($forecastDayTotals), $forecastDayTotals),
+        'daily' => array_map(static fn($day, $value) => ['day' => $day, 'date' => $historicalEnd->modify("+{$day} days")->format('Y-m-d'), 'forecast' => round($value, 2)], array_keys($forecastDayTotals), $forecastDayTotals),
         'summary' => ['totalProjectedDemand' => round($totalForecast, 2), 'highPriorityCount' => count(array_filter($forecastProducts, static fn($item) => $item['priority'] === 'High')), 'recommendationCount' => count($actions), 'trendPercent' => $trendPercent, 'peakDay' => !empty($forecastDayTotals) ? array_search(max($forecastDayTotals), $forecastDayTotals, true) : null],
-        'model' => ['name' => 'Moving average with linear trend', 'mae' => $mae !== null ? round($mae, 2) : null, 'rmse' => $rmse !== null ? round($rmse, 2) : null, 'mape' => $mape !== null ? round($mape, 2) : null, 'records' => array_sum(array_map(static fn($entry) => (int) ($entry['record_count'] ?? 1), $history)), 'training_start' => $historicalStart?->format('Y-m-d'), 'training_end' => $historicalEnd->format('Y-m-d'), 'validation_records' => count($validation['absolute'])],
+        'model' => [
+            'name' => 'Linear trend (28-day regression, damped)',
+            'mae' => $linearMetrics['mae'],
+            'rmse' => $linearMetrics['rmse'],
+            'mape' => $linearMetrics['mape'],
+            'wape' => $linearMetrics['wape'],
+            'validation_metrics' => $validationMetrics,
+            'records' => array_sum(array_map(static fn($entry) => (int) ($entry['record_count'] ?? 1), $history)),
+            'training_start' => $historicalStart?->format('Y-m-d'),
+            'training_end' => $historicalEnd->format('Y-m-d'),
+            'validation_records' => $linearMetrics['records'],
+        ],
         'drivers' => ['Historical product demand', 'Recent sales average', 'Linear demand trend'],
         'insights' => array_values(array_filter([ $trendPercent !== null ? 'Expected demand is ' . ($trendPercent >= 0 ? 'increasing' : 'decreasing') . ' by ' . abs($trendPercent) . '% compared with the previous equivalent period.' : null, !empty($forecastProducts) ? $forecastProducts[array_search(max(array_column($forecastProducts, 'totalForecast')), array_column($forecastProducts, 'totalForecast'), true)]['product'] . ' has the highest projected demand.' : null, !empty($risks) && count(array_filter($risks, static fn($item) => $item['riskStatus'] === 'HIGH')) ? 'One or more ingredients may run out based on projected consumption.' : null])),
     ];
+}
+
+/**
+ * Save the rows of an uploaded CSV into analytics_sales_history so that
+ * getSalesHistory() can merge them with live orders.
+ */
+function insertImportedHistory(mysqli $conn, array $history, int $importId): void {
+    $stmt = mysqli_prepare($conn, "INSERT INTO analytics_sales_history (import_id, product_name, sale_date, units_sold) VALUES (?, ?, ?, ?)");
+    if (!$stmt) {
+        throw new Exception('Could not save the imported sales rows.');
+    }
+
+    foreach ($history as $entry) {
+        $product = normalizeProductName($entry['product'] ?? '');
+        $date = $entry['date'] ?? '';
+        $qty = (float) ($entry['quantity'] ?? 0);
+        if (!$product || !$date) {
+            continue;
+        }
+        mysqli_stmt_bind_param($stmt, 'issd', $importId, $product, $date, $qty);
+        mysqli_stmt_execute($stmt);
+    }
+
+    mysqli_stmt_close($stmt);
 }
 
 function persistForecastData(mysqli $conn, array $history, array $forecastPayload, int $importId = 0): void {
@@ -570,12 +753,13 @@ function persistForecastData(mysqli $conn, array $history, array $forecastPayloa
         }
     }
 
+    // Forecast dates follow the last day with data, matching the API's "daily" labels.
+    $forecastStart = new DateTimeImmutable($forecastPayload['dataEndDate'] ?? 'today');
     foreach ($forecastPayload['products'] ?? [] as $productData) {
         $productName = $productData['product'];
         $series = $productData['forecast'] ?? ($productData['projectedSeries'] ?? []);
-        $forecastDate = date('Y-m-d', strtotime('+1 day'));
         foreach ($series as $index => $value) {
-            $date = date('Y-m-d', strtotime('+' . ($index + 1) . ' day'));
+            $date = $forecastStart->modify('+' . ($index + 1) . ' day')->format('Y-m-d');
             $confidence = 0.75 + ($index * 0.03);
             mysqli_stmt_bind_param($stmtForecast, 'ssdd', $productName, $date, $value, $confidence);
             mysqli_stmt_execute($stmtForecast);
@@ -656,6 +840,10 @@ try {
         if (!isset($_FILES['file']) || !is_uploaded_file($_FILES['file']['tmp_name'])) {
             throw new Exception('Please upload a valid CSV file.');
         }
+        $overlapMode = (string) ($_POST['overlap_mode'] ?? 'deduplicate_live');
+        if (!in_array($overlapMode, ['deduplicate_live', 'supplement'], true)) {
+            throw new Exception('Choose whether this CSV overlaps live orders or contains additional sales.');
+        }
 
         $filePath = $_FILES['file']['tmp_name'];
         $fileName = basename($_FILES['file']['name']);
@@ -664,6 +852,9 @@ try {
         if (empty($rows)) {
             throw new Exception('The uploaded file is empty.');
         }
+
+        // array_filter keeps the original keys, so re-index before reading $rows[0].
+        $rows = array_values($rows);
 
         $headers = array_map(function ($header) {
             return strtolower(trim(preg_replace('/^\xEF\xBB\xBF/', '', $header)));
@@ -690,8 +881,8 @@ try {
         }
 
         mysqli_query($conn, 'START TRANSACTION');
-        $importStmt = mysqli_prepare($conn, "INSERT INTO analytics_imports (file_name, source_name, rows_received, rows_processed, status) VALUES (?, ?, ?, ?, 'completed')");
-        mysqli_stmt_bind_param($importStmt, 'ssii', $fileName, $sourceName, $rowsReceived, $rowsProcessed);
+        $importStmt = mysqli_prepare($conn, "INSERT INTO analytics_imports (file_name, source_name, overlap_mode, rows_received, rows_processed, status) VALUES (?, ?, ?, ?, ?, 'completed')");
+        mysqli_stmt_bind_param($importStmt, 'sssii', $fileName, $sourceName, $overlapMode, $rowsReceived, $rowsProcessed);
         $sourceName = 'POS Export';
         $rowsReceived = count($rows) - 1;
         $rowsProcessed = count($history);
@@ -699,12 +890,17 @@ try {
         $importId = mysqli_insert_id($conn);
         mysqli_stmt_close($importStmt);
 
+        // 1) Save the CSV rows, 2) rebuild merged sales history using the import's
+        // overlap policy, 3) forecast from the merged history.
+        insertImportedHistory($conn, $history, (int) $importId);
+
         $period = (int) ($_POST['period'] ?? 7);
+        $mergedHistory = getSalesHistory($conn);
         $products = getProducts($conn);
         $ingredientStock = getIngredientStock($conn);
         $recipes = getProductRecipes($conn);
-        $forecastPayload = buildDetailedForecastPayload($history, $products, $ingredientStock, $recipes, $period);
-        persistForecastData($conn, $history, $forecastPayload, (int) $importId);
+        $forecastPayload = buildDetailedForecastPayload($mergedHistory, $products, $ingredientStock, $recipes, $period);
+        persistForecastData($conn, $mergedHistory, $forecastPayload, 0);
         mysqli_query($conn, 'COMMIT');
 
         echo json_encode([

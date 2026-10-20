@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
   Calculator,
@@ -6,10 +6,12 @@ import {
   ChevronRight,
   FileText,
   Package2,
+  Plus,
+  Trash2,
   TrendingUp,
   UploadCloud,
 } from "lucide-react";
-import { ROOT_BASE } from "../../services/config";
+import { LARAVEL_BASE, ROOT_BASE } from "../../services/config";
 import { getAuthHeaders } from "../../services/api";
 
 // ---------------------------------------------------------------------------
@@ -28,6 +30,73 @@ function niceMax(value) {
   const steps = [1, 1.2, 1.5, 2, 2.5, 3, 4, 5, 7.5, 10];
   const step = steps.find((candidate) => candidate >= normalized) || 10;
   return step * magnitude;
+}
+
+function ValidationMetricsChart({ metrics }) {
+  const [selectedMetric, setSelectedMetric] = useState("wape");
+  const metricOptions = {
+    wape: { label: "WAPE", suffix: "%", description: "Weighted error across all held-out sales." },
+    mae: { label: "MAE", suffix: " units", description: "Average absolute error per held-out day." },
+    rmse: { label: "RMSE", suffix: " units", description: "Penalizes larger errors more heavily." },
+    mape: { label: "MAPE", suffix: "%", description: "Average percentage error on non-zero sales days." },
+  };
+  const methods = [
+    { key: "linear", label: "Linear trend", color: "#b4901f" },
+    { key: "zero", label: "Predict zero", color: "#8a8a8a" },
+    { key: "yesterday", label: "Same as yesterday", color: "#718096" },
+    { key: "same_weekday_last_week", label: "Same weekday last week", color: "#81906c" },
+  ];
+  const option = metricOptions[selectedMetric];
+  const rows = methods.map((method) => ({
+    ...method,
+    value: metrics?.[method.key]?.[selectedMetric],
+    records: metrics?.[method.key]?.records ?? 0,
+  }));
+  const maxValue = Math.max(...rows.map((row) => Number.isFinite(Number(row.value)) ? Number(row.value) : 0), 0);
+
+  return (
+    <div className="mt-4 rounded-xl border border-black/10 bg-[#fafaf8] p-3" role="group" aria-label="Validation metric comparison chart">
+      <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
+        <div>
+          <p className="text-xs font-semibold text-black">{option.label} by forecast method</p>
+          <p className="mt-0.5 text-[10px] text-black/55">{option.description} Lower is better.</p>
+        </div>
+        <div className="inline-flex rounded-md border border-black/10 bg-white p-0.5" aria-label="Select validation metric">
+          {Object.entries(metricOptions).map(([key, metric]) => (
+            <button
+              key={key}
+              type="button"
+              aria-pressed={selectedMetric === key}
+              onClick={() => setSelectedMetric(key)}
+              className={`rounded px-2 py-1 text-[10px] font-semibold ${selectedMetric === key ? "bg-[#33251e] text-white" : "text-black/60 hover:bg-black/5"}`}
+            >
+              {metric.label}
+            </button>
+          ))}
+        </div>
+      </div>
+      {maxValue > 0 ? (
+        <div className="space-y-3">
+          {rows.map((row) => {
+            const available = Number.isFinite(Number(row.value)) && row.records > 0;
+            const value = available ? Number(row.value) : 0;
+            return (
+              <div key={row.key} className="grid grid-cols-[125px_minmax(0,1fr)_72px] items-center gap-2">
+                <span className="truncate text-[10px] font-medium text-black/70" title={row.label}>{row.label}</span>
+                <div className="h-3 overflow-hidden rounded-full bg-black/5" role="img" aria-label={`${row.label}: ${available ? `${value}${option.suffix}` : "not available"}`}>
+                  {available && <div className="h-full rounded-full transition-[width]" style={{ width: `${Math.max((value / maxValue) * 100, value > 0 ? 1 : 0)}%`, backgroundColor: row.color }} />}
+                </div>
+                <span className="text-right text-[10px] tabular-nums text-black/70">{available ? `${value}${option.suffix}` : "—"}</span>
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <p className="rounded-lg border border-dashed border-black/10 px-3 py-4 text-center text-xs text-black/55">Validation metrics will appear when there are enough historical sales days.</p>
+      )}
+      <p className="mt-3 text-[10px] text-black/45">Based on a chronological seven-day holdout. Same-weekday results require at least one prior matching week.</p>
+    </div>
+  );
 }
 
 function ForecastChart({ historical, forecast }) {
@@ -303,6 +372,67 @@ export default function PredictiveAnalytics() {
   const [preparationPage, setPreparationPage] = useState(1);
   const [actionsPage, setActionsPage] = useState(1);
   const [coveragePage, setCoveragePage] = useState(1);
+  const [overlapMode, setOverlapMode] = useState("deduplicate_live");
+  const [aliases, setAliases] = useState([]);
+  const [aliasProducts, setAliasProducts] = useState([]);
+  const [aliasName, setAliasName] = useState("");
+  const [aliasProductId, setAliasProductId] = useState("");
+  const [aliasError, setAliasError] = useState("");
+  const [savingAlias, setSavingAlias] = useState(false);
+
+  const loadProductAliases = useCallback(async () => {
+    const response = await fetch(`${LARAVEL_BASE}/api/admin/sales/product-aliases`, {
+      credentials: "include",
+      headers: { Accept: "application/json", ...getAuthHeaders() },
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || !data.success) throw new Error(data.message || "Could not load product aliases.");
+    setAliases(data.aliases || []);
+    setAliasProducts(data.products || []);
+    setAliasProductId((current) => current || String(data.products?.[0]?.id || ""));
+  }, []);
+
+  useEffect(() => {
+    loadProductAliases().catch((error) => setAliasError(error.message));
+  }, [loadProductAliases]);
+
+  const saveProductAlias = async (event) => {
+    event.preventDefault();
+    setSavingAlias(true);
+    setAliasError("");
+    try {
+      const response = await fetch(`${LARAVEL_BASE}/api/admin/sales/product-aliases`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json", Accept: "application/json", ...getAuthHeaders() },
+        body: JSON.stringify({ alias_name: aliasName, product_id: aliasProductId }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !data.success) throw new Error(data.message || "Could not save product alias.");
+      setAliasName("");
+      await loadProductAliases();
+    } catch (error) {
+      setAliasError(error.message);
+    } finally {
+      setSavingAlias(false);
+    }
+  };
+
+  const removeProductAlias = async (aliasId) => {
+    setAliasError("");
+    try {
+      const response = await fetch(`${LARAVEL_BASE}/api/admin/sales/product-aliases/${aliasId}`, {
+        method: "DELETE",
+        credentials: "include",
+        headers: { Accept: "application/json", ...getAuthHeaders() },
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !data.success) throw new Error(data.message || "Could not delete product alias.");
+      setAliases((current) => current.filter((alias) => alias.id !== aliasId));
+    } catch (error) {
+      setAliasError(error.message);
+    }
+  };
 
   const loadForecast = async (options = {}) => {
     setIsWorking(true);
@@ -400,6 +530,7 @@ export default function PredictiveAnalytics() {
     const formData = new FormData();
     formData.append("action", "import");
     formData.append("period", String(period));
+    formData.append("overlap_mode", overlapMode);
     formData.append("file", file);
 
     setIsWorking(true);
@@ -465,6 +596,13 @@ export default function PredictiveAnalytics() {
                 <UploadCloud size={16} />
                 <span>Upload CSV</span>
                 <input type="file" accept=".csv" className="hidden" onChange={handleFileUpload} />
+              </label>
+              <label className="flex h-10 items-center gap-2 rounded-md border border-[#e8dfd4] bg-white px-2.5 text-[10px] font-semibold text-[#65574d]">
+                CSV overlap
+                <select aria-label="CSV overlap handling" value={overlapMode} onChange={(event) => setOverlapMode(event.target.value)} className="max-w-[180px] bg-transparent text-[10px] outline-none">
+                  <option value="deduplicate_live">Skip live-order overlaps</option>
+                  <option value="supplement">Add as additional sales</option>
+                </select>
               </label>
             </div>
           </div>
@@ -551,6 +689,45 @@ export default function PredictiveAnalytics() {
               <span className="text-xs text-black/45">{forecast.model?.records || 0} records used</span>
             </div>
             {forecast.insights?.length ? <div className="grid gap-3 md:grid-cols-3">{forecast.insights.map((insight) => <div key={insight} className="rounded-2xl bg-[#fffaf0] p-4 text-sm leading-6 text-black/70">{insight}</div>)}</div> : <p className="text-sm text-black/55">Insufficient historical data for reliable insights.</p>}
+            <div className="mt-5 border-t border-black/10 pt-4">
+              <h3 className="text-sm font-semibold text-black">Holdout accuracy vs. simple baselines</h3>
+              <p className="mt-1 text-xs text-black/55">Seven most recent days held out chronologically. Lower WAPE is better; baselines are reference comparisons.</p>
+              <div className="mt-3 overflow-x-auto">
+                <table className="w-full min-w-[560px] text-left text-xs">
+                  <thead><tr className="border-b border-black/10 text-[10px] uppercase tracking-wider text-black/50"><th className="py-2 pr-3">Method</th><th className="py-2 pr-3">WAPE</th><th className="py-2 pr-3">MAE</th><th className="py-2 pr-3">RMSE</th><th className="py-2">Days</th></tr></thead>
+                  <tbody>
+                    {[
+                      ["Linear trend", "linear"],
+                      ["Predict zero", "zero"],
+                      ["Same as yesterday", "yesterday"],
+                      ["Same weekday last week", "same_weekday_last_week"],
+                    ].map(([label, key]) => {
+                      const metric = forecast.model?.validation_metrics?.[key];
+                      return <tr key={key} className="border-b border-black/5 last:border-0"><td className="py-2 pr-3 font-medium">{label}</td><td className="py-2 pr-3">{metric?.wape == null ? "—" : `${metric.wape}%`}</td><td className="py-2 pr-3">{metric?.mae ?? "—"}</td><td className="py-2 pr-3">{metric?.rmse ?? "—"}</td><td className="py-2">{metric?.records ?? 0}</td></tr>;
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <div className="mb-6 rounded-[24px] border border-black/10 bg-white p-5 shadow-sm">
+            <div className="mb-3">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.25em] text-black/50">CSV data quality</p>
+              <h2 className="text-lg font-semibold text-black">Product name aliases</h2>
+              <p className="mt-1 text-sm leading-6 text-black/60">Map alternate CSV labels to the exact catalog product. These mappings apply to imported sales in forecasts; they do not rename products.</p>
+            </div>
+            <form onSubmit={saveProductAlias} className="grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
+              <input aria-label="Alternate CSV product name" value={aliasName} onChange={(event) => setAliasName(event.target.value)} maxLength={191} required placeholder="e.g. Choco Cake" className="h-10 rounded-lg border border-black/15 px-3 text-sm" />
+              <select aria-label="Catalog product for alias" value={aliasProductId} onChange={(event) => setAliasProductId(event.target.value)} required className="h-10 rounded-lg border border-black/15 px-3 text-sm">
+                {aliasProducts.map((product) => <option key={product.id} value={product.id}>{product.name}</option>)}
+              </select>
+              <button type="submit" disabled={savingAlias || !aliasProducts.length} className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-[#33251e] px-4 text-xs font-semibold text-white disabled:opacity-50"><Plus size={14} />{savingAlias ? "Saving..." : "Add mapping"}</button>
+            </form>
+            {aliasError && <p role="alert" className="mt-2 rounded-md bg-[#fff4cd] px-3 py-2 text-xs text-[#33251e]">{aliasError}</p>}
+            {aliases.length > 0 && <ul className="mt-3 divide-y divide-black/5 rounded-lg border border-black/10">
+              {aliases.map((alias) => <li key={alias.id} className="flex items-center justify-between gap-3 px-3 py-2 text-xs"><span><strong>{alias.alias_name}</strong><span className="mx-2 text-black/40">→</span>{alias.product_name}</span><button type="button" onClick={() => removeProductAlias(alias.id)} aria-label={`Remove alias ${alias.alias_name}`} className="rounded p-1 text-black/50 hover:bg-black/5 hover:text-black"><Trash2 size={14} /></button></li>)}
+            </ul>}
           </div>
 
           <div className="mb-6 rounded-[24px] border border-black/10 bg-white p-5 shadow-sm">
@@ -695,7 +872,19 @@ export default function PredictiveAnalytics() {
 
           <div className="mb-6 grid gap-4 xl:grid-cols-2">
             <div className="rounded-[24px] border border-black/10 bg-white p-5 shadow-sm"><p className="text-[11px] font-semibold uppercase tracking-[0.25em] text-black/50">Forecast Drivers</p><h2 className="mb-3 text-lg font-semibold text-black">Factors used by this model</h2><div className="flex flex-wrap gap-2">{(forecast.drivers || []).map((driver) => <span key={driver} className="rounded-full bg-[#f7f2e8] px-3 py-2 text-xs text-black/70">{driver}</span>)}</div></div>
-            <div className="rounded-[24px] border border-black/10 bg-white p-5 shadow-sm"><p className="text-[11px] font-semibold uppercase tracking-[0.25em] text-black/50">Forecast Model Performance</p><h2 className="mb-3 text-lg font-semibold text-black">Validation metrics</h2><div className="grid grid-cols-2 gap-3 text-sm"><p>Model: <b>{forecast.model?.name || "—"}</b></p><p>Records: <b>{forecast.model?.records || 0}</b></p><p>MAE: <b>{forecast.model?.mae == null ? "Not available" : forecast.model.mae}</b></p><p>RMSE: <b>{forecast.model?.rmse == null ? "Not available" : forecast.model.rmse}</b></p><p>MAPE: <b>{forecast.model?.mape == null ? "Not available" : `${forecast.model.mape}%`}</b></p><p>Validation: <b>{forecast.model?.validation_records || 0} rows</b></p></div></div>
+            <div className="rounded-[24px] border border-black/10 bg-white p-5 shadow-sm">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.25em] text-black/50">Forecast Model Performance</p>
+              <h2 className="mb-3 text-lg font-semibold text-black">Validation metrics</h2>
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <p>Model: <b>{forecast.model?.name || "—"}</b></p>
+                <p>Records: <b>{forecast.model?.records || 0}</b></p>
+                <p>MAE: <b>{forecast.model?.mae == null ? "Not available" : forecast.model.mae}</b></p>
+                <p>RMSE: <b>{forecast.model?.rmse == null ? "Not available" : forecast.model.rmse}</b></p>
+                <p>MAPE: <b>{forecast.model?.mape == null ? "Not available" : `${forecast.model.mape}%`}</b></p>
+                <p>Validation: <b>{forecast.model?.validation_records || 0} days</b></p>
+              </div>
+              <ValidationMetricsChart metrics={forecast.model?.validation_metrics} />
+            </div>
           </div>
 
           <div className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">

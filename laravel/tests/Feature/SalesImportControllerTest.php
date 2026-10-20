@@ -21,6 +21,7 @@ class SalesImportControllerTest extends TestCase
         parent::setUp();
 
         Schema::dropIfExists('analytics_sales_history');
+        Schema::dropIfExists('analytics_product_aliases');
         Schema::dropIfExists('analytics_imports');
         Schema::dropIfExists('jobs');
         Schema::dropIfExists('failed_jobs');
@@ -44,6 +45,7 @@ class SalesImportControllerTest extends TestCase
             $table->string('file_name');
             $table->string('source_name')->default('POS Export');
             $table->string('sales_type', 30)->default('other');
+            $table->string('overlap_mode', 30)->default('deduplicate_live');
             $table->dateTime('uploaded_at');
             $table->string('status')->default('completed');
             $table->integer('rows_received')->default(0);
@@ -98,6 +100,13 @@ class SalesImportControllerTest extends TestCase
             $table->id();
             $table->string('name');
             $table->string('category');
+        });
+        Schema::create('analytics_product_aliases', function (Blueprint $table) {
+            $table->id();
+            $table->string('alias_name', 191);
+            $table->string('normalized_alias', 191)->unique();
+            $table->unsignedBigInteger('product_id');
+            $table->timestamps();
         });
     }
 
@@ -215,7 +224,7 @@ class SalesImportControllerTest extends TestCase
         $response = app(SalesImportController::class)->storeCsv(Request::create(
             '/api/sales/import-csv',
             'POST',
-            ['sales_type' => 'customized_cake'],
+            ['sales_type' => 'customized_cake', 'overlap_mode' => 'supplement'],
             [],
             ['file' => UploadedFile::fake()->createWithContent('history.csv', $contents)],
             ['HTTP_ACCEPT' => 'application/json'],
@@ -224,11 +233,11 @@ class SalesImportControllerTest extends TestCase
         $this->assertSame('queued', $response->getData(true)['status']);
 
         Queue::assertPushed(ProcessSalesCsvImport::class, 1);
-        $this->assertDatabaseHas('analytics_imports', ['file_name' => 'history.csv', 'sales_type' => 'customized_cake']);
+        $this->assertDatabaseHas('analytics_imports', ['file_name' => 'history.csv', 'sales_type' => 'customized_cake', 'overlap_mode' => 'supplement']);
         $duplicate = app(SalesImportController::class)->storeCsv(Request::create(
             '/api/sales/import-csv',
             'POST',
-            ['sales_type' => 'customized_cake'],
+            ['sales_type' => 'customized_cake', 'overlap_mode' => 'supplement'],
             [],
             ['file' => UploadedFile::fake()->createWithContent('history.csv', $contents)],
             ['HTTP_ACCEPT' => 'application/json'],
@@ -250,6 +259,33 @@ class SalesImportControllerTest extends TestCase
 
         $this->assertDatabaseCount('analytics_imports', 2);
         Queue::assertPushed(ProcessSalesCsvImport::class, 2);
+    }
+
+    public function test_admin_can_map_and_remove_case_insensitive_product_aliases(): void
+    {
+        $admin = User::factory()->createOne(['role' => 'admin']);
+        $productId = DB::table('products')->insertGetId(['name' => 'Chocolate Ganache Cake', 'category' => 'Cake']);
+
+        $created = $this->actingAs($admin)->postJson('/api/admin/sales/product-aliases', [
+            'alias_name' => '  Choco   Cake ',
+            'product_id' => $productId,
+        ])->assertCreated();
+        $created->assertJsonPath('alias.alias_name', 'Choco Cake')
+            ->assertJsonPath('alias.product_name', 'Chocolate Ganache Cake');
+
+        $this->getJson('/api/admin/sales/product-aliases')
+            ->assertOk()
+            ->assertJsonPath('aliases.0.alias_name', 'Choco Cake')
+            ->assertJsonPath('aliases.0.product_id', $productId);
+
+        $this->postJson('/api/admin/sales/product-aliases', [
+            'alias_name' => 'CHOCO CAKE',
+            'product_id' => $productId,
+        ])->assertUnprocessable();
+
+        $this->deleteJson('/api/admin/sales/product-aliases/' . $created->json('alias.id'))
+            ->assertOk()
+            ->assertJsonPath('success', true);
     }
 
     public function test_direct_csv_upload_persists_the_database_queue_job_id_and_processes_normally(): void
@@ -312,7 +348,7 @@ class SalesImportControllerTest extends TestCase
         $request = Request::create(
             '/api/sales/import-csv',
             'POST',
-            ['sales_type' => 'customized_cake'],
+            ['sales_type' => 'customized_cake', 'overlap_mode' => 'supplement'],
             [],
             ['file' => UploadedFile::fake()->createWithContent('history.csv', $contents)],
             ['HTTP_ACCEPT' => 'application/json'],
@@ -323,7 +359,12 @@ class SalesImportControllerTest extends TestCase
         $this->assertSame('queued', $response->getData(true)['status']);
         $this->assertSame($importId, $response->getData(true)['import_id']);
 
-        $this->assertDatabaseHas('analytics_imports', ['id' => $importId, 'sales_type' => 'customized_cake', 'status' => 'queued']);
+        $this->assertDatabaseHas('analytics_imports', [
+            'id' => $importId,
+            'sales_type' => 'customized_cake',
+            'overlap_mode' => 'supplement',
+            'status' => 'queued',
+        ]);
         $this->assertDatabaseCount('analytics_sales_history', 1);
         Queue::assertPushed(ProcessSalesCsvImport::class, 1);
 
@@ -332,6 +373,30 @@ class SalesImportControllerTest extends TestCase
         $this->assertDatabaseHas('analytics_imports', ['id' => $importId, 'status' => 'completed', 'sales_type' => 'customized_cake']);
         $this->assertDatabaseCount('analytics_sales_history', 1);
         $this->assertDatabaseHas('analytics_sales_history', ['import_id' => $importId, 'revenue' => 500]);
+    }
+
+    public function test_predictive_import_options_migration_adds_defaults_and_aliases(): void
+    {
+        Schema::dropIfExists('analytics_product_aliases');
+        Schema::table('analytics_imports', function (Blueprint $table) {
+            $table->dropColumn('overlap_mode');
+        });
+
+        $migration = require database_path('migrations/2026_10_20_000002_add_predictive_import_options.php');
+        $migration->up();
+
+        $this->assertTrue(Schema::hasColumn('analytics_imports', 'overlap_mode'));
+        $this->assertTrue(Schema::hasTable('analytics_product_aliases'));
+        DB::table('analytics_imports')->insert([
+            'file_name' => 'default-overlap.csv',
+            'source_name' => 'POS CSV',
+            'uploaded_at' => now(),
+            'status' => 'completed',
+        ]);
+        $this->assertDatabaseHas('analytics_imports', [
+            'file_name' => 'default-overlap.csv',
+            'overlap_mode' => 'deduplicate_live',
+        ]);
     }
 
     public function test_failed_exact_csv_import_can_be_retried_without_creating_another_import(): void

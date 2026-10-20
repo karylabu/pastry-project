@@ -119,6 +119,7 @@ export default function SalesImportDropzone({
   const [isDragging, setIsDragging] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [salesType, setSalesType] = useState('other');
+  const [overlapMode, setOverlapMode] = useState('deduplicate_live');
   const [toast, setToast] = useState(null); // { type: 'success' | 'error', message }
   const inputRef = useRef(null);
   const salesTypeRef = useRef('other');
@@ -139,6 +140,7 @@ export default function SalesImportDropzone({
         const formData = new FormData();
         formData.append('file', file);
         formData.append('sales_type', salesTypeRef.current);
+        formData.append('overlap_mode', overlapMode);
         if (retryFailed) formData.append('retry_failed', '1');
         const response = await fetch(`${LARAVEL_BASE}/api/sales/import-csv`, {
           method: 'POST',
@@ -202,7 +204,7 @@ export default function SalesImportDropzone({
       setIsProcessing(false);
       showToast('error', error.message || 'Unable to import the CSV.');
     }
-  }, [onImportComplete, showToast]);
+  }, [onImportComplete, overlapMode, showToast]);
 
   const handlePdfFile = useCallback(async (file) => {
     try {
@@ -271,6 +273,13 @@ export default function SalesImportDropzone({
     return (
       <div className="admin-sales-import-buttons flex flex-wrap gap-2">
         <input ref={inputRef} type="file" accept=".csv,.pdf" className="hidden" onChange={onInputChange} />
+        <label className="flex h-10 basis-full items-center gap-2 rounded-md border border-black/15 bg-white px-3 text-[10px] font-semibold text-black/70">
+          CSV overlap handling
+          <select aria-label="CSV overlap handling" value={overlapMode} onChange={(event) => setOverlapMode(event.target.value)} className="min-w-0 flex-1 bg-transparent text-[10px] outline-none">
+            <option value="deduplicate_live">Skip rows overlapping live orders</option>
+            <option value="supplement">Add as additional sales (e.g. walk-ins)</option>
+          </select>
+        </label>
         <button type="button" onClick={() => { chooseSalesType('customized_cake'); inputRef.current?.click(); }} disabled={isProcessing} className="inline-flex h-10 min-w-[150px] flex-1 items-center justify-center gap-2 rounded-md bg-black px-3 text-[11px] font-semibold text-white transition hover:bg-black/85 disabled:cursor-wait disabled:opacity-60">
           {isProcessing ? <Loader2 size={14} className="animate-spin" /> : <UploadCloud size={14} />}
           {isProcessing ? 'Importing report...' : 'Import Customized Cake Sales'}
@@ -327,6 +336,13 @@ export default function SalesImportDropzone({
           </button>
         ))}
       </div>
+      <label className="mb-3 flex max-w-xl flex-wrap items-center gap-2 rounded-md border border-black/10 bg-[#fafaf8] px-3 py-2 text-[11px] font-semibold text-black/70">
+        CSV overlap handling
+        <select aria-label="CSV overlap handling" value={overlapMode} onChange={(event) => setOverlapMode(event.target.value)} className="min-w-0 flex-1 bg-transparent text-[11px] outline-none">
+          <option value="deduplicate_live">Skip rows overlapping live orders</option>
+          <option value="supplement">Add as additional sales (e.g. walk-ins)</option>
+        </select>
+      </label>
 
       <div
         onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}

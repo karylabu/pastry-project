@@ -79,6 +79,9 @@ Route::post('orders/{orderId}/payment-failure', [OrderController::class, 'markPa
 Route::post('sales/import-pdf', [SalesImportController::class, 'store']);
 Route::post('sales/import-csv', [SalesImportController::class, 'storeCsv']);
 Route::post('sales/import', [SalesImportController::class, 'storeRows']);
+Route::get('admin/sales/product-aliases', [SalesImportController::class, 'productAliases']);
+Route::post('admin/sales/product-aliases', [SalesImportController::class, 'storeProductAlias']);
+Route::delete('admin/sales/product-aliases/{aliasId}', [SalesImportController::class, 'deleteProductAlias'])->whereNumber('aliasId');
 Route::get('sales/import/history', [SalesImportController::class, 'history']);
 Route::delete('sales/import/{importId}', [SalesImportController::class, 'deleteImport'])->whereNumber('importId');
 Route::get('sales/import/{importId}/status', [SalesImportController::class, 'importStatus'])->whereNumber('importId');

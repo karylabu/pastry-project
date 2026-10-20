@@ -49,6 +49,80 @@ class SalesImportController extends Controller
     private const MAX_CSV_KB = 50 * 1024; // 50MB
     private const HISTORY_PAGE_SIZE = 50;
 
+    public function productAliases(Request $request)
+    {
+        $user = $this->requireRole($request, 'admin');
+        if (!$user instanceof User) {
+            return $user;
+        }
+
+        return response()->json([
+            'success' => true,
+            'products' => DB::table('products')->orderBy('name')->get(['id', 'name']),
+            'aliases' => DB::table('analytics_product_aliases as aliases')
+                ->join('products', 'products.id', '=', 'aliases.product_id')
+                ->orderBy('aliases.alias_name')
+                ->get(['aliases.id', 'aliases.alias_name', 'aliases.product_id', 'products.name as product_name']),
+        ]);
+    }
+
+    public function storeProductAlias(Request $request)
+    {
+        $user = $this->requireRole($request, 'admin');
+        if (!$user instanceof User) {
+            return $user;
+        }
+
+        $validated = $request->validate([
+            'alias_name' => ['required', 'string', 'max:191'],
+            'product_id' => ['required', 'integer', 'exists:products,id'],
+        ]);
+        $aliasName = trim(preg_replace('/\s+/', ' ', $validated['alias_name']));
+        $normalizedAlias = mb_strtolower($aliasName, 'UTF-8');
+        if (DB::table('products')->whereRaw('LOWER(name) = ?', [$normalizedAlias])->exists()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'That name already matches a catalog product; no alias is needed.',
+            ], 422);
+        }
+        if (DB::table('analytics_product_aliases')->where('normalized_alias', $normalizedAlias)->exists()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'That CSV name is already mapped. Remove the existing mapping before adding another.',
+            ], 422);
+        }
+
+        $aliasId = DB::table('analytics_product_aliases')->insertGetId([
+            'alias_name' => $aliasName,
+            'normalized_alias' => $normalizedAlias,
+            'product_id' => (int) $validated['product_id'],
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'alias' => DB::table('analytics_product_aliases as aliases')
+                ->join('products', 'products.id', '=', 'aliases.product_id')
+                ->where('aliases.id', $aliasId)
+                ->first(['aliases.id', 'aliases.alias_name', 'aliases.product_id', 'products.name as product_name']),
+        ], 201);
+    }
+
+    public function deleteProductAlias(Request $request, int $aliasId)
+    {
+        $user = $this->requireRole($request, 'admin');
+        if (!$user instanceof User) {
+            return $user;
+        }
+
+        if (!DB::table('analytics_product_aliases')->where('id', $aliasId)->delete()) {
+            return response()->json(['success' => false, 'message' => 'Product alias not found.'], 404);
+        }
+
+        return response()->json(['success' => true]);
+    }
+
     public function storeCsv(Request $request)
     {
         $user = $this->requireRole($request, 'admin');
@@ -61,6 +135,7 @@ class SalesImportController extends Controller
                 'file' => ['required', 'file', 'mimes:csv,txt', 'max:' . self::MAX_CSV_KB],
                 'retry_failed' => ['nullable', 'boolean'],
                 'sales_type' => ['nullable', 'in:customized_cake,finished_product,other'],
+                'overlap_mode' => ['nullable', 'in:deduplicate_live,supplement'],
             ]);
         } catch (ValidationException $e) {
             return response()->json([
@@ -77,11 +152,17 @@ class SalesImportController extends Controller
 
         $existing = DB::table('analytics_imports')->where('source_hash', $sourceHash)->first();
         $salesType = (string) $request->input('sales_type', 'other');
+        $overlapMode = (string) $request->input('overlap_mode', 'deduplicate_live');
         $retryImportId = null;
         if ($existing) {
             if ($existing->status === 'failed' && $request->boolean('retry_failed')) {
                 $retryImportId = (int) $existing->id;
-            } elseif ($existing->status === 'completed' && $existing->sales_type !== $salesType) {
+            } elseif (
+                $existing->status === 'completed'
+                && ($existing->sales_type !== $salesType
+                    || (Schema::hasColumn('analytics_imports', 'overlap_mode')
+                        && ($existing->overlap_mode ?? 'deduplicate_live') !== $overlapMode))
+            ) {
                 $retryImportId = (int) $existing->id;
             } else {
                 return response()->json([
@@ -102,7 +183,7 @@ class SalesImportController extends Controller
         }
 
         try {
-            $importId = DB::transaction(function () use ($retryImportId, $file, $salesType, $sourceHash, $storedPath): ?int {
+            $importId = DB::transaction(function () use ($retryImportId, $file, $salesType, $overlapMode, $sourceHash, $storedPath): ?int {
                 if ($retryImportId !== null) {
                     $import = DB::table('analytics_imports')
                         ->where('id', $retryImportId)
@@ -122,6 +203,7 @@ class SalesImportController extends Controller
                             'error_message' => null,
                             'uploaded_at' => now(),
                             'sales_type' => $salesType,
+                            ...(Schema::hasColumn('analytics_imports', 'overlap_mode') ? ['overlap_mode' => $overlapMode] : []),
                             'stored_path' => $storedPath,
                             'queue_job_id' => null,
                         ]);
@@ -131,6 +213,7 @@ class SalesImportController extends Controller
                         'file_name' => basename($file->getClientOriginalName()),
                         'source_name' => 'POS CSV',
                         'sales_type' => $salesType,
+                        ...(Schema::hasColumn('analytics_imports', 'overlap_mode') ? ['overlap_mode' => $overlapMode] : []),
                         'uploaded_at' => now(),
                         'status' => 'queued',
                         'rows_received' => 0,
