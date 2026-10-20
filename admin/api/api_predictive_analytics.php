@@ -532,6 +532,7 @@ function buildDetailedForecastPayload(array $history, array $products, array $in
     foreach ($products as $product) $productByName[strtolower($product['name'])] = $product;
 
     $forecastProducts = [];
+    $previousEquivalentTotal = 0;
     $emptyMetrics = ['absolute' => [], 'squared' => [], 'percentage' => [], 'actual' => []];
     $validation = [
         'linear' => $emptyMetrics,
@@ -621,6 +622,7 @@ function buildDetailedForecastPayload(array $history, array $products, array $in
         $catalogue = $productByName[strtolower($productName)] ?? ['name' => $productName, 'category' => 'Unknown', 'stock' => 0, 'minimum_stock' => 0];
         $totalForecast = round(array_sum($forecastSeries), 2);
         $previousEquivalent = count($values) >= $period * 2 ? array_sum(array_slice($values, -$period * 2, $period)) : 0;
+        $previousEquivalentTotal += $previousEquivalent;
         $recipe = $recipes[strtolower($productName)] ?? [];
         $ingredientRows = [];
         foreach ($recipe as $ingredient) {
@@ -665,9 +667,9 @@ function buildDetailedForecastPayload(array $history, array $products, array $in
     $validationMetrics = array_map('summarizeValidationMetrics', $validation);
     $linearMetrics = $validationMetrics['linear'];
     $totalForecast = array_sum(array_column($forecastProducts, 'totalForecast'));
-    $previousTotal = 0;
-    foreach ($forecastProducts as $product) if ($product['trendPercent'] !== null) $previousTotal += $product['totalForecast'] / (1 + ($product['trendPercent'] / 100));
-    $trendPercent = $previousTotal > 0 ? round((($totalForecast - $previousTotal) / $previousTotal) * 100, 2) : null;
+    $trendPercent = $previousEquivalentTotal > 0
+        ? round((($totalForecast - $previousEquivalentTotal) / $previousEquivalentTotal) * 100, 2)
+        : null;
 
     // How stale the data is: forecast day 1 is the day after the last day with data.
     $dataAgeDays = max(0, (int) $historicalEnd->diff($today)->format('%r%a'));

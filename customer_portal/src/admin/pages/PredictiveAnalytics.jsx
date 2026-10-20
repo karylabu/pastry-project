@@ -694,7 +694,7 @@ export default function PredictiveAnalytics() {
               <p className="mt-1 text-xs text-black/55">Seven most recent days held out chronologically. Lower WAPE is better; baselines are reference comparisons.</p>
               <div className="mt-3 overflow-x-auto">
                 <table className="w-full min-w-[560px] text-left text-xs">
-                  <thead><tr className="border-b border-black/10 text-[10px] uppercase tracking-wider text-black/50"><th className="py-2 pr-3">Method</th><th className="py-2 pr-3">WAPE</th><th className="py-2 pr-3">MAE</th><th className="py-2 pr-3">RMSE</th><th className="py-2">Days</th></tr></thead>
+                  <thead><tr className="border-b border-black/10 text-[10px] uppercase tracking-wider text-black/50"><th className="py-2 pr-3">Method</th><th className="py-2 pr-3">WAPE</th><th className="py-2 pr-3">MAE</th><th className="py-2 pr-3">RMSE</th><th className="py-2">Observations</th></tr></thead>
                   <tbody>
                     {[
                       ["Linear trend", "linear"],
@@ -881,7 +881,7 @@ export default function PredictiveAnalytics() {
                 <p>MAE: <b>{forecast.model?.mae == null ? "Not available" : forecast.model.mae}</b></p>
                 <p>RMSE: <b>{forecast.model?.rmse == null ? "Not available" : forecast.model.rmse}</b></p>
                 <p>MAPE: <b>{forecast.model?.mape == null ? "Not available" : `${forecast.model.mape}%`}</b></p>
-                <p>Validation: <b>{forecast.model?.validation_records || 0} days</b></p>
+                <p>Validation observations: <b>{forecast.model?.validation_records || 0}</b></p>
               </div>
               <ValidationMetricsChart metrics={forecast.model?.validation_metrics} />
             </div>
