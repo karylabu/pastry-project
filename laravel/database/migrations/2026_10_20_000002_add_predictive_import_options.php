@@ -19,7 +19,7 @@ return new class extends Migration
                 $table->id();
                 $table->string('alias_name', 191);
                 $table->string('normalized_alias', 191)->unique();
-                $table->unsignedBigInteger('product_id');
+                $table->integer('product_id');
                 $table->timestamps();
                 $table->foreign('product_id')->references('id')->on('products')->cascadeOnDelete();
             });
