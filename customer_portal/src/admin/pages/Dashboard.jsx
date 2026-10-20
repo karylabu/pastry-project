@@ -96,35 +96,37 @@ function OrderStatusBreakdown({ rows }) {
 }
 
 function TopSellingTable({ rows }) {
+  // Grid-based rows so they stretch to fill the card height (no empty gap under the list).
+  const cols = "grid grid-cols-[28px_minmax(0,1fr)_84px_56px_96px] items-center gap-x-1 px-2.5";
   return (
-    <div className="overflow-x-auto p-3">
-      <table className="w-full min-w-[440px] border-collapse text-left">
-        <thead>
-          <tr className="bg-[#fbf7f2] text-[9px] uppercase tracking-[0.13em] text-[#9b8c83]">
-            <th className="px-2.5 py-2 font-semibold">#</th>
-            <th className="px-2.5 py-2 font-semibold">Cake Name</th>
-            <th className="px-2.5 py-2 font-semibold">Category</th>
-            <th className="px-2.5 py-2 text-right font-semibold">Sold</th>
-            <th className="px-2.5 py-2 text-right font-semibold">Revenue</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.length ? rows.map((item, index) => (
-            <tr key={item.name} className="border-b border-[#f2ebe5] last:border-0 hover:bg-[#fffaf0]">
-              <td className="px-2.5 py-2 text-[10px] text-[#9b8c83]">{index + 1}</td>
-              <td className="px-2.5 py-2">
+    <div className="flex flex-1 flex-col overflow-x-auto p-3">
+      <div className="flex min-h-0 min-w-[460px] flex-1 flex-col">
+        <div className={`${cols} rounded-md bg-[#fbf7f2] py-2 text-[9px] font-semibold uppercase tracking-[0.13em] text-[#9b8c83]`}>
+          <span>#</span>
+          <span>Cake Name</span>
+          <span>Category</span>
+          <span className="text-right">Sold</span>
+          <span className="text-right">Revenue</span>
+        </div>
+        {rows.length ? (
+          <div className="flex min-h-0 flex-1 flex-col">
+            {rows.map((item, index) => (
+              <div key={item.name} className={`${cols} min-h-[48px] flex-1 border-b border-[#f2ebe5] py-2 last:border-0 hover:bg-[#fffaf0]`}>
+                <span className="text-[10px] text-[#9b8c83]">{index + 1}</span>
                 <div className="flex min-w-0 items-center gap-2">
-                  {item.image ? <img src={`${ROOT_BASE}/uploads/${item.image}`} alt="" className="h-7 w-7 shrink-0 rounded-md bg-[#f5eee5] object-cover" /> : <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-[#fff4cd] text-[#a57c38]"><CakeSlice size={14} /></span>}
+                  {item.image ? <img src={`${ROOT_BASE}/uploads/${item.image}`} alt="" className="h-8 w-8 shrink-0 rounded-md bg-[#f5eee5] object-cover" /> : <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-[#fff4cd] text-[#a57c38]"><CakeSlice size={14} /></span>}
                   <span className="truncate text-[11px] font-medium text-[#4b3930]">{item.name}</span>
                 </div>
-              </td>
-              <td className="px-2.5 py-2"><span className="rounded-full bg-[#fff4cd] px-2 py-1 text-[9px] text-[#80600a]">{item.category || "Cake"}</span></td>
-              <td className="px-2.5 py-2 text-right text-[10px] font-semibold text-[#4b3930]">{item.qty}</td>
-              <td className="px-2.5 py-2 text-right text-[10px] font-semibold text-[#4b3930]">₱{Number(item.revenue || 0).toLocaleString()}</td>
-            </tr>
-          )) : <tr><td colSpan={5} className="px-4 py-4 text-center text-[11px] text-[#9b8c83]">No sales data yet.</td></tr>}
-        </tbody>
-      </table>
+                <span className="justify-self-start rounded-full bg-[#fff4cd] px-2 py-1 text-[9px] text-[#80600a]">{item.category || "Cake"}</span>
+                <span className="text-right text-[10px] font-semibold text-[#4b3930]">{item.qty}</span>
+                <span className="text-right text-[10px] font-semibold text-[#4b3930]">₱{Number(item.revenue || 0).toLocaleString()}</span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="flex flex-1 items-center justify-center px-4 py-4 text-center text-[11px] text-[#9b8c83]">No sales data yet.</div>
+        )}
+      </div>
     </div>
   );
 }
