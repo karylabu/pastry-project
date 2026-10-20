@@ -1050,8 +1050,8 @@ export default function PredictiveAnalytics() {
             </Card>
           </div>
 
-          {/* Row 4: drivers + validation metrics */}
-          <div className="mb-6 grid items-start gap-4 xl:grid-cols-2">
+          {/* Keep these cards in one column so the shorter drivers card does not leave a grid-sized gap. */}
+          <div className="mb-6 grid gap-4">
             <Card eyebrow="Forecast Drivers" title="Factors used by this model" stretch={false}>
               <div className="flex flex-wrap gap-2">
                 {(forecast.drivers || []).map((driver) => (
