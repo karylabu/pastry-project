@@ -19,9 +19,9 @@ import { getAuthHeaders } from "../../services/api";
 // stretching behaviour are identical across rows.
 // ---------------------------------------------------------------------------
 
-function Card({ eyebrow, title, action, children, className = "" }) {
+function Card({ eyebrow, title, action, children, className = "", stretch = true }) {
   return (
-    <section className={`flex h-full min-w-0 flex-col rounded-[24px] border border-black/10 bg-white p-5 shadow-sm ${className}`}>
+    <section className={`flex ${stretch ? "h-full" : "h-fit"} min-w-0 flex-col rounded-[24px] border border-black/10 bg-white p-5 shadow-sm ${className}`}>
       <header className="mb-4 flex min-h-[52px] items-start justify-between gap-3">
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-[0.25em] text-black/50">{eyebrow}</p>
@@ -1051,8 +1051,8 @@ export default function PredictiveAnalytics() {
           </div>
 
           {/* Row 4: drivers + validation metrics */}
-          <div className="mb-6 grid items-stretch gap-4 xl:grid-cols-2">
-            <Card eyebrow="Forecast Drivers" title="Factors used by this model">
+          <div className="mb-6 grid items-start gap-4 xl:grid-cols-2">
+            <Card eyebrow="Forecast Drivers" title="Factors used by this model" stretch={false}>
               <div className="flex flex-wrap gap-2">
                 {(forecast.drivers || []).map((driver) => (
                   <span key={driver} className="rounded-full bg-[#f7f2e8] px-3 py-2 text-xs text-black/70">{driver}</span>
