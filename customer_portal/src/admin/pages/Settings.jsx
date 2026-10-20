@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Bell, Building2, Check, Clock3, Eye, EyeOff, KeyRound, LogOut, Save, UserCircle2 } from "lucide-react";
 import { LARAVEL_BASE } from "../../services/config";
 import { getAuthHeaders } from "../../services/api";
 
-const STORAGE_KEY = "admin_settings";
 const defaultPreferences = {
   shopName: "Pastry Project",
   shopEmail: "",
@@ -42,7 +42,7 @@ function Section({ icon: Icon, eyebrow, title, children, className = "" }) {
   );
 }
 
-function Field({ label, value, onChange, type = "text", placeholder = "" }) {
+function Field({ label, value, onChange, type = "text", placeholder = "", min, max, step }) {
   const [showPassword, setShowPassword] = useState(false);
   const isPassword = type === "password";
 
@@ -50,7 +50,7 @@ function Field({ label, value, onChange, type = "text", placeholder = "" }) {
     <label className="block">
       <span className="text-[10px] font-semibold text-[#65574d]">{label}</span>
       <span className="mt-1.5 flex h-10 w-full items-center rounded-md border border-[#e8dfd4] bg-white transition focus-within:border-[#b89646] focus-within:ring-2 focus-within:ring-[#d4af37]/15">
-        <input type={isPassword && showPassword ? "text" : type} value={value} onChange={onChange} placeholder={placeholder} className={`${isPassword ? "admin-password-input" : ""} h-full min-w-0 flex-1 rounded-md bg-transparent px-3 text-[12px] text-[#33251e] outline-none placeholder:text-[#a99a8e]`} />
+        <input type={isPassword && showPassword ? "text" : type} value={value} onChange={onChange} placeholder={placeholder} min={min} max={max} step={step} className={`${isPassword ? "admin-password-input" : ""} h-full min-w-0 flex-1 rounded-md bg-transparent px-3 text-[12px] text-[#33251e] outline-none placeholder:text-[#a99a8e]`} />
         {isPassword && (
           <button type="button" onClick={() => setShowPassword((visible) => !visible)} className="mr-3 text-[#8f8076] transition hover:text-[#33251e]" aria-label={`${showPassword ? "Hide" : "Show"} ${label.toLowerCase()}`}>
             {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
@@ -72,24 +72,101 @@ function Toggle({ label, description, checked, onChange }) {
 }
 
 export default function Settings() {
+  const navigate = useNavigate();
   const [user, setUser] = useState(() => getUser());
-  const [preferences, setPreferences] = useState(() => {
-    try { return { ...defaultPreferences, ...JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}")} } catch { return defaultPreferences; }
-  });
+  const [preferences, setPreferences] = useState(defaultPreferences);
   const [profile, setProfile] = useState({ full_name: "", email: "", phone: "" });
   const [password, setPassword] = useState({ current_password: "", new_password: "", confirm_password: "" });
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
   const [savingProfile, setSavingProfile] = useState(false);
   const [savingPassword, setSavingPassword] = useState(false);
+  const [settingsLoading, setSettingsLoading] = useState(true);
+  const [settingsLoaded, setSettingsLoaded] = useState(false);
+  const [savingPreferences, setSavingPreferences] = useState(false);
   const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
 
   useEffect(() => {
     if (user) setProfile({ full_name: user.name || "", email: user.email || "", phone: user.phone || "" });
   }, [user]);
 
+  useEffect(() => {
+    let active = true;
+    const loadSettings = async () => {
+      setSettingsLoading(true);
+      try {
+        const response = await fetch(`${LARAVEL_BASE}/api/admin/settings`, {
+          credentials: "include",
+          headers: { Accept: "application/json", ...getAuthHeaders() },
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok || !data.success) throw new Error(data.message || "Unable to load settings.");
+        if (active) {
+          setPreferences({
+            ...defaultPreferences,
+            ...data.settings,
+            ...data.notification_preferences,
+          });
+          setSettingsLoaded(true);
+          setError("");
+        }
+      } catch (loadError) {
+        if (active) setError(loadError.message);
+      } finally {
+        if (active) setSettingsLoading(false);
+      }
+    };
+
+    loadSettings();
+    return () => { active = false; };
+  }, []);
+
   const updatePreference = (key, value) => setPreferences((current) => ({ ...current, [key]: value }));
-  const savePreferences = () => { localStorage.setItem(STORAGE_KEY, JSON.stringify(preferences)); setNotice("Settings saved successfully."); setError(""); };
+  const savePreferences = async () => {
+    setSavingPreferences(true);
+    setError("");
+    setNotice("");
+    try {
+      const response = await fetch(`${LARAVEL_BASE}/api/admin/settings`, {
+        method: "PUT",
+        credentials: "include",
+        headers: { "Content-Type": "application/json", Accept: "application/json", ...getAuthHeaders() },
+        body: JSON.stringify({
+          settings: {
+            shopName: preferences.shopName,
+            shopEmail: preferences.shopEmail,
+            shopPhone: preferences.shopPhone,
+            shopAddress: preferences.shopAddress,
+            openingHours: preferences.openingHours,
+            minimumOrder: preferences.minimumOrder,
+            preparationTime: preferences.preparationTime,
+            lowStockThreshold: preferences.lowStockThreshold,
+          },
+          notification_preferences: {
+            orderAlerts: preferences.orderAlerts,
+            lowStockAlerts: preferences.lowStockAlerts,
+            messageAlerts: preferences.messageAlerts,
+            promotionAlerts: preferences.promotionAlerts,
+          },
+        }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !data.success) throw new Error(data.message || "Unable to save settings.");
+      setPreferences({
+        ...defaultPreferences,
+        ...data.settings,
+        ...data.notification_preferences,
+      });
+      window.dispatchEvent(new CustomEvent("admin-settings-updated", {
+        detail: { notificationPreferences: data.notification_preferences },
+      }));
+      setNotice("Settings saved successfully.");
+    } catch (saveError) {
+      setError(saveError.message);
+    } finally {
+      setSavingPreferences(false);
+    }
+  };
 
   const saveProfile = async (event) => {
     event.preventDefault();
@@ -120,9 +197,15 @@ export default function Settings() {
   };
 
   const confirmLogout = () => {
-    localStorage.removeItem("user");
-    localStorage.removeItem("auth_token");
-    window.location.href = "/admin/login";
+    const token = getUser()?.token || "";
+    fetch(`${LARAVEL_BASE}/staff/logout.php`, {
+      credentials: "include",
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    }).catch((logoutError) => console.warn("Logout request failed:", logoutError)).finally(() => {
+      localStorage.removeItem("user");
+      localStorage.removeItem("auth_token");
+      navigate("/admin/login", { replace: true });
+    });
   };
 
   return (
@@ -142,7 +225,7 @@ export default function Settings() {
                 <span className="text-[#8f8076]">· {user?.role || "admin"}</span>
               </div>
               <button type="button" onClick={() => setLogoutConfirmOpen(true)} className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-[#efd8d4] px-3 text-[11px] font-semibold text-[#8d5357] transition hover:bg-[#fff0f0]"><LogOut size={14} /> Log out</button>
-              <button type="button" onClick={savePreferences} className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-[#33251e] px-4 text-[12px] font-semibold text-white transition hover:bg-[#5b4540]"><Save size={15} /> Save settings</button>
+              <button type="button" onClick={savePreferences} disabled={settingsLoading || !settingsLoaded || savingPreferences} className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-[#33251e] px-4 text-[12px] font-semibold text-white transition hover:bg-[#5b4540] disabled:cursor-not-allowed disabled:opacity-60"><Save size={15} /> {settingsLoading ? "Loading settings..." : savingPreferences ? "Saving..." : settingsLoaded ? "Save settings" : "Settings unavailable"}</button>
             </div>
           </div>
 
@@ -179,7 +262,7 @@ export default function Settings() {
                   <Field label="Phone number" value={preferences.shopPhone} onChange={(e) => updatePreference("shopPhone", e.target.value)} />
                 </div>
                 <Field label="Address" value={preferences.shopAddress} onChange={(e) => updatePreference("shopAddress", e.target.value)} />
-                <Field label="Opening hours" value={preferences.openingHours} onChange={(e) => updatePreference("openingHours", e.target.value)} />
+                <Field label="Opening hours (24-hour, HH:MM - HH:MM)" value={preferences.openingHours} placeholder="08:00 - 20:00" onChange={(e) => updatePreference("openingHours", e.target.value)} />
               </div>
             </Section>
 
@@ -194,9 +277,10 @@ export default function Settings() {
 
             <Section icon={Clock3} eyebrow="Operations" title="Order and inventory rules" className="h-full xl:col-span-2">
               <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                <Field label="Minimum order" type="number" value={preferences.minimumOrder} onChange={(e) => updatePreference("minimumOrder", e.target.value)} />
-                <Field label="Prep. minutes" type="number" value={preferences.preparationTime} onChange={(e) => updatePreference("preparationTime", e.target.value)} />
-                <Field label="Low-stock threshold" type="number" value={preferences.lowStockThreshold} onChange={(e) => updatePreference("lowStockThreshold", e.target.value)} />
+                <Field label="Minimum order subtotal (₱)" type="number" min="0" step="0.01" value={preferences.minimumOrder} onChange={(e) => updatePreference("minimumOrder", e.target.value)} />
+                <Field label="Estimated prep. minutes" type="number" min="1" max="1440" step="1" value={preferences.preparationTime} onChange={(e) => updatePreference("preparationTime", e.target.value)} />
+                <Field label="Product low-stock alert threshold" type="number" min="0" step="1" value={preferences.lowStockThreshold} onChange={(e) => updatePreference("lowStockThreshold", e.target.value)} />
+                <p className="text-[10px] leading-4 text-[#8f8076] sm:col-span-2 xl:col-span-4">The minimum applies to the cart subtotal before discounts. Product low-stock alerts use this shared threshold; ingredients keep their individual thresholds.</p>
               </div>
             </Section>
           </div>

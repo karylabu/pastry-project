@@ -18,19 +18,34 @@ L.Icon.Default.mergeOptions({
   shadowUrl: markerShadow,
 });
 
-const SHOP_HOURS_LABEL = '8:00 AM to 8:00 PM';
-const FULFILLMENT_TIME_SLOTS = Array.from({ length: 25 }, (_, index) => {
-  const totalMinutes = 8 * 60 + index * 30;
-  const hour = Math.floor(totalMinutes / 60);
-  const minute = totalMinutes % 60;
-  const period = hour < 12 ? 'AM' : 'PM';
-  const displayHour = hour % 12 || 12;
+const DEFAULT_SHOP_SETTINGS = {
+  shopName: 'Pastry Project',
+  shopEmail: '',
+  shopPhone: '',
+  shopAddress: '',
+  openingHours: '08:00 - 20:00',
+  minimumOrder: '0',
+  preparationTime: '30',
+};
+const createFulfillmentTimeSlots = (openingHours) => {
+  const match = String(openingHours || '').match(/^(\d{2}):(\d{2})\s*-\s*(\d{2}):(\d{2})$/);
+  if (!match) return [];
+  const openingMinutes = Number(match[1]) * 60 + Number(match[2]);
+  const closingMinutes = Number(match[3]) * 60 + Number(match[4]);
+  const slots = [];
 
-  return {
-    value: `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`,
-    label: `${displayHour}:${String(minute).padStart(2, '0')} ${period}`,
-  };
-});
+  for (let totalMinutes = openingMinutes; totalMinutes < closingMinutes; totalMinutes += 30) {
+    const hour = Math.floor(totalMinutes / 60);
+    const minute = totalMinutes % 60;
+    const period = hour < 12 ? 'AM' : 'PM';
+    const displayHour = hour % 12 || 12;
+    slots.push({
+      value: `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`,
+      label: `${displayHour}:${String(minute).padStart(2, '0')} ${period}`,
+    });
+  }
+  return slots;
+};
 const PICKUP_LOCATION = {
   name: 'Pastry Project Bakeshop & Cafe',
   lat: 14.0753416,
@@ -77,6 +92,7 @@ export default function CheckoutModal({
   const [fieldErrors, setFieldErrors] = useState({});
   const [shopOpen, setShopOpen] = useState(null);
   const [shopStatusError, setShopStatusError] = useState(false);
+  const [shopSettings, setShopSettings] = useState(DEFAULT_SHOP_SETTINGS);
   const [discountType, setDiscountType] = useState('none');
   const [rewardCodeInput, setRewardCodeInput] = useState('');
   const [promotionCouponInput, setPromotionCouponInput] = useState('');
@@ -96,6 +112,7 @@ export default function CheckoutModal({
         throw new Error(data?.message || `Shop status request failed (${response.status}).`);
       }
       setShopOpen(data.is_open);
+      setShopSettings({ ...DEFAULT_SHOP_SETTINGS, ...(data.settings || {}) });
       setShopStatusError(false);
     } catch (error) {
       if (error.name === 'AbortError') return;
@@ -528,6 +545,12 @@ export default function CheckoutModal({
   const taxAmount = 0;
 
   const total = subtotal + rushFee + taxAmount - discountAmount;
+  const fulfillmentTimeSlots = useMemo(
+    () => createFulfillmentTimeSlots(shopSettings.openingHours),
+    [shopSettings.openingHours]
+  );
+  const minimumOrder = Number(shopSettings.minimumOrder || 0);
+  const belowMinimumOrder = subtotal < minimumOrder;
   const berMonths = isBerMonth();
 
   useEffect(() => {
@@ -550,7 +573,12 @@ export default function CheckoutModal({
         alert('Checking shop hours. Please try again in a moment.');
         return;
       }
-      alert(`The shop is currently closed. Checkout is available from ${SHOP_HOURS_LABEL}.`);
+      alert(`The shop is currently closed. Checkout is available daily from ${shopSettings.openingHours}.`);
+      return;
+    }
+
+    if (belowMinimumOrder) {
+      alert(`The minimum order subtotal is ₱${minimumOrder.toLocaleString()}.`);
       return;
     }
 
@@ -1071,7 +1099,7 @@ export default function CheckoutModal({
                 className={`w-full rounded-xl border ${fieldErrors.deliveryTime ? 'border-red-500' : 'border-[#e8e1d8]'} bg-[#fffdfa] p-3 text-sm text-[#33251e] outline-none transition focus:border-[#d4af37] focus:ring-2 focus:ring-[#d4af37]/20`}
               >
                 <option value="" disabled>Select a time</option>
-                {FULFILLMENT_TIME_SLOTS.map((slot) => (
+                {fulfillmentTimeSlots.map((slot) => (
                   <option key={slot.value} value={slot.value}>{slot.label}</option>
                 ))}
               </select>
@@ -1292,8 +1320,21 @@ export default function CheckoutModal({
 
               <div className={`rounded-2xl border px-4 py-3 text-sm ${shopOpen === true ? 'border-green-200 bg-green-50 text-green-700' : 'border-amber-200 bg-amber-50 text-amber-800'}`}>
                 <span className="font-semibold">{shopOpen === true ? 'Shop is open' : shopOpen === false ? 'Shop is closed' : 'Checking shop hours'}</span>
-                <span className="ml-2">{shopOpen === true ? 'You can place your order now.' : shopOpen === false ? `Checkout is available daily from ${SHOP_HOURS_LABEL}.` : shopStatusError ? 'Shop hours could not be verified. Please try again.' : 'Please wait while we verify the current time.'}</span>
+                <span className="ml-2">{shopOpen === true ? `You can place your order now. Open daily ${shopSettings.openingHours}.` : shopOpen === false ? `Checkout is available daily from ${shopSettings.openingHours}.` : shopStatusError ? 'Shop hours could not be verified. Please try again.' : 'Please wait while we verify the current time.'}</span>
               </div>
+              <div className="rounded-xl border border-[#eee5db] bg-white px-4 py-3 text-xs leading-5 text-[#74675f]">
+                <p className="font-semibold text-[#33251e]">{shopSettings.shopName}</p>
+                {shopSettings.shopAddress && <p>{shopSettings.shopAddress}</p>}
+                {(shopSettings.shopPhone || shopSettings.shopEmail) && (
+                  <p>{[shopSettings.shopPhone, shopSettings.shopEmail].filter(Boolean).join(' · ')}</p>
+                )}
+                <p>Estimated preparation time: {shopSettings.preparationTime} minutes.</p>
+              </div>
+              {minimumOrder > 0 && (
+                <p role={belowMinimumOrder ? "alert" : undefined} className={`rounded-xl border px-4 py-3 text-xs ${belowMinimumOrder ? "border-amber-200 bg-amber-50 text-amber-800" : "border-[#eee5db] bg-white text-[#74675f]"}`}>
+                  Minimum order subtotal: ₱{minimumOrder.toLocaleString()}. {belowMinimumOrder ? `Add ₱${(minimumOrder - subtotal).toLocaleString()} before discounts to place your order.` : "Your cart meets the minimum."}
+                </p>
+              )}
 
               {firstOrderEligibility.status === 'checking' && (
                 <p className="rounded-xl border border-[#eadfca] bg-[#fff8e9] px-4 py-3 text-xs text-[#765d50]">
@@ -1505,14 +1546,14 @@ export default function CheckoutModal({
 
               <button
                 onClick={handlePlaceOrder}
-                disabled={loading || shopOpen !== true}
+                disabled={loading || shopOpen !== true || belowMinimumOrder}
                 className="mt-3 w-full rounded-xl border border-[#eadfca] bg-[#fff8e9] py-3.5 text-sm font-bold uppercase tracking-[0.16em] text-[#33251e] shadow-sm transition hover:border-[#e7c875] hover:bg-[#fff8df] hover:text-[#8d6a2e] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d4af37] disabled:cursor-not-allowed disabled:border-gray-200 disabled:bg-gray-200 disabled:text-gray-500"
               >
                 {loading
                   ? checkoutData.payment === "QRPh"
                     ? "REDIRECTING..."
                     : "SAVING..."
-                  : shopOpen === true ? "PLACE ORDER" : shopOpen === false ? "SHOP CLOSED" : "CHECKING HOURS"}
+                  : shopOpen === true ? belowMinimumOrder ? "MINIMUM ORDER NOT MET" : "PLACE ORDER" : shopOpen === false ? "SHOP CLOSED" : "CHECKING HOURS"}
               </button>
 
             </div>

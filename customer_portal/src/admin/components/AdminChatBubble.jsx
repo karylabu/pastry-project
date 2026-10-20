@@ -21,6 +21,7 @@ export default function AdminChatBubble() {
   const [loading, setLoading] = useState(false);
   const [sending, setSending] = useState(false);
   const [mobilePanel, setMobilePanel] = useState("conversation");
+  const [messageAlertsEnabled, setMessageAlertsEnabled] = useState(true);
 
   const selectedConversation = useMemo(
     () => conversations.find((item) => String(item.conversation_key) === String(selectedConversationKey)),
@@ -33,6 +34,33 @@ export default function AdminChatBubble() {
     return conversations.filter((item) => [item.customer_name, item.order_label, item.last_message]
       .some((value) => String(value || "").toLowerCase().includes(query)));
   }, [conversations, search]);
+
+  useEffect(() => {
+    let active = true;
+    const applyPreferences = (preferences) => {
+      if (typeof preferences?.messageAlerts === "boolean") {
+        setMessageAlertsEnabled(preferences.messageAlerts);
+      }
+    };
+    const handleSettingsUpdate = (event) => applyPreferences(event.detail?.notificationPreferences);
+
+    fetch(`${LARAVEL_BASE}/api/admin/settings`, {
+      credentials: "include",
+      headers: { Accept: "application/json", ...getAuthHeaders() },
+    })
+      .then(async (response) => {
+        const data = await safeParseJson(response);
+        if (!response.ok || !data?.success) throw new Error(data?.message || "Unable to load message alert settings.");
+        if (active) applyPreferences(data.notification_preferences);
+      })
+      .catch((error) => console.warn("Unable to load message alert settings:", error));
+
+    window.addEventListener("admin-settings-updated", handleSettingsUpdate);
+    return () => {
+      active = false;
+      window.removeEventListener("admin-settings-updated", handleSettingsUpdate);
+    };
+  }, []);
 
   const fetchConversations = async () => {
     try {
@@ -127,7 +155,9 @@ export default function AdminChatBubble() {
     }
   };
 
-  const unreadCount = conversations.reduce((total, item) => total + Number(item.unread_count || 0), 0);
+  const unreadCount = messageAlertsEnabled
+    ? conversations.reduce((total, item) => total + Number(item.unread_count || 0), 0)
+    : 0;
   const customerName = selectedConversation?.customer_name || "Customer";
 
   return (

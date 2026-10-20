@@ -2,6 +2,7 @@
 
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\AdminAlertController;
+use App\Http\Controllers\Api\AdminSettingsController;
 use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\PromotionController;
@@ -159,6 +160,8 @@ Route::middleware(['api'])->group(function () {
     Route::apiResource('users', UserController::class);
 
     Route::prefix('admin')->group(function () {
+        Route::get('settings', [AdminSettingsController::class, 'show']);
+        Route::put('settings', [AdminSettingsController::class, 'update']);
         Route::get('notifications', [NotificationController::class, 'index']);
         Route::patch('notifications/{id}/read', [NotificationController::class, 'markAsRead']);
         Route::post('notifications/mark-all-read', [NotificationController::class, 'markAllRead']);

@@ -11,6 +11,7 @@ use App\Models\Product;
 use App\Http\Requests\StoreOrderRequest;
 use App\Services\CustomizedCakeService;
 use App\Services\CustomCakeRequestSetting;
+use App\Services\ShopSettings;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
@@ -303,6 +304,20 @@ class OrderController extends Controller
                         'selectionDetails' => $selectionDetails,
                         'image' => $item['image'] ?? $product->image,
                     ];
+                }
+
+                $minimumOrder = (float) ShopSettings::all()['minimumOrder'];
+                if ($subtotal < $minimumOrder) {
+                    $message = sprintf(
+                        'The minimum order subtotal is ₱%s.',
+                        number_format($minimumOrder, 2)
+                    );
+
+                    return response()->json([
+                        'success' => false,
+                        'message' => $message,
+                        'errors' => ['items' => [$message]],
+                    ], 422);
                 }
 
                 $deliveryFee = 0.0;

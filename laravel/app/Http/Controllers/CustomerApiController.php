@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use App\Models\User;
 use App\Services\CustomerTwoFactor;
 use App\Services\CustomerTwoFactorDelivery;
+use App\Services\ShopSettings;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
@@ -51,14 +52,17 @@ class CustomerApiController extends Controller
     public function shopStatus()
     {
         $shopNow = now('Asia/Manila');
-        $shopMinutes = ($shopNow->hour * 60) + $shopNow->minute;
+        $settings = ShopSettings::all();
+        [$openingTime, $closingTime] = preg_split('/\s*-\s*/', $settings['openingHours']);
+        $currentTime = $shopNow->format('H:i');
 
         return $this->corsResponse([
-            'is_open' => $shopMinutes >= 480 && $shopMinutes < 1200,
+            'is_open' => $currentTime >= $openingTime && $currentTime < $closingTime,
             'server_time' => $shopNow->toIso8601String(),
             'timezone' => 'Asia/Manila',
-            'opens_at' => '08:00',
-            'closes_at' => '20:00',
+            'opens_at' => $openingTime,
+            'closes_at' => $closingTime,
+            'settings' => $settings,
         ])->header('Cache-Control', 'no-store, private');
     }
 

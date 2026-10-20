@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\AdminNotification;
 use App\Models\User;
+use App\Services\AdminNotificationPreferences;
+use App\Services\ShopSettings;
 use App\Services\InventoryService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -38,9 +40,9 @@ class NotificationController extends Controller
 
         $this->syncInventoryNotifications($user);
 
+        $preferences = AdminNotificationPreferences::forUser((int) $user->id);
         $notifications = AdminNotification::forUser($user->id)
             ->orderByDesc('created_at')
-            ->limit(10)
             ->get([
                 'id',
                 'type',
@@ -51,10 +53,15 @@ class NotificationController extends Controller
                 'is_read',
                 'read_at',
                 'created_at',
-            ]);
+            ])
+            ->filter(fn (AdminNotification $notification) => $this->notificationEnabled($notification, $preferences))
+            ->take(10)
+            ->values();
 
         $unreadCount = AdminNotification::forUser($user->id)
             ->unread()
+            ->get(['type', 'title', 'message', 'data'])
+            ->filter(fn (AdminNotification $notification) => $this->notificationEnabled($notification, $preferences))
             ->count();
 
         return response()->json([
@@ -66,6 +73,41 @@ class NotificationController extends Controller
         ]);
     }
 
+    private function notificationEnabled(AdminNotification $notification, array $preferences): bool
+    {
+        $type = strtolower((string) $notification->type);
+        $content = strtolower((string) $notification->title . ' ' . (string) $notification->message);
+        $data = $notification->data ?? [];
+
+        if (
+            in_array($type, ['inventory_alert', 'low_stock', 'inventory'], true)
+            || isset($data['ingredient_id'])
+            || preg_match('/\b(stock|inventory|ingredient)\b/', $content)
+        ) {
+            return $preferences['lowStockAlerts'];
+        }
+        if (
+            in_array($type, ['promotion', 'promotion_update', 'campaign'], true)
+            || preg_match('/\b(promotion|campaign|coupon)\b/', $content)
+        ) {
+            return $preferences['promotionAlerts'];
+        }
+        if (
+            in_array($type, ['message', 'chat_message', 'customer_message'], true)
+            || preg_match('/\b(message|conversation|chat)\b/', $content)
+        ) {
+            return $preferences['messageAlerts'];
+        }
+        if (
+            in_array($type, ['order_received', 'new_order', 'order_update', 'custom_cake_request'], true)
+            || preg_match('/\b(order|cake request|sale|payment|transaction)\b/', $content)
+        ) {
+            return $preferences['orderAlerts'];
+        }
+
+        return true;
+    }
+
     private function syncInventoryNotifications(User $user): void
     {
         if (! Schema::hasTable('notifications')) {
@@ -73,6 +115,7 @@ class NotificationController extends Controller
         }
 
         $activeAlerts = [];
+        $defaultProductThreshold = (float) ShopSettings::all()['lowStockThreshold'];
 
         if (Schema::hasTable('products')) {
             $thresholdColumn = Schema::hasColumn('products', 'minimum_stock')
@@ -85,7 +128,7 @@ class NotificationController extends Controller
 
             foreach ($productQuery->get() as $product) {
                 $stock = (float) ($product->stock ?? 0);
-                $threshold = (float) ($product->threshold ?? 0);
+                $threshold = $defaultProductThreshold;
                 $status = $stock <= 0 ? 'out_of_stock' : ($threshold > 0 && $stock <= $threshold ? 'low_stock' : null);
                 if ($status === null) {
                     continue;
@@ -313,6 +356,19 @@ class NotificationController extends Controller
         $sentCount = 0;
 
         foreach ($recipients as $recipient) {
+            $notification = new AdminNotification([
+                'type' => $type,
+                'title' => $title,
+                'message' => $body,
+                'data' => $data,
+            ]);
+            if (! $this->notificationEnabled(
+                $notification,
+                AdminNotificationPreferences::forUser((int) $recipient->id)
+            )) {
+                continue;
+            }
+
             AdminNotification::create([
                 'user_id' => $recipient->id,
                 'type' => $type,

@@ -15,7 +15,7 @@ class RewardCodeCheckoutTest extends TestCase
     {
         parent::setUp();
 
-        foreach (['notifications', 'realtime_events', 'order_items', 'product_sizes', 'products', 'loyalty_transactions', 'promotions', 'orders', 'user_sessions', 'users'] as $table) {
+        foreach (['shop_settings', 'notifications', 'realtime_events', 'order_items', 'product_sizes', 'products', 'loyalty_transactions', 'promotions', 'orders', 'user_sessions', 'users'] as $table) {
             Schema::dropIfExists($table);
         }
 
@@ -122,6 +122,26 @@ class RewardCodeCheckoutTest extends TestCase
             $table->string('action_url')->nullable();
             $table->timestamp('created_at')->nullable();
         });
+        Schema::create('shop_settings', function ($table) {
+            $table->unsignedTinyInteger('id')->primary();
+            $table->json('settings');
+            $table->timestamps();
+        });
+        DB::table('shop_settings')->insert([
+            'id' => 1,
+            'settings' => json_encode([
+                'shopName' => 'Pastry Project',
+                'shopEmail' => '',
+                'shopPhone' => '',
+                'shopAddress' => '',
+                'openingHours' => '08:00 - 20:00',
+                'minimumOrder' => '0',
+                'preparationTime' => '30',
+                'lowStockThreshold' => '5',
+            ]),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
 
         DB::table('users')->insert([
             'id' => 7,
@@ -149,11 +169,26 @@ class RewardCodeCheckoutTest extends TestCase
 
     protected function tearDown(): void
     {
-        foreach (['notifications', 'realtime_events', 'order_items', 'product_sizes', 'products', 'loyalty_transactions', 'promotions', 'orders', 'user_sessions', 'users'] as $table) {
+        foreach (['shop_settings', 'notifications', 'realtime_events', 'order_items', 'product_sizes', 'products', 'loyalty_transactions', 'promotions', 'orders', 'user_sessions', 'users'] as $table) {
             Schema::dropIfExists($table);
         }
 
         parent::tearDown();
+    }
+
+    public function test_order_minimum_is_enforced_against_the_verified_subtotal(): void
+    {
+        $settings = json_decode(DB::table('shop_settings')->where('id', 1)->value('settings'), true);
+        $settings['minimumOrder'] = '3001';
+        DB::table('shop_settings')->where('id', 1)->update([
+            'settings' => json_encode($settings),
+        ]);
+
+        $response = $this->placeOrder('');
+
+        $this->assertSame(422, $response->getStatusCode());
+        $this->assertSame('The minimum order subtotal is ₱3,001.00.', $response->getData(true)['message']);
+        $this->assertSame(0, DB::table('orders')->count());
     }
 
     public function test_valid_reward_code_applies_discount_cap_and_is_bound_to_created_order(): void
