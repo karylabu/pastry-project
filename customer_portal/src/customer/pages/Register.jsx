@@ -1069,6 +1069,7 @@ export default function Register() {
             <Link to="/customer/terms" className="text-sm font-semibold text-gray-600 hover:text-[#F0B94D]">Terms &amp; Conditions</Link>
             <Link to="/customer/privacy-policy" className="text-sm font-semibold text-gray-600 hover:text-[#F0B94D]">Privacy Policy</Link>
             <Link to="/customer/cookie-policy" className="text-sm font-semibold text-gray-600 hover:text-[#F0B94D]">Cookie Policy</Link>
+            <Link to="/customer/return-policy" className="text-sm font-semibold text-gray-600 hover:text-[#F0B94D]">Return Policy</Link>
             <button type="button" onClick={() => setShowCredits(true)} className="text-sm font-semibold text-gray-600 hover:text-[#F0B94D]">Credits</button>
             <Link to="/customer/chat-support" className="text-sm font-semibold text-gray-600 hover:text-[#F0B94D]">Help</Link>
           </div>

@@ -62,7 +62,7 @@ function CancelDialog({ order, onConfirm, onDismiss, isLoading }) {
 }
 
 // ── Order Received Confirmation Dialog ───────────────────────────────────────
-function ReceivedDialog({ order, onConfirm, onReturnRefund, onDismiss, isLoading }) {
+function ReceivedDialog({ order, onConfirm, onDismiss, isLoading }) {
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -97,97 +97,15 @@ function ReceivedDialog({ order, onConfirm, onReturnRefund, onDismiss, isLoading
           Confirm that you have received Order #{order.order_number ?? order.id}. This will mark it as <span className="text-slate-900 font-bold">Completed</span>.
         </p>
         <div className="flex gap-3">
-          {order.return_refund_request ? (
-            <p className="flex-1 self-center text-center text-[10px] font-bold uppercase tracking-[0.1em] text-amber-700">
-              Request {order.return_refund_request.status}
-            </p>
-          ) : (
-            <button
-              type="button"
-              onClick={onReturnRefund}
-              className="flex-1 py-4 rounded-[20px] border border-gray-200 text-[11px] font-black uppercase tracking-[0.12em] text-gray-600 hover:bg-gray-50 transition-all"
-            >
-              Return/Refund
-            </button>
-          )}
           <button
             onClick={onConfirm}
             disabled={isLoading}
-            className="flex-1 py-4 rounded-[20px] bg-slate-900 text-white text-[11px] font-black uppercase tracking-[0.2em] hover:bg-slate-800 transition-all disabled:opacity-50 active:scale-[0.97]"
+            className="w-full py-4 rounded-[20px] bg-slate-900 text-white text-[11px] font-black uppercase tracking-[0.2em] hover:bg-slate-800 transition-all disabled:opacity-50 active:scale-[0.97]"
           >
             {isLoading ? "Confirming…" : "Yes, Received!"}
           </button>
         </div>
       </motion.div>
-    </motion.div>
-  );
-}
-
-function ReturnRefundDialog({ order, onSubmit, onDismiss, isLoading, error }) {
-  const [reason, setReason] = useState('');
-
-  const handleSubmit = (event) => {
-    event.preventDefault();
-    onSubmit(reason);
-  };
-
-  return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/40 p-6 backdrop-blur-sm"
-      onClick={onDismiss}
-    >
-      <motion.form
-        initial={{ scale: 0.92, opacity: 0, y: 16 }}
-        animate={{ scale: 1, opacity: 1, y: 0 }}
-        exit={{ scale: 0.92, opacity: 0, y: 16 }}
-        transition={{ type: 'spring', damping: 24, stiffness: 260 }}
-        onSubmit={handleSubmit}
-        onClick={(event) => event.stopPropagation()}
-        className="relative w-full max-w-sm rounded-[32px] bg-white p-8 font-['DM_Sans'] shadow-2xl"
-      >
-        <button
-          type="button"
-          onClick={onDismiss}
-          className="absolute right-5 top-5 grid h-9 w-9 place-items-center rounded-full text-gray-400 transition hover:bg-gray-100 hover:text-gray-700"
-          aria-label="Close return/refund request"
-        >
-          <X size={18} />
-        </button>
-        <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-full bg-amber-50">
-          <AlertTriangle size={25} className="text-amber-700" strokeWidth={1.8} />
-        </div>
-        <h3 className="mb-2 text-center text-[20px] font-black leading-tight text-gray-900">
-          Return/Refund Request
-        </h3>
-        <p className="mb-5 text-center text-[12px] leading-relaxed text-gray-400">
-          Tell the admin why you’re requesting a return or refund for Order #{order.order_number ?? order.id}. Your request will be reviewed; this does not automatically issue a refund.
-        </p>
-        <label htmlFor="return-refund-reason" className="mb-2 block text-[11px] font-semibold text-gray-600">
-          Reason
-        </label>
-        <textarea
-          id="return-refund-reason"
-          value={reason}
-          onChange={(event) => setReason(event.target.value)}
-          minLength={5}
-          maxLength={1000}
-          rows={4}
-          required
-          placeholder="Describe the issue with your order..."
-          className="mb-3 w-full resize-none rounded-2xl border border-gray-200 px-4 py-3 text-sm text-gray-700 outline-none transition focus:border-slate-500"
-        />
-        {error && <p role="alert" className="mb-3 text-xs text-red-600">{error}</p>}
-        <button
-          type="submit"
-          disabled={isLoading || reason.trim().length < 5}
-          className="w-full rounded-[20px] bg-slate-900 py-4 text-[11px] font-black uppercase tracking-[0.16em] text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          {isLoading ? 'Submitting…' : 'Send Request'}
-        </button>
-      </motion.form>
     </motion.div>
   );
 }
@@ -339,8 +257,6 @@ export default function Orders() {
   const [expandedIds, setExpandedIds] = useState(new Set());
   const [cancelTarget, setCancelTarget]   = useState(null);
   const [receivedTarget, setReceivedTarget] = useState(null);
-  const [returnRefundTarget, setReturnRefundTarget] = useState(null);
-  const [returnRefundError, setReturnRefundError] = useState('');
   const [paymentProofTarget, setPaymentProofTarget] = useState(null);
   const [processingId, setProcessingId]   = useState(null);
   const [payingOrderId, setPayingOrderId] = useState(null);
@@ -583,42 +499,6 @@ export default function Orders() {
     } finally {
       setProcessingId(null);
       setReceivedTarget(null);
-    }
-  };
-
-  const handleReturnRefundSubmit = async (reason) => {
-    if (!returnRefundTarget) return;
-    setProcessingId(returnRefundTarget.id);
-    setReturnRefundError('');
-    try {
-      const response = await fetch(`${LARAVEL_BASE}/api/orders/${returnRefundTarget.id}/return-refund-request`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json', Accept: 'application/json', ...getAuthHeaders() },
-        body: JSON.stringify({ reason }),
-      });
-      const result = await safeParseJson(response);
-      if (!response.ok || !result?.success) {
-        throw new Error(result?.message || 'Unable to submit your return/refund request.');
-      }
-
-      const updatedOrders = orders.map((order) => (
-        order.id === returnRefundTarget.id
-          ? { ...order, status: 'Return/Refund', return_refund_request: result.return_refund_request }
-          : order
-      ));
-      setOrders(updatedOrders);
-      try {
-        localStorage.setItem(storageKey, JSON.stringify(updatedOrders));
-      } catch (storageError) {
-        console.warn('Unable to cache return/refund request status:', storageError);
-      }
-      setReturnRefundTarget(null);
-      setActionError('Your return/refund request was sent to the admin for review.');
-    } catch (error) {
-      setReturnRefundError(error.message || 'Unable to submit your return/refund request.');
-    } finally {
-      setProcessingId(null);
     }
   };
 
@@ -1099,7 +979,7 @@ export default function Orders() {
   }
 
   // ── Helpers ─────────────────────────────────────────────────────────────────
-  const statusOptions = ["All", "Pending", "Preparing", "Awaiting Balance Payment", "Ready for Pickup", "Completed", "Return/Refund", "Cancelled"];
+  const statusOptions = ["All", "Pending", "Preparing", "Awaiting Balance Payment", "Ready for Pickup", "Completed", "Cancelled"];
 
   const statusCounts = statusOptions.reduce((acc, s) => {
     acc[s] = s === 'All' ? orders.length : orders.filter((o) => String(o.status || '').toLowerCase() === s.toLowerCase()).length;
@@ -1156,7 +1036,6 @@ export default function Orders() {
       case "Preparing":  return "bg-slate-100 text-slate-700";
       case "Ready for Pickup": return "bg-emerald-50 text-emerald-800";
       case "Completed":  return "bg-slate-100 text-slate-700";
-      case "Return/Refund": return "bg-amber-50 text-amber-800";
       case "Cancelled":  return "bg-slate-100 text-slate-700";
       case "Awaiting Balance Payment": return "bg-amber-50 text-amber-800";
       default:           return "bg-gray-100 text-gray-600";
@@ -1302,7 +1181,7 @@ export default function Orders() {
                 const isPending    = order.status === "Pending";
                 const isToReceive  = order.status === "Ready for Pickup";
                 const isCompleted  = order.status === "Completed";
-                const isReturnRefund = order.status === "Return/Refund";
+                const hasReturnRefundRequest = Boolean(order.return_refund_request);
                 const isPreparing  = order.status === "Preparing";
                 const isExpanded   = expandedIds.has(order.id);
                 const items        = order.items || [];
@@ -1359,10 +1238,8 @@ export default function Orders() {
                   ? 'Being prepared in kitchen'
                   : isToReceive
                   ? 'Ready — confirm on arrival'
-                  : isReturnRefund
-                  ? order.return_refund_request?.status === 'Pending Review'
-                    ? 'Return/refund request is awaiting Admin review'
-                    : 'Return/refund request update'
+                  : hasReturnRefundRequest
+                  ? ''
                   : 'Payment settled';
 
                 return (
@@ -1468,9 +1345,11 @@ export default function Orders() {
                     {/* Order id + status */}
                     <div className="flex flex-col gap-1.5 pl-4">
                       <p className="text-xs text-gray-400">Order: <span className="text-slate-600 font-medium">#{order.order_number ?? order.id}</span></p>
-                      <span className={`inline-flex w-fit items-center rounded-full px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.1em] ${getStatusStyle(order.status)}`}>
-                        {order.status}
-                      </span>
+                      {order.status !== "Return/Refund" && (
+                        <span className={`inline-flex w-fit items-center rounded-full px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.1em] ${getStatusStyle(order.status)}`}>
+                          {order.status}
+                        </span>
+                      )}
                     </div>
 
                     {/* Date */}
@@ -1484,12 +1363,7 @@ export default function Orders() {
                     {/* Payment */}
                     <div>
                       <p className="text-sm text-gray-700">{isCustomized ? customPaymentMethod : order.payment || order.method || '—'}</p>
-                      <p className={`text-xs mt-0.5 ${isCancelled ? 'text-slate-500' : isCompleted ? 'text-slate-500' : 'text-gray-400'}`}>{paymentHint}</p>
-                      {order.return_refund_request?.status === 'Rejected' && order.return_refund_request.admin_reason && (
-                        <p className="mt-1 text-xs text-red-700">
-                          Request rejected: {order.return_refund_request.admin_reason}
-                        </p>
-                      )}
+                      {paymentHint && <p className={`text-xs mt-0.5 ${isCancelled ? 'text-slate-500' : isCompleted ? 'text-slate-500' : 'text-gray-400'}`}>{paymentHint}</p>}
                       {isCustomized && isAwaitingPayment && customDownpaymentAmount > 0 && (
                         <p className="mt-1 text-[10px] leading-4 text-gray-500">
                           Downpayment fee: ₱{downpaymentBreakdown.fee.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -1673,25 +1547,8 @@ export default function Orders() {
           <ReceivedDialog
             order={receivedTarget}
             onConfirm={handleReceivedConfirm}
-            onReturnRefund={() => {
-              setReturnRefundError('');
-              setReturnRefundTarget(receivedTarget);
-              setReceivedTarget(null);
-            }}
             onDismiss={() => setReceivedTarget(null)}
             isLoading={processingId === receivedTarget?.id}
-          />
-        )}
-      </AnimatePresence>
-
-      <AnimatePresence>
-        {returnRefundTarget && (
-          <ReturnRefundDialog
-            order={returnRefundTarget}
-            onSubmit={handleReturnRefundSubmit}
-            onDismiss={() => setReturnRefundTarget(null)}
-            isLoading={processingId === returnRefundTarget.id}
-            error={returnRefundError}
           />
         )}
       </AnimatePresence>

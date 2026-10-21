@@ -13,6 +13,7 @@ import CareersPage from '../pages/CareersPage';
 import AboutUsPage from '../pages/AboutUsPage';
 import TermsPage from '../pages/TermsPage';
 import CookiePolicyPage from '../pages/CookiePolicyPage';
+import ReturnPolicyPage from '../pages/ReturnPolicyPage';
 import CreditsPage from '../pages/CreditsPage';
 import PrivacyPage from '../pages/PrivacyPage';
 import Menu from '../pages/Menu';
@@ -431,6 +432,7 @@ export default function CustomerApp() {
     '/terms',
     '/privacy-policy',
     '/cookie-policy',
+    '/return-policy',
     '/credits',
     '/about-us',
     '/chat-support',
@@ -438,6 +440,7 @@ export default function CustomerApp() {
     '/customer/terms',
     '/customer/privacy-policy',
     '/customer/cookie-policy',
+    '/customer/return-policy',
     '/customer/credits',
     '/customer/about-us',
     '/customer/chat-support',
@@ -500,6 +503,7 @@ export default function CustomerApp() {
           <Route path="terms" element={<TermsPage />} />
           <Route path="privacy-policy" element={<PrivacyPage />} />
           <Route path="cookie-policy" element={<CookiePolicyPage />} />
+          <Route path="return-policy" element={<ReturnPolicyPage />} />
           <Route path="credits" element={<CreditsPage />} />
         </Routes>
       </div>
