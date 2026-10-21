@@ -413,14 +413,14 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
           </div>
 
           {/* FAVORITES */}
-          <div className="flex items-center gap-0.5 sm:gap-1">
+          <div className="flex items-center gap-1 sm:gap-1.5">
             <Link
               to="/customer/favorites"
               title="Favorites"
               aria-label="View favorites"
               className="flex h-7 w-7 items-center justify-center rounded-full text-gray-700 transition hover:bg-gray-100 sm:h-10 sm:w-10"
             >
-              <Heart size={16} className="sm:h-[19px] sm:w-[19px]" />
+              <Heart size={18} className="sm:h-[21px] sm:w-[21px]" />
             </Link>
 
             {/* NOTIFICATIONS */}
@@ -434,7 +434,7 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
                 className="relative flex h-7 w-7 items-center justify-center rounded-full hover:bg-gray-100 sm:h-10 sm:w-10"
               >
                 <span className="relative inline-flex">
-                  <Bell size={16} className="sm:h-[19px] sm:w-[19px]" />
+                  <Bell size={18} className="sm:h-[21px] sm:w-[21px]" />
                   {unreadCount > 0 && (
                     <span className="absolute -right-1 top-0 h-2.5 w-2.5 rounded-full bg-red-500" />
                   )}
@@ -634,7 +634,7 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
             {/* CART */}
             <button
               onClick={onCartClick}
-              className="relative flex h-7 w-7 items-center justify-center rounded-full bg-black text-white sm:h-10 sm:w-10"
+              className="relative ml-1 flex h-7 w-7 items-center justify-center rounded-full bg-black text-white sm:ml-2 sm:h-10 sm:w-10"
             >
               <ShoppingCart size={14} className="sm:h-[17px] sm:w-[17px]" />
               {cartCount > 0 && (
