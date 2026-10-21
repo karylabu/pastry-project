@@ -15,7 +15,7 @@ class RewardCodeCheckoutTest extends TestCase
     {
         parent::setUp();
 
-        foreach (['shop_settings', 'notifications', 'realtime_events', 'product_inventory_movements', 'order_items', 'product_sizes', 'products', 'loyalty_transactions', 'promotions', 'orders', 'user_sessions', 'users'] as $table) {
+        foreach (['shop_settings', 'notifications', 'realtime_events', 'customized_cake_orders', 'product_inventory_movements', 'order_items', 'product_sizes', 'products', 'loyalty_transactions', 'promotions', 'orders', 'user_sessions', 'users'] as $table) {
             Schema::dropIfExists($table);
         }
 
@@ -33,6 +33,10 @@ class RewardCodeCheckoutTest extends TestCase
             $table->unsignedBigInteger('user_id');
             $table->string('token');
             $table->timestamp('expires_at')->nullable();
+        });
+        Schema::create('customized_cake_orders', function ($table) {
+            $table->id();
+            $table->unsignedBigInteger('order_id');
         });
         Schema::create('orders', function ($table) {
             $table->id();
@@ -183,7 +187,7 @@ class RewardCodeCheckoutTest extends TestCase
 
     protected function tearDown(): void
     {
-        foreach (['shop_settings', 'notifications', 'realtime_events', 'order_items', 'product_sizes', 'products', 'loyalty_transactions', 'promotions', 'orders', 'user_sessions', 'users'] as $table) {
+        foreach (['shop_settings', 'notifications', 'realtime_events', 'customized_cake_orders', 'product_inventory_movements', 'order_items', 'product_sizes', 'products', 'loyalty_transactions', 'promotions', 'orders', 'user_sessions', 'users'] as $table) {
             Schema::dropIfExists($table);
         }
 
@@ -324,7 +328,7 @@ class RewardCodeCheckoutTest extends TestCase
         $this->assertSame(0, DB::table('orders')->count());
     }
 
-    public function test_checkout_deducts_stock_for_each_selected_cake_size(): void
+    public function test_checkout_does_not_deduct_stock_before_admin_approval(): void
     {
         DB::table('product_sizes')->insert([
             ['id' => 31, 'product_id' => 11, 'size' => 'Small', 'price' => 200, 'stock_quantity' => 5, 'available' => true],
@@ -338,23 +342,12 @@ class RewardCodeCheckoutTest extends TestCase
         $orderId = $response->getData(true)['order_id'];
 
         $this->assertSame(201, $response->getStatusCode());
-        $this->assertSame(3, (int) DB::table('product_sizes')->where('id', 31)->value('stock_quantity'));
-        $this->assertSame(4, (int) DB::table('product_sizes')->where('id', 32)->value('stock_quantity'));
-        $this->assertDatabaseHas('product_inventory_movements', [
-            'product_size_id' => 31,
-            'movement_type' => 'Order',
-            'quantity' => -2,
-            'reference_id' => $orderId,
-        ]);
-        $this->assertDatabaseHas('product_inventory_movements', [
-            'product_size_id' => 32,
-            'movement_type' => 'Order',
-            'quantity' => -3,
-            'reference_id' => $orderId,
-        ]);
+        $this->assertSame(5, (int) DB::table('product_sizes')->where('id', 31)->value('stock_quantity'));
+        $this->assertSame(7, (int) DB::table('product_sizes')->where('id', 32)->value('stock_quantity'));
+        $this->assertSame(0, DB::table('product_inventory_movements')->where('reference_id', $orderId)->count());
     }
 
-    public function test_cancelling_order_restores_reserved_cake_size_stock_once(): void
+    public function test_admin_approval_deducts_size_stock_and_cancellation_restores_it_once(): void
     {
         DB::table('product_sizes')->insert([
             'id' => 31,
@@ -369,11 +362,34 @@ class RewardCodeCheckoutTest extends TestCase
         ]);
         $orderId = $response->getData(true)['order_id'];
 
-        $request = Request::create("/api/orders/{$orderId}/cancel", 'POST', [], [], [], [
-            'HTTP_X_AUTH_TOKEN' => 'test-customer-token',
-        ]);
-        $cancelResponse = app(OrderController::class)->cancel($request, $orderId);
+        $this->assertSame(201, $response->getStatusCode());
+        $this->assertSame(5, (int) DB::table('product_sizes')->where('id', 31)->value('stock_quantity'));
 
+        DB::table('users')->insert([
+            'id' => 99,
+            'name' => 'Test Admin',
+            'email' => 'admin@example.com',
+            'password' => 'unused',
+            'role' => 'admin',
+            'status' => 'active',
+        ]);
+        DB::table('user_sessions')->insert([
+            'user_id' => 99,
+            'token' => 'test-admin-token',
+            'expires_at' => now()->addHour(),
+        ]);
+
+        $approvalResponse = $this->updateOrderStatus($orderId, 'Confirmed');
+        $this->assertSame(200, $approvalResponse->getStatusCode());
+        $this->assertSame(3, (int) DB::table('product_sizes')->where('id', 31)->value('stock_quantity'));
+        $this->assertDatabaseHas('product_inventory_movements', [
+            'product_size_id' => 31,
+            'movement_type' => 'Order',
+            'quantity' => -2,
+            'reference_id' => $orderId,
+        ]);
+
+        $cancelResponse = $this->updateOrderStatus($orderId, 'Cancelled');
         $this->assertSame(200, $cancelResponse->getStatusCode());
         $this->assertSame(5, (int) DB::table('product_sizes')->where('id', 31)->value('stock_quantity'));
         $this->assertDatabaseHas('product_inventory_movements', [
@@ -382,6 +398,15 @@ class RewardCodeCheckoutTest extends TestCase
             'quantity' => 2,
             'reference_id' => $orderId,
         ]);
+    }
+
+    private function updateOrderStatus(int $orderId, string $status)
+    {
+        $request = Request::create("/api/orders/{$orderId}/status", 'PUT', ['status' => $status], [], [], [
+            'HTTP_X_AUTH_TOKEN' => 'test-admin-token',
+        ]);
+
+        return app(OrderController::class)->updateStatus($request, $orderId);
     }
 
     public function test_checkout_coupon_validation_returns_configured_percent_for_active_code(): void

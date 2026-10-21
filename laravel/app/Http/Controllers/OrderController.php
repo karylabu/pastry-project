@@ -449,8 +449,6 @@ class OrderController extends Controller
                     'created_at' => now(),
                 ]);
 
-                $this->deductOrderSizeStock($canonicalItems, (int) $order->id, (int) $user->id);
-
                 if ($rewardTransactionId !== null) {
                     $claimedReward = DB::table('loyalty_transactions')
                         ->where('id', $rewardTransactionId)
@@ -1134,6 +1132,7 @@ class OrderController extends Controller
                     $this->restoreOrderSizeStock($order, (int) $user->id);
                 }
                 if ($oldStatus !== 'Confirmed' && $newStatus === 'Confirmed') {
+                    $this->deductOrderSizeStock($order->items ?? [], (int) $order->id, (int) $user->id);
                     $this->deductOrderProductStock($order, (int) $user->id);
                 } elseif ($oldStatus === 'Confirmed' && $newStatus === 'Cancelled') {
                     $this->restoreOrderProductStock($order, (int) $user->id);
