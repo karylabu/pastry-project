@@ -279,7 +279,7 @@ function resolveProduct(mysqli $conn, int $productId, string $productName): ?arr
 }
 
 function collectInventoryPlan(mysqli $conn, array $orderLines): array {
-    $plan = ['products' => []];
+    $plan = ['products' => [], 'sizes' => []];
 
     foreach ($orderLines as $line) {
         $qty = max(1, intval($line['qty'] ?? 0));
@@ -302,6 +302,47 @@ function collectInventoryPlan(mysqli $conn, array $orderLines): array {
             'name' => $productName,
             'qty' => ($plan['products'][$productId]['qty'] ?? 0) + $qty,
         ];
+
+        $productSizeId = (int) ($line['product_size_id'] ?? 0);
+        $variant = trim((string) ($line['variant'] ?? ''));
+        if ($productSizeId <= 0 && $variant !== '') {
+            $sizeStmt = $conn->prepare('SELECT id FROM product_sizes WHERE product_id = ? AND LOWER(TRIM(size)) = LOWER(?) LIMIT 1');
+            if (!$sizeStmt) {
+                return ['success' => false, 'message' => 'Failed to prepare cake size stock lookup'];
+            }
+            $sizeStmt->bind_param('is', $productId, $variant);
+            if (!$sizeStmt->execute()) {
+                $sizeStmt->close();
+                return ['success' => false, 'message' => 'Failed to look up cake size stock'];
+            }
+            $productSizeId = (int) ($sizeStmt->get_result()->fetch_assoc()['id'] ?? 0);
+            $sizeStmt->close();
+        }
+
+        if ($productSizeId > 0) {
+            $sizeStmt = $conn->prepare('SELECT id FROM product_sizes WHERE id = ? AND product_id = ? LIMIT 1');
+            if (!$sizeStmt) {
+                return ['success' => false, 'message' => 'Failed to prepare cake size validation'];
+            }
+            $sizeStmt->bind_param('ii', $productSizeId, $productId);
+            if (!$sizeStmt->execute()) {
+                $sizeStmt->close();
+                return ['success' => false, 'message' => 'Failed to validate cake size'];
+            }
+            $validSize = $sizeStmt->get_result()->fetch_assoc();
+            $sizeStmt->close();
+            if (!$validSize) {
+                return ['success' => false, 'message' => 'Order contains an invalid cake size'];
+            }
+
+            $plan['sizes'][$productSizeId] = [
+                'product_id' => $productId,
+                'product_size_id' => $productSizeId,
+                'name' => $productName,
+                'variant' => $variant,
+                'qty' => ($plan['sizes'][$productSizeId]['qty'] ?? 0) + $qty,
+            ];
+        }
     }
 
     return [
@@ -699,6 +740,54 @@ function applyInventoryPlan(mysqli $conn, int $orderId, string $status, array $p
         $stmt->close();
     }
 
+    foreach ($plan['sizes'] ?? [] as $sizeEntry) {
+        $productId = (int) $sizeEntry['product_id'];
+        $productSizeId = (int) $sizeEntry['product_size_id'];
+        $qty = (int) $sizeEntry['qty'];
+
+        $stmt = $conn->prepare('SELECT size, stock_quantity FROM product_sizes WHERE id = ? AND product_id = ? FOR UPDATE');
+        if (!$stmt) {
+            return ['success' => false, 'message' => 'Failed to prepare cake size stock update'];
+        }
+        $stmt->bind_param('ii', $productSizeId, $productId);
+        if (!$stmt->execute()) {
+            $stmt->close();
+            return ['success' => false, 'message' => 'Failed to read cake size stock'];
+        }
+        $row = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+
+        $previous = $row ? (float) $row['stock_quantity'] : -1;
+        if ($previous < $qty) {
+            return ['success' => false, 'message' => 'Insufficient stock for ' . ($sizeEntry['name'] ?? 'product') . ' (' . ($row['size'] ?? $sizeEntry['variant'] ?? 'selected size') . ')'];
+        }
+
+        $newStock = $previous - $qty;
+        $stmt = $conn->prepare('UPDATE product_sizes SET stock_quantity = ?, updated_at = NOW() WHERE id = ? AND product_id = ? AND stock_quantity >= ?');
+        if (!$stmt) {
+            return ['success' => false, 'message' => 'Failed to prepare cake size stock deduction'];
+        }
+        $stmt->bind_param('diii', $newStock, $productSizeId, $productId, $qty);
+        if (!$stmt->execute() || $stmt->affected_rows !== 1) {
+            $stmt->close();
+            return ['success' => false, 'message' => 'Failed to deduct cake size stock'];
+        }
+        $stmt->close();
+
+        $movement = $conn->prepare("INSERT INTO product_inventory_movements (product_id, product_size_id, movement_type, quantity, previous_stock, new_stock, reason, reference_type, reference_id, user_id, created_at) VALUES (?, ?, 'Order', ?, ?, ?, ?, 'order', ?, ?, NOW())");
+        if (!$movement) {
+            return ['success' => false, 'message' => 'Failed to prepare cake size stock history'];
+        }
+        $reason = "Order #{$orderId} size stock deduction on {$status}";
+        $movementQty = -$qty;
+        $movement->bind_param('iidddsii', $productId, $productSizeId, $movementQty, $previous, $newStock, $reason, $orderId, $userId);
+        if (!$movement->execute()) {
+            $movement->close();
+            return ['success' => false, 'message' => 'Failed to record cake size stock deduction'];
+        }
+        $movement->close();
+    }
+
     return ['success' => true];
 }
 
@@ -1007,14 +1096,61 @@ try {
     }
 
     if ($status === 'Cancelled' && $oldStatus !== 'Cancelled') {
-        $movementStmt = $conn->prepare("SELECT product_id, quantity FROM product_inventory_movements WHERE movement_type = 'Order' AND reference_type = 'order' AND reference_id = ? FOR UPDATE");
+        $movementStmt = $conn->prepare("SELECT product_id, product_size_id, -SUM(quantity) AS restore_quantity FROM product_inventory_movements WHERE movement_type IN ('Order', 'Cancellation') AND reference_type = 'order' AND reference_id = ? GROUP BY product_id, product_size_id HAVING SUM(quantity) < 0");
         $movementStmt->bind_param('i', $id);
         $movementStmt->execute();
         $movementResult = $movementStmt->get_result();
         while ($movement = $movementResult->fetch_assoc()) {
             $productId = (int) $movement['product_id'];
-            $restoreQty = abs((float) $movement['quantity']);
-            if ($restoreQty <= 0 || productMovementExists($conn, $productId, 'Cancellation', 'order', $id)) {
+            $productSizeId = (int) ($movement['product_size_id'] ?? 0);
+            $restoreQty = (float) $movement['restore_quantity'];
+            if ($restoreQty <= 0) {
+                continue;
+            }
+
+            if ($productSizeId > 0) {
+                $sizeStmt = $conn->prepare("SELECT stock_quantity FROM product_sizes WHERE id = ? AND product_id = ? FOR UPDATE");
+                if (!$sizeStmt) {
+                    $conn->rollback();
+                    sendJson(false, 'Failed to prepare cake size stock restoration');
+                }
+                $sizeStmt->bind_param('ii', $productSizeId, $productId);
+                $sizeStmt->execute();
+                $sizeRow = $sizeStmt->get_result()->fetch_assoc();
+                $sizeStmt->close();
+                if (!$sizeRow) {
+                    $conn->rollback();
+                    sendJson(false, 'Cake size not found while restoring cancelled order');
+                }
+
+                $previous = (float) $sizeRow['stock_quantity'];
+                $newStock = $previous + $restoreQty;
+                $sizeStmt = $conn->prepare('UPDATE product_sizes SET stock_quantity = ?, updated_at = NOW() WHERE id = ? AND product_id = ?');
+                if (!$sizeStmt) {
+                    $conn->rollback();
+                    sendJson(false, 'Failed to prepare cake size stock restoration');
+                }
+                $sizeStmt->bind_param('dii', $newStock, $productSizeId, $productId);
+                if (!$sizeStmt->execute()) {
+                    $sizeStmt->close();
+                    $conn->rollback();
+                    sendJson(false, 'Failed to restore cancelled cake size stock');
+                }
+                $sizeStmt->close();
+
+                $movementInsert = $conn->prepare("INSERT INTO product_inventory_movements (product_id, product_size_id, movement_type, quantity, previous_stock, new_stock, reason, reference_type, reference_id, user_id, created_at) VALUES (?, ?, 'Cancellation', ?, ?, ?, ?, 'order', ?, ?, NOW())");
+                if (!$movementInsert) {
+                    $conn->rollback();
+                    sendJson(false, 'Failed to prepare cake size cancellation history');
+                }
+                $reason = "Order #{$id} cancelled";
+                $movementInsert->bind_param('iidddsii', $productId, $productSizeId, $restoreQty, $previous, $newStock, $reason, $id, $currentUserId);
+                if (!$movementInsert->execute()) {
+                    $movementInsert->close();
+                    $conn->rollback();
+                    sendJson(false, 'Failed to record cancelled cake size stock');
+                }
+                $movementInsert->close();
                 continue;
             }
 
