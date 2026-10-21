@@ -420,7 +420,7 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
               aria-label="View favorites"
               className="flex h-7 w-7 items-center justify-center rounded-full text-gray-700 transition hover:bg-gray-100 sm:h-10 sm:w-10"
             >
-              <Heart size={14} className="sm:h-[17px] sm:w-[17px]" />
+              <Heart size={16} className="sm:h-[19px] sm:w-[19px]" />
             </Link>
 
             {/* NOTIFICATIONS */}
@@ -434,7 +434,7 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
                 className="relative flex h-7 w-7 items-center justify-center rounded-full hover:bg-gray-100 sm:h-10 sm:w-10"
               >
                 <span className="relative inline-flex">
-                  <Bell size={14} className="sm:h-[17px] sm:w-[17px]" />
+                  <Bell size={16} className="sm:h-[19px] sm:w-[19px]" />
                   {unreadCount > 0 && (
                     <span className="absolute -right-1 top-0 h-2.5 w-2.5 rounded-full bg-red-500" />
                   )}
