@@ -123,13 +123,14 @@ class OrderController extends Controller
         if (Schema::hasTable('order_return_refund_requests') && $orders->isNotEmpty()) {
             $requestsByOrder = DB::table('order_return_refund_requests')
                 ->whereIn('order_id', $orders->pluck('id'))
-                ->get(['order_id', 'reason', 'status', 'created_at'])
+                ->get(['order_id', 'reason', 'admin_reason', 'status', 'created_at'])
                 ->keyBy('order_id');
 
             foreach ($orders as $order) {
                 $returnRefundRequest = $requestsByOrder->get($order->id);
                 $order->setAttribute('return_refund_request', $returnRefundRequest ? [
                     'reason' => $returnRefundRequest->reason,
+                    'admin_reason' => $returnRefundRequest->admin_reason,
                     'status' => $returnRefundRequest->status,
                     'created_at' => $returnRefundRequest->created_at,
                 ] : null);
@@ -1188,6 +1189,67 @@ class OrderController extends Controller
                 'created_at' => $returnRefundRequest->created_at,
             ],
         ], 201);
+    }
+
+    public function rejectReturnRefundRequest(Request $request, int $orderId)
+    {
+        $user = $this->getAuthenticatedUser($request);
+        if (!$user || strtolower((string) $user->role) !== 'admin') {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], $user ? 403 : 401);
+        }
+
+        $validated = $request->validate([
+            'admin_reason' => ['required', 'string', 'min:5', 'max:1000'],
+        ]);
+
+        try {
+            $customerId = DB::transaction(function () use ($orderId, $validated) {
+                $order = Order::query()->whereKey($orderId)->lockForUpdate()->first();
+                if (!$order) {
+                    throw new RuntimeException('Order not found.');
+                }
+
+                $returnRefundRequest = DB::table('order_return_refund_requests')
+                    ->where('order_id', $orderId)
+                    ->lockForUpdate()
+                    ->first();
+                if (!$returnRefundRequest || $returnRefundRequest->status !== 'Pending Review') {
+                    throw new RuntimeException('There is no pending return/refund request to reject.');
+                }
+
+                $adminReason = trim($validated['admin_reason']);
+                DB::table('order_return_refund_requests')
+                    ->where('id', $returnRefundRequest->id)
+                    ->update([
+                        'status' => 'Rejected',
+                        'admin_reason' => $adminReason,
+                        'updated_at' => now(),
+                    ]);
+                $order->update(['status' => 'Completed']);
+
+                DB::table('notifications')->insert([
+                    'user_id' => $returnRefundRequest->customer_id,
+                    'title' => "Return/refund request rejected for order #{$orderId}",
+                    'message' => "Your return/refund request for order #{$orderId} was rejected. Admin reason: {$adminReason}",
+                    'type' => 'Warning',
+                    'is_read' => false,
+                    'action_url' => '/customer/orders',
+                    'created_at' => now(),
+                ]);
+
+                return (int) $returnRefundRequest->customer_id;
+            });
+        } catch (RuntimeException $exception) {
+            $status = $exception->getMessage() === 'Order not found.' ? 404 : 409;
+            return response()->json(['success' => false, 'message' => $exception->getMessage()], $status);
+        }
+
+        app(\App\Services\RealtimeEventPublisher::class)->orderUpdated($customerId, $orderId);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'The return/refund request was rejected and the customer was notified.',
+        ]);
     }
 
     /**

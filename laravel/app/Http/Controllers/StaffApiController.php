@@ -216,7 +216,7 @@ class StaffApiController extends Controller
             if ($orders->isNotEmpty() && Schema::hasTable('order_return_refund_requests')) {
                 $returnRefundRequestsByOrder = DB::table('order_return_refund_requests')
                     ->whereIn('order_id', $orders->pluck('id'))
-                    ->get(['order_id', 'reason', 'status', 'created_at'])
+                    ->get(['order_id', 'reason', 'admin_reason', 'status', 'created_at'])
                     ->keyBy('order_id');
             }
             $orderNumbers = DB::table('orders')
@@ -363,6 +363,7 @@ class StaffApiController extends Controller
                 $returnRefundRequest = $returnRefundRequestsByOrder->get($order->id);
                 $order->return_refund_request = $returnRefundRequest ? [
                     'reason' => $returnRefundRequest->reason,
+                    'admin_reason' => $returnRefundRequest->admin_reason,
                     'status' => $returnRefundRequest->status,
                     'created_at' => $returnRefundRequest->created_at,
                 ] : null;

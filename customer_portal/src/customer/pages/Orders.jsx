@@ -1465,6 +1465,11 @@ export default function Orders() {
                     <div>
                       <p className="text-sm text-gray-700">{isCustomized ? customPaymentMethod : order.payment || order.method || '—'}</p>
                       <p className={`text-xs mt-0.5 ${isCancelled ? 'text-slate-500' : isCompleted ? 'text-slate-500' : 'text-gray-400'}`}>{paymentHint}</p>
+                      {order.return_refund_request?.status === 'Rejected' && order.return_refund_request.admin_reason && (
+                        <p className="mt-1 text-xs text-red-700">
+                          Request rejected: {order.return_refund_request.admin_reason}
+                        </p>
+                      )}
                       {isCustomized && isAwaitingPayment && customDownpaymentAmount > 0 && (
                         <p className="mt-1 text-[10px] leading-4 text-gray-500">
                           Downpayment fee: ₱{downpaymentBreakdown.fee.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}

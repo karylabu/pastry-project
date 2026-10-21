@@ -76,6 +76,7 @@ Route::post('orders', [OrderController::class, 'store']);
 Route::post('orders/{orderId}/cancel', [OrderController::class, 'cancel']);
 Route::post('orders/{orderId}/confirm-received', [OrderController::class, 'confirmReceived']);
 Route::post('orders/{orderId}/return-refund-request', [OrderController::class, 'requestReturnRefund']);
+Route::post('staff/orders/{orderId}/return-refund/reject', [OrderController::class, 'rejectReturnRefundRequest']);
 Route::post('orders/{orderId}/payment-proof', [OrderController::class, 'submitPaymentProof']);
 Route::post('orders/{orderId}/payment-failure', [OrderController::class, 'markPaymentFailed']);
 Route::post('sales/import-pdf', [SalesImportController::class, 'store']);

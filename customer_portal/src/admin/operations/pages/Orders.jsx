@@ -110,6 +110,9 @@ export default function Orders() {
   const [wasteModalOrderId, setWasteModalOrderId] = useState(null);
   const [wasteForm, setWasteForm] = useState({ item: "", qty: "1", reason: "Production loss" });
   const [wasteSubmitting, setWasteSubmitting] = useState(false);
+  const [rejectModalOrderId, setRejectModalOrderId] = useState(null);
+  const [rejectReason, setRejectReason] = useState("");
+  const [rejectSubmitting, setRejectSubmitting] = useState(false);
   const pollRef = useRef(null);
   const discountIdPreviewUrlsRef = useRef({});
   const paymentProofPreviewUrlsRef = useRef({});
@@ -385,6 +388,37 @@ export default function Orders() {
       .finally(() => setUpdatingId(null));
   };
 
+  const submitReturnRefundRejection = async (event) => {
+    event.preventDefault();
+    const adminReason = rejectReason.trim();
+    if (adminReason.length < 5) {
+      addToast("Please enter a rejection reason (at least 5 characters).", "error");
+      return;
+    }
+
+    setRejectSubmitting(true);
+    try {
+      const response = await laravelStaffFetch(`${LARAVEL_BASE}/api/staff/orders/${rejectModalOrderId}/return-refund/reject`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ admin_reason: adminReason }),
+      });
+      const data = await response.json();
+      if (!response.ok || !data?.success) {
+        throw new Error(data?.message || "Unable to reject the return/refund request.");
+      }
+
+      addToast(`Return/refund request for order #${rejectModalOrderId} rejected. Customer notified.`);
+      setRejectModalOrderId(null);
+      setRejectReason("");
+      fetchOrders(true);
+    } catch (error) {
+      addToast(error.message || "Unable to reject the return/refund request.", "error");
+    } finally {
+      setRejectSubmitting(false);
+    }
+  };
+
   const advanceOrder = (order) => {
     const hasReviewableProof = order.status === 'Awaiting Payment'
       && String(order.payment_status || '').toLowerCase() === 'proof_submitted'
@@ -610,7 +644,9 @@ export default function Orders() {
                       <div className="mt-3 flex flex-wrap gap-1.5">
                         <button type="button" onClick={() => setExpandedOrderId(isExpanded ? null : order.id)} className="rounded-md border border-[#e8dfd4] bg-white px-2.5 py-1.5 text-[10px] font-semibold text-[#65574d] hover:bg-[#faf7f2]">{isExpanded ? "Hide details" : "View details"}</button>
                         {canAdvance && <button type="button" onClick={() => advanceOrder(order)} disabled={updatingId === order.id} className="rounded-md bg-black px-2.5 py-1.5 text-[10px] font-semibold text-white disabled:opacity-50">{updatingId === order.id ? "Updating..." : needsPaymentReview ? "Review payment" : order.status === "Pending" ? "Approve" : order.status === "Preparing" ? "Ready" : order.status === "Return/Refund" ? "Resolve request" : "Complete"}</button>}
-                        {!["Completed", "Cancelled"].includes(order.status) && <button type="button" onClick={() => updateStatus(order.id, "Cancelled")} disabled={updatingId === order.id} className="rounded-md border border-red-200 bg-red-50 px-2.5 py-1.5 text-[10px] font-semibold text-red-700 disabled:opacity-50">Cancel</button>}
+                        {order.status === "Return/Refund"
+                          ? order.return_refund_request?.status === "Pending Review" && <button type="button" onClick={() => { setRejectModalOrderId(order.id); setRejectReason(""); }} disabled={updatingId === order.id} className="rounded-md border border-red-200 bg-red-50 px-2.5 py-1.5 text-[10px] font-semibold text-red-700 disabled:opacity-50">Reject</button>
+                          : !["Completed", "Cancelled"].includes(order.status) && <button type="button" onClick={() => updateStatus(order.id, "Cancelled")} disabled={updatingId === order.id} className="rounded-md border border-red-200 bg-red-50 px-2.5 py-1.5 text-[10px] font-semibold text-red-700 disabled:opacity-50">Cancel</button>}
                         <button type="button" onClick={() => openWasteModal(order)} className="rounded-md border border-[#e8dfd4] bg-[#faf7f2] px-2.5 py-1.5 text-[10px] font-semibold text-[#65574d]">Log waste</button>
                       </div>
                     </div>
@@ -619,6 +655,7 @@ export default function Orders() {
                         <div className="mb-3 rounded-md border border-amber-200 bg-amber-50 p-3">
                           <p className="text-[9px] font-semibold uppercase tracking-[0.14em] text-amber-800">Return/refund request · {order.return_refund_request.status}</p>
                           <p className="mt-1 whitespace-pre-wrap text-[11px] text-amber-950">{order.return_refund_request.reason}</p>
+                          {order.return_refund_request.admin_reason && <p className="mt-2 whitespace-pre-wrap text-[11px] text-red-800"><span className="font-semibold">Admin rejection reason:</span> {order.return_refund_request.admin_reason}</p>}
                         </div>
                       )}
                       <div className="grid gap-3 sm:grid-cols-2">
@@ -696,7 +733,9 @@ export default function Orders() {
                             <div className="flex flex-wrap justify-end gap-2">
                               <button type="button" onClick={() => setExpandedOrderId(isExpanded ? null : order.id)} className="rounded-full border border-black/10 bg-white px-3 py-1.5 text-[11px] font-semibold text-black hover:bg-black hover:text-white">{isExpanded ? "Hide" : "View"}</button>
                               {(!(order.status === "Completed" || order.status === "Cancelled") && (order.status !== 'Awaiting Payment' || needsPaymentReview)) && <button type="button" onClick={() => advanceOrder(order)} disabled={updatingId === order.id} className="rounded-full bg-black px-3 py-1.5 text-[11px] font-semibold text-white hover:bg-black/80 disabled:opacity-50">{needsPaymentReview ? "Verify & move to Pending" : order.status === "Pending" ? "Approve" : order.status === "Preparing" ? "Ready" : order.status === "Return/Refund" ? "Resolve request" : "Complete"}</button>}
-                              {!("Completed" === order.status || "Cancelled" === order.status) && <button type="button" onClick={() => updateStatus(order.id, "Cancelled")} disabled={updatingId === order.id} className="rounded-full border border-red-200 bg-red-50 px-3 py-1.5 text-[11px] font-semibold text-red-600 hover:bg-red-100 disabled:opacity-50">Cancel</button>}
+                              {order.status === "Return/Refund"
+                                ? order.return_refund_request?.status === "Pending Review" && <button type="button" onClick={() => { setRejectModalOrderId(order.id); setRejectReason(""); }} disabled={updatingId === order.id || rejectSubmitting} className="rounded-full border border-red-200 bg-red-50 px-3 py-1.5 text-[11px] font-semibold text-red-600 hover:bg-red-100 disabled:opacity-50">Reject</button>
+                                : !["Completed", "Cancelled"].includes(order.status) && <button type="button" onClick={() => updateStatus(order.id, "Cancelled")} disabled={updatingId === order.id} className="rounded-full border border-red-200 bg-red-50 px-3 py-1.5 text-[11px] font-semibold text-red-600 hover:bg-red-100 disabled:opacity-50">Cancel</button>}
                               <button type="button" onClick={() => openWasteModal(order)} className="rounded-full border border-black/10 bg-[#F7F5EE] px-3 py-1.5 text-[11px] font-semibold text-black hover:bg-black hover:text-white">Waste</button>
                             </div>
                           </td>
@@ -708,6 +747,7 @@ export default function Orders() {
                                 <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-3">
                                   <p className="text-[9px] uppercase tracking-[0.2em] text-amber-800">Return/refund request · {order.return_refund_request.status}</p>
                                   <p className="mt-1 whitespace-pre-wrap text-[11px] text-amber-950">{order.return_refund_request.reason}</p>
+                                  {order.return_refund_request.admin_reason && <p className="mt-2 whitespace-pre-wrap text-[11px] text-red-800"><span className="font-semibold">Admin rejection reason:</span> {order.return_refund_request.admin_reason}</p>}
                                 </div>
                               )}
                               <div className="grid gap-4 md:grid-cols-2">
@@ -962,6 +1002,59 @@ export default function Orders() {
           )}
         </div>
       </div>
+
+      <AnimatePresence>
+        {rejectModalOrderId && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          >
+            <motion.div
+              initial={{ y: 16, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: 16, opacity: 0 }}
+              className="w-full max-w-md rounded-[24px] border border-black/10 bg-white p-5 shadow-xl"
+            >
+              <div className="mb-4 flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-[10px] uppercase tracking-[0.2em] text-red-700">Reject request</p>
+                  <h3 className="text-[18px] font-semibold text-black">Order #{rejectModalOrderId}</h3>
+                </div>
+                <button type="button" onClick={() => setRejectModalOrderId(null)} className="text-[12px] font-semibold text-black/60">
+                  Close
+                </button>
+              </div>
+
+              <form onSubmit={submitReturnRefundRejection} className="space-y-3">
+                <div>
+                  <label htmlFor="return-refund-rejection-reason" className="mb-1 block text-[12px] font-semibold text-black/70">Reason for rejecting</label>
+                  <textarea
+                    id="return-refund-rejection-reason"
+                    required
+                    minLength={5}
+                    maxLength={1000}
+                    rows={4}
+                    value={rejectReason}
+                    onChange={(event) => setRejectReason(event.target.value)}
+                    className="w-full resize-y rounded-2xl border border-black/10 bg-white px-4 py-3 text-[13px] text-black/80 outline-none focus:border-[#D4AF37]"
+                    placeholder="Explain why this return/refund request is being rejected."
+                  />
+                </div>
+                <div className="flex justify-end gap-2 pt-2">
+                  <button type="button" onClick={() => setRejectModalOrderId(null)} className="rounded-full border border-black/10 bg-white px-4 py-2 text-[12px] font-semibold text-black">
+                    Back
+                  </button>
+                  <button type="submit" disabled={rejectSubmitting} className="rounded-full bg-red-700 px-4 py-2 text-[12px] font-semibold text-white disabled:cursor-not-allowed disabled:bg-red-700/50">
+                    {rejectSubmitting ? "Rejecting..." : "Reject request"}
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <AnimatePresence>
         {wasteModalOrderId && (

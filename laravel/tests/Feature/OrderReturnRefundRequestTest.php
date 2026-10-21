@@ -37,6 +37,7 @@ class OrderReturnRefundRequestTest extends TestCase
             $table->unsignedBigInteger('order_id')->unique();
             $table->unsignedBigInteger('customer_id');
             $table->text('reason');
+            $table->text('admin_reason')->nullable();
             $table->string('status')->default('Pending Review');
             $table->timestamps();
         });
@@ -70,6 +71,7 @@ class OrderReturnRefundRequestTest extends TestCase
         DB::table('user_sessions')->insert([
             ['user_id' => 1, 'token' => 'customer-token', 'expires_at' => now()->addHour()],
             ['user_id' => 3, 'token' => 'other-customer-token', 'expires_at' => now()->addHour()],
+            ['user_id' => 2, 'token' => 'admin-token', 'expires_at' => now()->addHour()],
         ]);
         DB::table('orders')->insert([
             ['id' => 10, 'user_id' => 1, 'email' => null, 'status' => 'Ready for Pickup'],
@@ -139,5 +141,49 @@ class OrderReturnRefundRequestTest extends TestCase
             'order_id' => 13,
             'customer_id' => 1,
         ]);
+    }
+
+    public function test_admin_can_reject_a_return_refund_request_with_a_reason_and_notify_customer(): void
+    {
+        DB::table('order_return_refund_requests')->insert([
+            'order_id' => 10,
+            'customer_id' => 1,
+            'reason' => 'Wrong cake',
+            'status' => 'Pending Review',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        DB::table('orders')->where('id', 10)->update(['status' => 'Return/Refund']);
+
+        $this->withHeader('Authorization', 'Bearer admin-token')
+            ->postJson('http://localhost/api/staff/orders/10/return-refund/reject', [
+                'admin_reason' => 'The delivered cake matches the confirmed order.',
+            ])
+            ->assertOk()
+            ->assertJsonPath('success', true);
+
+        $this->assertDatabaseHas('order_return_refund_requests', [
+            'order_id' => 10,
+            'status' => 'Rejected',
+            'admin_reason' => 'The delivered cake matches the confirmed order.',
+        ]);
+        $this->assertDatabaseHas('orders', ['id' => 10, 'status' => 'Completed']);
+        $this->assertDatabaseHas('notifications', [
+            'user_id' => 1,
+            'title' => 'Return/refund request rejected for order #10',
+            'message' => 'Your return/refund request for order #10 was rejected. Admin reason: The delivered cake matches the confirmed order.',
+            'type' => 'Warning',
+            'action_url' => '/customer/orders',
+        ]);
+    }
+
+    public function test_only_admin_can_reject_a_return_refund_request(): void
+    {
+        $this->withHeader('Authorization', 'Bearer customer-token')
+            ->postJson('http://localhost/api/staff/orders/10/return-refund/reject', [
+                'admin_reason' => 'Not approved.',
+            ])
+            ->assertForbidden()
+            ->assertJsonPath('success', false);
     }
 }
