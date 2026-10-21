@@ -62,7 +62,7 @@ function CancelDialog({ order, onConfirm, onDismiss, isLoading }) {
 }
 
 // ── Order Received Confirmation Dialog ───────────────────────────────────────
-function ReceivedDialog({ order, onConfirm, onDismiss, isLoading }) {
+function ReceivedDialog({ order, onConfirm, onReturnRefund, onDismiss, isLoading }) {
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -77,8 +77,16 @@ function ReceivedDialog({ order, onConfirm, onDismiss, isLoading }) {
         exit={{ scale: 0.92, opacity: 0, y: 16 }}
         transition={{ type: "spring", damping: 24, stiffness: 260 }}
         onClick={(e) => e.stopPropagation()}
-        className="bg-white rounded-[32px] p-8 w-full max-w-sm shadow-2xl font-['DM_Sans']"
+        className="relative bg-white rounded-[32px] p-8 w-full max-w-sm shadow-2xl font-['DM_Sans']"
       >
+        <button
+          type="button"
+          onClick={onDismiss}
+          className="absolute right-5 top-5 grid h-9 w-9 place-items-center rounded-full text-gray-400 transition hover:bg-gray-100 hover:text-gray-700"
+          aria-label="Close order confirmation"
+        >
+          <X size={18} />
+        </button>
         <div className="w-14 h-14 rounded-full bg-gray-50 flex items-center justify-center mb-6 mx-auto">
           <PackageCheck size={26} className="text-gray-700" strokeWidth={1.8} />
         </div>
@@ -89,12 +97,19 @@ function ReceivedDialog({ order, onConfirm, onDismiss, isLoading }) {
           Confirm that you have received Order #{order.order_number ?? order.id}. This will mark it as <span className="text-slate-900 font-bold">Completed</span>.
         </p>
         <div className="flex gap-3">
-          <button
-            onClick={onDismiss}
-            className="flex-1 py-4 rounded-[20px] border border-gray-200 text-[11px] font-black uppercase tracking-[0.2em] text-gray-500 hover:bg-gray-50 transition-all"
-          >
-            Not Yet
-          </button>
+          {order.return_refund_request ? (
+            <p className="flex-1 self-center text-center text-[10px] font-bold uppercase tracking-[0.1em] text-amber-700">
+              Request {order.return_refund_request.status}
+            </p>
+          ) : (
+            <button
+              type="button"
+              onClick={onReturnRefund}
+              className="flex-1 py-4 rounded-[20px] border border-gray-200 text-[11px] font-black uppercase tracking-[0.12em] text-gray-600 hover:bg-gray-50 transition-all"
+            >
+              Return/Refund
+            </button>
+          )}
           <button
             onClick={onConfirm}
             disabled={isLoading}
@@ -104,6 +119,75 @@ function ReceivedDialog({ order, onConfirm, onDismiss, isLoading }) {
           </button>
         </div>
       </motion.div>
+    </motion.div>
+  );
+}
+
+function ReturnRefundDialog({ order, onSubmit, onDismiss, isLoading, error }) {
+  const [reason, setReason] = useState('');
+
+  const handleSubmit = (event) => {
+    event.preventDefault();
+    onSubmit(reason);
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/40 p-6 backdrop-blur-sm"
+      onClick={onDismiss}
+    >
+      <motion.form
+        initial={{ scale: 0.92, opacity: 0, y: 16 }}
+        animate={{ scale: 1, opacity: 1, y: 0 }}
+        exit={{ scale: 0.92, opacity: 0, y: 16 }}
+        transition={{ type: 'spring', damping: 24, stiffness: 260 }}
+        onSubmit={handleSubmit}
+        onClick={(event) => event.stopPropagation()}
+        className="relative w-full max-w-sm rounded-[32px] bg-white p-8 font-['DM_Sans'] shadow-2xl"
+      >
+        <button
+          type="button"
+          onClick={onDismiss}
+          className="absolute right-5 top-5 grid h-9 w-9 place-items-center rounded-full text-gray-400 transition hover:bg-gray-100 hover:text-gray-700"
+          aria-label="Close return/refund request"
+        >
+          <X size={18} />
+        </button>
+        <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-full bg-amber-50">
+          <AlertTriangle size={25} className="text-amber-700" strokeWidth={1.8} />
+        </div>
+        <h3 className="mb-2 text-center text-[20px] font-black leading-tight text-gray-900">
+          Return/Refund Request
+        </h3>
+        <p className="mb-5 text-center text-[12px] leading-relaxed text-gray-400">
+          Tell the admin why you’re requesting a return or refund for Order #{order.order_number ?? order.id}. Your request will be reviewed; this does not automatically issue a refund.
+        </p>
+        <label htmlFor="return-refund-reason" className="mb-2 block text-[11px] font-semibold text-gray-600">
+          Reason
+        </label>
+        <textarea
+          id="return-refund-reason"
+          value={reason}
+          onChange={(event) => setReason(event.target.value)}
+          minLength={5}
+          maxLength={1000}
+          rows={4}
+          required
+          placeholder="Describe the issue with your order..."
+          className="mb-3 w-full resize-none rounded-2xl border border-gray-200 px-4 py-3 text-sm text-gray-700 outline-none transition focus:border-slate-500"
+        />
+        {error && <p role="alert" className="mb-3 text-xs text-red-600">{error}</p>}
+        <button
+          type="submit"
+          disabled={isLoading || reason.trim().length < 5}
+          className="w-full rounded-[20px] bg-slate-900 py-4 text-[11px] font-black uppercase tracking-[0.16em] text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {isLoading ? 'Submitting…' : 'Send Request'}
+        </button>
+      </motion.form>
     </motion.div>
   );
 }
@@ -255,6 +339,8 @@ export default function Orders() {
   const [expandedIds, setExpandedIds] = useState(new Set());
   const [cancelTarget, setCancelTarget]   = useState(null);
   const [receivedTarget, setReceivedTarget] = useState(null);
+  const [returnRefundTarget, setReturnRefundTarget] = useState(null);
+  const [returnRefundError, setReturnRefundError] = useState('');
   const [paymentProofTarget, setPaymentProofTarget] = useState(null);
   const [processingId, setProcessingId]   = useState(null);
   const [payingOrderId, setPayingOrderId] = useState(null);
@@ -497,6 +583,42 @@ export default function Orders() {
     } finally {
       setProcessingId(null);
       setReceivedTarget(null);
+    }
+  };
+
+  const handleReturnRefundSubmit = async (reason) => {
+    if (!returnRefundTarget) return;
+    setProcessingId(returnRefundTarget.id);
+    setReturnRefundError('');
+    try {
+      const response = await fetch(`${LARAVEL_BASE}/api/orders/${returnRefundTarget.id}/return-refund-request`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json', ...getAuthHeaders() },
+        body: JSON.stringify({ reason }),
+      });
+      const result = await safeParseJson(response);
+      if (!response.ok || !result?.success) {
+        throw new Error(result?.message || 'Unable to submit your return/refund request.');
+      }
+
+      const updatedOrders = orders.map((order) => (
+        order.id === returnRefundTarget.id
+          ? { ...order, return_refund_request: result.return_refund_request }
+          : order
+      ));
+      setOrders(updatedOrders);
+      try {
+        localStorage.setItem(storageKey, JSON.stringify(updatedOrders));
+      } catch (storageError) {
+        console.warn('Unable to cache return/refund request status:', storageError);
+      }
+      setReturnRefundTarget(null);
+      setActionError('Your return/refund request was sent to the admin for review.');
+    } catch (error) {
+      setReturnRefundError(error.message || 'Unable to submit your return/refund request.');
+    } finally {
+      setProcessingId(null);
     }
   };
 
@@ -1520,8 +1642,25 @@ export default function Orders() {
           <ReceivedDialog
             order={receivedTarget}
             onConfirm={handleReceivedConfirm}
+            onReturnRefund={() => {
+              setReturnRefundError('');
+              setReturnRefundTarget(receivedTarget);
+              setReceivedTarget(null);
+            }}
             onDismiss={() => setReceivedTarget(null)}
             isLoading={processingId === receivedTarget?.id}
+          />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {returnRefundTarget && (
+          <ReturnRefundDialog
+            order={returnRefundTarget}
+            onSubmit={handleReturnRefundSubmit}
+            onDismiss={() => setReturnRefundTarget(null)}
+            isLoading={processingId === returnRefundTarget.id}
+            error={returnRefundError}
           />
         )}
       </AnimatePresence>

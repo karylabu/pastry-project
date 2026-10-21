@@ -277,6 +277,7 @@ export default function Orders() {
         order.address,
         order.delivery_address,
         order.total,
+        order.return_refund_request?.reason,
         ...(order.items || []).flatMap((item) => [item.name, item.qty]),
       ].join(" ").toLowerCase();
       const matchesSearch = !query || searchableText.includes(query);
@@ -587,6 +588,7 @@ export default function Orders() {
                           <div className="flex flex-wrap items-center gap-1.5">
                             <span className="text-[12px] font-bold text-[#33251e]">#{order.order_number ?? order.id}</span>
                             <span className={`rounded px-2 py-1 text-[9px] font-semibold ${statusColors[order.status] ?? "bg-black/5 text-black"}`}>{order.status}</span>
+                            {order.return_refund_request && <span className="rounded bg-amber-100 px-2 py-1 text-[9px] font-semibold text-amber-900">Return/refund · {order.return_refund_request.status}</span>}
                             {urgency.isUrgent && <span className="inline-flex items-center gap-1 rounded bg-[#fff3d1] px-2 py-1 text-[9px] font-semibold text-[#80600a]"><AlertTriangle size={11} /> Rush · {urgency.ageMinutes}m</span>}
                           </div>
                           <p className="mt-2 truncate text-[13px] font-semibold text-[#33251e]">{customerLabel}</p>
@@ -606,6 +608,12 @@ export default function Orders() {
                       </div>
                     </div>
                     {isExpanded && <div className="border-t border-[#eee6de] bg-[#fffdfa] p-3.5 text-[11px] text-[#65574d]">
+                      {order.return_refund_request && (
+                        <div className="mb-3 rounded-md border border-amber-200 bg-amber-50 p-3">
+                          <p className="text-[9px] font-semibold uppercase tracking-[0.14em] text-amber-800">Return/refund request · {order.return_refund_request.status}</p>
+                          <p className="mt-1 whitespace-pre-wrap text-[11px] text-amber-950">{order.return_refund_request.reason}</p>
+                        </div>
+                      )}
                       <div className="grid gap-3 sm:grid-cols-2">
                         <div><p className="text-[9px] font-semibold uppercase tracking-[0.14em] text-[#9b8c83]">Order details</p><p className="mt-1 font-semibold text-[#33251e]">{customerLabel}</p><p>{order.email || "No email provided"}</p><p>{order.phone || "No phone provided"}</p><p>{addressLabel}</p><p>Payment: {order.payment || "N/A"}</p></div>
                         <div><p className="text-[9px] font-semibold uppercase tracking-[0.14em] text-[#9b8c83]">Items</p>{(order.items || []).map((item, index) => <div key={`${order.id}-mobile-${index}`} className="flex justify-between gap-3 border-b border-[#eee6de] py-1.5 last:border-0"><span>{item.name || "Item"} · Qty {item.qty || 1}</span><strong className="shrink-0 text-[#33251e]">₱{Number(item.price || 0).toLocaleString()}</strong></div>)}</div>
@@ -671,7 +679,12 @@ export default function Orders() {
                           </td>
                           <td className="max-w-[260px] px-4 py-3 text-[12px] text-black/65" title={itemLabel}>{itemLabel}</td>
                           <td className="px-4 py-3 text-[13px] font-semibold text-black">₱{Number(order.total || 0).toLocaleString()}</td>
-                          <td className="px-4 py-3"><span className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-semibold ${statusColors[order.status] ?? "bg-black/5 text-black"}`}>{order.status}</span></td>
+                          <td className="px-4 py-3">
+                            <div className="flex flex-col items-start gap-1.5">
+                              <span className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-semibold ${statusColors[order.status] ?? "bg-black/5 text-black"}`}>{order.status}</span>
+                              {order.return_refund_request && <span className="rounded bg-amber-100 px-2 py-1 text-[9px] font-semibold text-amber-900">Return/refund · {order.return_refund_request.status}</span>}
+                            </div>
+                          </td>
                           <td className="px-4 py-3">
                             <div className="flex flex-wrap justify-end gap-2">
                               <button type="button" onClick={() => setExpandedOrderId(isExpanded ? null : order.id)} className="rounded-full border border-black/10 bg-white px-3 py-1.5 text-[11px] font-semibold text-black hover:bg-black hover:text-white">{isExpanded ? "Hide" : "View"}</button>
@@ -684,6 +697,12 @@ export default function Orders() {
                         {isExpanded && (
                           <tr className="border-b border-black/10 bg-[#FFFDF7]">
                             <td colSpan="6" className="px-4 py-4 text-[11px] leading-5 text-black/70">
+                              {order.return_refund_request && (
+                                <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-3">
+                                  <p className="text-[9px] uppercase tracking-[0.2em] text-amber-800">Return/refund request · {order.return_refund_request.status}</p>
+                                  <p className="mt-1 whitespace-pre-wrap text-[11px] text-amber-950">{order.return_refund_request.reason}</p>
+                                </div>
+                              )}
                               <div className="grid gap-4 md:grid-cols-2">
                                 <div><p className="text-[9px] uppercase tracking-[0.2em] text-black/50">Order details</p><p className="mt-1 font-semibold text-black">Order #{order.order_number ?? order.id}</p><p>{customerLabel}</p><p>{order.method || "N/A"}</p><p>{addressLabel}</p><p>Payment: {order.payment || "N/A"}</p></div>
                                 <div><p className="text-[9px] uppercase tracking-[0.2em] text-black/50">Items</p>{(order.items || []).map((item, index) => <div key={`${order.id}-${index}`} className="flex justify-between border-b border-black/10 py-1 last:border-0"><span>{item.name || "Item"} · Qty {item.qty || 1}</span><strong>₱{Number(item.price || 0).toLocaleString()}</strong></div>)}<div className="mt-2 flex justify-between font-semibold text-black"><span>Total</span><span>₱{Number(order.total || 0).toLocaleString()}</span></div></div>

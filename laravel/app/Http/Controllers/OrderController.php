@@ -120,6 +120,22 @@ class OrderController extends Controller
             }
         }
 
+        if (Schema::hasTable('order_return_refund_requests') && $orders->isNotEmpty()) {
+            $requestsByOrder = DB::table('order_return_refund_requests')
+                ->whereIn('order_id', $orders->pluck('id'))
+                ->get(['order_id', 'reason', 'status', 'created_at'])
+                ->keyBy('order_id');
+
+            foreach ($orders as $order) {
+                $returnRefundRequest = $requestsByOrder->get($order->id);
+                $order->setAttribute('return_refund_request', $returnRefundRequest ? [
+                    'reason' => $returnRefundRequest->reason,
+                    'status' => $returnRefundRequest->status,
+                    'created_at' => $returnRefundRequest->created_at,
+                ] : null);
+            }
+        }
+
         return response()->json([
             'success' => true,
             'orders' => $orders
@@ -1097,6 +1113,75 @@ class OrderController extends Controller
         }
 
         return response()->json(['success' => true]);
+    }
+
+    public function requestReturnRefund(Request $request, int $id)
+    {
+        $user = $this->getAuthenticatedUser($request);
+        if (!$user) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+
+        $validated = $request->validate([
+            'reason' => ['required', 'string', 'min:5', 'max:1000'],
+        ]);
+
+        try {
+            $returnRefundRequest = DB::transaction(function () use ($id, $user, $validated) {
+                $order = Order::query()->whereKey($id)->lockForUpdate()->first();
+                $belongsToUser = $order && (
+                    (int) $order->user_id === (int) $user->id
+                    || (!$order->user_id && strcasecmp((string) $order->email, (string) $user->email) === 0)
+                );
+                if (!$belongsToUser) {
+                    throw new RuntimeException('Order not found.');
+                }
+                if ($order->status !== 'Ready for Pickup') {
+                    throw new RuntimeException('Return or refund requests are only available for orders ready for pickup.');
+                }
+
+                $existingRequest = DB::table('order_return_refund_requests')
+                    ->where('order_id', $order->id)
+                    ->first();
+                if ($existingRequest) {
+                    throw new RuntimeException('A return or refund request has already been submitted for this order.');
+                }
+
+                $requestId = DB::table('order_return_refund_requests')->insertGetId([
+                    'order_id' => $order->id,
+                    'customer_id' => $user->id,
+                    'reason' => trim($validated['reason']),
+                    'status' => 'Pending Review',
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+
+                AdminNotification::notifyRoles(['admin'], [
+                    'type' => 'return_refund_request',
+                    'title' => "Return/refund request for order #{$order->id}",
+                    'message' => "{$user->name} requested a return/refund for order #{$order->id}: " . trim($validated['reason']),
+                    'action_url' => '/admin/orders',
+                    'created_at' => now(),
+                ]);
+
+                return DB::table('order_return_refund_requests')->where('id', $requestId)->first();
+            });
+        } catch (RuntimeException $exception) {
+            $status = $exception->getMessage() === 'Order not found.' ? 404 : 409;
+            return response()->json(['success' => false, 'message' => $exception->getMessage()], $status);
+        }
+
+        app(\App\Services\RealtimeEventPublisher::class)->orderUpdated((int) $user->id, $id);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Your return/refund request was sent to the admin for review.',
+            'return_refund_request' => [
+                'reason' => $returnRefundRequest->reason,
+                'status' => $returnRefundRequest->status,
+                'created_at' => $returnRefundRequest->created_at,
+            ],
+        ], 201);
     }
 
     /**

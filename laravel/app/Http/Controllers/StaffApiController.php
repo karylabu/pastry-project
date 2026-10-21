@@ -212,6 +212,13 @@ class StaffApiController extends Controller
             }
 
             $orders = $query->orderByDesc('id')->get();
+            $returnRefundRequestsByOrder = collect();
+            if ($orders->isNotEmpty() && Schema::hasTable('order_return_refund_requests')) {
+                $returnRefundRequestsByOrder = DB::table('order_return_refund_requests')
+                    ->whereIn('order_id', $orders->pluck('id'))
+                    ->get(['order_id', 'reason', 'status', 'created_at'])
+                    ->keyBy('order_id');
+            }
             $orderNumbers = DB::table('orders')
                 ->orderBy('created_at')
                 ->orderBy('id')
@@ -269,7 +276,7 @@ class StaffApiController extends Controller
                 }
             }
 
-            $orders = $orders->map(function ($order) use ($orderNumbers, $itemsByOrder, $productSizesById, $legacyCustomByOrder, $customizedByOrder) {
+            $orders = $orders->map(function ($order) use ($orderNumbers, $itemsByOrder, $productSizesById, $legacyCustomByOrder, $customizedByOrder, $returnRefundRequestsByOrder) {
                 $rawItems = json_decode((string) ($order->items ?? '[]'), true);
                 $items = $itemsByOrder->get($order->id, collect())
                     ->map(function ($item) use ($productSizesById) {
@@ -353,6 +360,12 @@ class StaffApiController extends Controller
                 $order->custom_details = $customDetails;
                 $order->custom_inspo_images = $customImages;
                 $order->customized_inspo_images = is_array($customizedImages) ? $customizedImages : [];
+                $returnRefundRequest = $returnRefundRequestsByOrder->get($order->id);
+                $order->return_refund_request = $returnRefundRequest ? [
+                    'reason' => $returnRefundRequest->reason,
+                    'status' => $returnRefundRequest->status,
+                    'created_at' => $returnRefundRequest->created_at,
+                ] : null;
                 $order->details = $customDetails['details'] ?? $customized->notes ?? $legacyCustom->notes ?? null;
                 $order->name = $customDetails['customer_name'] ?? $order->customer;
                 $order->customer_name = $customDetails['customer_name'] ?? $order->customer;
