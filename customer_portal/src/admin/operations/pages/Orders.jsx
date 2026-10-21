@@ -474,7 +474,13 @@ export default function Orders() {
             : {}),
         }),
       });
-      const data = await response.json();
+      let data;
+      try {
+        const responseText = await response.text();
+        data = responseText ? JSON.parse(responseText) : {};
+      } catch {
+        throw new Error(`Waste logging server returned an unexpected response (HTTP ${response.status}).`);
+      }
       if (!response.ok || !data?.success) {
         throw new Error(data?.message || "Waste log failed.");
       }
