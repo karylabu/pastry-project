@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { AlertTriangle, Clock3, PackageCheck, RefreshCw, Search, ShoppingBag, X } from "lucide-react";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 
 /* STAFF NAVBAR */
 import { STAFF_BASE, LARAVEL_BASE } from "../../../services/config";
@@ -89,6 +89,7 @@ function Toast({ toasts }) {
 
 export default function Orders() {
   const location = useLocation();
+  const navigate = useNavigate();
   const [orders, setOrders] = useState([]);
   const [ingredients, setIngredients] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -107,15 +108,6 @@ export default function Orders() {
   const [paymentProofPreviews, setPaymentProofPreviews] = useState({});
   const [paymentProofLoading, setPaymentProofLoading] = useState(null);
   const [connectionIssue, setConnectionIssue] = useState(false);
-  const [wasteModalOrderId, setWasteModalOrderId] = useState(null);
-  const [wasteForm, setWasteForm] = useState({
-    item: "",
-    itemType: "Finished Product",
-    productId: "",
-    qty: "1",
-    reason: "Production loss",
-  });
-  const [wasteSubmitting, setWasteSubmitting] = useState(false);
   const [rejectModalOrderId, setRejectModalOrderId] = useState(null);
   const [rejectReason, setRejectReason] = useState("");
   const [rejectSubmitting, setRejectSubmitting] = useState(false);
@@ -435,74 +427,6 @@ export default function Orders() {
     if (nextStatus) updateStatus(order.id, nextStatus);
   };
 
-  const openWasteModal = (order) => {
-    const orderItem = order.items?.[0];
-    const fallbackIngredient = lowStockIngredients[0];
-    setWasteModalOrderId(order.id);
-    setWasteForm({
-      item: orderItem?.name || fallbackIngredient?.name || "",
-      itemType: orderItem ? "Finished Product" : "Raw Material",
-      productId: orderItem?.product_id || orderItem?.productId || "",
-      qty: "1",
-      reason: "Production loss",
-    });
-  };
-
-  const submitWasteLog = async (event) => {
-    event.preventDefault();
-    const item = wasteForm.item.trim();
-    const qty = Number(wasteForm.qty);
-    const reason = wasteForm.reason.trim() || "Production loss";
-
-    if (!item || !qty || qty <= 0) {
-      addToast("Please enter a valid item and quantity.", "error");
-      return;
-    }
-
-    setWasteSubmitting(true);
-    try {
-      const response = await staffFetch(`${STAFF_BASE}/api_waste_log.php`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          item,
-          qty,
-          reason,
-          item_type: wasteForm.itemType,
-          ...(wasteForm.itemType === "Finished Product" && wasteForm.productId
-            ? { product_id: wasteForm.productId }
-            : {}),
-        }),
-      });
-      let data;
-      try {
-        const responseText = await response.text();
-        data = responseText ? JSON.parse(responseText) : {};
-      } catch {
-        throw new Error(`Waste logging server returned an unexpected response (HTTP ${response.status}).`);
-      }
-      if (!response.ok || !data?.success) {
-        throw new Error(data?.message || "Waste log failed.");
-      }
-
-      addToast(`Waste logged for ${item}`, "success");
-      setWasteModalOrderId(null);
-      setWasteForm({
-        item: "",
-        itemType: "Finished Product",
-        productId: "",
-        qty: "1",
-        reason: "Production loss",
-      });
-    } catch (error) {
-      addToast(error.message || "Network error — could not log waste.", "error");
-    } finally {
-      setWasteSubmitting(false);
-    }
-  };
-
-  const wasteOrder = orders.find((order) => order.id === wasteModalOrderId);
-
   return (
     <div className="min-h-screen bg-[#f5f3ee]">
       <Toast toasts={toasts} />
@@ -679,7 +603,7 @@ export default function Orders() {
                         {order.status === "Return/Refund"
                           ? order.return_refund_request?.status === "Pending Review" && <button type="button" onClick={() => { setRejectModalOrderId(order.id); setRejectReason(""); }} disabled={updatingId === order.id} className="rounded-md border border-red-200 bg-red-50 px-2.5 py-1.5 text-[10px] font-semibold text-red-700 disabled:opacity-50">Reject</button>
                           : !["Completed", "Cancelled"].includes(order.status) && <button type="button" onClick={() => updateStatus(order.id, "Cancelled")} disabled={updatingId === order.id} className="rounded-md border border-red-200 bg-red-50 px-2.5 py-1.5 text-[10px] font-semibold text-red-700 disabled:opacity-50">Cancel</button>}
-                        <button type="button" onClick={() => openWasteModal(order)} className="rounded-md border border-[#e8dfd4] bg-[#faf7f2] px-2.5 py-1.5 text-[10px] font-semibold text-[#65574d]">Log waste</button>
+                        <button type="button" onClick={() => navigate("/admin/waste-tracking")} className="rounded-md border border-[#e8dfd4] bg-[#faf7f2] px-2.5 py-1.5 text-[10px] font-semibold text-[#65574d]">Waste analytics</button>
                       </div>
                     </div>
                     {isExpanded && <div className="border-t border-[#eee6de] bg-[#fffdfa] p-3.5 text-[11px] text-[#65574d]">
@@ -768,7 +692,7 @@ export default function Orders() {
                               {order.status === "Return/Refund"
                                 ? order.return_refund_request?.status === "Pending Review" && <button type="button" onClick={() => { setRejectModalOrderId(order.id); setRejectReason(""); }} disabled={updatingId === order.id || rejectSubmitting} className="rounded-full border border-red-200 bg-red-50 px-3 py-1.5 text-[11px] font-semibold text-red-600 hover:bg-red-100 disabled:opacity-50">Reject</button>
                                 : !["Completed", "Cancelled"].includes(order.status) && <button type="button" onClick={() => updateStatus(order.id, "Cancelled")} disabled={updatingId === order.id} className="rounded-full border border-red-200 bg-red-50 px-3 py-1.5 text-[11px] font-semibold text-red-600 hover:bg-red-100 disabled:opacity-50">Cancel</button>}
-                              <button type="button" onClick={() => openWasteModal(order)} className="rounded-full border border-black/10 bg-[#F7F5EE] px-3 py-1.5 text-[11px] font-semibold text-black hover:bg-black hover:text-white">Waste</button>
+                              <button type="button" onClick={() => navigate("/admin/waste-tracking")} className="rounded-full border border-black/10 bg-[#F7F5EE] px-3 py-1.5 text-[11px] font-semibold text-black hover:bg-black hover:text-white">Waste analytics</button>
                             </div>
                           </td>
                         </tr>
@@ -971,10 +895,10 @@ export default function Orders() {
                                 )}
                                 <button
                                   type="button"
-                                  onClick={() => openWasteModal(order)}
+                                  onClick={() => navigate("/admin/waste-tracking")}
                                   className="rounded-full border border-black/10 bg-[#F7F5EE] px-3 py-2 text-[12px] font-semibold text-black transition hover:bg-black hover:text-white"
                                 >
-                                  Log waste
+                                  Waste analytics
                                 </button>
                               </div>
 
@@ -1088,98 +1012,6 @@ export default function Orders() {
         )}
       </AnimatePresence>
 
-      <AnimatePresence>
-        {wasteModalOrderId && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-          >
-            <motion.div
-              initial={{ y: 16, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              exit={{ y: 16, opacity: 0 }}
-              className="w-full max-w-md rounded-[24px] border border-black/10 bg-white p-5 shadow-xl"
-            >
-              <div className="mb-4 flex items-start justify-between gap-3">
-                <div>
-                  <p className="text-[10px] uppercase tracking-[0.2em] text-black/45">Waste log</p>
-                  <h3 className="text-[18px] font-semibold text-black">Log waste for order #{wasteOrder?.id ?? ""}</h3>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setWasteModalOrderId(null)}
-                  className="text-[12px] font-semibold text-black/60"
-                >
-                  Close
-                </button>
-              </div>
-
-              <form onSubmit={submitWasteLog} className="space-y-3">
-                <div>
-                  <label className="mb-1 block text-[12px] font-semibold text-black/70">Item</label>
-                  <input
-                    type="text"
-                    value={wasteForm.item}
-                    onChange={(e) => setWasteForm((prev) => ({ ...prev, item: e.target.value, productId: "" }))}
-                    className="w-full rounded-2xl border border-black/10 bg-white px-4 py-3 text-[13px] text-black/80 outline-none focus:border-[#D4AF37]"
-                    placeholder="Ingredient or product"
-                  />
-                </div>
-                <div>
-                  <label className="mb-1 block text-[12px] font-semibold text-black/70">Item type</label>
-                  <select
-                    value={wasteForm.itemType}
-                    onChange={(e) => setWasteForm((prev) => ({ ...prev, itemType: e.target.value, productId: "" }))}
-                    className="w-full rounded-2xl border border-black/10 bg-white px-4 py-3 text-[13px] text-black/80 outline-none focus:border-[#D4AF37]"
-                  >
-                    <option value="Finished Product">Finished Product</option>
-                    <option value="Raw Material">Raw Material</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="mb-1 block text-[12px] font-semibold text-black/70">Quantity</label>
-                  <input
-                    type="number"
-                    min="1"
-                    step="0.1"
-                    value={wasteForm.qty}
-                    onChange={(e) => setWasteForm((prev) => ({ ...prev, qty: e.target.value }))}
-                    className="w-full rounded-2xl border border-black/10 bg-white px-4 py-3 text-[13px] text-black/80 outline-none focus:border-[#D4AF37]"
-                  />
-                </div>
-                <div>
-                  <label className="mb-1 block text-[12px] font-semibold text-black/70">Reason</label>
-                  <input
-                    type="text"
-                    value={wasteForm.reason}
-                    onChange={(e) => setWasteForm((prev) => ({ ...prev, reason: e.target.value }))}
-                    className="w-full rounded-2xl border border-black/10 bg-white px-4 py-3 text-[13px] text-black/80 outline-none focus:border-[#D4AF37]"
-                    placeholder="Spoilage, overproduction, etc."
-                  />
-                </div>
-                <div className="flex justify-end gap-2 pt-2">
-                  <button
-                    type="button"
-                    onClick={() => setWasteModalOrderId(null)}
-                    className="rounded-full border border-black/10 bg-white px-4 py-2 text-[12px] font-semibold text-black"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={wasteSubmitting}
-                    className="rounded-full bg-black px-4 py-2 text-[12px] font-semibold text-white disabled:cursor-not-allowed disabled:bg-black/50"
-                  >
-                    {wasteSubmitting ? "Saving..." : "Save waste"}
-                  </button>
-                </div>
-              </form>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
     </div>
   );
 }
