@@ -1218,8 +1218,6 @@ export default function Orders() {
                 const customPaymentMethod = isCustomized ? 'QR Ph' : (order.payment || customPaymentDetails.payment_method || '—');
                 const downpaymentBreakdown = getCustomCakePaymentBreakdown(customDownpaymentAmount);
                 const balanceBreakdown = getCustomCakePaymentBreakdown(customBalanceAmount);
-                const productImage = getProductThumbnail(order, primaryItem);
-
                 const paymentHint = isCancelled
                   ? 'Order cancelled'
                   : isAwaitingPayment
@@ -1250,15 +1248,28 @@ export default function Orders() {
                   >
                     {/* Product */}
                     <div className="flex items-center gap-3 min-w-0">
-                      <div className="w-11 h-11 shrink-0 overflow-hidden rounded-xl bg-slate-100 ring-1 ring-slate-200">
-                        {productImage ? (
-                          <img
-                            src={productImage}
-                            alt={primaryItem?.name || 'Product thumbnail'}
-                            className="h-full w-full object-cover"
-                          />
-                        ) : (
-                          <div className="grid h-full w-full place-items-center text-slate-900">
+                      <div className="flex max-w-32 shrink-0 flex-wrap gap-1">
+                        {items.length > 0 ? items.map((item, itemIndex) => {
+                          const image = getProductThumbnail(order, item);
+                          return (
+                            <div
+                              key={`${item.id ?? item.name}-${itemIndex}`}
+                              className="grid h-10 w-10 place-items-center overflow-hidden rounded-xl bg-slate-100 text-slate-900 ring-1 ring-slate-200"
+                              title={item.name}
+                            >
+                              {image ? (
+                                <img
+                                  src={image}
+                                  alt={`${item.name} thumbnail`}
+                                  className="h-full w-full object-cover"
+                                />
+                              ) : (
+                                <Cookie size={18} strokeWidth={1.8} />
+                              )}
+                            </div>
+                          );
+                        }) : (
+                          <div className="grid h-10 w-10 place-items-center rounded-xl bg-slate-100 text-slate-900 ring-1 ring-slate-200">
                             <Cookie size={20} strokeWidth={1.8} />
                           </div>
                         )}
