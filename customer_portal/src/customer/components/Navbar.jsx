@@ -413,33 +413,34 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
           </div>
 
           {/* FAVORITES */}
-          <Link
-            to="/customer/favorites"
-            title="Favorites"
-            aria-label="View favorites"
-            className="flex h-8 w-8 items-center justify-center rounded-full text-gray-700 transition hover:bg-gray-100 sm:h-10 sm:w-10 xl:h-12 xl:w-12"
-          >
-            <Heart size={20} className="sm:h-6 sm:w-6 xl:h-7 xl:w-7" />
-          </Link>
-
-          {/* NOTIFICATIONS */}
-          <div ref={notifRef} className="relative">
-
-            <button
-              type="button"
-              onClick={handleToggleNotif}
-              aria-label={`Notifications${unreadCount ? `, ${unreadCount} unread` : ''}`}
-              aria-expanded={openNotif}
-              className="relative flex h-9 w-9 items-center justify-center rounded-full hover:bg-gray-100 sm:h-10 sm:w-10 xl:h-12 xl:w-12"
+          <div className="flex items-center gap-0.5 sm:gap-1">
+            <Link
+              to="/customer/favorites"
+              title="Favorites"
+              aria-label="View favorites"
+              className="flex h-7 w-7 items-center justify-center rounded-full text-gray-700 transition hover:bg-gray-100 sm:h-10 sm:w-10"
             >
-              <span className="relative inline-flex">
-                <Bell size={20} className="sm:h-6 sm:w-6 xl:h-7 xl:w-7" />
-                {unreadCount > 0 && (
-                  <span className="absolute -right-0.5 top-0 h-2 w-2 rounded-full bg-red-500" />
-                )}
-              </span>
+              <Heart size={14} className="sm:h-[17px] sm:w-[17px]" />
+            </Link>
 
-            </button>
+            {/* NOTIFICATIONS */}
+            <div ref={notifRef} className="relative">
+
+              <button
+                type="button"
+                onClick={handleToggleNotif}
+                aria-label={`Notifications${unreadCount ? `, ${unreadCount} unread` : ''}`}
+                aria-expanded={openNotif}
+                className="relative flex h-7 w-7 items-center justify-center rounded-full hover:bg-gray-100 sm:h-10 sm:w-10"
+              >
+                <span className="relative inline-flex">
+                  <Bell size={14} className="sm:h-[17px] sm:w-[17px]" />
+                  {unreadCount > 0 && (
+                    <span className="absolute -right-1 top-0 h-2.5 w-2.5 rounded-full bg-red-500" />
+                  )}
+                </span>
+
+              </button>
 
             {openNotif && (
               <div className="fixed left-2 right-2 top-[94px] z-20 max-h-[calc(100dvh-7rem)] overflow-y-auto rounded-[24px] border border-gray-200 bg-white shadow-2xl sm:absolute sm:left-auto sm:right-0 sm:top-[65px] sm:w-[380px] sm:max-h-[70vh]">
@@ -628,20 +629,21 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
               </div>
             )}
 
-          </div>
+            </div>
 
-          {/* CART */}
-          <button
-            onClick={onCartClick}
-            className="relative flex h-7 w-7 items-center justify-center rounded-full bg-black text-white sm:h-10 sm:w-10"
-          >
-            <ShoppingCart size={14} className="sm:h-[17px] sm:w-[17px]" />
-            {cartCount > 0 && (
-              <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-[#d4af37] text-[8px] text-black">
-                {cartCount}
-              </span>
-            )}
-          </button>
+            {/* CART */}
+            <button
+              onClick={onCartClick}
+              className="relative flex h-7 w-7 items-center justify-center rounded-full bg-black text-white sm:h-10 sm:w-10"
+            >
+              <ShoppingCart size={14} className="sm:h-[17px] sm:w-[17px]" />
+              {cartCount > 0 && (
+                <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-[#d4af37] text-[8px] text-black">
+                  {cartCount}
+                </span>
+              )}
+            </button>
+          </div>
 
           {/* ACCOUNT */}
           <div ref={accountRef} className="relative">
