@@ -35,6 +35,7 @@ Route::options('{any}', fn () => response()->noContent())->where('any', '.*');
 
 Route::get('products', [ProductController::class, 'index']);
 Route::get('reviews', [OrderFeedbackController::class, 'publicIndex']);
+Route::post('reviews', [OrderFeedbackController::class, 'store']);
 Route::get('shop/status', [CustomerApiController::class, 'shopStatus']);
 Route::match(['get', 'post'], 'customer/products', [CustomerApiController::class, 'products']);
 Route::match(['get', 'options'], 'staff/dashboard', [StaffApiController::class, 'getDashboard']);

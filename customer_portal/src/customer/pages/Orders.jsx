@@ -556,7 +556,7 @@ export default function Orders() {
     setFeedbackSubmitting(true);
     setActionError(null);
     try {
-      const res = await fetch(`${CUSTOMER_BASE}/api_order_feedback.php`, {
+      const res = await fetch(`${LARAVEL_BASE}/api/reviews`, {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },

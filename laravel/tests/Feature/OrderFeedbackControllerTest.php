@@ -17,6 +17,12 @@ class OrderFeedbackControllerTest extends TestCase
             $table->id();
             $table->string('name');
             $table->string('email');
+            $table->string('role')->default('customer');
+        });
+        Schema::create('orders', function ($table) {
+            $table->id();
+            $table->unsignedBigInteger('user_id')->nullable();
+            $table->string('status')->default('Pending');
         });
         Schema::create('order_feedback', function ($table) {
             $table->id();
@@ -26,9 +32,11 @@ class OrderFeedbackControllerTest extends TestCase
             $table->string('comment', 1000)->default('');
             $table->timestamp('created_at')->nullable();
             $table->timestamp('updated_at')->nullable();
+            $table->unique(['order_id', 'user_id'], 'unique_order_feedback');
         });
 
-        DB::table('users')->insert(['id' => 7, 'name' => 'Test Customer', 'email' => 'customer@example.com']);
+        DB::table('users')->insert(['id' => 7, 'name' => 'Test Customer', 'email' => 'customer@example.com', 'role' => 'customer']);
+        DB::table('orders')->insert(['id' => 42, 'user_id' => 7, 'status' => 'Completed']);
         DB::table('order_feedback')->insert([
             'order_id' => 42,
             'user_id' => 7,
@@ -42,6 +50,7 @@ class OrderFeedbackControllerTest extends TestCase
     protected function tearDown(): void
     {
         Schema::dropIfExists('order_feedback');
+        Schema::dropIfExists('orders');
         Schema::dropIfExists('users');
 
         parent::tearDown();
@@ -72,6 +81,52 @@ class OrderFeedbackControllerTest extends TestCase
             ->assertJsonPath('reviews.0.comment', 'Excellent cake.')
             ->assertJsonMissingPath('reviews.0.customer_email')
             ->assertJsonMissingPath('reviews.0.order_id');
+    }
+
+    public function test_customer_feedback_is_saved_and_appears_in_public_reviews(): void
+    {
+        $customer = new User();
+        $customer->id = 7;
+        $customer->role = 'customer';
+
+        $this->actingAs($customer)
+            ->postJson('/api/reviews', [
+                'order_id' => 42,
+                'rating' => 4,
+                'comment' => 'Fresh and delicious.',
+            ])
+            ->assertOk()
+            ->assertJsonPath('success', true);
+
+        $this->assertDatabaseHas('order_feedback', [
+            'order_id' => 42,
+            'user_id' => 7,
+            'rating' => 4,
+            'comment' => 'Fresh and delicious.',
+        ]);
+
+        $this->getJson('/api/reviews')
+            ->assertOk()
+            ->assertJsonPath('reviews.0.rating', 4)
+            ->assertJsonPath('reviews.0.comment', 'Fresh and delicious.');
+    }
+
+    public function test_customer_cannot_submit_feedback_for_another_customers_order(): void
+    {
+        $customer = new User();
+        $customer->id = 8;
+        $customer->role = 'customer';
+
+        $this->actingAs($customer)
+            ->postJson('/api/reviews', [
+                'order_id' => 42,
+                'rating' => 4,
+                'comment' => 'Not my order.',
+            ])
+            ->assertForbidden()
+            ->assertJsonPath('success', false);
+
+        $this->assertDatabaseCount('order_feedback', 1);
     }
 
     public function test_non_admin_cannot_view_reviews(): void
