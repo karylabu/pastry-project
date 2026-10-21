@@ -1249,7 +1249,7 @@ export default function Orders() {
                   >
                     {/* Product */}
                     <div className="flex items-center gap-3 min-w-0">
-                      <div className="grid h-11 w-11 shrink-0 place-items-center overflow-hidden rounded-xl bg-slate-100 text-slate-900 ring-1 ring-slate-200">
+                      <div className={`grid h-11 w-11 shrink-0 place-items-center overflow-hidden rounded-xl bg-slate-100 text-slate-900 ring-1 ring-slate-200 ${isExpanded ? 'hidden' : ''}`}>
                         {primaryItem ? (
                           primaryProductImage ? (
                             <img
