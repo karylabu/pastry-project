@@ -111,6 +111,29 @@ class OrderFeedbackControllerTest extends TestCase
             ->assertJsonPath('reviews.0.comment', 'Fresh and delicious.');
     }
 
+    public function test_legacy_customer_feedback_url_uses_the_laravel_feedback_handler(): void
+    {
+        $customer = new User();
+        $customer->id = 7;
+        $customer->role = 'customer';
+
+        $this->actingAs($customer)
+            ->postJson('/api_order_feedback.php', [
+                'order_id' => 42,
+                'rating' => 3,
+                'comment' => 'Good.',
+            ])
+            ->assertOk()
+            ->assertJsonPath('success', true);
+
+        $this->assertDatabaseHas('order_feedback', [
+            'order_id' => 42,
+            'user_id' => 7,
+            'rating' => 3,
+            'comment' => 'Good.',
+        ]);
+    }
+
     public function test_customer_cannot_submit_feedback_for_another_customers_order(): void
     {
         $customer = new User();

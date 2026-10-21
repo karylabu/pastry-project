@@ -6,6 +6,7 @@ use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\CustomerApiController;
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\Api\OrderFeedbackController;
 use App\Http\Controllers\LegacyController;
 use App\Http\Controllers\SalesImportController;
 
@@ -103,6 +104,8 @@ Route::any('/create_payment.php', [CustomerApiController::class, 'createPayment'
 Route::any('/cart_api.php', [CustomerApiController::class, 'cartApi'])
     ->withoutMiddleware([Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
 Route::get('/api_user.php', [CustomerApiController::class, 'user'])
+    ->withoutMiddleware([Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
+Route::post('/api_order_feedback.php', [OrderFeedbackController::class, 'store'])
     ->withoutMiddleware([Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
 
 Route::any('/staff/api_products.php', [LegacyController::class, 'render'])

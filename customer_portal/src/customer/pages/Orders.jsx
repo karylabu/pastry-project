@@ -559,7 +559,7 @@ export default function Orders() {
       const res = await fetch(`${LARAVEL_BASE}/api/reviews`, {
         method: 'POST',
         credentials: 'include',
-        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+        headers: { Accept: 'application/json', 'Content-Type': 'application/json', ...getAuthHeaders() },
         body: JSON.stringify({
           order_id: feedbackTarget.id,
           rating,
