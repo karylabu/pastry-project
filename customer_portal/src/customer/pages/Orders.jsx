@@ -1218,6 +1218,7 @@ export default function Orders() {
                 const customPaymentMethod = isCustomized ? 'QR Ph' : (order.payment || customPaymentDetails.payment_method || '—');
                 const downpaymentBreakdown = getCustomCakePaymentBreakdown(customDownpaymentAmount);
                 const balanceBreakdown = getCustomCakePaymentBreakdown(customBalanceAmount);
+                const primaryProductImage = getProductThumbnail(order, primaryItem);
                 const paymentHint = isCancelled
                   ? 'Order cancelled'
                   : isAwaitingPayment
@@ -1248,30 +1249,19 @@ export default function Orders() {
                   >
                     {/* Product */}
                     <div className="flex items-center gap-3 min-w-0">
-                      <div className="flex max-w-32 shrink-0 flex-wrap gap-1">
-                        {items.length > 0 ? items.map((item, itemIndex) => {
-                          const image = getProductThumbnail(order, item);
-                          return (
-                            <div
-                              key={`${item.id ?? item.name}-${itemIndex}`}
-                              className="grid h-10 w-10 place-items-center overflow-hidden rounded-xl bg-slate-100 text-slate-900 ring-1 ring-slate-200"
-                              title={item.name}
-                            >
-                              {image ? (
-                                <img
-                                  src={image}
-                                  alt={`${item.name} thumbnail`}
-                                  className="h-full w-full object-cover"
-                                />
-                              ) : (
-                                <Cookie size={18} strokeWidth={1.8} />
-                              )}
-                            </div>
-                          );
-                        }) : (
-                          <div className="grid h-10 w-10 place-items-center rounded-xl bg-slate-100 text-slate-900 ring-1 ring-slate-200">
+                      <div className="grid h-11 w-11 shrink-0 place-items-center overflow-hidden rounded-xl bg-slate-100 text-slate-900 ring-1 ring-slate-200">
+                        {primaryItem ? (
+                          primaryProductImage ? (
+                            <img
+                              src={primaryProductImage}
+                              alt={`${primaryItem.name} thumbnail`}
+                              className="h-full w-full object-cover"
+                            />
+                          ) : (
                             <Cookie size={20} strokeWidth={1.8} />
-                          </div>
+                          )
+                        ) : (
+                          <Cookie size={20} strokeWidth={1.8} />
                         )}
                       </div>
                       <div className="min-w-0">
@@ -1287,7 +1277,7 @@ export default function Orders() {
                             onClick={(e) => { e.stopPropagation(); toggleExpanded(order.id); }}
                             className="mt-1 text-[11px] font-semibold text-slate-900 hover:underline"
                           >
-                            {isExpanded ? 'Show less' : `+${extraCount} more item${extraCount > 1 ? 's' : ''}`}
+                            {isExpanded ? 'Show less' : 'Show more'}
                           </button>
                         )}
                         <AnimatePresence>
@@ -1298,13 +1288,29 @@ export default function Orders() {
                               exit={{ height: 0, opacity: 0 }}
                               className="overflow-hidden"
                             >
-                              <ul className="mt-2 space-y-1">
-                                {items.slice(1).map((it, i) => (
-                                  <li key={i} className="text-xs text-gray-500">
-                                    {it.name} <span className="text-gray-400">× {it.qty}</span>
-                                  </li>
-                                ))}
-                              </ul>
+                              <div className="mt-2 space-y-2">
+                                {items.map((item, itemIndex) => {
+                                  const image = getProductThumbnail(order, item);
+                                  return (
+                                    <div key={`${item.id ?? item.name}-${itemIndex}`} className="flex items-center gap-2">
+                                      <div className="grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-lg bg-slate-100 text-slate-900 ring-1 ring-slate-200">
+                                        {image ? (
+                                          <img
+                                            src={image}
+                                            alt={`${item.name} thumbnail`}
+                                            className="h-full w-full object-cover"
+                                          />
+                                        ) : (
+                                          <Cookie size={18} strokeWidth={1.8} />
+                                        )}
+                                      </div>
+                                      <p className="text-xs text-gray-500">
+                                        {item.name} <span className="text-gray-400">× {item.qty}</span>
+                                      </p>
+                                    </div>
+                                  );
+                                })}
+                              </div>
                             </motion.div>
                           )}
                         </AnimatePresence>
