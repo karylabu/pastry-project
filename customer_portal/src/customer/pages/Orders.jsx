@@ -1257,7 +1257,7 @@ export default function Orders() {
           {/* Table header row */}
           <div className="hidden md:grid grid-cols-[1.2fr_1.7fr_0.9fr_0.8fr_1fr_1.2fr] items-center gap-4 px-6 py-3.5 border-b border-[#eadfd8] bg-[#fffaf7]">
             <span className="text-[11px] uppercase tracking-[0.12em] text-gray-400 font-semibold">Product</span>
-            <span className="text-[11px] uppercase tracking-[0.12em] text-gray-400 font-semibold">Order</span>
+            <span className="pl-2 text-[11px] uppercase tracking-[0.12em] text-gray-400 font-semibold">Order</span>
             <span className="text-[11px] uppercase tracking-[0.12em] text-gray-400 font-semibold">Date</span>
             <span className="text-[11px] uppercase tracking-[0.12em] text-gray-400 font-semibold">Price</span>
             <span className="text-[11px] uppercase tracking-[0.12em] text-gray-400 font-semibold">Payment</span>
@@ -1466,7 +1466,7 @@ export default function Orders() {
                     </div>
 
                     {/* Order id + status */}
-                    <div className="flex flex-col gap-1.5">
+                    <div className="flex flex-col gap-1.5 pl-2">
                       <p className="text-xs text-gray-400">Order: <span className="text-slate-600 font-medium">#{order.order_number ?? order.id}</span></p>
                       <span className={`inline-flex w-fit items-center rounded-full px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.1em] ${getStatusStyle(order.status)}`}>
                         {order.status}
