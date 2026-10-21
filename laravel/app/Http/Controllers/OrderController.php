@@ -449,6 +449,8 @@ class OrderController extends Controller
                     'created_at' => now(),
                 ]);
 
+                $this->deductOrderSizeStock($canonicalItems, (int) $order->id, (int) $user->id);
+
                 if ($rewardTransactionId !== null) {
                     $claimedReward = DB::table('loyalty_transactions')
                         ->where('id', $rewardTransactionId)
@@ -724,6 +726,7 @@ class OrderController extends Controller
                     'status' => 'Cancelled',
                     'payment_status' => 'failed',
                 ]);
+                $this->restoreOrderSizeStock($lockedOrder, (int) $user->id);
 
                 if (Schema::hasTable('notifications')) {
                     DB::table('notifications')
@@ -1034,6 +1037,7 @@ class OrderController extends Controller
                 if ($order->status !== 'Pending') {
                     throw new RuntimeException('Only pending orders can be cancelled.');
                 }
+                $this->restoreOrderSizeStock($order, (int) $user->id);
                 $order->update(['status' => 'Cancelled']);
 
                 if (Schema::hasTable('notifications')) {
@@ -1126,6 +1130,9 @@ class OrderController extends Controller
                 $oldStatus = $order->status;
                 $newStatus = $request->status;
                 $previousStatus = $oldStatus;
+                if ($oldStatus !== $newStatus && strtolower($newStatus) === 'cancelled') {
+                    $this->restoreOrderSizeStock($order, (int) $user->id);
+                }
                 if ($oldStatus !== 'Confirmed' && $newStatus === 'Confirmed') {
                     $this->deductOrderProductStock($order, (int) $user->id);
                 } elseif ($oldStatus === 'Confirmed' && $newStatus === 'Cancelled') {
@@ -1223,13 +1230,142 @@ class OrderController extends Controller
     {
         $lines = [];
         foreach ($order->items ?? [] as $item) {
-            $productId = (int) ($item['id'] ?? 0);
+            if ((int) ($item['product_size_id'] ?? 0) > 0) continue;
+            $productId = (int) ($item['product_id'] ?? $item['id'] ?? 0);
             $quantity = (float) ($item['qty'] ?? $item['quantity'] ?? 0);
             if ($productId <= 0 || $quantity <= 0) continue;
             $lines[$productId] = ($lines[$productId] ?? 0) + $quantity;
         }
 
         return $lines;
+    }
+
+    private function deductOrderSizeStock(array $items, int $orderId, int $userId): void
+    {
+        $sizeQuantities = [];
+        foreach ($items as $item) {
+            $productSizeId = (int) ($item['product_size_id'] ?? 0);
+            $productId = (int) ($item['product_id'] ?? 0);
+            $quantity = (int) ($item['qty'] ?? 0);
+            if ($productSizeId <= 0 || $productId <= 0 || $quantity <= 0) continue;
+
+            $sizeQuantities[$productSizeId] = [
+                'product_id' => $productId,
+                'quantity' => ($sizeQuantities[$productSizeId]['quantity'] ?? 0) + $quantity,
+            ];
+        }
+
+        if (!$sizeQuantities) return;
+        if (
+            !Schema::hasColumn('product_sizes', 'stock_quantity')
+            || !Schema::hasTable('product_inventory_movements')
+            || !Schema::hasColumn('product_inventory_movements', 'product_size_id')
+        ) {
+            throw new RuntimeException('Size inventory tracking is unavailable.');
+        }
+
+        ksort($sizeQuantities);
+        foreach ($sizeQuantities as $productSizeId => $sizeInventory) {
+            $size = DB::table('product_sizes')
+                ->where('id', $productSizeId)
+                ->where('product_id', $sizeInventory['product_id'])
+                ->lockForUpdate()
+                ->first();
+            if (!$size) {
+                throw new RuntimeException('The selected product size is no longer available.');
+            }
+
+            $previousStock = (int) $size->stock_quantity;
+            $quantity = (int) $sizeInventory['quantity'];
+            if ($previousStock < $quantity) {
+                throw new RuntimeException('You ordered more than the stock available.');
+            }
+
+            $newStock = $previousStock - $quantity;
+            $updated = DB::table('product_sizes')
+                ->where('id', $productSizeId)
+                ->where('stock_quantity', '>=', $quantity)
+                ->update(['stock_quantity' => $newStock]);
+            if ($updated !== 1) {
+                throw new RuntimeException('Unable to update product size stock.');
+            }
+
+            $inserted = DB::table('product_inventory_movements')->insert([
+                'product_id' => $sizeInventory['product_id'],
+                'product_size_id' => $productSizeId,
+                'movement_type' => 'Order',
+                'quantity' => -$quantity,
+                'previous_stock' => $previousStock,
+                'new_stock' => $newStock,
+                'reason' => "Order #{$orderId} placed",
+                'reference_type' => 'order',
+                'reference_id' => $orderId,
+                'user_id' => $userId,
+                'created_at' => now(),
+            ]);
+            if (!$inserted) {
+                throw new RuntimeException('Failed to record product size order movement.');
+            }
+        }
+    }
+
+    private function restoreOrderSizeStock(Order $order, int $userId): void
+    {
+        if (
+            !Schema::hasTable('product_inventory_movements')
+            || !Schema::hasColumn('product_inventory_movements', 'product_size_id')
+        ) {
+            return;
+        }
+
+        $deductions = DB::table('product_inventory_movements')
+            ->select('product_id', 'product_size_id', DB::raw('SUM(quantity) as net_quantity'))
+            ->where('reference_type', 'order')
+            ->where('reference_id', $order->id)
+            ->whereIn('movement_type', ['Order', 'Cancellation'])
+            ->whereNotNull('product_size_id')
+            ->groupBy('product_id', 'product_size_id')
+            ->get();
+
+        foreach ($deductions as $deduction) {
+            $restoreQuantity = max(0, -(float) $deduction->net_quantity);
+            if ($restoreQuantity <= 0.000001) continue;
+
+            $size = DB::table('product_sizes')
+                ->where('id', $deduction->product_size_id)
+                ->where('product_id', $deduction->product_id)
+                ->lockForUpdate()
+                ->first();
+            if (!$size) {
+                throw new RuntimeException('Product size not found for order restoration.');
+            }
+
+            $previousStock = (float) $size->stock_quantity;
+            $newStock = $previousStock + $restoreQuantity;
+            $updated = DB::table('product_sizes')
+                ->where('id', $deduction->product_size_id)
+                ->update(['stock_quantity' => $newStock]);
+            if ($updated !== 1) {
+                throw new RuntimeException('Failed to restore product size stock.');
+            }
+
+            $inserted = DB::table('product_inventory_movements')->insert([
+                'product_id' => $deduction->product_id,
+                'product_size_id' => $deduction->product_size_id,
+                'movement_type' => 'Cancellation',
+                'quantity' => $restoreQuantity,
+                'previous_stock' => $previousStock,
+                'new_stock' => $newStock,
+                'reason' => "Order #{$order->id} cancelled",
+                'reference_type' => 'order',
+                'reference_id' => $order->id,
+                'user_id' => $userId,
+                'created_at' => now(),
+            ]);
+            if (!$inserted) {
+                throw new RuntimeException('Failed to record product size cancellation movement.');
+            }
+        }
     }
 
     private function deductOrderProductStock(Order $order, int $userId): void
@@ -1266,6 +1402,7 @@ class OrderController extends Controller
             ->where('reference_type', 'order')
             ->where('reference_id', $order->id)
             ->whereIn('movement_type', ['Order', 'Cancellation'])
+            ->whereNull('product_size_id')
             ->groupBy('product_id')
             ->get();
 

@@ -15,7 +15,7 @@ class RewardCodeCheckoutTest extends TestCase
     {
         parent::setUp();
 
-        foreach (['shop_settings', 'notifications', 'realtime_events', 'order_items', 'product_sizes', 'products', 'loyalty_transactions', 'promotions', 'orders', 'user_sessions', 'users'] as $table) {
+        foreach (['shop_settings', 'notifications', 'realtime_events', 'product_inventory_movements', 'order_items', 'product_sizes', 'products', 'loyalty_transactions', 'promotions', 'orders', 'user_sessions', 'users'] as $table) {
             Schema::dropIfExists($table);
         }
 
@@ -89,6 +89,20 @@ class RewardCodeCheckoutTest extends TestCase
             $table->decimal('price', 10, 2);
             $table->json('details')->nullable();
             $table->string('image')->nullable();
+        });
+        Schema::create('product_inventory_movements', function ($table) {
+            $table->id();
+            $table->unsignedBigInteger('product_id');
+            $table->unsignedBigInteger('product_size_id')->nullable();
+            $table->string('movement_type');
+            $table->decimal('quantity', 10, 3);
+            $table->decimal('previous_stock', 10, 3);
+            $table->decimal('new_stock', 10, 3);
+            $table->string('reason')->nullable();
+            $table->string('reference_type')->nullable();
+            $table->unsignedBigInteger('reference_id')->nullable();
+            $table->unsignedBigInteger('user_id')->nullable();
+            $table->timestamp('created_at')->nullable();
         });
         Schema::create('loyalty_transactions', function ($table) {
             $table->increments('id');
@@ -308,6 +322,66 @@ class RewardCodeCheckoutTest extends TestCase
         $this->assertSame(422, $response->getStatusCode());
         $this->assertSame('You ordered more than the stock available.', $response->getData(true)['message']);
         $this->assertSame(0, DB::table('orders')->count());
+    }
+
+    public function test_checkout_deducts_stock_for_each_selected_cake_size(): void
+    {
+        DB::table('product_sizes')->insert([
+            ['id' => 31, 'product_id' => 11, 'size' => 'Small', 'price' => 200, 'stock_quantity' => 5, 'available' => true],
+            ['id' => 32, 'product_id' => 11, 'size' => 'Big', 'price' => 400, 'stock_quantity' => 7, 'available' => true],
+        ]);
+
+        $response = $this->placeOrder('', 'none', '', [
+            ['product_id' => 11, 'product_size_id' => 31, 'qty' => 2],
+            ['product_id' => 11, 'product_size_id' => 32, 'qty' => 3],
+        ]);
+        $orderId = $response->getData(true)['order_id'];
+
+        $this->assertSame(201, $response->getStatusCode());
+        $this->assertSame(3, (int) DB::table('product_sizes')->where('id', 31)->value('stock_quantity'));
+        $this->assertSame(4, (int) DB::table('product_sizes')->where('id', 32)->value('stock_quantity'));
+        $this->assertDatabaseHas('product_inventory_movements', [
+            'product_size_id' => 31,
+            'movement_type' => 'Order',
+            'quantity' => -2,
+            'reference_id' => $orderId,
+        ]);
+        $this->assertDatabaseHas('product_inventory_movements', [
+            'product_size_id' => 32,
+            'movement_type' => 'Order',
+            'quantity' => -3,
+            'reference_id' => $orderId,
+        ]);
+    }
+
+    public function test_cancelling_order_restores_reserved_cake_size_stock_once(): void
+    {
+        DB::table('product_sizes')->insert([
+            'id' => 31,
+            'product_id' => 11,
+            'size' => 'Small',
+            'price' => 200,
+            'stock_quantity' => 5,
+            'available' => true,
+        ]);
+        $response = $this->placeOrder('', 'none', '', [
+            ['product_id' => 11, 'product_size_id' => 31, 'qty' => 2],
+        ]);
+        $orderId = $response->getData(true)['order_id'];
+
+        $request = Request::create("/api/orders/{$orderId}/cancel", 'POST', [], [], [], [
+            'HTTP_X_AUTH_TOKEN' => 'test-customer-token',
+        ]);
+        $cancelResponse = app(OrderController::class)->cancel($request, $orderId);
+
+        $this->assertSame(200, $cancelResponse->getStatusCode());
+        $this->assertSame(5, (int) DB::table('product_sizes')->where('id', 31)->value('stock_quantity'));
+        $this->assertDatabaseHas('product_inventory_movements', [
+            'product_size_id' => 31,
+            'movement_type' => 'Cancellation',
+            'quantity' => 2,
+            'reference_id' => $orderId,
+        ]);
     }
 
     public function test_checkout_coupon_validation_returns_configured_percent_for_active_code(): void
