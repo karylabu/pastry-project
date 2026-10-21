@@ -108,7 +108,13 @@ export default function Orders() {
   const [paymentProofLoading, setPaymentProofLoading] = useState(null);
   const [connectionIssue, setConnectionIssue] = useState(false);
   const [wasteModalOrderId, setWasteModalOrderId] = useState(null);
-  const [wasteForm, setWasteForm] = useState({ item: "", qty: "1", reason: "Production loss" });
+  const [wasteForm, setWasteForm] = useState({
+    item: "",
+    itemType: "Finished Product",
+    productId: "",
+    qty: "1",
+    reason: "Production loss",
+  });
   const [wasteSubmitting, setWasteSubmitting] = useState(false);
   const [rejectModalOrderId, setRejectModalOrderId] = useState(null);
   const [rejectReason, setRejectReason] = useState("");
@@ -430,9 +436,13 @@ export default function Orders() {
   };
 
   const openWasteModal = (order) => {
+    const orderItem = order.items?.[0];
+    const fallbackIngredient = lowStockIngredients[0];
     setWasteModalOrderId(order.id);
     setWasteForm({
-      item: order.items?.[0]?.name || lowStockIngredients[0]?.name || "",
+      item: orderItem?.name || fallbackIngredient?.name || "",
+      itemType: orderItem ? "Finished Product" : "Raw Material",
+      productId: orderItem?.product_id || orderItem?.productId || "",
       qty: "1",
       reason: "Production loss",
     });
@@ -450,23 +460,39 @@ export default function Orders() {
     }
 
     setWasteSubmitting(true);
-    staffFetch(`${STAFF_BASE}/api_waste_log.php`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ item, qty, reason }),
-    })
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.success) {
-          addToast(`Waste logged for ${item}`, "success");
-          setWasteModalOrderId(null);
-          setWasteForm({ item: "", qty: "1", reason: "Production loss" });
-        } else {
-          addToast(data.message || "Waste log failed.", "error");
-        }
-      })
-      .catch(() => addToast("Network error — could not log waste.", "error"))
-      .finally(() => setWasteSubmitting(false));
+    try {
+      const response = await staffFetch(`${STAFF_BASE}/api_waste_log.php`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          item,
+          qty,
+          reason,
+          item_type: wasteForm.itemType,
+          ...(wasteForm.itemType === "Finished Product" && wasteForm.productId
+            ? { product_id: wasteForm.productId }
+            : {}),
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok || !data?.success) {
+        throw new Error(data?.message || "Waste log failed.");
+      }
+
+      addToast(`Waste logged for ${item}`, "success");
+      setWasteModalOrderId(null);
+      setWasteForm({
+        item: "",
+        itemType: "Finished Product",
+        productId: "",
+        qty: "1",
+        reason: "Production loss",
+      });
+    } catch (error) {
+      addToast(error.message || "Network error — could not log waste.", "error");
+    } finally {
+      setWasteSubmitting(false);
+    }
   };
 
   const wasteOrder = orders.find((order) => order.id === wasteModalOrderId);
@@ -1090,10 +1116,21 @@ export default function Orders() {
                   <input
                     type="text"
                     value={wasteForm.item}
-                    onChange={(e) => setWasteForm((prev) => ({ ...prev, item: e.target.value }))}
+                    onChange={(e) => setWasteForm((prev) => ({ ...prev, item: e.target.value, productId: "" }))}
                     className="w-full rounded-2xl border border-black/10 bg-white px-4 py-3 text-[13px] text-black/80 outline-none focus:border-[#D4AF37]"
                     placeholder="Ingredient or product"
                   />
+                </div>
+                <div>
+                  <label className="mb-1 block text-[12px] font-semibold text-black/70">Item type</label>
+                  <select
+                    value={wasteForm.itemType}
+                    onChange={(e) => setWasteForm((prev) => ({ ...prev, itemType: e.target.value, productId: "" }))}
+                    className="w-full rounded-2xl border border-black/10 bg-white px-4 py-3 text-[13px] text-black/80 outline-none focus:border-[#D4AF37]"
+                  >
+                    <option value="Finished Product">Finished Product</option>
+                    <option value="Raw Material">Raw Material</option>
+                  </select>
                 </div>
                 <div>
                   <label className="mb-1 block text-[12px] font-semibold text-black/70">Quantity</label>
