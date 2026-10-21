@@ -379,7 +379,7 @@ class RewardCodeCheckoutTest extends TestCase
             'expires_at' => now()->addHour(),
         ]);
 
-        $approvalResponse = $this->updateOrderStatus($orderId, 'Confirmed');
+        $approvalResponse = $this->updateOrderStatus($orderId, 'Preparing');
         $this->assertSame(200, $approvalResponse->getStatusCode());
         $this->assertSame(3, (int) DB::table('product_sizes')->where('id', 31)->value('stock_quantity'));
         $this->assertDatabaseHas('product_inventory_movements', [
@@ -398,6 +398,45 @@ class RewardCodeCheckoutTest extends TestCase
             'quantity' => 2,
             'reference_id' => $orderId,
         ]);
+    }
+
+    public function test_migration_releases_previously_deducted_stock_from_pending_orders_once(): void
+    {
+        DB::table('product_sizes')->insert([
+            'id' => 31,
+            'product_id' => 11,
+            'size' => 'Small',
+            'price' => 200,
+            'stock_quantity' => 3,
+            'available' => true,
+        ]);
+        $response = $this->placeOrder('', 'none', '', [
+            ['product_id' => 11, 'product_size_id' => 31, 'qty' => 2],
+        ]);
+        $orderId = $response->getData(true)['order_id'];
+        DB::table('product_inventory_movements')->insert([
+            'product_id' => 11,
+            'product_size_id' => 31,
+            'movement_type' => 'Order',
+            'quantity' => -2,
+            'previous_stock' => 5,
+            'new_stock' => 3,
+            'reason' => "Order #{$orderId} placed",
+            'reference_type' => 'order',
+            'reference_id' => $orderId,
+            'user_id' => 7,
+            'created_at' => now(),
+        ]);
+
+        $migration = require database_path('migrations/2026_10_21_000002_release_unapproved_order_size_stock.php');
+        $migration->up();
+        $migration->up();
+
+        $this->assertSame(5, (int) DB::table('product_sizes')->where('id', 31)->value('stock_quantity'));
+        $this->assertSame(1, DB::table('product_inventory_movements')
+            ->where('reference_id', $orderId)
+            ->where('movement_type', 'Reservation Release')
+            ->count());
     }
 
     private function updateOrderStatus(int $orderId, string $status)

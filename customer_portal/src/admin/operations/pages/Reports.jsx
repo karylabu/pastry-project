@@ -1622,7 +1622,7 @@ export default function Reports() {
             <label className="text-[10px] font-bold uppercase tracking-[0.16em] text-black/60">Movement
               <select value={analyticsMovementType} onChange={(e) => setAnalyticsMovementType(e.target.value)} className="mt-1.5 h-10 w-full rounded-md border border-black/15 bg-white px-3 py-2 text-[12px] font-normal normal-case tracking-normal text-black outline-none focus:border-[#d4af37] focus:ring-2 focus:ring-[#d4af37]/15">
                 <option value="">All movement types</option>
-                {['Production', 'Order', 'Cancellation', 'Waste', 'Return', 'Stock Adjustment', 'Inventory Correction'].map((type) => <option key={type} value={type}>{type}</option>)}
+                {['Production', 'Order', 'Cancellation', 'Reservation Release', 'Waste', 'Return', 'Stock Adjustment', 'Inventory Correction'].map((type) => <option key={type} value={type}>{type}</option>)}
               </select>
             </label>
             <button

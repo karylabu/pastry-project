@@ -1128,13 +1128,15 @@ class OrderController extends Controller
                 $oldStatus = $order->status;
                 $newStatus = $request->status;
                 $previousStatus = $oldStatus;
-                if ($oldStatus !== $newStatus && strtolower($newStatus) === 'cancelled') {
-                    $this->restoreOrderSizeStock($order, (int) $user->id);
-                }
-                if ($oldStatus !== 'Confirmed' && $newStatus === 'Confirmed') {
+                $approvedStatuses = ['confirmed', 'approved', 'preparing'];
+                $wasApproved = in_array(strtolower(trim($oldStatus)), $approvedStatuses, true);
+                $isApproved = in_array(strtolower(trim($newStatus)), $approvedStatuses, true);
+
+                if (!$wasApproved && $isApproved) {
                     $this->deductOrderSizeStock($order->items ?? [], (int) $order->id, (int) $user->id);
                     $this->deductOrderProductStock($order, (int) $user->id);
-                } elseif ($oldStatus === 'Confirmed' && $newStatus === 'Cancelled') {
+                } elseif ($wasApproved && strtolower(trim($newStatus)) === 'cancelled') {
+                    $this->restoreOrderSizeStock($order, (int) $user->id);
                     $this->restoreOrderProductStock($order, (int) $user->id);
                 }
 
@@ -1321,7 +1323,7 @@ class OrderController extends Controller
             ->select('product_id', 'product_size_id', DB::raw('SUM(quantity) as net_quantity'))
             ->where('reference_type', 'order')
             ->where('reference_id', $order->id)
-            ->whereIn('movement_type', ['Order', 'Cancellation'])
+            ->whereIn('movement_type', ['Order', 'Cancellation', 'Reservation Release'])
             ->whereNotNull('product_size_id')
             ->groupBy('product_id', 'product_size_id')
             ->get();
