@@ -604,7 +604,7 @@ export default function Orders() {
 
       const updatedOrders = orders.map((order) => (
         order.id === returnRefundTarget.id
-          ? { ...order, return_refund_request: result.return_refund_request }
+          ? { ...order, status: 'Return/Refund', return_refund_request: result.return_refund_request }
           : order
       ));
       setOrders(updatedOrders);
@@ -1099,7 +1099,7 @@ export default function Orders() {
   }
 
   // ── Helpers ─────────────────────────────────────────────────────────────────
-  const statusOptions = ["All", "Pending", "Preparing", "Awaiting Balance Payment", "Ready for Pickup", "Completed", "Cancelled"];
+  const statusOptions = ["All", "Pending", "Preparing", "Awaiting Balance Payment", "Ready for Pickup", "Completed", "Return/Refund", "Cancelled"];
 
   const statusCounts = statusOptions.reduce((acc, s) => {
     acc[s] = s === 'All' ? orders.length : orders.filter((o) => String(o.status || '').toLowerCase() === s.toLowerCase()).length;
@@ -1156,6 +1156,7 @@ export default function Orders() {
       case "Preparing":  return "bg-slate-100 text-slate-700";
       case "Ready for Pickup": return "bg-emerald-50 text-emerald-800";
       case "Completed":  return "bg-slate-100 text-slate-700";
+      case "Return/Refund": return "bg-amber-50 text-amber-800";
       case "Cancelled":  return "bg-slate-100 text-slate-700";
       case "Awaiting Balance Payment": return "bg-amber-50 text-amber-800";
       default:           return "bg-gray-100 text-gray-600";
@@ -1301,6 +1302,7 @@ export default function Orders() {
                 const isPending    = order.status === "Pending";
                 const isToReceive  = order.status === "Ready for Pickup";
                 const isCompleted  = order.status === "Completed";
+                const isReturnRefund = order.status === "Return/Refund";
                 const isPreparing  = order.status === "Preparing";
                 const isExpanded   = expandedIds.has(order.id);
                 const items        = order.items || [];
@@ -1357,6 +1359,10 @@ export default function Orders() {
                   ? 'Being prepared in kitchen'
                   : isToReceive
                   ? 'Ready — confirm on arrival'
+                  : isReturnRefund
+                  ? order.return_refund_request?.status === 'Pending Review'
+                    ? 'Return/refund request is awaiting Admin review'
+                    : 'Return/refund request update'
                   : 'Payment settled';
 
                 return (

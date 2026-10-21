@@ -47,6 +47,11 @@ const BOARD_COLUMNS = [
     description: "Cleared orders and finished transactions.",
   },
   {
+    key: "Return/Refund",
+    title: "Return / Refund",
+    description: "Customer requests awaiting admin review.",
+  },
+  {
     key: "Cancelled",
     title: "Cancelled",
     description: "Orders stopped due to issues.",
@@ -114,7 +119,7 @@ export default function Orders() {
     Object.values(paymentProofPreviewUrlsRef.current).forEach((url) => URL.revokeObjectURL(url));
   }, []);
 
-  const statusFilterOptions = ["All", "Awaiting Payment", "Pending", "Preparing", "Ready for Pickup", "Completed", "Cancelled"];
+  const statusFilterOptions = ["All", "Awaiting Payment", "Pending", "Preparing", "Ready for Pickup", "Completed", "Return/Refund", "Cancelled"];
 
   const statusColors = {
     "Awaiting Payment": "bg-amber-50 text-amber-800 border border-amber-200",
@@ -122,6 +127,7 @@ export default function Orders() {
     Preparing: "bg-black/5 text-black border border-black/15",
     "Ready for Pickup": "bg-[#D4AF37]/10 text-black border border-[#D4AF37]/20",
     Completed: "bg-black text-white border border-black",
+    "Return/Refund": "bg-amber-100 text-amber-900 border border-amber-200",
     Cancelled: "bg-black/10 text-black border border-black/20",
   };
 
@@ -131,7 +137,8 @@ export default function Orders() {
     Preparing: 1,
     "Ready for Pickup": 2,
     Completed: 3,
-    Cancelled: 4,
+    "Return/Refund": 4,
+    Cancelled: 5,
   };
 
   const isLowStockIngredient = (ingredient) => {
@@ -384,7 +391,7 @@ export default function Orders() {
       && order.has_payment_proof;
     const nextStatus = hasReviewableProof
       ? 'Pending'
-      : order.status === "Pending" ? "Preparing" : order.status === "Preparing" ? "Ready for Pickup" : order.status === "Ready for Pickup" ? "Completed" : null;
+      : order.status === "Pending" ? "Preparing" : order.status === "Preparing" ? "Ready for Pickup" : ["Ready for Pickup", "Return/Refund"].includes(order.status) ? "Completed" : null;
     if (nextStatus) updateStatus(order.id, nextStatus);
   };
 
@@ -602,7 +609,7 @@ export default function Orders() {
                       </div>
                       <div className="mt-3 flex flex-wrap gap-1.5">
                         <button type="button" onClick={() => setExpandedOrderId(isExpanded ? null : order.id)} className="rounded-md border border-[#e8dfd4] bg-white px-2.5 py-1.5 text-[10px] font-semibold text-[#65574d] hover:bg-[#faf7f2]">{isExpanded ? "Hide details" : "View details"}</button>
-                        {canAdvance && <button type="button" onClick={() => advanceOrder(order)} disabled={updatingId === order.id} className="rounded-md bg-black px-2.5 py-1.5 text-[10px] font-semibold text-white disabled:opacity-50">{updatingId === order.id ? "Updating..." : needsPaymentReview ? "Review payment" : order.status === "Pending" ? "Approve" : order.status === "Preparing" ? "Ready" : "Complete"}</button>}
+                        {canAdvance && <button type="button" onClick={() => advanceOrder(order)} disabled={updatingId === order.id} className="rounded-md bg-black px-2.5 py-1.5 text-[10px] font-semibold text-white disabled:opacity-50">{updatingId === order.id ? "Updating..." : needsPaymentReview ? "Review payment" : order.status === "Pending" ? "Approve" : order.status === "Preparing" ? "Ready" : order.status === "Return/Refund" ? "Resolve request" : "Complete"}</button>}
                         {!["Completed", "Cancelled"].includes(order.status) && <button type="button" onClick={() => updateStatus(order.id, "Cancelled")} disabled={updatingId === order.id} className="rounded-md border border-red-200 bg-red-50 px-2.5 py-1.5 text-[10px] font-semibold text-red-700 disabled:opacity-50">Cancel</button>}
                         <button type="button" onClick={() => openWasteModal(order)} className="rounded-md border border-[#e8dfd4] bg-[#faf7f2] px-2.5 py-1.5 text-[10px] font-semibold text-[#65574d]">Log waste</button>
                       </div>
@@ -688,7 +695,7 @@ export default function Orders() {
                           <td className="px-4 py-3">
                             <div className="flex flex-wrap justify-end gap-2">
                               <button type="button" onClick={() => setExpandedOrderId(isExpanded ? null : order.id)} className="rounded-full border border-black/10 bg-white px-3 py-1.5 text-[11px] font-semibold text-black hover:bg-black hover:text-white">{isExpanded ? "Hide" : "View"}</button>
-                              {(!(order.status === "Completed" || order.status === "Cancelled") && (order.status !== 'Awaiting Payment' || needsPaymentReview)) && <button type="button" onClick={() => advanceOrder(order)} disabled={updatingId === order.id} className="rounded-full bg-black px-3 py-1.5 text-[11px] font-semibold text-white hover:bg-black/80 disabled:opacity-50">{needsPaymentReview ? "Verify & move to Pending" : order.status === "Pending" ? "Approve" : order.status === "Preparing" ? "Ready" : "Complete"}</button>}
+                              {(!(order.status === "Completed" || order.status === "Cancelled") && (order.status !== 'Awaiting Payment' || needsPaymentReview)) && <button type="button" onClick={() => advanceOrder(order)} disabled={updatingId === order.id} className="rounded-full bg-black px-3 py-1.5 text-[11px] font-semibold text-white hover:bg-black/80 disabled:opacity-50">{needsPaymentReview ? "Verify & move to Pending" : order.status === "Pending" ? "Approve" : order.status === "Preparing" ? "Ready" : order.status === "Return/Refund" ? "Resolve request" : "Complete"}</button>}
                               {!("Completed" === order.status || "Cancelled" === order.status) && <button type="button" onClick={() => updateStatus(order.id, "Cancelled")} disabled={updatingId === order.id} className="rounded-full border border-red-200 bg-red-50 px-3 py-1.5 text-[11px] font-semibold text-red-600 hover:bg-red-100 disabled:opacity-50">Cancel</button>}
                               <button type="button" onClick={() => openWasteModal(order)} className="rounded-full border border-black/10 bg-[#F7F5EE] px-3 py-1.5 text-[11px] font-semibold text-black hover:bg-black hover:text-white">Waste</button>
                             </div>
@@ -875,6 +882,8 @@ export default function Orders() {
                                     ? "Approve & bake"
                                     : order.status === "Preparing"
                                     ? "Mark ready"
+                                    : order.status === "Return/Refund"
+                                    ? "Resolve request"
                                     : "Complete"}
                                   </button>
                                 )}

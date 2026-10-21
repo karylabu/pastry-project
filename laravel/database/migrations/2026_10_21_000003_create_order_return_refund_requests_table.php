@@ -8,14 +8,16 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('order_return_refund_requests', function (Blueprint $table) {
-            $table->id();
-            $table->unsignedBigInteger('order_id')->unique();
-            $table->unsignedBigInteger('customer_id');
-            $table->text('reason');
-            $table->string('status')->default('Pending Review');
-            $table->timestamps();
-        });
+        if (!Schema::hasTable('order_return_refund_requests')) {
+            Schema::create('order_return_refund_requests', function (Blueprint $table) {
+                $table->id();
+                $table->unsignedBigInteger('order_id')->unique();
+                $table->unsignedBigInteger('customer_id');
+                $table->text('reason');
+                $table->string('status')->default('Pending Review');
+                $table->timestamps();
+            });
+        }
     }
 
     public function down(): void

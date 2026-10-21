@@ -88,7 +88,7 @@ class OrderReturnRefundRequestTest extends TestCase
         parent::tearDown();
     }
 
-    public function test_customer_can_submit_one_return_refund_request_for_ready_order_without_changing_order_status(): void
+    public function test_customer_can_submit_one_return_refund_request_and_admin_is_notified(): void
     {
         $this->withHeader('Authorization', 'Bearer customer-token')
             ->postJson('http://localhost/api/orders/10/return-refund-request', ['reason' => 'The cake arrived damaged.'])
@@ -96,7 +96,7 @@ class OrderReturnRefundRequestTest extends TestCase
             ->assertJsonPath('success', true)
             ->assertJsonPath('return_refund_request.status', 'Pending Review');
 
-        $this->assertDatabaseHas('orders', ['id' => 10, 'status' => 'Ready for Pickup']);
+        $this->assertDatabaseHas('orders', ['id' => 10, 'status' => 'Return/Refund']);
         $this->assertDatabaseHas('order_return_refund_requests', [
             'order_id' => 10,
             'customer_id' => 1,

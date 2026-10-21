@@ -1155,6 +1155,12 @@ class OrderController extends Controller
                     'created_at' => now(),
                     'updated_at' => now(),
                 ]);
+                $statusUpdated = DB::table('orders')
+                    ->where('id', $order->id)
+                    ->update(['status' => 'Return/Refund']);
+                if ($statusUpdated !== 1) {
+                    throw new RuntimeException('Unable to update the order status for this request.');
+                }
 
                 AdminNotification::notifyRoles(['admin'], [
                     'type' => 'return_refund_request',
@@ -1214,7 +1220,8 @@ class OrderController extends Controller
                 $newStatus = $request->status;
                 $previousStatus = $oldStatus;
                 $approvedStatuses = ['confirmed', 'approved', 'preparing'];
-                $wasApproved = in_array(strtolower(trim($oldStatus)), $approvedStatuses, true);
+                $stockDeductedStatuses = array_merge($approvedStatuses, ['return/refund']);
+                $wasApproved = in_array(strtolower(trim($oldStatus)), $stockDeductedStatuses, true);
                 $isApproved = in_array(strtolower(trim($newStatus)), $approvedStatuses, true);
 
                 if (!$wasApproved && $isApproved) {
@@ -1240,6 +1247,17 @@ class OrderController extends Controller
                 }
 
                 $order->update(['status' => $newStatus]);
+
+                if (Schema::hasTable('order_return_refund_requests')
+                    && in_array(strtolower(trim($newStatus)), ['completed', 'cancelled'], true)) {
+                    DB::table('order_return_refund_requests')
+                        ->where('order_id', $order->id)
+                        ->where('status', 'Pending Review')
+                        ->update([
+                            'status' => strtolower(trim($newStatus)) === 'completed' ? 'Resolved' : 'Cancelled',
+                            'updated_at' => now(),
+                        ]);
+                }
 
                 if ($oldStatus !== $newStatus && Schema::hasTable('notifications')) {
                     $type = strtolower($newStatus) === 'cancelled' ? 'Warning' : 'Success';

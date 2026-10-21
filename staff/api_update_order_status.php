@@ -878,7 +878,7 @@ $id = isset($data['id']) ? intval($data['id']) : 0;
 $status = isset($data['status']) ? trim($data['status']) : "";
 $pickupOutcome = trim((string) ($data['pickup_outcome'] ?? ''));
 
-$allowedStatuses = ['Awaiting Payment', 'Awaiting Balance Payment', 'Pending', 'Confirmed', 'Preparing', 'Ready for Pickup', 'Completed', 'Cancelled'];
+$allowedStatuses = ['Awaiting Payment', 'Awaiting Balance Payment', 'Pending', 'Confirmed', 'Preparing', 'Ready for Pickup', 'Return/Refund', 'Completed', 'Cancelled'];
 if (!$id || !in_array($status, $allowedStatuses, true)) {
     sendJson(false, "Invalid input");
 }
@@ -1201,6 +1201,23 @@ try {
         throw new Exception("Update failed");
     }
     $stmt->close();
+
+    if (in_array($status, ['Completed', 'Cancelled'], true) && $oldStatus !== $status) {
+        $returnRefundTable = $conn->query("SHOW TABLES LIKE 'order_return_refund_requests'");
+        if ($returnRefundTable && $returnRefundTable->num_rows > 0) {
+            $requestStatus = $status === 'Completed' ? 'Resolved' : 'Cancelled';
+            $requestStmt = $conn->prepare("UPDATE order_return_refund_requests SET status = ?, updated_at = NOW() WHERE order_id = ? AND status = 'Pending Review'");
+            if (!$requestStmt) {
+                throw new Exception('Failed to update return/refund review status.');
+            }
+            $requestStmt->bind_param('si', $requestStatus, $id);
+            if (!$requestStmt->execute()) {
+                $requestStmt->close();
+                throw new Exception('Failed to update return/refund review status.');
+            }
+            $requestStmt->close();
+        }
+    }
 
     if ($pickupOutcome === 'picked_up') {
         $pickupStmt = $conn->prepare("UPDATE orders SET pickup_outcome = 'picked_up', pickup_outcome_at = NOW() WHERE id = ?");
