@@ -109,6 +109,15 @@ class StaffOrdersApiTest extends TestCase
             $table->string('idempotency_key')->nullable();
             $table->timestamp('created_at')->nullable();
         });
+        Schema::create('ingredients', function ($table) {
+            $table->id();
+            $table->string('name');
+            $table->string('unit');
+        });
+        Schema::create('ingredient_batches', function ($table) {
+            $table->id();
+            $table->string('batch_number')->nullable();
+        });
 
         DB::table('users')->insert([
             'id' => 1,
@@ -127,6 +136,8 @@ class StaffOrdersApiTest extends TestCase
 
     protected function tearDown(): void
     {
+        Schema::dropIfExists('ingredient_batches');
+        Schema::dropIfExists('ingredients');
         Schema::dropIfExists('waste_log');
         Schema::dropIfExists('order_items');
         Schema::dropIfExists('customized_cake_orders');
@@ -296,6 +307,12 @@ class StaffOrdersApiTest extends TestCase
             'status' => 'Cancelled',
             'created_at' => now(),
         ]);
+        DB::table('order_items')->insert([
+            'order_id' => 51,
+            'product' => 'Chocolate Cake',
+            'qty' => 2,
+            'price' => 437.75,
+        ]);
 
         $this->withHeader('Authorization', 'Bearer test-admin-token')
             ->postJson('/api/staff/orders/51/waste', ['total' => 1])
@@ -303,7 +320,8 @@ class StaffOrdersApiTest extends TestCase
             ->assertJsonPath('success', true)
             ->assertJsonPath('already_recorded', false)
             ->assertJsonPath('entry.cost', 875.5)
-            ->assertJsonPath('entry.unit', 'orders');
+            ->assertJsonPath('entry.item', 'Chocolate Cake x2')
+            ->assertJsonPath('entry.unit', 'order');
 
         $this->withHeader('Authorization', 'Bearer test-admin-token')
             ->postJson('/api/staff/orders/51/waste')
@@ -313,7 +331,7 @@ class StaffOrdersApiTest extends TestCase
 
         $this->assertDatabaseCount('waste_log', 1);
         $this->assertDatabaseHas('waste_log', [
-            'item' => 'Order ID #51',
+            'item' => 'Chocolate Cake x2',
             'qty' => 1,
             'unit_cost' => 875.50,
             'reference_type' => 'order_waste',
@@ -325,6 +343,15 @@ class StaffOrdersApiTest extends TestCase
             ->getJson('/api/staff/orders')
             ->assertOk()
             ->assertJsonPath('orders.0.is_wasted', true);
+
+        DB::table('waste_log')->where('reference_type', 'order_waste')
+            ->where('reference_id', 51)
+            ->update(['item' => 'Order ID #51']);
+
+        $this->withHeader('Authorization', 'Bearer test-admin-token')
+            ->getJson('/api/staff/inventory/waste')
+            ->assertOk()
+            ->assertJsonPath('entries.0.item', 'Chocolate Cake x2');
     }
 
     public function test_only_admin_can_record_order_as_waste(): void

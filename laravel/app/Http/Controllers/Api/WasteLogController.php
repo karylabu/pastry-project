@@ -20,16 +20,28 @@ class WasteLogController extends Controller
     {
         if ($response = $this->authorizeOperationalStaff($request)) return $response;
 
-        $entries = WasteLog::query()->with(['ingredient:id,name,unit', 'batch:id,batch_number'])
-            ->orderByDesc('datetime')->get()
-            ->map(fn (WasteLog $waste) => [
+        $wastes = WasteLog::query()->with(['ingredient:id,name,unit', 'batch:id,batch_number'])
+            ->orderByDesc('datetime')->get();
+        $orderWasteIds = $wastes
+            ->where('reference_type', 'order_waste')
+            ->pluck('reference_id')
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
+        $orderItemNames = $this->orderWasteItemNames($orderWasteIds);
+
+        $entries = $wastes->map(fn (WasteLog $waste) => [
                 'id' => (int) $waste->id, 'datetime' => $waste->datetime,
-                'item' => $waste->item, 'qty' => (float) $waste->qty,
+                'item' => $waste->reference_type === 'order_waste'
+                    ? ($orderItemNames[$waste->reference_id] ?? $waste->item)
+                    : $waste->item,
+                'qty' => (float) $waste->qty,
                 'unit_cost' => (float) $waste->unit_cost,
                 'cost' => round((float) $waste->qty * (float) $waste->unit_cost, 2),
                 'type' => $waste->item_type, 'reason' => $waste->reason,
                 'unit' => $waste->reference_type === 'order_waste'
-                    ? 'orders'
+                    ? 'order'
                     : ($waste->ingredient?->unit ?? ($waste->item_type === 'Finished Product' ? 'pcs' : 'kg')),
                 'ingredient_id' => $waste->ingredient_id, 'ingredient_batch_id' => $waste->ingredient_batch_id,
                 'reference_type' => $waste->reference_type, 'reference_id' => $waste->reference_id,
@@ -106,10 +118,11 @@ class WasteLogController extends Controller
                     abort(422, 'An order with a zero total cannot be recorded as financial loss.');
                 }
 
+                $itemName = $this->orderWasteItemNames([$orderId])[$orderId] ?? "Order #{$orderId}";
                 $now = now();
                 $wasteId = DB::table('waste_log')->insertGetId([
                     'datetime' => $now,
-                    'item' => "Order ID #{$orderId}",
+                    'item' => $itemName,
                     'qty' => 1,
                     'unit_cost' => $total,
                     'item_type' => 'Finished Product',
@@ -117,7 +130,7 @@ class WasteLogController extends Controller
                     'user_id' => $user->id,
                     'reference_type' => 'order_waste',
                     'reference_id' => $orderId,
-                    'unit' => 'orders',
+                    'unit' => 'order',
                     'idempotency_key' => "order-waste:{$orderId}",
                     'created_at' => $now,
                 ]);
@@ -140,7 +153,7 @@ class WasteLogController extends Controller
                     'cost' => round((float) $record->qty * (float) $record->unit_cost, 2),
                     'type' => $record->item_type,
                     'reason' => $record->reason,
-                    'unit' => 'orders',
+                    'unit' => 'order',
                     'reference_type' => $record->reference_type,
                     'reference_id' => (int) $record->reference_id,
                 ],
@@ -156,5 +169,56 @@ class WasteLogController extends Controller
             report($exception);
             return response()->json(['success' => false, 'message' => 'Unable to record order waste.'], 500);
         }
+    }
+
+    private function orderWasteItemNames(array $orderIds): array
+    {
+        if ($orderIds === []) {
+            return [];
+        }
+
+        $itemNames = [];
+        if (Schema::hasTable('order_items') && Schema::hasColumn('order_items', 'product')) {
+            $columns = ['order_id', 'product'];
+            if (Schema::hasColumn('order_items', 'qty')) {
+                $columns[] = 'qty';
+            }
+
+            foreach (DB::table('order_items')->whereIn('order_id', $orderIds)->get($columns) as $item) {
+                $name = trim((string) ($item->product ?? ''));
+                if ($name === '') {
+                    continue;
+                }
+                $quantity = max(1, (int) ($item->qty ?? 1));
+                $itemNames[$item->order_id][] = $quantity > 1 ? "{$name} x{$quantity}" : $name;
+            }
+        }
+
+        $missingIds = array_values(array_diff($orderIds, array_map('intval', array_keys($itemNames))));
+        if ($missingIds !== [] && Schema::hasTable('orders') && Schema::hasColumn('orders', 'items')) {
+            foreach (DB::table('orders')->whereIn('id', $missingIds)->get(['id', 'items']) as $order) {
+                $items = json_decode((string) $order->items, true);
+                if (!is_array($items)) {
+                    continue;
+                }
+
+                foreach ($items as $item) {
+                    if (!is_array($item)) {
+                        continue;
+                    }
+                    $name = trim((string) ($item['name'] ?? $item['product'] ?? ''));
+                    if ($name === '') {
+                        continue;
+                    }
+                    $quantity = max(1, (int) ($item['qty'] ?? $item['quantity'] ?? 1));
+                    $itemNames[$order->id][] = $quantity > 1 ? "{$name} x{$quantity}" : $name;
+                }
+            }
+        }
+
+        return array_map(
+            static fn (array $names): string => implode(', ', $names),
+            $itemNames
+        );
     }
 }

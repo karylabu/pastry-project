@@ -47,11 +47,6 @@ const BOARD_COLUMNS = [
     description: "Cleared orders and finished transactions.",
   },
   {
-    key: "Return/Refund",
-    title: "Return / Refund",
-    description: "Customer requests awaiting admin review.",
-  },
-  {
     key: "Cancelled",
     title: "Cancelled",
     description: "Orders stopped due to issues.",
@@ -120,7 +115,7 @@ export default function Orders() {
     Object.values(paymentProofPreviewUrlsRef.current).forEach((url) => URL.revokeObjectURL(url));
   }, []);
 
-  const statusFilterOptions = ["All", "Awaiting Payment", "Pending", "Preparing", "Ready for Pickup", "Completed", "Return/Refund", "Cancelled"];
+  const statusFilterOptions = ["All", "Awaiting Payment", "Pending", "Preparing", "Ready for Pickup", "Completed", "Cancelled"];
 
   const statusColors = {
     "Awaiting Payment": "bg-amber-50 text-amber-800 border border-amber-200",
@@ -128,7 +123,6 @@ export default function Orders() {
     Preparing: "bg-black/5 text-black border border-black/15",
     "Ready for Pickup": "bg-[#D4AF37]/10 text-black border border-[#D4AF37]/20",
     Completed: "bg-black text-white border border-black",
-    "Return/Refund": "bg-amber-100 text-amber-900 border border-amber-200",
     Cancelled: "bg-black/10 text-black border border-black/20",
   };
 
@@ -138,8 +132,7 @@ export default function Orders() {
     Preparing: 1,
     "Ready for Pickup": 2,
     Completed: 3,
-    "Return/Refund": 4,
-    Cancelled: 5,
+    Cancelled: 4,
   };
 
   const isLowStockIngredient = (ingredient) => {
@@ -231,6 +224,7 @@ export default function Orders() {
     (Array.isArray(items) ? items : []).map((order) => ({
       ...order,
       source,
+      status: order.status === "Return/Refund" ? "Ready for Pickup" : order.status,
       items: typeof order.items === "string" ? JSON.parse(order.items) : order.items || [],
     }));
 
@@ -430,15 +424,15 @@ export default function Orders() {
       });
       const data = await response.json();
       if (!response.ok || !data?.success) {
-        throw new Error(data?.message || "Unable to reject the return/refund request.");
+        throw new Error(data?.message || "Unable to reject the customer request.");
       }
 
-      addToast(`Return/refund request for order #${rejectModalOrderId} rejected. Customer notified.`);
+      addToast(`Customer request for order #${rejectModalOrderId} rejected. Customer notified.`);
       setRejectModalOrderId(null);
       setRejectReason("");
       fetchOrders(true);
     } catch (error) {
-      addToast(error.message || "Unable to reject the return/refund request.", "error");
+      addToast(error.message || "Unable to reject the customer request.", "error");
     } finally {
       setRejectSubmitting(false);
     }
@@ -450,7 +444,7 @@ export default function Orders() {
       && order.has_payment_proof;
     const nextStatus = hasReviewableProof
       ? 'Pending'
-      : order.status === "Pending" ? "Preparing" : order.status === "Preparing" ? "Ready for Pickup" : ["Ready for Pickup", "Return/Refund"].includes(order.status) ? "Completed" : null;
+      : order.status === "Pending" ? "Preparing" : order.status === "Preparing" ? "Ready for Pickup" : order.status === "Ready for Pickup" ? "Completed" : null;
     if (nextStatus) updateStatus(order.id, nextStatus);
   };
 
@@ -612,7 +606,7 @@ export default function Orders() {
                           <div className="flex flex-wrap items-center gap-1.5">
                             <span className="text-[12px] font-bold text-[#33251e]">#{order.order_number ?? order.id}</span>
                             <span className={`rounded px-2 py-1 text-[9px] font-semibold ${statusColors[order.status] ?? "bg-black/5 text-black"}`}>{order.status}</span>
-                            {order.return_refund_request && <span className="rounded bg-amber-100 px-2 py-1 text-[9px] font-semibold text-amber-900">Return/refund · {order.return_refund_request.status}</span>}
+                            {order.return_refund_request && <span className="rounded bg-amber-100 px-2 py-1 text-[9px] font-semibold text-amber-900">Customer request · {order.return_refund_request.status}</span>}
                             {urgency.isUrgent && <span className="inline-flex items-center gap-1 rounded bg-[#fff3d1] px-2 py-1 text-[9px] font-semibold text-[#80600a]"><AlertTriangle size={11} /> Rush · {urgency.ageMinutes}m</span>}
                           </div>
                           <p className="mt-2 truncate text-[13px] font-semibold text-[#33251e]">{customerLabel}</p>
@@ -626,9 +620,9 @@ export default function Orders() {
                       </div>
                       <div className="mt-3 flex flex-wrap gap-1.5">
                         <button type="button" onClick={() => setExpandedOrderId(isExpanded ? null : order.id)} className="rounded-md border border-[#e8dfd4] bg-white px-2.5 py-1.5 text-[10px] font-semibold text-[#65574d] hover:bg-[#faf7f2]">{isExpanded ? "Hide details" : "View details"}</button>
-                        {canAdvance && <button type="button" onClick={() => advanceOrder(order)} disabled={updatingId === order.id} className="rounded-md bg-black px-2.5 py-1.5 text-[10px] font-semibold text-white disabled:opacity-50">{updatingId === order.id ? "Updating..." : needsPaymentReview ? "Review payment" : order.status === "Pending" ? "Approve" : order.status === "Preparing" ? "Ready" : order.status === "Return/Refund" ? "Resolve request" : "Complete"}</button>}
-                        {order.status === "Return/Refund"
-                          ? order.return_refund_request?.status === "Pending Review" && <button type="button" onClick={() => { setRejectModalOrderId(order.id); setRejectReason(""); }} disabled={updatingId === order.id} className="rounded-md border border-red-200 bg-red-50 px-2.5 py-1.5 text-[10px] font-semibold text-red-700 disabled:opacity-50">Reject</button>
+                        {canAdvance && <button type="button" onClick={() => advanceOrder(order)} disabled={updatingId === order.id} className="rounded-md bg-black px-2.5 py-1.5 text-[10px] font-semibold text-white disabled:opacity-50">{updatingId === order.id ? "Updating..." : needsPaymentReview ? "Review payment" : order.status === "Pending" ? "Approve" : order.status === "Preparing" ? "Ready" : "Complete"}</button>}
+                        {order.return_refund_request?.status === "Pending Review"
+                          ? <button type="button" onClick={() => { setRejectModalOrderId(order.id); setRejectReason(""); }} disabled={updatingId === order.id} className="rounded-md border border-red-200 bg-red-50 px-2.5 py-1.5 text-[10px] font-semibold text-red-700 disabled:opacity-50">Reject</button>
                           : !["Completed", "Cancelled"].includes(order.status) && <button type="button" onClick={() => updateStatus(order.id, "Cancelled")} disabled={updatingId === order.id} className="rounded-md border border-red-200 bg-red-50 px-2.5 py-1.5 text-[10px] font-semibold text-red-700 disabled:opacity-50">Cancel</button>}
                         <button type="button" onClick={() => markOrderAsWaste(order)} disabled={order.is_wasted} className="rounded-md border border-[#e8dfd4] bg-[#faf7f2] px-2.5 py-1.5 text-[10px] font-semibold text-[#65574d] disabled:cursor-not-allowed disabled:opacity-50">{order.is_wasted ? "Counted as waste" : "Waste"}</button>
                       </div>
@@ -636,7 +630,7 @@ export default function Orders() {
                     {isExpanded && <div className="border-t border-[#eee6de] bg-[#fffdfa] p-3.5 text-[11px] text-[#65574d]">
                       {order.return_refund_request && (
                         <div className="mb-3 rounded-md border border-amber-200 bg-amber-50 p-3">
-                          <p className="text-[9px] font-semibold uppercase tracking-[0.14em] text-amber-800">Return/refund request · {order.return_refund_request.status}</p>
+                          <p className="text-[9px] font-semibold uppercase tracking-[0.14em] text-amber-800">Customer request · {order.return_refund_request.status}</p>
                           <p className="mt-1 whitespace-pre-wrap text-[11px] text-amber-950">{order.return_refund_request.reason}</p>
                           {order.return_refund_request.admin_reason && <p className="mt-2 whitespace-pre-wrap text-[11px] text-red-800"><span className="font-semibold">Admin rejection reason:</span> {order.return_refund_request.admin_reason}</p>}
                         </div>
@@ -709,14 +703,14 @@ export default function Orders() {
                           <td className="px-4 py-3">
                             <div className="flex flex-col items-start gap-1.5">
                               <span className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-semibold ${statusColors[order.status] ?? "bg-black/5 text-black"}`}>{order.status}</span>
-                              {order.return_refund_request && <span className="rounded bg-amber-100 px-2 py-1 text-[9px] font-semibold text-amber-900">Return/refund · {order.return_refund_request.status}</span>}
+                              {order.return_refund_request && <span className="rounded bg-amber-100 px-2 py-1 text-[9px] font-semibold text-amber-900">Customer request · {order.return_refund_request.status}</span>}
                             </div>
                           </td>
                           <td className="px-4 py-3">
                             <div className="flex flex-wrap justify-end gap-2">
                               <button type="button" onClick={() => setExpandedOrderId(isExpanded ? null : order.id)} className="rounded-full border border-black/10 bg-white px-3 py-1.5 text-[11px] font-semibold text-black hover:bg-black hover:text-white">{isExpanded ? "Hide" : "View"}</button>
-                              {(!(order.status === "Completed" || order.status === "Cancelled") && (order.status !== 'Awaiting Payment' || needsPaymentReview)) && <button type="button" onClick={() => advanceOrder(order)} disabled={updatingId === order.id} className="rounded-full bg-black px-3 py-1.5 text-[11px] font-semibold text-white hover:bg-black/80 disabled:opacity-50">{needsPaymentReview ? "Verify & move to Pending" : order.status === "Pending" ? "Approve" : order.status === "Preparing" ? "Ready" : order.status === "Return/Refund" ? "Resolve request" : "Complete"}</button>}
-                              {order.status === "Return/Refund"
+                              {(!(order.status === "Completed" || order.status === "Cancelled") && (order.status !== 'Awaiting Payment' || needsPaymentReview)) && <button type="button" onClick={() => advanceOrder(order)} disabled={updatingId === order.id} className="rounded-full bg-black px-3 py-1.5 text-[11px] font-semibold text-white hover:bg-black/80 disabled:opacity-50">{needsPaymentReview ? "Verify & move to Pending" : order.status === "Pending" ? "Approve" : order.status === "Preparing" ? "Ready" : "Complete"}</button>}
+                              {order.return_refund_request?.status === "Pending Review"
                                 ? order.return_refund_request?.status === "Pending Review" && <button type="button" onClick={() => { setRejectModalOrderId(order.id); setRejectReason(""); }} disabled={updatingId === order.id || rejectSubmitting} className="rounded-full border border-red-200 bg-red-50 px-3 py-1.5 text-[11px] font-semibold text-red-600 hover:bg-red-100 disabled:opacity-50">Reject</button>
                                 : !["Completed", "Cancelled"].includes(order.status) && <button type="button" onClick={() => updateStatus(order.id, "Cancelled")} disabled={updatingId === order.id} className="rounded-full border border-red-200 bg-red-50 px-3 py-1.5 text-[11px] font-semibold text-red-600 hover:bg-red-100 disabled:opacity-50">Cancel</button>}
                               <button type="button" onClick={() => markOrderAsWaste(order)} disabled={order.is_wasted} className="rounded-full border border-black/10 bg-[#F7F5EE] px-3 py-1.5 text-[11px] font-semibold text-black hover:bg-black hover:text-white disabled:cursor-not-allowed disabled:opacity-50">{order.is_wasted ? "Counted as waste" : "Waste"}</button>
@@ -728,7 +722,7 @@ export default function Orders() {
                             <td colSpan="6" className="px-4 py-4 text-[11px] leading-5 text-black/70">
                               {order.return_refund_request && (
                                 <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-3">
-                                  <p className="text-[9px] uppercase tracking-[0.2em] text-amber-800">Return/refund request · {order.return_refund_request.status}</p>
+                                  <p className="text-[9px] uppercase tracking-[0.2em] text-amber-800">Customer request · {order.return_refund_request.status}</p>
                                   <p className="mt-1 whitespace-pre-wrap text-[11px] text-amber-950">{order.return_refund_request.reason}</p>
                                   {order.return_refund_request.admin_reason && <p className="mt-2 whitespace-pre-wrap text-[11px] text-red-800"><span className="font-semibold">Admin rejection reason:</span> {order.return_refund_request.admin_reason}</p>}
                                 </div>
@@ -905,7 +899,7 @@ export default function Orders() {
                                     ? "Approve & bake"
                                     : order.status === "Preparing"
                                     ? "Mark ready"
-                                    : order.status === "Return/Refund"
+                                    : order.status === "Ready for Pickup"
                                     ? "Resolve request"
                                     : "Complete"}
                                   </button>
@@ -1023,7 +1017,7 @@ export default function Orders() {
                     value={rejectReason}
                     onChange={(event) => setRejectReason(event.target.value)}
                     className="w-full resize-y rounded-2xl border border-black/10 bg-white px-4 py-3 text-[13px] text-black/80 outline-none focus:border-[#D4AF37]"
-                    placeholder="Explain why this return/refund request is being rejected."
+                    placeholder="Explain why this customer request is being rejected."
                   />
                 </div>
                 <div className="flex justify-end gap-2 pt-2">
