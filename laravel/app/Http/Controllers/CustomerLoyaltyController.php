@@ -48,10 +48,20 @@ class CustomerLoyaltyController extends Controller
             ->limit(10)
             ->get(['reward_code', 'points', 'discount_amount', 'discount_percent', 'max_discount_amount', 'created_at']);
 
+        $hasAvailableRewardCode = DB::table('loyalty_transactions')
+            ->where('user_id', $user->id)
+            ->where('type', 'redeem')
+            ->where('points', -1000)
+            ->where('discount_percent', 5)
+            ->whereNotNull('reward_code')
+            ->whereNull('order_id')
+            ->exists();
+
         return response()->json([
             'success' => true,
             'balance' => max(0, (int) ($summary->balance ?? 0)),
             'earned' => (int) ($summary->earned ?? 0),
+            'has_available_reward_code' => $hasAvailableRewardCode,
             'points_per_hundred' => 10,
             'discount_percent' => 5,
             'max_discount_amount' => 100,

@@ -100,6 +100,7 @@ export default function CheckoutModal({
   const [couponValidationMessage, setCouponValidationMessage] = useState('');
   const [validatingCoupon, setValidatingCoupon] = useState(false);
   const [firstOrderEligibility, setFirstOrderEligibility] = useState({ status: 'unknown' });
+  const [rewardEligibility, setRewardEligibility] = useState({ status: 'unknown' });
   const [discountIdFile, setDiscountIdFile] = useState(null);
   const [discountIdPreview, setDiscountIdPreview] = useState('');
   const modalScrollRef = useRef(null);
@@ -258,6 +259,45 @@ export default function CheckoutModal({
       .catch((error) => {
         console.error('Could not verify first-order discount eligibility:', error);
         if (isCurrent) setFirstOrderEligibility({ status: 'error' });
+      });
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [isOpen, userId]);
+
+  useEffect(() => {
+    if (!isOpen) return undefined;
+
+    if (!userId) {
+      setRewardEligibility({ status: 'unavailable' });
+      return undefined;
+    }
+
+    let isCurrent = true;
+    setRewardEligibility({ status: 'checking' });
+
+    fetch(`${LARAVEL_BASE}/api/loyalty`, {
+      credentials: 'include',
+      headers: getAuthHeaders(),
+    })
+      .then(async (response) => {
+        const data = await safeParseJson(response);
+        if (!response.ok || !data?.success || typeof data.balance !== 'number' ||
+          typeof data.has_available_reward_code !== 'boolean') {
+          throw new Error(data?.message || 'Could not verify reward code eligibility.');
+        }
+        if (isCurrent) {
+          setRewardEligibility({
+            status: 'ready',
+            eligible: data.balance >= Number(data.minimum_redeem_points || 1000) ||
+              data.has_available_reward_code,
+          });
+        }
+      })
+      .catch((error) => {
+        console.error('Could not verify reward code eligibility:', error);
+        if (isCurrent) setRewardEligibility({ status: 'error' });
       });
 
     return () => {
@@ -1349,11 +1389,6 @@ export default function CheckoutModal({
                     : 'This offer cannot be combined with a promotion coupon, reward code, or Senior Citizen / PWD discount.'}
                 </p>
               )}
-              {firstOrderEligibility.status === 'used' && (
-                <p className="rounded-xl border border-[#eee5db] bg-white px-4 py-3 text-xs text-[#8d7a6e]">
-                  The first-order special offer has already been used on this account.
-                </p>
-              )}
               {firstOrderEligibility.status === 'error' && (
                 <p role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-xs text-red-700">
                   We couldn’t verify your first-order offer. Refresh checkout to check your eligibility.
@@ -1433,26 +1468,33 @@ export default function CheckoutModal({
                       </p>
                     </div>
 
-                    <div className="space-y-2 rounded-xl border border-[#eee5db] bg-white p-3">
-                      <label htmlFor="checkout-reward-code" className="block text-xs font-semibold text-[#765d50]">
-                        Pastry Project reward code
-                      </label>
-                      <input
-                        id="checkout-reward-code"
-                        type="text"
-                        value={rewardCodeInput}
-                        onChange={(event) => setRewardCodeInput(event.target.value.toUpperCase())}
-                        maxLength={32}
-                        autoCapitalize="characters"
-                        autoComplete="off"
-                        spellCheck={false}
-                        placeholder="PPR-XXXXXXXX"
-                        className="w-full rounded-lg border border-[#e8e1d8] bg-[#fffdfa] p-2.5 text-sm uppercase text-[#33251e] outline-none placeholder:normal-case placeholder:text-gray-400 focus:border-[#d4af37] focus:ring-2 focus:ring-[#d4af37]/20"
-                      />
-                      <p className="text-[11px] leading-4 text-[#8d7a6e]">
-                        Redeem 5% off your subtotal, up to ₱100. Reward codes cannot be combined with promotion coupons or Senior Citizen / PWD discounts.
+                    {rewardEligibility.status === 'ready' && rewardEligibility.eligible && (
+                      <div className="space-y-2 rounded-xl border border-[#eee5db] bg-white p-3">
+                        <label htmlFor="checkout-reward-code" className="block text-xs font-semibold text-[#765d50]">
+                          Pastry Project reward code
+                        </label>
+                        <input
+                          id="checkout-reward-code"
+                          type="text"
+                          value={rewardCodeInput}
+                          onChange={(event) => setRewardCodeInput(event.target.value.toUpperCase())}
+                          maxLength={32}
+                          autoCapitalize="characters"
+                          autoComplete="off"
+                          spellCheck={false}
+                          placeholder="PPR-XXXXXXXX"
+                          className="w-full rounded-lg border border-[#e8e1d8] bg-[#fffdfa] p-2.5 text-sm uppercase text-[#33251e] outline-none placeholder:normal-case placeholder:text-gray-400 focus:border-[#d4af37] focus:ring-2 focus:ring-[#d4af37]/20"
+                        />
+                        <p className="text-[11px] leading-4 text-[#8d7a6e]">
+                          Redeem 5% off your subtotal, up to ₱100. Reward codes cannot be combined with promotion coupons or Senior Citizen / PWD discounts.
+                        </p>
+                      </div>
+                    )}
+                    {rewardEligibility.status === 'error' && (
+                      <p role="alert" className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+                        We couldn’t verify reward code eligibility. Refresh checkout to try again.
                       </p>
-                    </div>
+                    )}
                   </div>
                 )}
                 {discountType !== 'none' && (

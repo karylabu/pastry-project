@@ -95,6 +95,7 @@ class CustomerLoyaltyApiTest extends TestCase
         $this->assertSame(200, $response->getStatusCode());
         $this->assertSame(20, $data['balance']);
         $this->assertSame(20, $data['earned']);
+        $this->assertFalse($data['has_available_reward_code']);
         $this->assertCount(1, $data['history']);
 
         $this->assertSame(20, $this->callLoyalty()->getData(true)['balance']);
@@ -119,7 +120,25 @@ class CustomerLoyaltyApiTest extends TestCase
 
         $refreshed = $this->callLoyalty()->getData(true);
         $this->assertSame(0, $refreshed['balance']);
+        $this->assertTrue($refreshed['has_available_reward_code']);
         $this->assertSame('5% OFF reward', $refreshed['history'][0]['label']);
+    }
+
+    public function test_redeemed_reward_code_is_unavailable_after_use(): void
+    {
+        $this->callLoyalty();
+        DB::table('loyalty_transactions')->insert([
+            'user_id' => 7,
+            'order_id' => 42,
+            'type' => 'redeem',
+            'points' => -1000,
+            'discount_percent' => 5,
+            'max_discount_amount' => 100,
+            'reward_code' => 'PPR-USED1234',
+            'created_at' => now(),
+        ]);
+
+        $this->assertFalse($this->callLoyalty()->getData(true)['has_available_reward_code']);
     }
 
     public function test_loyalty_endpoints_require_customer_authentication(): void
