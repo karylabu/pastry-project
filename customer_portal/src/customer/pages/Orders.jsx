@@ -1419,8 +1419,16 @@ export default function Orders() {
                               <div className="mt-2 space-y-2">
                                 {items.map((item, itemIndex) => {
                                   const image = getProductThumbnail(order, item);
+                                  const itemSize = item.variant || item.selectionDetails?.size || item.selectionDetails?.variant || (
+                                    isCustomized ? getCustomCakeDetails(order).cake_size : ''
+                                  );
+                                  const itemSizeLabel = Array.isArray(itemSize)
+                                    ? itemSize.filter(Boolean).join(', ')
+                                    : itemSize && typeof itemSize === 'object'
+                                      ? Object.values(itemSize).filter(Boolean).join(', ')
+                                      : String(itemSize || '').trim();
                                   return (
-                                    <div key={`${item.id ?? item.name}-${itemIndex}`} className="flex items-center gap-2">
+                                    <div key={`${item.id ?? item.name}-${itemIndex}`} className="flex items-start gap-2">
                                       <div className="grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-lg bg-slate-100 text-slate-900 ring-1 ring-slate-200">
                                         {image ? (
                                           <img
@@ -1432,9 +1440,21 @@ export default function Orders() {
                                           <Cookie size={18} strokeWidth={1.8} />
                                         )}
                                       </div>
-                                      <p className="text-xs text-gray-500">
-                                        {item.name} <span className="text-gray-400">× {item.qty}</span>
-                                      </p>
+                                      <div className="flex min-w-0 flex-1 items-start justify-between gap-2">
+                                        <div className="min-w-0">
+                                          <p className="text-xs text-gray-500">
+                                            {item.name} <span className="text-gray-400">× {item.qty}</span>
+                                          </p>
+                                          {itemSizeLabel && (
+                                            <p className="mt-0.5 text-[11px] text-gray-400">
+                                              {isCustomized ? 'Cake size' : 'Size'}: {itemSizeLabel}
+                                            </p>
+                                          )}
+                                        </div>
+                                        <p className="shrink-0 text-xs font-semibold text-slate-700">
+                                          ₱{(Number(item.price || 0) * Number(item.qty || 1)).toLocaleString()}
+                                        </p>
+                                      </div>
                                     </div>
                                   );
                                 })}
