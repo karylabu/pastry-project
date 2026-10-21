@@ -219,6 +219,13 @@ class StaffApiController extends Controller
                     ->get(['order_id', 'reason', 'admin_reason', 'status', 'created_at'])
                     ->keyBy('order_id');
             }
+            $wastedOrderIds = $orders->isNotEmpty() && Schema::hasTable('waste_log')
+                ? DB::table('waste_log')
+                    ->where('reference_type', 'order_waste')
+                    ->whereIn('reference_id', $orders->pluck('id'))
+                    ->pluck('reference_id')
+                    ->flip()
+                : collect();
             $orderNumbers = DB::table('orders')
                 ->orderBy('created_at')
                 ->orderBy('id')
@@ -276,7 +283,7 @@ class StaffApiController extends Controller
                 }
             }
 
-            $orders = $orders->map(function ($order) use ($orderNumbers, $itemsByOrder, $productSizesById, $legacyCustomByOrder, $customizedByOrder, $returnRefundRequestsByOrder) {
+            $orders = $orders->map(function ($order) use ($orderNumbers, $itemsByOrder, $productSizesById, $legacyCustomByOrder, $customizedByOrder, $returnRefundRequestsByOrder, $wastedOrderIds) {
                 $rawItems = json_decode((string) ($order->items ?? '[]'), true);
                 $items = $itemsByOrder->get($order->id, collect())
                     ->map(function ($item) use ($productSizesById) {
@@ -367,6 +374,7 @@ class StaffApiController extends Controller
                     'status' => $returnRefundRequest->status,
                     'created_at' => $returnRefundRequest->created_at,
                 ] : null;
+                $order->is_wasted = $wastedOrderIds->has($order->id);
                 $order->details = $customDetails['details'] ?? $customized->notes ?? $legacyCustom->notes ?? null;
                 $order->name = $customDetails['customer_name'] ?? $order->customer;
                 $order->customer_name = $customDetails['customer_name'] ?? $order->customer;

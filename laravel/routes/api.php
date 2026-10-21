@@ -109,6 +109,7 @@ Route::put('addresses/{id}', [AddressController::class, 'update']);
 Route::delete('addresses/{id}', [AddressController::class, 'destroy']);
 Route::get('staff/orders/{orderId}/discount-id', [StaffApiController::class, 'viewOrderDiscountId']);
 Route::get('staff/orders/{orderId}/payment-proof', [StaffApiController::class, 'viewOrderPaymentProof']);
+Route::post('staff/orders/{orderId}/waste', [WasteLogController::class, 'storeOrderWaste']);
 Route::get('staff/orders', [StaffApiController::class, 'getOrders']);
 Route::get('admin/reports/peak-ordering-times', [StaffApiController::class, 'peakOrderingTimes']);
 Route::get('admin/analytics/cake-sales', [CakeSalesAnalyticsController::class, 'index']);

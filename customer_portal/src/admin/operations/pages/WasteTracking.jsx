@@ -181,10 +181,15 @@ export default function WasteTracking() {
   /* ---------------- Overview card figures ---------------- */
 
   const wasteByType = useMemo(() => periodEntries.reduce((totals, entry) => {
+    if (entry.reference_type === 'order_waste') return totals;
     const type = entry.type === 'Finished Product' ? 'Finished Product' : 'Raw Material';
     totals[type] = (totals[type] || 0) + entry.qty;
     return totals;
   }, { 'Raw Material': 0, 'Finished Product': 0 }), [periodEntries]);
+  const wastedOrderCount = useMemo(
+    () => periodEntries.filter((entry) => entry.reference_type === 'order_waste').length,
+    [periodEntries]
+  );
 
   const totalFinancialLoss = useMemo(
     () => periodEntries.reduce((sum, e) => sum + e.cost, 0),
@@ -363,7 +368,7 @@ export default function WasteTracking() {
             <div className="rounded-lg border border-t-[3px] bg-white p-4" style={{ borderColor: C.border, borderTopColor: C.gold }}>
               <div className="flex items-center justify-between gap-2"><p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-black/55">Total waste quantity</p><Trash2 size={16} className="text-[#9b7810]" /></div>
               <p className="mt-3 text-[24px] font-bold leading-none text-black">{wasteByType['Raw Material'].toFixed(1)} <span className="text-[12px] font-medium">kg</span></p>
-              <p className="mt-2 text-[10px] text-black/55">{wasteByType['Finished Product'].toFixed(1)} finished product units · {periodLabel}</p>
+              <p className="mt-2 text-[10px] text-black/55">{wasteByType['Finished Product'].toFixed(1)} finished product units · {wastedOrderCount} orders · {periodLabel}</p>
             </div>
             <div className="rounded-lg border border-t-[3px] bg-white p-4" style={{ borderColor: C.border, borderTopColor: C.red }}>
               <div className="flex items-center justify-between gap-2"><p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-black/55">Total financial loss</p><DollarSign size={16} className="text-[#b55f52]" /></div>

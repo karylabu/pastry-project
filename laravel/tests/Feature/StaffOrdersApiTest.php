@@ -91,6 +91,24 @@ class StaffOrdersApiTest extends TestCase
             $table->text('inspo_images')->nullable();
             $table->timestamps();
         });
+        Schema::create('waste_log', function ($table) {
+            $table->id();
+            $table->dateTime('datetime');
+            $table->string('item');
+            $table->decimal('qty', 10, 3);
+            $table->decimal('unit_cost', 10, 2)->default(0);
+            $table->string('item_type')->default('Raw Material');
+            $table->string('reason');
+            $table->unsignedBigInteger('ingredient_id')->nullable();
+            $table->unsignedBigInteger('product_id')->nullable();
+            $table->unsignedBigInteger('user_id')->nullable();
+            $table->string('reference_type')->nullable();
+            $table->unsignedBigInteger('reference_id')->nullable();
+            $table->unsignedBigInteger('ingredient_batch_id')->nullable();
+            $table->string('unit')->nullable();
+            $table->string('idempotency_key')->nullable();
+            $table->timestamp('created_at')->nullable();
+        });
 
         DB::table('users')->insert([
             'id' => 1,
@@ -109,6 +127,7 @@ class StaffOrdersApiTest extends TestCase
 
     protected function tearDown(): void
     {
+        Schema::dropIfExists('waste_log');
         Schema::dropIfExists('order_items');
         Schema::dropIfExists('customized_cake_orders');
         Schema::dropIfExists('custom_cake_orders');
@@ -263,5 +282,82 @@ class StaffOrdersApiTest extends TestCase
             ->assertJsonPath('orders.0.custom_details.quoted_total', 1200)
             ->assertJsonPath('orders.0.custom_inspo_images.0', 'https://example.test/ocean-cake.jpg')
             ->assertJsonPath('orders.0.details', 'Blue ocean theme');
+    }
+
+    public function test_admin_can_record_order_as_waste_using_server_total_once(): void
+    {
+        DB::table('orders')->insert([
+            'id' => 51,
+            'customer' => 'Cancelled Customer',
+            'items' => '[]',
+            'total' => 875.50,
+            'payment' => 'Cash',
+            'payment_status' => 'paid',
+            'status' => 'Cancelled',
+            'created_at' => now(),
+        ]);
+
+        $this->withHeader('Authorization', 'Bearer test-admin-token')
+            ->postJson('/api/staff/orders/51/waste', ['total' => 1])
+            ->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('already_recorded', false)
+            ->assertJsonPath('entry.cost', 875.5)
+            ->assertJsonPath('entry.unit', 'orders');
+
+        $this->withHeader('Authorization', 'Bearer test-admin-token')
+            ->postJson('/api/staff/orders/51/waste')
+            ->assertOk()
+            ->assertJsonPath('already_recorded', true)
+            ->assertJsonPath('entry.cost', 875.5);
+
+        $this->assertDatabaseCount('waste_log', 1);
+        $this->assertDatabaseHas('waste_log', [
+            'item' => 'Order ID #51',
+            'qty' => 1,
+            'unit_cost' => 875.50,
+            'reference_type' => 'order_waste',
+            'reference_id' => 51,
+            'user_id' => 1,
+        ]);
+
+        $this->withHeader('Authorization', 'Bearer test-admin-token')
+            ->getJson('/api/staff/orders')
+            ->assertOk()
+            ->assertJsonPath('orders.0.is_wasted', true);
+    }
+
+    public function test_only_admin_can_record_order_as_waste(): void
+    {
+        DB::table('users')->insert([
+            'id' => 2,
+            'name' => 'Test Staff',
+            'email' => 'staff@example.com',
+            'password' => 'unused',
+            'role' => 'staff',
+            'status' => 'active',
+        ]);
+        DB::table('user_sessions')->insert([
+            'user_id' => 2,
+            'token' => 'test-staff-token',
+            'expires_at' => now()->addHour(),
+        ]);
+
+        $this->postJson('/api/staff/orders/51/waste')
+            ->assertUnauthorized();
+
+        $this->withHeader('Authorization', 'Bearer test-staff-token')
+            ->postJson('/api/staff/orders/51/waste')
+            ->assertForbidden();
+
+        $this->assertDatabaseCount('waste_log', 0);
+    }
+
+    public function test_recording_waste_for_missing_order_returns_not_found(): void
+    {
+        $this->withHeader('Authorization', 'Bearer test-admin-token')
+            ->postJson('/api/staff/orders/999/waste')
+            ->assertNotFound()
+            ->assertJsonPath('success', false);
     }
 }

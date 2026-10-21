@@ -200,6 +200,33 @@ export default function Orders() {
     }
   };
 
+  const markOrderAsWaste = async (order) => {
+    if (order.is_wasted) return;
+
+    try {
+      const response = await laravelStaffFetch(`${LARAVEL_BASE}/api/staff/orders/${order.id}/waste`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+      const data = await response.json();
+      if (!response.ok || !data?.success) {
+        throw new Error(data?.message || "Unable to count this order as waste.");
+      }
+
+      setOrders((current) => current.map((item) => (
+        item.id === order.id ? { ...item, is_wasted: true } : item
+      )));
+      addToast(
+        data.already_recorded
+          ? `Order #${order.order_number ?? order.id} is already counted as waste.`
+          : `Order #${order.order_number ?? order.id} counted as waste: ₱${Number(data.entry.cost).toLocaleString()}`,
+        data.already_recorded ? "error" : "success",
+      );
+    } catch (error) {
+      addToast(error.message || "Unable to count this order as waste.", "error");
+    }
+  };
+
   const normalizeOrders = (items, source) =>
     (Array.isArray(items) ? items : []).map((order) => ({
       ...order,
@@ -603,7 +630,7 @@ export default function Orders() {
                         {order.status === "Return/Refund"
                           ? order.return_refund_request?.status === "Pending Review" && <button type="button" onClick={() => { setRejectModalOrderId(order.id); setRejectReason(""); }} disabled={updatingId === order.id} className="rounded-md border border-red-200 bg-red-50 px-2.5 py-1.5 text-[10px] font-semibold text-red-700 disabled:opacity-50">Reject</button>
                           : !["Completed", "Cancelled"].includes(order.status) && <button type="button" onClick={() => updateStatus(order.id, "Cancelled")} disabled={updatingId === order.id} className="rounded-md border border-red-200 bg-red-50 px-2.5 py-1.5 text-[10px] font-semibold text-red-700 disabled:opacity-50">Cancel</button>}
-                        <button type="button" onClick={() => navigate("/admin/waste-tracking")} className="rounded-md border border-[#e8dfd4] bg-[#faf7f2] px-2.5 py-1.5 text-[10px] font-semibold text-[#65574d]">Waste analytics</button>
+                        <button type="button" onClick={() => markOrderAsWaste(order)} disabled={order.is_wasted} className="rounded-md border border-[#e8dfd4] bg-[#faf7f2] px-2.5 py-1.5 text-[10px] font-semibold text-[#65574d] disabled:cursor-not-allowed disabled:opacity-50">{order.is_wasted ? "Counted as waste" : "Waste"}</button>
                       </div>
                     </div>
                     {isExpanded && <div className="border-t border-[#eee6de] bg-[#fffdfa] p-3.5 text-[11px] text-[#65574d]">
@@ -692,7 +719,7 @@ export default function Orders() {
                               {order.status === "Return/Refund"
                                 ? order.return_refund_request?.status === "Pending Review" && <button type="button" onClick={() => { setRejectModalOrderId(order.id); setRejectReason(""); }} disabled={updatingId === order.id || rejectSubmitting} className="rounded-full border border-red-200 bg-red-50 px-3 py-1.5 text-[11px] font-semibold text-red-600 hover:bg-red-100 disabled:opacity-50">Reject</button>
                                 : !["Completed", "Cancelled"].includes(order.status) && <button type="button" onClick={() => updateStatus(order.id, "Cancelled")} disabled={updatingId === order.id} className="rounded-full border border-red-200 bg-red-50 px-3 py-1.5 text-[11px] font-semibold text-red-600 hover:bg-red-100 disabled:opacity-50">Cancel</button>}
-                              <button type="button" onClick={() => navigate("/admin/waste-tracking")} className="rounded-full border border-black/10 bg-[#F7F5EE] px-3 py-1.5 text-[11px] font-semibold text-black hover:bg-black hover:text-white">Waste analytics</button>
+                              <button type="button" onClick={() => markOrderAsWaste(order)} disabled={order.is_wasted} className="rounded-full border border-black/10 bg-[#F7F5EE] px-3 py-1.5 text-[11px] font-semibold text-black hover:bg-black hover:text-white disabled:cursor-not-allowed disabled:opacity-50">{order.is_wasted ? "Counted as waste" : "Waste"}</button>
                             </div>
                           </td>
                         </tr>
@@ -895,10 +922,11 @@ export default function Orders() {
                                 )}
                                 <button
                                   type="button"
-                                  onClick={() => navigate("/admin/waste-tracking")}
-                                  className="rounded-full border border-black/10 bg-[#F7F5EE] px-3 py-2 text-[12px] font-semibold text-black transition hover:bg-black hover:text-white"
+                                  onClick={() => markOrderAsWaste(order)}
+                                  disabled={order.is_wasted}
+                                  className="rounded-full border border-black/10 bg-[#F7F5EE] px-3 py-2 text-[12px] font-semibold text-black transition hover:bg-black hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
                                 >
-                                  Waste analytics
+                                  {order.is_wasted ? "Counted as waste" : "Waste"}
                                 </button>
                               </div>
 
