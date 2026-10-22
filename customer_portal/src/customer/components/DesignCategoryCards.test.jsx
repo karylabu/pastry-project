@@ -42,7 +42,9 @@ describe('DesignCategoryCards', () => {
 
       expect(badge).toHaveClass('-bottom-4', 'rounded-full', 'border-2', 'border-white');
       expect(badge).toHaveClass(...accent.split(' '));
-      expect(imageFrame.nextElementSibling).toHaveClass('pl-12');
+      expect(imageFrame.nextElementSibling).toHaveClass('pl-12', 'gap-1');
+      expect(imageFrame.nextElementSibling.firstElementChild).toHaveClass('min-w-0', 'flex-1', 'text-[10px]', 'sm:text-xs');
+      expect(imageFrame.nextElementSibling.lastElementChild).toHaveClass('h-4', 'w-4', 'sm:h-5', 'sm:w-5', 'shrink-0');
     });
   });
 

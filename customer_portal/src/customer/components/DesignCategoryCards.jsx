@@ -101,12 +101,13 @@ export default function DesignCategoryCards({ onSelectCategory, className = '' }
                 <Icon aria-hidden="true" size={17} strokeWidth={1.7} />
               </span>
             </span>
-            <span className="mt-auto flex min-h-11 w-full items-center justify-between gap-2 pl-12 pr-1.5 sm:min-h-12 sm:pl-14 sm:pr-2">
-              <span className="min-w-0 font-serif text-[13px] font-semibold leading-tight text-[#3B2A20] sm:text-base lg:text-[13px] xl:text-[15px]">
+            <span className="mt-auto flex min-h-11 w-full items-center justify-between gap-1 pl-12 pr-1.5 sm:min-h-12 sm:gap-2 sm:pl-14 sm:pr-2">
+              <span className="min-w-0 flex-1 font-serif text-[10px] font-semibold leading-tight text-[#3B2A20] sm:text-xs lg:text-[11px] xl:text-xs">
                 {label}
               </span>
-              <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full transition duration-300 group-hover:translate-x-0.5 ${accent}`}>
-                <ArrowRight aria-hidden="true" size={15} strokeWidth={1.8} />
+              <span className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full transition duration-300 group-hover:translate-x-0.5 sm:h-5 sm:w-5 ${accent}`}>
+                <ArrowRight aria-hidden="true" size={10} strokeWidth={1.8} className="sm:hidden" />
+                <ArrowRight aria-hidden="true" size={12} strokeWidth={1.8} className="hidden sm:block" />
               </span>
             </span>
           </button>
