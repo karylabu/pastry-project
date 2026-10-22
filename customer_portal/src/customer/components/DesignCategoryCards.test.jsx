@@ -19,26 +19,30 @@ describe('DesignCategoryCards', () => {
     render(<DesignCategoryCards onSelectCategory={jest.fn()} />);
 
     DESIGN_CATEGORIES.forEach(({ label }) => {
-      expect(screen.getByRole('button', { name: new RegExp(label) })).toHaveClass('rounded-[22px]', 'bg-white/80', 'border');
+      expect(screen.getByRole('button', { name: new RegExp(label) })).toHaveClass('bg-white', 'border', 'rounded-[22px]');
     });
   });
 
-  it('uses the reference heading style and responsive category grid', () => {
+  it('shows the collection heading, subtitle, and responsive category grid', () => {
     render(<DesignCategoryCards onSelectCategory={jest.fn()} />);
 
-    expect(screen.getByText('Explore Our')).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Customize Categories' })).toHaveClass('font-serif', 'text-2xl', 'md:text-4xl');
-    expect(screen.getByRole('navigation', { name: 'Cake design categories' })).toHaveClass('grid-cols-2', 'sm:grid-cols-3', 'xl:grid-cols-6');
+    expect(screen.getByText('Explore Our Collection')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Customize Categories' })).toHaveClass('font-serif');
+    expect(screen.getByText('Make it yours! Choose a category and let us bring your dream cake to life.')).toBeInTheDocument();
+    expect(screen.getByRole('navigation', { name: 'Cake design categories' })).toHaveClass('grid-cols-2', 'sm:grid-cols-3', 'lg:grid-cols-6');
   });
 
-  it('uses matching fixed image and label heights for every category', () => {
+  it('shows each category icon in a pastel badge overlapping the photo edge', () => {
     render(<DesignCategoryCards onSelectCategory={jest.fn()} />);
 
-    DESIGN_CATEGORIES.forEach(({ label }) => {
+    DESIGN_CATEGORIES.forEach(({ label, accent }) => {
       const image = screen.getByRole('img', { name: `${label} cake design` });
-      expect(image).toHaveClass('object-cover', 'object-center');
-      expect(image.parentElement).toHaveClass('h-36', 'sm:h-40', 'flex-none');
-      expect(image.parentElement.nextElementSibling).toHaveClass('h-10', 'mt-auto', 'flex-none');
+      const imageFrame = image.parentElement.parentElement;
+      const badge = imageFrame.querySelector('span.z-10');
+
+      expect(badge).toHaveClass('-bottom-4', 'rounded-full', 'border-2', 'border-white');
+      expect(badge).toHaveClass(...accent.split(' '));
+      expect(imageFrame.nextElementSibling).toHaveClass('pl-12');
     });
   });
 
