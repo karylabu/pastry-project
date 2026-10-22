@@ -330,6 +330,12 @@ export default function ProductCard({
           {product.name}
         </h3>
 
+        {product.description?.trim() && (
+          <p className="mb-1 line-clamp-2 px-1 text-[9px] leading-3 text-[#8b817a]">
+            {product.description.trim()}
+          </p>
+        )}
+
         {shouldShowVariantSelector && (
           <div className="mb-1 flex min-h-[25px] w-full items-center justify-center gap-1 rounded-full border border-[#f1e6df] bg-[#f8f3ee] p-1">
             <div className="flex w-full items-center justify-center gap-1">

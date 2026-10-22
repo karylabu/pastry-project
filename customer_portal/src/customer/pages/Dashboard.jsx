@@ -368,6 +368,11 @@ function RecommendationCard({ product, onSelect, onEnsureShopOpen }) {
       </div>
 
       <h3 className="home-recommendation-title min-h-[2.5rem] line-clamp-2 overflow-hidden text-[11px] font-bold leading-tight text-[#33251e]">{product.name}</h3>
+      {product.description?.trim() && (
+        <p className="mt-0.5 line-clamp-2 text-[9px] leading-3 text-[#8b817a]">
+          {product.description.trim()}
+        </p>
+      )}
       <p className="home-recommendation-price mt-0.5 min-h-4 text-[11px] font-semibold text-[#33251e]">₱{Number(selectedPrice || 0).toLocaleString()}</p>
 
       <div className="home-recommendation-options mt-1 flex min-h-6 flex-wrap content-start justify-center gap-1">
