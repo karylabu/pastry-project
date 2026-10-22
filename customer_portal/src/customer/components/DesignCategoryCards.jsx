@@ -16,7 +16,6 @@ export const DESIGN_CATEGORIES = [
     path: '/customer/cutesy-designs',
     Icon: Heart,
     accent: 'bg-[#a88bc9]',
-    imageScale: 'scale-[1.06]',
   },
   {
     label: 'Holidays',
@@ -31,7 +30,6 @@ export const DESIGN_CATEGORIES = [
     path: '/customer/kids-designs',
     Icon: PawPrint,
     accent: 'bg-[#f0b62e]',
-    imageScale: 'scale-[1.1]',
   },
   {
     label: 'Wedding',
@@ -67,25 +65,25 @@ export default function DesignCategoryCards({ onSelectCategory, className = '' }
         aria-label="Cake design categories"
         className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 xl:grid-cols-6"
       >
-        {DESIGN_CATEGORIES.map(({ label, image, path, Icon, accent, imageScale = '' }) => (
+        {DESIGN_CATEGORIES.map(({ label, image, path, Icon, accent }) => (
           <button
             key={label}
             type="button"
             onClick={() => onSelectCategory(path)}
-            className="group flex min-w-0 flex-col rounded-[22px] border border-[#f0e6df] bg-white/80 p-2 shadow-[0_5px_14px_rgba(91,64,39,0.08)] transition-all duration-300 hover:-translate-y-1 hover:border-[#e7c875] hover:shadow-[0_10px_22px_rgba(91,64,39,0.13)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#b68b43] sm:p-2.5"
+            className="group flex h-full min-w-0 flex-col rounded-[22px] border border-[#f0e6df] bg-white/80 p-2 shadow-[0_5px_14px_rgba(91,64,39,0.08)] transition-all duration-300 hover:-translate-y-1 hover:border-[#e7c875] hover:shadow-[0_10px_22px_rgba(91,64,39,0.13)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#b68b43] sm:p-2.5"
           >
-            <span className="relative block aspect-[4/3] w-full rounded-[18px] bg-[#f8eee8]">
+            <span className="relative block h-36 w-full flex-none overflow-hidden rounded-[18px] bg-[#f8eee8] sm:h-40">
               <img
                 src={image}
                 alt={`${label} cake design`}
                 loading="lazy"
-                className={`h-full w-full rounded-[18px] object-cover transition-transform duration-500 group-hover:scale-[1.04] ${imageScale}`}
+                className="h-full w-full rounded-[18px] object-cover object-center transition-transform duration-500 group-hover:scale-[1.04]"
               />
               <span className={`absolute -bottom-3 left-1.5 flex h-10 w-10 items-center justify-center rounded-full border-2 border-white text-white shadow-sm sm:left-2 sm:h-11 sm:w-11 ${accent}`}>
                 <Icon aria-hidden="true" size={20} strokeWidth={1.7} />
               </span>
             </span>
-            <span className="flex min-h-9 w-full items-center justify-between gap-1 pl-1.5 pr-0.5 pt-3 sm:pl-2">
+            <span className="mt-auto flex h-10 w-full flex-none items-center justify-between gap-1 pl-1.5 pr-0.5 sm:pl-2">
               <span className="min-w-0 font-serif text-[13px] font-semibold italic leading-tight text-[#49392f] sm:text-base">
                 {label}
               </span>

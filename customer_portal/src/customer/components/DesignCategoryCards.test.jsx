@@ -31,12 +31,15 @@ describe('DesignCategoryCards', () => {
     expect(screen.getByRole('navigation', { name: 'Cake design categories' })).toHaveClass('grid-cols-2', 'sm:grid-cols-3', 'xl:grid-cols-6');
   });
 
-  it('slightly enlarges the Cutesy and Kids Themes photos to match the other cards', () => {
+  it('uses matching fixed image and label heights for every category', () => {
     render(<DesignCategoryCards onSelectCategory={jest.fn()} />);
 
-    expect(screen.getByRole('img', { name: 'Cutesy cake design' })).toHaveClass('scale-[1.06]');
-    expect(screen.getByRole('img', { name: 'Kids Themes cake design' })).toHaveClass('scale-[1.1]');
-    expect(screen.getByRole('img', { name: 'Birthday cake design' })).not.toHaveClass('scale-[1.06]', 'scale-[1.1]');
+    DESIGN_CATEGORIES.forEach(({ label }) => {
+      const image = screen.getByRole('img', { name: `${label} cake design` });
+      expect(image).toHaveClass('object-cover', 'object-center');
+      expect(image.parentElement).toHaveClass('h-36', 'sm:h-40', 'flex-none');
+      expect(image.parentElement.nextElementSibling).toHaveClass('h-10', 'mt-auto', 'flex-none');
+    });
   });
 
   it('opens the selected category gallery', () => {
