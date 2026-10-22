@@ -74,7 +74,7 @@ export default function Footer() {
           </div>
 
           {/* INFORMATION */}
-          <div className="order-4 min-w-0 text-left md:order-none">
+          <div className="order-4 min-w-0 translate-x-3 text-left md:order-none md:translate-x-0">
             <p className="mb-2 text-[#d4af37] text-[10px] font-black uppercase tracking-[0.15em] md:mb-3 md:text-[10px] md:tracking-[0.2em]">
               Information
             </p>
