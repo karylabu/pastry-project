@@ -8,18 +8,19 @@ describe('DesignCategoryCards', () => {
 
     render(<DesignCategoryCards onSelectCategory={onSelectCategory} />);
 
-    DESIGN_CATEGORIES.forEach(({ label, description, image }) => {
+    DESIGN_CATEGORIES.forEach(({ label, image }) => {
       expect(screen.getByRole('button', { name: new RegExp(label) })).toBeInTheDocument();
       expect(screen.getByRole('img', { name: `${label} cake design` })).toHaveAttribute('src', image);
-      expect(screen.getByText(description)).toBeInTheDocument();
     });
+    expect(screen.getByRole('heading', { name: 'Customize Categories' })).toBeInTheDocument();
   });
 
-  it('shows category buttons without card backgrounds', () => {
+  it('shows every category in its own card', () => {
     render(<DesignCategoryCards onSelectCategory={jest.fn()} />);
 
-    expect(screen.getByRole('button', { name: /birthday/i })).not.toHaveClass('bg-white');
-    expect(screen.getByRole('button', { name: /birthday/i })).not.toHaveClass('border');
+    DESIGN_CATEGORIES.forEach(({ label }) => {
+      expect(screen.getByRole('button', { name: new RegExp(label) })).toHaveClass('bg-white', 'border');
+    });
   });
 
   it('opens the selected category gallery', () => {
