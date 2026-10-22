@@ -29,7 +29,7 @@ function getSchedule(order) {
     ? (() => { try { return JSON.parse(order.custom_details); } catch { return {}; } })()
     : (order?.custom_details || {});
   return {
-    date: String(order?.pickup_date || details.pickup_date || "").slice(0, 10),
+    date: String(order?.delivery_date || order?.pickup_date || details.pickup_date || "").slice(0, 10),
     time: String(order?.pickup_time || details.pickup_time || ""),
   };
 }

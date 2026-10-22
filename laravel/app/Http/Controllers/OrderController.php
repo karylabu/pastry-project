@@ -453,6 +453,7 @@ class OrderController extends Controller
                     'delivery_service' => in_array($request->method, ['Delivery', 'Deliver'], true)
                         ? $request->input('delivery_service')
                         : null,
+                    'delivery_date' => $request->input('delivery_date'),
                     'delivery_time' => $deliveryTime !== '' ? $deliveryTime : null,
                     'payment' => $request->payment,
                     'address' => $request->address ?? '',

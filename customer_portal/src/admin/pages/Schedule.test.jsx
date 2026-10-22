@@ -32,6 +32,7 @@ describe("Schedule", () => {
           { id: 35, status: "Preparing", custom_details: { pickup_date: dateFromToday(1) }, name: "Preparing Cake" },
           { id: 36, status: "Ready for Pickup", custom_details: { pickup_date: dateFromToday(1) }, name: "Ready Cake" },
           { id: 37, status: "Completed", custom_details: { pickup_date: dateFromToday(1) }, name: "Completed Cake" },
+          { id: 38, status: "Confirmed", delivery_date: dateFromToday(1), name: "Standard Pickup" },
         ],
       }),
     });
@@ -49,6 +50,7 @@ describe("Schedule", () => {
     expect(screen.getAllByText("Preparing Cake").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Ready Cake").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Completed Cake").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Standard Pickup").length).toBeGreaterThan(0);
     expect(screen.queryByText("Pending Cake")).not.toBeInTheDocument();
     expect(screen.queryByText("Payment Cake")).not.toBeInTheDocument();
     expect(screen.queryByText("Cancelled Cake")).not.toBeInTheDocument();

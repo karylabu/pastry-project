@@ -60,6 +60,17 @@ const isBerMonth = () => {
   return manilaDate.getMonth() >= 8;
 };
 
+const getManilaDateString = () => {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Manila',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(new Date());
+  const dateParts = Object.fromEntries(parts.map(({ type, value }) => [type, value]));
+  return `${dateParts.year}-${dateParts.month}-${dateParts.day}`;
+};
+
 const formatSavedAddress = (address) => {
   if (!address) return '';
   const parts = [];
@@ -127,6 +138,7 @@ export default function CheckoutModal({
   const [checkoutData, setCheckoutData] = useState({
     method: "Deliver",
     deliveryService: "",
+    pickupDate: "",
     deliveryTime: "",
     payment: "QRPh",
     orderType: "Standard",
@@ -632,6 +644,7 @@ export default function CheckoutModal({
     const missingFields = {
       phone: checkoutData.phone.trim() ? '' : 'Fill up this field',
       address: checkoutData.method !== 'Deliver' || checkoutData.address.trim() ? '' : 'Fill up this field',
+      pickupDate: checkoutData.method !== 'Pickup' || (checkoutData.pickupDate && checkoutData.pickupDate >= getManilaDateString()) ? '' : 'Choose today or a future date',
       deliveryTime: checkoutData.deliveryTime ? '' : 'Fill up this field',
       deliveryService: checkoutData.method !== 'Deliver' || checkoutData.deliveryService ? '' : 'Fill up this field',
       discountId: discountType === 'none' || discountIdFile ? '' : 'Fill up this field',
@@ -642,6 +655,7 @@ export default function CheckoutModal({
       const fieldIds = {
         phone: 'checkout-phone',
         address: 'checkout-address',
+        pickupDate: 'checkout-pickup-date',
         deliveryTime: 'checkout-fulfillment-time',
         deliveryService: 'checkout-delivery-service',
         discountId: 'discount-id-image',
@@ -710,6 +724,7 @@ export default function CheckoutModal({
 
         method: checkoutData.method,
         delivery_service: checkoutData.method === "Deliver" ? checkoutData.deliveryService : "",
+        delivery_date: checkoutData.method === "Pickup" ? checkoutData.pickupDate : "",
         delivery_time: checkoutData.deliveryTime,
         payment: checkoutData.payment,
         order_type: checkoutData.orderType || "Standard",
@@ -1125,6 +1140,29 @@ export default function CheckoutModal({
             </div>
 
             <div className="mb-6">
+              {checkoutData.method === "Pickup" && (
+                <div className="mb-4">
+                  <label htmlFor="checkout-pickup-date" className="mb-1 block text-xs font-medium text-gray-600">
+                    Pickup date <span className="text-red-600" aria-hidden="true">*</span>
+                  </label>
+                  <input
+                    id="checkout-pickup-date"
+                    type="date"
+                    required
+                    min={getManilaDateString()}
+                    aria-invalid={Boolean(fieldErrors.pickupDate)}
+                    value={checkoutData.pickupDate}
+                    onChange={(event) => {
+                      setFieldErrors((prev) => ({ ...prev, pickupDate: '' }));
+                      setCheckoutData((current) => ({ ...current, pickupDate: event.target.value }));
+                    }}
+                    className={`w-full rounded-xl border ${fieldErrors.pickupDate ? 'border-red-500' : 'border-[#e8e1d8]'} bg-[#fffdfa] p-3 text-sm text-[#33251e] outline-none transition focus:border-[#d4af37] focus:ring-2 focus:ring-[#d4af37]/20`}
+                  />
+                  {fieldErrors.pickupDate && (
+                    <p role="alert" className="mt-1 text-xs font-medium text-red-600">{fieldErrors.pickupDate}</p>
+                  )}
+                </div>
+              )}
               <label htmlFor="checkout-fulfillment-time" className="mb-1 block text-xs font-medium text-gray-600">
                 {checkoutData.method === "Pickup" ? "Pickup time" : "Delivery time"} <span className="text-red-600" aria-hidden="true">*</span>
               </label>

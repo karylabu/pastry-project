@@ -6,6 +6,7 @@ use App\Http\Controllers\OrderController;
 use App\Http\Requests\StoreOrderRequest;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Http\Request;
 use Tests\TestCase;
 
@@ -53,6 +54,7 @@ class RewardCodeCheckoutTest extends TestCase
             $table->decimal('total', 10, 2)->default(0);
             $table->string('method')->nullable();
             $table->string('delivery_service')->nullable();
+            $table->date('delivery_date')->nullable();
             $table->string('delivery_time')->nullable();
             $table->string('payment')->nullable();
             $table->string('address')->nullable();
@@ -468,6 +470,25 @@ class RewardCodeCheckoutTest extends TestCase
         $this->assertNull(DB::table('orders')->value('delivery_time'));
     }
 
+    public function test_pickup_date_is_stored_and_request_rules_reject_missing_or_past_dates(): void
+    {
+        $pickupDate = now()->addDay()->toDateString();
+        $response = $this->placeOrder('', 'none', '', null, '', $pickupDate);
+
+        $this->assertSame(201, $response->getStatusCode());
+        $this->assertSame($pickupDate, DB::table('orders')->value('delivery_date'));
+
+        $dateRule = (new StoreOrderRequest())->rules()['delivery_date'];
+        $this->assertTrue(Validator::make(
+            ['method' => 'Pickup'],
+            ['delivery_date' => $dateRule]
+        )->fails());
+        $this->assertTrue(Validator::make(
+            ['method' => 'Pickup', 'delivery_date' => now()->subDay()->toDateString()],
+            ['delivery_date' => $dateRule]
+        )->fails());
+    }
+
     public function test_first_order_discount_is_applied_once_and_reported_by_eligibility_endpoint(): void
     {
         $this->assertTrue($this->firstOrderDiscountEligibility()['eligible']);
@@ -577,12 +598,14 @@ class RewardCodeCheckoutTest extends TestCase
         string $discountType = 'none',
         string $deliveryTime = '',
         ?array $items = null,
-        string $promotionCouponCode = ''
+        string $promotionCouponCode = '',
+        ?string $deliveryDate = null
     )
     {
         $request = StoreOrderRequest::create('/api/orders', 'POST', [
             'items' => $items ?? [['product_id' => 11, 'qty' => 1]],
             'method' => 'Pickup',
+            'delivery_date' => $deliveryDate,
             'delivery_time' => $deliveryTime,
             'payment' => 'Counter',
             'phone' => '09171234567',
