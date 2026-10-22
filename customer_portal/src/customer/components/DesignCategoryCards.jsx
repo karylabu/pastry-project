@@ -5,11 +5,30 @@ import {
   Flower2,
   Heart,
   HeartHandshake,
-  PawPrint,
   Sparkles,
   TreePine,
 } from 'lucide-react';
 import { ROOT_BASE } from '../../services/config';
+
+const DollIcon = ({ size = 24, strokeWidth = 2, ...props }) => (
+  <svg
+    aria-hidden="true"
+    data-icon="doll"
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth={strokeWidth}
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    {...props}
+  >
+    <circle cx="12" cy="6" r="3" />
+    <path d="M9 5c.5-2 5.5-2 6 0M10 9.5h4l3.5 5h-11L10 9.5Z" />
+    <path d="m10 14.5-2.5 5m6.5-5 2.5 5M10 10l-3 2m7-2 3 2" />
+  </svg>
+);
 
 export const DESIGN_CATEGORIES = [
   {
@@ -24,28 +43,28 @@ export const DESIGN_CATEGORIES = [
     image: `${ROOT_BASE}/uploads/cutesy(1).jpg`,
     path: '/customer/cutesy-designs',
     Icon: Heart,
-    accent: 'bg-[#a88bc9] text-white',
+    accent: 'bg-[#ec8faa] text-white',
   },
   {
     label: 'Holidays',
     image: `${ROOT_BASE}/uploads/holiday(1).jpg`,
     path: '/customer/holiday-designs',
     Icon: TreePine,
-    accent: 'bg-[#79a18d] text-white',
+    accent: 'bg-[#d4a017] text-white',
   },
   {
     label: 'Kids Themes',
     image: `${ROOT_BASE}/uploads/kids(1).jpg`,
     path: '/customer/kids-designs',
-    Icon: PawPrint,
-    accent: 'bg-[#e3ad35] text-white',
+    Icon: DollIcon,
+    accent: 'bg-[#a88bc9] text-white',
   },
   {
     label: 'Wedding',
     image: `${ROOT_BASE}/uploads/wedding(1).jpg`,
     path: '/customer/wedding-designs',
     Icon: HeartHandshake,
-    accent: 'bg-[#df8b91] text-white',
+    accent: 'bg-[#d8c3a5] text-[#5b4632]',
   },
   {
     label: 'Floral Designs',
