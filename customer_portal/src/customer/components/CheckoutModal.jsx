@@ -1,6 +1,7 @@
 import React, { useCallback, useState, useEffect, useMemo, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Loader2, SearchX } from "lucide-react";
+import { Link } from "react-router-dom";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { CUSTOMER_BASE, LARAVEL_BASE } from '../../services/config';
@@ -1358,9 +1359,20 @@ export default function CheckoutModal({
             {/* TOTALS */}
             <div className="mt-5 space-y-2 border-t border-[#e9dfd2] pt-5">
 
-              <div className={`rounded-2xl border px-4 py-3 text-sm ${shopOpen === true ? 'border-green-200 bg-green-50 text-green-700' : 'border-amber-200 bg-amber-50 text-amber-800'}`}>
-                <span className="font-semibold">{shopOpen === true ? 'Shop is open' : shopOpen === false ? 'Shop is closed' : 'Checking shop hours'}</span>
-                <span className="ml-2">{shopOpen === true ? `You can place your order now. Open daily ${shopSettings.openingHours}.` : shopOpen === false ? `Checkout is available daily from ${shopSettings.openingHours}.` : shopStatusError ? 'Shop hours could not be verified. Please try again.' : 'Please wait while we verify the current time.'}</span>
+              <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                <p className="font-semibold">Return Policy Reminder</p>
+                <p className="mt-1 leading-5">
+                  All cakes sold on Pastry Project are perishable and made-to-order. Therefore, we generally do not accept returns or offer refunds once the order has been accepted by the customer (via pickup or delivery).
+                </p>
+                <p className="mt-2 leading-5">
+                  Once the cake leaves our shop or is handed over to the delivery courier, the responsibility for its condition transfers to the customer/courier.
+                </p>
+                <Link
+                  to="/customer/return-policy"
+                  className="mt-3 inline-flex rounded-full border border-amber-800 px-3 py-1.5 text-xs font-semibold text-amber-900 transition hover:bg-amber-100"
+                >
+                  View policy
+                </Link>
               </div>
               <div className="rounded-xl border border-[#eee5db] bg-white px-4 py-3 text-xs leading-5 text-[#74675f]">
                 <p className="font-semibold text-[#33251e]">{shopSettings.shopName}</p>

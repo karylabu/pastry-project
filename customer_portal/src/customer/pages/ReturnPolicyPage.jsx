@@ -134,9 +134,13 @@ export default function ReturnPolicyPage() {
               <section id="section-0">
                 <h2 className="text-base font-bold text-[#171717]">Overview</h2>
                 <p className="mt-2">
-                  Pastry Project prepares fresh and perishable food, including cakes made to order. If something is
-                  wrong with your order, contact us as soon as possible so we can review what happened and discuss an
-                  appropriate resolution.
+                  All cakes sold on Pastry Project are perishable and made-to-order. Therefore, we generally do not
+                  accept returns or offer refunds once the order has been accepted by the customer (via pickup or
+                  delivery).
+                </p>
+                <p className="mt-2">
+                  Once the cake leaves our shop or is handed over to the delivery courier, the responsibility for its
+                  condition transfers to the customer/courier.
                 </p>
                 <p className="mt-2">
                   This policy does not limit any rights you may have under applicable Philippine consumer-protection
@@ -152,8 +156,9 @@ export default function ReturnPolicyPage() {
                   the issue while the details are still clear.
                 </p>
                 <p className="mt-2">
-                  Returns for a change of mind or a preference change may not be suitable for fresh or made-to-order
-                  products. We review reported concerns individually and will explain the available options.
+                  Because orders are perishable and made-to-order, we generally do not accept returns or offer refunds
+                  after an order has been accepted. We review concerns about incorrect, damaged, or poor-quality orders
+                  individually, subject to applicable consumer-protection laws.
                 </p>
               </section>
 
