@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { Menu as MenuIcon, X } from "lucide-react";
 import { ROOT_BASE } from "../../services/config";
 import BrandName from "../components/BrandName";
@@ -14,7 +14,9 @@ const sections = [
 ];
 
 export default function ReturnPolicyPage() {
+  const location = useLocation();
   const navigate = useNavigate();
+  const returnToCheckout = Boolean(location.state?.fromCheckout);
   const [activeSection, setActiveSection] = useState(0);
   const [sectionsOpen, setSectionsOpen] = useState(true);
 
@@ -77,7 +79,7 @@ export default function ReturnPolicyPage() {
               onClick={() => navigate(-1)}
               className="inline-flex items-center gap-2 rounded-full border border-[#d4af37]/40 bg-[#fffaf0] px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-[#171717] transition hover:border-[#d4af37] hover:bg-[#fdf3d7]"
             >
-              ← Back
+              {returnToCheckout ? "← Back to Checkout" : "← Back"}
             </button>
             <div className="flex items-center gap-3">
               <img src={`${ROOT_BASE}/uploads/logo.png?v=logo-v2`} alt="Pastry Project logo" className="h-9 w-9 object-contain" />

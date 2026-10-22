@@ -83,13 +83,22 @@ export default function CustomerApp() {
   const [showGuestPrompt, setShowGuestPrompt] = useState(false);
   const [shopAccessNotice, setShopAccessNotice] = useState(null);
   const [floatingFooterApproaching, setFloatingFooterApproaching] = useState(false);
+  const returnPolicyCheckoutRef = useRef(false);
   const paymentReturnInProgress = useRef(false);
 
   useEffect(() => {
     setIsCartOpen(false);
-    setIsCheckoutOpen(false);
+    const normalizedPath = (location.pathname || '/').replace(/\/+$/, '') || '/';
+    const isReturnPolicyPath = ['/return-policy', '/customer/return-policy'].includes(normalizedPath);
+    if (isReturnPolicyPath && location.state?.fromCheckout) {
+      returnPolicyCheckoutRef.current = true;
+    } else if (returnPolicyCheckoutRef.current) {
+      returnPolicyCheckoutRef.current = false;
+    } else {
+      setIsCheckoutOpen(false);
+    }
     setShowGuestPrompt(false);
-  }, [location.pathname]);
+  }, [location.pathname, location.state?.fromCheckout]);
 
   useEffect(() => {
     const showAccountPrompt = () => setShowGuestPrompt(true);
@@ -459,6 +468,7 @@ export default function CustomerApp() {
     ['/','/home','/menu','/customized-cakes','/customer','/customer/home','/customer/menu','/customer/customized-cakes'].includes(normalizedPath);
   const hideDashboardFloaters = floatingFooterApproaching &&
     ['/','/customer','/customer/home'].includes(normalizedPath);
+  const isReturnPolicyPath = ['/return-policy', '/customer/return-policy'].includes(normalizedPath);
 
   let storedRole = '';
   try {
@@ -560,7 +570,7 @@ export default function CustomerApp() {
 
       {/* CHECKOUT MODAL */}
       <CheckoutModal
-        isOpen={isCheckoutOpen}
+        isOpen={isCheckoutOpen && !isReturnPolicyPath}
         onClose={() => setIsCheckoutOpen(false)}
         cartItems={checkoutCartItems}
         fullCartItems={cartItems}

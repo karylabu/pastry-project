@@ -1369,6 +1369,7 @@ export default function CheckoutModal({
                 </p>
                 <Link
                   to="/customer/return-policy"
+                  state={{ fromCheckout: true }}
                   className="mt-3 inline-flex rounded-full border border-amber-800 px-3 py-1.5 text-xs font-semibold text-amber-900 transition hover:bg-amber-100"
                 >
                   View policy
