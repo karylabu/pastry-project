@@ -748,7 +748,7 @@ export default function CustomizedCakes() {
 
       <DesignCategoryCards
         onSelectCategory={navigate}
-        className="mb-5 rounded-[18px] border border-[#eadfd8] bg-white p-1.5 shadow-[0_5px_18px_rgba(91,64,39,0.04)] md:p-2"
+        className="mb-5"
       />
 
       <div className="mb-6">

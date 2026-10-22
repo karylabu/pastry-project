@@ -1275,7 +1275,7 @@ export default function Dashboard({ onAddToCart, onEnsureShopOpen, hideFloating 
       <main className="mx-auto max-w-[1380px] px-4 py-5 md:px-10">
         <DesignCategoryCards
           onSelectCategory={navigate}
-          className="mb-3 rounded-xl border border-[#eadfd8] bg-white px-2 py-1 shadow-[0_5px_18px_rgba(91,64,39,0.04)]"
+          className="mb-3"
         />
 
         <SecondaryBanner onOrderNow={() => navigate("/customer/customized-cakes")} />
