@@ -12,6 +12,8 @@ describe('DesignCategoryCards', () => {
       expect(screen.getByRole('button', { name: new RegExp(label) })).toBeInTheDocument();
       expect(screen.getByRole('img', { name: `${label} cake design` })).toHaveAttribute('src', image);
     });
+    expect(screen.getByRole('img', { name: 'Wedding cake design' })).toHaveClass('scale-[1.5]');
+    expect(screen.getByRole('img', { name: 'Birthday cake design' })).not.toHaveClass('scale-[1.5]');
     expect(screen.getByRole('heading', { name: 'Customize Categories' })).toBeInTheDocument();
   });
 

@@ -94,7 +94,11 @@ export default function DesignCategoryCards({ onSelectCategory, className = '' }
                   src={image}
                   alt={`${label} cake design`}
                   loading="lazy"
-                  className="h-full w-full object-cover object-center transition-transform duration-500 ease-out group-hover:scale-[1.05]"
+                  className={`h-full w-full object-cover object-center transition-transform duration-500 ease-out ${
+                    label === 'Wedding'
+                      ? 'scale-[1.5] group-hover:scale-[1.55]'
+                      : 'group-hover:scale-[1.05]'
+                  }`}
                 />
               </span>
               <span className={`absolute -bottom-4 left-2 z-10 flex h-9 w-9 items-center justify-center rounded-full border-2 border-white shadow-[0_2px_8px_rgba(59,42,32,0.16)] sm:-bottom-[18px] sm:h-10 sm:w-10 ${accent}`}>
