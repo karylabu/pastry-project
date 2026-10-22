@@ -38,33 +38,33 @@ export const DESIGN_CATEGORIES = [
 export default function DesignCategoryCards({ onSelectCategory, className = '' }) {
   return (
     <section className={className}>
-      <h2 className="mb-2 text-sm font-bold text-[#49392f] sm:mb-3 sm:text-base">
+      <h2 className="mb-2 font-serif text-xl text-[#33251e] sm:mb-3 md:text-2xl">
         Customize Categories
       </h2>
       <nav
         aria-label="Cake design categories"
-        className="grid grid-cols-3 gap-2 sm:grid-cols-6 sm:gap-3"
+        className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6"
       >
         {DESIGN_CATEGORIES.map(({ label, image, path }) => (
           <button
             key={label}
             type="button"
             onClick={() => onSelectCategory(path)}
-            className="group flex min-w-0 flex-col items-center justify-center gap-1.5 rounded-2xl border border-[#eee5d8] bg-white px-1.5 py-2 text-center text-[#49392f] shadow-[0_3px_12px_rgba(76,53,31,0.045)] transition duration-200 hover:-translate-y-1 hover:border-[#d9bd7b] hover:bg-[#fffdf8] hover:shadow-[0_10px_22px_rgba(76,53,31,0.11)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#b68b43] sm:gap-2 sm:rounded-[20px] sm:py-3"
+            className="group flex min-w-0 flex-col overflow-hidden rounded-xl border border-[#eadfd8] bg-[#fffaf7] p-2 text-left text-[#33251e] shadow-[0_5px_14px_rgba(91,64,39,0.06)] transition-all duration-300 hover:-translate-y-0.5 hover:border-[#e7c875] hover:shadow-[0_10px_20px_rgba(91,64,39,0.1)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#b68b43]"
           >
-            <span className="block h-16 w-16 rounded-full bg-gradient-to-br from-[#f3e7c9] via-[#fffaf0] to-[#ead7b4] p-[3px] shadow-[0_3px_9px_rgba(91,64,39,0.12)] sm:h-24 sm:w-24">
+            <span className="mb-2 block aspect-[4/3] w-full overflow-hidden rounded-lg border border-[#f1e6df] bg-[#f8eee8]">
               <img
                 src={image}
                 alt={`${label} cake design`}
                 loading="lazy"
-                className="h-full w-full rounded-full border-2 border-white object-cover transition-transform duration-300 group-hover:scale-[1.04]"
+                className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
               />
             </span>
-            <span className="flex min-h-5 w-full items-center justify-center gap-1 text-[9px] font-semibold leading-tight tracking-[-0.01em] sm:text-[11px]">
-              <span>{label}</span>
+            <span className="flex min-h-8 w-full items-center justify-between gap-2 px-1 pb-1">
+              <span className="min-w-0 text-[11px] font-bold leading-tight sm:text-sm">{label}</span>
               <ArrowUpRight
                 aria-hidden="true"
-                size={13}
+                size={15}
                 strokeWidth={1.8}
                 className="shrink-0 text-[#aa8546] transition-transform duration-200 group-hover:translate-x-0.5 group-hover:-translate-y-0.5"
               />

@@ -19,8 +19,15 @@ describe('DesignCategoryCards', () => {
     render(<DesignCategoryCards onSelectCategory={jest.fn()} />);
 
     DESIGN_CATEGORIES.forEach(({ label }) => {
-      expect(screen.getByRole('button', { name: new RegExp(label) })).toHaveClass('bg-white', 'border');
+      expect(screen.getByRole('button', { name: new RegExp(label) })).toHaveClass('rounded-xl', 'bg-[#fffaf7]', 'border');
     });
+  });
+
+  it('uses the featured section heading style and responsive product-card grid', () => {
+    render(<DesignCategoryCards onSelectCategory={jest.fn()} />);
+
+    expect(screen.getByRole('heading', { name: 'Customize Categories' })).toHaveClass('font-serif', 'text-xl', 'md:text-2xl');
+    expect(screen.getByRole('navigation', { name: 'Cake design categories' })).toHaveClass('grid-cols-2', 'sm:grid-cols-3', 'lg:grid-cols-6');
   });
 
   it('opens the selected category gallery', () => {
