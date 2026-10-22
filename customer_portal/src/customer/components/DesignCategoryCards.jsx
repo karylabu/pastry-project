@@ -43,7 +43,7 @@ export const DESIGN_CATEGORIES = [
     image: `${ROOT_BASE}/uploads/cutesy(1).jpg`,
     path: '/customer/cutesy-designs',
     Icon: Heart,
-    accent: 'bg-[#ec8faa] text-white',
+    accent: 'bg-[#f6c4d2] text-[#6b3d4a]',
   },
   {
     label: 'Holidays',

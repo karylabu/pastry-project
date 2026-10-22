@@ -55,7 +55,7 @@ describe('DesignCategoryCards', () => {
     const categoryAccent = (label) => DESIGN_CATEGORIES.find((category) => category.label === label).accent;
 
     expect(categoryAccent('Holidays')).toBe('bg-[#d4a017] text-white');
-    expect(categoryAccent('Cutesy')).toBe('bg-[#ec8faa] text-white');
+    expect(categoryAccent('Cutesy')).toBe('bg-[#f6c4d2] text-[#6b3d4a]');
     expect(categoryAccent('Kids Themes')).toBe('bg-[#a88bc9] text-white');
     expect(categoryAccent('Wedding')).toBe('bg-[#d8c3a5] text-[#5b4632]');
     expect(screen.getByRole('button', { name: /kids themes/i }).querySelector('[data-icon="doll"]')).toBeInTheDocument();
