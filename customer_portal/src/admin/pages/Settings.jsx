@@ -9,7 +9,7 @@ const defaultPreferences = {
   shopEmail: "",
   shopPhone: "",
   shopAddress: "",
-  openingHours: "08:00 - 00:00",
+  openingHours: "08:00 - 20:00",
   minimumOrder: "0",
   preparationTime: "30",
   lowStockThreshold: "5",

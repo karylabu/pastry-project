@@ -607,7 +607,7 @@ export default function CustomerApp() {
             </h2>
             <p className="mt-3 text-sm leading-6 text-gray-600">
               {shopAccessNotice === 'closed'
-                ? 'Our shop is currently closed. Shop hours are 8AM–12AM. Please come back when we reopen at 8AM.'
+                ? 'Our shop is currently closed. Shop hours are 8AM–8PM. Please come back when we reopen at 8AM.'
                 : 'We couldn’t verify whether the shop is open, so we can’t add items right now. Please try again shortly.'}
             </p>
             <button
