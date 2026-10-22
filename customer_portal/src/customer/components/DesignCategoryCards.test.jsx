@@ -31,6 +31,14 @@ describe('DesignCategoryCards', () => {
     expect(screen.getByRole('navigation', { name: 'Cake design categories' })).toHaveClass('grid-cols-2', 'sm:grid-cols-3', 'xl:grid-cols-6');
   });
 
+  it('slightly enlarges the Cutesy and Kids Themes photos to match the other cards', () => {
+    render(<DesignCategoryCards onSelectCategory={jest.fn()} />);
+
+    expect(screen.getByRole('img', { name: 'Cutesy cake design' })).toHaveClass('scale-[1.06]');
+    expect(screen.getByRole('img', { name: 'Kids Themes cake design' })).toHaveClass('scale-[1.1]');
+    expect(screen.getByRole('img', { name: 'Birthday cake design' })).not.toHaveClass('scale-[1.06]', 'scale-[1.1]');
+  });
+
   it('opens the selected category gallery', () => {
     const onSelectCategory = jest.fn();
 

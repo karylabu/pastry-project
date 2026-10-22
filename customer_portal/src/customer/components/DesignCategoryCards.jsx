@@ -16,6 +16,7 @@ export const DESIGN_CATEGORIES = [
     path: '/customer/cutesy-designs',
     Icon: Heart,
     accent: 'bg-[#a88bc9]',
+    imageScale: 'scale-[1.06]',
   },
   {
     label: 'Holidays',
@@ -30,6 +31,7 @@ export const DESIGN_CATEGORIES = [
     path: '/customer/kids-designs',
     Icon: PawPrint,
     accent: 'bg-[#f0b62e]',
+    imageScale: 'scale-[1.1]',
   },
   {
     label: 'Wedding',
@@ -65,7 +67,7 @@ export default function DesignCategoryCards({ onSelectCategory, className = '' }
         aria-label="Cake design categories"
         className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 xl:grid-cols-6"
       >
-        {DESIGN_CATEGORIES.map(({ label, image, path, Icon, accent }) => (
+        {DESIGN_CATEGORIES.map(({ label, image, path, Icon, accent, imageScale = '' }) => (
           <button
             key={label}
             type="button"
@@ -77,7 +79,7 @@ export default function DesignCategoryCards({ onSelectCategory, className = '' }
                 src={image}
                 alt={`${label} cake design`}
                 loading="lazy"
-                className="h-full w-full rounded-[18px] object-cover transition-transform duration-500 group-hover:scale-[1.04]"
+                className={`h-full w-full rounded-[18px] object-cover transition-transform duration-500 group-hover:scale-[1.04] ${imageScale}`}
               />
               <span className={`absolute -bottom-3 left-1.5 flex h-10 w-10 items-center justify-center rounded-full border-2 border-white text-white shadow-sm sm:left-2 sm:h-11 sm:w-11 ${accent}`}>
                 <Icon aria-hidden="true" size={20} strokeWidth={1.7} />
