@@ -12,7 +12,7 @@ class ShopSettings
         'shopEmail' => '',
         'shopPhone' => '',
         'shopAddress' => '',
-        'openingHours' => '08:00 - 20:00',
+        'openingHours' => '08:00 - 00:00',
         'minimumOrder' => '0',
         'preparationTime' => '30',
         'lowStockThreshold' => '5',
@@ -36,6 +36,20 @@ class ShopSettings
         }
 
         return $settings;
+    }
+
+    public static function isOpenAt(string $currentTime, ?string $openingHours = null): bool
+    {
+        $openingHours ??= self::all()['openingHours'];
+        [$openingTime, $closingTime] = preg_split('/\s*-\s*/', $openingHours);
+
+        if ($closingTime === $openingTime) {
+            return false;
+        }
+
+        return $closingTime > $openingTime
+            ? $currentTime >= $openingTime && $currentTime < $closingTime
+            : $currentTime >= $openingTime || $currentTime < $closingTime;
     }
 
     public static function update(array $settings): array

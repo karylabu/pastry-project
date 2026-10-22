@@ -51,7 +51,8 @@ class AdminSettingsController extends Controller
                     [$opens, $closes] = preg_split('/\s*-\s*/', $value);
                     $openMinutes = ((int) substr($opens, 0, 2) * 60) + (int) substr($opens, 3, 2);
                     $closeMinutes = ((int) substr($closes, 0, 2) * 60) + (int) substr($closes, 3, 2);
-                    if ($closeMinutes - $openMinutes < 30) {
+                    $durationMinutes = ($closeMinutes - $openMinutes + 1440) % 1440;
+                    if ($durationMinutes < 30) {
                         $fail('Closing time must be at least 30 minutes after opening time.');
                     }
                 },

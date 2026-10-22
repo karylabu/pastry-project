@@ -9,7 +9,7 @@ const defaultPreferences = {
   shopEmail: "",
   shopPhone: "",
   shopAddress: "",
-  openingHours: "08:00 - 20:00",
+  openingHours: "08:00 - 00:00",
   minimumOrder: "0",
   preparationTime: "30",
   lowStockThreshold: "5",
@@ -262,7 +262,7 @@ export default function Settings() {
                   <Field label="Phone number" value={preferences.shopPhone} onChange={(e) => updatePreference("shopPhone", e.target.value)} />
                 </div>
                 <Field label="Address" value={preferences.shopAddress} onChange={(e) => updatePreference("shopAddress", e.target.value)} />
-                <Field label="Opening hours (24-hour, HH:MM - HH:MM)" value={preferences.openingHours} placeholder="08:00 - 20:00" onChange={(e) => updatePreference("openingHours", e.target.value)} />
+                <Field label="Opening hours (24-hour, HH:MM - HH:MM)" value={preferences.openingHours} placeholder="08:00 - 00:00" onChange={(e) => updatePreference("openingHours", e.target.value)} />
               </div>
             </Section>
 

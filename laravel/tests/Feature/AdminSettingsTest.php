@@ -82,7 +82,7 @@ class AdminSettingsTest extends TestCase
                 'shopEmail' => 'HELLO@EXAMPLE.COM',
                 'shopPhone' => '09123456789',
                 'shopAddress' => 'Tanauan City',
-                'openingHours' => '09:00 - 18:00',
+                'openingHours' => '08:00 - 00:00',
                 'minimumOrder' => '250',
                 'preparationTime' => '45',
                 'lowStockThreshold' => '7',
@@ -97,6 +97,7 @@ class AdminSettingsTest extends TestCase
 
         $response->assertOk()
             ->assertJsonPath('settings.shopName', 'Sweet Shop')
+            ->assertJsonPath('settings.openingHours', '08:00 - 00:00')
             ->assertJsonPath('settings.minimumOrder', '250')
             ->assertJsonPath('notification_preferences.orderAlerts', false)
             ->assertJsonPath('notification_preferences.messageAlerts', false);
@@ -136,7 +137,7 @@ class AdminSettingsTest extends TestCase
                 'shopEmail' => '',
                 'shopPhone' => '',
                 'shopAddress' => '',
-                'openingHours' => '20:00 - 08:00',
+                'openingHours' => '09:00 - 09:00',
                 'minimumOrder' => '-1',
                 'preparationTime' => '0',
                 'lowStockThreshold' => '5',
@@ -185,6 +186,33 @@ class AdminSettingsTest extends TestCase
         $this->assertFalse($status['is_open']);
         $this->assertSame('09:00', $status['opens_at']);
         $this->assertSame('Sweet Shop', $status['settings']['shopName']);
+
+        Carbon::setTestNow();
+    }
+
+    public function test_shop_status_remains_open_until_midnight(): void
+    {
+        DB::table('shop_settings')->where('id', 1)->update([
+            'settings' => json_encode([
+                'shopName' => 'Sweet Shop',
+                'shopEmail' => '',
+                'shopPhone' => '',
+                'shopAddress' => '',
+                'openingHours' => '08:00 - 00:00',
+                'minimumOrder' => '0',
+                'preparationTime' => '30',
+                'lowStockThreshold' => '5',
+            ]),
+        ]);
+
+        Carbon::setTestNow(Carbon::parse('2026-10-20 23:59:00', 'Asia/Manila'));
+        $status = app(\App\Http\Controllers\CustomerApiController::class)->shopStatus()->getData(true);
+        $this->assertTrue($status['is_open']);
+        $this->assertSame('00:00', $status['closes_at']);
+
+        Carbon::setTestNow(Carbon::parse('2026-10-21 00:00:00', 'Asia/Manila'));
+        $status = app(\App\Http\Controllers\CustomerApiController::class)->shopStatus()->getData(true);
+        $this->assertFalse($status['is_open']);
 
         Carbon::setTestNow();
     }

@@ -124,6 +124,15 @@ class CustomerProductsApiTest extends TestCase
 
         Carbon::setTestNow(Carbon::parse('2026-10-10 20:00:00', 'Asia/Manila'));
         $status = app(CustomerApiController::class)->shopStatus()->getData(true);
+        $this->assertTrue($status['is_open']);
+        $this->assertSame('00:00', $status['closes_at']);
+
+        Carbon::setTestNow(Carbon::parse('2026-10-10 23:59:00', 'Asia/Manila'));
+        $status = app(CustomerApiController::class)->shopStatus()->getData(true);
+        $this->assertTrue($status['is_open']);
+
+        Carbon::setTestNow(Carbon::parse('2026-10-11 00:00:00', 'Asia/Manila'));
+        $status = app(CustomerApiController::class)->shopStatus()->getData(true);
         $this->assertFalse($status['is_open']);
 
         Carbon::setTestNow();

@@ -24,7 +24,7 @@ const DEFAULT_SHOP_SETTINGS = {
   shopEmail: '',
   shopPhone: '',
   shopAddress: '',
-  openingHours: '08:00 - 20:00',
+  openingHours: '08:00 - 00:00',
   minimumOrder: '0',
   preparationTime: '30',
 };
@@ -33,10 +33,11 @@ const createFulfillmentTimeSlots = (openingHours) => {
   if (!match) return [];
   const openingMinutes = Number(match[1]) * 60 + Number(match[2]);
   const closingMinutes = Number(match[3]) * 60 + Number(match[4]);
+  const closingMinutesAdjusted = closingMinutes <= openingMinutes ? closingMinutes + 1440 : closingMinutes;
   const slots = [];
 
-  for (let totalMinutes = openingMinutes; totalMinutes < closingMinutes; totalMinutes += 30) {
-    const hour = Math.floor(totalMinutes / 60);
+  for (let totalMinutes = openingMinutes; totalMinutes < closingMinutesAdjusted; totalMinutes += 30) {
+    const hour = Math.floor(totalMinutes / 60) % 24;
     const minute = totalMinutes % 60;
     const period = hour < 12 ? 'AM' : 'PM';
     const displayHour = hour % 12 || 12;

@@ -57,7 +57,7 @@ class CustomerApiController extends Controller
         $currentTime = $shopNow->format('H:i');
 
         return $this->corsResponse([
-            'is_open' => $currentTime >= $openingTime && $currentTime < $closingTime,
+            'is_open' => ShopSettings::isOpenAt($currentTime, $settings['openingHours']),
             'server_time' => $shopNow->toIso8601String(),
             'timezone' => 'Asia/Manila',
             'opens_at' => $openingTime,
@@ -486,11 +486,11 @@ class CustomerApiController extends Controller
         }
 
         $shopNow = now()->setTimezone('Asia/Manila');
-        $shopMinutes = ($shopNow->hour * 60) + $shopNow->minute;
-        if ($shopMinutes < 480 || $shopMinutes >= 1200) {
+        $shopSettings = ShopSettings::all();
+        if (!ShopSettings::isOpenAt($shopNow->format('H:i'), $shopSettings['openingHours'])) {
             return $this->corsResponse([
                 'status' => 'error',
-                'message' => 'The shop is closed. Checkout is available from 8:00 AM to 8:00 PM.',
+                'message' => "The shop is closed. Checkout is available from {$shopSettings['openingHours']}.",
             ], 403);
         }
 
@@ -1280,7 +1280,7 @@ Conversation history:
 {$conversationContext}
 
 ## Available business and order information
-Shop hours: 8:00 AM to 8:00 PM, Asia/Manila time.
+Shop hours: 8:00 AM to 12:00 AM, Asia/Manila time.
 Store contact number: 0938-796-2033.
 Customers can view current products and prices on the Menu page.
 
