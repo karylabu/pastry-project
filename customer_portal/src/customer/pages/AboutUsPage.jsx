@@ -34,8 +34,14 @@ export default function AboutUsPage() {
         <div className="relative mx-auto grid max-w-7xl gap-10 px-5 py-12 sm:px-6 md:grid-cols-[1.1fr_0.9fr] md:px-10 md:py-14">
           <div className="flex flex-col justify-center">
             <div className="mb-4 flex items-center gap-3">
-              <img src={`${ROOT_BASE}/uploads/logo.png?v=logo-v2`} alt="Pastry Project logo" className="h-12 w-12 rounded-none bg-transparent object-contain" />
-              <p className="text-2xl tracking-tight"><BrandName /></p>
+              <Link
+                to="/customer"
+                aria-label="Pastry Project home"
+                className="flex items-center gap-3 rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#b18a23]"
+              >
+                <img src={`${ROOT_BASE}/uploads/logo.png?v=logo-v2`} alt="" className="h-12 w-12 rounded-none bg-transparent object-contain" />
+                <p className="text-2xl tracking-tight"><BrandName /></p>
+              </Link>
             </div>
 
             <p className="text-xs font-black uppercase tracking-[0.35em] text-[#b18a23]">About Pastry Project</p>
