@@ -393,9 +393,14 @@ export default function ProductModal({ isOpen, onClose, product, allCakes, onAdd
               }
             />
           </div>
-          <h2 className="mb-3 px-2 text-xl font-bold tracking-tight text-[#30251f]">
+          <h2 className={`${product.description?.trim() ? 'mb-1' : 'mb-3'} px-2 text-xl font-bold tracking-tight text-[#30251f]`}>
             {product.name}
           </h2>
+          {product.description?.trim() && (
+            <p className="mb-3 max-w-full break-words px-1 text-xs leading-5 text-[#8b817a]">
+              {product.description.trim()}
+            </p>
+          )}
 
           {/* Size / Variant pill selector */}
           {shouldShowVariantSelector && variantButtons.length > 0 && (

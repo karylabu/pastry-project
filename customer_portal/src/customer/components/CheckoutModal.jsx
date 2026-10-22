@@ -1339,7 +1339,6 @@ export default function CheckoutModal({
                 <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#a77b26]">Order Summary</p>
                 <p className="mt-1 text-xs text-[#8d7a6e]">{cartItems.length} {cartItems.length === 1 ? "item" : "items"}</p>
               </div>
-              <span className="rounded-full bg-[#fff0c2] px-3 py-1 text-xs font-bold text-[#8d6a2e]">₱{total.toLocaleString()}</span>
             </div>
 
             {/* ITEMS */}

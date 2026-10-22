@@ -13,6 +13,20 @@ const cake = {
 };
 
 describe('ProductModal stock limits', () => {
+  test('shows the product description in the product detail modal', () => {
+    render(
+      <ProductModal
+        isOpen
+        onClose={jest.fn()}
+        product={{ ...cake, description: 'Creamy cheesecake with a bright blueberry finish.' }}
+        allCakes={[cake]}
+        onAddToCart={jest.fn()}
+      />
+    );
+
+    expect(screen.getByText('Creamy cheesecake with a bright blueberry finish.')).toBeInTheDocument();
+  });
+
   test('caps quantity at the selected cake size stock', () => {
     render(
       <ProductModal
