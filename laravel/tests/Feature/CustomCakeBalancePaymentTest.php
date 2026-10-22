@@ -20,6 +20,7 @@ class CustomCakeBalancePaymentTest extends TestCase
             $table->string('status');
             $table->decimal('total', 10, 2);
             $table->decimal('downpayment_amount', 10, 2)->nullable();
+            $table->string('method')->nullable();
             $table->string('payment');
             $table->string('payment_status')->default('pending');
             $table->string('payment_reference')->nullable();
@@ -51,6 +52,12 @@ class CustomCakeBalancePaymentTest extends TestCase
                 'data' => [
                     'id' => 'cs_balance_test',
                     'attributes' => ['checkout_url' => 'https://checkout.example.test/balance'],
+                ],
+            ], 200),
+            'https://api.paymongo.com/v1/payment_links' => Http::response([
+                'data' => [
+                    'id' => 'link_pickup_deposit',
+                    'url' => 'https://checkout.example.test/pickup-deposit',
                 ],
             ], 200),
         ]);
@@ -128,6 +135,104 @@ class CustomCakeBalancePaymentTest extends TestCase
             ->assertStatus(409);
 
         Http::assertNothingSent();
+    }
+
+    public function test_standard_pickup_downpayment_link_uses_server_stored_half_total(): void
+    {
+        \Illuminate\Support\Facades\DB::table('orders')->insert([
+            'id' => 40,
+            'user_id' => 9,
+            'status' => 'Awaiting Payment',
+            'total' => 1000,
+            'downpayment_amount' => 500,
+            'method' => 'Pickup',
+            'payment' => 'QRPh',
+            'payment_status' => 'pending',
+            'is_customized' => false,
+            'order_type' => 'Standard',
+        ]);
+
+        $customer = new User();
+        $customer->id = 9;
+        $customer->role = 'customer';
+
+        $this->actingAs($customer)
+            ->postJson('/create_payment.php', [
+                'order_id' => 40,
+                'amount' => 1,
+                'payment_type' => 'downpayment',
+            ])
+            ->assertOk()
+            ->assertJsonPath('data.url', 'https://checkout.example.test/pickup-deposit');
+
+        Http::assertSent(fn (ClientRequest $request) =>
+            $request->url() === 'https://api.paymongo.com/v1/payment_links'
+            && $request['amount'] === 50000
+            && str_contains($request['description'], 'Downpayment')
+        );
+    }
+
+    public function test_standard_delivery_cannot_create_a_downpayment_link(): void
+    {
+        \Illuminate\Support\Facades\DB::table('orders')->insert([
+            'id' => 41,
+            'user_id' => 9,
+            'status' => 'Awaiting Payment',
+            'total' => 1000,
+            'downpayment_amount' => 500,
+            'method' => 'Delivery',
+            'payment' => 'QRPh',
+            'payment_status' => 'pending',
+            'is_customized' => false,
+            'order_type' => 'Standard',
+        ]);
+
+        $customer = new User();
+        $customer->id = 9;
+        $customer->role = 'customer';
+
+        $this->actingAs($customer)
+            ->postJson('/create_payment.php', ['order_id' => 41, 'payment_type' => 'downpayment'])
+            ->assertStatus(409);
+
+        Http::assertNothingSent();
+    }
+
+    public function test_paid_standard_pickup_deposit_is_recorded_as_partially_paid(): void
+    {
+        \Illuminate\Support\Facades\DB::table('orders')->insert([
+            'id' => 42,
+            'user_id' => 9,
+            'status' => 'Awaiting Payment',
+            'total' => 1000,
+            'downpayment_amount' => 500,
+            'method' => 'Pickup',
+            'payment' => 'QRPh',
+            'payment_status' => 'pending',
+            'payment_reference' => 'link_pickup_deposit_paid',
+            'is_customized' => false,
+            'order_type' => 'Standard',
+        ]);
+        Http::fake([
+            'https://api.paymongo.com/v1/payment_links/link_pickup_deposit_paid/payments' => Http::response([
+                'data' => [['id' => 'pay_pickup_deposit', 'status' => 'paid']],
+            ], 200),
+        ]);
+
+        $customer = new User();
+        $customer->id = 9;
+        $customer->role = 'customer';
+
+        $this->actingAs($customer)
+            ->postJson('/api/orders/42/payment-failure')
+            ->assertOk()
+            ->assertJsonPath('payment_status', 'paid');
+
+        $this->assertDatabaseHas('orders', [
+            'id' => 42,
+            'status' => 'Pending',
+            'payment_status' => 'downpayment_paid',
+        ]);
     }
 
     public function test_balance_link_recovers_deposit_from_legacy_custom_order_notes(): void

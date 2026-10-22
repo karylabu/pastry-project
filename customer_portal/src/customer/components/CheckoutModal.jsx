@@ -828,7 +828,8 @@ export default function CheckoutModal({
             },
             body: JSON.stringify({
               order_id: result.order_id,
-              amount: Number(result.total ?? total),
+              amount: Number(result.total ?? total) * (checkoutData.method === "Pickup" ? 0.5 : 1),
+              payment_type: checkoutData.method === "Pickup" ? "downpayment" : "full",
               payment_method: checkoutData.payment,
             }),
           }
@@ -1115,13 +1116,15 @@ export default function CheckoutModal({
                   <button
                     key={m}
                     onClick={() =>
-                      setCheckoutData({
-                        ...checkoutData,
+                      setCheckoutData((current) => ({
+                        ...current,
                         method: m,
-                        ...(m === "Deliver" && checkoutData.payment === "Counter"
+                        ...(m === "Pickup"
+                          ? { payment: "QRPh" }
+                          : m === "Deliver" && checkoutData.payment === "Counter"
                           ? { payment: "QRPh" }
                           : {}),
-                      })
+                      }))
                     }
                     className={`rounded-xl border px-3 py-2.5 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e7c875]
                     ${
@@ -1229,12 +1232,14 @@ export default function CheckoutModal({
                 Payment Method
               </p>
 
-              <div className={`grid gap-2 ${checkoutData.method === "Deliver" ? "grid-cols-1" : "sm:grid-cols-2"}`}>
+              <div className="grid grid-cols-1 gap-2">
                 {[
                   { value: "QRPh", label: "QRPh" },
                   { value: "Counter", label: "Pay at the Counter" },
                 ]
-                  .filter((paymentOption) => checkoutData.method !== "Deliver" || paymentOption.value !== "Counter")
+                  .filter((paymentOption) => checkoutData.method === "Pickup"
+                    ? paymentOption.value === "QRPh"
+                    : paymentOption.value !== "Counter")
                   .map((paymentOption) => (
                   <button
                     key={paymentOption.value}
@@ -1256,6 +1261,11 @@ export default function CheckoutModal({
                   </button>
                 ))}
               </div>
+              {checkoutData.method === "Pickup" && (
+                <p className="rounded-xl border border-[#e9d8ae] bg-[#fffaf0] px-3 py-2.5 text-xs leading-5 text-[#6b4f1d]">
+                  Pay a 50% downpayment via QRPh to confirm your pickup order. The remaining balance is due at the counter when you pick it up.
+                </p>
+              )}
 
             </div>
 
@@ -1636,6 +1646,12 @@ export default function CheckoutModal({
                 <span>Total</span>
                 <span>₱{total.toLocaleString()}</span>
               </div>
+              {checkoutData.method === "Pickup" && (
+                <div className="flex justify-between px-1 text-sm font-semibold text-[#6b4f1d]">
+                  <span>Pay now (50% downpayment)</span>
+                  <span>₱{(total * 0.5).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                </div>
+              )}
 
               <button
                 onClick={handlePlaceOrder}
@@ -1646,7 +1662,7 @@ export default function CheckoutModal({
                   ? checkoutData.payment === "QRPh"
                     ? "REDIRECTING..."
                     : "SAVING..."
-                  : shopOpen === true ? belowMinimumOrder ? "MINIMUM ORDER NOT MET" : "PLACE ORDER" : shopOpen === false ? "SHOP CLOSED" : "CHECKING HOURS"}
+                  : shopOpen === true ? belowMinimumOrder ? "MINIMUM ORDER NOT MET" : checkoutData.method === "Pickup" ? "PAY 50% DOWNPAYMENT" : "PLACE ORDER" : shopOpen === false ? "SHOP CLOSED" : "CHECKING HOURS"}
               </button>
 
             </div>

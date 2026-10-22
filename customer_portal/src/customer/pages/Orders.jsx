@@ -631,7 +631,14 @@ export default function Orders() {
         ['Order status', formatReceiptValue(o.status)],
         ['Order type', formatReceiptValue(o.order_type || rawCustomDetails.cake_type)],
         ['Payment method', formatReceiptValue(o.payment)],
-        ['Payment status', formatReceiptValue(o.payment_status)],
+        ['Payment status', String(o.payment_status || '').toLowerCase() === 'downpayment_paid'
+          ? '50% downpayment paid; balance due at counter on pickup'
+          : formatReceiptValue(o.payment_status)],
+        ['Downpayment', Number(o.downpayment_amount || 0) > 0 ? `₱${Number(o.downpayment_amount).toLocaleString()}` : ''],
+        ['Balance due at pickup', String(o.payment_status || '').toLowerCase() === 'downpayment_paid'
+          && String(o.method || '').toLowerCase() === 'pickup'
+          ? `₱${Math.max(0, Number(o.total || 0) - Number(o.downpayment_amount || 0)).toLocaleString()}`
+          : ''],
         ['Fulfillment method', formatReceiptValue(o.method || rawCustomDetails.delivery_method)],
         ['Delivery address', formatReceiptValue(o.address || rawCustomDetails.delivery_address)],
         ['Delivery date', formatReceiptValue(o.delivery_date || rawCustomDetails.delivery_date || rawCustomDetails.pickup_date)],
@@ -1193,6 +1200,10 @@ export default function Orders() {
                   String(order.type || '').toLowerCase() === 'customized' ||
                   items.some((item) => String(item.name || '').toLowerCase().includes('custom'))
                 );
+                const isPickupDownpaymentPaid = !isCustomized
+                  && String(order.method || '').toLowerCase() === 'pickup'
+                  && String(order.payment_status || '').toLowerCase() === 'downpayment_paid'
+                  && Number(order.downpayment_amount) > 0;
                 const cakeSize = isCustomized
                   ? getCustomCakeDetails(order).cake_size
                   : primaryItem?.variant || primaryItem?.selectionDetails?.size || primaryItem?.selectionDetails?.variant || '';
@@ -1232,6 +1243,8 @@ export default function Orders() {
                   ? hasPaymentProof
                     ? 'Balance proof submitted — awaiting Admin review'
                     : 'Remaining balance payment required'
+                  : isPickupDownpaymentPaid
+                  ? '50% downpayment paid — balance due at counter on pickup'
                   : isPending
                   ? 'Please complete before pickup'
                   : isPreparing
@@ -1364,6 +1377,11 @@ export default function Orders() {
                     <div>
                       <p className="text-sm text-gray-700">{isCustomized ? customPaymentMethod : order.payment || order.method || '—'}</p>
                       {paymentHint && <p className={`text-xs mt-0.5 ${isCancelled ? 'text-slate-500' : isCompleted ? 'text-slate-500' : 'text-gray-400'}`}>{paymentHint}</p>}
+                      {isPickupDownpaymentPaid && (
+                        <p className="mt-1 text-[10px] leading-4 text-gray-500">
+                          Deposit: ₱{Number(order.downpayment_amount).toLocaleString()} · Balance: ₱{Math.max(0, Number(order.total || 0) - Number(order.downpayment_amount)).toLocaleString()}
+                        </p>
+                      )}
                       {isCustomized && isAwaitingPayment && customDownpaymentAmount > 0 && (
                         <p className="mt-1 text-[10px] leading-4 text-gray-500">
                           Downpayment fee: ₱{downpaymentBreakdown.fee.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}

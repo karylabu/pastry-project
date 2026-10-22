@@ -435,6 +435,10 @@ class OrderController extends Controller
                 $total = $subtotal - $discountAmount + $rushFee;
                 $requiresQrPayment = in_array(strtolower((string) $request->payment), ['gcash', 'qrph'], true);
                 $initialStatus = $requiresQrPayment ? 'Awaiting Payment' : 'Pending';
+                $pickupDownpayment = strcasecmp((string) $request->method, 'Pickup') === 0
+                    && strtolower((string) $request->payment) === 'qrph'
+                    ? round($total * 0.5, 2)
+                    : null;
                 $deliveryTime = trim((string) $request->input('delivery_time', ''));
 
                 $order = Order::create([
@@ -449,6 +453,7 @@ class OrderController extends Controller
                     'discount' => $discountAmount,
                     'discount_id_path' => $discountIdPath,
                     'total' => $total,
+                    'downpayment_amount' => $pickupDownpayment,
                     'method' => $request->method,
                     'delivery_service' => in_array($request->method, ['Delivery', 'Deliver'], true)
                         ? $request->input('delivery_service')
@@ -703,9 +708,13 @@ class OrderController extends Controller
                 }
 
                 if ($paymentState === 'paid') {
+                    $isStandardPickupDownpayment = strtolower((string) $lockedOrder->method) === 'pickup'
+                        && !(bool) $lockedOrder->is_customized
+                        && strcasecmp((string) $lockedOrder->order_type, 'Customized') !== 0
+                        && (float) ($lockedOrder->downpayment_amount ?? 0) > 0;
                     $lockedOrder->update([
                         'status' => 'Pending',
-                        'payment_status' => 'paid',
+                        'payment_status' => $isStandardPickupDownpayment ? 'downpayment_paid' : 'paid',
                     ]);
 
                     if (Schema::hasTable('notifications')) {

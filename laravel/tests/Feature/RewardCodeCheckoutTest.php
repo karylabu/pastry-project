@@ -52,6 +52,7 @@ class RewardCodeCheckoutTest extends TestCase
             $table->decimal('discount', 10, 2)->default(0);
             $table->string('discount_id_path')->nullable();
             $table->decimal('total', 10, 2)->default(0);
+            $table->decimal('downpayment_amount', 10, 2)->nullable();
             $table->string('method')->nullable();
             $table->string('delivery_service')->nullable();
             $table->date('delivery_date')->nullable();
@@ -487,6 +488,21 @@ class RewardCodeCheckoutTest extends TestCase
             ['method' => 'Pickup', 'delivery_date' => now()->subDay()->toDateString()],
             ['delivery_date' => $dateRule]
         )->fails());
+        $pickupRequest = StoreOrderRequest::create('/api/orders', 'POST', ['method' => 'Pickup']);
+        $paymentRule = $pickupRequest->rules()['payment'];
+        $this->assertTrue(Validator::make(
+            ['method' => 'Pickup', 'payment' => 'Counter'],
+            ['payment' => $paymentRule]
+        )->fails());
+    }
+
+    public function test_qrph_pickup_order_stores_half_of_the_total_as_downpayment(): void
+    {
+        $response = $this->placeOrder('', 'none', '', null, '', now()->addDay()->toDateString(), 'QRPh');
+
+        $this->assertSame(201, $response->getStatusCode());
+        $order = DB::table('orders')->first();
+        $this->assertSame(round((float) $order->total / 2, 2), (float) $order->downpayment_amount);
     }
 
     public function test_first_order_discount_is_applied_once_and_reported_by_eligibility_endpoint(): void
@@ -599,7 +615,8 @@ class RewardCodeCheckoutTest extends TestCase
         string $deliveryTime = '',
         ?array $items = null,
         string $promotionCouponCode = '',
-        ?string $deliveryDate = null
+        ?string $deliveryDate = null,
+        string $payment = 'Counter'
     )
     {
         $request = StoreOrderRequest::create('/api/orders', 'POST', [
@@ -607,7 +624,7 @@ class RewardCodeCheckoutTest extends TestCase
             'method' => 'Pickup',
             'delivery_date' => $deliveryDate,
             'delivery_time' => $deliveryTime,
-            'payment' => 'Counter',
+            'payment' => $payment,
             'phone' => '09171234567',
             'order_type' => 'Standard',
             'discount_type' => $discountType,

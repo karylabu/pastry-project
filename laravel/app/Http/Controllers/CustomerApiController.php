@@ -1537,7 +1537,7 @@ PROMPT;
         $order = DB::table('orders')
             ->where('id', $orderId)
             ->where('user_id', $user->id)
-            ->first(['id', 'status', 'total', 'downpayment_amount', 'payment', 'payment_status', 'is_customized', 'order_type']);
+            ->first(['id', 'status', 'total', 'downpayment_amount', 'method', 'payment', 'payment_status', 'is_customized', 'order_type']);
         if (!$order) {
             return $this->corsResponse(['error' => 'Order not found.'], 404);
         }
@@ -1550,6 +1550,10 @@ PROMPT;
         if (!$customOrder && Schema::hasTable('customized_cake_orders')) {
             $customOrder = DB::table('customized_cake_orders')->where('order_id', $orderId)->exists();
         }
+        $pickupDownpayment = !$customOrder
+            && strtolower((string) $order->method) === 'pickup'
+            && strtolower((string) $order->payment) === 'qrph'
+            && (float) ($order->downpayment_amount ?? 0) > 0;
         $downpaymentAmount = (float) ($order->downpayment_amount ?? 0);
         $customPaymentDetails = [];
         if ($customOrder && Schema::hasTable('custom_cake_orders')) {
@@ -1574,7 +1578,10 @@ PROMPT;
         $supportedOrderPayment = $customOrder
             || in_array(strtolower((string) $order->payment), ['qrph', 'gcash'], true);
         $currentStageAlreadyPaid = $order->status === 'Awaiting Payment'
-            && in_array($paymentStatus, ['paid', 'proof_submitted'], true);
+            && in_array($paymentStatus, ['paid', 'downpayment_paid', 'proof_submitted'], true);
+        if ($pickupDownpayment && $paymentType !== 'downpayment') {
+            return $this->corsResponse(['error' => 'Pickup orders must be paid using the 50% downpayment.'], 409);
+        }
         if (!$supportedOrderPayment
             || !in_array($order->status, ['Awaiting Payment', 'Awaiting Balance Payment'], true)
             || $currentStageAlreadyPaid) {
@@ -1593,10 +1600,12 @@ PROMPT;
         } elseif ($order->status !== 'Awaiting Payment') {
             return $this->corsResponse(['error' => 'This payment stage is no longer active.'], 409);
         } elseif ($paymentType === 'downpayment') {
-            if (!$customOrder) {
-                return $this->corsResponse(['error' => 'Downpayment is only available for custom cake orders.'], 409);
+            if (!$customOrder && !$pickupDownpayment) {
+                return $this->corsResponse(['error' => 'Downpayment is only available for custom cake and pickup orders.'], 409);
             }
-            $amount = $downpaymentAmount > 0 ? $downpaymentAmount : (float) ($data['amount'] ?? 0);
+            $amount = $pickupDownpayment
+                ? $downpaymentAmount
+                : ($downpaymentAmount > 0 ? $downpaymentAmount : (float) ($data['amount'] ?? 0));
             if ($amount <= 0 || $amount >= (float) $order->total) {
                 return $this->corsResponse(['error' => 'The quoted downpayment is invalid.'], 409);
             }
