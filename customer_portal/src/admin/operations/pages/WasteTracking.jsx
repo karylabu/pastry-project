@@ -85,6 +85,7 @@ export default function WasteTracking() {
   const [catalogue, setCatalogue] = useState([]);
   const [completedOrders, setCompletedOrders] = useState([]);
   const [range, setRange] = useState("all"); // all | daily | weekly | monthly
+  const [auditPage, setAuditPage] = useState(1);
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState({
     item: "",
@@ -147,6 +148,15 @@ export default function WasteTracking() {
     () => entries.map((e) => enrich(e, catalogue)).sort((a, b) => new Date(b.datetime) - new Date(a.datetime)),
     [entries, catalogue]
   );
+  const auditPageSize = 10;
+  const auditPageCount = Math.max(1, Math.ceil(enrichedEntries.length / auditPageSize));
+  const auditPageEntries = enrichedEntries.slice((auditPage - 1) * auditPageSize, auditPage * auditPageSize);
+  const firstAuditEntry = enrichedEntries.length ? (auditPage - 1) * auditPageSize + 1 : 0;
+  const lastAuditEntry = Math.min(auditPage * auditPageSize, enrichedEntries.length);
+
+  useEffect(() => {
+    if (auditPage > auditPageCount) setAuditPage(auditPageCount);
+  }, [auditPage, auditPageCount]);
 
   const periodStart = useMemo(() => {
     if (range === 'all') return new Date(0);
@@ -460,7 +470,7 @@ export default function WasteTracking() {
                   {enrichedEntries.length === 0 ? (
                     <tr><td colSpan={6} className="px-6 py-10 text-center" style={{ color: C.sub }}>No waste logged yet.</td></tr>
                   ) : (
-                    enrichedEntries.map((e) => {
+                    auditPageEntries.map((e) => {
                       const reason = reasonMeta(e.reason);
                       const flagged = flaggedItems.has(e.item);
                       return (
@@ -497,6 +507,30 @@ export default function WasteTracking() {
                   )}
                 </tbody>
               </table>
+            </div>
+            <div className="flex flex-col gap-3 border-t px-5 py-3 text-xs sm:flex-row sm:items-center sm:justify-between" style={{ borderColor: C.border, color: C.sub }}>
+              <p>Showing {firstAuditEntry}–{lastAuditEntry} of {enrichedEntries.length} entries</p>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setAuditPage((page) => Math.max(1, page - 1))}
+                  disabled={auditPage === 1}
+                  className="rounded-md border bg-white px-3 py-1.5 font-medium transition hover:bg-[#fffaf0] disabled:cursor-not-allowed disabled:opacity-40"
+                  style={{ borderColor: C.border, color: C.ink }}
+                >
+                  Previous
+                </button>
+                <span aria-live="polite">Page {auditPage} of {auditPageCount}</span>
+                <button
+                  type="button"
+                  onClick={() => setAuditPage((page) => Math.min(auditPageCount, page + 1))}
+                  disabled={auditPage === auditPageCount}
+                  className="rounded-md border bg-white px-3 py-1.5 font-medium transition hover:bg-[#fffaf0] disabled:cursor-not-allowed disabled:opacity-40"
+                  style={{ borderColor: C.border, color: C.ink }}
+                >
+                  Next
+                </button>
+              </div>
             </div>
           </div>
         </div>
