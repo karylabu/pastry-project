@@ -55,6 +55,7 @@ export default function Ingredients({
   const [modalUnitCost, setModalUnitCost] = useState('0');
   const [modalThreshold, setModalThreshold] = useState('0');
   const [modalExpiry, setModalExpiry] = useState('');
+  const [createIngredientError, setCreateIngredientError] = useState('');
   const [stockFilter, setStockFilter] = useState('all');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [unitFilter, setUnitFilter] = useState('all');
@@ -155,6 +156,7 @@ export default function Ingredients({
   const openModal = (type, ingredient) => {
     setModalType(type);
     setModalIngredient(ingredient);
+    setCreateIngredientError('');
     setModalQty('');
     setModalNote('');
     if (ingredient) {
@@ -230,6 +232,7 @@ export default function Ingredients({
     setModalOpen(false);
     setModalType('');
     setModalIngredient(null);
+    setCreateIngredientError('');
     setModalQty('');
     setModalNote('');
     setHistoryEntries([]);
@@ -266,6 +269,7 @@ export default function Ingredients({
   };
 
   const submitCreateIngredient = async () => {
+    if (duplicateIngredientName) return;
     const thresholdValue = Number(modalThreshold || 0);
     const initialStock = Number(modalStock || 0);
     const unitCost = Number(modalUnitCost || 0);
@@ -296,7 +300,12 @@ export default function Ingredients({
         closeModal();
         return;
       }
-      alert(j.errors?.name?.[0] || j.message || 'Failed to create ingredient');
+      const errorMessage = j.errors?.name?.[0] || j.message || 'Failed to create ingredient';
+      if (errorMessage.toLowerCase().includes('already exists')) {
+        setCreateIngredientError(errorMessage);
+        return;
+      }
+      alert(errorMessage);
     } catch (e) {
       alert('Network error while creating ingredient');
     }
@@ -690,8 +699,20 @@ export default function Ingredients({
                 {modalType === 'create' && (
                   <div className="mt-2 grid gap-2">
                     <label className="text-xs text-gray-600">Name</label>
-                    <input type="text" value={modalName} onChange={(e) => setModalName(e.target.value)} className="rounded-xl border px-2 py-1 text-xs" />
-                    {duplicateIngredientName && <p role="alert" className="text-xs font-medium text-red-600">This ingredient already exists.</p>}
+                    <input type="text" value={modalName} onChange={(e) => { setModalName(e.target.value); setCreateIngredientError(''); }} className="rounded-xl border px-2 py-1 text-xs" />
+                    {(duplicateIngredientName || createIngredientError) && (
+                      <div role="alert" className="flex gap-3 rounded-xl border border-[#e7d58f] bg-[#fff8e1] p-3 text-[#55451c]">
+                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#f5e8b2] text-[#9b7810]">
+                          <AlertTriangle size={18} />
+                        </span>
+                        <div>
+                          <p className="text-xs font-semibold">Ingredient already exists</p>
+                          <p className="mt-1 text-[11px] leading-4">
+                            {createIngredientError || `“${ingredients.find((ingredient) => String(ingredient.name || '').trim().toLocaleLowerCase() === modalName.trim().toLocaleLowerCase())?.name || modalName.trim()}” is already in your ingredient list. Choose a different name or add stock to the existing ingredient.`}
+                          </p>
+                        </div>
+                      </div>
+                    )}
                     <label className="text-xs text-gray-600">Unit</label>
                     <input type="text" value={modalUnit} onChange={(e) => setModalUnit(e.target.value)} className="rounded-xl border px-2 py-1 text-xs" />
                     <div className="grid grid-cols-2 gap-2">
