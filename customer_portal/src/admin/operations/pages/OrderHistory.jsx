@@ -44,15 +44,19 @@ export default function OrderHistory() {
   const [importHistoryError, setImportHistoryError] = useState("");
 
   useEffect(() => {
-    laravelStaffFetch(`${LARAVEL_BASE}/api/staff/orders`)
-      .then(async (response) => {
-        const payload = await response.json().catch(() => ({}));
-        if (!response.ok || !payload.success || !Array.isArray(payload.orders)) {
-          throw new Error(payload.message || "Unable to load order history.");
-        }
-        return payload.orders;
-      })
-      .then((data) => setOrders(data
+    Promise.all(["0", "1"].map(async (custom) => {
+      const response = await laravelStaffFetch(`${LARAVEL_BASE}/api/staff/orders?custom=${custom}`);
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || !payload.success || !Array.isArray(payload.orders)) {
+        throw new Error(payload.message || "Unable to load order history.");
+      }
+      return payload.orders.map((order) => ({
+        ...order,
+        is_customized: custom === "1",
+        order_type: custom === "1" ? "Customized" : (order.order_type || "Standard"),
+      }));
+    }))
+      .then((orderGroups) => setOrders(orderGroups.flat()
         .filter((order) => ["Completed", "Cancelled", "Ready for Pickup"].includes(order.status))
         .map((order) => ({
           ...order,
@@ -161,7 +165,13 @@ export default function OrderHistory() {
     return [...orders, ...importedSales].filter((order) => {
       const searchableValues = [order.id, order.customer, order.name, order.phone, ...(order.items || []).map((item) => item.name)];
       const matchesQuery = !term || searchableValues.some((value) => String(value || "").toLowerCase().includes(term));
-      const matchesType = orderTypeFilter === "All" || (orderTypeFilter === "Imported Sales" ? order.isImportedSales : order.order_type === orderTypeFilter || (orderTypeFilter === "Standard Pre-order" && (!order.order_type || order.order_type === "Standard")) || (orderTypeFilter === "Urgent Rush Order" && order.order_type === "Urgent"));
+      const orderType = String(order.order_type || "").toLowerCase();
+      const matchesType = orderTypeFilter === "All"
+        || (orderTypeFilter === "Imported Sales" ? order.isImportedSales
+          : orderTypeFilter === "Custom Cake Request" ? order.is_customized
+            : orderTypeFilter === "Standard Order" ? !order.is_customized && !orderType.includes("urgent") && !orderType.includes("rush")
+              : orderTypeFilter === "Urgent Rush Order" ? orderType.includes("urgent") || orderType.includes("rush")
+                : false);
       const matchesStatus = statusFilter === "All" || order.status === statusFilter;
       const matchesDate = matchesTimeRange(order.completed_at || order.updated_at || order.created_at);
       return matchesQuery && matchesType && matchesStatus && matchesDate;
@@ -191,9 +201,9 @@ export default function OrderHistory() {
   const getOrderTypeMeta = (order) => {
     if (order?.isImportedSales) return { label: "Imported Sales", isCustomCake: false, isUrgent: false };
     const normalizedOrderType = String(order?.order_type || order?.type || "").toLowerCase();
-    const isCustomCake = Boolean(order?.is_customized || order?.custom_details || normalizedOrderType === "custom" || normalizedOrderType === "custom cake" || normalizedOrderType === "customized");
+    const isCustomCake = Boolean(order?.is_customized) || ["custom", "custom cake", "customized"].includes(normalizedOrderType);
     const isUrgent = normalizedOrderType.includes("urgent") || normalizedOrderType.includes("rush") || order?.order_type === "Urgent";
-    const label = isCustomCake ? "Custom Cake Request" : isUrgent ? "Urgent Rush Order" : "Standard Pre-order";
+    const label = isCustomCake ? "Custom Cake Request" : isUrgent ? "Urgent Rush Order" : "Standard Order";
     return { label, isCustomCake, isUrgent };
   };
 
@@ -377,7 +387,8 @@ export default function OrderHistory() {
             </label>
             <select value={orderTypeFilter} onChange={(e) => setOrderTypeFilter(e.target.value)} aria-label="Filter by order type" className="h-10 rounded-md border border-[#e8dfd4] bg-white px-3 text-[12px] text-[#33251e] outline-none focus:border-[#b89646] focus:ring-2 focus:ring-[#d4af37]/15">
               <option value="All">All order types</option>
-              <option value="Standard Pre-order">Standard pre-order</option>
+              <option value="Standard Order">Standard order</option>
+              <option value="Custom Cake Request">Custom cake request</option>
               <option value="Urgent Rush Order">Urgent rush order</option>
               <option value="Imported Sales">Imported sales</option>
             </select>

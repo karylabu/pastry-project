@@ -324,6 +324,7 @@ class StaffApiController extends Controller
 
                 $legacyCustom = $legacyCustomByOrder->get($order->id);
                 $customized = $customizedByOrder->get($order->id);
+                $isCustomCakeRequest = $legacyCustom !== null || $customized !== null;
                 $customDetails = json_decode((string) ($legacyCustom->notes ?? ''), true);
                 if (!is_array($customDetails)) {
                     $customDetails = [];
@@ -364,6 +365,12 @@ class StaffApiController extends Controller
                     && strtolower((string) ($order->payment_status ?? '')) === 'proof_submitted';
                 unset($order->discount_id_path, $order->payment_proof_path);
                 $order->items = $items;
+                $order->is_customized = $isCustomCakeRequest;
+                $order->order_type = $isCustomCakeRequest
+                    ? 'Customized'
+                    : (strcasecmp((string) ($order->order_type ?? ''), 'Customized') === 0
+                        ? 'Standard'
+                        : ($order->order_type ?? 'Standard'));
                 $order->custom_details = $customDetails;
                 $order->custom_inspo_images = $customImages;
                 $order->customized_inspo_images = is_array($customizedImages) ? $customizedImages : [];

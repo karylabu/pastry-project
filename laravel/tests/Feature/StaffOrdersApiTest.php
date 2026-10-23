@@ -41,6 +41,8 @@ class StaffOrdersApiTest extends TestCase
             $table->string('payment')->nullable();
             $table->string('payment_status')->nullable();
             $table->string('status')->nullable();
+            $table->string('order_type')->default('Standard');
+            $table->boolean('is_customized')->default(false);
             $table->string('discount_id_path')->nullable();
             $table->string('payment_proof_path')->nullable();
             $table->timestamp('created_at')->nullable();
@@ -198,6 +200,8 @@ class StaffOrdersApiTest extends TestCase
             ->assertJsonCount(1, 'orders')
             ->assertJsonPath('orders.0.id', 21)
             ->assertJsonPath('orders.0.order_number', 1)
+            ->assertJsonPath('orders.0.is_customized', false)
+            ->assertJsonPath('orders.0.order_type', 'Standard')
             ->assertJsonPath('orders.0.has_payment_proof', true)
             ->assertJsonPath('orders.0.items.0.name', 'Chocolate Cake')
             ->assertJsonPath('orders.0.items.0.qty', 2)
@@ -287,6 +291,8 @@ class StaffOrdersApiTest extends TestCase
             ->assertJsonPath('success', true)
             ->assertJsonCount(1, 'orders')
             ->assertJsonPath('orders.0.id', 31)
+            ->assertJsonPath('orders.0.is_customized', true)
+            ->assertJsonPath('orders.0.order_type', 'Customized')
             ->assertJsonPath('orders.0.custom_details.cake_size', '8 inches')
             ->assertJsonPath('orders.0.custom_details.cake_flavor', 'Vanilla')
             ->assertJsonPath('orders.0.custom_details.cake_color', 'Blue')
