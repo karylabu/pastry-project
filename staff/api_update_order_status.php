@@ -1095,7 +1095,7 @@ try {
         deductOrderIngredients($conn, $id, $ingredientRequirements, $currentUserId);
     }
 
-    if ($status === 'Cancelled' && $oldStatus !== 'Cancelled') {
+    if ($status === 'Cancelled' && $oldStatus !== 'Cancelled' && $oldStatus !== 'Ready for Pickup') {
         $movementStmt = $conn->prepare("SELECT product_id, product_size_id, -SUM(quantity) AS restore_quantity FROM product_inventory_movements WHERE movement_type IN ('Order', 'Cancellation') AND reference_type = 'order' AND reference_id = ? GROUP BY product_id, product_size_id HAVING SUM(quantity) < 0");
         $movementStmt->bind_param('i', $id);
         $movementStmt->execute();
@@ -1201,6 +1201,94 @@ try {
         throw new Exception("Update failed");
     }
     $stmt->close();
+
+    $readyTimestampColumn = $conn->query("SHOW COLUMNS FROM orders LIKE 'ready_for_pickup_at'");
+    if ($oldStatus !== $status && $readyTimestampColumn && $readyTimestampColumn->num_rows > 0) {
+        $readyForPickupAt = $status === 'Ready for Pickup' ? date('Y-m-d H:i:s') : null;
+        $readyTimestampStmt = $conn->prepare("UPDATE orders SET ready_for_pickup_at = ? WHERE id = ?");
+        if (!$readyTimestampStmt) {
+            throw new Exception('Unable to update the pickup timer.');
+        }
+        $readyTimestampStmt->bind_param('si', $readyForPickupAt, $id);
+        if (!$readyTimestampStmt->execute()) {
+            $readyTimestampStmt->close();
+            throw new Exception('Unable to update the pickup timer.');
+        }
+        $readyTimestampStmt->close();
+    }
+
+    if ($oldStatus === 'Ready for Pickup' && $status === 'Cancelled') {
+        $wasteTable = $conn->query("SHOW TABLES LIKE 'waste_log'");
+        if (!$wasteTable || $wasteTable->num_rows === 0) {
+            throw new Exception('Waste tracking is unavailable; the ready order was not cancelled.');
+        }
+
+        $existingWasteStmt = $conn->prepare("SELECT id FROM waste_log WHERE reference_type = 'order_waste' AND reference_id = ? LIMIT 1");
+        if (!$existingWasteStmt) {
+            throw new Exception('Unable to check whether this order is already recorded as waste.');
+        }
+        $existingWasteStmt->bind_param('i', $id);
+        $existingWasteStmt->execute();
+        $existingWasteResult = $existingWasteStmt->get_result();
+        $existingWaste = $existingWasteResult ? $existingWasteResult->fetch_assoc() : null;
+        $existingWasteStmt->close();
+
+        if (!$existingWaste) {
+            $orderItems = loadLegacyOrderItems($conn, $id);
+            $wasteNames = array_map(
+                static fn (array $item): string => (int) $item['qty'] > 1
+                    ? "{$item['product_name']} x{$item['qty']}"
+                    : $item['product_name'],
+                $orderItems
+            );
+            if (!$wasteNames) {
+                $wasteNames = array_map(
+                    static function (array $item): string {
+                        $name = $item['name'] ?? $item['product'] ?? 'Order item';
+                        $quantity = max(1, (int) ($item['qty'] ?? $item['quantity'] ?? 1));
+
+                        return $quantity > 1 ? "{$name} x{$quantity}" : $name;
+                    },
+                    loadOrderItemsFromJson((string) ($orderRow['items'] ?? '[]'))
+                );
+            }
+            $wasteDatetime = date('Y-m-d H:i:s');
+            $wasteItem = $wasteNames ? implode(', ', $wasteNames) : "Order #{$id}";
+            $wasteQty = 1.0;
+            $wasteUnitCost = (float) ($orderRow['total'] ?? 0);
+            $wasteType = 'Finished Product';
+            $wasteReason = 'Cancelled after ready for pickup';
+            $wasteReferenceType = 'order_waste';
+            $wasteUnit = 'order';
+            $wasteIdempotencyKey = "order-waste:{$id}";
+            $wasteCreatedAt = $wasteDatetime;
+            $wasteUserId = $currentUserId > 0 ? $currentUserId : null;
+            $wasteStmt = $conn->prepare("INSERT INTO waste_log (datetime, item, qty, unit_cost, item_type, reason, user_id, reference_type, reference_id, unit, idempotency_key, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+            if (!$wasteStmt) {
+                throw new Exception('Unable to prepare waste tracking for the cancelled order.');
+            }
+            $wasteStmt->bind_param(
+                'ssddssisisss',
+                $wasteDatetime,
+                $wasteItem,
+                $wasteQty,
+                $wasteUnitCost,
+                $wasteType,
+                $wasteReason,
+                $wasteUserId,
+                $wasteReferenceType,
+                $id,
+                $wasteUnit,
+                $wasteIdempotencyKey,
+                $wasteCreatedAt
+            );
+            if (!$wasteStmt->execute()) {
+                $wasteStmt->close();
+                throw new Exception('Unable to record the cancelled order as waste.');
+            }
+            $wasteStmt->close();
+        }
+    }
 
     if (in_array($status, ['Completed', 'Cancelled'], true) && $oldStatus !== $status) {
         $returnRefundTable = $conn->query("SHOW TABLES LIKE 'order_return_refund_requests'");

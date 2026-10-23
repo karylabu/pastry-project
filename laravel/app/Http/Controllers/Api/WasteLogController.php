@@ -16,7 +16,7 @@ use Throwable;
 
 class WasteLogController extends Controller
 {
-    public function index(Request $request): JsonResponse
+    public function index(Request $request, \App\Services\OrderWasteService $orderWaste): JsonResponse
     {
         if ($response = $this->authorizeOperationalStaff($request)) return $response;
 
@@ -29,7 +29,7 @@ class WasteLogController extends Controller
             ->unique()
             ->values()
             ->all();
-        $orderItemNames = $this->orderWasteItemNames($orderWasteIds);
+        $orderItemNames = $orderWaste->itemNames($orderWasteIds);
 
         $entries = $wastes->map(fn (WasteLog $waste) => [
                 'id' => (int) $waste->id, 'datetime' => $waste->datetime,
@@ -88,58 +88,15 @@ class WasteLogController extends Controller
         }
     }
 
-    public function storeOrderWaste(Request $request, int $orderId): JsonResponse
+    public function storeOrderWaste(Request $request, int $orderId, \App\Services\OrderWasteService $orderWaste): JsonResponse
     {
         $user = $this->requireRole($request, 'admin');
         if ($user instanceof JsonResponse) {
             return $user;
         }
-        if (!Schema::hasTable('waste_log')) {
-            return response()->json(['success' => false, 'message' => 'Waste tracking is unavailable.'], 503);
-        }
 
         try {
-            $waste = DB::transaction(function () use ($orderId, $user) {
-                $order = DB::table('orders')->where('id', $orderId)->lockForUpdate()->first(['id', 'total']);
-                if (!$order) {
-                    abort(404, 'Order not found.');
-                }
-
-                $existing = DB::table('waste_log')
-                    ->where('reference_type', 'order_waste')
-                    ->where('reference_id', $orderId)
-                    ->first();
-                if ($existing) {
-                    return ['record' => $existing, 'already_recorded' => true];
-                }
-
-                $total = round((float) $order->total, 2);
-                if ($total <= 0) {
-                    abort(422, 'An order with a zero total cannot be recorded as financial loss.');
-                }
-
-                $itemName = $this->orderWasteItemNames([$orderId])[$orderId] ?? "Order #{$orderId}";
-                $now = now();
-                $wasteId = DB::table('waste_log')->insertGetId([
-                    'datetime' => $now,
-                    'item' => $itemName,
-                    'qty' => 1,
-                    'unit_cost' => $total,
-                    'item_type' => 'Finished Product',
-                    'reason' => 'unsold',
-                    'user_id' => $user->id,
-                    'reference_type' => 'order_waste',
-                    'reference_id' => $orderId,
-                    'unit' => 'order',
-                    'idempotency_key' => "order-waste:{$orderId}",
-                    'created_at' => $now,
-                ]);
-
-                return [
-                    'record' => DB::table('waste_log')->where('id', $wasteId)->first(),
-                    'already_recorded' => false,
-                ];
-            });
+            $waste = $orderWaste->record($orderId, (int) $user->id, 'Unclaimed order');
 
             $record = $waste['record'];
             return response()->json([
@@ -171,54 +128,4 @@ class WasteLogController extends Controller
         }
     }
 
-    private function orderWasteItemNames(array $orderIds): array
-    {
-        if ($orderIds === []) {
-            return [];
-        }
-
-        $itemNames = [];
-        if (Schema::hasTable('order_items') && Schema::hasColumn('order_items', 'product')) {
-            $columns = ['order_id', 'product'];
-            if (Schema::hasColumn('order_items', 'qty')) {
-                $columns[] = 'qty';
-            }
-
-            foreach (DB::table('order_items')->whereIn('order_id', $orderIds)->get($columns) as $item) {
-                $name = trim((string) ($item->product ?? ''));
-                if ($name === '') {
-                    continue;
-                }
-                $quantity = max(1, (int) ($item->qty ?? 1));
-                $itemNames[$item->order_id][] = $quantity > 1 ? "{$name} x{$quantity}" : $name;
-            }
-        }
-
-        $missingIds = array_values(array_diff($orderIds, array_map('intval', array_keys($itemNames))));
-        if ($missingIds !== [] && Schema::hasTable('orders') && Schema::hasColumn('orders', 'items')) {
-            foreach (DB::table('orders')->whereIn('id', $missingIds)->get(['id', 'items']) as $order) {
-                $items = json_decode((string) $order->items, true);
-                if (!is_array($items)) {
-                    continue;
-                }
-
-                foreach ($items as $item) {
-                    if (!is_array($item)) {
-                        continue;
-                    }
-                    $name = trim((string) ($item['name'] ?? $item['product'] ?? ''));
-                    if ($name === '') {
-                        continue;
-                    }
-                    $quantity = max(1, (int) ($item['qty'] ?? $item['quantity'] ?? 1));
-                    $itemNames[$order->id][] = $quantity > 1 ? "{$name} x{$quantity}" : $name;
-                }
-            }
-        }
-
-        return array_map(
-            static fn (array $names): string => implode(', ', $names),
-            $itemNames
-        );
-    }
 }
