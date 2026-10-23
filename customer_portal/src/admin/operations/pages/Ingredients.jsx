@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useLocation } from "react-router-dom";
-import { AlertTriangle, CalendarDays, Package, PackagePlus, Plus, Search } from "lucide-react";
+import { AlertTriangle, CalendarDays, Package, PackagePlus, Plus, Search, Trash2 } from "lucide-react";
 import { LARAVEL_BASE, STAFF_BASE } from "../../../services/config";
 
 const staffFetch = (url, options = {}) => fetch(url, { credentials: "include", ...options });
@@ -47,6 +47,8 @@ export default function Ingredients({
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [deletingIngredient, setDeletingIngredient] = useState(false);
   const [modalType, setModalType] = useState(''); // 'create' | 'edit' | 'in' | 'out' | 'history'
   const [modalIngredient, setModalIngredient] = useState(null);
   const [modalQty, setModalQty] = useState('');
@@ -359,7 +361,7 @@ export default function Ingredients({
   const canSaveCreate = modalName.trim().length > 0 && thresholdValid;
 
   const deleteIngredient = async (id) => {
-    if (!window.confirm('Delete this ingredient? This cannot be undone.')) return false;
+    setDeletingIngredient(true);
     try {
       const res = await laravelStaffFetch(`${LARAVEL_BASE}/api/staff/ingredients/${encodeURIComponent(id)}`, {
         method: 'DELETE', headers: { 'Content-Type': 'application/json' },
@@ -372,6 +374,8 @@ export default function Ingredients({
       alert(j.message || 'Failed to delete ingredient');
     } catch (e) {
       alert('Network error while deleting ingredient');
+    } finally {
+      setDeletingIngredient(false);
     }
     return false;
   };
@@ -781,7 +785,7 @@ export default function Ingredients({
                       <p className="text-xs text-red-600">Threshold must be greater than 0 to enable alerts and avoid silent low-stock conditions.</p>
                     )}
                     <div className="flex items-center gap-2 justify-between mt-4">
-                      <button onClick={async () => { const deleted = await deleteIngredient(modalIngredient.id); if (deleted) closeModal(); }} className="px-2 py-1 rounded-md bg-black text-white text-xs">Delete</button>
+                      <button type="button" onClick={() => setDeleteConfirmOpen(true)} className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700 transition hover:border-red-300 hover:bg-red-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-300"><Trash2 size={14} /> Delete</button>
                       <div className="flex items-center gap-2">
                         <button onClick={closeModal} className="px-2 py-1 rounded-md bg-black text-white text-xs">Cancel</button>
                         <button onClick={submitEditIngredient} disabled={!canSaveEdit} className={`px-2 py-1 rounded-md text-xs font-semibold ${canSaveEdit ? 'bg-black text-white' : 'bg-black/20 text-black/50 cursor-not-allowed'}`}>Save</button>
@@ -802,6 +806,38 @@ export default function Ingredients({
                       <button onClick={closeModal} className="px-2 py-1 rounded-md bg-black text-white text-xs">Cancel</button>
                       <button onClick={submitStockChange} className="px-2 py-1 rounded-md bg-black text-white text-xs font-semibold">Confirm</button>
                     </div>
+                  </div>
+                )}
+                {deleteConfirmOpen && modalIngredient && (
+                  <div className="fixed inset-0 z-[10002] flex items-center justify-center bg-[#241812]/55 px-4 py-5 backdrop-blur-[2px]">
+                    <section role="alertdialog" aria-modal="true" aria-labelledby="delete-ingredient-title" aria-describedby="delete-ingredient-description" className="w-full max-w-md overflow-hidden rounded-2xl border border-[#eee4de] bg-white shadow-[0_24px_70px_rgba(38,25,16,0.28)]">
+                      <div className="flex gap-4 p-5 sm:p-6">
+                        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-red-50 text-red-600">
+                          <Trash2 size={19} />
+                        </span>
+                        <div className="min-w-0">
+                          <h2 id="delete-ingredient-title" className="text-base font-semibold text-[#33251e]">Delete ingredient?</h2>
+                          <p id="delete-ingredient-description" className="mt-1.5 text-sm leading-6 text-[#74675f]">
+                            You’re about to delete <span className="font-semibold text-[#33251e]">{modalIngredient.name}</span>. This action cannot be undone.
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex flex-col-reverse gap-2 border-t border-[#f0e7e0] bg-[#fbfaf5] p-4 sm:flex-row sm:justify-end">
+                        <button type="button" disabled={deletingIngredient} onClick={() => setDeleteConfirmOpen(false)} className="rounded-lg border border-[#eadfd8] bg-white px-4 py-2.5 text-sm font-semibold text-[#6a5a50] transition hover:bg-[#fff8df] disabled:cursor-not-allowed disabled:opacity-50">
+                          Cancel
+                        </button>
+                        <button type="button" disabled={deletingIngredient} onClick={async () => {
+                          const deleted = await deleteIngredient(modalIngredient.id);
+                          if (deleted) {
+                            setDeleteConfirmOpen(false);
+                            closeModal();
+                          }
+                        }} className="inline-flex items-center justify-center gap-2 rounded-lg bg-red-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-300 disabled:cursor-not-allowed disabled:opacity-60">
+                          <Trash2 size={15} />
+                          {deletingIngredient ? 'Deleting…' : 'Delete ingredient'}
+                        </button>
+                      </div>
+                    </section>
                   </div>
                 )}
               </div>
