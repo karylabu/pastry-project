@@ -33,13 +33,21 @@ class IngredientController extends Controller
         }
 
         $validated = $request->validate([
-            'name' => 'required|string|max:255|unique:ingredients,name',
+            'name' => 'required|string|max:255',
             'unit' => 'required|string|max:50',
             'threshold' => 'required|numeric|min:0',
             'stock' => 'sometimes|required|numeric|min:0',
             'unit_cost' => 'sometimes|required|numeric|min:0',
             'expiry' => 'nullable|date',
         ]);
+        $validated['name'] = trim($validated['name']);
+        if ($this->ingredientNameExists($validated['name'])) {
+            return response()->json([
+                'success' => false,
+                'message' => 'An ingredient with this name already exists.',
+                'errors' => ['name' => ['An ingredient with this name already exists.']],
+            ], 422);
+        }
 
         try {
             $userId = (int) ($this->getAuthenticatedUser($request)?->id ?? 0);
@@ -100,11 +108,19 @@ class IngredientController extends Controller
         }
 
         $validated = $request->validate([
-            'name' => 'required|string|max:255|unique:ingredients,name,' . $ingredient->id,
+            'name' => 'required|string|max:255',
             'unit' => 'required|string|max:50',
             'threshold' => 'required|numeric|min:0',
             'unit_cost' => 'sometimes|required|numeric|min:0',
         ]);
+        $validated['name'] = trim($validated['name']);
+        if ($this->ingredientNameExists($validated['name'], (int) $ingredient->id)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'An ingredient with this name already exists.',
+                'errors' => ['name' => ['An ingredient with this name already exists.']],
+            ], 422);
+        }
 
         try {
             $updates = [
@@ -163,6 +179,14 @@ class IngredientController extends Controller
                 'message' => 'Failed to delete ingredient: ' . $e->getMessage(),
             ], 400);
         }
+    }
+
+    private function ingredientNameExists(string $name, ?int $exceptId = null): bool
+    {
+        return DB::table('ingredients')
+            ->whereRaw('LOWER(TRIM(name)) = ?', [mb_strtolower(trim($name))])
+            ->when($exceptId !== null, fn ($query) => $query->where('id', '!=', $exceptId))
+            ->exists();
     }
 
     /**

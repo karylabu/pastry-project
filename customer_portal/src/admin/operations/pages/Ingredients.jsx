@@ -70,6 +70,9 @@ export default function Ingredients({
   const [selectedCakeFlavor, setSelectedCakeFlavor] = useState(null);
   const currentUser = (() => { try { return JSON.parse(window.localStorage.getItem('user') || 'null'); } catch (e) { return null; } })();
   const canApproveDiscard = String(currentUser?.role || '').toLowerCase() === 'admin';
+  const duplicateIngredientName = modalType === 'create' && modalName.trim()
+    ? ingredients.some((ingredient) => String(ingredient.name || '').trim().toLocaleLowerCase() === modalName.trim().toLocaleLowerCase())
+    : false;
 
   useEffect(() => {
     const ingredientId = new URLSearchParams(location.search).get("ingredient_id");
@@ -293,7 +296,7 @@ export default function Ingredients({
         closeModal();
         return;
       }
-      alert(j.message || 'Failed to create ingredient');
+      alert(j.errors?.name?.[0] || j.message || 'Failed to create ingredient');
     } catch (e) {
       alert('Network error while creating ingredient');
     }
@@ -688,6 +691,7 @@ export default function Ingredients({
                   <div className="mt-2 grid gap-2">
                     <label className="text-xs text-gray-600">Name</label>
                     <input type="text" value={modalName} onChange={(e) => setModalName(e.target.value)} className="rounded-xl border px-2 py-1 text-xs" />
+                    {duplicateIngredientName && <p role="alert" className="text-xs font-medium text-red-600">This ingredient already exists.</p>}
                     <label className="text-xs text-gray-600">Unit</label>
                     <input type="text" value={modalUnit} onChange={(e) => setModalUnit(e.target.value)} className="rounded-xl border px-2 py-1 text-xs" />
                     <div className="grid grid-cols-2 gap-2">
@@ -713,7 +717,7 @@ export default function Ingredients({
                     )}
                     <div className="flex items-center gap-2 justify-end mt-3">
                       <button onClick={closeModal} className="px-2 py-1 rounded-md bg-black text-white text-xs">Cancel</button>
-                      <button onClick={submitCreateIngredient} disabled={!canSaveCreate} className={`px-2 py-1 rounded-md text-xs font-semibold ${canSaveCreate ? 'bg-black text-white' : 'bg-black/20 text-black/50 cursor-not-allowed'}`}>Create</button>
+                      <button onClick={submitCreateIngredient} disabled={!canSaveCreate || duplicateIngredientName} className={`px-2 py-1 rounded-md text-xs font-semibold ${canSaveCreate && !duplicateIngredientName ? 'bg-black text-white' : 'bg-black/20 text-black/50 cursor-not-allowed'}`}>Create</button>
                     </div>
                   </div>
                 )}
