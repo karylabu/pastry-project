@@ -1278,8 +1278,8 @@ export default function CheckoutModal({
 
               <div className="grid gap-2">
                 {[
-                  { value: "Standard", label: "Standard Pre-order", note: "Regular order timing" },
-                  ...(!berMonths ? [{ value: "Urgent", label: "Urgent Rush Order", note: "Priority handling" }] : []),
+                  { value: "Standard", label: "Standard Pre-order", note: "Ready in a little over 1 hour" },
+                  ...(!berMonths ? [{ value: "Urgent", label: "Urgent Rush Order", note: "Ready for shop pickup in 20–30 minutes" }] : []),
                 ].map((option) => (
                   <button
                     key={option.value}

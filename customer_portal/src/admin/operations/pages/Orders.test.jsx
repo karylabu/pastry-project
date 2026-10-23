@@ -58,6 +58,7 @@ beforeEach(() => {
           }),
           orderFixture(104, "Completed", 60),
           orderFixture(105, "Cancelled", 60),
+          orderFixture(106, "Pending", 2, { order_type: "Urgent" }),
         ],
       }),
     });
@@ -78,14 +79,16 @@ test("dashboard cards filter live orders and toggle off when clicked again", asy
   await screen.findAllByText("Customer 105");
 
   fireEvent.click(screen.getByRole("button", { name: /Open orders/i }));
-  expect(screen.getByText("3 matching orders")).toBeInTheDocument();
+  expect(screen.getByText("4 matching orders")).toBeInTheDocument();
   expect(screen.queryAllByText("Customer 104")).toHaveLength(0);
   expect(screen.queryAllByText("Customer 105")).toHaveLength(0);
 
   fireEvent.click(screen.getByRole("button", { name: /Rush orders/i }));
-  expect(screen.getByText("2 matching orders")).toBeInTheDocument();
-  expect(screen.getAllByText("Customer 101").length).toBeGreaterThan(0);
-  expect(screen.getAllByText("Customer 102").length).toBeGreaterThan(0);
+  expect(screen.getByText("1 matching order")).toBeInTheDocument();
+  expect(screen.getAllByText("Customer 106").length).toBeGreaterThan(0);
+  expect(screen.queryAllByText("Customer 101")).toHaveLength(0);
+  expect(screen.queryAllByText("Customer 102")).toHaveLength(0);
+  expect(screen.getAllByText(/Rush order/i).length).toBeGreaterThan(0);
 
   fireEvent.click(screen.getByRole("button", { name: /Payment review/i }));
   expect(screen.getByText("1 matching order")).toBeInTheDocument();
@@ -93,8 +96,9 @@ test("dashboard cards filter live orders and toggle off when clicked again", asy
   expect(screen.queryAllByText("Customer 101")).toHaveLength(0);
 
   fireEvent.click(screen.getByRole("button", { name: /Payment review/i }));
-  await waitFor(() => expect(screen.getByText("5 matching orders")).toBeInTheDocument());
+  await waitFor(() => expect(screen.getByText("6 matching orders")).toBeInTheDocument());
   expect(screen.getAllByText("Customer 101").length).toBeGreaterThan(0);
+  expect(screen.getAllByText(/Rush order/i).length).toBeGreaterThan(0);
 });
 
 test("low stock card shows only low-stock ingredients and supports search", async () => {

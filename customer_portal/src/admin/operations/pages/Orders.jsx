@@ -276,18 +276,13 @@ export default function Orders() {
     };
   }, []);
 
-  const getUrgency = (order) => {
+  const getOrderTiming = (order) => {
     const createdAt = order.created_at ? new Date(order.created_at).getTime() : null;
     const ageMinutes = createdAt ? Math.max(0, Math.floor((Date.now() - createdAt) / 60000)) : 0;
-    const targetMinutes = order.status === "Pending" ? 20 : order.status === "Preparing" ? 35 : 45;
-    const minutesLeft = Math.max(0, targetMinutes - ageMinutes);
-    const isUrgent = order.status === "Pending"
-      ? ageMinutes > 15
-      : order.status === "Preparing"
-      ? ageMinutes > 25
-      : false;
+    const orderType = String(order.order_type || order.type || "").trim().toLowerCase();
+    const isRushOrder = orderType.includes("urgent") || orderType.includes("rush");
 
-    return { ageMinutes, minutesLeft, isUrgent };
+    return { ageMinutes, isRushOrder };
   };
 
   const displayedOrders = orders
@@ -295,7 +290,7 @@ export default function Orders() {
       const matchesFilter = statusFilter === "All" || order.status === statusFilter;
       const matchesDashboardFilter = dashboardFilter === null
         || (dashboardFilter === "open" && !["Completed", "Cancelled"].includes(order.status))
-        || (dashboardFilter === "rush" && getUrgency(order).isUrgent)
+        || (dashboardFilter === "rush" && getOrderTiming(order).isRushOrder)
         || (dashboardFilter === "payment" && order.status === "Awaiting Payment" && order.has_payment_proof);
       const query = searchQuery.trim().toLowerCase();
       const searchableText = [
@@ -344,7 +339,7 @@ export default function Orders() {
     status === "All" ? orders.length : orders.filter((order) => order.status === status).length,
   ]));
   const openOrderCount = orders.filter((order) => !["Completed", "Cancelled"].includes(order.status)).length;
-  const rushOrderCount = orders.filter((order) => getUrgency(order).isUrgent).length;
+  const rushOrderCount = orders.filter((order) => getOrderTiming(order).isRushOrder).length;
   const paymentReviewCount = orders.filter((order) => order.status === "Awaiting Payment" && order.has_payment_proof).length;
   const visibleLowStockIngredients = lowStockIngredients.filter((ingredient) => {
     const query = searchQuery.trim().toLowerCase();
@@ -508,7 +503,7 @@ export default function Orders() {
           <div className="mb-5 grid grid-cols-2 gap-2.5 lg:grid-cols-4 lg:gap-3">
             {[
               { key: "open", label: "Open orders", value: openOrderCount, note: "Need follow-up", icon: ShoppingBag, tone: "text-[#8a6515]", border: "border-t-[#d4af37]" },
-              { key: "rush", label: "Rush orders", value: rushOrderCount, note: "Past target time", icon: AlertTriangle, tone: "text-[#a34f36]", border: "border-t-[#c87954]" },
+              { key: "rush", label: "Rush orders", value: rushOrderCount, note: "Customer-selected rush", icon: AlertTriangle, tone: "text-[#a34f36]", border: "border-t-[#c87954]" },
               { key: "payment", label: "Payment review", value: paymentReviewCount, note: "Proof submitted", icon: Clock3, tone: "text-[#80600a]", border: "border-t-[#c9a94f]" },
               { key: "low_stock", label: "Low stock", value: lowStockIngredients.length, note: "Ingredients to check", icon: PackageCheck, tone: "text-[#61734f]", border: "border-t-[#81906c]" },
             ].map(({ key, label, value, note, icon: Icon, tone, border }) => (
@@ -646,14 +641,14 @@ export default function Orders() {
                 const needsPaymentReview = order.status === "Awaiting Payment"
                   && String(order.payment_status || "").toLowerCase() === "proof_submitted"
                   && order.has_payment_proof;
-                const urgency = getUrgency(order);
+                const orderTiming = getOrderTiming(order);
                 const customerLabel = order.customer || order.customer_name || order.name || order.phone || "Customer";
                 const addressLabel = order.address || order.delivery_address || order.customer_address || "No address provided";
                 const canAdvance = !["Completed", "Cancelled"].includes(order.status)
                   && (order.status !== "Awaiting Payment" || needsPaymentReview);
 
                 return (
-                  <article key={order.id} className={`overflow-hidden rounded-lg border bg-white shadow-[0_3px_12px_rgba(60,42,28,0.035)] ${urgency.isUrgent ? "border-[#d4af37]/60" : "border-[#e9e1d9]"}`}>
+                  <article key={order.id} className={`overflow-hidden rounded-lg border bg-white shadow-[0_3px_12px_rgba(60,42,28,0.035)] ${orderTiming.isRushOrder ? "border-[#d4af37]/60" : "border-[#e9e1d9]"}`}>
                     <div className="p-3.5">
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
@@ -661,7 +656,7 @@ export default function Orders() {
                             <span className="text-[12px] font-bold text-[#33251e]">#{order.order_number ?? order.id}</span>
                             <span className={`rounded px-2 py-1 text-[9px] font-semibold ${statusColors[order.status] ?? "bg-black/5 text-black"}`}>{order.status}</span>
                             {order.return_refund_request && <span className="rounded bg-amber-100 px-2 py-1 text-[9px] font-semibold text-amber-900">Customer request · {order.return_refund_request.status}</span>}
-                            {urgency.isUrgent && <span className="inline-flex items-center gap-1 rounded bg-[#fff3d1] px-2 py-1 text-[9px] font-semibold text-[#80600a]"><AlertTriangle size={11} /> Rush · {urgency.ageMinutes}m</span>}
+                            {orderTiming.isRushOrder && <span className="inline-flex items-center gap-1 rounded bg-[#fff3d1] px-2 py-1 text-[9px] font-semibold text-[#80600a]"><AlertTriangle size={11} /> Rush order</span>}
                           </div>
                           <p className="mt-2 truncate text-[13px] font-semibold text-[#33251e]">{customerLabel}</p>
                           <p className="mt-0.5 text-[10px] text-[#8f8076]">{order.method || "N/A"} · {order.source || "Order"}{order.phone ? ` · ${order.phone}` : ""}</p>
@@ -670,7 +665,7 @@ export default function Orders() {
                       </div>
                       <div className="mt-3 flex items-start justify-between gap-3 border-t border-[#f0e9e2] pt-3">
                         <p className="min-w-0 text-[11px] leading-4 text-[#65574d]">{(order.items || []).slice(0, 2).map((item) => `${item.name || "Item"} ×${item.qty || 1}`).join(", ") || "No item details"}{(order.items || []).length > 2 ? ` +${order.items.length - 2} more` : ""}</p>
-                        <span className="shrink-0 text-[10px] text-[#9b8c83]">{urgency.ageMinutes}m ago</span>
+                        <span className="shrink-0 text-[10px] text-[#9b8c83]">{orderTiming.ageMinutes}m ago</span>
                       </div>
                       <div className="mt-3 flex flex-wrap gap-1.5">
                         <button type="button" onClick={() => setExpandedOrderId(isExpanded ? null : order.id)} className="rounded-md border border-[#e8dfd4] bg-white px-2.5 py-1.5 text-[10px] font-semibold text-[#65574d] hover:bg-[#faf7f2]">{isExpanded ? "Hide details" : "View details"}</button>
@@ -736,7 +731,7 @@ export default function Orders() {
                     const needsPaymentReview = order.status === 'Awaiting Payment'
                       && String(order.payment_status || '').toLowerCase() === 'proof_submitted'
                       && order.has_payment_proof;
-                    const urgency = getUrgency(order);
+                    const orderTiming = getOrderTiming(order);
                     const customerLabel = order.customer || order.customer_name || order.name || order.phone || "";
                     const itemNames = (order.items || []).slice(0, 2).map((item) => `${item.name} x${item.qty}`).join(", ");
                     const itemLabel = order.items?.length
@@ -746,7 +741,7 @@ export default function Orders() {
 
                     return (
                       <React.Fragment key={order.id}>
-                        <tr className={`border-b border-black/10 align-middle transition hover:bg-[#FFFDF7] ${urgency.isUrgent ? "bg-[#FFF9E8]" : "bg-white"}`}>
+                        <tr className={`border-b border-black/10 align-middle transition hover:bg-[#FFFDF7] ${orderTiming.isRushOrder ? "bg-[#FFF9E8]" : "bg-white"}`}>
                           <td className="px-4 py-3 text-[13px] font-semibold text-black">#{order.order_number ?? order.id}</td>
                           <td className="px-4 py-3">
                             <p className="text-[13px] font-semibold text-black">{customerLabel}</p>
@@ -757,6 +752,7 @@ export default function Orders() {
                           <td className="px-4 py-3">
                             <div className="flex flex-col items-start gap-1.5">
                               <span className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-semibold ${statusColors[order.status] ?? "bg-black/5 text-black"}`}>{order.status}</span>
+                              {orderTiming.isRushOrder && <span className="inline-flex rounded-full bg-[#fff3d1] px-2.5 py-1 text-[9px] font-semibold text-[#80600a]">Rush order</span>}
                               {order.return_refund_request && <span className="rounded bg-amber-100 px-2 py-1 text-[9px] font-semibold text-amber-900">Customer request · {order.return_refund_request.status}</span>}
                             </div>
                           </td>
@@ -892,7 +888,7 @@ export default function Orders() {
                       ) : (
                         columnOrders.map((order) => {
                           const isExpanded = expandedOrderId === order.id;
-                          const urgency = getUrgency(order);
+                          const orderTiming = getOrderTiming(order);
                           const customerLabel = order.customer || order.customer_name || order.name || order.phone || "";
                           const itemNames = (order.items || []).slice(0, 2).map((item) => `${item.name} x${item.qty}`).join(", ");
                           const itemLabel = order.items?.length
@@ -903,7 +899,7 @@ export default function Orders() {
                           return (
                             <div
                               key={order.id}
-                              className={`rounded-xl border p-3 shadow-sm ${urgency.isUrgent ? "border-[#D4AF37]/35 bg-[#FFF9E8]" : "border-black/10 bg-white"}`}
+                              className={`rounded-xl border p-3 shadow-sm ${orderTiming.isRushOrder ? "border-[#D4AF37]/35 bg-[#FFF9E8]" : "border-black/10 bg-white"}`}
                             >
                               <div className="flex items-start justify-between gap-2">
                                 <div>
@@ -912,10 +908,10 @@ export default function Orders() {
                                     <span className={`rounded-full px-2.5 py-1 text-[10px] font-semibold ${statusColors[order.status] ?? "bg-black/5 text-black"}`}>
                                       {order.status}
                                     </span>
-                                    {urgency.isUrgent ? (
-                                      <span className="rounded-full bg-[#D4AF37] px-2.5 py-1 text-[10px] font-semibold text-black">RUSH • {urgency.minutesLeft}m</span>
+                                    {orderTiming.isRushOrder ? (
+                                      <span className="rounded-full bg-[#D4AF37] px-2.5 py-1 text-[10px] font-semibold text-black">RUSH ORDER</span>
                                     ) : (
-                                      <span className="rounded-full bg-black/5 px-2.5 py-1 text-[10px] font-semibold text-black/70">{urgency.ageMinutes}m old</span>
+                                      <span className="rounded-full bg-black/5 px-2.5 py-1 text-[10px] font-semibold text-black/70">{orderTiming.ageMinutes}m old</span>
                                     )}
                                   </div>
                                   <p className="mt-2 text-[13px] font-semibold text-black">{customerLabel}</p>
