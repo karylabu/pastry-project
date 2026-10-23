@@ -428,7 +428,7 @@ export default function Ingredients({
       res = res.filter(i => i.unit === unitFilter);
     }
     if (stockFilter === 'low') {
-      res = res.filter(i => Number(i.usable_stock) <= Number(i.threshold || 0));
+      res = res.filter(i => Number(i.threshold) > 0 && Number(i.usable_stock) > 0 && Number(i.usable_stock) <= Number(i.threshold));
     }
     if (stockFilter === 'expired') {
       res = res.filter(i => i.has_expired_batches);
@@ -447,9 +447,19 @@ export default function Ingredients({
     return res;
   }, [ingredients, query, stockFilter, categoryFilter, unitFilter, sortBy, selectedCakeFlavor, expiryByIngredient]);
 
-  const lowStockCount = ingredients.filter((item) => Number(item.threshold) > 0 && Number(item.usable_stock) <= Number(item.threshold)).length;
+  const lowStockCount = ingredients.filter((item) => Number(item.threshold) > 0 && Number(item.usable_stock) > 0 && Number(item.usable_stock) <= Number(item.threshold)).length;
   const nearExpiryCount = ingredients.filter((item) => expiryByIngredient.get(Number(item.id))?.daysRemaining <= 7).length;
   const outOfStockCount = ingredients.filter((item) => Number(item.usable_stock) <= 0).length;
+
+  const selectSummaryFilter = (filter) => {
+    setStockFilter(filter);
+    if (filter === 'all') {
+      setQuery('');
+      setCategoryFilter('all');
+      setUnitFilter('all');
+      setSelectedCakeFlavor(null);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-[#fbfaf5] text-[#33251e]">
@@ -465,22 +475,22 @@ export default function Ingredients({
         </header>
 
         <div className="mb-5 grid grid-cols-2 gap-2.5 sm:grid-cols-4">
-          <div className="flex items-center gap-3 rounded-xl border border-[#eee4de] bg-white p-4 shadow-[0_5px_18px_rgba(91,64,39,0.04)]">
+          <button type="button" aria-pressed={stockFilter === 'all'} onClick={() => selectSummaryFilter('all')} className={`flex min-w-0 items-center gap-3 rounded-xl border p-4 text-left shadow-[0_5px_18px_rgba(91,64,39,0.04)] transition hover:-translate-y-0.5 hover:border-[#d4af37] hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d4af37] ${stockFilter === 'all' ? 'border-[#d4af37] bg-[#fffaf0]' : 'border-[#eee4de] bg-white'}`}>
             <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#fff4cd] text-[#9b7810]"><Package size={17} /></span>
-            <div><p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#9b8c83]">Ingredients</p><p className="mt-0.5 text-[20px] font-bold leading-none text-[#33251e]">{ingredients.length}</p></div>
-          </div>
-          <div className="flex items-center gap-3 rounded-xl border border-[#eee4de] bg-white p-4 shadow-[0_5px_18px_rgba(91,64,39,0.04)]">
+            <span className="min-w-0"><span className="block truncate text-[10px] font-semibold uppercase tracking-[0.16em] text-[#9b8c83]">Ingredients</span><span className="mt-0.5 block text-[20px] font-bold leading-none text-[#33251e]">{ingredients.length}</span></span>
+          </button>
+          <button type="button" aria-pressed={stockFilter === 'low'} onClick={() => selectSummaryFilter(stockFilter === 'low' ? 'all' : 'low')} className={`flex min-w-0 items-center gap-3 rounded-xl border p-4 text-left shadow-[0_5px_18px_rgba(91,64,39,0.04)] transition hover:-translate-y-0.5 hover:border-[#d4af37] hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d4af37] ${stockFilter === 'low' ? 'border-[#d4af37] bg-[#fffaf0]' : 'border-[#eee4de] bg-white'}`}>
             <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#fff4cd] text-[#9b7810]"><AlertTriangle size={17} /></span>
-            <div><p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#9b8c83]">Low Stock</p><p className="mt-0.5 text-[20px] font-bold leading-none text-[#33251e]">{lowStockCount}</p></div>
-          </div>
-          <div className="flex items-center gap-3 rounded-xl border border-[#eee4de] bg-white p-4 shadow-[0_5px_18px_rgba(91,64,39,0.04)]">
+            <span className="min-w-0"><span className="block truncate text-[10px] font-semibold uppercase tracking-[0.16em] text-[#9b8c83]">Low Stock</span><span className="mt-0.5 block text-[20px] font-bold leading-none text-[#33251e]">{lowStockCount}</span></span>
+          </button>
+          <button type="button" aria-pressed={stockFilter === 'near_expiry'} onClick={() => selectSummaryFilter(stockFilter === 'near_expiry' ? 'all' : 'near_expiry')} className={`flex min-w-0 items-center gap-3 rounded-xl border p-4 text-left shadow-[0_5px_18px_rgba(91,64,39,0.04)] transition hover:-translate-y-0.5 hover:border-[#d4af37] hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d4af37] ${stockFilter === 'near_expiry' ? 'border-[#d4af37] bg-[#fffaf0]' : 'border-[#eee4de] bg-white'}`}>
             <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#fff4cd] text-[#9b7810]"><CalendarDays size={17} /></span>
-            <div><p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#9b8c83]">Near Expiry</p><p className="mt-0.5 text-[20px] font-bold leading-none text-[#33251e]">{nearExpiryCount}</p></div>
-          </div>
-          <div className="flex items-center gap-3 rounded-xl border border-[#eee4de] bg-white p-4 shadow-[0_5px_18px_rgba(91,64,39,0.04)]">
+            <span className="min-w-0"><span className="block truncate text-[10px] font-semibold uppercase tracking-[0.16em] text-[#9b8c83]">Near Expiry</span><span className="mt-0.5 block text-[20px] font-bold leading-none text-[#33251e]">{nearExpiryCount}</span></span>
+          </button>
+          <button type="button" aria-pressed={stockFilter === 'out'} onClick={() => selectSummaryFilter(stockFilter === 'out' ? 'all' : 'out')} className={`flex min-w-0 items-center gap-3 rounded-xl border p-4 text-left shadow-[0_5px_18px_rgba(91,64,39,0.04)] transition hover:-translate-y-0.5 hover:border-[#d4af37] hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d4af37] ${stockFilter === 'out' ? 'border-[#d4af37] bg-[#fffaf0]' : 'border-[#eee4de] bg-white'}`}>
             <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#fff4cd] text-[#9b7810]"><Package size={17} /></span>
-            <div><p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#9b8c83]">Out of Stock</p><p className="mt-0.5 text-[20px] font-bold leading-none text-[#33251e]">{outOfStockCount}</p></div>
-          </div>
+            <span className="min-w-0"><span className="block truncate text-[10px] font-semibold uppercase tracking-[0.16em] text-[#9b8c83]">Out of Stock</span><span className="mt-0.5 block text-[20px] font-bold leading-none text-[#33251e]">{outOfStockCount}</span></span>
+          </button>
         </div>
 
         {cakeRecipes.length > 0 && <section className="mb-5 rounded-xl border border-[#eee4de] bg-white p-4 shadow-[0_5px_18px_rgba(91,64,39,0.04)]">
