@@ -183,10 +183,17 @@ class IngredientController extends Controller
 
     private function ingredientNameExists(string $name, ?int $exceptId = null): bool
     {
+        $normalizedName = $this->normalizeIngredientName($name);
+
         return DB::table('ingredients')
-            ->whereRaw('LOWER(TRIM(name)) = ?', [mb_strtolower(trim($name))])
             ->when($exceptId !== null, fn ($query) => $query->where('id', '!=', $exceptId))
-            ->exists();
+            ->pluck('name')
+            ->contains(fn ($existingName) => $this->normalizeIngredientName((string) $existingName) === $normalizedName);
+    }
+
+    private function normalizeIngredientName(string $name): string
+    {
+        return preg_replace('/[\p{P}\p{Z}\s]+/u', '', mb_strtolower(trim($name))) ?? '';
     }
 
     /**

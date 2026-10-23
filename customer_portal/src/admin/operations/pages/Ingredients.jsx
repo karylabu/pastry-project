@@ -21,6 +21,10 @@ const laravelStaffFetch = (url, options = {}) => {
 
 const INGREDIENT_CATEGORIES = ["Baking", "Fruits", "Dairy", "Toppings", "Others"];
 
+function normalizeIngredientName(name) {
+  return String(name || "").trim().toLocaleLowerCase().replace(/[\p{P}\p{Z}\s]+/gu, "");
+}
+
 function getIngredientCategory(ingredient) {
   const explicitCategory = String(ingredient?.category || ingredient?.group || "").trim();
   if (explicitCategory) return explicitCategory;
@@ -71,8 +75,9 @@ export default function Ingredients({
   const [selectedCakeFlavor, setSelectedCakeFlavor] = useState(null);
   const currentUser = (() => { try { return JSON.parse(window.localStorage.getItem('user') || 'null'); } catch (e) { return null; } })();
   const canApproveDiscard = String(currentUser?.role || '').toLowerCase() === 'admin';
-  const duplicateIngredientName = modalType === 'create' && modalName.trim()
-    ? ingredients.some((ingredient) => String(ingredient.name || '').trim().toLocaleLowerCase() === modalName.trim().toLocaleLowerCase())
+  const normalizedModalName = normalizeIngredientName(modalName);
+  const duplicateIngredientName = modalType === 'create' && normalizedModalName
+    ? ingredients.some((ingredient) => normalizeIngredientName(ingredient.name) === normalizedModalName)
     : false;
 
   useEffect(() => {
@@ -708,7 +713,7 @@ export default function Ingredients({
                         <div>
                           <p className="text-xs font-semibold">Ingredient already exists</p>
                           <p className="mt-1 text-[11px] leading-4">
-                            {createIngredientError || `“${ingredients.find((ingredient) => String(ingredient.name || '').trim().toLocaleLowerCase() === modalName.trim().toLocaleLowerCase())?.name || modalName.trim()}” is already in your ingredient list. Choose a different name or add stock to the existing ingredient.`}
+                            {createIngredientError || `“${ingredients.find((ingredient) => normalizeIngredientName(ingredient.name) === normalizedModalName)?.name || modalName.trim()}” is already in your ingredient list. Choose a different name or add stock to the existing ingredient.`}
                           </p>
                         </div>
                       </div>

@@ -169,6 +169,23 @@ class IngredientControllerFixTest extends TestCase
         $this->assertSame(0, IngredientBatch::count());
     }
 
+    public function test_ingredient_store_rejects_duplicate_names_with_different_punctuation(): void
+    {
+        Ingredient::factory()->create([
+            'name' => 'all purpose flour',
+            'unit' => 'kg',
+        ]);
+
+        $this->actingAsStaff()->postJson('/api/staff/ingredients', [
+            'name' => 'All-purpose Flour',
+            'unit' => 'kg',
+            'threshold' => 5,
+        ])->assertStatus(422)
+            ->assertJsonPath('message', 'An ingredient with this name already exists.');
+
+        $this->assertSame(1, Ingredient::count());
+    }
+
     public function test_ingredient_update_rejects_another_ingredients_name_regardless_of_case(): void
     {
         Ingredient::factory()->create([
@@ -183,6 +200,27 @@ class IngredientControllerFixTest extends TestCase
         $this->actingAsStaff()->putJson("/api/staff/ingredients/{$ingredient->id}", [
             'name' => 'COCOA POWDER',
             'unit' => 'g',
+            'threshold' => 5,
+        ])->assertStatus(422)
+            ->assertJsonPath('message', 'An ingredient with this name already exists.');
+
+        $this->assertSame('Vanilla', $ingredient->fresh()->name);
+    }
+
+    public function test_ingredient_update_rejects_duplicate_names_with_different_punctuation(): void
+    {
+        Ingredient::factory()->create([
+            'name' => 'all purpose flour',
+            'unit' => 'kg',
+        ]);
+        $ingredient = Ingredient::factory()->create([
+            'name' => 'Vanilla',
+            'unit' => 'g',
+        ]);
+
+        $this->actingAsStaff()->putJson("/api/staff/ingredients/{$ingredient->id}", [
+            'name' => 'All-purpose Flour',
+            'unit' => 'kg',
             'threshold' => 5,
         ])->assertStatus(422)
             ->assertJsonPath('message', 'An ingredient with this name already exists.');
