@@ -89,6 +89,7 @@ export default function Orders() {
   const [ingredients, setIngredients] = useState([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState("All");
+  const [dashboardFilter, setDashboardFilter] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState("status");
   const [sortDirection, setSortDirection] = useState("asc");
@@ -292,6 +293,10 @@ export default function Orders() {
   const displayedOrders = orders
     .filter((order) => {
       const matchesFilter = statusFilter === "All" || order.status === statusFilter;
+      const matchesDashboardFilter = dashboardFilter === null
+        || (dashboardFilter === "open" && !["Completed", "Cancelled"].includes(order.status))
+        || (dashboardFilter === "rush" && getUrgency(order).isUrgent)
+        || (dashboardFilter === "payment" && order.status === "Awaiting Payment" && order.has_payment_proof);
       const query = searchQuery.trim().toLowerCase();
       const searchableText = [
         order.id,
@@ -310,7 +315,7 @@ export default function Orders() {
         ...(order.items || []).flatMap((item) => [item.name, item.qty]),
       ].join(" ").toLowerCase();
       const matchesSearch = !query || searchableText.includes(query);
-      return matchesFilter && matchesSearch;
+      return matchesFilter && matchesDashboardFilter && matchesSearch;
     })
     .sort((a, b) => {
       const valueFor = (order) => {
@@ -341,10 +346,15 @@ export default function Orders() {
   const openOrderCount = orders.filter((order) => !["Completed", "Cancelled"].includes(order.status)).length;
   const rushOrderCount = orders.filter((order) => getUrgency(order).isUrgent).length;
   const paymentReviewCount = orders.filter((order) => order.status === "Awaiting Payment" && order.has_payment_proof).length;
+  const visibleLowStockIngredients = lowStockIngredients.filter((ingredient) => {
+    const query = searchQuery.trim().toLowerCase();
+    return !query || [ingredient.name, ingredient.unit, ingredient.stock, ingredient.threshold]
+      .some((value) => String(value ?? "").toLowerCase().includes(query));
+  });
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [statusFilter, searchQuery, sortBy, sortDirection, pageSize]);
+  }, [statusFilter, dashboardFilter, searchQuery, sortBy, sortDirection, pageSize]);
 
   useEffect(() => {
     if (currentPage > pageCount) setCurrentPage(pageCount);
@@ -354,6 +364,7 @@ export default function Orders() {
     const orderId = new URLSearchParams(location.search).get("order_id");
     if (!orderId || !/^\d+$/.test(orderId)) return;
     setStatusFilter("All");
+    setDashboardFilter(null);
     setSearchQuery(orderId);
     setExpandedOrderId(Number(orderId));
     setCurrentPage(1);
@@ -473,8 +484,8 @@ export default function Orders() {
                     type="search"
                     value={searchQuery}
                     onChange={(event) => setSearchQuery(event.target.value)}
-                    placeholder="Search orders or customers"
-                    aria-label="Search live orders"
+                    placeholder={dashboardFilter === "low_stock" ? "Search low-stock ingredients" : "Search orders or customers"}
+                    aria-label={dashboardFilter === "low_stock" ? "Search low-stock ingredients" : "Search live orders"}
                     className="h-10 w-full rounded-lg border border-[#e8dfd4] bg-white pl-9 pr-9 text-[12px] text-[#33251e] outline-none transition placeholder:text-[#a99a8e] focus:border-[#b89646] focus:ring-2 focus:ring-[#d4af37]/15"
                   />
                   {searchQuery && <button type="button" onClick={() => setSearchQuery("")} aria-label="Clear search" className="absolute right-3 top-1/2 -translate-y-1/2 text-[#8f8076] hover:text-[#33251e]"><X size={14} /></button>}
@@ -496,12 +507,25 @@ export default function Orders() {
 
           <div className="mb-5 grid grid-cols-2 gap-2.5 lg:grid-cols-4 lg:gap-3">
             {[
-              { label: "Open orders", value: openOrderCount, note: "Need follow-up", icon: ShoppingBag, tone: "text-[#8a6515]", border: "border-t-[#d4af37]" },
-              { label: "Rush orders", value: rushOrderCount, note: "Past target time", icon: AlertTriangle, tone: "text-[#a34f36]", border: "border-t-[#c87954]" },
-              { label: "Payment review", value: paymentReviewCount, note: "Proof submitted", icon: Clock3, tone: "text-[#80600a]", border: "border-t-[#c9a94f]" },
-              { label: "Low stock", value: lowStockIngredients.length, note: "Ingredients to check", icon: PackageCheck, tone: "text-[#61734f]", border: "border-t-[#81906c]" },
-            ].map(({ label, value, note, icon: Icon, tone, border }) => (
-              <div key={label} className={`rounded-lg border border-[#e9e1d9] border-t-[3px] ${border} bg-white px-3.5 py-3 shadow-[0_3px_12px_rgba(60,42,28,0.035)] sm:px-4`}>
+              { key: "open", label: "Open orders", value: openOrderCount, note: "Need follow-up", icon: ShoppingBag, tone: "text-[#8a6515]", border: "border-t-[#d4af37]" },
+              { key: "rush", label: "Rush orders", value: rushOrderCount, note: "Past target time", icon: AlertTriangle, tone: "text-[#a34f36]", border: "border-t-[#c87954]" },
+              { key: "payment", label: "Payment review", value: paymentReviewCount, note: "Proof submitted", icon: Clock3, tone: "text-[#80600a]", border: "border-t-[#c9a94f]" },
+              { key: "low_stock", label: "Low stock", value: lowStockIngredients.length, note: "Ingredients to check", icon: PackageCheck, tone: "text-[#61734f]", border: "border-t-[#81906c]" },
+            ].map(({ key, label, value, note, icon: Icon, tone, border }) => (
+              <button
+                key={label}
+                type="button"
+                onClick={() => {
+                  const nextFilter = dashboardFilter === key ? null : key;
+                  if (dashboardFilter === "low_stock" || nextFilter === "low_stock") setSearchQuery("");
+                  setDashboardFilter(nextFilter);
+                  setStatusFilter("All");
+                }}
+                aria-pressed={dashboardFilter === key}
+                className={`w-full rounded-lg border border-[#e9e1d9] border-t-[3px] ${border} px-3.5 py-3 text-left shadow-[0_3px_12px_rgba(60,42,28,0.035)] transition hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#b89646] sm:px-4 ${
+                  dashboardFilter === key ? "bg-[#fff8e8] ring-2 ring-[#d4af37]/35" : "bg-white"
+                }`}
+              >
                 <div className="flex items-center justify-between gap-2">
                   <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#74675f]">{label}</p>
                   <Icon size={15} className={tone} aria-hidden="true" />
@@ -510,7 +534,7 @@ export default function Orders() {
                   <p className="text-[25px] font-bold leading-none text-[#33251e]">{value}</p>
                   <p className="hidden text-[10px] text-[#9b8c83] sm:block">{note}</p>
                 </div>
-              </div>
+              </button>
             ))}
           </div>
 
@@ -520,7 +544,7 @@ export default function Orders() {
             </div>
           )}
 
-          <div className="mb-4 rounded-lg border border-[#e9e1d9] bg-white p-3 shadow-[0_3px_12px_rgba(60,42,28,0.035)] sm:p-4">
+          {dashboardFilter !== "low_stock" && <div className="mb-4 rounded-lg border border-[#e9e1d9] bg-white p-3 shadow-[0_3px_12px_rgba(60,42,28,0.035)] sm:p-4">
             <div className="mb-3 flex items-center justify-between gap-3">
               <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#65574d]">Filter by status</p>
               <p className="text-[10px] text-[#8f8076]">{displayedOrders.length} matching {displayedOrders.length === 1 ? "order" : "orders"}</p>
@@ -530,7 +554,10 @@ export default function Orders() {
                 <button
                   key={option}
                   type="button"
-                  onClick={() => setStatusFilter(option)}
+                  onClick={() => {
+                    setDashboardFilter(null);
+                    setStatusFilter(option);
+                  }}
                   aria-pressed={statusFilter === option}
                   className={`inline-flex min-h-10 w-full min-w-0 items-center justify-between gap-1 rounded-md border px-2.5 py-2 text-[10px] font-medium transition sm:text-[11px] ${
                     statusFilter === option
@@ -543,15 +570,42 @@ export default function Orders() {
                 </button>
               ))}
             </div>
-          </div>
+          </div>}
 
-          {inventoryAlert && (
+          {inventoryAlert && dashboardFilter !== "low_stock" && (
             <div className="mb-6 rounded-[20px] border border-[#D4AF37]/25 bg-[#FFF8E1] px-4 py-3 text-[13px] text-black/70">
               <span className="font-semibold">Inventory watch:</span> {inventoryAlert}
             </div>
           )}
 
-          {loading ? (
+          {dashboardFilter === "low_stock" ? (
+            <section className="rounded-lg border border-[#e9e1d9] bg-white p-4 shadow-[0_3px_12px_rgba(60,42,28,0.035)]" aria-labelledby="low-stock-heading">
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-2 border-b border-[#eee7df] pb-3">
+                <div>
+                  <h2 id="low-stock-heading" className="text-[13px] font-semibold text-[#33251e]">Low-stock ingredients</h2>
+                  <p className="mt-1 text-[11px] text-[#8f8076]">Ingredients at or below their stock threshold.</p>
+                </div>
+                <p className="text-[10px] text-[#8f8076]">{visibleLowStockIngredients.length} matching {visibleLowStockIngredients.length === 1 ? "ingredient" : "ingredients"}</p>
+              </div>
+              {visibleLowStockIngredients.length ? (
+                <ul className="divide-y divide-[#eee7df]">
+                  {visibleLowStockIngredients.map((ingredient) => (
+                    <li key={ingredient.id ?? ingredient.name} className="flex items-center justify-between gap-3 py-3 first:pt-1 last:pb-1">
+                      <span className="min-w-0 truncate text-[12px] font-medium text-[#33251e]">{ingredient.name || "Unnamed ingredient"}</span>
+                      <span className="shrink-0 rounded-md bg-[#fff4cd] px-2.5 py-1 text-[11px] font-semibold text-[#80600a]">
+                        {ingredient.stock ?? 0}{ingredient.unit ? ` ${ingredient.unit}` : ""}
+                        {Number(ingredient.threshold) > 0 ? ` · threshold ${ingredient.threshold}` : ""}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="py-6 text-center text-[12px] text-[#8f8076]">
+                  {lowStockIngredients.length ? "No low-stock ingredients match your search." : "There are no low-stock ingredients right now."}
+                </p>
+              )}
+            </section>
+          ) : loading ? (
             <div className="flex items-center gap-2 rounded-lg border border-[#e9e1d9] bg-white px-4 py-8 text-[12px] text-[#74675f]" role="status">
               <RefreshCw size={15} className="animate-spin text-[#92701e]" /> Loading live orders...
             </div>
@@ -566,7 +620,7 @@ export default function Orders() {
               <Search size={22} className="mx-auto text-[#b7a69c]" />
               <p className="mt-3 text-[13px] font-semibold text-[#33251e]">No matching orders</p>
               <p className="mt-1 text-[12px] text-[#8f8076]">Try another status or search term.</p>
-              <button type="button" onClick={() => { setStatusFilter("All"); setSearchQuery(""); }} className="mt-3 text-[11px] font-semibold text-[#765d50] underline underline-offset-2">Clear filters</button>
+              <button type="button" onClick={() => { setDashboardFilter(null); setStatusFilter("All"); setSearchQuery(""); }} className="mt-3 text-[11px] font-semibold text-[#765d50] underline underline-offset-2">Clear filters</button>
             </div>
           ) : (
             <>
