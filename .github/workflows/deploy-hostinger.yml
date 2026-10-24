@@ -7,6 +7,8 @@ on:
     paths:
       - "customer_portal/**"
       - "laravel/**"
+      - "customer/**"
+      - "includes/**"
       - "customer/api_register.php"
       - "customer/api_place_order.php"
       - "includes/api_auth.php"
@@ -21,6 +23,7 @@ on:
       - "staff/api_waste_log.php"
       - "uploads/about us.jpg"
       - "uploads/login_cake.png"
+      - "uploads/**"
       - ".htaccess"
       - ".github/workflows/deploy-hostinger.yml"
   workflow_dispatch:

@@ -13,8 +13,15 @@ class AdminController extends Controller
     protected function requireLogin()
     {
         $user = session('user');
+        $userId = is_array($user) ? (int) ($user['id'] ?? 0) : 0;
         $role = is_array($user) ? strtolower((string) ($user['role'] ?? '')) : '';
-        if (!$user || $role !== 'admin') {
+        $currentUser = $userId > 0
+            ? DB::table('users')->where('id', $userId)->first(['role', 'status'])
+            : null;
+        if (!$user || $role !== 'admin' || !$currentUser
+            || strtolower((string) $currentUser->role) !== 'admin'
+            || strtolower(trim((string) ($currentUser->status ?? 'active'))) !== 'active') {
+            session()->forget('user');
             return redirect('/staff_login.php');
         }
 
@@ -27,15 +34,20 @@ class AdminController extends Controller
             $email = trim($request->input('email', ''));
             $password = trim($request->input('password', ''));
             $error = '';
+            $attemptKey = $this->rateLimitKey('admin-login-email', $email);
 
             if (!$email || !$password) {
                 $error = 'Please enter both email and password.';
+            } elseif ($response = $this->rateLimitResponse($attemptKey, 10)) {
+                $error = $response->getData(true)['message'];
             } else {
                 $user = DB::table('users')->where('email', $email)->first();
 
                 if ($user && strtolower((string) ($user->role ?? '')) === 'admin'
                     && strtolower(trim((string) ($user->status ?? 'active'))) === 'active'
                     && Hash::check($password, $user->password)) {
+                    $this->clearRateLimit($attemptKey);
+                    $this->regenerateAuthenticationSession();
                     $role = $user->role;
                     session(['user' => [
                         'id' => $user->id,
@@ -48,6 +60,7 @@ class AdminController extends Controller
                 }
 
                 $error = 'Invalid email or password.';
+                $this->recordRateLimitAttempt($attemptKey, 900);
             }
 
             return view('staff.login', compact('error'));
@@ -63,8 +76,9 @@ class AdminController extends Controller
     public function logout(Request $request)
     {
         $this->revokeCurrentToken($request);
-        session()->forget('user');
-        session()->flush();
+        unset($_SESSION['user'], $_SESSION['auth_token']);
+        session()->invalidate();
+        session()->regenerateToken();
 
         return redirect('/staff_login.php');
     }

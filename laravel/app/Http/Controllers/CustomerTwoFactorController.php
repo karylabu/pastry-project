@@ -106,6 +106,11 @@ class CustomerTwoFactorController extends Controller
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
         }
 
+        $attemptKey = $this->rateLimitKey('two-factor-enable', (string) $user->id);
+        if ($response = $this->rateLimitResponse($attemptKey, 5)) {
+            return $response;
+        }
+
         $code = trim((string) $request->input('code', ''));
         $recoveryCodes = $twoFactor->generateRecoveryCodes();
         $result = DB::transaction(function () use ($user, $code, $twoFactor, $recoveryCodes) {
@@ -164,8 +169,10 @@ class CustomerTwoFactorController extends Controller
             return response()->json(['success' => false, 'message' => 'Authenticator setup expired. Start setup again.'], 422);
         }
         if ($result === 'invalid_code') {
+            $this->recordRateLimitAttempt($attemptKey, 900);
             return response()->json(['success' => false, 'message' => 'That verification code is invalid or expired. Request a new code or try again.'], 422);
         }
+        $this->clearRateLimit($attemptKey);
 
         return response()->json([
             'success' => true,
@@ -225,6 +232,11 @@ class CustomerTwoFactorController extends Controller
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
         }
 
+        $attemptKey = $this->rateLimitKey('two-factor-disable', (string) $user->id);
+        if ($response = $this->rateLimitResponse($attemptKey, 5)) {
+            return $response;
+        }
+
         $result = DB::transaction(function () use ($user, $request, $twoFactor) {
             $factor = DB::table('customer_two_factor')
                 ->where('user_id', $user->id)
@@ -261,8 +273,10 @@ class CustomerTwoFactorController extends Controller
             return response()->json(['success' => false, 'message' => 'Two-factor authentication is not enabled.'], 409);
         }
         if ($result === 'invalid_code') {
+            $this->recordRateLimitAttempt($attemptKey, 900);
             return response()->json(['success' => false, 'message' => 'That authenticator code is invalid or expired.'], 422);
         }
+        $this->clearRateLimit($attemptKey);
 
         return response()->json(['success' => true, 'enabled' => false]);
     }
@@ -387,7 +401,7 @@ class CustomerTwoFactorController extends Controller
         if (session_status() === PHP_SESSION_NONE) {
             session_start();
         }
-        session_regenerate_id(true);
+        $this->regenerateAuthenticationSession();
         $_SESSION['user'] = $result['user'];
         $_SESSION['auth_token'] = $result['token'];
         session(['user' => $result['user'], 'auth_token' => $result['token']]);

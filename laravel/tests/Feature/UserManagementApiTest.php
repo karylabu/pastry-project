@@ -199,6 +199,8 @@ class UserManagementApiTest extends TestCase
             ->patchJson('/api/users/2', ['status' => 'inactive'])
             ->assertOk();
 
+        $this->assertDatabaseMissing('user_sessions', ['user_id' => 2]);
+
         $this->withHeader('Authorization', 'Bearer customer-token')
             ->getJson('/api/user')
             ->assertUnauthorized();

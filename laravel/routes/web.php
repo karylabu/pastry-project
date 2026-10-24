@@ -20,10 +20,11 @@ Route::redirect('/', '/products');
 Route::get('/products', [ProductController::class, 'index'])->name('products.index');
 
 Route::get('/login.php', [AuthController::class, 'showLogin'])->name('auth.login');
-Route::post('/login.php', [AuthController::class, 'login'])->name('auth.login.submit');
+Route::post('/login.php', [AuthController::class, 'login'])
+    ->middleware(\Illuminate\Routing\Middleware\ThrottleRequests::class . ':5,15')
+    ->name('auth.login.submit');
 Route::get('/auth/google', [AuthController::class, 'redirectToGoogle'])->name('auth.google.redirect');
 Route::get('/auth/google/callback', [AuthController::class, 'handleGoogleCallback'])->name('auth.google.callback');
-Route::get('/auth/google/test', [AuthController::class, 'testGoogleLogin'])->name('auth.google.test');
 Route::get('/register.php', [AuthController::class, 'showRegister'])->name('auth.register');
 Route::post('/register.php', [AuthController::class, 'register'])->name('auth.register.submit');
 
@@ -45,7 +46,8 @@ Route::get('/products.php', [ProductController::class, 'index']);
 
 // Legacy customer pages converted into Laravel controllers
 Route::get('/dashboard.php', [CustomerController::class, 'dashboard']);
-Route::match(['get', 'post'], '/staff_login.php', [AdminController::class, 'login']);
+Route::match(['get', 'post'], '/staff_login.php', [AdminController::class, 'login'])
+    ->middleware(\Illuminate\Routing\Middleware\ThrottleRequests::class . ':5,15');
 Route::get('/staff/logout.php', [AdminController::class, 'logout']);
 Route::get('/staff/dashboard.php', [AdminController::class, 'dashboard']);
 Route::get('/staff/products.php', [AdminController::class, 'products']);

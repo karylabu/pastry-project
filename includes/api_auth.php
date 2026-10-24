@@ -3,6 +3,7 @@
 require_once __DIR__ . '/../laravel/legacy_compat.php';
 
 if (session_status() === PHP_SESSION_NONE) {
+    require_once __DIR__ . '/session_security.php';
     session_start();
 }
 

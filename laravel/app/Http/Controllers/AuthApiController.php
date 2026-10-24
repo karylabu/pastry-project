@@ -135,6 +135,7 @@ class AuthApiController extends Controller
     {
         $email = strtolower(trim((string) $request->input('email', '')));
         $password = (string) $request->input('password', '');
+        $attemptKey = $this->rateLimitKey('login-email', $email);
 
         $validator = Validator::make(['email' => $email, 'password' => $password], [
             'email' => 'required|email',
@@ -145,9 +146,14 @@ class AuthApiController extends Controller
             return response()->json(['success' => false, 'message' => 'Invalid input'], 422);
         }
 
+        if ($response = $this->rateLimitResponse($attemptKey, 10)) {
+            return $response;
+        }
+
         $user = User::whereRaw('LOWER(email) = ?', [$email])->first();
 
         if (!$user) {
+            $this->recordRateLimitAttempt($attemptKey, 900);
             return response()->json([
                 'success' => false,
                 'message' => 'Account not found. Please register first.'
@@ -172,6 +178,7 @@ class AuthApiController extends Controller
             && Hash::check($password, $storedPassword);
 
         if (!$passwordValid && !$isLegacyPassword) {
+            $this->recordRateLimitAttempt($attemptKey, 900);
             return response()->json([
                 'success' => false,
                 'message' => 'Incorrect password. Please try again.'
@@ -183,6 +190,7 @@ class AuthApiController extends Controller
                 ->where('id', $user->id)
                 ->update(['password' => Hash::make($password)]);
         }
+        $this->clearRateLimit($attemptKey);
 
         if (strtolower((string) $user->role) === 'customer' && $twoFactor->isEnabled((int) $user->id)) {
             try {
@@ -233,6 +241,7 @@ class AuthApiController extends Controller
         if (session_status() === PHP_SESSION_NONE) {
             session_start();
         }
+        $this->regenerateAuthenticationSession();
         $_SESSION['user'] = $userData;
         $_SESSION['auth_token'] = $token;
         session(['user' => $userData]);
@@ -277,7 +286,7 @@ class AuthApiController extends Controller
             'email' => 'sometimes|email|max:150|unique:users,email,' . $user->id,
             'username' => 'sometimes|nullable|string|max:100',
             'profile_picture' => $hasProfilePhoto
-                ? 'sometimes|file|image|mimes:jpeg,png,webp|max:5120'
+                ? ['sometimes', 'file', 'image', 'mimes:jpeg,png,webp', $this->allowedFileExtensions(['jpg', 'jpeg', 'png', 'webp']), 'max:5120']
                 : 'sometimes|nullable|string|max:2048',
         ]);
 
@@ -378,6 +387,14 @@ class AuthApiController extends Controller
             return response()->json(['success' => false, 'message' => 'Please enter a valid email address.'], 422);
         }
 
+        $requestKey = $this->rateLimitKey('password-reset-request', $email);
+        $ipKey = $this->rateLimitKey('password-reset-request-ip', $request->ip() ?? 'unknown');
+        if ($response = $this->rateLimitResponse($ipKey, 10) ?? $this->rateLimitResponse($requestKey, 3)) {
+            return $response;
+        }
+        $this->recordRateLimitAttempt($ipKey, 3600);
+        $this->recordRateLimitAttempt($requestKey, 3600);
+
         $user = User::where('email', $email)->first();
         if (!$user) {
             return response()->json(['success' => true]);
@@ -428,6 +445,14 @@ class AuthApiController extends Controller
             return response()->json(['success' => false, 'message' => 'Invalid or expired code'], 422);
         }
 
+        $attemptKey = $this->rateLimitKey('password-reset-code', $email);
+        $ipKey = $this->rateLimitKey('password-reset-code-ip', $request->ip() ?? 'unknown');
+        if ($response = $this->rateLimitResponse($ipKey, 10) ?? $this->rateLimitResponse($attemptKey, 5)) {
+            return $response;
+        }
+        $this->recordRateLimitAttempt($ipKey, 900);
+        $this->recordRateLimitAttempt($attemptKey, 900);
+
         $valid = DB::table('password_resets')
             ->whereRaw('LOWER(email) = ?', [$email])
             ->where('token', $code)
@@ -460,6 +485,14 @@ class AuthApiController extends Controller
             return response()->json(['success' => false, 'message' => 'Please provide a valid code and password.'], 422);
         }
 
+        $attemptKey = $this->rateLimitKey('password-reset-code', $email);
+        $ipKey = $this->rateLimitKey('password-reset-code-ip', $request->ip() ?? 'unknown');
+        if ($response = $this->rateLimitResponse($ipKey, 10) ?? $this->rateLimitResponse($attemptKey, 5)) {
+            return $response;
+        }
+        $this->recordRateLimitAttempt($ipKey, 900);
+        $this->recordRateLimitAttempt($attemptKey, 900);
+
         $reset = DB::table('password_resets')
             ->whereRaw('LOWER(email) = ?', [$email])
             ->where('token', $code)
@@ -473,8 +506,14 @@ class AuthApiController extends Controller
 
         $user = User::where('email', $email)->first();
         if ($user) {
-            DB::table('users')->where('id', $user->id)->update(['password' => Hash::make($newPassword)]);
-            DB::table('password_resets')->whereRaw('LOWER(email) = ?', [$email])->update(['used' => 1]);
+            DB::transaction(function () use ($user, $newPassword) {
+                DB::table('users')->where('id', $user->id)->update(['password' => Hash::make($newPassword)]);
+                $this->revokeUserTokens((int) $user->id);
+                DB::table('password_resets')->whereRaw('LOWER(email) = ?', [strtolower((string) $user->email)])
+                    ->update(['used' => 1]);
+            });
+            unset($_SESSION['user'], $_SESSION['auth_token']);
+            session()->forget(['user', 'auth_token']);
             $this->notifyCustomerAccountUpdate(
                 $user,
                 'Password Changed',
@@ -503,9 +542,14 @@ class AuthApiController extends Controller
             return response()->json(['success' => false, 'message' => 'Current password is incorrect.'], 422);
         }
 
-        DB::table('users')->where('id', $user->id)->update([
-            'password' => Hash::make((string) $request->input('new_password')),
-        ]);
+        DB::transaction(function () use ($request, $user) {
+            DB::table('users')->where('id', $user->id)->update([
+                'password' => Hash::make((string) $request->input('new_password')),
+            ]);
+            $this->revokeUserTokens((int) $user->id);
+        });
+        unset($_SESSION['user'], $_SESSION['auth_token']);
+        session()->forget(['user', 'auth_token']);
         $this->notifyCustomerAccountUpdate(
             $user,
             'Password Changed',
@@ -513,6 +557,16 @@ class AuthApiController extends Controller
         );
 
         return response()->json(['success' => true, 'message' => 'Password updated successfully.']);
+    }
+
+    public function logout(Request $request)
+    {
+        $this->revokeCurrentToken($request);
+        unset($_SESSION['user'], $_SESSION['auth_token']);
+        session()->invalidate();
+        session()->regenerateToken();
+
+        return response()->json(['success' => true, 'message' => 'Logged out successfully.']);
     }
 
     private function notifyCustomerAccountUpdate(

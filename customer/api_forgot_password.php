@@ -13,45 +13,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { http_response_code(200); exit; }
 
 require_once __DIR__ . '/../vendor/autoload.php';
 require_once __DIR__ . '/../includes/db.php';
+require_once __DIR__ . '/../includes/endpoint_rate_limit.php';
 
 function sendJson(bool $success, string $message = '', int $statusCode = 200) {
     http_response_code($statusCode);
     echo json_encode(['success' => $success, 'message' => $message]);
     exit;
-}
-
-function getClientIp() {
-    foreach (['HTTP_CF_CONNECTING_IP', 'HTTP_X_FORWARDED_FOR', 'HTTP_X_FORWARDED', 'REMOTE_ADDR'] as $key) {
-        if (!empty($_SERVER[$key])) {
-            $ip = trim(explode(',', $_SERVER[$key])[0]);
-            if ($ip !== '') {
-                return $ip;
-            }
-        }
-    }
-    return 'unknown';
-}
-
-function rateLimitExceeded(string $key): bool {
-    $dir = __DIR__ . '/uploads/rate_limit';
-    if (!is_dir($dir) && !mkdir($dir, 0777, true) && !is_dir($dir)) {
-        return false;
-    }
-
-    $file = $dir . '/' . preg_replace('/[^a-zA-Z0-9_.-]/', '_', $key) . '.json';
-    $now = time();
-    if (file_exists($file)) {
-        $data = json_decode(@file_get_contents($file), true);
-        if (is_array($data) && !empty($data['first_seen']) && ($now - (int) $data['first_seen']) < 900) {
-            $count = (int) $data['count'] + 1;
-            $data['count'] = $count;
-            @file_put_contents($file, json_encode($data));
-            return $count > 5;
-        }
-    }
-
-    @file_put_contents($file, json_encode(['count' => 1, 'first_seen' => $now]));
-    return false;
 }
 
 try {
@@ -76,7 +43,12 @@ try {
         sendJson(false, 'Please enter a valid email address.');
     }
 
-    if (rateLimitExceeded(getClientIp()) || rateLimitExceeded('email_' . $email)) {
+    $retryAfter = pastryRateLimitConsume('password-reset-ip', (string) ($_SERVER['REMOTE_ADDR'] ?? 'unknown'), 10, 3600);
+    if ($retryAfter === 0) {
+        $retryAfter = pastryRateLimitConsume('password-reset-email', $email, 3, 3600);
+    }
+    if ($retryAfter > 0) {
+        header('Retry-After: ' . $retryAfter);
         sendJson(false, 'Too many reset attempts. Please try again later.', 429);
     }
 
@@ -133,6 +105,6 @@ try {
 
 } catch (\Throwable $e) {
     error_log('Password reset request failed: ' . $e->getMessage());
-    sendJson(false, 'Something went wrong. Please try again.');
+    sendJson(false, 'Something went wrong. Please try again later.', 503);
 }
 ?>

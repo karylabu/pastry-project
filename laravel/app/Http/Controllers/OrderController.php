@@ -572,8 +572,21 @@ class OrderController extends Controller
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
         }
 
+        $rateLimitKey = $this->rateLimitKey('payment-proof', $user->id . ':' . $orderId);
+        if ($response = $this->rateLimitResponse($rateLimitKey, 3)) {
+            return $response;
+        }
+        $this->recordRateLimitAttempt($rateLimitKey, 3600);
+
         $request->validate([
-            'payment_proof' => 'required|image|mimes:jpeg,jpg,png,webp|max:5120',
+            'payment_proof' => [
+                'required',
+                'file',
+                'image',
+                'mimes:jpeg,jpg,png,webp',
+                $this->allowedFileExtensions(['jpg', 'jpeg', 'png', 'webp']),
+                'max:5120',
+            ],
         ]);
 
         $order = Order::query()->whereKey($orderId)->where('user_id', $user->id)->first();

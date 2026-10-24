@@ -4,9 +4,11 @@
 
     # Laravel handles requests under its public path.
     RewriteRule ^laravel/public/ - [L]
+    RewriteRule ^laravel/ - [F,L]
 
     # Keep private PHP dependencies and includes inaccessible.
     RewriteRule ^(includes|vendor)(/|$) - [F,L]
+    RewriteRule ^legacy_archive/ - [F,L]
 
     # Keep legacy PHP endpoints and staff APIs on their existing handlers.
     RewriteRule ^(customer|staff)/.*\.php$ - [L]

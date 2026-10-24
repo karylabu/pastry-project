@@ -3,12 +3,75 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
+use Closure;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Facades\Schema;
 
 abstract class Controller
 {
+    protected function allowedFileExtensions(array $extensions): Closure
+    {
+        return static function (string $attribute, mixed $value, Closure $fail) use ($extensions): void {
+            if ($value instanceof UploadedFile
+                && !in_array(strtolower($value->getClientOriginalExtension()), $extensions, true)) {
+                $fail('The ' . str_replace('_', ' ', $attribute) . ' file extension is not supported.');
+            }
+        };
+    }
+
+    protected function rateLimitKey(string $scope, string $identity): string
+    {
+        return $scope . ':' . hash('sha256', strtolower(trim($identity)));
+    }
+
+    protected function rateLimitResponse(string $key, int $maxAttempts): ?JsonResponse
+    {
+        if (!RateLimiter::tooManyAttempts($key, $maxAttempts)) {
+            return null;
+        }
+
+        $retryAfter = RateLimiter::availableIn($key);
+
+        return response()->json([
+            'success' => false,
+            'message' => 'Too many attempts. Please wait before trying again.',
+            'retry_after' => $retryAfter,
+        ], 429)->header('Retry-After', (string) $retryAfter);
+    }
+
+    protected function recordRateLimitAttempt(string $key, int $decaySeconds): void
+    {
+        RateLimiter::hit($key, $decaySeconds);
+    }
+
+    protected function clearRateLimit(string $key): void
+    {
+        RateLimiter::clear($key);
+    }
+
+    protected function regenerateAuthenticationSession(): void
+    {
+        if (session_status() === PHP_SESSION_ACTIVE) {
+            session_regenerate_id(true);
+        }
+
+        session()->regenerate();
+    }
+
+    protected function revokeUserTokens(int $userId): void
+    {
+        if (Schema::hasTable('user_sessions')) {
+            DB::table('user_sessions')->where('user_id', $userId)->delete();
+        }
+        if (Schema::hasTable('customer_two_factor_login_challenges')) {
+            DB::table('customer_two_factor_login_challenges')->where('user_id', $userId)->delete();
+        }
+    }
+
     /**
      * Helper to get authenticated user from Laravel auth or a valid session token.
      */

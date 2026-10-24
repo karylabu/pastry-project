@@ -11,6 +11,8 @@ header("Access-Control-Allow-Headers: Content-Type");
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { http_response_code(200); exit; }
 
+require_once __DIR__ . '/../includes/endpoint_rate_limit.php';
+
 try {
     $conn = mysqli_connect("localhost", "root", "", "pastry_db");
     if (!$conn) throw new Exception("DB connection failed");
@@ -21,6 +23,17 @@ try {
 
     if (!$email || !$code) {
         echo json_encode(["success" => false, "message" => "Email and code are required."]);
+        exit;
+    }
+
+    $retryAfter = pastryRateLimitConsume('password-reset-code-ip', (string) ($_SERVER['REMOTE_ADDR'] ?? 'unknown'), 10, 900);
+    if ($retryAfter === 0) {
+        $retryAfter = pastryRateLimitConsume('password-reset-code', strtolower($email), 5, 900);
+    }
+    if ($retryAfter > 0) {
+        http_response_code(429);
+        header('Retry-After: ' . $retryAfter);
+        echo json_encode(["success" => false, "message" => "Too many verification attempts. Please try again later."]);
         exit;
     }
 

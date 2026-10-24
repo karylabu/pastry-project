@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/cors.php';
+require_once __DIR__ . '/../includes/endpoint_rate_limit.php';
 // pastry_system/customer/api_login.php
 
 error_reporting(0);
@@ -31,12 +32,25 @@ try {
         exit;
     }
 
+    $clientIp = (string) ($_SERVER['REMOTE_ADDR'] ?? 'unknown');
+    $retryAfter = pastryRateLimitConsume('login-ip', $clientIp, 5, 900);
+    if ($retryAfter === 0) {
+        $retryAfter = pastryRateLimitConsume('login-email', strtolower($email), 10, 900);
+    }
+    if ($retryAfter > 0) {
+        http_response_code(429);
+        header('Retry-After: ' . $retryAfter);
+        echo json_encode(["success" => false, "message" => "Too many login attempts. Please try again later."]);
+        exit;
+    }
+
     $escaped = mysqli_real_escape_string($conn, $email);
     // Keep login compatible with databases created from older schemas that do
     // not yet have the optional users.status column.
     $result  = mysqli_query($conn, "SELECT * FROM users WHERE email='$escaped' LIMIT 1");
 
     if (!$result || mysqli_num_rows($result) === 0) {
+        http_response_code(401);
         echo json_encode(["success" => false, "message" => "User not found."]);
         exit;
     }
@@ -56,6 +70,7 @@ try {
     $passwordValid = password_verify($password, $user['password']);
 
     if (!$passwordValid) {
+        http_response_code(401);
         echo json_encode(["success" => false, "message" => "Incorrect password."]);
         exit;
     }
@@ -145,6 +160,7 @@ try {
     ]);
 
 } catch (Exception $e) {
-    echo json_encode(["success" => false, "message" => $e->getMessage()]);
+    http_response_code(503);
+    echo json_encode(["success" => false, "message" => "Sign-in is temporarily unavailable. Please try again later."]);
 }
 ?>

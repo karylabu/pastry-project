@@ -29,7 +29,6 @@ Route::get('/login.php', [AuthController::class, 'showLogin'])->name('auth.login
 Route::post('/login.php', [AuthController::class, 'login'])->name('auth.login.submit');
 Route::get('/auth/google', [AuthController::class, 'redirectToGoogle'])->name('auth.google.redirect');
 Route::get('/auth/google/callback', [AuthController::class, 'handleGoogleCallback'])->name('auth.google.callback');
-Route::get('/auth/google/test', [AuthController::class, 'testGoogleLogin'])->name('auth.google.test');
 Route::get('/register.php', [AuthController::class, 'showRegister'])->name('auth.register');
 Route::post('/register.php', [AuthController::class, 'register'])->name('auth.register.submit');
 

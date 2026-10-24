@@ -12,6 +12,7 @@
 */
 
 if (session_status() !== PHP_SESSION_ACTIVE) {
+    require_once __DIR__ . '/../includes/session_security.php';
     session_start();
 }
 

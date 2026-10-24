@@ -5,3 +5,7 @@
 
 # Let PHP handle OPTIONS so the customer API can emit Access-Control-Allow-Origin headers.
 # Removing the direct 204 rewrite ensures cors.php runs for preflight requests.
+
+<FilesMatch "\.php$">
+    Require all denied
+</FilesMatch>

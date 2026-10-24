@@ -33,9 +33,12 @@ class AuthController extends Controller
         $email = trim($request->input('email', ''));
         $password = trim($request->input('password', ''));
         $error = '';
+        $attemptKey = $this->rateLimitKey('web-login-email', $email);
 
         if (!$email || !$password) {
             $error = 'Please fill all fields.';
+        } elseif ($response = $this->rateLimitResponse($attemptKey, 10)) {
+            $error = $response->getData(true)['message'];
         } else {
             $user = DB::table('users')
                 ->whereRaw('LOWER(email) = ?', [$email])
@@ -53,6 +56,8 @@ class AuthController extends Controller
                 && $twoFactor->isEnabled((int) $user->id)) {
                 $error = 'Two-factor authentication is enabled. Please sign in through the customer portal to verify your code.';
             } else {
+                $this->clearRateLimit($attemptKey);
+                $this->regenerateAuthenticationSession();
                 $userData = [
                     'id' => $user->id,
                     'name' => $user->name,
@@ -68,6 +73,10 @@ class AuthController extends Controller
                     return redirect('http://127.0.0.1:3000/admin');
                 }
                 return redirect('http://127.0.0.1:3000/customer');
+            }
+
+            if ($error !== '') {
+                $this->recordRateLimitAttempt($attemptKey, 900);
             }
         }
 
@@ -403,6 +412,7 @@ class AuthController extends Controller
             'avatar' => $profilePicture,
         ];
 
+        $this->regenerateAuthenticationSession();
         $_SESSION['user'] = $userData;
         $_SESSION['auth_token'] = $token;
         session(['user' => $userData]);
@@ -669,6 +679,11 @@ class AuthController extends Controller
             $user = DB::table('users')->where('email', $email)->first();
         }
 
+        if (!in_array(strtolower((string) ($user->role ?? '')), ['customer', 'admin'], true)
+            || strtolower(trim((string) ($user->status ?? 'active'))) !== 'active') {
+            return redirect()->route('auth.login')->with('error', 'This account is not eligible for access.');
+        }
+
         $userData = [
             'id' => $user->id,
             'name' => $user->name,
@@ -676,6 +691,7 @@ class AuthController extends Controller
             'role' => $user->role ?? 'customer',
         ];
 
+        $this->regenerateAuthenticationSession();
         $_SESSION['user'] = $userData;
         session(['user' => $userData]);
         session()->forget('oauth_state');
@@ -734,44 +750,11 @@ class AuthController extends Controller
 
         $this->revokeCurrentToken($request);
         unset($_SESSION['user']);
-        session()->forget('user');
-        session()->flush();
+        unset($_SESSION['auth_token']);
+        session()->invalidate();
+        session()->regenerateToken();
 
         return redirect('http://127.0.0.1:3000/customer/login');
     }
 
-    public function testGoogleLogin(Request $request)
-    {
-        // Test mode: simulate successful Google login
-        // In production, this would be replaced with real Google OAuth
-
-        $testEmail = 'testgoogle' . time() . '@gmail.com';
-        $testName = 'Test Google User';
-
-        $user = DB::table('users')->where('email', $testEmail)->first();
-
-        if (!$user) {
-            DB::table('users')->insert([
-                'name' => $testName,
-                'email' => $testEmail,
-                'password' => Hash::make(bin2hex(random_bytes(16))),
-                'role' => 'customer',
-                'created_at' => now(),
-            ]);
-
-            $user = DB::table('users')->where('email', $testEmail)->first();
-        }
-
-        $userData = [
-            'id' => $user->id,
-            'name' => $user->name,
-            'email' => $user->email,
-            'role' => $user->role ?? 'customer',
-        ];
-
-        $_SESSION['user'] = $userData;
-        session(['user' => $userData]);
-
-        return redirect($this->buildFrontendAuthRedirect($request, $userData));
-    }
 }

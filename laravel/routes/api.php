@@ -42,9 +42,9 @@ Route::match(['get', 'options'], 'staff/dashboard', [StaffApiController::class, 
 Route::get('staff/products', [ProductController::class, 'staffIndex']);
 Route::post('staff/products/{product}', [ProductController::class, 'updateStaff']);
 Route::post('login', [AuthApiController::class, 'login'])
-    ->middleware(\Illuminate\Routing\Middleware\ThrottleRequests::class . ':10,1');
+    ->middleware(\Illuminate\Routing\Middleware\ThrottleRequests::class . ':5,15');
 Route::post('login/two-factor', [CustomerTwoFactorController::class, 'verifyLogin'])
-    ->middleware(\Illuminate\Routing\Middleware\ThrottleRequests::class . ':5,1');
+    ->middleware(\Illuminate\Routing\Middleware\ThrottleRequests::class . ':5,15');
 Route::get('customer/two-factor', [CustomerTwoFactorController::class, 'status']);
 Route::post('customer/two-factor/setup', [CustomerTwoFactorController::class, 'setup'])
     ->middleware(\Illuminate\Routing\Middleware\ThrottleRequests::class . ':5,1');
@@ -58,17 +58,19 @@ Route::get('auth/status', [AuthApiController::class, 'status']);
 Route::post('register', [AuthApiController::class, 'register']);
 Route::post('profile', [AuthApiController::class, 'updateProfile']);
 Route::post('password/forgot', [AuthApiController::class, 'forgotPassword'])
-    ->middleware(\Illuminate\Routing\Middleware\ThrottleRequests::class . ':5,15');
+    ->middleware(\Illuminate\Routing\Middleware\ThrottleRequests::class . ':10,60');
 Route::post('password/verify', [AuthApiController::class, 'verifyResetCode'])
     ->middleware(\Illuminate\Routing\Middleware\ThrottleRequests::class . ':10,15');
 Route::post('password/reset', [AuthApiController::class, 'resetPassword'])
     ->middleware(\Illuminate\Routing\Middleware\ThrottleRequests::class . ':10,15');
+Route::post('logout', [AuthApiController::class, 'logout']);
 Route::post('password/change', [AuthApiController::class, 'changePassword']);
 Route::post('account/delete', [AuthApiController::class, 'deleteAccount']);
 Route::get('sessions', [AuthApiController::class, 'sessions']);
 Route::post('recaptcha/verify', [AuthController::class, 'verifyRecaptcha'])
     ->middleware(\Illuminate\Routing\Middleware\ThrottleRequests::class . ':10,1');
-Route::post('google-login', [AuthController::class, 'googleLogin']);
+Route::post('google-login', [AuthController::class, 'googleLogin'])
+    ->middleware(\Illuminate\Routing\Middleware\ThrottleRequests::class . ':5,15');
 Route::options('google-login', [AuthController::class, 'googleLogin']);
 Route::get('orders', [OrderController::class, 'index']);
 Route::get('orders/first-order-discount', [OrderController::class, 'firstOrderDiscountEligibility']);
@@ -77,7 +79,8 @@ Route::post('orders/{orderId}/cancel', [OrderController::class, 'cancel']);
 Route::post('orders/{orderId}/confirm-received', [OrderController::class, 'confirmReceived']);
 Route::post('orders/{orderId}/return-refund-request', [OrderController::class, 'requestReturnRefund']);
 Route::post('staff/orders/{orderId}/return-refund/reject', [OrderController::class, 'rejectReturnRefundRequest']);
-Route::post('orders/{orderId}/payment-proof', [OrderController::class, 'submitPaymentProof']);
+Route::post('orders/{orderId}/payment-proof', [OrderController::class, 'submitPaymentProof'])
+    ->middleware(\Illuminate\Routing\Middleware\ThrottleRequests::class . ':10,60');
 Route::post('orders/{orderId}/payment-failure', [OrderController::class, 'markPaymentFailed']);
 Route::post('sales/import-pdf', [SalesImportController::class, 'store']);
 Route::post('sales/import-csv', [SalesImportController::class, 'storeCsv']);

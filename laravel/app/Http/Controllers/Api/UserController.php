@@ -221,8 +221,17 @@ class UserController extends Controller
             unset($validated['password']);
         }
 
+        $roleChanged = isset($validated['role']) && $validated['role'] !== $user->role;
+        $passwordChanged = isset($validated['password']);
+        $accountDisabled = isset($validated['status']) && $validated['status'] !== 'active';
+
         try {
-            $user->update($validated);
+            DB::transaction(function () use ($user, $validated, $roleChanged, $passwordChanged, $accountDisabled) {
+                $user->update($validated);
+                if ($roleChanged || $passwordChanged || $accountDisabled) {
+                    $this->revokeUserTokens((int) $user->id);
+                }
+            });
         } catch (QueryException $exception) {
             if (
                 empty($validated['email'])

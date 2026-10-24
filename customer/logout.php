@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/../includes/session_security.php';
 session_start();
 
 $token = $_SESSION['auth_token'] ?? '';

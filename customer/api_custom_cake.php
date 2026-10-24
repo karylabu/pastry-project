@@ -85,7 +85,7 @@ if ($name === '') {
 // ---------------------------------------------------------------
 $uploadDir = __DIR__ . '/uploads/custom_cake/';
 if (!is_dir($uploadDir)) {
-    mkdir($uploadDir, 0755, true);
+    mkdir($uploadDir, 0750, true);
 }
 
 $savedFiles = [];
@@ -119,18 +119,47 @@ if ($referenceCount > 5) {
     echo json_encode(['success' => false, 'message' => 'You can select up to 5 reference images in one request.']);
     exit;
 }
-if (!empty($_FILES['files']['name'][0])) {
-    foreach ($_FILES['files']['tmp_name'] as $i => $tmpName) {
-        $originalName = basename($_FILES['files']['name'][$i]);
-        $ext          = pathinfo($originalName, PATHINFO_EXTENSION);
-        $safeName     = uniqid('cc_') . '.' . $ext;
-        $destPath     = $uploadDir . $safeName;
 
-        if (move_uploaded_file($tmpName, $destPath)) {
-            // store the relative path that the frontend/admin can use to display it
-            $savedFiles[] = 'uploads/custom_cake/' . $safeName;
+$validatedUploads = [];
+$imageExtensions = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp'];
+if (is_array($_FILES['files']['name'] ?? null)) {
+    foreach ($_FILES['files']['name'] as $i => $originalName) {
+        if ($originalName === '') {
+            continue;
         }
+
+        $tmpName = $_FILES['files']['tmp_name'][$i] ?? '';
+        $uploadError = (int) ($_FILES['files']['error'][$i] ?? UPLOAD_ERR_NO_FILE);
+        if ($uploadError !== UPLOAD_ERR_OK || !is_uploaded_file($tmpName)
+            || !is_file($tmpName) || filesize($tmpName) > 5 * 1024 * 1024) {
+            http_response_code(422);
+            echo json_encode(['success' => false, 'message' => 'Each reference image must be a valid image no larger than 5 MB.']);
+            exit;
+        }
+
+        $fileInfo = new finfo(FILEINFO_MIME_TYPE);
+        $mimeType = $fileInfo->file($tmpName);
+        $extension = $imageExtensions[$mimeType] ?? null;
+        if (!$extension || @getimagesize($tmpName) === false) {
+            http_response_code(422);
+            echo json_encode(['success' => false, 'message' => 'Reference images must be JPEG, PNG, or WebP files.']);
+            exit;
+        }
+
+        $validatedUploads[] = [
+            'tmp_name' => $tmpName,
+            'filename' => bin2hex(random_bytes(16)) . '.' . $extension,
+        ];
     }
+}
+foreach ($validatedUploads as $upload) {
+    $destPath = $uploadDir . $upload['filename'];
+    if (!move_uploaded_file($upload['tmp_name'], $destPath)) {
+        http_response_code(500);
+        echo json_encode(['success' => false, 'message' => 'Unable to save a reference image. Please try again.']);
+        exit;
+    }
+    $savedFiles[] = 'uploads/custom_cake/' . $upload['filename'];
 }
 foreach ($referenceImages as $image) {
     if (is_array($image) && ($image['type'] ?? null) === 'example' && !empty($image['url'])) {

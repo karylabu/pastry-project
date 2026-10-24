@@ -156,7 +156,16 @@ class CustomerApiController extends Controller
 
             try {
                 $form = array_merge($request->all(), $this->parseJson($request));
-                Log::info('Custom cake request:', $form);
+                $request->validate([
+                    'inspo_images' => 'sometimes|array|max:5',
+                    'inspo_images.*' => [
+                        'required',
+                        'image',
+                        'mimes:jpeg,jpg,png,webp',
+                        $this->allowedFileExtensions(['jpg', 'jpeg', 'png', 'webp']),
+                        'max:5120',
+                    ],
+                ]);
 
                 $flavor = trim($form['flavor'] ?? $form['cake_flavor'] ?? '');
                 $tiers = trim($form['tiers'] ?? $form['cake_size'] ?? '');
@@ -171,10 +180,10 @@ class CustomerApiController extends Controller
                 if ($request->hasFile('inspo_images')) {
                     foreach ($request->file('inspo_images') as $index => $file) {
                         if ($file->isValid()) {
-                            $name = 'inspo_' . time() . '_' . $index . '.' . $file->extension();
+                            $name = bin2hex(random_bytes(16)) . '.' . $file->extension();
                             $destination = public_path('uploads/inspo');
-                            if (!is_dir($destination)) {
-                                mkdir($destination, 0777, true);
+                            if (!is_dir($destination) && !mkdir($destination, 0750, true) && !is_dir($destination)) {
+                                throw new \RuntimeException('Unable to create the reference image directory.');
                             }
                             $file->move($destination, $name);
                             $uploadedImages[] = $name;
@@ -235,9 +244,15 @@ class CustomerApiController extends Controller
                     'message' => 'Custom cake request submitted successfully!',
                     'order_id' => $orderId,
                 ]);
+            } catch (\Illuminate\Validation\ValidationException $e) {
+                return $this->corsResponse([
+                    'success' => false,
+                    'message' => 'Please upload up to five supported images, no larger than 5 MB each.',
+                    'errors' => $e->errors(),
+                ], 422);
             } catch (\Exception $e) {
                 Log::error('Customization error: ' . $e->getMessage());
-                return $this->corsResponse(['success' => false, 'message' => 'Error: ' . $e->getMessage()], 500);
+                return $this->corsResponse(['success' => false, 'message' => 'Unable to submit the custom cake request. Please try again.'], 500);
             }
         }
 
@@ -256,10 +271,18 @@ class CustomerApiController extends Controller
 
             $email = trim($data['email'] ?? '');
             $password = (string) ($data['password'] ?? '');
+            $attemptKey = $this->rateLimitKey('login-email', $email);
+            $ipKey = $this->rateLimitKey('login-ip', $request->ip() ?? 'unknown');
 
             if (!$email || !$password) {
                 return $this->corsResponse(['success' => false, 'message' => 'Please fill all fields.']);
             }
+
+            if ($response = $this->rateLimitResponse($ipKey, 5) ?? $this->rateLimitResponse($attemptKey, 10)) {
+                return $response->header('Access-Control-Allow-Origin', '*');
+            }
+            $this->recordRateLimitAttempt($ipKey, 900);
+            $this->recordRateLimitAttempt($attemptKey, 900);
 
             $user = DB::table('users')->where('email', $email)->first();
             if (!$user) {
@@ -289,6 +312,7 @@ class CustomerApiController extends Controller
                     'password' => Hash::make($password),
                 ]);
             }
+            $this->clearRateLimit($attemptKey);
 
             if (strtolower((string) $user->role) === 'customer' && $twoFactor->isEnabled((int) $user->id)) {
                 try {
@@ -332,6 +356,7 @@ class CustomerApiController extends Controller
             if (session_status() === PHP_SESSION_NONE) {
                 session_start();
             }
+            $this->regenerateAuthenticationSession();
             $_SESSION['user'] = $userData;
             $_SESSION['auth_token'] = $token;
             session(['user' => $userData]);
@@ -356,11 +381,19 @@ class CustomerApiController extends Controller
         }
 
         $data = $this->parseJson($request);
-        $email = trim($data['email'] ?? '');
+        $email = strtolower(trim($data['email'] ?? ''));
 
         if (!$email) {
             return $this->corsResponse(['success' => false, 'message' => 'Email is required.']);
         }
+
+        $requestKey = $this->rateLimitKey('password-reset-request', $email);
+        $ipKey = $this->rateLimitKey('password-reset-request-ip', $request->ip() ?? 'unknown');
+        if ($response = $this->rateLimitResponse($ipKey, 10) ?? $this->rateLimitResponse($requestKey, 3)) {
+            return $response->header('Access-Control-Allow-Origin', '*');
+        }
+        $this->recordRateLimitAttempt($ipKey, 3600);
+        $this->recordRateLimitAttempt($requestKey, 3600);
 
         DB::statement("CREATE TABLE IF NOT EXISTS password_resets (
             id INT AUTO_INCREMENT PRIMARY KEY,
@@ -424,12 +457,20 @@ class CustomerApiController extends Controller
         }
 
         $data = $this->parseJson($request);
-        $email = trim($data['email'] ?? '');
+        $email = strtolower(trim($data['email'] ?? ''));
         $code = trim($data['code'] ?? '');
 
         if (!$email || !$code) {
             return $this->corsResponse(['success' => false, 'message' => 'Email and code are required.']);
         }
+
+        $attemptKey = $this->rateLimitKey('password-reset-code', $email);
+        $ipKey = $this->rateLimitKey('password-reset-code-ip', $request->ip() ?? 'unknown');
+        if ($response = $this->rateLimitResponse($ipKey, 10) ?? $this->rateLimitResponse($attemptKey, 5)) {
+            return $response->header('Access-Control-Allow-Origin', '*');
+        }
+        $this->recordRateLimitAttempt($ipKey, 900);
+        $this->recordRateLimitAttempt($attemptKey, 900);
 
         $valid = DB::table('password_resets')
             ->where('email', $email)
@@ -449,7 +490,7 @@ class CustomerApiController extends Controller
         }
 
         $data = $this->parseJson($request);
-        $email = trim($data['email'] ?? '');
+        $email = strtolower(trim($data['email'] ?? ''));
         $code = trim($data['code'] ?? '');
         $newPassword = trim($data['new_password'] ?? '');
 
@@ -460,6 +501,14 @@ class CustomerApiController extends Controller
         if (strlen($newPassword) < 6) {
             return $this->corsResponse(['success' => false, 'message' => 'Password must be at least 6 characters.']);
         }
+
+        $attemptKey = $this->rateLimitKey('password-reset-code', $email);
+        $ipKey = $this->rateLimitKey('password-reset-code-ip', $request->ip() ?? 'unknown');
+        if ($response = $this->rateLimitResponse($ipKey, 10) ?? $this->rateLimitResponse($attemptKey, 5)) {
+            return $response->header('Access-Control-Allow-Origin', '*');
+        }
+        $this->recordRateLimitAttempt($ipKey, 900);
+        $this->recordRateLimitAttempt($attemptKey, 900);
 
         $valid = DB::table('password_resets')
             ->where('email', $email)
@@ -472,8 +521,16 @@ class CustomerApiController extends Controller
             return $this->corsResponse(['success' => false, 'message' => 'Code expired. Please request a new one.']);
         }
 
-        DB::table('users')->where('email', $email)->update(['password' => bcrypt($newPassword)]);
-        DB::table('password_resets')->where('email', $email)->update(['used' => 1]);
+        $user = DB::table('users')->where('email', $email)->first(['id']);
+        if ($user) {
+            DB::transaction(function () use ($user, $email, $newPassword) {
+                DB::table('users')->where('id', $user->id)->update(['password' => bcrypt($newPassword)]);
+                $this->revokeUserTokens((int) $user->id);
+                DB::table('password_resets')->where('email', $email)->update(['used' => 1]);
+            });
+        }
+        unset($_SESSION['user'], $_SESSION['auth_token']);
+        session()->forget(['user', 'auth_token']);
 
         return $this->corsResponse(['success' => true]);
     }
@@ -757,12 +814,20 @@ class CustomerApiController extends Controller
                 return $this->corsResponse(['success' => false, 'status' => 'error', 'message' => 'Invalid account status.'], 422);
             }
 
-            DB::table('users')->where('id', $userId)->update(['status' => $status]);
+            DB::transaction(function () use ($userId, $status) {
+                DB::table('users')->where('id', $userId)->update(['status' => $status]);
+                if ($status !== 'active') {
+                    $this->revokeUserTokens($userId);
+                }
+            });
             return $this->corsResponse(['success' => true, 'status' => 'success', 'message' => 'User status updated.']);
         }
 
         if ($action === 'delete') {
-            DB::table('users')->where('id', $userId)->update(['status' => 'inactive']);
+            DB::transaction(function () use ($userId) {
+                DB::table('users')->where('id', $userId)->update(['status' => 'inactive']);
+                $this->revokeUserTokens($userId);
+            });
             return $this->corsResponse(['success' => true, 'status' => 'success', 'message' => 'User deactivated.']);
         }
 
@@ -1058,7 +1123,14 @@ class CustomerApiController extends Controller
 
         if ($imageFile) {
             $imageValidator = Validator::make($request->all(), [
-                'image' => 'required|image|mimes:jpeg,jpg,png,gif,webp|max:5120',
+                'image' => [
+                    'required',
+                    'file',
+                    'image',
+                    'mimes:jpeg,jpg,png,gif,webp',
+                    $this->allowedFileExtensions(['jpg', 'jpeg', 'png', 'gif', 'webp']),
+                    'max:5120',
+                ],
             ]);
             if ($imageValidator->fails()) {
                 return $this->corsResponse([

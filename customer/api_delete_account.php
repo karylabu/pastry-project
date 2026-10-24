@@ -18,10 +18,23 @@ try {
     }
 
     $input = json_decode(file_get_contents('php://input'), true) ?: [];
-    $userId = intval($input['user_id'] ?? 0);
+    require_once __DIR__ . '/../includes/api_auth.php';
+    require_once __DIR__ . '/../includes/endpoint_rate_limit.php';
+    $authUser = requireApiRole(['customer']);
+    $userId = (int) $authUser['id'];
+    $retryAfter = pastryRateLimitConsume('account-delete-ip', (string) ($_SERVER['REMOTE_ADDR'] ?? 'unknown'), 10, 900);
+    if ($retryAfter === 0) {
+        $retryAfter = pastryRateLimitConsume('account-delete-user', (string) $userId, 5, 900);
+    }
+    if ($retryAfter > 0) {
+        http_response_code(429);
+        header('Retry-After: ' . $retryAfter);
+        echo json_encode(['success' => false, 'message' => 'Too many account deletion attempts. Please try again later.']);
+        exit;
+    }
     $password = trim($input['password'] ?? '');
 
-    if (!$userId || !$password) {
+    if (!$password) {
         echo json_encode(['success' => false, 'message' => 'Please provide your password to confirm deletion.']);
         exit;
     }
@@ -40,7 +53,14 @@ try {
         exit;
     }
 
-    mysqli_query($conn, "DELETE FROM users WHERE id = $userId");
+    $deleteSessions = $conn->prepare('DELETE FROM user_sessions WHERE user_id = ?');
+    $deleteSessions->bind_param('i', $userId);
+    $deleteSessions->execute();
+    $deleteSessions->close();
+    $deleteUser = $conn->prepare('DELETE FROM users WHERE id = ?');
+    $deleteUser->bind_param('i', $userId);
+    $deleteUser->execute();
+    unset($_SESSION['user'], $_SESSION['auth_token']);
     echo json_encode(['success' => true, 'message' => 'Account deleted successfully.']);
 } catch (Exception $e) {
     echo json_encode(['success' => false, 'message' => $e->getMessage()]);

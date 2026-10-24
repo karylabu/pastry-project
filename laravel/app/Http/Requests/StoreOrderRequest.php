@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Http\UploadedFile;
 
 class StoreOrderRequest extends FormRequest
 {
@@ -21,6 +22,13 @@ class StoreOrderRequest extends FormRequest
 
     public function rules(): array
     {
+        $allowedImageExtension = static function (string $attribute, mixed $value, \Closure $fail): void {
+            if ($value instanceof UploadedFile
+                && !in_array(strtolower($value->getClientOriginalExtension()), ['jpg', 'jpeg', 'png', 'webp'], true)) {
+                $fail('The discount ID image file extension is not supported.');
+            }
+        };
+
         return [
             'items' => 'required|array|min:1',
             'items.*.product_id' => 'required|integer|exists:products,id',
@@ -47,7 +55,15 @@ class StoreOrderRequest extends FormRequest
             'order_type' => 'nullable|string',
             'is_customized' => 'nullable|boolean',
             'discount_type' => 'nullable|in:none,senior_citizen,pwd',
-            'discount_id_image' => 'exclude_unless:discount_type,senior_citizen,pwd|required|image|mimes:jpeg,jpg,png,webp|max:5120',
+            'discount_id_image' => [
+                'exclude_unless:discount_type,senior_citizen,pwd',
+                'required',
+                'file',
+                'image',
+                'mimes:jpeg,jpg,png,webp',
+                $allowedImageExtension,
+                'max:5120',
+            ],
             'reward_code' => 'nullable|string|max:32',
             'promotion_coupon_code' => 'nullable|string|max:50',
         ];

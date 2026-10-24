@@ -20,6 +20,12 @@ class CustomerAuthApiTest extends TestCase
         foreach (['setup', 'sign-in', 'disable'] as $purpose) {
             RateLimiter::clear('customer-two-factor:7:' . $purpose);
         }
+        foreach (['password-reset-request', 'password-reset-code'] as $scope) {
+            RateLimiter::clear($scope . ':' . hash('sha256', 'customer@example.com'));
+        }
+        foreach (['password-reset-request-ip', 'password-reset-code-ip'] as $scope) {
+            RateLimiter::clear($scope . ':' . hash('sha256', '127.0.0.1'));
+        }
 
         Schema::create('users', function ($table) {
             $table->id();
@@ -734,10 +740,9 @@ class CustomerAuthApiTest extends TestCase
             'action_url' => '/customer/account-settings',
         ]);
 
+        $this->assertDatabaseMissing('user_sessions', ['user_id' => 7]);
         $this->withHeaders($headers)->getJson('/api/sessions')
-            ->assertOk()
-            ->assertJsonPath('sessions.0.current', true)
-            ->assertJsonPath('sessions.0.device_name', 'Browser');
+            ->assertUnauthorized();
     }
 
     public function test_customer_can_delete_their_account_after_password_confirmation(): void
@@ -775,6 +780,7 @@ class CustomerAuthApiTest extends TestCase
 
         $storedPassword = DB::table('users')->where('id', 7)->value('password');
         $this->assertTrue(Hash::check('reset-password', $storedPassword));
+        $this->assertDatabaseMissing('user_sessions', ['user_id' => 7]);
         $this->assertDatabaseHas('password_resets', ['email' => 'customer@example.com', 'used' => 1]);
         $this->assertDatabaseHas('notifications', [
             'user_id' => 7,
@@ -782,6 +788,25 @@ class CustomerAuthApiTest extends TestCase
             'type' => 'Info',
             'action_url' => '/customer/account-settings',
         ]);
+    }
+
+    public function test_login_attempts_are_limited_per_account(): void
+    {
+        $this->withoutMiddleware(\Illuminate\Routing\Middleware\ThrottleRequests::class);
+        $attemptKey = 'login-email:' . hash('sha256', 'locked@example.com');
+        RateLimiter::clear($attemptKey);
+
+        for ($attempt = 0; $attempt < 10; $attempt++) {
+            $this->postJson('/api/login', [
+                'email' => 'locked@example.com',
+                'password' => 'incorrect-password',
+            ])->assertOk();
+        }
+
+        $this->postJson('/api/login', [
+            'email' => 'locked@example.com',
+            'password' => 'incorrect-password',
+        ])->assertStatus(429)->assertHeader('Retry-After');
     }
 
     private function seedCustomer(): void
