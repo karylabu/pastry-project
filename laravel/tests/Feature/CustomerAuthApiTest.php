@@ -130,6 +130,7 @@ class CustomerAuthApiTest extends TestCase
 
     public function test_customer_login_requires_totp_and_prevents_reusing_a_recovery_code(): void
     {
+        $this->withoutMiddleware(\Illuminate\Routing\Middleware\ThrottleRequests::class);
         [, $recoveryCodes] = $this->enableTwoFactorForCustomer();
 
         $challengeResponse = $this->postJson('http://localhost/api/login', [
@@ -170,6 +171,7 @@ class CustomerAuthApiTest extends TestCase
 
     public function test_customer_can_login_with_totp_but_cannot_replay_a_code(): void
     {
+        $this->withoutMiddleware(\Illuminate\Routing\Middleware\ThrottleRequests::class);
         [$secret] = $this->enableTwoFactorForCustomer();
         $code = $this->totpCode($secret, intdiv(time(), 30));
 
@@ -423,7 +425,7 @@ class CustomerAuthApiTest extends TestCase
             'expires_at' => now()->addHour(),
         ]);
 
-        $this->withHeader('Authorization', '******')
+        $this->withHeader('Authorization', 'Bearer test-admin-token')
             ->getJson('/api/auth/status')
             ->assertOk()
             ->assertJsonPath('success', true)

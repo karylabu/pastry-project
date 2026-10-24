@@ -306,7 +306,7 @@ class PromotionController extends Controller
         $promotion->update([
             'title' => $validated['title'],
             'description' => $validated['message'],
-            'coupon_code' => $validated['coupon_code'] ?: null,
+            'coupon_code' => $validated['coupon_code'] ?? null,
             'discount_percent' => $validated['discount_percent'] ?? null,
             'image_url' => $imageUrl,
             'starts_at' => $validated['starts_at'],

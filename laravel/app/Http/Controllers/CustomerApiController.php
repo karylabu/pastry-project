@@ -1859,16 +1859,18 @@ PROMPT;
             return $this->corsResponse([]);
         }
 
-        $ordersMissingPlacementNotice = DB::table('orders')
-            ->where('user_id', $user->id)
-            ->whereIn('status', ['Pending', 'Confirmed', 'Preparing', 'Awaiting Balance Payment', 'Ready for Pickup', 'Completed'])
-            ->where(function ($query) {
-                $query->whereNull('payment_status')
-                    ->orWhereRaw("LOWER(payment_status) <> 'failed'");
-            })
-            ->orderByDesc('created_at')
-            ->limit(50)
-            ->get(['id', 'created_at']);
+        $ordersMissingPlacementNotice = Schema::hasTable('orders')
+            ? DB::table('orders')
+                ->where('user_id', $user->id)
+                ->whereIn('status', ['Pending', 'Confirmed', 'Preparing', 'Awaiting Balance Payment', 'Ready for Pickup', 'Completed'])
+                ->where(function ($query) {
+                    $query->whereNull('payment_status')
+                        ->orWhereRaw("LOWER(payment_status) <> 'failed'");
+                })
+                ->orderByDesc('created_at')
+                ->limit(50)
+                ->get(['id', 'created_at'])
+            : collect();
 
         foreach ($ordersMissingPlacementNotice as $order) {
             $message = "Your order #{$order->id} has been placed%";
@@ -1912,7 +1914,7 @@ PROMPT;
             ->unique()
             ->values();
 
-        if ($failedOrderIds->isNotEmpty()) {
+        if ($failedOrderIds->isNotEmpty() && Schema::hasTable('orders')) {
             $failedOrderIds = DB::table('orders')
                 ->where('user_id', $user->id)
                 ->whereIn('id', $failedOrderIds)

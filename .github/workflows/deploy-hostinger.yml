@@ -17,6 +17,7 @@ on:
       - "staff/api_orders.php"
       - "staff/api_product_stock_history.php"
       - "staff/api_update_order_status.php"
+      - "staff/.htaccess"
       - "staff/api_waste_log.php"
       - "uploads/about us.jpg"
       - "uploads/login_cake.png"
@@ -158,6 +159,15 @@ jobs:
             -e "ssh -i ~/.ssh/id_ed25519 -p $SSH_PORT -o IdentitiesOnly=yes -o BatchMode=yes -o ConnectTimeout=20 -o ConnectionAttempts=3" \
             staff/api_update_order_status.php \
             "$SSH_USERNAME@$SSH_HOST:$REMOTE_ROOT/staff/api_update_order_status.php"
+
+      - name: Deploy staff access rules and remove legacy SMS log
+        run: |
+          set -eu
+          scp -i ~/.ssh/id_ed25519 -P "$SSH_PORT" -o IdentitiesOnly=yes -o BatchMode=yes -o ConnectTimeout=20 -o ConnectionAttempts=3 \
+            staff/.htaccess \
+            "$SSH_USERNAME@$SSH_HOST:$REMOTE_ROOT/staff/.htaccess"
+          ssh -i ~/.ssh/id_ed25519 -p "$SSH_PORT" -o IdentitiesOnly=yes -o BatchMode=yes -o ConnectTimeout=20 -o ConnectionAttempts=3 "$SSH_USERNAME@$SSH_HOST" \
+            "rm -f '$REMOTE_ROOT/staff/sms_log.txt'"
 
       - name: Deploy custom cake quote handler
         run: |

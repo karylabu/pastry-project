@@ -705,7 +705,14 @@ class SalesImportController extends Controller
             ->paginate($pageSize);
         $sales = array_map(static function ($row) {
             $size = $row->size;
-            if ($row->source === 'imported' && trim((string) $size) === '') {
+            if (
+                $row->source === 'imported'
+                && trim((string) $size) === ''
+                && (
+                    $row->sales_type === 'customized_cake'
+                    || preg_match('/\bcake\b|\bbento\b|\btier\b|\d{1,2}\s*[x×]\s*\d{1,2}/i', (string) $row->cake_name) === 1
+                )
+            ) {
                 $size = SalesItemSize::fromProductName((string) $row->cake_name);
             }
 

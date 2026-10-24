@@ -1,9 +1,6 @@
 import { act, render, screen } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 import AdminDeviceGuard from "./AdminDeviceGuard";
-
-jest.mock("react-router-dom", () => ({
-  Link: ({ children, className, to }) => require("react").createElement("a", { href: to, className }, children),
-}), { virtual: true });
 
 function renderGuard(matches) {
   const listeners = new Set();
@@ -13,7 +10,11 @@ function renderGuard(matches) {
     removeEventListener: jest.fn((event, listener) => listeners.delete(listener)),
   };
   window.matchMedia = jest.fn(() => mediaQuery);
-  const view = render(<AdminDeviceGuard><div>Admin dashboard</div></AdminDeviceGuard>);
+  const view = render(
+    <MemoryRouter>
+      <AdminDeviceGuard><div>Admin dashboard</div></AdminDeviceGuard>
+    </MemoryRouter>,
+  );
 
   return {
     ...view,

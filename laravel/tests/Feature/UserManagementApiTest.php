@@ -160,7 +160,7 @@ class UserManagementApiTest extends TestCase
             'status' => 'active',
         ]);
 
-        $this->withHeader('Authorization', '******')
+        $this->withHeader('Authorization', 'Bearer admin-token')
             ->postJson('/api/users', [
                 'name' => 'Duplicate User',
                 'email' => 'legacyuser@EXAMPLE.com',
@@ -185,7 +185,7 @@ class UserManagementApiTest extends TestCase
             'status' => 'active',
         ]);
 
-        $this->withHeader('Authorization', '******')
+        $this->withHeader('Authorization', 'Bearer admin-token')
             ->putJson('/api/users/2', ['email' => 'legacyuser@EXAMPLE.com'])
             ->assertUnprocessable()
             ->assertJsonValidationErrors('email');

@@ -39,6 +39,7 @@ Thumbs.db
 
 # Logs
 *.log
+/staff/sms_log.txt
 
 # Secrets / credentials
 *.pem

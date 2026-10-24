@@ -145,22 +145,24 @@ function sendOrderStatusSms(?string $phone, int $orderId, string $status, bool $
     curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
     curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
     curl_setopt($ch, CURLOPT_TIMEOUT, 15);
-    $response = curl_exec($ch);
-    $curlError = curl_error($ch);
+    curl_exec($ch);
+    $curlErrorNumber = curl_errno($ch);
     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
     curl_close($ch);
 
-    file_put_contents(
-        __DIR__ . '/sms_log.txt',
-        date('Y-m-d H:i:s') . " | ORDER:{$orderId} | STATUS:{$status} | PHONE:{$phone} | HTTP:{$httpCode} | RESPONSE:{$response} | ERROR:{$curlError}\n",
-        FILE_APPEND
-    );
+    if ($curlErrorNumber !== 0 || $httpCode < 200 || $httpCode >= 300) {
+        error_log(sprintf(
+            'Order status SMS failed | order_id=%d | status=%s | http_code=%d | transport_error=%s',
+            $orderId,
+            $status,
+            $httpCode,
+            $curlErrorNumber !== 0 ? 'yes' : 'no'
+        ));
 
-    if ($curlError) {
-        return ['sent' => false, 'error' => $curlError];
-    }
-    if ($httpCode < 200 || $httpCode >= 300) {
-        return ['sent' => false, 'error' => $response ?: "SMS request failed with HTTP {$httpCode}"];
+        return [
+            'sent' => false,
+            'error' => $curlErrorNumber !== 0 ? 'SMS transport failed.' : "SMS provider returned HTTP {$httpCode}.",
+        ];
     }
 
     return ['sent' => true, 'error' => null];
