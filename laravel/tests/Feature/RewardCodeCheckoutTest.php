@@ -6,7 +6,9 @@ use App\Http\Controllers\OrderController;
 use App\Http\Requests\StoreOrderRequest;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Http\Request;
 use Tests\TestCase;
 
@@ -248,6 +250,49 @@ class RewardCodeCheckoutTest extends TestCase
         $this->assertSame(422, $response->getStatusCode());
         $this->assertSame(0, DB::table('orders')->count());
         $this->assertNull(DB::table('loyalty_transactions')->where('reward_code', 'PPR-STACK0001')->value('order_id'));
+    }
+
+    public function test_senior_or_pwd_discount_is_rejected_without_an_id_image(): void
+    {
+        foreach (['senior_citizen', 'pwd'] as $discountType) {
+            $response = $this->placeOrder('', $discountType);
+
+            $this->assertSame(422, $response->getStatusCode());
+            $this->assertSame(
+                'A valid Senior Citizen or PWD ID image is required to apply this discount.',
+                $response->getData(true)['message']
+            );
+        }
+
+        $this->assertSame(0, DB::table('orders')->count());
+    }
+
+    public function test_valid_id_image_is_required_and_saved_with_senior_or_pwd_discount(): void
+    {
+        Storage::fake('local');
+        $idImage = UploadedFile::fake()->image('discount-id.png');
+        $request = StoreOrderRequest::create('/api/orders', 'POST', [
+            'items' => [['product_id' => 11, 'qty' => 1]],
+            'method' => 'Pickup',
+            'delivery_time' => '10:00',
+            'payment' => 'Counter',
+            'phone' => '09171234567',
+            'order_type' => 'Standard',
+            'discount_type' => 'pwd',
+        ], [], ['discount_id_image' => $idImage], [
+            'HTTP_ACCEPT' => 'application/json',
+            'HTTP_AUTHORIZATION' => 'Bearer test-customer-token',
+        ]);
+
+        $response = app(OrderController::class)->store($request);
+        $data = $response->getData(true);
+        $storedPath = DB::table('orders')->value('discount_id_path');
+
+        $this->assertSame(201, $response->getStatusCode());
+        $this->assertSame('pwd', $data['discount_type']);
+        $this->assertSame(150.0, (float) $data['discount']);
+        $this->assertNotEmpty($storedPath);
+        Storage::disk('local')->assertExists($storedPath);
     }
 
     public function test_active_promotion_coupon_applies_admin_configured_percent_and_is_saved_with_order(): void

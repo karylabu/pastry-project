@@ -57,7 +57,7 @@ class StoreOrderRequest extends FormRequest
             'discount_type' => 'nullable|in:none,senior_citizen,pwd',
             'discount_id_image' => [
                 'exclude_unless:discount_type,senior_citizen,pwd',
-                'required',
+                'required_if:discount_type,senior_citizen,pwd',
                 'file',
                 'image',
                 'mimes:jpeg,jpg,png,webp',

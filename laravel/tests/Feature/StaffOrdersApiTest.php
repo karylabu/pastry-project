@@ -6,6 +6,7 @@ use App\Http\Controllers\StaffApiController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class StaffOrdersApiTest extends TestCase
@@ -43,6 +44,8 @@ class StaffOrdersApiTest extends TestCase
             $table->string('status')->nullable();
             $table->string('order_type')->default('Standard');
             $table->boolean('is_customized')->default(false);
+            $table->string('discount_type')->nullable();
+            $table->decimal('discount', 10, 2)->default(0);
             $table->string('discount_id_path')->nullable();
             $table->string('payment_proof_path')->nullable();
             $table->timestamp('created_at')->nullable();
@@ -206,6 +209,56 @@ class StaffOrdersApiTest extends TestCase
             ->assertJsonPath('orders.0.items.0.name', 'Chocolate Cake')
             ->assertJsonPath('orders.0.items.0.qty', 2)
             ->assertJsonPath('orders.0.items.0.size', 'Big');
+    }
+
+    public function test_admin_can_review_private_discount_id_but_customers_cannot(): void
+    {
+        Storage::fake('local');
+        $path = 'discount-ids/order-44.png';
+        Storage::disk('local')->put($path, 'private-id-image');
+        DB::table('orders')->insert([
+            'id' => 44,
+            'customer' => 'Discount Customer',
+            'email' => 'discount@example.com',
+            'items' => '[]',
+            'discount_type' => 'senior_citizen',
+            'discount' => 150,
+            'discount_id_path' => $path,
+            'total' => 2850,
+            'payment' => 'Counter',
+            'status' => 'Pending',
+            'created_at' => now(),
+        ]);
+
+        $this->withHeader('Authorization', 'Bearer test-admin-token')
+            ->getJson('/api/staff/orders')
+            ->assertOk()
+            ->assertJsonPath('orders.0.has_discount_id', true)
+            ->assertJsonMissingPath('orders.0.discount_id_path');
+
+        DB::table('users')->insert([
+            'id' => 2,
+            'name' => 'Test Customer',
+            'email' => 'customer@example.com',
+            'password' => 'unused',
+            'role' => 'customer',
+            'status' => 'active',
+        ]);
+        DB::table('user_sessions')->insert([
+            'user_id' => 2,
+            'token' => 'test-customer-token',
+            'expires_at' => now()->addHour(),
+        ]);
+
+        $this->withHeader('Authorization', 'Bearer test-customer-token')
+            ->get('/api/staff/orders/44/discount-id')
+            ->assertForbidden();
+
+        $this->withHeader('Authorization', 'Bearer test-admin-token')
+            ->get('/api/staff/orders/44/discount-id')
+            ->assertOk()
+            ->assertHeader('Cache-Control', 'no-store, private')
+            ->assertSeeText('private-id-image');
     }
 
     public function test_order_items_return_selected_size_for_sales_report_table(): void

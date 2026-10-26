@@ -170,6 +170,15 @@ class OrderController extends Controller
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
         }
 
+        if (in_array($request->input('discount_type'), ['senior_citizen', 'pwd'], true)
+            && (!$request->hasFile('discount_id_image') || !$request->file('discount_id_image')->isValid())) {
+            return response()->json([
+                'success' => false,
+                'message' => 'A valid Senior Citizen or PWD ID image is required to apply this discount.',
+                'errors' => ['discount_id_image' => ['Upload a valid photo of your Senior Citizen or PWD ID.']],
+            ], 422);
+        }
+
         $discountIdPath = null;
         try {
             return DB::transaction(function () use ($request, $user, &$discountIdPath) {
