@@ -13,6 +13,7 @@ use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Database\QueryException;
+use App\Services\AdminSessionGuard;
 
 class AuthApiController extends Controller
 {
@@ -213,27 +214,48 @@ class AuthApiController extends Controller
             ]);
         }
 
-        try {
-            $this->ensureSessionsTable();
-        } catch (\Exception $e) {
-            Log::error('Failed to ensure sessions table: ' . $e->getMessage());
-        }
+        if (strtolower((string) $user->role) === 'admin') {
+            try {
+                $token = app(AdminSessionGuard::class)->claim((int) $user->id, $request);
+            } catch (\Throwable $exception) {
+                Log::error('Admin session claim failed.', [
+                    'user_id' => $user->id,
+                    'error' => $exception->getMessage(),
+                ]);
 
-        $token = bin2hex(random_bytes(32));
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Unable to verify the current admin session. Please try again.',
+                ], 503);
+            }
 
-        try {
-            // Sync with legacy user_sessions table
-            DB::table('user_sessions')->updateOrInsert(
-                ['user_id' => $user->id],
-                [
-                    'token' => $token,
-                    'created_at' => now(),
-                    'expires_at' => now()->addDays(30)
-                ]
-            );
-        } catch (\Exception $e) {
-            Log::error('Failed to update user_sessions: ' . $e->getMessage());
-            // Continue anyway as we still have the token for the app
+            if ($token === null) {
+                return response()->json([
+                    'success' => false,
+                    'code' => 'ADMIN_SESSION_ACTIVE',
+                    'message' => 'This account is already signed in on a web browser. Sign out on that device before signing in here.',
+                ], 409);
+            }
+        } else {
+            try {
+                $this->ensureSessionsTable();
+                $token = bin2hex(random_bytes(32));
+                DB::table('user_sessions')->updateOrInsert(
+                    ['user_id' => $user->id],
+                    [
+                        'token' => $token,
+                        'created_at' => now(),
+                        'expires_at' => now()->addDays(30)
+                    ]
+                );
+            } catch (\Throwable $exception) {
+                Log::error('Customer session creation failed: ' . $exception->getMessage());
+
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Unable to create your session. Please try again.',
+                ], 503);
+            }
         }
 
         $userData = $this->formatUserData($user);

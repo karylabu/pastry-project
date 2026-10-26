@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Services\InventoryService;
 use App\Models\User;
+use App\Services\AdminSessionGuard;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
@@ -78,15 +79,27 @@ class StaffApiController extends Controller
             return $this->corsResponse(['success' => false, 'message' => 'Incorrect password.'], 401);
         }
 
-        $token = bin2hex(random_bytes(32));
-        DB::table('user_sessions')->updateOrInsert(
-            ['user_id' => $user->id],
-            [
-                'token' => $token,
-                'created_at' => now(),
-                'expires_at' => now()->addDays(30),
-            ]
-        );
+        try {
+            $token = app(AdminSessionGuard::class)->claim((int) $user->id, $request);
+        } catch (\Throwable $exception) {
+            \Illuminate\Support\Facades\Log::error('Admin API session claim failed.', [
+                'user_id' => $user->id,
+                'error' => $exception->getMessage(),
+            ]);
+
+            return $this->corsResponse([
+                'success' => false,
+                'message' => 'Unable to verify the current admin session. Please try again.',
+            ], 503);
+        }
+
+        if ($token === null) {
+            return $this->corsResponse([
+                'success' => false,
+                'code' => 'ADMIN_SESSION_ACTIVE',
+                'message' => 'This account is already signed in on a web browser. Sign out on that device before signing in here.',
+            ], 409);
+        }
 
         return $this->corsResponse([
             'success' => true,

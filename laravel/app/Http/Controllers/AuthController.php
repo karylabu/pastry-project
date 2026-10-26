@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Services\CustomerTwoFactor;
+use App\Services\AdminSessionGuard;
 use Illuminate\Http\Request;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\DB;
@@ -56,6 +57,27 @@ class AuthController extends Controller
                 && $twoFactor->isEnabled((int) $user->id)) {
                 $error = 'Two-factor authentication is enabled. Please sign in through the customer portal to verify your code.';
             } else {
+                $adminToken = null;
+                if (strtolower((string) ($user->role ?? '')) === 'admin') {
+                    try {
+                        $adminToken = app(AdminSessionGuard::class)->claim((int) $user->id, $request);
+                    } catch (\Throwable $exception) {
+                        \Illuminate\Support\Facades\Log::error('Web admin session claim failed.', [
+                            'user_id' => $user->id,
+                            'error' => $exception->getMessage(),
+                        ]);
+                        $error = 'Unable to verify the current admin session. Please try again.';
+                    }
+                    if ($adminToken === null && $error === '') {
+                        $error = 'This account is already signed in on a web browser. Sign out on that device before signing in here.';
+                    }
+                }
+
+                if ($error !== '') {
+                    $this->recordRateLimitAttempt($attemptKey, 900);
+                    return back()->withInput()->with('error', $error);
+                }
+
                 $this->clearRateLimit($attemptKey);
                 $this->regenerateAuthenticationSession();
                 $userData = [
@@ -67,6 +89,10 @@ class AuthController extends Controller
 
                 $_SESSION['user'] = $userData;
                 session(['user' => $userData]);
+                if ($adminToken !== null) {
+                    $_SESSION['auth_token'] = $adminToken;
+                    session(['auth_token' => $adminToken]);
+                }
 
                 // Redirect to React app on port 3000
                 if (strtolower($userData['role']) === 'admin') {

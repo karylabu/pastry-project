@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Eye, EyeOff, Lock, Mail } from "lucide-react";
+import { AlertCircle, Eye, EyeOff, Lock, Mail } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import ForgotPassword from "../../customer/pages/ForgotPassword";
 import { LARAVEL_BASE, ROOT_BASE } from "../../services/config";
@@ -24,11 +24,13 @@ export default function StaffAdminLogin() {
   const [showForgot, setShowForgot] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [sessionConflict, setSessionConflict] = useState(false);
   const [success, setSuccess] = useState("");
 
   const handleSubmit = async (event) => {
     event.preventDefault();
     setError("");
+    setSessionConflict(false);
     setSuccess("");
     setLoading(true);
 
@@ -36,12 +38,18 @@ export default function StaffAdminLogin() {
       const response = await fetch(`${LARAVEL_BASE}/api/login`, {
         method: "POST",
         credentials: "include",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(localStorage.getItem("auth_token")
+            ? { Authorization: `Bearer ${localStorage.getItem("auth_token")}` }
+            : {}),
+        },
         body: JSON.stringify({ email, password }),
       });
 
       const data = await response.json();
       if (!response.ok || !data.success) {
+        setSessionConflict(data.code === "ADMIN_SESSION_ACTIVE");
         throw new Error(data.message || "Login failed.");
       }
 
@@ -493,8 +501,16 @@ export default function StaffAdminLogin() {
                     </div>
 
                     {error && (
-                      <div role="alert" className="mb-5 rounded-xl border border-red-100 bg-red-50 p-4 text-sm text-red-600">
-                        {error}
+                      <div
+                        role="alert"
+                        className={`mb-5 flex gap-3 rounded-xl border p-4 text-sm ${
+                          sessionConflict
+                            ? "border-red-200 bg-red-50 text-red-800"
+                            : "border-red-100 bg-red-50 text-red-600"
+                        }`}
+                      >
+                        {sessionConflict && <AlertCircle aria-hidden="true" className="mt-0.5 h-5 w-5 shrink-0" />}
+                        <span>{error}</span>
                       </div>
                     )}
                     {success && (

@@ -134,6 +134,69 @@ class CustomerAuthApiTest extends TestCase
         $this->assertDatabaseHas('user_sessions', ['user_id' => 7]);
     }
 
+    public function test_admin_login_is_blocked_while_another_admin_session_is_active(): void
+    {
+        DB::table('users')->insert([
+            'id' => 9,
+            'name' => 'Test Admin',
+            'email' => 'admin@example.com',
+            'password' => Hash::make('admin-password'),
+            'role' => 'admin',
+            'status' => 'active',
+        ]);
+
+        $firstLogin = $this->postJson('/api/login', [
+            'email' => 'admin@example.com',
+            'password' => 'admin-password',
+        ])->assertOk()->assertJsonPath('success', true);
+        $activeToken = $firstLogin->json('token');
+
+        $this->postJson('/api/login', [
+            'email' => 'admin@example.com',
+            'password' => 'admin-password',
+        ])
+            ->assertStatus(409)
+            ->assertJsonPath('code', 'ADMIN_SESSION_ACTIVE')
+            ->assertJsonPath('message', 'This account is already signed in on a web browser. Sign out on that device before signing in here.');
+
+        $this->postJson('/api/login', [
+            'email' => 'admin@example.com',
+            'password' => 'admin-password',
+        ], ['Authorization' => 'Bearer ' . $activeToken])
+            ->assertOk()
+            ->assertJsonPath('token', $activeToken);
+
+        $this->assertDatabaseCount('user_sessions', 1);
+        $this->assertDatabaseHas('user_sessions', ['user_id' => 9, 'token' => $activeToken]);
+    }
+
+    public function test_expired_admin_session_does_not_block_a_new_login(): void
+    {
+        DB::table('users')->insert([
+            'id' => 10,
+            'name' => 'Expired Admin',
+            'email' => 'expired-admin@example.com',
+            'password' => Hash::make('admin-password'),
+            'role' => 'admin',
+            'status' => 'active',
+        ]);
+        DB::table('user_sessions')->insert([
+            'user_id' => 10,
+            'token' => str_repeat('a', 64),
+            'created_at' => now()->subDays(40),
+            'expires_at' => now()->subDays(10),
+        ]);
+
+        $response = $this->postJson('/api/login', [
+            'email' => 'expired-admin@example.com',
+            'password' => 'admin-password',
+        ])->assertOk()->assertJsonPath('success', true);
+
+        $this->assertNotSame(str_repeat('a', 64), $response->json('token'));
+        $this->assertDatabaseCount('user_sessions', 1);
+        $this->assertDatabaseHas('user_sessions', ['user_id' => 10, 'token' => $response->json('token')]);
+    }
+
     public function test_customer_login_requires_totp_and_prevents_reusing_a_recovery_code(): void
     {
         $this->withoutMiddleware(\Illuminate\Routing\Middleware\ThrottleRequests::class);
