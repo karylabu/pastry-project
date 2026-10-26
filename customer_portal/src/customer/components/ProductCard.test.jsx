@@ -18,8 +18,8 @@ describe('ProductCard cake stock options', () => {
   test('shows the product description when provided', () => {
     render(<ProductCard product={{ ...makeCake(3, 5), description: 'A soft vanilla cake with fresh strawberry filling.' }} />);
 
+    expect(screen.getByText('A soft vanilla cake with fresh strawberry filling.')).toHaveClass('line-clamp-1', 'break-words');
     expect(screen.getByText('A soft vanilla cake with fresh strawberry filling.')).not.toHaveClass('line-clamp-2');
-    expect(screen.getByText('A soft vanilla cake with fresh strawberry filling.')).toHaveClass('break-words');
   });
 
   test('disables only the out-of-stock size when the other size has stock', () => {
