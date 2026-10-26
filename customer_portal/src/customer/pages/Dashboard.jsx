@@ -367,18 +367,18 @@ function RecommendationCard({ product, onSelect, onEnsureShopOpen }) {
         />
       </div>
 
-      <h3 className="home-recommendation-title min-h-[2.5rem] line-clamp-2 overflow-hidden text-[11px] font-bold leading-tight text-[#33251e]">{product.name}</h3>
+      <h3 className="home-recommendation-title min-h-[2.25rem] line-clamp-2 overflow-hidden text-[11px] font-bold leading-tight text-[#33251e]">{product.name}</h3>
       {product.description?.trim() && (
         <p
-          className="mt-0.5 w-full min-w-0 line-clamp-2 break-words text-[9px] leading-3 text-[#8b817a]"
+          className="mt-0 w-full min-w-0 line-clamp-2 break-words text-[9px] leading-3 text-[#8b817a]"
           title={product.description.trim()}
         >
           {product.description.trim()}
         </p>
       )}
-      <p className="home-recommendation-price mt-0.5 min-h-4 text-[11px] font-semibold text-[#33251e]">₱{Number(selectedPrice || 0).toLocaleString()}</p>
+      <p className="home-recommendation-price mt-0 min-h-4 text-[11px] font-semibold text-[#33251e]">₱{Number(selectedPrice || 0).toLocaleString()}</p>
 
-      <div className="home-recommendation-options mt-1 flex min-h-6 flex-wrap content-start justify-center gap-1">
+      <div className="home-recommendation-options mt-0.5 flex min-h-6 flex-wrap content-start justify-center gap-1">
         {sizeOptions.map((option) => {
           const label = String(option.size || 'Regular');
           const isSelected = selectedSize === label;
