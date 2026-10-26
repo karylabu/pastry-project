@@ -13,6 +13,50 @@ export function getAuthHeaders() {
   }
 }
 
+export async function parseJsonResponse(response, fallbackMessage) {
+  if (!response) {
+    throw new Error(fallbackMessage);
+  }
+
+  let text;
+  try {
+    text = await response.text();
+  } catch {
+    throw new Error(fallbackMessage);
+  }
+
+  if (!text.trim()) {
+    throw new Error(fallbackMessage);
+  }
+
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new Error(fallbackMessage);
+  }
+}
+
+export function getUserFriendlyAuthError(response, payload, fallbackMessage) {
+  if (response?.status === 429) {
+    return 'Too many sign-in attempts. Please wait 15 minutes, then try again.';
+  }
+
+  if (response?.status >= 500) {
+    return 'Sign-in is temporarily unavailable. Please try again in a few minutes.';
+  }
+
+  if (payload?.code === 'ADMIN_SESSION_ACTIVE') {
+    return 'This admin account is active in another browser or device. Sign out there first, or contact your administrator for help.';
+  }
+
+  const message = typeof payload?.message === 'string' ? payload.message.trim() : '';
+  const containsTechnicalDetails = /<[^>]+>|unexpected token|doctype|sqlstate|stack trace|exception|fatal error|syntaxerror|referenceerror|typeerror|undefined index|internal server error/i.test(message);
+
+  return message && message.length <= 240 && !containsTechnicalDetails
+    ? message
+    : fallbackMessage;
+}
+
 export async function safeParseJson(response) {
   if (!response) {
     return {};

@@ -5,7 +5,7 @@ import ForgotPassword from "./ForgotPassword";
 import CreditsModal from "../components/CreditsModal";
 import GoogleRecaptcha from "../components/GoogleRecaptcha";
 import { LARAVEL_BASE, ROOT_BASE } from "../../services/config";
-import { safeParseJson } from '../../services/api';
+import { getUserFriendlyAuthError, parseJsonResponse } from '../../services/api';
 import { signInWithGoogle } from "../../services/firebase";
 
 const ASSET_BASE = process.env.NODE_ENV === "production"
@@ -70,6 +70,7 @@ export default function Login() {
     setRecaptchaWidgetKey((currentKey) => currentKey + 1);
     setGoogleLoading(true);
 
+    let response;
     try {
       const { idToken, user: googleUser, email, name, photoURL } = await signInWithGoogle();
       const googlePayload = {
@@ -78,7 +79,7 @@ export default function Login() {
         photoUrl: photoURL || googleUser?.photoURL || "",
       };
 
-      const response = await fetch(`${LARAVEL_BASE}/api/google-login`, {
+      response = await fetch(`${LARAVEL_BASE}/api/google-login`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Accept: "application/json" },
         credentials: "include",
@@ -89,7 +90,8 @@ export default function Login() {
           ...googlePayload,
         }),
       });
-      const data = await safeParseJson(response);
+      const fallbackMessage = "We couldn't sign you in with Google. Please try again shortly.";
+      const data = await parseJsonResponse(response, fallbackMessage);
 
       if (data?.requires_two_factor && data.challenge_token) {
         setTwoFactorChallenge(data.challenge_token);
@@ -101,15 +103,17 @@ export default function Login() {
 
       if (!response.ok || !data?.success) {
         if (response.status === 404 && data?.code === "user_not_found") {
-          setError(data.message || "User not found. Please create an account.");
+          setError(getUserFriendlyAuthError(response, data, "We couldn't find an account for this Google sign-in."));
           setGoogleUserNotFound(true);
           return;
         }
-        throw new Error(data?.message || "Google sign-in failed.");
+        setError(getUserFriendlyAuthError(response, data, fallbackMessage));
+        return;
       }
 
       if (!isCustomerRole(data.user?.role)) {
-        throw new Error('Only customer accounts can use customer login.');
+        setError("This login is for customer accounts only. Please use the correct sign-in page for your account.");
+        return;
       }
 
       const googleAccount = {
@@ -121,7 +125,14 @@ export default function Login() {
       setJustLoggedUser(googleAccount);
       setShowLoginSuccess(true);
     } catch (error) {
-      setError(error?.code === "auth/popup-closed-by-user" ? "Google sign-in was cancelled." : (error.message || "Google sign-in failed."));
+      if (error?.code === "auth/popup-closed-by-user") {
+        setError("Google sign-in was cancelled.");
+      } else {
+        const fallbackMessage = response
+          ? "We couldn't sign you in with Google. Please try again shortly."
+          : "We couldn't connect to Google sign-in. Check your connection and try again.";
+        setError(getUserFriendlyAuthError(response, null, fallbackMessage));
+      }
     } finally {
       setGoogleLoading(false);
     }
@@ -139,14 +150,16 @@ export default function Login() {
     setSuccess("");
     setLoading(true);
 
+    let response;
     try {
-      const res  = await fetch(`${LARAVEL_BASE}/api/login`, {
+      response = await fetch(`${LARAVEL_BASE}/api/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({ email, password, recaptcha_proof: recaptchaProof }),
       });
-      const data = await safeParseJson(res);
+      const fallbackMessage = "We couldn't sign you in right now. Please try again shortly.";
+      const data = await parseJsonResponse(response, fallbackMessage);
 
       if (data?.requires_two_factor && data.challenge_token) {
         setTwoFactorChallenge(data.challenge_token);
@@ -159,7 +172,7 @@ export default function Login() {
 
       if (data?.success) {
         if (!isCustomerRole(data.user?.role)) {
-          setError('Staff and admin accounts must use the staff or admin login.');
+          setError("This login is for customer accounts only. Please use the correct sign-in page for your account.");
           return;
         }
 
@@ -173,10 +186,13 @@ export default function Login() {
         setJustLoggedUser(account);
         setShowLoginSuccess(true);
       } else {
-        setError(data.message || "Login failed.");
+        setError(getUserFriendlyAuthError(response, data, fallbackMessage));
       }
     } catch {
-      setError("Network error. Please try again.");
+      const fallbackMessage = response
+        ? "We couldn't sign you in right now. Please try again shortly."
+        : "We couldn't connect to the sign-in service. Check your internet connection and try again.";
+      setError(getUserFriendlyAuthError(response, null, fallbackMessage));
     } finally {
       setLoading(false);
     }
@@ -188,20 +204,24 @@ export default function Login() {
 
     setError("");
     setLoading(true);
+    let response;
     try {
-      const response = await fetch(`${LARAVEL_BASE}/api/login/two-factor`, {
+      response = await fetch(`${LARAVEL_BASE}/api/login/two-factor`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Accept: "application/json" },
         credentials: "include",
         body: JSON.stringify({ challenge_token: twoFactorChallenge, code: twoFactorCode }),
       });
-      const data = await safeParseJson(response);
+      const fallbackMessage = "We couldn't verify your sign-in code. Please try again.";
+      const data = await parseJsonResponse(response, fallbackMessage);
       if (!response.ok || !data?.success) {
-        throw new Error(data?.message || "Unable to verify the authenticator code.");
+        setError(getUserFriendlyAuthError(response, data, fallbackMessage));
+        return;
       }
 
       if (!isCustomerRole(data.user?.role)) {
-        throw new Error("Only customer accounts can use customer login.");
+        setError("This login is for customer accounts only. Please use the correct sign-in page for your account.");
+        return;
       }
 
       const account = {
@@ -212,8 +232,11 @@ export default function Login() {
       localStorage.setItem("user", JSON.stringify(account));
       setJustLoggedUser(account);
       setShowLoginSuccess(true);
-    } catch (error) {
-      setError(error.message || "Unable to verify the authenticator code.");
+    } catch {
+      const fallbackMessage = response
+        ? "We couldn't verify your sign-in code. Please try again."
+        : "We couldn't connect to the sign-in service. Check your internet connection and try again.";
+      setError(getUserFriendlyAuthError(response, null, fallbackMessage));
     } finally {
       setLoading(false);
     }

@@ -4,6 +4,7 @@ import { AlertCircle, Eye, EyeOff, Lock, Mail } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import ForgotPassword from "../../customer/pages/ForgotPassword";
 import { LARAVEL_BASE, ROOT_BASE } from "../../services/config";
+import { getUserFriendlyAuthError, parseJsonResponse } from "../../services/api";
 
 const ASSET_BASE = process.env.NODE_ENV === "production"
   ? `${ROOT_BASE}/customer_portal/build/assets`
@@ -34,8 +35,9 @@ export default function StaffAdminLogin() {
     setSuccess("");
     setLoading(true);
 
+    let response;
     try {
-      const response = await fetch(`${LARAVEL_BASE}/api/login`, {
+      response = await fetch(`${LARAVEL_BASE}/api/login`, {
         method: "POST",
         credentials: "include",
         headers: {
@@ -47,15 +49,18 @@ export default function StaffAdminLogin() {
         body: JSON.stringify({ email, password }),
       });
 
-      const data = await response.json();
+      const fallbackMessage = "We couldn't sign you in right now. Please try again shortly.";
+      const data = await parseJsonResponse(response, fallbackMessage);
       if (!response.ok || !data.success) {
         setSessionConflict(data.code === "ADMIN_SESSION_ACTIVE");
-        throw new Error(data.message || "Login failed.");
+        setError(getUserFriendlyAuthError(response, data, fallbackMessage));
+        return;
       }
 
       const normalizedRole = normalizeRole(data.user?.role);
       if (normalizedRole !== "admin") {
-        throw new Error("Only admin accounts can access this area.");
+        setError("This login is for admin accounts only. Please use the correct sign-in page for your account.");
+        return;
       }
 
       const userWithRole = { ...data.user, role: normalizedRole, token: data.token || "" };
@@ -63,8 +68,11 @@ export default function StaffAdminLogin() {
       localStorage.setItem("auth_token", data.token || "");
       setSuccess("Signed in successfully.");
       navigate("/admin", { replace: true });
-    } catch (err) {
-      setError(err.message || "Unable to sign in right now.");
+    } catch {
+      const fallbackMessage = response
+        ? "We couldn't sign you in right now. Please try again shortly."
+        : "We couldn't connect to the sign-in service. Check your internet connection and try again.";
+      setError(getUserFriendlyAuthError(response, null, fallbackMessage));
     } finally {
       setLoading(false);
     }
