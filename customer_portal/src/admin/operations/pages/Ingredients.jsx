@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useLocation } from "react-router-dom";
-import { AlertTriangle, CalendarDays, History, Package, PackagePlus, Pencil, Plus, Search, Trash2, X } from "lucide-react";
+import { AlertTriangle, CalendarDays, CircleAlert, History, Package, PackagePlus, Pencil, Plus, Search, Trash2, X } from "lucide-react";
 import { LARAVEL_BASE, STAFF_BASE } from "../../../services/config";
 
 const staffFetch = (url, options = {}) => fetch(url, { credentials: "include", ...options });
@@ -87,6 +87,7 @@ export default function Ingredients({
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
+  const [alertDialog, setAlertDialog] = useState(null);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [deletingIngredient, setDeletingIngredient] = useState(false);
   const [modalType, setModalType] = useState(''); // 'create' | 'edit' | 'in' | 'out' | 'history'
@@ -113,6 +114,7 @@ export default function Ingredients({
   const [batchSubmitting, setBatchSubmitting] = useState(false);
   const [ingredientSearch, setIngredientSearch] = useState('');
   const [pendingRequests, setPendingRequests] = useState([]);
+  const showAlert = (message, variant = 'error') => setAlertDialog({ message, variant });
   const currentUser = (() => { try { return JSON.parse(window.localStorage.getItem('user') || 'null'); } catch (e) { return null; } })();
   const canApproveDiscard = String(currentUser?.role || '').toLowerCase() === 'admin';
   const normalizedModalName = normalizeIngredientName(modalName);
@@ -156,7 +158,7 @@ export default function Ingredients({
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.success) throw new Error(getFriendlyErrorMessage(data, 'We could not update this discard request. Please try again.'));
       await loadPendingRequests(); await loadIngredients();
-    } catch (e) { alert(e.message || 'We could not update this discard request. Check your connection and try again.'); }
+    } catch (e) { showAlert(e.message || 'We could not update this discard request. Check your connection and try again.'); }
     finally { setBatchSubmitting(false); }
   };
 
@@ -239,12 +241,12 @@ export default function Ingredients({
     const quantity = Number(batchForm.quantity);
     const exactIngredient = ingredients.find((ingredient) => ingredient.name.trim().toLowerCase() === ingredientSearch.trim().toLowerCase());
     const ingredientId = batchForm.ingredient_id || (exactIngredient ? String(exactIngredient.id) : '');
-    if (!ingredientId) { alert('Choose an ingredient from the matching results, or enter its exact name.'); return; }
-    if (!Number.isFinite(quantity) || quantity <= 0) { alert('Enter a quantity greater than zero.'); return; }
-    if (!batchForm.batch_number.trim()) { alert('Enter a batch or lot number.'); return; }
-    if (!batchForm.expiry_date) { alert('Enter the ingredient batch expiry date.'); return; }
+    if (!ingredientId) { showAlert('Choose an ingredient from the matching results, or enter its exact name.'); return; }
+    if (!Number.isFinite(quantity) || quantity <= 0) { showAlert('Enter a quantity greater than zero.'); return; }
+    if (!batchForm.batch_number.trim()) { showAlert('Enter a batch or lot number.'); return; }
+    if (!batchForm.expiry_date) { showAlert('Enter the ingredient batch expiry date.'); return; }
     if (batchForm.purchase_date && batchForm.expiry_date < batchForm.purchase_date) {
-      alert('The expiry date must be the same as or later than the purchase date. Please check both dates.');
+      showAlert('The expiry date must be the same as or later than the purchase date. Please check both dates.');
       return;
     }
     setBatchSubmitting(true);
@@ -255,26 +257,26 @@ export default function Ingredients({
       await loadIngredients(); closeModal();
     } catch (e) {
       const fallback = 'We could not add this stock batch. Check your connection and try again.';
-      alert(e?.name === 'TypeError' ? fallback : e.message || fallback);
+      showAlert(e?.name === 'TypeError' ? fallback : e.message || fallback);
     }
     finally { setBatchSubmitting(false); }
   };
 
   const submitDiscardRequest = async () => {
     const quantity = Number(discardForm.quantity);
-    if (!discardForm.batch_id || quantity <= 0) { alert('Select a batch and enter a positive quantity.'); return; }
+    if (!discardForm.batch_id || quantity <= 0) { showAlert('Select a batch and enter a positive quantity.'); return; }
     setBatchSubmitting(true);
     try {
       const res = await laravelStaffFetch(`${LARAVEL_BASE}/api/staff/inventory/discards`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ingredient_id: Number(modalIngredient?.id), ingredient_batch_id: Number(discardForm.batch_id), quantity, reason: discardForm.reason, notes: discardForm.notes }) });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.success) throw new Error(getFriendlyErrorMessage(data, 'We could not submit this discard request. Please check the batch details and try again.'));
-      alert(data.auto_approved ? 'Expired ingredient discarded and added to waste analytics.' : 'Discard request submitted for owner approval.');
+      showAlert(data.auto_approved ? 'Expired ingredient discarded and added to waste analytics.' : 'Discard request submitted for owner approval.', 'success');
       closeModal();
       await loadIngredients();
       await loadPendingRequests();
     } catch (e) {
       const fallback = 'We could not submit this discard request. Check your connection and try again.';
-      alert(e?.name === 'TypeError' ? fallback : e.message || fallback);
+      showAlert(e?.name === 'TypeError' ? fallback : e.message || fallback);
     }
     finally { setBatchSubmitting(false); }
   };
@@ -293,11 +295,11 @@ export default function Ingredients({
     if (!modalIngredient) return;
     const qty = Number(modalQty || 0);
     if (qty <= 0) {
-      alert('Quantity must be greater than zero.');
+      showAlert('Quantity must be greater than zero.');
       return;
     }
     if (modalType === 'out' && qty > Number(modalIngredient.stock || 0)) {
-      alert('Cannot stock out more than current balance.');
+      showAlert('Cannot stock out more than current balance.');
       return;
     }
     const action = modalType === 'in' ? 'stock_in' : 'stock_out';
@@ -313,9 +315,9 @@ export default function Ingredients({
         closeModal();
         return;
       }
-      alert(getFriendlyErrorMessage(j, 'We could not update the ingredient stock. Please try again.'));
+      showAlert(getFriendlyErrorMessage(j, 'We could not update the ingredient stock. Please try again.'));
     } catch (e) {
-      alert('We could not update the ingredient stock. Check your connection and try again.');
+      showAlert('We could not update the ingredient stock. Check your connection and try again.');
     }
   };
 
@@ -325,11 +327,11 @@ export default function Ingredients({
     const initialStock = Number(modalStock || 0);
     const unitCost = Number(modalUnitCost || 0);
     if (thresholdValue <= 0) {
-      alert('Threshold must be greater than zero.');
+      showAlert('Threshold must be greater than zero.');
       return;
     }
     if (!Number.isFinite(initialStock) || initialStock < 0 || !Number.isFinite(unitCost) || unitCost < 0) {
-      alert('Initial stock and unit price must be zero or greater.');
+      showAlert('Initial stock and unit price must be zero or greater.');
       return;
     }
     const payload = {
@@ -356,9 +358,9 @@ export default function Ingredients({
         setCreateIngredientError(errorMessage);
         return;
       }
-      alert(errorMessage);
+      showAlert(errorMessage);
     } catch (e) {
-      alert('We could not create this ingredient. Check your connection and try again.');
+      showAlert('We could not create this ingredient. Check your connection and try again.');
     }
   };
 
@@ -366,12 +368,12 @@ export default function Ingredients({
     if (!modalIngredient) return;
     const thresholdValue = Number(modalThreshold || 0);
     if (thresholdValue <= 0) {
-      alert('Threshold must be greater than zero.');
+      showAlert('Threshold must be greater than zero.');
       return;
     }
     const unitCost = Number(modalUnitCost || 0);
     if (!Number.isFinite(unitCost) || unitCost < 0) {
-      alert('Unit price must be zero or greater.');
+      showAlert('Unit price must be zero or greater.');
       return;
     }
     const payload = {
@@ -391,9 +393,9 @@ export default function Ingredients({
         closeModal();
         return;
       }
-      alert(getFriendlyErrorMessage(j, 'We could not update this ingredient. Please try again.'));
+      showAlert(getFriendlyErrorMessage(j, 'We could not update this ingredient. Please try again.'));
     } catch (e) {
-      alert('We could not update this ingredient. Check your connection and try again.');
+      showAlert('We could not update this ingredient. Check your connection and try again.');
     }
   };
 
@@ -415,9 +417,9 @@ export default function Ingredients({
         await loadIngredients();
         return true;
       }
-      alert(getFriendlyErrorMessage(j, 'We could not delete this ingredient. Please try again.'));
+      showAlert(getFriendlyErrorMessage(j, 'We could not delete this ingredient. Please try again.'));
     } catch (e) {
-      alert('We could not delete this ingredient. Check your connection and try again.');
+      showAlert('We could not delete this ingredient. Check your connection and try again.');
     } finally {
       setDeletingIngredient(false);
     }
@@ -876,6 +878,54 @@ export default function Ingredients({
                 )}
               </div>
             </div>
+          </div>
+        )}
+        {alertDialog && (
+          <div
+            className="fixed inset-0 z-[10003] flex items-center justify-center bg-[#241812]/55 px-4 py-5 backdrop-blur-[2px]"
+            onMouseDown={(event) => {
+              if (event.target === event.currentTarget) setAlertDialog(null);
+            }}
+          >
+            <section
+              role="alertdialog"
+              aria-modal="true"
+              aria-labelledby="ingredient-alert-title"
+              aria-describedby="ingredient-alert-description"
+              className="w-full max-w-md overflow-hidden rounded-2xl border border-[#eee4de] bg-white shadow-[0_24px_70px_rgba(38,25,16,0.28)]"
+            >
+              <div className="flex items-start gap-4 p-5 sm:p-6">
+                <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full ${alertDialog.variant === 'success' ? 'bg-emerald-50 text-emerald-600' : 'bg-[#fff1e9] text-[#a64d31]'}`}>
+                  {alertDialog.variant === 'success' ? <Package size={19} /> : <CircleAlert size={19} />}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <h2 id="ingredient-alert-title" className="text-base font-semibold text-[#33251e]">
+                    {alertDialog.variant === 'success' ? 'Done' : 'Please check this'}
+                  </h2>
+                  <p id="ingredient-alert-description" className="mt-1.5 text-sm leading-6 text-[#74675f]">
+                    {alertDialog.message}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setAlertDialog(null)}
+                  aria-label="Close alert"
+                  className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[#8f8076] transition hover:bg-[#f6f1ec] hover:text-[#33251e]"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+              <div className="flex justify-end border-t border-[#f0e7e0] bg-[#fbfaf5] p-4">
+                <button
+                  type="button"
+                  autoFocus
+                  onClick={() => setAlertDialog(null)}
+                  className="rounded-lg bg-[#8f432d] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-[#713522] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#c87a5c] focus-visible:ring-offset-2"
+                >
+                  Got it
+                </button>
+              </div>
+            </section>
           </div>
         )}
         </div>

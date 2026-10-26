@@ -1,5 +1,5 @@
 import React from "react";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import Ingredients from "./Ingredients";
 
 jest.mock("react-router-dom", () => ({
@@ -51,11 +51,12 @@ describe("Ingredients alerts", () => {
     const addStockButtons = screen.getAllByRole("button", { name: "Add Stock" });
     fireEvent.click(addStockButtons[addStockButtons.length - 1]);
 
-    await waitFor(() => {
-      expect(window.alert).toHaveBeenCalledWith(
-        "The expiry date must be the same as or later than the purchase date. Please check both dates."
-      );
-    });
+    const alertDialog = await screen.findByRole("alertdialog");
+    expect(alertDialog).toHaveTextContent(
+      "The expiry date must be the same as or later than the purchase date. Please check both dates."
+    );
+    expect(screen.getByRole("button", { name: "Got it" })).toBeInTheDocument();
+    expect(window.alert).not.toHaveBeenCalled();
     expect(global.fetch).not.toHaveBeenCalledWith(
       "https://example.test/laravel/public/api/staff/inventory/batches",
       expect.objectContaining({ method: "POST" })
