@@ -160,6 +160,72 @@ class OrderController extends Controller
         ]);
     }
 
+    public function updateRiderInformation(Request $request, int $orderId)
+    {
+        $user = $this->getAuthenticatedUser($request);
+        if (!$user) {
+            return response()->json(['success' => false, 'message' => 'Authentication required.'], 401);
+        }
+        if (strtolower((string) $user->role) !== 'customer') {
+            return response()->json(['success' => false, 'message' => 'Customer access required.'], 403);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'rider_name' => 'required|string|max:120',
+            'rider_contact' => 'required|string|max:120',
+            'rider_plate_number' => 'required|string|max:120',
+        ]);
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Enter the rider name, contact number, and plate number.',
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        $order = Order::query()
+            ->whereKey($orderId)
+            ->where(function ($query) use ($user) {
+                $query->where('user_id', $user->id)
+                    ->orWhere(function ($legacyQuery) use ($user) {
+                        $legacyQuery->whereNull('user_id')
+                            ->whereRaw('LOWER(email) = LOWER(?)', [$user->email]);
+                    });
+            })
+            ->first();
+
+        if (!$order) {
+            return response()->json(['success' => false, 'message' => 'Order not found.'], 404);
+        }
+        if (strtolower((string) $order->status) !== 'ready for pickup') {
+            return response()->json(['success' => false, 'message' => 'Rider information can only be added when the order is ready.'], 422);
+        }
+        if (!in_array(strtolower(trim((string) $order->method)), ['deliver', 'delivery'], true)) {
+            return response()->json(['success' => false, 'message' => 'Rider information is only available for delivery orders.'], 422);
+        }
+        if (!Schema::hasColumn('orders', 'rider_name')
+            || !Schema::hasColumn('orders', 'rider_contact')
+            || !Schema::hasColumn('orders', 'rider_plate_number')) {
+            Log::error('Rider information columns are unavailable for order updates.', ['order_id' => $orderId]);
+            return response()->json(['success' => false, 'message' => 'Rider information is temporarily unavailable. Please try again later.'], 503);
+        }
+
+        $riderInformation = [
+            'rider_name' => trim($request->input('rider_name')),
+            'rider_contact' => trim($request->input('rider_contact')),
+            'rider_plate_number' => strtoupper(trim($request->input('rider_plate_number'))),
+        ];
+
+        $order->forceFill($riderInformation)->save();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Rider information saved.',
+            'rider_information' => $riderInformation,
+            'delivery_service' => $order->delivery_service,
+        ]);
+    }
+
     /**
      * Store a newly created order in storage.
      */

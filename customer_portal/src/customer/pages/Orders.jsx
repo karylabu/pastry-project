@@ -251,6 +251,9 @@ export default function Orders() {
   const [user, setUser]               = useState(null);
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [riderInfoTarget, setRiderInfoTarget] = useState(null);
+  const [riderForm, setRiderForm] = useState({ name: '', contact: '', plateNumber: '' });
+  const [riderInfoSaving, setRiderInfoSaving] = useState(false);
+  const [riderInfoError, setRiderInfoError] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
   const [sortBy, setSortBy]           = useState('newest');
   const [search, setSearch]           = useState('');
@@ -270,6 +273,62 @@ export default function Orders() {
   const userEmail = user?.email?.toLowerCase?.();
   const userName  = user?.name?.toLowerCase?.();
   const storageKey = userEmail ? `customer_orders_${userEmail}` : "customer_orders";
+
+  const openRiderInfo = (order, riderInformation) => {
+    setRiderForm({
+      name: riderInformation.name || '',
+      contact: riderInformation.contact || '',
+      plateNumber: riderInformation.plateNumber || '',
+    });
+    setRiderInfoError('');
+    setRiderInfoTarget({ order, riderInformation });
+  };
+
+  const saveRiderInfo = async (event) => {
+    event.preventDefault();
+    if (!riderInfoTarget) return;
+
+    setRiderInfoSaving(true);
+    setRiderInfoError('');
+    try {
+      const response = await fetch(`${LARAVEL_BASE}/api/orders/${riderInfoTarget.order.id}/rider-information`, {
+        method: 'PUT',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json', ...getAuthHeaders() },
+        body: JSON.stringify({
+          rider_name: riderForm.name,
+          rider_contact: riderForm.contact,
+          rider_plate_number: riderForm.plateNumber,
+        }),
+      });
+      const data = await safeParseJson(response);
+      if (!response.ok || !data?.success) {
+        throw new Error(data?.message || 'Unable to save rider information.');
+      }
+
+      const riderInformation = {
+        ...riderInfoTarget.riderInformation,
+        name: data.rider_information.rider_name,
+        contact: data.rider_information.rider_contact,
+        plateNumber: data.rider_information.rider_plate_number,
+        service: data.delivery_service || riderInfoTarget.riderInformation.service,
+      };
+      const updatedOrder = {
+        ...riderInfoTarget.order,
+        ...data.rider_information,
+      };
+      setOrders((currentOrders) => {
+        const nextOrders = currentOrders.map((order) => order.id === updatedOrder.id ? updatedOrder : order);
+        localStorage.setItem(storageKey, JSON.stringify(nextOrders));
+        return nextOrders;
+      });
+      setRiderInfoTarget({ order: updatedOrder, riderInformation });
+    } catch (error) {
+      setRiderInfoError(error.message || 'Unable to save rider information.');
+    } finally {
+      setRiderInfoSaving(false);
+    }
+  };
 
   const normalizeOrderItems = useCallback((order) => {
     const rawItems = order?.items;
@@ -1221,12 +1280,13 @@ export default function Orders() {
                   service: order.delivery_service || order.rider_service || customPaymentDetails.delivery_service || customPaymentDetails.rider_service,
                   name: order.rider_name || order.delivery_rider_name || order.rider?.name || customPaymentDetails.rider_name || customPaymentDetails.delivery_rider_name,
                   contact: order.rider_contact || order.rider_phone || order.delivery_rider_contact || order.rider?.contact || customPaymentDetails.rider_contact || customPaymentDetails.rider_phone,
+                  plateNumber: order.rider_plate_number || order.rider?.plate_number || customPaymentDetails.rider_plate_number || customPaymentDetails.plate_number,
                   reference: order.rider_booking_reference || order.booking_reference || customPaymentDetails.rider_booking_reference || customPaymentDetails.booking_reference,
                 };
                 const openOrder = (event) => {
                   if (event.target.closest('button, a, input, select, textarea')) return;
                   if (isToReceive && isDeliveryOrder) {
-                    setRiderInfoTarget({ order, riderInformation });
+                    openRiderInfo(order, riderInformation);
                     return;
                   }
                   setSelectedOrder(order);
@@ -1458,7 +1518,7 @@ export default function Orders() {
                           {isDeliveryOrder && (
                             <button
                               type="button"
-                              onClick={() => setRiderInfoTarget({ order, riderInformation })}
+                              onClick={() => openRiderInfo(order, riderInformation)}
                               className="inline-flex items-center gap-1.5 rounded-lg border border-[#e9d8ae] bg-[#fffaf0] px-3 py-2 text-[12px] font-semibold text-[#6b4f1d] transition-colors hover:bg-[#fff1bd]"
                               aria-label="View delivery rider information"
                             >
@@ -1530,11 +1590,12 @@ export default function Orders() {
             aria-modal="true"
             aria-labelledby="delivery-rider-dialog-title"
           >
-            <motion.div
+            <motion.form
               initial={{ opacity: 0, y: 12, scale: 0.98 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 12, scale: 0.98 }}
               onClick={(event) => event.stopPropagation()}
+              onSubmit={saveRiderInfo}
               className="w-full max-w-md rounded-2xl border border-[#eadfd8] bg-white p-5 shadow-2xl sm:p-6"
             >
               <div className="flex items-start justify-between gap-4">
@@ -1542,27 +1603,40 @@ export default function Orders() {
                   <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#9b7810]">Order #{riderInfoTarget.order.order_number ?? riderInfoTarget.order.id}</p>
                   <h2 id="delivery-rider-dialog-title" className="mt-1 text-lg font-bold text-[#33251e]">Delivery Rider Information</h2>
                 </div>
-                <button type="button" onClick={() => setRiderInfoTarget(null)} className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-[#765d50] transition hover:bg-[#fff4cd]" aria-label="Close rider information"><X size={18} /></button>
+                <button type="button" onClick={() => setRiderInfoTarget(null)} disabled={riderInfoSaving} className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-[#765d50] transition hover:bg-[#fff4cd]" aria-label="Close rider information"><X size={18} /></button>
               </div>
-              {Object.values(riderInfoTarget.riderInformation).some(Boolean) ? (
-                <dl className="mt-5 space-y-3">
-                  {[
-                    ['Delivery service', riderInfoTarget.riderInformation.service],
-                    ['Rider name', riderInfoTarget.riderInformation.name],
-                    ['Rider contact', riderInfoTarget.riderInformation.contact],
-                    ['Booking/reference', riderInfoTarget.riderInformation.reference],
-                  ].filter(([, value]) => value).map(([label, value]) => (
-                    <div key={label} className="border-b border-[#f0e6db] pb-2 last:border-0 last:pb-0">
-                      <dt className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#8f8076]">{label}</dt>
-                      <dd className="mt-1 break-words text-sm font-medium text-[#33251e]">{value}</dd>
-                    </div>
-                  ))}
-                </dl>
-              ) : (
-                <p className="mt-5 rounded-xl bg-[#fffaf0] px-4 py-3 text-sm leading-6 text-[#6b4f1d]">Rider information is not available yet. Please check again once a rider has been assigned.</p>
-              )}
-              <button type="button" onClick={() => setRiderInfoTarget(null)} className="mt-5 w-full rounded-xl bg-[#f0b94d] px-4 py-2.5 text-sm font-semibold text-black transition hover:bg-[#e5ae3d]">Close</button>
-            </motion.div>
+              <div className="mt-5 rounded-xl bg-[#fffaf0] px-4 py-3">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#8f8076]">Delivery service</p>
+                <p className="mt-1 text-sm font-semibold text-[#33251e]">{riderInfoTarget.riderInformation.service || 'Not specified'}</p>
+              </div>
+              <p className="mt-4 text-xs leading-5 text-[#74675f]">Enter the rider details from your Lalamove or GrabCar booking.</p>
+              <div className="mt-4 space-y-3">
+                {[
+                  ['Rider name', 'name', 'text', 'Enter rider name'],
+                  ['Contact number', 'contact', 'tel', 'Enter rider contact number'],
+                  ['Plate number', 'plateNumber', 'text', 'Enter vehicle plate number'],
+                ].map(([label, field, type, placeholder]) => (
+                  <label key={field} className="block">
+                    <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#8f8076]">{label}</span>
+                    <input
+                      type={type}
+                      value={riderForm[field]}
+                      onChange={(event) => setRiderForm((current) => ({ ...current, [field]: event.target.value }))}
+                      required
+                      maxLength={120}
+                      placeholder={placeholder}
+                      className="mt-1 w-full rounded-lg border border-[#eadfd8] px-3 py-2 text-sm text-[#33251e] outline-none focus:border-[#b89646] focus:ring-2 focus:ring-[#d4af37]/15"
+                      disabled={riderInfoSaving}
+                    />
+                  </label>
+                ))}
+              </div>
+              {riderInfoError && <p className="mt-3 text-sm text-red-700" role="alert">{riderInfoError}</p>}
+              <div className="mt-5 flex gap-2">
+                <button type="button" onClick={() => setRiderInfoTarget(null)} disabled={riderInfoSaving} className="flex-1 rounded-xl border border-[#eadfd8] px-4 py-2.5 text-sm font-semibold text-[#765d50] transition hover:bg-[#fffaf0] disabled:opacity-50">Close</button>
+                <button type="submit" disabled={riderInfoSaving} className="flex-1 rounded-xl bg-[#f0b94d] px-4 py-2.5 text-sm font-semibold text-black transition hover:bg-[#e5ae3d] disabled:opacity-50">{riderInfoSaving ? 'Saving...' : 'Save rider info'}</button>
+              </div>
+            </motion.form>
           </motion.div>
         )}
       </AnimatePresence>

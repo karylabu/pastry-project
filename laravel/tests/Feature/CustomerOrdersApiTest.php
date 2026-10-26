@@ -36,6 +36,10 @@ class CustomerOrdersApiTest extends TestCase
             $table->decimal('delivery_fee', 10, 2)->default(0);
             $table->decimal('total', 10, 2)->default(0);
             $table->string('method')->nullable();
+            $table->string('delivery_service')->nullable();
+            $table->string('rider_name', 120)->nullable();
+            $table->string('rider_contact', 120)->nullable();
+            $table->string('rider_plate_number', 120)->nullable();
             $table->string('payment')->nullable();
             $table->text('address')->nullable();
             $table->string('phone')->nullable();
@@ -185,5 +189,77 @@ class CustomerOrdersApiTest extends TestCase
             ->assertJsonPath('success', true);
 
         $this->assertDatabaseHas('orders', ['id' => 10, 'status' => 'Completed']);
+    }
+
+    public function test_customer_can_save_rider_information_on_their_ready_delivery_order(): void
+    {
+        DB::table('orders')->insert([
+            'id' => 10,
+            'user_id' => 7,
+            'email' => 'customer@example.com',
+            'method' => 'Deliver',
+            'delivery_service' => 'GrabCar',
+            'status' => 'Ready for Pickup',
+        ]);
+
+        $this->withToken('test-customer-token')
+            ->putJson('/api/orders/10/rider-information', [
+                'rider_name' => 'Juan Dela Cruz',
+                'rider_contact' => '09171234567',
+                'rider_plate_number' => 'abc 1234',
+            ])
+            ->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('delivery_service', 'GrabCar')
+            ->assertJsonPath('rider_information.rider_plate_number', 'ABC 1234');
+
+        $this->assertDatabaseHas('orders', [
+            'id' => 10,
+            'rider_name' => 'Juan Dela Cruz',
+            'rider_contact' => '09171234567',
+            'rider_plate_number' => 'ABC 1234',
+        ]);
+
+        $this->getJson('/api/orders')
+            ->assertOk()
+            ->assertJsonPath('orders.0.delivery_service', 'GrabCar')
+            ->assertJsonPath('orders.0.rider_name', 'Juan Dela Cruz')
+            ->assertJsonPath('orders.0.rider_contact', '09171234567')
+            ->assertJsonPath('orders.0.rider_plate_number', 'ABC 1234');
+    }
+
+    public function test_customer_cannot_save_rider_information_for_another_order_or_before_ready(): void
+    {
+        DB::table('orders')->insert([
+            [
+                'id' => 10,
+                'user_id' => 8,
+                'email' => 'other@example.com',
+                'method' => 'Deliver',
+                'status' => 'Ready for Pickup',
+            ],
+            [
+                'id' => 11,
+                'user_id' => 7,
+                'email' => 'customer@example.com',
+                'method' => 'Deliver',
+                'status' => 'Preparing',
+            ],
+        ]);
+
+        $riderInformation = [
+            'rider_name' => 'Juan Dela Cruz',
+            'rider_contact' => '09171234567',
+            'rider_plate_number' => 'ABC 1234',
+        ];
+
+        $this->withToken('test-customer-token')
+            ->putJson('/api/orders/10/rider-information', $riderInformation)
+            ->assertNotFound();
+        $this->putJson('/api/orders/11/rider-information', $riderInformation)
+            ->assertStatus(422);
+
+        $this->assertDatabaseMissing('orders', ['id' => 10, 'rider_name' => 'Juan Dela Cruz']);
+        $this->assertDatabaseMissing('orders', ['id' => 11, 'rider_name' => 'Juan Dela Cruz']);
     }
 }

@@ -266,6 +266,15 @@ class CustomizedCakeController extends Controller
             $notes['payment_method'] = $paymentMethod;
             $payload['notes'] = json_encode($notes);
         }
+        $deliveryMethod = strtolower(trim((string) ($notes['delivery_method'] ?? 'pickup')));
+        $isDeliveryOrder = in_array($deliveryMethod, ['delivery', 'deliver'], true);
+        $deliveryService = trim((string) ($payload['delivery_service'] ?? $notes['delivery_service'] ?? ''));
+        if ($isDeliveryOrder && !in_array($deliveryService, ['Lalamove', 'GrabCar'], true)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Choose Lalamove or GrabCar for delivery.',
+            ], 422);
+        }
 
         $cakeType = $payload['cake_type'] ?? 'single';
         $tiers = $payload['tiers'] ?? [];
@@ -401,7 +410,7 @@ class CustomizedCakeController extends Controller
                 $uploadedImages[] = $referenceImage;
             }
 
-            $customizedCakeOrderId = DB::transaction(function () use ($cakeType, $tiers, $payload, $uploadedImages, $user, $paymentMethod) {
+            $customizedCakeOrderId = DB::transaction(function () use ($cakeType, $tiers, $payload, $uploadedImages, $user, $paymentMethod, $notes, $isDeliveryOrder, $deliveryService) {
                 if (!$this->requestSetting->enabled(true)) {
                     return null;
                 }
@@ -418,11 +427,12 @@ class CustomizedCakeController extends Controller
                         'subtotal' => 0,
                         'delivery_fee' => 0,
                         'total' => 0,
-                        'method' => 'Pickup',
-                        'delivery_date' => null,
-                        'delivery_time' => null,
+                        'method' => $isDeliveryOrder ? 'Deliver' : 'Pickup',
+                        'delivery_service' => $isDeliveryOrder ? $deliveryService : null,
+                        'delivery_date' => $notes['pickup_date'] ?? null,
+                        'delivery_time' => $notes['pickup_time'] ?? null,
                         'payment' => $paymentMethod,
-                        'address' => '',
+                        'address' => $isDeliveryOrder ? ($notes['delivery_address'] ?? '') : '',
                         'phone' => $user->phone ?? '',
                         'customer' => $user->name,
                         'email' => $user->email,

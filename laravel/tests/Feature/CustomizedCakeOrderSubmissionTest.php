@@ -31,6 +31,7 @@ class CustomizedCakeOrderSubmissionTest extends TestCase
             $table->decimal('delivery_fee', 10, 2);
             $table->decimal('total', 10, 2);
             $table->string('method');
+            $table->string('delivery_service')->nullable();
             $table->date('delivery_date')->nullable();
             $table->time('delivery_time')->nullable();
             $table->string('payment');
@@ -179,6 +180,42 @@ class CustomizedCakeOrderSubmissionTest extends TestCase
             ->assertJsonPath('orders.0.custom_details.reference_image.url', 'https://pastryproject.shop/uploads/holiday(2).jpg')
             ->assertJsonPath('orders.0.custom_details.payment_method', 'QR Ph')
             ->assertJsonPath('orders.0.is_customized', true);
+    }
+
+    public function test_custom_cake_delivery_service_and_method_are_saved_to_order(): void
+    {
+        $customer = new User();
+        $customer->id = 1;
+        $customer->name = 'Customer';
+        $customer->email = 'customer@example.test';
+        $customer->role = 'customer';
+        $customer->status = 'active';
+
+        $this->actingAs($customer)
+            ->postJson('http://localhost/api/customized-cakes/order', [
+                'cake_type' => 'single',
+                'tiers' => [['flavor_id' => 1, 'size_id' => 1]],
+                'payment_method' => 'QR Ph',
+                'delivery_service' => 'Lalamove',
+                'notes' => json_encode([
+                    'delivery_method' => 'Delivery',
+                    'delivery_address' => 'Tanauan, Batangas',
+                    'delivery_service' => 'Lalamove',
+                    'pickup_date' => '2026-10-28',
+                    'pickup_time' => '09:30',
+                ]),
+            ])
+            ->assertOk()
+            ->assertJsonPath('success', true);
+
+        $this->assertDatabaseHas('orders', [
+            'id' => 1,
+            'method' => 'Deliver',
+            'delivery_service' => 'Lalamove',
+            'delivery_date' => '2026-10-28',
+            'delivery_time' => '09:30',
+            'address' => 'Tanauan, Batangas',
+        ]);
     }
 
     public function test_customer_custom_cake_request_rejects_an_unsupported_payment_method(): void

@@ -75,6 +75,7 @@ Route::options('google-login', [AuthController::class, 'googleLogin']);
 Route::get('orders', [OrderController::class, 'index']);
 Route::get('orders/first-order-discount', [OrderController::class, 'firstOrderDiscountEligibility']);
 Route::post('orders', [OrderController::class, 'store']);
+Route::put('orders/{orderId}/rider-information', [OrderController::class, 'updateRiderInformation'])->whereNumber('orderId');
 Route::post('orders/{orderId}/cancel', [OrderController::class, 'cancel']);
 Route::post('orders/{orderId}/confirm-received', [OrderController::class, 'confirmReceived']);
 Route::post('orders/{orderId}/return-refund-request', [OrderController::class, 'requestReturnRefund']);
