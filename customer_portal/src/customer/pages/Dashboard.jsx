@@ -369,7 +369,10 @@ function RecommendationCard({ product, onSelect, onEnsureShopOpen }) {
 
       <h3 className="home-recommendation-title min-h-[2.5rem] line-clamp-2 overflow-hidden text-[11px] font-bold leading-tight text-[#33251e]">{product.name}</h3>
       {product.description?.trim() && (
-        <p className="mt-0.5 w-full min-w-0 truncate text-[9px] leading-3 text-[#8b817a]">
+        <p
+          className="mt-0.5 w-full min-w-0 line-clamp-2 break-words text-[9px] leading-3 text-[#8b817a]"
+          title={product.description.trim()}
+        >
           {product.description.trim()}
         </p>
       )}

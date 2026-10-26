@@ -16,10 +16,11 @@ const makeCake = (smallStock, bigStock) => ({
 
 describe('ProductCard cake stock options', () => {
   test('shows the product description when provided', () => {
-    render(<ProductCard product={{ ...makeCake(3, 5), description: 'A soft vanilla cake with fresh strawberry filling.' }} />);
+    const description = 'A soft vanilla cake with fresh strawberry filling.';
+    render(<ProductCard product={{ ...makeCake(3, 5), description }} />);
 
-    expect(screen.getByText('A soft vanilla cake with fresh strawberry filling.')).toHaveClass('truncate', 'w-full');
-    expect(screen.getByText('A soft vanilla cake with fresh strawberry filling.')).not.toHaveClass('line-clamp-2');
+    expect(screen.getByText(description)).toHaveClass('line-clamp-2', 'w-full');
+    expect(screen.getByText(description)).toHaveAttribute('title', description);
   });
 
   test('disables only the out-of-stock size when the other size has stock', () => {

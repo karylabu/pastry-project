@@ -331,7 +331,10 @@ export default function ProductCard({
         </h3>
 
         {product.description?.trim() && (
-          <p className="mb-1 w-full min-w-0 truncate px-1 text-[9px] leading-3 text-[#8b817a]">
+          <p
+            className="mb-1 w-full min-w-0 line-clamp-2 break-words px-1 text-[9px] leading-3 text-[#8b817a]"
+            title={product.description.trim()}
+          >
             {product.description.trim()}
           </p>
         )}
