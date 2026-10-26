@@ -650,7 +650,7 @@ function buildDetailedForecastPayload(array $history, array $products, array $in
     $validationMetrics = array_map('summarizeValidationMetrics', $validation);
 
     $linearMetrics = $validationMetrics['linear'];
-    $linearMetrics = $validationMetrics['linear'];
+    $selectedMetrics = $validationMetrics[$selectedForecastMethod] ?? $linearMetrics;
     $totalForecast = array_sum(array_column($forecastProducts, 'totalForecast'));
     $trendPercent = $previousEquivalentTotal > 0
         ? round((($totalForecast - $previousEquivalentTotal) / $previousEquivalentTotal) * 100, 2)
