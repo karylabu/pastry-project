@@ -1,4 +1,11 @@
-import { buildBusinessAnalyticsCsv, fetchAllReportHistory, filterImportedTransactions, filterSalesTransactions, formatOrderItemSizes, getAnalyticsDateRange, getReportPeriodLabel, getReportSellerRows, groupRevenueByInterval, normalizeReportProducts, selectReportIngredients } from "./Reports";
+import { buildBusinessAnalyticsCsv, fetchAllReportHistory, filterImportedTransactions, filterSalesTransactions, formatOrderItemSizes, getAnalyticsDateRange, getReportPeriodLabel, getReportSellerRows, groupRevenueByInterval, normalizeReportProducts, peso, selectReportIngredients } from "./Reports";
+
+describe("peso", () => {
+  test("formats Philippine pesos with two decimal places", () => {
+    expect(peso(1234.5)).toBe("₱1,234.50");
+    expect(peso(0)).toBe("₱0.00");
+  });
+});
 
 const sales = [
   { date: "2026-10-05", revenue: 100, orders: 2 },

@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  TrendingUp, TrendingDown, DollarSign, Wallet, AlertTriangle, Trash2,
+  TrendingUp, TrendingDown, Wallet, AlertTriangle, Trash2,
   Download, Package, ChevronDown, ChevronUp, Flame, Clock, XCircle, CalendarClock,
   UploadCloud, FileSpreadsheet, CheckCircle2, AlertCircle
 } from 'lucide-react';
@@ -51,7 +51,13 @@ const C = {
 };
 
 function fmt(n)  { return Number(n || 0).toLocaleString(undefined, { maximumFractionDigits: 0 }); }
-function peso(n) { return `₱${Number(n || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}`; }
+export function peso(n) {
+  return `₱${Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+function PesoSign({ size = 16, style }) {
+  return <span aria-hidden="true" className="font-semibold leading-none" style={{ fontSize: size, ...style }}>₱</span>;
+}
 
 /* Used only for the "Total Waste Cost" KPI card estimate — there's no
    real spoilage log yet, so this is a rough sample, not tied to the
@@ -1523,7 +1529,7 @@ export default function Reports() {
 
           <div className="admin-sales-report-summary grid grid-cols-1 gap-2.5 sm:grid-cols-2 xl:grid-cols-4 mb-5">
             <StatCard
-              title="Total Revenue" icon={DollarSign} color={C.violet} soft={C.violetSoft}
+              title="Total Revenue" icon={PesoSign} color={C.violet} soft={C.violetSoft}
               value={analyticsLoading ? '…' : analytics ? peso(analytics.summary.revenue) : '—'}
               sub={analyticsLoading ? `${revenuePeriodLabel} · updating` : analytics ? `${analytics.filters.start_date} to ${analytics.filters.end_date}` : 'Analytics unavailable'}
             />
