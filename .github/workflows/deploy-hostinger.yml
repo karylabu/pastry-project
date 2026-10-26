@@ -219,7 +219,7 @@ jobs:
             "mkdir -p '$REMOTE_ROOT/includes'"
           rsync -az \
             -e "ssh -i ~/.ssh/id_ed25519 -p $SSH_PORT -o IdentitiesOnly=yes -o BatchMode=yes -o ConnectTimeout=20 -o ConnectionAttempts=3" \
-            includes/api_auth.php includes/db.php includes/inventory.php includes/session_security.php \
+            includes/api_auth.php includes/db.php includes/inventory.php includes/session_security.php includes/predictive_forecasting.php \
             "$SSH_USERNAME@$SSH_HOST:$REMOTE_ROOT/includes/"
 
       - name: Deploy waste logging handler

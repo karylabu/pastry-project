@@ -72,6 +72,10 @@ const VALIDATION_METHODS = [
   { key: "zero", label: "Predict zero", color: "#9a9a9a" },
 ];
 
+const FORECAST_METHOD_LABELS = Object.fromEntries(
+  VALIDATION_METHODS.filter((method) => method.key !== "zero").map(({ key, label }) => [key, label])
+);
+
 const formatMetric = (value, suffix) =>
   value == null || !Number.isFinite(Number(value)) ? "—" : `${Number(value)}${suffix}`;
 
@@ -87,6 +91,9 @@ function ValidationMetrics({ model }) {
     (activeScope === "aggregate" ? model?.aggregate_validation_metrics : model?.validation_metrics) || {};
   const option = METRIC_OPTIONS[selected];
   const linearMetrics = metrics.linear || {};
+  const forecastMethod = model?.selected_forecast_method || "linear";
+  const forecastMetrics = metrics[forecastMethod] || linearMetrics;
+  const forecastMethodLabel = FORECAST_METHOD_LABELS[forecastMethod] || "Linear trend (model)";
 
   const rows = VALIDATION_METHODS.map((method) => {
     const raw = metrics[method.key]?.[selected];
@@ -99,16 +106,16 @@ function ValidationMetrics({ model }) {
   const best = availableRows.length
     ? availableRows.reduce((winner, row) => (row.value < winner.value ? row : winner))
     : null;
-  const linear = rows.find((row) => row.key === "linear");
   const zero = rows.find((row) => row.key === "zero");
   const zeroPosition = zero?.value != null && maxValue > 0 ? (zero.value / maxValue) * 100 : null;
-  const modelLoses = linear?.value != null && best && best.key !== "linear";
+  const selectedMethod = rows.find((row) => row.key === forecastMethod);
+  const selectedMethodLoses = selectedMethod?.value != null && best && best.key !== forecastMethod;
 
   const tiles = [
-    ["MAE", formatMetric(linearMetrics.mae, "")],
-    ["RMSE", formatMetric(linearMetrics.rmse, "")],
-    ["MAPE", formatMetric(linearMetrics.mape, "%")],
-    ["WAPE", formatMetric(linearMetrics.wape, "%")],
+    ["MAE", formatMetric(forecastMetrics.mae, "")],
+    ["RMSE", formatMetric(forecastMetrics.rmse, "")],
+    ["MAPE", formatMetric(forecastMetrics.mape, "%")],
+    ["WAPE", formatMetric(forecastMetrics.wape, "%")],
   ];
 
   const scopeButtons = [
@@ -139,6 +146,12 @@ function ValidationMetrics({ model }) {
           </div>
         )}
       </div>
+      <p className="rounded-lg bg-[#f7f2e8] px-3 py-2 text-[11px] text-black/70">
+        Forecast uses <span className="font-semibold">{forecastMethodLabel}</span>, selected by shop-total WAPE
+        {model?.selected_forecast_method_wape != null
+          ? ` (${formatMetric(model.selected_forecast_method_wape, "%")} on the last 7-day holdout).`
+          : " when holdout data is available; linear trend is the fallback."}
+      </p>
 
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         {tiles.map(([label, value]) => (
@@ -214,9 +227,9 @@ function ValidationMetrics({ model }) {
         </p>
       )}
 
-      {modelLoses && (
+      {selectedMethodLoses && (
         <p className="rounded-lg bg-[#fff4cd] px-3 py-2 text-[11px] leading-5 text-[#33251e]">
-          The linear model is not the best method on {option.label}. “{best.label}” performs better. Sparse sales data can cause this.
+          {forecastMethodLabel} is not the lowest-error method on {option.label} for this view. “{best.label}” performs better here.
         </p>
       )}
 
