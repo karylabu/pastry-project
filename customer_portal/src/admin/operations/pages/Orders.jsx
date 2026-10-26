@@ -540,9 +540,30 @@ export default function Orders() {
           )}
 
           {dashboardFilter !== "low_stock" && <div className="mb-4 rounded-lg border border-[#e9e1d9] bg-white p-3 shadow-[0_3px_12px_rgba(60,42,28,0.035)] sm:p-4">
-            <div className="mb-3 flex items-center justify-between gap-3">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
               <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#65574d]">Filter by status</p>
-              <p className="text-[10px] text-[#8f8076]">{displayedOrders.length} matching {displayedOrders.length === 1 ? "order" : "orders"}</p>
+              <div className="flex flex-wrap items-center gap-3">
+                <p className="text-[10px] text-[#8f8076]">{displayedOrders.length} matching {displayedOrders.length === 1 ? "order" : "orders"}</p>
+                <label className="flex items-center gap-2 text-[10px] text-[#74675f]">
+                  Sort by
+                  <select
+                    aria-label="Sort orders"
+                    value={`${sortBy}:${sortDirection}`}
+                    onChange={(event) => {
+                      const [nextSortBy, nextDirection] = event.target.value.split(":");
+                      setSortBy(nextSortBy);
+                      setSortDirection(nextDirection);
+                    }}
+                    className="rounded-md border border-[#e8dfd4] bg-white px-2 py-1.5 text-[10px] text-[#33251e]"
+                  >
+                    <option value="date:asc">Oldest</option>
+                    <option value="date:desc">Newest</option>
+                    <option value="status:asc">Priority</option>
+                    <option value="total:desc">Highest total</option>
+                    <option value="total:asc">Lowest total</option>
+                  </select>
+                </label>
+              </div>
             </div>
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 xl:grid-cols-7" role="group" aria-label="Filter orders by status">
               {statusFilterOptions.map((option) => (
@@ -621,19 +642,6 @@ export default function Orders() {
             <>
             <div className="mb-3 flex items-center justify-between gap-3 xl:hidden">
               <p className="text-[11px] font-semibold text-[#65574d]">Orders <span className="ml-1 text-[#9b8c83]">{firstVisibleOrder}–{lastVisibleOrder} of {displayedOrders.length}</span></p>
-              <label className="flex items-center gap-2 text-[10px] text-[#74675f]">Sort
-                <select value={`${sortBy}:${sortDirection}`} onChange={(event) => {
-                  const [nextSortBy, nextDirection] = event.target.value.split(":");
-                  setSortBy(nextSortBy);
-                  setSortDirection(nextDirection);
-                }} className="rounded-md border border-[#e8dfd4] bg-white px-2 py-1.5 text-[10px] text-[#33251e]">
-                  <option value="status:asc">Priority</option>
-                  <option value="date:desc">Newest</option>
-                  <option value="date:asc">Oldest</option>
-                  <option value="total:desc">Highest total</option>
-                  <option value="total:asc">Lowest total</option>
-                </select>
-              </label>
             </div>
             <div className="space-y-2.5 xl:hidden">
               {pageOrders.map((order) => {

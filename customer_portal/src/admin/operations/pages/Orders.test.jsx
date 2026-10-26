@@ -80,6 +80,17 @@ test("shows the oldest order first by default across all statuses", async () => 
   expect(container.querySelector("article")).toHaveTextContent("#105");
 });
 
+test("sorts orders newest-first from the status filter toolbar", async () => {
+  const { container } = renderOrders();
+  await screen.findAllByText("Customer 101");
+
+  fireEvent.change(screen.getByRole("combobox", { name: "Sort orders" }), {
+    target: { value: "date:desc" },
+  });
+
+  await waitFor(() => expect(container.querySelector("article")).toHaveTextContent("#106"));
+});
+
 test("dashboard cards filter live orders and toggle off when clicked again", async () => {
   renderOrders();
   await screen.findAllByText("Customer 101");
