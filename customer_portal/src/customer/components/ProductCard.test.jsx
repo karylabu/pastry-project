@@ -19,8 +19,16 @@ describe('ProductCard cake stock options', () => {
     const description = 'A soft vanilla cake with fresh strawberry filling.';
     render(<ProductCard product={{ ...makeCake(3, 5), description }} />);
 
-    expect(screen.getByText(description)).toHaveClass('line-clamp-2', 'w-full');
-    expect(screen.getByText(description)).toHaveAttribute('title', description);
+    const descriptionPreview = screen.getByText('A soft vanilla cake with…');
+    expect(descriptionPreview).toHaveClass('line-clamp-2', 'w-full');
+    expect(descriptionPreview).toHaveAttribute('title', description);
+  });
+
+  test('keeps non-cake product descriptions unchanged', () => {
+    const description = 'A soft vanilla cake with fresh strawberry filling.';
+    render(<ProductCard product={{ ...makeCake(3, 5), category: 'Drinks', description }} />);
+
+    expect(screen.getByText(description)).toBeInTheDocument();
   });
 
   test('disables only the out-of-stock size when the other size has stock', () => {

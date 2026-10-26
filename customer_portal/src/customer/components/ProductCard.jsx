@@ -263,6 +263,11 @@ export default function ProductCard({
   if (!product) return null;
 
   const currentPrice = currentVariant ? parseFloat(currentVariant.price) || 0 : 0;
+  const productDescription = String(product.description || '').trim();
+  const descriptionWords = productDescription.split(/\s+/);
+  const cardDescription = isCakeProduct && descriptionWords.length > 5
+    ? `${descriptionWords.slice(0, 5).join(' ')}…`
+    : productDescription;
 
   const overallOutOfStock = variantButtons.length > 0
     ? variantButtons.every((variant) => variant.stock_quantity <= 0 || !variant.available)
@@ -330,12 +335,12 @@ export default function ProductCard({
           {product.name}
         </h3>
 
-        {product.description?.trim() && (
+        {cardDescription && (
           <p
             className="mb-1 w-full min-w-0 line-clamp-2 break-words px-1 text-[9px] leading-3 text-[#8b817a]"
-            title={product.description.trim()}
+            title={productDescription}
           >
-            {product.description.trim()}
+            {cardDescription}
           </p>
         )}
 
