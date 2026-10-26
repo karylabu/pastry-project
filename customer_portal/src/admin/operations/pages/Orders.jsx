@@ -676,11 +676,13 @@ export default function Orders() {
                         <span className="shrink-0 text-[10px] text-[#9b8c83]">{orderTiming.ageMinutes}m ago</span>
                       </div>
                       <div className="mt-3 flex flex-wrap gap-1.5">
-                        <button type="button" onClick={() => setExpandedOrderId(isExpanded ? null : order.id)} className="rounded-md border border-[#e8dfd4] bg-white px-2.5 py-1.5 text-[10px] font-semibold text-[#65574d] hover:bg-[#faf7f2]">{isExpanded ? "Hide details" : "View details"}</button>
-                        {canAdvance && <button type="button" onClick={() => advanceOrder(order)} disabled={updatingId === order.id} className="rounded-md bg-black px-2.5 py-1.5 text-[10px] font-semibold text-white disabled:opacity-50">{updatingId === order.id ? "Updating..." : needsPaymentReview ? "Review payment" : order.status === "Pending" ? "Approve" : order.status === "Preparing" ? "Ready" : "Complete"}</button>}
-                        {order.return_refund_request?.status === "Pending Review"
-                          ? <button type="button" onClick={() => { setRejectModalOrderId(order.id); setRejectReason(""); }} disabled={updatingId === order.id} className="rounded-md border border-red-200 bg-red-50 px-2.5 py-1.5 text-[10px] font-semibold text-red-700 disabled:opacity-50">Reject</button>
-                          : !["Completed", "Cancelled"].includes(order.status) && <button type="button" onClick={() => updateStatus(order.id, "Cancelled")} disabled={updatingId === order.id} className="rounded-md border border-red-200 bg-red-50 px-2.5 py-1.5 text-[10px] font-semibold text-red-700 disabled:opacity-50">Cancel</button>}
+                        {!order.is_wasted && <>
+                          <button type="button" onClick={() => setExpandedOrderId(isExpanded ? null : order.id)} className="rounded-md border border-[#e8dfd4] bg-white px-2.5 py-1.5 text-[10px] font-semibold text-[#65574d] hover:bg-[#faf7f2]">{isExpanded ? "Hide details" : "View details"}</button>
+                          {canAdvance && <button type="button" onClick={() => advanceOrder(order)} disabled={updatingId === order.id} className="rounded-md bg-black px-2.5 py-1.5 text-[10px] font-semibold text-white disabled:opacity-50">{updatingId === order.id ? "Updating..." : needsPaymentReview ? "Review payment" : order.status === "Pending" ? "Approve" : order.status === "Preparing" ? "Ready" : "Complete"}</button>}
+                          {order.return_refund_request?.status === "Pending Review"
+                            ? <button type="button" onClick={() => { setRejectModalOrderId(order.id); setRejectReason(""); }} disabled={updatingId === order.id} className="rounded-md border border-red-200 bg-red-50 px-2.5 py-1.5 text-[10px] font-semibold text-red-700 disabled:opacity-50">Reject</button>
+                            : !["Completed", "Cancelled"].includes(order.status) && <button type="button" onClick={() => updateStatus(order.id, "Cancelled")} disabled={updatingId === order.id} className="rounded-md border border-red-200 bg-red-50 px-2.5 py-1.5 text-[10px] font-semibold text-red-700 disabled:opacity-50">Cancel</button>}
+                        </>}
                         <button type="button" onClick={() => markOrderAsWaste(order)} disabled={order.is_wasted} className="rounded-md border border-[#e8dfd4] bg-[#faf7f2] px-2.5 py-1.5 text-[10px] font-semibold text-[#65574d] disabled:cursor-not-allowed disabled:opacity-50">{order.is_wasted ? "Counted as waste" : "Waste"}</button>
                       </div>
                     </div>
@@ -766,11 +768,13 @@ export default function Orders() {
                           </td>
                           <td className="px-4 py-3">
                             <div className="flex flex-wrap justify-end gap-2">
-                              <button type="button" onClick={() => setExpandedOrderId(isExpanded ? null : order.id)} className="rounded-full border border-black/10 bg-white px-3 py-1.5 text-[11px] font-semibold text-black hover:bg-black hover:text-white">{isExpanded ? "Hide" : "View"}</button>
-                              {(!(order.status === "Completed" || order.status === "Cancelled") && (order.status !== 'Awaiting Payment' || needsPaymentReview)) && <button type="button" onClick={() => advanceOrder(order)} disabled={updatingId === order.id} className="rounded-full bg-black px-3 py-1.5 text-[11px] font-semibold text-white hover:bg-black/80 disabled:opacity-50">{needsPaymentReview ? "Verify & move to Pending" : order.status === "Pending" ? "Approve" : order.status === "Preparing" ? "Ready" : "Complete"}</button>}
-                              {order.return_refund_request?.status === "Pending Review"
-                                ? order.return_refund_request?.status === "Pending Review" && <button type="button" onClick={() => { setRejectModalOrderId(order.id); setRejectReason(""); }} disabled={updatingId === order.id || rejectSubmitting} className="rounded-full border border-red-200 bg-red-50 px-3 py-1.5 text-[11px] font-semibold text-red-600 hover:bg-red-100 disabled:opacity-50">Reject</button>
-                                : !["Completed", "Cancelled"].includes(order.status) && <button type="button" onClick={() => updateStatus(order.id, "Cancelled")} disabled={updatingId === order.id} className="rounded-full border border-red-200 bg-red-50 px-3 py-1.5 text-[11px] font-semibold text-red-600 hover:bg-red-100 disabled:opacity-50">Cancel</button>}
+                              {!order.is_wasted && <>
+                                <button type="button" onClick={() => setExpandedOrderId(isExpanded ? null : order.id)} className="rounded-full border border-black/10 bg-white px-3 py-1.5 text-[11px] font-semibold text-black hover:bg-black hover:text-white">{isExpanded ? "Hide" : "View"}</button>
+                                {(!(order.status === "Completed" || order.status === "Cancelled") && (order.status !== 'Awaiting Payment' || needsPaymentReview)) && <button type="button" onClick={() => advanceOrder(order)} disabled={updatingId === order.id} className="rounded-full bg-black px-3 py-1.5 text-[11px] font-semibold text-white hover:bg-black/80 disabled:opacity-50">{needsPaymentReview ? "Verify & move to Pending" : order.status === "Pending" ? "Approve" : order.status === "Preparing" ? "Ready" : "Complete"}</button>}
+                                {order.return_refund_request?.status === "Pending Review"
+                                  ? order.return_refund_request?.status === "Pending Review" && <button type="button" onClick={() => { setRejectModalOrderId(order.id); setRejectReason(""); }} disabled={updatingId === order.id || rejectSubmitting} className="rounded-full border border-red-200 bg-red-50 px-3 py-1.5 text-[11px] font-semibold text-red-600 hover:bg-red-100 disabled:opacity-50">Reject</button>
+                                  : !["Completed", "Cancelled"].includes(order.status) && <button type="button" onClick={() => updateStatus(order.id, "Cancelled")} disabled={updatingId === order.id} className="rounded-full border border-red-200 bg-red-50 px-3 py-1.5 text-[11px] font-semibold text-red-600 hover:bg-red-100 disabled:opacity-50">Cancel</button>}
+                              </>}
                               <button type="button" onClick={() => markOrderAsWaste(order)} disabled={order.is_wasted} className="rounded-full border border-black/10 bg-[#F7F5EE] px-3 py-1.5 text-[11px] font-semibold text-black hover:bg-black hover:text-white disabled:cursor-not-allowed disabled:opacity-50">{order.is_wasted ? "Counted as waste" : "Waste"}</button>
                             </div>
                           </td>
@@ -943,39 +947,41 @@ export default function Orders() {
                               )}
 
                               <div className="mt-3 flex flex-wrap gap-2">
-                                <button
-                                  type="button"
-                                  onClick={() => setExpandedOrderId(isExpanded ? null : order.id)}
-                                  className="rounded-full border border-black/10 bg-white px-3 py-2 text-[12px] font-semibold text-black transition hover:bg-black hover:text-white"
-                                >
-                                  {isExpanded ? "Hide" : "View"}
-                                </button>
-                                {!(["Completed", "Cancelled"].includes(order.status)) && (
+                                {!order.is_wasted && <>
                                   <button
                                     type="button"
-                                    onClick={() => advanceOrder(order)}
-                                    disabled={updatingId === order.id}
-                                    className="rounded-full border border-black/10 bg-black px-3 py-2 text-[12px] font-semibold text-white transition hover:bg-black/90"
+                                    onClick={() => setExpandedOrderId(isExpanded ? null : order.id)}
+                                    className="rounded-full border border-black/10 bg-white px-3 py-2 text-[12px] font-semibold text-black transition hover:bg-black hover:text-white"
                                   >
-                                  {order.status === "Pending"
-                                    ? "Approve & bake"
-                                    : order.status === "Preparing"
-                                    ? "Mark ready"
-                                    : order.status === "Ready for Pickup"
-                                    ? "Resolve request"
-                                    : "Complete"}
+                                    {isExpanded ? "Hide" : "View"}
                                   </button>
-                                )}
-                                {!(["Completed", "Cancelled"].includes(order.status)) && (
-                                  <button
-                                    type="button"
-                                    onClick={() => updateStatus(order.id, "Cancelled")}
-                                    disabled={updatingId === order.id}
-                                    className="rounded-full border border-red-200 bg-red-50 px-3 py-2 text-[12px] font-semibold text-red-600 transition hover:bg-red-100"
-                                  >
-                                    Cancel
-                                  </button>
-                                )}
+                                  {!(["Completed", "Cancelled"].includes(order.status)) && (
+                                    <button
+                                      type="button"
+                                      onClick={() => advanceOrder(order)}
+                                      disabled={updatingId === order.id}
+                                      className="rounded-full border border-black/10 bg-black px-3 py-2 text-[12px] font-semibold text-white transition hover:bg-black/90"
+                                    >
+                                    {order.status === "Pending"
+                                      ? "Approve & bake"
+                                      : order.status === "Preparing"
+                                      ? "Mark ready"
+                                      : order.status === "Ready for Pickup"
+                                      ? "Resolve request"
+                                      : "Complete"}
+                                    </button>
+                                  )}
+                                  {!(["Completed", "Cancelled"].includes(order.status)) && (
+                                    <button
+                                      type="button"
+                                      onClick={() => updateStatus(order.id, "Cancelled")}
+                                      disabled={updatingId === order.id}
+                                      className="rounded-full border border-red-200 bg-red-50 px-3 py-2 text-[12px] font-semibold text-red-600 transition hover:bg-red-100"
+                                    >
+                                      Cancel
+                                    </button>
+                                  )}
+                                </>}
                                 <button
                                   type="button"
                                   onClick={() => markOrderAsWaste(order)}

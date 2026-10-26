@@ -1,5 +1,5 @@
 import React from "react";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import Orders from "./Orders";
 
 jest.mock("react-router-dom", () => ({
@@ -33,6 +33,16 @@ const orderFixture = (id, status, ageMinutes, extra = {}) => ({
 
 beforeEach(() => {
   global.fetch = jest.fn((url) => {
+    if (String(url).includes("/orders/106/waste")) {
+      return Promise.resolve({
+        ok: true,
+        json: async () => ({
+          success: true,
+          entry: { cost: 250 },
+        }),
+      });
+    }
+
     if (String(url).includes("/inventory/ingredients")) {
       return Promise.resolve({
         ok: true,
@@ -89,6 +99,30 @@ test("sorts orders newest-first from the status filter toolbar", async () => {
   });
 
   await waitFor(() => expect(container.querySelector("article")).toHaveTextContent("#106"));
+});
+
+test("removes view, approval, and cancel actions after an order is counted as waste", async () => {
+  const { container } = renderOrders();
+  const orderCard = (await screen.findAllByText("Customer 106"))[0].closest("article");
+  expect(within(orderCard).getByRole("button", { name: "Approve" })).toBeInTheDocument();
+  expect(within(orderCard).getByRole("button", { name: "Cancel" })).toBeInTheDocument();
+  expect(within(orderCard).getByRole("button", { name: "View details" })).toBeInTheDocument();
+
+  fireEvent.click(within(orderCard).getByRole("button", { name: "Waste" }));
+
+  await waitFor(() => {
+    expect(within(orderCard).getByRole("button", { name: "Counted as waste" })).toBeDisabled();
+    expect(within(orderCard).queryByRole("button", { name: "Approve" })).not.toBeInTheDocument();
+    expect(within(orderCard).queryByRole("button", { name: "Cancel" })).not.toBeInTheDocument();
+    expect(within(orderCard).queryByRole("button", { name: "View details" })).not.toBeInTheDocument();
+  });
+
+  const orderRow = Array.from(container.querySelectorAll("tr")).find((row) => row.textContent.includes("#106"));
+  expect(orderRow).toBeTruthy();
+  expect(within(orderRow).getByRole("button", { name: "Counted as waste" })).toBeDisabled();
+  expect(within(orderRow).queryByRole("button", { name: "Approve" })).not.toBeInTheDocument();
+  expect(within(orderRow).queryByRole("button", { name: "Cancel" })).not.toBeInTheDocument();
+  expect(within(orderRow).queryByRole("button", { name: "View" })).not.toBeInTheDocument();
 });
 
 test("dashboard cards filter live orders and toggle off when clicked again", async () => {
