@@ -73,8 +73,6 @@ export default function Ingredients({
   const [batchSubmitting, setBatchSubmitting] = useState(false);
   const [ingredientSearch, setIngredientSearch] = useState('');
   const [pendingRequests, setPendingRequests] = useState([]);
-  const [cakeRecipes, setCakeRecipes] = useState([]);
-  const [selectedCakeFlavor, setSelectedCakeFlavor] = useState(null);
   const currentUser = (() => { try { return JSON.parse(window.localStorage.getItem('user') || 'null'); } catch (e) { return null; } })();
   const canApproveDiscard = String(currentUser?.role || '').toLowerCase() === 'admin';
   const normalizedModalName = normalizeIngredientName(modalName);
@@ -98,11 +96,6 @@ export default function Ingredients({
         // ignore sync errors; still attempt to load existing ingredients
       }
       loadIngredients();
-      try {
-        const response = await fetch(`${LARAVEL_BASE}/api/customized-cakes/recipes`, { headers: { Accept: 'application/json' } });
-        const data = await response.json();
-        setCakeRecipes(data.success ? data.recipes || [] : []);
-      } catch (e) { setCakeRecipes([]); }
       if (canApproveDiscard) loadPendingRequests();
     })();
   }, [canApproveDiscard]);
@@ -414,10 +407,6 @@ export default function Ingredients({
   const filteredIngredients = useMemo(() => {
     const term = query.trim().toLowerCase();
     let res = ingredients.slice();
-    if (selectedCakeFlavor) {
-      const recipeIngredientIds = new Set((selectedCakeFlavor.ingredients || []).map((line) => Number(line.ingredient_id)));
-      res = res.filter((item) => recipeIngredientIds.has(Number(item.id)));
-    }
     if (term) {
       res = res.filter((item) =>
         item.name?.toLowerCase().includes(term) ||
@@ -449,7 +438,7 @@ export default function Ingredients({
     else if (sortBy === 'threshold') res.sort((a,b) => Number(b.threshold || 0) - Number(a.threshold || 0));
     else res.sort((a,b) => String(a.name || '').localeCompare(String(b.name || '')));
     return res;
-  }, [ingredients, query, stockFilter, categoryFilter, unitFilter, sortBy, selectedCakeFlavor, expiryByIngredient]);
+  }, [ingredients, query, stockFilter, categoryFilter, unitFilter, sortBy, expiryByIngredient]);
 
   const lowStockCount = ingredients.filter((item) => Number(item.threshold) > 0 && Number(item.usable_stock) > 0 && Number(item.usable_stock) <= Number(item.threshold)).length;
   const nearExpiryCount = ingredients.filter((item) => expiryByIngredient.get(Number(item.id))?.daysRemaining <= 7).length;
@@ -461,7 +450,6 @@ export default function Ingredients({
       setQuery('');
       setCategoryFilter('all');
       setUnitFilter('all');
-      setSelectedCakeFlavor(null);
     }
   };
 
@@ -496,11 +484,6 @@ export default function Ingredients({
             <span className="min-w-0"><span className="block truncate text-[10px] font-semibold uppercase tracking-[0.16em] text-[#9b8c83]">Out of Stock</span><span className="mt-0.5 block text-[20px] font-bold leading-none text-[#33251e]">{outOfStockCount}</span></span>
           </button>
         </div>
-
-        {cakeRecipes.length > 0 && <section className="mb-5 rounded-xl border border-[#eee4de] bg-white p-4 shadow-[0_5px_18px_rgba(91,64,39,0.04)]">
-          <div className="flex flex-wrap items-center justify-between gap-2"><p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#9b7810]">Filter by Cake Flavor</p>{selectedCakeFlavor && <button type="button" onClick={() => setSelectedCakeFlavor(null)} className="text-[11px] font-semibold text-[#8f7130] hover:text-[#5d470e]">Clear flavor</button>}</div>
-          <div className="mt-3 flex flex-wrap gap-2">{cakeRecipes.map((recipe) => <button key={recipe.id} type="button" onClick={() => setSelectedCakeFlavor(selectedCakeFlavor?.id === recipe.id ? null : recipe)} className={`rounded-full border px-3 py-1.5 text-[11px] font-semibold transition ${selectedCakeFlavor?.id === recipe.id ? 'border-[#c49b2e] bg-[#fff4cd] text-[#75580a]' : 'border-[#eee4de] bg-[#fffdfa] text-[#6a5a50] hover:border-[#e4c86f] hover:bg-[#fffaf0]'}`}>{recipe.flavor_name}</button>)}</div>
-        </section>}
 
         <div className="mb-5 flex flex-nowrap items-center gap-3 overflow-x-auto py-1">
           <label className="relative min-w-[296px] flex-1 sm:w-[296px] sm:flex-none">
