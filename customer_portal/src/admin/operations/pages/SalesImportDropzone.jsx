@@ -138,6 +138,7 @@ export default function SalesImportDropzone({
   dateFilterStart = '',
   dateFilterEnd = '',
   onDownloadCsvReport,
+  onDownloadPdfReport,
 }) {
   const [isDragging, setIsDragging] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -291,34 +292,44 @@ export default function SalesImportDropzone({
 
   if (compact) {
     return (
-      <div className="admin-sales-import-buttons flex flex-wrap gap-2">
+      <div className="admin-sales-import-buttons grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
         <input ref={inputRef} type="file" accept=".csv,.pdf" className="hidden" onChange={onInputChange} />
-        <label className="flex h-10 basis-full items-center gap-2 rounded-md border border-black/15 bg-white px-3 text-[10px] font-semibold text-black/70">
+        <label className="col-span-full flex h-10 min-w-0 items-center gap-2 rounded-md border border-black/15 bg-white px-3 text-[10px] font-semibold text-black/70">
           CSV overlap handling
           <select aria-label="CSV overlap handling" value={overlapMode} onChange={(event) => setOverlapMode(event.target.value)} className="min-w-0 flex-1 bg-transparent text-[10px] outline-none">
             <option value="deduplicate_live">Skip rows overlapping live orders</option>
             <option value="supplement">Add as additional sales (e.g. walk-ins)</option>
           </select>
         </label>
-        <button type="button" onClick={() => { chooseSalesType('customized_cake'); inputRef.current?.click(); }} disabled={isProcessing} className="inline-flex h-10 min-w-[150px] flex-1 items-center justify-center gap-2 rounded-md bg-black px-3 text-[11px] font-semibold text-white transition hover:bg-black/85 disabled:cursor-wait disabled:opacity-60">
+        <button type="button" onClick={() => { chooseSalesType('customized_cake'); inputRef.current?.click(); }} disabled={isProcessing} className="inline-flex h-10 min-w-0 items-center justify-center gap-2 rounded-md bg-black px-3 text-[11px] font-semibold text-white transition hover:bg-black/85 disabled:cursor-wait disabled:opacity-60">
           {isProcessing ? <Loader2 size={14} className="animate-spin" /> : <UploadCloud size={14} />}
           {isProcessing ? 'Importing report...' : 'Import Customized Cake Sales'}
         </button>
-        <button type="button" onClick={() => { chooseSalesType('finished_product'); inputRef.current?.click(); }} disabled={isProcessing} className="inline-flex h-10 min-w-[150px] flex-1 items-center justify-center gap-2 rounded-md bg-black px-3 text-[11px] font-semibold text-white transition hover:bg-black/85 disabled:cursor-wait disabled:opacity-60">
+        <button type="button" onClick={() => { chooseSalesType('finished_product'); inputRef.current?.click(); }} disabled={isProcessing} className="inline-flex h-10 min-w-0 items-center justify-center gap-2 rounded-md bg-black px-3 text-[11px] font-semibold text-white transition hover:bg-black/85 disabled:cursor-wait disabled:opacity-60">
           {isProcessing ? <Loader2 size={14} className="animate-spin" /> : <UploadCloud size={14} />}
           {isProcessing ? 'Importing report...' : 'Import Finished Product Sales'}
         </button>
         <button
           type="button"
           onClick={onDownloadCsvReport || (() => downloadCsvTemplate(range, dateFilterStart, dateFilterEnd))}
-          className="inline-flex h-10 min-w-[150px] flex-1 items-center justify-center gap-2 rounded-md bg-black px-3 text-[11px] font-semibold text-white transition hover:bg-black/85"
+          className="inline-flex h-10 min-w-0 items-center justify-center gap-2 rounded-md bg-black px-3 text-[11px] font-semibold text-white transition hover:bg-black/85"
         >
           <Download size={14} />
           {onDownloadCsvReport ? 'Download CSV Report' : 'Download CSV template'}
         </button>
+        {onDownloadPdfReport && (
+          <button
+            type="button"
+            onClick={onDownloadPdfReport}
+            className="admin-sales-report-pdf-button inline-flex h-10 min-w-0 items-center justify-center gap-2 rounded-md bg-black px-3 text-[11px] font-semibold text-white transition hover:bg-black/85"
+          >
+            <Download size={15} />
+            Download PDF Report
+          </button>
+        )}
         <AnimatePresence>
           {toast && (
-            <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} className="admin-sales-import-toast flex basis-full items-start gap-2 rounded-md px-3 py-2 text-[10px]" style={{ background: toast.type === 'success' ? C.emeraldSoft : C.redSoft, color: '#000000' }}>
+            <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} className="admin-sales-import-toast col-span-full flex items-start gap-2 rounded-md px-3 py-2 text-[10px]" style={{ background: toast.type === 'success' ? C.emeraldSoft : C.redSoft, color: '#000000' }}>
               {toast.type === 'success' ? <CheckCircle2 size={14} className="mt-0.5 shrink-0" /> : <AlertCircle size={14} className="mt-0.5 shrink-0" />}
               <span className="flex-1">{toast.message}</span>
               <button type="button" onClick={() => setToast(null)} aria-label="Dismiss import message"><X size={13} /></button>

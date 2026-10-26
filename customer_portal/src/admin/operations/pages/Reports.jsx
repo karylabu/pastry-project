@@ -1508,23 +1508,16 @@ export default function Reports() {
               <h1 className="text-[26px] font-bold leading-tight text-black sm:text-[30px]">Sales Reports</h1>
               <p className="mt-1.5 text-[13px] text-black/60">Revenue, demand, inventory movement, and procurement.</p>
             </div>
-            <div className="admin-sales-report-actions flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-start">
+            <div className="admin-sales-report-actions w-full sm:max-w-[780px]">
               <SalesImportDropzone
                 compact
                 range={range}
                 dateFilterStart={dateFilterStart}
                 dateFilterEnd={dateFilterEnd}
                 onDownloadCsvReport={exportCsvReport}
+                onDownloadPdfReport={exportReport}
                 onImportComplete={refreshAnalyticsAfterImport}
               />
-              <button
-                type="button"
-                onClick={exportReport}
-                className="admin-sales-report-pdf-button inline-flex h-10 min-w-[150px] flex-1 items-center justify-center gap-2 rounded-md bg-black px-3 text-[11px] font-semibold text-white transition hover:bg-black/85"
-              >
-                <Download size={15} />
-                Download PDF Report
-              </button>
             </div>
           </div>
 
