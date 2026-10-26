@@ -7,6 +7,9 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Http\Request;
+use App\Http\Controllers\AuthApiController;
+use App\Services\AdminSessionGuard;
 use App\Services\CustomerTwoFactor;
 use Tests\TestCase;
 
@@ -225,6 +228,104 @@ class CustomerAuthApiTest extends TestCase
         $this->assertNotSame(str_repeat('a', 64), $response->json('token'));
         $this->assertDatabaseCount('user_sessions', 1);
         $this->assertDatabaseHas('user_sessions', ['user_id' => 10, 'token' => $response->json('token')]);
+    }
+
+    public function test_inactive_admin_session_does_not_block_a_new_login(): void
+    {
+        DB::table('users')->insert([
+            'id' => 12,
+            'name' => 'Inactive Admin',
+            'email' => 'inactive-admin@example.com',
+            'password' => Hash::make('admin-password'),
+            'role' => 'admin',
+            'status' => 'active',
+        ]);
+        DB::table('user_sessions')->insert([
+            'user_id' => 12,
+            'token' => str_repeat('b', 64),
+            'created_at' => now()->subMinutes(3),
+            'expires_at' => now()->addDays(30),
+            'device_name' => 'Old browser',
+            'ip_address' => '192.0.2.1',
+        ]);
+
+        $token = app(AdminSessionGuard::class)->claim(
+            12,
+            Request::create('/api/login', 'POST', [], [], [], [
+                'HTTP_USER_AGENT' => 'New Browser/1.0',
+                'REMOTE_ADDR' => '192.0.2.2',
+            ])
+        );
+
+        $this->assertDatabaseCount('user_sessions', 1);
+        $this->assertDatabaseHas('user_sessions', [
+            'user_id' => 12,
+            'token' => $token,
+        ]);
+        $this->assertNotSame(str_repeat('b', 64), $token);
+    }
+
+    public function test_active_admin_session_blocks_a_different_browser(): void
+    {
+        DB::table('users')->insert([
+            'id' => 14,
+            'name' => 'Active Admin',
+            'email' => 'active-admin@example.com',
+            'password' => Hash::make('admin-password'),
+            'role' => 'admin',
+            'status' => 'active',
+        ]);
+        DB::table('user_sessions')->insert([
+            'user_id' => 14,
+            'token' => str_repeat('d', 64),
+            'created_at' => now(),
+            'expires_at' => now()->addMinutes(3),
+            'device_name' => 'Old browser',
+            'ip_address' => '192.0.2.1',
+        ]);
+
+        $token = app(AdminSessionGuard::class)->claim(
+            14,
+            Request::create('/api/login', 'POST', [], [], [], [
+                'HTTP_USER_AGENT' => 'New Browser/1.0',
+                'REMOTE_ADDR' => '192.0.2.2',
+            ])
+        );
+
+        $this->assertNull($token);
+        $this->assertDatabaseCount('user_sessions', 1);
+    }
+
+    public function test_admin_status_refreshes_active_session_lease(): void
+    {
+        DB::table('users')->insert([
+            'id' => 13,
+            'name' => 'Heartbeat Admin',
+            'email' => 'heartbeat-admin@example.com',
+            'password' => Hash::make('admin-password'),
+            'role' => 'admin',
+            'status' => 'active',
+        ]);
+        $token = str_repeat('c', 64);
+        DB::table('user_sessions')->insert([
+            'user_id' => 13,
+            'token' => $token,
+            'created_at' => now()->subMinutes(3),
+            'expires_at' => now()->addDays(30),
+            'device_name' => 'Admin browser',
+            'ip_address' => '127.0.0.1',
+        ]);
+
+        $request = Request::create('/api/auth/status', 'GET');
+        $request->headers->set('Authorization', 'Bearer ' . $token);
+        $response = app(AuthApiController::class)->status($request);
+
+        $this->assertSame(200, $response->getStatusCode());
+
+        $session = DB::table('user_sessions')->where('token', $token)->first();
+        $this->assertNotNull($session);
+        $this->assertTrue(now()->diffInSeconds($session->created_at) < 5);
+        $this->assertTrue(now()->diffInSeconds($session->expires_at) <= 180);
     }
 
     public function test_customer_login_requires_totp_and_prevents_reusing_a_recovery_code(): void

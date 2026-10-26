@@ -9,6 +9,8 @@ use RuntimeException;
 
 class AdminSessionGuard
 {
+    private const ACTIVE_SESSION_WINDOW_MINUTES = 3;
+
     public function claim(int $userId, Request $request): ?string
     {
         if (!Schema::hasTable('user_sessions')) {
@@ -23,6 +25,7 @@ class AdminSessionGuard
 
             $activeSessions = DB::table('user_sessions')
                 ->where('user_id', $userId)
+                ->where('created_at', '>', now()->subMinutes(self::ACTIVE_SESSION_WINDOW_MINUTES))
                 ->where(function ($query) {
                     $query->whereNull('expires_at')->orWhere('expires_at', '>', now());
                 });
@@ -70,7 +73,7 @@ class AdminSessionGuard
                 'user_id' => $userId,
                 'token' => $token,
                 'created_at' => now(),
-                'expires_at' => now()->addDays(30),
+                'expires_at' => now()->addMinutes(self::ACTIVE_SESSION_WINDOW_MINUTES),
             ];
 
             if (Schema::hasColumn('user_sessions', 'device_name')) {
@@ -84,6 +87,28 @@ class AdminSessionGuard
 
             return $token;
         });
+    }
+
+    public function refresh(int $userId, Request $request): void
+    {
+        $token = trim((string) (
+            $request->bearerToken()
+            ?: $request->header('X-Auth-Token')
+            ?: session('auth_token')
+            ?: ($_SESSION['auth_token'] ?? '')
+        ));
+
+        if ($token === '' || !Schema::hasTable('user_sessions')) {
+            return;
+        }
+
+        DB::table('user_sessions')
+            ->where('user_id', $userId)
+            ->where('token', $token)
+            ->update([
+                'created_at' => now(),
+                'expires_at' => now()->addMinutes(self::ACTIVE_SESSION_WINDOW_MINUTES),
+            ]);
     }
 
     private function browserName(string $userAgent): string

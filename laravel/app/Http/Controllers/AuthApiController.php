@@ -27,6 +27,10 @@ class AuthApiController extends Controller
             ], 401);
         }
 
+        if (strtolower((string) $user->role) === 'admin') {
+            app(AdminSessionGuard::class)->refresh((int) $user->id, $request);
+        }
+
         return response()->json([
             'success' => true,
             'user' => [
