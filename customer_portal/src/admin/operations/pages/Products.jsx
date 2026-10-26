@@ -733,7 +733,7 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   placeholder="Search products"
-                  className="w-full rounded-lg border border-[#eadfd8] bg-white py-2.5 pl-10 pr-24 text-[12px] text-[#33251e] outline-none placeholder:text-[#b7a69c] focus:border-[#d4af37] focus:ring-2 focus:ring-[#d4af37]/15"
+                  className="w-full rounded-xl border border-[#eadfd8] bg-white py-2.5 pl-10 pr-24 text-[12px] text-[#33251e] outline-none placeholder:text-[#b7a69c] focus:border-[#d4af37] focus:ring-2 focus:ring-[#d4af37]/15"
                 />
                 {searchTerm && (
                   <button
@@ -1171,7 +1171,7 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
                 initial={{ scale: 0.95 }}
                 animate={{ scale: 1 }}
                 exit={{ scale: 0.95 }}
-                className="bg-white w-full max-w-[420px] rounded-[18px] p-4 shadow-xl border border-black/10 max-h-[80vh] overflow-y-auto"
+                className="bg-white w-full max-w-[420px] rounded-2xl p-4 shadow-xl border border-black/10 max-h-[80vh] overflow-y-auto"
               >
                 <div className="sticky top-0 z-20 bg-white pt-3 pb-4 mb-5 border-b border-black/5">
                   <div className="flex flex-col gap-2">
@@ -1385,7 +1385,7 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
                       type="text"
                       value={editProduct.name}
                       onChange={(e) => setEditProduct((p) => ({ ...p, name: e.target.value }))}
-                      className="w-full rounded-lg border border-[#eadfd8] bg-white px-3 py-2.5 text-[12px] text-[#33251e] outline-none transition focus:border-[#d4af37] focus:ring-2 focus:ring-[#d4af37]/15"
+                      className="w-full rounded-xl border border-[#eadfd8] bg-white px-3 py-2.5 text-[12px] text-[#33251e] outline-none transition focus:border-[#d4af37] focus:ring-2 focus:ring-[#d4af37]/15"
                     />
                   </div>
 
@@ -1395,7 +1395,7 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
                       id="edit-product-category"
                       value={editProduct.category}
                       onChange={(e) => setEditProduct((p) => ({ ...p, category: e.target.value }))}
-                      className="w-full rounded-lg border border-[#eadfd8] bg-white px-3 py-2.5 text-[12px] text-[#33251e] outline-none transition focus:border-[#d4af37] focus:ring-2 focus:ring-[#d4af37]/15"
+                      className="w-full rounded-xl border border-[#eadfd8] bg-white px-3 py-2.5 text-[12px] text-[#33251e] outline-none transition focus:border-[#d4af37] focus:ring-2 focus:ring-[#d4af37]/15"
                     >
                       {[...new Set([
                         ...(canManageCatalog ? ["Cakes", "Small Cakes"] : ["Cakes", "Small Cakes", "Meals", "Pasta", "Starter"]),
@@ -1415,7 +1415,7 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
                       step="0.01"
                       value={editProduct.price}
                       onChange={(e) => setEditProduct((p) => ({ ...p, price: e.target.value }))}
-                      className="w-full rounded-lg border border-[#eadfd8] bg-white px-3 py-2.5 text-[12px] text-[#33251e] outline-none transition focus:border-[#d4af37] focus:ring-2 focus:ring-[#d4af37]/15"
+                      className="w-full rounded-xl border border-[#eadfd8] bg-white px-3 py-2.5 text-[12px] text-[#33251e] outline-none transition focus:border-[#d4af37] focus:ring-2 focus:ring-[#d4af37]/15"
                     />
                   </div>
 
@@ -1446,7 +1446,7 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
                   <textarea
                     value={editProduct.description}
                     onChange={(e) => setEditProduct((p) => ({ ...p, description: e.target.value }))}
-                    className="min-h-[120px] w-full rounded-lg border border-[#eadfd8] bg-white px-3 py-2.5 text-[12px] text-[#33251e] outline-none transition focus:border-[#d4af37] focus:ring-2 focus:ring-[#d4af37]/15"
+                    className="min-h-[120px] w-full rounded-xl border border-[#eadfd8] bg-white px-3 py-2.5 text-[12px] text-[#33251e] outline-none transition focus:border-[#d4af37] focus:ring-2 focus:ring-[#d4af37]/15"
                   />
                 </div>
 
