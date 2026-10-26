@@ -27,6 +27,7 @@ import {
 import { BASE, LARAVEL_BASE } from "../../services/config";
 import { getAuthHeaders } from "../../services/api";
 import { getAdminNotificationTarget } from "./notificationNavigation";
+import AdminDialog from "./AdminDialog";
 
 const NAV_GROUPS = [
   { label: "Overview", items: [{ name: "Dashboard", path: "/admin/dashboard" }] },
@@ -101,6 +102,7 @@ export default function AdminNavbar({ onSidebarChange }) {
   const [accountOpen, setAccountOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState(() => getStoredUser());
   const [currentDateTime, setCurrentDateTime] = useState(() => new Date());
+  const [adminDialog, setAdminDialog] = useState(null);
   const searchRef = useRef(null);
   const notificationsRef = useRef(null);
   const accountRef = useRef(null);
@@ -242,8 +244,6 @@ export default function AdminNavbar({ onSidebarChange }) {
   };
 
   const handleLogout = async () => {
-    if (!window.confirm("Are you sure you want to log out?")) return;
-
     const token = getStoredUser()?.token || "";
     try {
       await fetch(`${BASE}/staff/logout.php`, {
@@ -258,6 +258,14 @@ export default function AdminNavbar({ onSidebarChange }) {
     localStorage.removeItem("auth_token");
     navigate("/admin/login", { replace: true });
   };
+
+  const confirmLogout = () => setAdminDialog({
+    kind: "confirm",
+    title: "Log out?",
+    message: "Are you sure you want to log out of the admin panel?",
+    confirmLabel: "Log out",
+    onConfirm: handleLogout,
+  });
 
   return (
     <>
@@ -303,7 +311,7 @@ export default function AdminNavbar({ onSidebarChange }) {
         </nav>
 
         <div className="shrink-0 border-t border-[#f0e7e0] px-4 py-5">
-          <button type="button" onClick={handleLogout} className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-[13px] text-[#5f514a] transition-colors hover:bg-[#fff8df] hover:text-[#33251e]">
+          <button type="button" onClick={confirmLogout} className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-[13px] text-[#5f514a] transition-colors hover:bg-[#fff8df] hover:text-[#33251e]">
             <LogOut size={16} /> Logout
           </button>
         </div>
@@ -435,13 +443,22 @@ export default function AdminNavbar({ onSidebarChange }) {
                 </div>
                 <div className="p-1.5">
                   {[["Dashboard", "/admin/dashboard"], ["Sales Reports", "/admin/reports"], ["Settings", "/admin/settings"]].map(([label, path]) => <Link key={path} to={path} onClick={() => setAccountOpen(false)} className="block rounded-md px-3 py-2 text-[11px] text-[#5f514a] transition hover:bg-[#fff8df]">{label}</Link>)}
-                  <button type="button" onClick={handleLogout} className="mt-1 w-full rounded-md px-3 py-2 text-left text-[11px] font-semibold text-[#8d5357] transition hover:bg-[#fff0f0]">Log out</button>
+                  <button type="button" onClick={confirmLogout} className="mt-1 w-full rounded-md px-3 py-2 text-left text-[11px] font-semibold text-[#8d5357] transition hover:bg-[#fff0f0]">Log out</button>
                 </div>
               </section>
             )}
           </div>
         </div>
       </header>
+      <AdminDialog
+        dialog={adminDialog}
+        onClose={() => setAdminDialog(null)}
+        onConfirm={() => {
+          const action = adminDialog?.onConfirm;
+          setAdminDialog(null);
+          void action?.();
+        }}
+      />
     </>
   );
 }

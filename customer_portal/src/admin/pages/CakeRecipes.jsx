@@ -4,6 +4,7 @@ import * as XLSX from "xlsx";
 import { Calculator, CakeSlice, CheckCircle2, Package, Plus, Search, Save, Trash2, Upload } from "lucide-react";
 import { LARAVEL_BASE } from "../../services/config";
 import { safeParseJson } from "../../services/api";
+import AdminDialog from "../components/AdminDialog";
 
 const emptyLine = { ingredient_id: "", quantity: "", unit: "g" };
 
@@ -21,6 +22,7 @@ export default function CakeRecipes() {
     { flavor_id: "", size_id: "" },
   ]);
   const [preview, setPreview] = useState(null);
+  const [adminDialog, setAdminDialog] = useState(null);
 
   const request = async (path, options = {}) => {
     let storedUser = null;
@@ -170,7 +172,19 @@ export default function CakeRecipes() {
       });
 
       const hasDraft = recipeLines.some((line) => line.ingredient_id || line.quantity);
-      if (hasDraft && !window.confirm("Replace the current recipe draft with the imported file?")) return;
+      if (hasDraft) {
+        setAdminDialog({
+          kind: "confirm",
+          title: "Replace recipe draft?",
+          message: "Importing this file will replace the ingredients currently in the recipe draft.",
+          confirmLabel: "Replace draft",
+          onConfirm: () => {
+            setRecipeLines(importedLines);
+            setStatus(`Imported ${importedLines.length} ingredients for ${selectedFlavor?.name || "this flavor"}. Review the recipe, then save it.`);
+          },
+        });
+        return;
+      }
 
       setRecipeLines(importedLines);
       setStatus(`Imported ${importedLines.length} ingredients for ${selectedFlavor?.name || "this flavor"}. Review the recipe, then save it.`);
@@ -427,6 +441,15 @@ export default function CakeRecipes() {
           )}
         </section>
       </div>
+      <AdminDialog
+        dialog={adminDialog}
+        onClose={() => setAdminDialog(null)}
+        onConfirm={() => {
+          const action = adminDialog?.onConfirm;
+          setAdminDialog(null);
+          action?.();
+        }}
+      />
     </div>
   );
 }

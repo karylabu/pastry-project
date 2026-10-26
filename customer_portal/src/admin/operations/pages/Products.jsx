@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useLocation, useNavigate } from "react-router-dom";
 import { AlertTriangle, ChefHat, CircleCheck, CircleX, History, ImagePlus, LayoutGrid, Pencil, Plus, RefreshCw, Search, SlidersHorizontal, Table2, Trash2, X } from "lucide-react";
 import { BASE, LARAVEL_BASE, STAFF_BASE } from "../../../services/config";
+import AdminDialog from "../../components/AdminDialog";
 
 const getStaffAuthHeaders = () => {
   let token = '';
@@ -81,6 +82,7 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState(null);
+  const [adminDialog, setAdminDialog] = useState(null);
 
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [qty, setQty] = useState("");
@@ -1616,7 +1618,10 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
                           throw new Error(data.error || data.message || 'Product update failed.');
                         }
                       } catch (err) {
-                        alert(err.message || 'Server error while updating product.');
+                        setAdminDialog({
+                          title: "Product not updated",
+                          message: err.message || "We could not update the product. Please try again.",
+                        });
                       } finally {
                         setEditSaving(false);
                       }
@@ -1634,6 +1639,7 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
           )}
 
         </AnimatePresence>
+        <AdminDialog dialog={adminDialog} onClose={() => setAdminDialog(null)} />
 
       </div>
 

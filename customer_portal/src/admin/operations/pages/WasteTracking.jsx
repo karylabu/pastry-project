@@ -22,6 +22,7 @@ import {
   Cell,
 } from "recharts";
 import { LARAVEL_BASE, STAFF_BASE } from "../../../services/config";
+import AdminDialog from "../../components/AdminDialog";
 
 const staffFetch = (url, options = {}) => fetch(url, { credentials: "include", ...options });
 const laravelStaffFetch = (url, options = {}) => {
@@ -87,6 +88,7 @@ export default function WasteTracking() {
   const [range, setRange] = useState("all"); // all | daily | weekly | monthly
   const [auditPage, setAuditPage] = useState(1);
   const [showModal, setShowModal] = useState(false);
+  const [adminDialog, setAdminDialog] = useState(null);
   const [form, setForm] = useState({
     item: "",
     qty: "",
@@ -332,7 +334,10 @@ export default function WasteTracking() {
       setEntries((prev) => [data.entry, ...prev]);
       setShowModal(false);
     } catch (error) {
-      window.alert(error.message || "Waste log failed.");
+      setAdminDialog({
+        title: "Waste entry not saved",
+        message: error.message || "Waste log failed. Please check the details and try again.",
+      });
       return;
     }
 
@@ -612,6 +617,7 @@ export default function WasteTracking() {
           </div>
         </div>
       )}
+      <AdminDialog dialog={adminDialog} onClose={() => setAdminDialog(null)} />
     </div>
   );
 }
