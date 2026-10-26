@@ -19,9 +19,10 @@ describe('ProductCard cake stock options', () => {
     const description = 'A soft vanilla cake with fresh strawberry filling.';
     render(<ProductCard product={{ ...makeCake(3, 5), description }} />);
 
-    const descriptionPreview = screen.getByText('A soft vanilla cake with…');
-    expect(descriptionPreview).toHaveClass('line-clamp-2', 'w-full');
-    expect(descriptionPreview).toHaveAttribute('title', description);
+    const fullDescription = screen.getByText(description);
+    expect(fullDescription).toHaveClass('w-full');
+    expect(fullDescription).toHaveClass('whitespace-pre-wrap');
+    expect(fullDescription).not.toHaveClass('line-clamp-2');
   });
 
   test('keeps non-cake product descriptions unchanged', () => {

@@ -264,10 +264,6 @@ export default function ProductCard({
 
   const currentPrice = currentVariant ? parseFloat(currentVariant.price) || 0 : 0;
   const productDescription = String(product.description || '').trim();
-  const descriptionWords = productDescription.split(/\s+/);
-  const cardDescription = isCakeProduct && descriptionWords.length > 5
-    ? `${descriptionWords.slice(0, 5).join(' ')}…`
-    : productDescription;
 
   const overallOutOfStock = variantButtons.length > 0
     ? variantButtons.every((variant) => variant.stock_quantity <= 0 || !variant.available)
@@ -292,7 +288,7 @@ export default function ProductCard({
         onSelect?.(product, label, currentPrice);
       }}
       aria-disabled={overallOutOfStock}
-      className={`group relative flex h-full min-h-[292px] min-w-0 flex-col items-center overflow-hidden rounded-xl border border-[#eadfd8] bg-[#fffaf7] p-2 text-center shadow-[0_5px_14px_rgba(91,64,39,0.06)] transition-all duration-300 ${overallOutOfStock ? 'border-gray-300 bg-gray-100 opacity-70' : 'hover:-translate-y-0.5 hover:border-[#e7c875] hover:shadow-[0_10px_20px_rgba(91,64,39,0.1)]'}`}
+      className={`group relative flex h-full min-h-[292px] min-w-0 flex-col items-center rounded-xl border border-[#eadfd8] bg-[#fffaf7] p-2 text-center shadow-[0_5px_14px_rgba(91,64,39,0.06)] transition-all duration-300 ${overallOutOfStock ? 'border-gray-300 bg-gray-100 opacity-70' : 'hover:-translate-y-0.5 hover:border-[#e7c875] hover:shadow-[0_10px_20px_rgba(91,64,39,0.1)]'}`}
     >
       <div
         className="mb-2 flex h-[130px] w-full flex-shrink-0 items-center justify-center overflow-hidden rounded-lg border border-[#f1e6df] bg-[#f8eee8] p-2"
@@ -335,12 +331,11 @@ export default function ProductCard({
           {product.name}
         </h3>
 
-        {cardDescription && (
+        {productDescription && (
           <p
-            className="mb-1 w-full min-w-0 line-clamp-2 break-words px-1 text-[9px] leading-3 text-[#8b817a]"
-            title={productDescription}
+            className="mb-1 w-full min-w-0 break-words whitespace-pre-wrap px-1 text-[9px] leading-3 text-[#8b817a]"
           >
-            {cardDescription}
+            {productDescription}
           </p>
         )}
 
