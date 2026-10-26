@@ -8,6 +8,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use App\Services\ProductionService;
 use Throwable;
@@ -64,6 +65,138 @@ class ProductController extends Controller
             ->values();
 
         return response()->json($products);
+    }
+
+    public function storeStaff(Request $request): JsonResponse
+    {
+        $admin = $this->requireRole($request, 'admin');
+        if (!$admin instanceof \App\Models\User) {
+            return $admin;
+        }
+
+        if (!Schema::hasTable('product_sizes')) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Product size storage is unavailable. Please contact support.',
+            ], 500);
+        }
+
+        $data = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'category' => ['required', 'string', 'max:100'],
+            'description' => ['nullable', 'string'],
+            'price' => ['required', 'numeric', 'gt:0'],
+            'stock' => ['required', 'integer', 'min:0'],
+            'image' => ['required', 'image', 'mimes:jpg,jpeg,png,gif', 'max:5120'],
+            'ingredient_id' => ['sometimes', 'array'],
+            'ingredient_id.*' => ['required', 'integer', 'exists:ingredients,id'],
+            'ingredient_qty' => ['sometimes', 'array'],
+            'ingredient_qty.*' => ['required', 'numeric', 'gt:0'],
+        ]);
+
+        if (count($data['ingredient_id'] ?? []) !== count($data['ingredient_qty'] ?? [])) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Check that every recipe ingredient has a quantity.',
+            ], 422);
+        }
+
+        $uploadDirectory = base_path('../uploads');
+        if (!is_dir($uploadDirectory) && !mkdir($uploadDirectory, 0755, true) && !is_dir($uploadDirectory)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unable to prepare image storage. Please try again later.',
+            ], 500);
+        }
+
+        $image = $request->file('image');
+        $imageName = 'p' . Str::uuid() . '.' . $image->extension();
+        try {
+            $image->move($uploadDirectory, $imageName);
+        } catch (Throwable $exception) {
+            Log::error('Product image upload failed.', ['exception' => $exception]);
+            return response()->json([
+                'success' => false,
+                'message' => 'Unable to save the product image. Please choose another image and try again.',
+            ], 500);
+        }
+
+        try {
+            $productId = DB::transaction(function () use ($data, $imageName) {
+                $now = now();
+                $productAttributes = [
+                    'name' => trim($data['name']),
+                    'category' => trim($data['category']),
+                    'price' => $data['price'],
+                    'big_price' => $data['price'],
+                    'stock' => (int) $data['stock'],
+                    'image' => $imageName,
+                    'description' => trim((string) ($data['description'] ?? '')) ?: null,
+                    'available' => true,
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ];
+                $productAttributes = array_filter(
+                    $productAttributes,
+                    fn ($value, $column) => Schema::hasColumn('products', $column),
+                    ARRAY_FILTER_USE_BOTH
+                );
+                $productId = (int) DB::table('products')->insertGetId($productAttributes);
+
+                $isCake = in_array(strtolower(trim($data['category'])), ['cake', 'cakes', 'small cakes'], true);
+                $sizeAttributes = [
+                    'product_id' => $productId,
+                    'size' => $isCake ? 'Big' : 'Regular',
+                    'price' => $data['price'],
+                    'stock_quantity' => (int) $data['stock'],
+                    'available' => true,
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ];
+                $sizeAttributes = array_filter(
+                    $sizeAttributes,
+                    fn ($value, $column) => Schema::hasColumn('product_sizes', $column),
+                    ARRAY_FILTER_USE_BOTH
+                );
+                $sizeId = (int) DB::table('product_sizes')->insertGetId($sizeAttributes);
+
+                if (Schema::hasTable('product_recipes')) {
+                    foreach ($data['ingredient_id'] ?? [] as $index => $ingredientId) {
+                        $recipeAttributes = [
+                            'product_id' => $productId,
+                            'product_size_id' => $sizeId,
+                            'ingredient_id' => (int) $ingredientId,
+                            'qty' => $data['ingredient_qty'][$index],
+                            'active' => true,
+                            'created_at' => $now,
+                            'updated_at' => $now,
+                        ];
+                        $recipeAttributes = array_filter(
+                            $recipeAttributes,
+                            fn ($value, $column) => Schema::hasColumn('product_recipes', $column),
+                            ARRAY_FILTER_USE_BOTH
+                        );
+                        DB::table('product_recipes')->insert($recipeAttributes);
+                    }
+                }
+
+                return $productId;
+            });
+        } catch (Throwable $exception) {
+            $this->removeFailedProductImage($imageName, 0);
+            Log::error('Product creation failed.', ['exception' => $exception]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Unable to add the product. Please review the details and try again.',
+            ], 500);
+        }
+
+        return response()->json([
+            'success' => true,
+            'product_id' => $productId,
+            'message' => 'Product added to the customer menu.',
+        ], 201);
     }
 
     public function updateStaff(Request $request, Product $product): JsonResponse

@@ -119,6 +119,37 @@ describe('Products admin catalog', () => {
     expect(screen.queryByText('Chicken Meal')).not.toBeInTheDocument();
   });
 
+  test('previews a selected image and creates the product through the catalog API', async () => {
+    URL.createObjectURL = jest.fn(() => 'blob:product-preview');
+    URL.revokeObjectURL = jest.fn();
+    const { container } = render(<Products allowCatalogManagement />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Strawberry Cake')).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Add New' }));
+    expect(screen.getByRole('dialog', { name: /Add New Product/ })).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText('Product Name'), { target: { value: 'Vanilla Cloud Cake' } });
+    fireEvent.change(screen.getByLabelText('Base Price (Big Cake)'), { target: { value: '650' } });
+    fireEvent.change(screen.getByLabelText('Starting Stock'), { target: { value: '6' } });
+    const imageInput = container.querySelector('input[type="file"][accept*="image/png"]');
+    const image = new File(['image-data'], 'vanilla-cake.png', { type: 'image/png' });
+    fireEvent.change(imageInput, { target: { files: [image] } });
+
+    expect(await screen.findByAltText('Product image preview')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Create Product' }));
+
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringContaining('/api/staff/products'),
+        expect.objectContaining({ method: 'POST', body: expect.any(FormData) }),
+      );
+      expect(screen.queryByRole('dialog', { name: /Add New Product/ })).not.toBeInTheDocument();
+    });
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:product-preview');
+  });
+
   test('keeps the same cakes and changes to their small-size price', async () => {
     render(<Products allowCatalogManagement />);
 
