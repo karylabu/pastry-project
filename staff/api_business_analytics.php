@@ -78,7 +78,7 @@ function analyticsOrderItems(array $orders, array $products, int $filterProductI
             $sales[$key]['order_ids'][(string) $order['id']] = true;
             $date = substr((string) ($order['created_at'] ?? ''), 0, 10);
             if ($date !== '') {
-                $sales[$key]['daily'][$date][(string) $order['id']] = $quantity * $unitPrice;
+                $sales[$key]['daily'][$date][(string) $order['id']] = ($sales[$key]['daily'][$date][(string) $order['id']] ?? 0) + ($quantity * $unitPrice);
             }
         }
     }
@@ -127,28 +127,31 @@ foreach ($productsRows as $product) $products[(int) $product['id']] = $product;
 
 $orderRows = analyticsRows($conn, "SELECT id, items, total, created_at FROM orders WHERE LOWER(status) = 'completed' AND created_at >= ? AND created_at < DATE_ADD(?, INTERVAL 1 DAY) ORDER BY created_at", 'ss', [$start . ' 00:00:00', $end]);
 $sales = analyticsOrderItems($orderRows, $products, $productId, $category);
-$customCakeRows = analyticsRows($conn, "SELECT custom.order_id, custom.quantity, custom.flavor, custom.estimated_price, orders.subtotal, orders.total FROM custom_cake_orders AS custom INNER JOIN orders ON orders.id = custom.order_id WHERE LOWER(orders.status) = 'completed' AND orders.created_at >= ? AND orders.created_at < DATE_ADD(?, INTERVAL 1 DAY) ORDER BY orders.created_at", 'ss', [$start . ' 00:00:00', $end]);
+$customCakeRows = analyticsRows($conn, "SELECT custom.order_id, custom.quantity, custom.flavor, custom.estimated_price, orders.subtotal, orders.total, orders.delivery_fee, orders.created_at FROM custom_cake_orders AS custom INNER JOIN orders ON orders.id = custom.order_id WHERE LOWER(orders.status) = 'completed' AND orders.created_at >= ? AND orders.created_at < DATE_ADD(?, INTERVAL 1 DAY) ORDER BY orders.created_at", 'ss', [$start . ' 00:00:00', $end]);
 $customCakeSales = [];
 if ($productId === 0 && ($category === '' || stripos($category, 'customized') !== false)) {
     foreach ($customCakeRows as $customCake) {
         $quantity = max(1, (float) ($customCake['quantity'] ?? 1));
         $revenueAmount = (float) ($customCake['subtotal'] ?? 0) > 0
             ? (float) $customCake['subtotal']
-            : ((float) ($customCake['total'] ?? 0) > 0
-                ? (float) $customCake['total']
-                : (float) ($customCake['estimated_price'] ?? 0) * $quantity);
+            : ((float) ($customCake['estimated_price'] ?? 0) > 0
+                ? (float) $customCake['estimated_price'] * $quantity
+                : max(0, (float) ($customCake['total'] ?? 0) - (float) ($customCake['delivery_fee'] ?? 0)));
         $flavor = trim((string) ($customCake['flavor'] ?? ''));
+        $orderId = (string) $customCake['order_id'];
+        $date = substr((string) ($customCake['created_at'] ?? ''), 0, 10);
         $customCakeSales[] = [
             'product_id' => 0,
             'product' => $flavor !== '' ? 'Customized Cake - ' . $flavor : 'Customized Cake',
             'category' => 'Customized Cakes',
             'sold' => $quantity,
             'revenue' => $revenueAmount,
+            'order_ids' => [$orderId => true],
+            'daily' => $date !== '' ? [$date => [$orderId => $revenueAmount]] : [],
         ];
     }
 }
-$revenue = 0.0;
-foreach ($orderRows as $order) $revenue += (float) $order['total'];
+$revenue = array_sum(array_column($sales, 'revenue')) + array_sum(array_column($customCakeSales, 'revenue'));
 $ordersCount = count($orderRows);
 
 $historicalRows = analyticsRows($conn, "SELECT history.product_name, history.sale_date, imports.sales_type, SUM(history.units_sold) AS units_sold, SUM(history.revenue) AS revenue, COUNT(*) AS record_count FROM analytics_sales_history AS history INNER JOIN analytics_imports AS imports ON imports.id = history.import_id WHERE imports.status = 'completed' AND history.sale_date >= ? AND history.sale_date <= ? GROUP BY history.product_name, history.sale_date, imports.sales_type ORDER BY history.sale_date", 'ss', [$start, $end]);
@@ -202,64 +205,44 @@ foreach (array_merge($historicalRows, array_map(static fn ($row) => $row + ['sou
 }
 $revenue += $historicalRevenue;
 $ordersCount += $historicalRecords;
+$selectedSales = array_merge($sales, $customCakeSales);
 if ($category !== '') {
-    $selectedSales = strcasecmp($category, 'Finished Products') === 0 ? $sales : [];
-    $selectedSales = array_merge($selectedSales, $customCakeSales);
-    $revenue = array_sum(array_column($selectedSales, 'revenue')) + $historicalRevenue;
     $systemOrderIds = [];
     foreach ($selectedSales as $sale) {
-        if (!isset($sale['imported_record_count']) && isset($sale['order_id'])) {
-            $systemOrderIds[(string) $sale['order_id']] = true;
-        }
         foreach ($sale['order_ids'] ?? [] as $orderId => $_) {
             $systemOrderIds[(string) $orderId] = true;
         }
     }
     $ordersCount = count($systemOrderIds) + $historicalRecords;
 }
-foreach ($sales as &$sale) {
-    unset($sale['order_ids'], $sale['daily']);
-}
-unset($sale);
-$sales = array_merge($sales, $customCakeSales);
-
-$dailyRevenue = analyticsRows($conn, "SELECT DATE(created_at) AS date, COALESCE(SUM(total), 0) AS revenue, COUNT(*) AS orders FROM orders WHERE LOWER(status) = 'completed' AND created_at >= ? AND created_at < DATE_ADD(?, INTERVAL 1 DAY) GROUP BY DATE(created_at) ORDER BY date", 'ss', [$start . ' 00:00:00', $end]);
-if ($category !== '') {
-    $dailyRevenueBySelectedCategory = [];
-    $selectedOrderIdsByDate = [];
-    foreach ($selectedSales as $sale) {
-        foreach ($sale['daily'] ?? [] as $date => $ordersByDate) {
-            if (!isset($dailyRevenueBySelectedCategory[$date])) {
-                $dailyRevenueBySelectedCategory[$date] = ['date' => $date, 'revenue' => 0, 'orders' => 0];
-            }
-            foreach ($ordersByDate as $orderId => $revenueAmount) {
-                $dailyRevenueBySelectedCategory[$date]['revenue'] += $revenueAmount;
-                $selectedOrderIdsByDate[$date][$orderId] = true;
-            }
-        }
-        if (!empty($sale['date']) && !isset($sale['imported_record_count'])) {
-            $date = (string) $sale['date'];
-            if (!isset($dailyRevenueBySelectedCategory[$date])) {
-                $dailyRevenueBySelectedCategory[$date] = ['date' => $date, 'revenue' => 0, 'orders' => 0];
-            }
-            $dailyRevenueBySelectedCategory[$date]['revenue'] += (float) $sale['revenue'];
-            $dailyRevenueBySelectedCategory[$date]['orders']++;
-        }
-    }
-    foreach ($dailyRevenueBySelectedCategory as $date => &$daily) {
-        if (isset($selectedOrderIdsByDate[$date])) {
-            $daily['orders'] += count($selectedOrderIdsByDate[$date]);
-        }
-    }
-    unset($daily);
-    $dailyRevenue = array_values($dailyRevenueBySelectedCategory);
-}
 $dailyRevenueByDate = [];
-foreach ($dailyRevenue as $daily) $dailyRevenueByDate[(string) $daily['date']] = ['date' => (string) $daily['date'], 'revenue' => (float) $daily['revenue'], 'orders' => (int) $daily['orders']];
+$systemOrdersByDate = [];
+foreach ($selectedSales as $sale) {
+    foreach ($sale['daily'] ?? [] as $date => $ordersByDate) {
+        if (!isset($dailyRevenueByDate[$date])) $dailyRevenueByDate[$date] = ['date' => $date, 'revenue' => 0, 'orders' => 0];
+        foreach ($ordersByDate as $orderId => $revenueAmount) {
+            $dailyRevenueByDate[$date]['revenue'] += (float) $revenueAmount;
+            $systemOrdersByDate[$date][(string) $orderId] = true;
+        }
+    }
+}
+foreach ($dailyRevenueByDate as $date => &$daily) {
+    $daily['orders'] = count($systemOrdersByDate[$date] ?? []);
+}
+unset($daily);
 foreach ($historicalDaily as $date => $daily) {
     if (!isset($dailyRevenueByDate[$date])) $dailyRevenueByDate[$date] = $daily;
     else { $dailyRevenueByDate[$date]['revenue'] += $daily['revenue']; $dailyRevenueByDate[$date]['orders'] += $daily['orders']; }
 }
+foreach ($sales as &$sale) {
+    unset($sale['order_ids'], $sale['daily']);
+}
+unset($sale);
+foreach ($customCakeSales as &$sale) {
+    unset($sale['order_ids'], $sale['daily']);
+}
+unset($sale);
+$sales = array_merge($sales, $customCakeSales);
 $dailyRevenue = array_values($dailyRevenueByDate);
 usort($dailyRevenue, static fn($a, $b) => strcmp($a['date'], $b['date']));
 $historicalProductSales = array_values($historicalProducts);
