@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { X, ShoppingBag, Check, Minus, Plus } from 'lucide-react';
 import { motion } from 'framer-motion';
-import { CUSTOMER_BASE } from '../../services/config';
+import { CUSTOMER_BASE, ROOT_BASE } from '../../services/config';
 
 function AddOnCard({ label, price, selected, onClick }) {
   return (
@@ -369,6 +369,12 @@ export default function ProductModal({ isOpen, onClose, product, allCakes, onAdd
               src={resolveProductImage(product)}
               alt={product.name}
               onError={(event) => {
+                const image = event.currentTarget;
+                if (product?.image && !image.dataset.rootUploadFallbackAttempted) {
+                  image.dataset.rootUploadFallbackAttempted = 'true';
+                  image.src = `${ROOT_BASE}/uploads/${encodeURIComponent(product.image)}`;
+                  return;
+                }
                 const fallback = category.includes('coffee')
                   ? 'americano.png'
                   : category.includes('drink')
@@ -376,7 +382,6 @@ export default function ProductModal({ isOpen, onClose, product, allCakes, onAdd
                   : category.includes('pizza')
                   ? 'pepperoni.png'
                   : 'americano.png';
-                const image = event.currentTarget;
                 const fallbackUrl = productImageUrl(fallback);
                 if (image.dataset.fallbackAttempted || image.src === fallbackUrl) {
                   image.style.visibility = 'hidden';

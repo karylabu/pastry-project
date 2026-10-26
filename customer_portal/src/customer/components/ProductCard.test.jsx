@@ -1,7 +1,7 @@
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 import ProductCard from './ProductCard';
-import { CUSTOMER_BASE } from '../../services/config';
+import { CUSTOMER_BASE, ROOT_BASE } from '../../services/config';
 
 const makeCake = (smallStock, bigStock) => ({
   id: 1,
@@ -32,6 +32,18 @@ describe('ProductCard cake stock options', () => {
     expect(screen.getByRole('img', { name: 'Test Cake' })).toHaveAttribute(
       'src',
       `${CUSTOMER_BASE}/uploads/new-cake.png?v=transparent-v25`
+    );
+  });
+
+  test('falls back to the root upload folder for older product photos', () => {
+    render(<ProductCard product={{ ...makeCake(3, 5), image: 'previously-uploaded-cake.jpg' }} />);
+
+    const image = screen.getByRole('img', { name: 'Test Cake' });
+    fireEvent.error(image);
+
+    expect(image).toHaveAttribute(
+      'src',
+      `${ROOT_BASE}/uploads/previously-uploaded-cake.jpg`
     );
   });
 
