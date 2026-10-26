@@ -13,6 +13,11 @@ class StoreOrderRequest extends FormRequest
         if (is_array($payload)) {
             $this->merge($payload);
         }
+
+        $deliveryDate = $this->input('delivery_date');
+        if (is_string($deliveryDate) && trim($deliveryDate) === '') {
+            $this->merge(['delivery_date' => null]);
+        }
     }
 
     public function authorize(): bool

@@ -516,6 +516,17 @@ class RewardCodeCheckoutTest extends TestCase
         $this->assertNull(DB::table('orders')->value('delivery_time'));
     }
 
+    public function test_delivery_qrph_order_with_empty_delivery_date_is_saved_with_null_date(): void
+    {
+        $response = $this->placeOrder('', 'none', '09:30', null, '', '', 'QRPh', 'Deliver');
+
+        $this->assertSame(201, $response->getStatusCode());
+        $order = DB::table('orders')->first();
+        $this->assertSame('Deliver', $order->method);
+        $this->assertSame('QRPh', $order->payment);
+        $this->assertNull($order->delivery_date);
+    }
+
     public function test_pickup_date_is_stored_and_request_rules_reject_missing_or_past_dates(): void
     {
         $pickupDate = now()->addDay()->toDateString();
@@ -661,15 +672,18 @@ class RewardCodeCheckoutTest extends TestCase
         ?array $items = null,
         string $promotionCouponCode = '',
         ?string $deliveryDate = null,
-        string $payment = 'Counter'
+        string $payment = 'Counter',
+        string $method = 'Pickup'
     )
     {
         $request = StoreOrderRequest::create('/api/orders', 'POST', [
             'items' => $items ?? [['product_id' => 11, 'qty' => 1]],
-            'method' => 'Pickup',
+            'method' => $method,
+            'delivery_service' => in_array($method, ['Delivery', 'Deliver'], true) ? 'Lalamove' : null,
             'delivery_date' => $deliveryDate,
             'delivery_time' => $deliveryTime,
             'payment' => $payment,
+            'address' => 'Purok 1, Trapiche, Tanauan, Batangas',
             'phone' => '09171234567',
             'order_type' => 'Standard',
             'discount_type' => $discountType,

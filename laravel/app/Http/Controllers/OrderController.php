@@ -449,6 +449,7 @@ class OrderController extends Controller
                     ? round($total * 0.5, 2)
                     : null;
                 $deliveryTime = trim((string) $request->input('delivery_time', ''));
+                $deliveryDate = trim((string) $request->input('delivery_date', ''));
 
                 $order = Order::create([
                     'user_id' => $user->id,
@@ -467,7 +468,7 @@ class OrderController extends Controller
                     'delivery_service' => in_array($request->method, ['Delivery', 'Deliver'], true)
                         ? $request->input('delivery_service')
                         : null,
-                    'delivery_date' => $request->input('delivery_date'),
+                    'delivery_date' => $deliveryDate !== '' ? $deliveryDate : null,
                     'delivery_time' => $deliveryTime !== '' ? $deliveryTime : null,
                     'payment' => $request->payment,
                     'address' => $request->address ?? '',
