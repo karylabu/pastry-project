@@ -1186,7 +1186,7 @@ export default function Orders() {
                   && (Boolean(order.is_customized) || ['gcash', 'qrph'].includes(String(order.payment || '').toLowerCase()));
                 const hasPaymentProof = String(order.payment_status || '').toLowerCase() === 'proof_submitted';
                 const isPending    = order.status === "Pending";
-                const isToReceive  = order.status === "Ready for Pickup";
+                const isToReceive  = String(order.status || '').toLowerCase() === "ready for pickup";
                 const isCompleted  = order.status === "Completed";
                 const hasReturnRefundRequest = Boolean(order.return_refund_request);
                 const isPreparing  = order.status === "Preparing";
@@ -1216,12 +1216,20 @@ export default function Orders() {
                   ? (() => { try { return JSON.parse(order.custom_details); } catch { return {}; } })()
                   : (order.custom_details || order.custom_cake_details || {});
                 const isDeliveryOrder = [order.method, order.delivery_method, customPaymentDetails.delivery_method]
-                  .some((method) => String(method || '').toLowerCase().includes('delivery'));
+                  .some((method) => String(method || '').trim().toLowerCase().includes('deliver'));
                 const riderInformation = {
                   service: order.delivery_service || order.rider_service || customPaymentDetails.delivery_service || customPaymentDetails.rider_service,
                   name: order.rider_name || order.delivery_rider_name || order.rider?.name || customPaymentDetails.rider_name || customPaymentDetails.delivery_rider_name,
                   contact: order.rider_contact || order.rider_phone || order.delivery_rider_contact || order.rider?.contact || customPaymentDetails.rider_contact || customPaymentDetails.rider_phone,
                   reference: order.rider_booking_reference || order.booking_reference || customPaymentDetails.rider_booking_reference || customPaymentDetails.booking_reference,
+                };
+                const openOrder = (event) => {
+                  if (event.target.closest('button, a, input, select, textarea')) return;
+                  if (isToReceive && isDeliveryOrder) {
+                    setRiderInfoTarget({ order, riderInformation });
+                    return;
+                  }
+                  setSelectedOrder(order);
                 };
                 const quotedDownpayment = Number(order.downpayment_amount ?? customPaymentDetails.downpayment_amount);
                 const downpaymentPercent = Number(customPaymentDetails.downpayment_percent ?? 50);
@@ -1262,7 +1270,7 @@ export default function Orders() {
                     initial={{ opacity: 0, y: 8 }}
                     animate={{ opacity: isCancelled ? 0.65 : 1, y: 0 }}
                     transition={{ duration: 0.2 }}
-                    onClick={() => setSelectedOrder(order)}
+                    onClick={openOrder}
                     className="grid grid-cols-1 md:grid-cols-[1.2fr_1.7fr_0.9fr_0.8fr_1fr_1.2fr] items-center gap-3 md:gap-4 px-6 py-4 cursor-pointer hover:bg-[#fffaf0] transition-colors"
                   >
                     {/* Product */}
