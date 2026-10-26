@@ -148,13 +148,17 @@ class CustomerAuthApiTest extends TestCase
         $firstLogin = $this->postJson('/api/login', [
             'email' => 'admin@example.com',
             'password' => 'admin-password',
-        ])->assertOk()->assertJsonPath('success', true);
+        ], ['User-Agent' => 'Google Chrome/130.0'])
+            ->assertOk()
+            ->assertJsonPath('success', true);
         $activeToken = $firstLogin->json('token');
+        session()->forget(['auth_token', 'user']);
+        unset($_SESSION['auth_token'], $_SESSION['user']);
 
         $this->postJson('/api/login', [
             'email' => 'admin@example.com',
             'password' => 'admin-password',
-        ])
+        ], ['User-Agent' => 'Firefox/130.0'])
             ->assertStatus(409)
             ->assertJsonPath('code', 'ADMIN_SESSION_ACTIVE')
             ->assertJsonPath('message', 'This account is already signed in on a web browser. Sign out on that device before signing in here.');
@@ -168,6 +172,32 @@ class CustomerAuthApiTest extends TestCase
 
         $this->assertDatabaseCount('user_sessions', 1);
         $this->assertDatabaseHas('user_sessions', ['user_id' => 9, 'token' => $activeToken]);
+    }
+
+    public function test_admin_can_sign_in_again_from_the_same_browser_and_device(): void
+    {
+        DB::table('users')->insert([
+            'id' => 11,
+            'name' => 'Same Device Admin',
+            'email' => 'same-device-admin@example.com',
+            'password' => Hash::make('admin-password'),
+            'role' => 'admin',
+            'status' => 'active',
+        ]);
+
+        $headers = ['User-Agent' => 'Google Chrome/130.0'];
+        $firstLogin = $this->postJson('/api/login', [
+            'email' => 'same-device-admin@example.com',
+            'password' => 'admin-password',
+        ], $headers)->assertOk();
+
+        $secondLogin = $this->postJson('/api/login', [
+            'email' => 'same-device-admin@example.com',
+            'password' => 'admin-password',
+        ], $headers)->assertOk();
+
+        $this->assertSame($firstLogin->json('token'), $secondLogin->json('token'));
+        $this->assertDatabaseCount('user_sessions', 1);
     }
 
     public function test_expired_admin_session_does_not_block_a_new_login(): void

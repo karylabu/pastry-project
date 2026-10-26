@@ -27,13 +27,35 @@ class AdminSessionGuard
                     $query->whereNull('expires_at')->orWhere('expires_at', '>', now());
                 });
 
-            $presentedToken = trim((string) $request->bearerToken());
+            $presentedToken = trim((string) (
+                $request->bearerToken()
+                ?: $request->header('X-Auth-Token')
+                ?: session('auth_token')
+                ?: ($_SESSION['auth_token'] ?? '')
+            ));
             if ($presentedToken !== '') {
                 $currentSession = (clone $activeSessions)
                     ->where('token', $presentedToken)
                     ->first();
                 if ($currentSession) {
                     return (string) $currentSession->token;
+                }
+            }
+
+            if (Schema::hasColumn('user_sessions', 'device_name')
+                && Schema::hasColumn('user_sessions', 'ip_address')
+                && $request->userAgent()
+                && $request->ip()) {
+                $deviceName = substr((string) $request->userAgent(), 0, 120);
+                $browserName = $this->browserName((string) $request->userAgent());
+                $sameDeviceSession = (clone $activeSessions)
+                    ->where('ip_address', $request->ip())
+                    ->whereIn('device_name', array_unique([$deviceName, $browserName]))
+                    ->orderByDesc('created_at')
+                    ->first();
+
+                if ($sameDeviceSession) {
+                    return (string) $sameDeviceSession->token;
                 }
             }
 
@@ -62,5 +84,16 @@ class AdminSessionGuard
 
             return $token;
         });
+    }
+
+    private function browserName(string $userAgent): string
+    {
+        return match (true) {
+            preg_match('/Edg\\//i', $userAgent) === 1 => 'Microsoft Edge',
+            preg_match('/Chrome\\//i', $userAgent) === 1 => 'Google Chrome',
+            preg_match('/Firefox\\//i', $userAgent) === 1 => 'Mozilla Firefox',
+            preg_match('/Safari\\//i', $userAgent) === 1 => 'Safari',
+            default => 'Unknown browser',
+        };
     }
 }
