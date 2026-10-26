@@ -211,6 +211,34 @@ export default function CustomCakes() {
     ].filter(([, value]) => value);
   };
 
+  const getRequestDetailsSummary = (order) => {
+    const summaryFields = new Set([
+      "Details",
+      "Cake size",
+      "Cake type",
+      "Servings",
+      "Cake flavor",
+      "Filling flavor",
+      "Frosting type",
+      "Occasion",
+      "Theme",
+      "Packaging",
+      "Delivery method",
+      "Delivery address",
+      "Pickup date",
+      "Pickup time",
+      "Cake color",
+      "Custom message",
+      "Special instructions",
+      "Add-ons",
+    ]);
+
+    return parseCustomDetails(order)
+      .filter(([label]) => summaryFields.has(label))
+      .map(([label, value]) => `${label}: ${value}`)
+      .join(" · ") || "Custom cake request details";
+  };
+
   const getOrderReferenceImage = (order) => {
     let customDetails = order?.custom_details || {};
     if (typeof customDetails === "string") {
@@ -840,7 +868,7 @@ export default function CustomCakes() {
                   const nextStatus = ((order.status === "Pending" && String(order.payment_status || "").toLowerCase() === "paid") || order.status === "Confirmed")
                     ? "Preparing"
                     : order.status === "Preparing" ? "Awaiting Balance Payment" : order.status === "Ready for Pickup" ? "Completed" : null;
-                  const customerLabel = order.name || order.customer_name || order.phone || "No customer";
+                  const customerLabel = order.name || order.customer_name || order.customer || order.phone || "No customer";
                   const itemNames = order.items?.slice(0, 2).map((item) => `${item.name} ×${item.qty}`).join(", ");
                   const itemLabel = order.items?.length
                     ? `${order.items.length} item${order.items.length > 1 ? "s" : ""}${itemNames ? ` · ${itemNames}` : ""}`
@@ -860,7 +888,7 @@ export default function CustomCakes() {
                       </div>
                       <div className="mt-3 flex items-start gap-3 border-t border-[#f0e9e2] pt-3">
                         <div className="h-14 w-14 shrink-0 overflow-hidden rounded-md border border-[#eee4de] bg-[#f7f4ef]">{referenceImage ? <img src={referenceImage} alt="Cake reference" className="h-full w-full object-cover" /> : <div className="grid h-full place-items-center text-[8px] font-semibold uppercase text-[#a99a8e]">Cake</div>}</div>
-                        <div className="min-w-0 flex-1"><p className="text-[11px] font-medium text-[#65574d]">{itemLabel}</p><p className="mt-1 line-clamp-2 text-[10px] leading-4 text-[#8f8076]">{order.details || order.custom_details?.details || "Custom cake request details"}</p><p className="mt-1 text-[9px] text-[#a99a8e]">{order.created_at ? new Date(order.created_at).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "No date"}</p></div>
+                        <div className="min-w-0 flex-1"><p className="text-[11px] font-medium text-[#65574d]">{itemLabel}</p><p className="mt-1 line-clamp-2 text-[10px] leading-4 text-[#8f8076]">{getRequestDetailsSummary(order)}</p><p className="mt-1 text-[9px] text-[#a99a8e]">{order.created_at ? new Date(order.created_at).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "No date"}</p></div>
                       </div>
                       <div className="mt-3 flex flex-wrap gap-1.5">
                         <button type="button" onClick={() => openOrderDetails(order)} title={`View order ${order.order_number || order.id}`} aria-label={`View details for order ${order.order_number || order.id}`} className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-[#e8dfd4] bg-white text-[#65574d] transition hover:bg-[#faf7f2]"><Eye size={14} aria-hidden="true" /></button>
@@ -900,7 +928,7 @@ export default function CustomCakes() {
                       : order.status === "Ready for Pickup"
                       ? "Completed"
                       : null;
-                    const customerLabel = order.phone || order.name || "No Customer";
+                    const customerLabel = order.name || order.customer_name || order.customer || order.phone || "No Customer";
                     const itemNames = order.items?.slice(0, 2).map(item => `${item.name} x${item.qty}`).join(", ");
                     const itemLabel = order.items?.length > 0
                       ? `${order.items.length} item${order.items.length > 1 ? "s" : ""}${itemNames ? ` • ${itemNames}` : ""}`
@@ -925,7 +953,7 @@ export default function CustomCakes() {
                             <div className="min-w-0 space-y-2">
                               <div className="leading-5 text-black/75">
                                 <p className="font-medium">{itemLabel}</p>
-                                <p className="mt-0.5 max-w-[360px] truncate text-[11px] text-black/50">{order.details || order.custom_details?.details || "Custom cake request details"}</p>
+                                <p className="mt-0.5 max-w-[360px] truncate text-[11px] text-black/50">{getRequestDetailsSummary(order)}</p>
                               </div>
                             {hasCustomDetails && (
                               <div className="flex flex-wrap items-center gap-2">
@@ -1139,7 +1167,7 @@ export default function CustomCakes() {
                   <p className="text-[10px] font-bold uppercase tracking-[0.24em] text-[#8a7040]">Custom Cake Request</p>
                   <h2 className="mt-1 text-[22px] font-semibold text-black">Order #{selectedOrder.id}</h2>
                   <p className="mt-1 text-sm text-black/60">
-                    {selectedOrder.phone || selectedOrder.name || selectedOrder.customer_name || "No customer information"}
+                    {selectedOrder.name || selectedOrder.customer_name || selectedOrder.customer || selectedOrder.phone || "No customer information"}
                   </p>
                 </div>
                 <button

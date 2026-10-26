@@ -396,8 +396,9 @@ class StaffApiController extends Controller
                 ] : null;
                 $order->is_wasted = $wastedOrderIds->has($order->id);
                 $order->details = $customDetails['details'] ?? $customized->notes ?? $legacyCustom->notes ?? null;
-                $order->name = $customDetails['customer_name'] ?? $order->customer;
-                $order->customer_name = $customDetails['customer_name'] ?? $order->customer;
+                $customerName = $customDetails['customer_name'] ?? $customDetails['name'] ?? $order->customer;
+                $order->name = $customerName;
+                $order->customer_name = $customerName;
 
                 return $order;
             })->values();
