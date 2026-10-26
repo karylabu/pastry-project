@@ -228,7 +228,7 @@ export default function CakeRecipes() {
             <div className="mb-1.5 inline-flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-[0.18em] text-[#9b7810]">
               <CakeSlice size={12} /> Production setup
             </div>
-            <h1 className="font-serif text-[26px] font-semibold leading-tight text-[#33251e]">Cake Recipes</h1>
+            <h1 className="font-serif text-[26px] font-semibold leading-tight text-[#33251e]">Customize Cakes Recipes</h1>
             <p className="mt-1 text-[12px] leading-4 text-[#74675f]">Build and maintain ingredient recipes for customized cakes.</p>
           </div>
           <div className="flex items-center gap-5 rounded-lg border border-[#eadfd8] bg-white px-4 py-2.5 sm:gap-7">
@@ -430,4 +430,3 @@ export default function CakeRecipes() {
     </div>
   );
 }
-

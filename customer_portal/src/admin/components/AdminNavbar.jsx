@@ -34,7 +34,7 @@ const NAV_GROUPS = [
     label: "Inventory Management",
     items: [
       { name: "Ingredients Stock", path: "/admin/ingredients" },
-      { name: "Cake Recipes", path: "/admin/custom-cake-recipes" },
+      { name: "Customize Cakes Recipes", path: "/admin/custom-cake-recipes" },
       { name: "Products", path: "/admin/products" },
     ],
   },
