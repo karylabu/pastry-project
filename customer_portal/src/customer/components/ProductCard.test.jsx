@@ -1,6 +1,7 @@
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 import ProductCard from './ProductCard';
+import { CUSTOMER_BASE } from '../../services/config';
 
 const makeCake = (smallStock, bigStock) => ({
   id: 1,
@@ -23,6 +24,15 @@ describe('ProductCard cake stock options', () => {
     expect(fullDescription).toHaveClass('w-full');
     expect(fullDescription).toHaveClass('whitespace-pre-wrap');
     expect(fullDescription).not.toHaveClass('line-clamp-2');
+  });
+
+  test('loads product photos from the customer-facing uploads folder', () => {
+    render(<ProductCard product={{ ...makeCake(3, 5), image: 'new-cake.png' }} />);
+
+    expect(screen.getByRole('img', { name: 'Test Cake' })).toHaveAttribute(
+      'src',
+      `${CUSTOMER_BASE}/uploads/new-cake.png?v=transparent-v25`
+    );
   });
 
   test('keeps non-cake product descriptions unchanged', () => {

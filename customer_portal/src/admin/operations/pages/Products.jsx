@@ -114,7 +114,7 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
   const [productSaving, setProductSaving] = useState(false);
   const [productFormError, setProductFormError] = useState(null);
   const [productImageError, setProductImageError] = useState("");
-  const [newProduct, setNewProduct] = useState({ name: "", category: catalogCategory, price: "", stock: "0", description: "" });
+  const [newProduct, setNewProduct] = useState({ name: "", category: catalogCategory, size: "Big", price: "", stock: "0", description: "" });
   const [viewMode, setViewMode] = useState("cards");
   const [newImage, setNewImage] = useState(null);
   const newImageInputRef = useRef(null);
@@ -252,6 +252,7 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
     setNewProduct({
       name: "",
       category: canManageCatalog ? "Cakes" : catalogCategory,
+      size: activeCat === "Small Cakes" ? "Small" : "Big",
       price: "",
       stock: "0",
       description: ""
@@ -308,6 +309,7 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
     const formData = new FormData();
     formData.append("name", newProduct.name.trim());
     formData.append("category", newProduct.category.trim());
+    formData.append("size", newProduct.size);
     formData.append("price", Number(newProduct.price));
     formData.append("stock", Number(newProduct.stock) || 0);
     formData.append("description", newProduct.description.trim());
@@ -683,6 +685,7 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
   const filteredProducts = products.filter((p) => {
     const matchesCategory = canManageCatalog
       ? ["cake", "cakes"].includes(p.category?.trim().toLowerCase())
+        && Boolean(getProductSizeForCategory(p, activeCat))
       : activeCat === "All" || p.category?.toLowerCase() === activeCat.toLowerCase();
 
     const query = searchTerm.trim().toLowerCase();
@@ -1251,21 +1254,20 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
                   </div>
 
                   <div className="space-y-2">
-                    <label htmlFor="new-product-category" className="block text-[10px] font-bold uppercase tracking-[0.15em] text-[#8f8076]">Category</label>
+                    <label htmlFor="new-product-size" className="block text-[10px] font-bold uppercase tracking-[0.15em] text-[#8f8076]">Cake Size</label>
                     <select
-                      id="new-product-category"
-                      value={newProduct.category}
-                      onChange={(e) => setNewProduct((prev) => ({ ...prev, category: e.target.value }))}
+                      id="new-product-size"
+                      value={newProduct.size}
+                      onChange={(e) => setNewProduct((prev) => ({ ...prev, size: e.target.value }))}
                       className="w-full rounded-xl border border-[#eadfd8] bg-white px-3.5 py-3 text-[13px] text-[#33251e] outline-none transition focus:border-[#d4af37] focus:ring-2 focus:ring-[#d4af37]/15"
                     >
-                      {(canManageCatalog ? ["Cakes"] : ["Cakes", "Small Cakes", "Meals", "Pasta", "Starter"]).map((category) => (
-                        <option key={category}>{category}</option>
-                      ))}
+                      <option value="Big">Big Cake</option>
+                      <option value="Small">Small Cake</option>
                     </select>
                   </div>
 
                   <div className="space-y-2">
-                    <label htmlFor="new-product-price" className="block text-[10px] font-bold uppercase tracking-[0.15em] text-[#8f8076]">Base Price (Big Cake)</label>
+                    <label htmlFor="new-product-price" className="block text-[10px] font-bold uppercase tracking-[0.15em] text-[#8f8076]">Price ({newProduct.size} Cake)</label>
                     <input
                       id="new-product-price"
                       type="number"
@@ -1299,7 +1301,7 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
                     <div className="flex items-center gap-4 rounded-2xl border border-dashed border-[#d8c9b5] bg-[#fbf7f2] p-3.5">
                       <div className="grid h-24 w-24 shrink-0 place-items-center overflow-hidden rounded-xl border border-[#eadfd8] bg-white">
                         {newImagePreview
-                          ? <img src={newImagePreview} alt="Product image preview" className="h-full w-full object-cover" />
+                          ? <img src={newImagePreview} alt="Selected product preview" className="h-full w-full object-cover" />
                           : <ImagePlus size={26} className="text-[#b7a69c]" aria-hidden="true" />}
                       </div>
                       <div className="min-w-0 flex-1">

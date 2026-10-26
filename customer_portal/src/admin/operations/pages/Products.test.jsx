@@ -51,6 +51,17 @@ describe('Products admin catalog', () => {
               image: 'mini-cake.jpg',
               description: 'Small chocolate cake',
             },
+            {
+              id: 4,
+              name: 'Mini Vanilla Cake',
+              category: 'Cakes',
+              price: 320,
+              sizes: [{ id: 14, size: 'Small', price: 320, stock_quantity: 6, available: true }],
+              stock: 6,
+              minimum_stock: 2,
+              image: 'mini-vanilla.jpg',
+              description: 'Small vanilla cake',
+            },
           ],
         });
       }
@@ -117,6 +128,7 @@ describe('Products admin catalog', () => {
     expect(screen.getByRole('button', { name: /edit/i })).toBeInTheDocument();
     expect(screen.getByText('₱480.00')).toBeInTheDocument();
     expect(screen.queryByText('Chicken Meal')).not.toBeInTheDocument();
+    expect(screen.queryByText('Mini Vanilla Cake')).not.toBeInTheDocument();
   });
 
   test('previews a selected image and creates the product through the catalog API', async () => {
@@ -131,13 +143,13 @@ describe('Products admin catalog', () => {
     expect(screen.getByRole('dialog', { name: /Add New Product/ })).toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText('Product Name'), { target: { value: 'Vanilla Cloud Cake' } });
-    fireEvent.change(screen.getByLabelText('Base Price (Big Cake)'), { target: { value: '650' } });
+    fireEvent.change(screen.getByLabelText('Price (Big Cake)'), { target: { value: '650' } });
     fireEvent.change(screen.getByLabelText('Starting Stock'), { target: { value: '6' } });
     const imageInput = container.querySelector('input[type="file"][accept*="image/png"]');
     const image = new File(['image-data'], 'vanilla-cake.png', { type: 'image/png' });
     fireEvent.change(imageInput, { target: { files: [image] } });
 
-    expect(await screen.findByAltText('Product image preview')).toBeInTheDocument();
+    expect(await screen.findByAltText('Selected product preview')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Create Product' }));
 
     await waitFor(() => {
@@ -147,7 +159,37 @@ describe('Products admin catalog', () => {
       );
       expect(screen.queryByRole('dialog', { name: /Add New Product/ })).not.toBeInTheDocument();
     });
+    const createCall = global.fetch.mock.calls.find(([url, options]) =>
+      String(url).endsWith('/api/staff/products') && options?.method === 'POST'
+    );
+    expect(createCall[1].body.get('size')).toBe('Big');
     expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:product-preview');
+  });
+
+  test('creates a small cake when Small Cake is selected', async () => {
+    const { container } = render(<Products allowCatalogManagement />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Strawberry Cake')).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Add New' }));
+    fireEvent.change(screen.getByLabelText('Product Name'), { target: { value: 'Mini Vanilla Cake' } });
+    fireEvent.change(screen.getByLabelText('Cake Size'), { target: { value: 'Small' } });
+    fireEvent.change(screen.getByLabelText('Price (Small Cake)'), { target: { value: '320' } });
+    const imageInput = container.querySelector('input[type="file"][accept*="image/png"]');
+    fireEvent.change(imageInput, {
+      target: { files: [new File(['image-data'], 'mini-vanilla.png', { type: 'image/png' })] },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Create Product' }));
+
+    await waitFor(() => {
+      const createCall = global.fetch.mock.calls.find(([url, options]) =>
+        String(url).endsWith('/api/staff/products') && options?.method === 'POST'
+      );
+      expect(createCall).toBeDefined();
+      expect(createCall[1].body.get('size')).toBe('Small');
+      expect(createCall[1].body.get('price')).toBe('320');
+    });
   });
 
   test('keeps the same cakes and changes to their small-size price', async () => {
@@ -159,7 +201,8 @@ describe('Products admin catalog', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Small Cakes' }));
     expect(screen.getByText('Strawberry Cake')).toBeInTheDocument();
-    expect(screen.getByText('₱320.00')).toBeInTheDocument();
+    expect(screen.getByText('Mini Vanilla Cake')).toBeInTheDocument();
+    expect(screen.getAllByText('₱320.00')).toHaveLength(2);
     expect(screen.queryByText('Mini Chocolate Cake')).not.toBeInTheDocument();
   });
 

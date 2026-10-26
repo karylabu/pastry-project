@@ -195,6 +195,7 @@ class StaffProductCatalogTest extends TestCase
             ->post('/api/staff/products', [
                 'name' => 'New Vanilla Cake',
                 'category' => 'Cakes',
+                'size' => 'Big',
                 'price' => '650.00',
                 'stock' => '6',
                 'description' => 'Vanilla cake with cream',
@@ -226,8 +227,57 @@ class StaffProductCatalogTest extends TestCase
         $this->assertSame('Big', $customerProduct['sizes'][0]['size']);
         $this->assertNotEmpty($customerProduct['image']);
 
-        $imagePath = base_path('../uploads/' . $product->image);
-        if (is_file($imagePath)) {
+        $imagePaths = [
+            base_path('../uploads/' . $product->image),
+            public_path('uploads/' . $product->image),
+        ];
+        foreach ($imagePaths as $imagePath) {
+            $this->assertFileExists($imagePath);
+            unlink($imagePath);
+        }
+    }
+
+    public function test_admin_can_create_a_small_cake_that_is_available_to_customers(): void
+    {
+        $admin = new User();
+        $admin->role = 'admin';
+        $admin->status = 'active';
+
+        $response = $this->actingAs($admin)
+            ->post('/api/staff/products', [
+                'name' => 'Mini Vanilla Cake',
+                'category' => 'Cakes',
+                'size' => 'Small',
+                'price' => '320.00',
+                'stock' => '8',
+                'description' => 'Small vanilla cake',
+                'image' => UploadedFile::fake()->image('mini-vanilla.jpg'),
+            ], ['Accept' => 'application/json']);
+
+        $response->assertCreated()->assertJsonPath('success', true);
+        $productId = (int) $response->json('product_id');
+        $product = DB::table('products')->where('id', $productId)->first();
+        $this->assertDatabaseHas('product_sizes', [
+            'product_id' => $productId,
+            'size' => 'Small',
+            'price' => 320,
+            'stock_quantity' => 8,
+            'available' => true,
+        ]);
+
+        $customerProducts = $this->getJson('/api/customer/products?action=list')
+            ->assertOk()
+            ->json();
+        $customerProduct = collect($customerProducts)->firstWhere('id', $productId);
+        $this->assertNotNull($customerProduct);
+        $this->assertSame('Small', $customerProduct['sizes'][0]['size']);
+
+        $imagePaths = [
+            base_path('../uploads/' . $product->image),
+            public_path('uploads/' . $product->image),
+        ];
+        foreach ($imagePaths as $imagePath) {
+            $this->assertFileExists($imagePath);
             unlink($imagePath);
         }
     }

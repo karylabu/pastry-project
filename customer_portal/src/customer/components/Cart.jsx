@@ -126,8 +126,7 @@ export default function Cart({
                         {/* Image */}
                         <div className="w-20 h-20 rounded-2xl bg-gray-50 overflow-hidden flex items-center justify-center p-2 flex-shrink-0">
                           <img
-                            src={`${BASE}/uploads/${item?.image || ''}`}
-                                                        src={`${CUSTOMER_BASE}/uploads/${item?.image || ''}`}
+                            src={`${CUSTOMER_BASE}/uploads/${item?.image || ''}`}
                             alt={item?.name || 'Product'}
                             className="w-full h-full object-contain"
                             onError={(e) => { e.target.src = 'https://via.placeholder.com/150?text=Item'; }}
