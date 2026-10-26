@@ -65,7 +65,7 @@ const METRIC_OPTIONS = {
 };
 
 const VALIDATION_METHODS = [
-  { key: "linear", label: "Linear trend (model)", color: "#b4901f" },
+  { key: "linear", label: "Linear trend", color: "#b4901f" },
   { key: "moving_average_7", label: "7-day average", color: "#6b8f71" },
   { key: "same_weekday_last_week", label: "Same weekday last week", color: "#81906c" },
   { key: "yesterday", label: "Last known day", color: "#718096" },
@@ -93,7 +93,7 @@ function ValidationMetrics({ model }) {
   const linearMetrics = metrics.linear || {};
   const forecastMethod = model?.selected_forecast_method || "linear";
   const forecastMetrics = metrics[forecastMethod] || linearMetrics;
-  const forecastMethodLabel = FORECAST_METHOD_LABELS[forecastMethod] || "Linear trend (model)";
+  const forecastMethodLabel = FORECAST_METHOD_LABELS[forecastMethod] || "Linear trend";
 
   const rows = VALIDATION_METHODS.map((method) => {
     const raw = metrics[method.key]?.[selected];
