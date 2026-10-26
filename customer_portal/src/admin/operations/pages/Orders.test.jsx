@@ -57,7 +57,7 @@ beforeEach(() => {
             has_payment_proof: true,
           }),
           orderFixture(104, "Completed", 60),
-          orderFixture(105, "Cancelled", 60),
+          orderFixture(105, "Cancelled", 61),
           orderFixture(106, "Pending", 2, { order_type: "Urgent" }),
         ],
       }),
@@ -72,6 +72,13 @@ afterEach(() => {
 function renderOrders() {
   return render(<Orders />);
 }
+
+test("shows the oldest order first by default across all statuses", async () => {
+  const { container } = renderOrders();
+  await screen.findAllByText("Customer 101");
+
+  expect(container.querySelector("article")).toHaveTextContent("#105");
+});
 
 test("dashboard cards filter live orders and toggle off when clicked again", async () => {
   renderOrders();

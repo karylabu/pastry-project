@@ -40,13 +40,15 @@ class ExpireUnpaidOrdersTest extends TestCase
         parent::tearDown();
     }
 
-    public function test_expires_only_unpaid_online_orders_older_than_24_hours_and_notifies_customer(): void
+    public function test_cancels_pending_and_awaiting_payment_orders_older_than_24_hours_and_notifies_customer(): void
     {
         DB::table('orders')->insert([
             ['id' => 1, 'user_id' => 7, 'status' => 'Awaiting Payment', 'payment' => 'QRPh', 'payment_status' => 'pending', 'created_at' => now()->subHours(25)],
             ['id' => 2, 'user_id' => 7, 'status' => 'Awaiting Payment', 'payment' => 'Gcash', 'payment_status' => 'paid', 'created_at' => now()->subHours(25)],
             ['id' => 3, 'user_id' => 7, 'status' => 'Awaiting Payment', 'payment' => 'QRPh', 'payment_status' => 'pending', 'created_at' => now()->subHours(23)],
             ['id' => 4, 'user_id' => 7, 'status' => 'Pending', 'payment' => 'Cash on Delivery', 'payment_status' => 'pending', 'created_at' => now()->subHours(25)],
+            ['id' => 5, 'user_id' => 7, 'status' => 'Pending', 'payment' => 'QRPh', 'payment_status' => 'proof_submitted', 'created_at' => now()->subHours(26)],
+            ['id' => 6, 'user_id' => 7, 'status' => 'Preparing', 'payment' => 'Cash on Delivery', 'payment_status' => 'pending', 'created_at' => now()->subHours(48)],
         ]);
         DB::table('notifications')->insert([
             'user_id' => 7,
@@ -60,19 +62,22 @@ class ExpireUnpaidOrdersTest extends TestCase
 
         $this->artisan('orders:expire-unpaid')->assertExitCode(0);
 
-        $this->assertDatabaseHas('orders', ['id' => 1, 'status' => 'Cancelled', 'payment_status' => 'failed']);
-        $this->assertDatabaseHas('orders', ['id' => 2, 'status' => 'Awaiting Payment', 'payment_status' => 'paid']);
+        $this->assertDatabaseHas('orders', ['id' => 1, 'status' => 'Cancelled', 'payment_status' => 'pending']);
+        $this->assertDatabaseHas('orders', ['id' => 2, 'status' => 'Cancelled', 'payment_status' => 'paid']);
         $this->assertDatabaseHas('orders', ['id' => 3, 'status' => 'Awaiting Payment', 'payment_status' => 'pending']);
-        $this->assertDatabaseHas('orders', ['id' => 4, 'status' => 'Pending', 'payment_status' => 'pending']);
-        $this->assertDatabaseMissing('notifications', ['title' => 'Order Placed']);
+        $this->assertDatabaseHas('orders', ['id' => 4, 'status' => 'Cancelled', 'payment_status' => 'pending']);
+        $this->assertDatabaseHas('orders', ['id' => 5, 'status' => 'Cancelled', 'payment_status' => 'proof_submitted']);
+        $this->assertDatabaseHas('orders', ['id' => 6, 'status' => 'Preparing', 'payment_status' => 'pending']);
+        $this->assertDatabaseMissing('notifications', ['message' => 'Your order #1 has been placed and is awaiting payment.']);
         $this->assertDatabaseHas('notifications', [
             'user_id' => 7,
             'title' => 'Order Expired',
+            'message' => 'Order #1 was automatically cancelled because it remained Pending or Awaiting Payment for over 24 hours.',
             'type' => 'Warning',
             'action_url' => '/customer/orders',
         ]);
 
         $this->artisan('orders:expire-unpaid')->assertExitCode(0);
-        $this->assertDatabaseCount('notifications', 1);
+        $this->assertDatabaseCount('notifications', 4);
     }
 }

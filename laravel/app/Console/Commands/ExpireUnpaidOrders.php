@@ -10,18 +10,13 @@ class ExpireUnpaidOrders extends Command
 {
     protected $signature = 'orders:expire-unpaid';
 
-    protected $description = 'Expire online orders that have remained unpaid for 24 hours';
+    protected $description = 'Cancel pending and awaiting-payment orders older than 24 hours';
 
     public function handle(): int
     {
         $cutoff = now()->subHours(24);
         $orderIds = DB::table('orders')
-            ->where('status', 'Awaiting Payment')
-            ->whereRaw("LOWER(COALESCE(payment, '')) IN ('gcash', 'qrph')")
-            ->where(function ($query) {
-                $query->whereNull('payment_status')
-                    ->orWhereRaw("LOWER(payment_status) NOT IN ('paid', 'proof_submitted')");
-            })
+            ->whereIn('status', ['Pending', 'Awaiting Payment'])
             ->where('created_at', '<=', $cutoff)
             ->pluck('id');
 
@@ -33,15 +28,12 @@ class ExpireUnpaidOrders extends Command
                     ->where('created_at', '<=', $cutoff)
                     ->lockForUpdate()
                     ->first();
-                if (!$order
-                    || $order->status !== 'Awaiting Payment'
-                    || in_array(strtolower((string) ($order->payment_status ?? '')), ['paid', 'proof_submitted'], true)) {
+                if (!$order || !in_array($order->status, ['Pending', 'Awaiting Payment'], true)) {
                     return false;
                 }
 
                 DB::table('orders')->where('id', $order->id)->update([
                     'status' => 'Cancelled',
-                    'payment_status' => 'failed',
                 ]);
 
                 if (Schema::hasTable('notifications') && $order->user_id) {
@@ -54,7 +46,7 @@ class ExpireUnpaidOrders extends Command
                     DB::table('notifications')->insert([
                         'user_id' => $order->user_id,
                         'title' => 'Order Expired',
-                        'message' => "Order #{$order->id} was cancelled because payment was not completed within 24 hours.",
+                        'message' => "Order #{$order->id} was automatically cancelled because it remained Pending or Awaiting Payment for over 24 hours.",
                         'type' => 'Warning',
                         'is_read' => 0,
                         'action_url' => '/customer/orders',

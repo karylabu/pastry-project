@@ -91,7 +91,7 @@ export default function Orders() {
   const [statusFilter, setStatusFilter] = useState("All");
   const [dashboardFilter, setDashboardFilter] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [sortBy, setSortBy] = useState("status");
+  const [sortBy, setSortBy] = useState("date");
   const [sortDirection, setSortDirection] = useState("asc");
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
