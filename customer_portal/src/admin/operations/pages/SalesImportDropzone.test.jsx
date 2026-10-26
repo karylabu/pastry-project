@@ -1,4 +1,4 @@
-import { buildCsvTemplate, getCsvTemplateSampleDates } from './SalesImportDropzone';
+import { buildCsvTemplate, describeCleaningReport, getCsvTemplateSampleDates } from './SalesImportDropzone';
 
 describe('CSV import template date samples', () => {
   const now = new Date(2026, 9, 16, 12);
@@ -35,5 +35,18 @@ describe('CSV import template date samples', () => {
       '2026-10-12,Chocolate Cake,8 inch,2,850,1700',
       '2026-10-14,Vanilla Cake,6 inch,1,650,650',
     ].join('\n'));
+  });
+
+  test('summarizes cleaned, skipped, duplicate, and warning rows for the admin', () => {
+    expect(describeCleaningReport({
+      rows_cleaned: 2,
+      rows_skipped: 1,
+      rows_with_warnings: 2,
+      possible_duplicates: 1,
+      total_mismatches: 1,
+      quantity_inferred: 0,
+      aliases_mapped: 1,
+      warnings: [{ row: 4, message: 'Sale date is blank.' }],
+    })).toContain('row 4: Sale date is blank.');
   });
 });

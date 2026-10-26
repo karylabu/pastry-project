@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Controllers\Controller;
 use App\Jobs\ProcessSalesCsvImport;
 use App\Models\User;
+use App\Support\SalesImportCleaner;
 use App\Support\SalesItemSize;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -59,6 +60,19 @@ class SalesImportController extends Controller
                 'customized cakes',
             ]);
         });
+    }
+
+    private function productAliasMap(): array
+    {
+        if (!Schema::hasTable('analytics_product_aliases') || !Schema::hasTable('products')) {
+            return [];
+        }
+
+        return DB::table('analytics_product_aliases as aliases')
+            ->join('products', 'products.id', '=', 'aliases.product_id')
+            ->pluck('products.name', 'aliases.normalized_alias')
+            ->mapWithKeys(static fn ($name, $alias) => [(string) $alias => (string) $name])
+            ->all();
     }
 
     public function productAliases(Request $request)
@@ -221,6 +235,7 @@ class SalesImportController extends Controller
                             'rows_received' => 0,
                             'rows_processed' => 0,
                             'error_message' => null,
+                            ...(Schema::hasColumn('analytics_imports', 'cleaning_report') ? ['cleaning_report' => null] : []),
                             'uploaded_at' => now(),
                             'sales_type' => $salesType,
                             ...(Schema::hasColumn('analytics_imports', 'overlap_mode') ? ['overlap_mode' => $overlapMode] : []),
@@ -312,7 +327,7 @@ class SalesImportController extends Controller
 
         $import = DB::table('analytics_imports')
             ->where('id', $importId)
-            ->first(['id', 'status', 'rows_received', 'rows_processed', 'error_message', 'sales_type']);
+            ->first(['id', 'status', 'rows_received', 'rows_processed', 'error_message', 'sales_type', 'cleaning_report']);
         if (!$import) {
             return response()->json(['success' => false, 'message' => 'Import not found.'], 404);
         }
@@ -331,6 +346,9 @@ class SalesImportController extends Controller
                 'rows_processed' => (int) $import->rows_processed,
                 'rows_skipped' => max(0, (int) $import->rows_received - (int) $import->rows_processed),
                 'sales_type' => $import->sales_type,
+                'cleaning_report' => $import->cleaning_report
+                    ? json_decode((string) $import->cleaning_report, true)
+                    : null,
                 'items_sold' => (float) $totals->items_sold,
                 'revenue' => (float) $totals->revenue,
                 'message' => $import->error_message,
@@ -549,32 +567,36 @@ class SalesImportController extends Controller
             ], 409);
         }
 
-        [$rows, $warnings] = $this->parseLines($text);
+        $reportDate = SalesImportCleaner::extractReportDate($text);
+        [$rows, $cleaningReport] = $this->parseLines($text, $reportDate);
 
         if (empty($rows)) {
             return response()->json([
                 'success' => false,
-                'message' => 'No recognizable sales line items were found in that PDF. The receipt layout may not match the expected format — see SalesImportController::LINE_PATTERNS.',
+                'message' => $reportDate === null
+                    ? 'No unambiguous sale date was found in the PDF. Add a clearly labeled report date or upload a CSV with a sale_date column.'
+                    : 'No valid dated sales line items were found in that PDF. Check the row warnings and the expected receipt format.',
+                'cleaning_report' => $cleaningReport,
             ], 422);
         }
 
-        $dedupedRows = $this->deduplicate($rows);
-        if (count($dedupedRows) > 5000) {
+        if (count($rows) > 5000) {
             return response()->json([
                 'success' => false,
                 'message' => 'The PDF contains too many sales rows. Limit imports to 5,000 rows.',
             ], 422);
         }
 
-        $itemsSold = array_sum(array_column($dedupedRows, 'quantity'));
-        $revenue = round(array_sum(array_column($dedupedRows, 'total')), 2);
+        $itemsSold = array_sum(array_column($rows, 'quantity'));
+        $revenue = round(array_sum(array_column($rows, 'total')), 2);
         $importId = $this->persistRows(
-            $dedupedRows,
+            $rows,
             $file->getClientOriginalName(),
             'POS PDF',
-            count($rows) + count($warnings),
+            $cleaningReport['rows_received'],
             $sourceHash,
-            (string) $request->input('sales_type', 'other')
+            (string) $request->input('sales_type', 'other'),
+            $cleaningReport
         );
 
         return response()->json([
@@ -582,8 +604,9 @@ class SalesImportController extends Controller
             'import_id' => $importId,
             'items_sold' => $itemsSold,
             'revenue' => $revenue,
-            'rows' => $dedupedRows,
-            'warnings' => $warnings,
+            'rows' => $rows,
+            'cleaning_report' => $cleaningReport,
+            'warnings' => $cleaningReport['warnings'],
         ]);
     }
 
@@ -781,11 +804,19 @@ class SalesImportController extends Controller
         ]);
     }
 
-    private function persistRows(array $rows, string $fileName, string $sourceName, int $rowsReceived, ?string $sourceHash = null, string $salesType = 'other'): int
+    private function persistRows(
+        array $rows,
+        string $fileName,
+        string $sourceName,
+        int $rowsReceived,
+        ?string $sourceHash = null,
+        string $salesType = 'other',
+        ?array $cleaningReport = null
+    ): int
     {
         $now = now();
 
-        return DB::transaction(function () use ($rows, $fileName, $sourceName, $rowsReceived, $now, $sourceHash, $salesType): int {
+        return DB::transaction(function () use ($rows, $fileName, $sourceName, $rowsReceived, $now, $sourceHash, $salesType, $cleaningReport): int {
             $importId = (int) DB::table('analytics_imports')->insertGetId([
                 'file_name' => basename($fileName),
                 'source_name' => $sourceName,
@@ -795,6 +826,9 @@ class SalesImportController extends Controller
                 'rows_received' => $rowsReceived,
                 'rows_processed' => count($rows),
                 'source_hash' => $sourceHash,
+                ...(Schema::hasColumn('analytics_imports', 'cleaning_report') && $cleaningReport !== null
+                    ? ['cleaning_report' => json_encode($cleaningReport, JSON_THROW_ON_ERROR)]
+                    : []),
             ]);
 
             $historyRows = array_map(static fn (array $row) => [
@@ -819,68 +853,133 @@ class SalesImportController extends Controller
      * lines (headers, totals, footers) are expected and collected as
      * warnings for transparency rather than crashing the request.
      */
-    private function parseLines(string $text): array
+    private function parseLines(string $text, ?string $saleDate): array
     {
         $lines = preg_split('/\r\n|\r|\n/', $text);
         $rows = [];
-        $warnings = [];
+        $report = [
+            'rows_received' => 0,
+            'rows_cleaned' => 0,
+            'rows_skipped' => 0,
+            'rows_with_warnings' => 0,
+            'possible_duplicates' => 0,
+            'aliases_mapped' => 0,
+            'total_mismatches' => 0,
+            'issue_counts' => [],
+            'warnings' => [],
+            '_last_warning_row' => null,
+        ];
+        $seenRows = [];
+        $aliases = $this->productAliasMap();
 
-        foreach ($lines as $rawLine) {
+        foreach ($lines as $lineIndex => $rawLine) {
             $line = trim($rawLine);
             if ($line === '') continue;
 
             // Skip obvious non-item lines (headers/footers/totals) so they
             // don't get logged as noisy warnings.
-            if (preg_match('/^(subtotal|total|vat|tax|thank you|cashier|receipt|invoice|date|order\s*#?)/i', $line)) {
+            if (preg_match('/^(subtotal|total|vat|tax|thank you|cashier|receipt|invoice|(?:sales\s+)?date|transaction date|report date|order\s*#?)/i', $line)) {
                 continue;
             }
 
+            $report['rows_received']++;
             $matched = false;
             foreach (self::LINE_PATTERNS as $pattern) {
                 if (preg_match($pattern, $line, $m)) {
-                    $name = trim($m['name']);
+                    $name = SalesImportCleaner::normalizeProductName((string) $m['name']);
                     $qty = (int) ($m['qty'] ?? 0);
                     $total = (float) str_replace(',', '', $m['total']);
 
                     if ($name === '' || $qty <= 0 || $total <= 0) {
-                        $warnings[] = $line;
+                        $this->recordPdfIssue($report, $lineIndex + 1, 'invalid_sales_row', 'The line has an invalid product name, quantity, or total.', true);
+                        $matched = true;
+                        break;
+                    }
+                    if ($saleDate === null) {
+                        $this->recordPdfIssue($report, $lineIndex + 1, 'missing_sale_date', 'No unambiguous sale date was found for this line; it was skipped.', true);
                         $matched = true;
                         break;
                     }
 
-                    $rows[] = [
+                    $row = [
                         'name' => $name,
                         'quantity' => $qty,
                         'total' => round($total, 2),
+                        'sale_date' => $saleDate,
                     ];
+                    $rowCleaned = false;
+                    if ($name !== trim((string) $m['name'])) {
+                        $rowCleaned = true;
+                    }
+                    $normalizedAlias = mb_strtolower($name, 'UTF-8');
+                    if (isset($aliases[$normalizedAlias])) {
+                        $row['name'] = $aliases[$normalizedAlias];
+                        $report['aliases_mapped']++;
+                        $rowCleaned = true;
+                        $this->recordPdfIssue(
+                            $report,
+                            $lineIndex + 1,
+                            'product_alias_mapped',
+                            'Product alias was mapped to ' . $row['name'] . '.'
+                        );
+                    }
+                    $price = (float) str_replace(',', '', (string) ($m['price'] ?? '0'));
+                    if ($price > 0 && abs(($qty * $price) - $total) > 0.01) {
+                        $report['total_mismatches']++;
+                        $this->recordPdfIssue(
+                            $report,
+                            $lineIndex + 1,
+                            'total_mismatch',
+                            'Total amount does not match quantity multiplied by unit price; the provided total was kept.'
+                        );
+                    }
+                    if ($rowCleaned) {
+                        $report['rows_cleaned']++;
+                    }
+                    $duplicateKey = mb_strtolower($row['name']) . '|' . $saleDate . '|' . $qty . '|'
+                        . number_format($row['total'], 2, '.', '');
+                    if (isset($seenRows[$duplicateKey])) {
+                        $report['possible_duplicates']++;
+                        $this->recordPdfIssue(
+                            $report,
+                            $lineIndex + 1,
+                            'possible_duplicate',
+                            'This row matches an earlier sale row; it was kept because repeated sales may be legitimate.'
+                        );
+                    }
+                    $seenRows[$duplicateKey] = true;
+                    $rows[] = $row;
                     $matched = true;
                     break;
                 }
             }
 
             if (!$matched) {
-                $warnings[] = $line;
+                $this->recordPdfIssue($report, $lineIndex + 1, 'unrecognized_line', 'This line could not be recognized as a sales row.', true);
             }
         }
 
-        return [$rows, $warnings];
+        unset($report['_last_warning_row']);
+
+        return [$rows, $report];
     }
 
-    /**
-     * Collapses exact-duplicate line items (same name/qty/total) which
-     * can happen when a receipt repeats a summary section after the
-     * itemized list.
-     */
-    private function deduplicate(array $rows): array
+    private function recordPdfIssue(array &$report, int $rowNumber, string $code, string $message, bool $skipped = false): void
     {
-        $seen = [];
-        $out = [];
-        foreach ($rows as $row) {
-            $key = strtolower($row['name']) . '|' . $row['quantity'] . '|' . number_format($row['total'], 2, '.', '');
-            if (isset($seen[$key])) continue;
-            $seen[$key] = true;
-            $out[] = $row;
+        $report['issue_counts'][$code] = ($report['issue_counts'][$code] ?? 0) + 1;
+        if ($report['_last_warning_row'] !== $rowNumber) {
+            $report['rows_with_warnings']++;
+            $report['_last_warning_row'] = $rowNumber;
         }
-        return $out;
+        if ($skipped) {
+            $report['rows_skipped']++;
+        }
+        if (count($report['warnings']) < 100) {
+            $report['warnings'][] = [
+                'row' => $rowNumber,
+                'code' => $code,
+                'message' => $message,
+            ];
+        }
     }
 }

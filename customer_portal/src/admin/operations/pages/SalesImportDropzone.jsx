@@ -79,6 +79,29 @@ function validateFile(file) {
   return null;
 }
 
+export function describeCleaningReport(report) {
+  if (!report) return '';
+
+  const summary = [];
+  if (report.rows_cleaned) summary.push(`${report.rows_cleaned} cleaned`);
+  if (report.rows_skipped) summary.push(`${report.rows_skipped} skipped`);
+  if (report.rows_with_warnings) summary.push(`${report.rows_with_warnings} rows to review`);
+  if (report.possible_duplicates) summary.push(`${report.possible_duplicates} possible duplicate${report.possible_duplicates === 1 ? '' : 's'} kept`);
+  if (report.total_mismatches) summary.push(`${report.total_mismatches} total mismatch${report.total_mismatches === 1 ? '' : 'es'}`);
+  if (report.quantity_inferred) summary.push(`${report.quantity_inferred} inferred quantity`);
+  if (report.aliases_mapped) summary.push(`${report.aliases_mapped} product alias${report.aliases_mapped === 1 ? '' : 'es'} mapped`);
+
+  const examples = (report.warnings || [])
+    .slice(0, 2)
+    .map((warning) => `row ${warning.row}: ${warning.message}`);
+  const details = [
+    summary.length ? `Data cleaning: ${summary.join(', ')}.` : '',
+    examples.length ? `Check ${examples.join('; ')}.` : '',
+  ].filter(Boolean);
+
+  return details.length ? ` ${details.join(' ')}` : '';
+}
+
 export function buildCsvTemplate(range, startDate = '', endDate = '', now = new Date()) {
   const headers = ['sale_date', 'item_name', 'size', 'quantity', 'price', 'total_amount'];
   const [firstDate, secondDate] = getCsvTemplateSampleDates(range, startDate, endDate, now);
@@ -198,7 +221,7 @@ export default function SalesImportDropzone({
       const itemsSold = Number(result.items_sold || 0);
       const revenue = Number(result.revenue || 0);
       setIsProcessing(false);
-      showToast('success', `Imported ${result.rows_processed.toLocaleString()} of ${result.rows_received.toLocaleString()} rows: ${itemsSold.toLocaleString()} items and ₱${revenue.toLocaleString(undefined, { maximumFractionDigits: 2 })} revenue.`);
+      showToast('success', `Imported ${result.rows_processed.toLocaleString()} of ${result.rows_received.toLocaleString()} rows: ${itemsSold.toLocaleString()} items and ₱${revenue.toLocaleString(undefined, { maximumFractionDigits: 2 })} revenue.${describeCleaningReport(result.cleaning_report)}`);
       onImportComplete?.({ itemsSold, revenue, source: 'csv', importId: payload.import_id, salesType: result.sales_type });
     } catch (error) {
       setIsProcessing(false);
@@ -222,19 +245,16 @@ export default function SalesImportDropzone({
       const payload = await res.json().catch(() => null);
 
       if (!res.ok || !payload || payload.success === false) {
-        const msg = payload?.message || `Import failed (server responded ${res.status}).`;
+        const msg = `${payload?.message || `Import failed (server responded ${res.status}).`}${describeCleaningReport(payload?.cleaning_report)}`;
         setIsProcessing(false);
         showToast('error', msg);
         return;
       }
 
-      const { items_sold: itemsSold, revenue, rows = [], warnings = [] } = payload;
+      const { items_sold: itemsSold, revenue, rows = [], cleaning_report: cleaningReport } = payload;
 
       setIsProcessing(false);
-      let message = `Successfully imported ${itemsSold} items, adding ₱${Number(revenue).toLocaleString(undefined, { maximumFractionDigits: 2 })} to total revenue.`;
-      if (warnings.length) {
-        message += ` (${warnings.length} line${warnings.length === 1 ? '' : 's'} could not be parsed and were skipped.)`;
-      }
+      const message = `Successfully imported ${itemsSold} items, adding ₱${Number(revenue).toLocaleString(undefined, { maximumFractionDigits: 2 })} to total revenue.${describeCleaningReport(cleaningReport)}`;
       showToast('success', message);
       onImportComplete?.({ itemsSold, revenue, rows, source: 'pdf', salesType: salesTypeRef.current });
     } catch (err) {
