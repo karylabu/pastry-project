@@ -1537,11 +1537,13 @@ export default function Orders() {
 
                       {isCompleted && (
                         <button
+                          type="button"
                           onClick={() => setSelectedOrder(order)}
-                          className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 px-3.5 py-2 text-[12px] font-semibold text-slate-900 hover:bg-gray-100 transition-colors"
+                          title={`Print receipt for order ${order.order_number ?? order.id}`}
+                          aria-label={`Print receipt for order ${order.order_number ?? order.id}`}
+                          className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-300 text-slate-900 transition-colors hover:bg-gray-100"
                         >
-                          <Printer size={13} />
-                          Print Receipt
+                          <Printer size={15} aria-hidden="true" />
                         </button>
                       )}
 

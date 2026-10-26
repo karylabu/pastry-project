@@ -377,7 +377,7 @@ export default function CakeRecipes() {
               )}
 
               <div className="flex flex-wrap items-center justify-between gap-2 border-t border-[#f0e7e0] pt-3">
-                <button type="button" disabled={!selectedFlavorId} onClick={() => setRecipeLines((lines) => [...lines, { ...emptyLine }])} className="inline-flex items-center gap-1.5 rounded-md border border-[#eadfd8] bg-white px-3 py-2 text-[10px] font-semibold text-[#5f514a] transition hover:border-[#d4af37] hover:bg-[#fff8e9] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d4af37] disabled:cursor-not-allowed disabled:opacity-40"><Plus size={13} /> Add ingredient</button>
+                <button type="button" title="Add ingredient" aria-label="Add ingredient" disabled={!selectedFlavorId} onClick={() => setRecipeLines((lines) => [...lines, { ...emptyLine }])} className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-[#eadfd8] bg-white text-[#5f514a] transition hover:border-[#d4af37] hover:bg-[#fff8e9] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d4af37] disabled:cursor-not-allowed disabled:opacity-40"><Plus size={16} aria-hidden="true" /></button>
                 <button type="submit" disabled={loading || !selectedFlavorId} className="inline-flex items-center gap-1.5 rounded-md bg-[#33251e] px-4 py-2 text-[10px] font-semibold text-white transition hover:bg-[#5b4540] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d4af37] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-40"><Save size={13} /> Save recipe</button>
               </div>
             </form>

@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useLocation } from "react-router-dom";
-import { AlertTriangle, CalendarDays, Package, PackagePlus, Plus, Search, Trash2 } from "lucide-react";
+import { AlertTriangle, CalendarDays, History, Package, PackagePlus, Pencil, Plus, Search, Trash2, X } from "lucide-react";
 import { LARAVEL_BASE, STAFF_BASE } from "../../../services/config";
 
 const staffFetch = (url, options = {}) => fetch(url, { credentials: "include", ...options });
@@ -610,9 +610,9 @@ export default function Ingredients({
                         </td>
                         <td className="px-6 py-4">
                           <div className="flex items-center gap-2">
-                            <button onClick={() => openModal('edit', item)} className="rounded-md bg-[#33251e] px-2.5 py-1.5 text-[10px] font-semibold text-white hover:bg-[#5b4540]">Edit</button>
+                            <button type="button" onClick={() => openModal('edit', item)} title={`Edit ${item.name}`} aria-label={`Edit ${item.name}`} className="inline-flex h-8 w-8 items-center justify-center rounded-md bg-[#33251e] text-white transition hover:bg-[#5b4540]"><Pencil size={14} aria-hidden="true" /></button>
                             {Number(item.expired_batch_count) > 0 && Number(item.pending_discard_count) === 0 && <button onClick={() => openModal('history', item)} className="rounded-md border border-[#eadfca] bg-[#fff4cd] px-2.5 py-1.5 text-[10px] font-semibold text-[#80600a]">Discard expired</button>}
-                            <button onClick={() => openModal('history', item)} className="rounded-md border border-[#eee4de] bg-white px-2.5 py-1.5 text-[10px] font-semibold text-[#6a5a50] hover:bg-[#fff8df]">History</button>
+                            <button type="button" onClick={() => openModal('history', item)} title={`View ${item.name} history`} aria-label={`View ${item.name} history`} className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-[#eee4de] bg-white text-[#6a5a50] transition hover:bg-[#fff8df]"><History size={14} aria-hidden="true" /></button>
                           </div>
                         </td>
                       </tr>
@@ -640,7 +640,7 @@ export default function Ingredients({
                     ? 'Stock In'
                     : 'Stock Out'}
                 </h3>
-                <button onClick={closeModal} className="text-gray-500">Close</button>
+                <button type="button" onClick={closeModal} title="Close ingredient modal" aria-label="Close ingredient modal" className="inline-flex h-8 w-8 items-center justify-center rounded-full text-gray-500 transition hover:bg-gray-100 hover:text-gray-800"><X size={16} aria-hidden="true" /></button>
               </div>
               <div className="mt-4">
                 {modalType === 'history' && (

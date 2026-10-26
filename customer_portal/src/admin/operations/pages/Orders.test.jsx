@@ -106,7 +106,7 @@ test("removes view, approval, and cancel actions after an order is counted as wa
   const orderCard = (await screen.findAllByText("Customer 106"))[0].closest("article");
   expect(within(orderCard).getByRole("button", { name: "Approve" })).toBeInTheDocument();
   expect(within(orderCard).getByRole("button", { name: "Cancel" })).toBeInTheDocument();
-  expect(within(orderCard).getByRole("button", { name: "View details" })).toBeInTheDocument();
+  expect(within(orderCard).getByRole("button", { name: /View details for order/ })).toBeInTheDocument();
 
   fireEvent.click(within(orderCard).getByRole("button", { name: "Waste" }));
 
@@ -114,7 +114,7 @@ test("removes view, approval, and cancel actions after an order is counted as wa
     expect(within(orderCard).getByRole("button", { name: "Counted as waste" })).toBeDisabled();
     expect(within(orderCard).queryByRole("button", { name: "Approve" })).not.toBeInTheDocument();
     expect(within(orderCard).queryByRole("button", { name: "Cancel" })).not.toBeInTheDocument();
-    expect(within(orderCard).queryByRole("button", { name: "View details" })).not.toBeInTheDocument();
+    expect(within(orderCard).queryByRole("button", { name: /View details for order/ })).not.toBeInTheDocument();
   });
 
   const orderRow = Array.from(container.querySelectorAll("tr")).find((row) => row.textContent.includes("#106"));

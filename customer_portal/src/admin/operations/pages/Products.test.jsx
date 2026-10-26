@@ -141,10 +141,10 @@ describe('Products admin catalog', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /table/i }));
     const actions = screen.getByLabelText('Actions for Strawberry Cake');
-    expect(actions).toHaveClass('grid', 'grid-cols-4');
+    expect(actions).toHaveClass('flex', 'items-center', 'justify-center');
     expect(Array.from(actions.children)).toHaveLength(4);
     Array.from(actions.children).forEach((button) => {
-      expect(button).toHaveClass('w-full');
+      expect(button).toHaveClass('h-9', 'w-9');
     });
   });
 
@@ -155,7 +155,7 @@ describe('Products admin catalog', () => {
       expect(screen.getByText('Strawberry Cake')).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getAllByRole('button', { name: 'Produce' })[0]);
+    fireEvent.click(screen.getAllByRole('button', { name: /^Produce / })[0]);
 
     const dialog = await screen.findByRole('dialog');
     expect(dialog).toHaveClass('top-[72px]');
@@ -179,7 +179,7 @@ describe('Products admin catalog', () => {
       expect(screen.getByText('Strawberry Cake')).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getAllByRole('button', { name: 'Produce' })[0]);
+    fireEvent.click(screen.getAllByRole('button', { name: /^Produce / })[0]);
     await screen.findByRole('dialog');
     fireEvent.click(screen.getByRole('button', { name: 'Close' }));
 
@@ -200,7 +200,7 @@ describe('Products admin catalog', () => {
     expect(screen.getByText('2', { exact: true })).toBeInTheDocument();
     expect(screen.queryByText('7', { exact: true })).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getAllByRole('button', { name: 'Produce' })[0]);
+    fireEvent.click(screen.getAllByRole('button', { name: /^Produce / })[0]);
     await waitFor(() => {
       expect(screen.getByText('Cake size: Small')).toBeInTheDocument();
       expect(screen.getByText(/Production:.*Available/)).toBeInTheDocument();
@@ -218,7 +218,7 @@ describe('Products admin catalog', () => {
       expect(screen.getByText('Strawberry Cake')).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getAllByRole('button', { name: 'Adjust' })[0]);
+    fireEvent.click(screen.getAllByRole('button', { name: /^Adjust / })[0]);
     expect(screen.getByText('Current Stock: 7')).toBeInTheDocument();
     expect(screen.getByText('Adjusting Big Cake stock')).toBeInTheDocument();
 
@@ -249,7 +249,7 @@ describe('Products admin catalog', () => {
       expect(screen.getByText('Strawberry Cake')).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getAllByRole('button', { name: 'Edit' })[0]);
+    fireEvent.click(screen.getAllByRole('button', { name: /^Edit / })[0]);
     fireEvent.change(screen.getByLabelText('Product Name'), { target: { value: 'Pistachio Dream' } });
     fireEvent.change(screen.getByLabelText('Category'), { target: { value: 'Small Cakes' } });
     fireEvent.change(screen.getByLabelText('Big Cake Price'), { target: { value: '525' } });
@@ -290,7 +290,7 @@ describe('Products admin catalog', () => {
     });
 
     fireEvent.click(screen.getByRole('button', { name: 'Small Cakes' }));
-    fireEvent.click(screen.getAllByRole('button', { name: 'Edit' })[0]);
+    fireEvent.click(screen.getAllByRole('button', { name: /^Edit / })[0]);
 
     expect(screen.getByText('Recipe for: Small Cake')).toBeInTheDocument();
     expect(screen.queryByLabelText('Cake Size')).not.toBeInTheDocument();

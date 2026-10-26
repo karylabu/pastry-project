@@ -452,7 +452,7 @@ export default function OrderHistory() {
                   </div>
                   <div className="mt-3 flex items-center justify-between gap-3 border-t border-[#f0e9e2] pt-3">
                     <p className="text-[10px] text-[#8f8076]">{fulfillmentDate ? new Date(fulfillmentDate).toLocaleString([], { dateStyle: "medium", timeStyle: "short" }) : "Date unavailable"}</p>
-                    {order.isImportedSales ? <span className="text-[10px] font-semibold text-[#80600a]">CSV sales record</span> : <button type="button" onClick={() => setSelectedOrder(order)} className="inline-flex items-center gap-1.5 rounded-md bg-black px-3 py-2 text-[10px] font-semibold text-white"><Eye size={13} /> View receipt</button>}
+                    {order.isImportedSales ? <span className="text-[10px] font-semibold text-[#80600a]">CSV sales record</span> : <button type="button" onClick={() => setSelectedOrder(order)} title={`View receipt for order ${order.order_number || order.id}`} aria-label={`View receipt for order ${order.order_number || order.id}`} className="inline-flex h-9 w-9 items-center justify-center rounded-md bg-black text-white transition hover:bg-black/80"><Eye size={15} aria-hidden="true" /></button>}
                   </div>
                 </article>
               );

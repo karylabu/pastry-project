@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useLocation, useNavigate } from "react-router-dom";
-import { AlertTriangle, CircleCheck, CircleX, History, ImagePlus, LayoutGrid, Plus, RefreshCw, Search, Table2, Trash2, X } from "lucide-react";
+import { AlertTriangle, ChefHat, CircleCheck, CircleX, History, ImagePlus, LayoutGrid, Pencil, Plus, RefreshCw, Search, SlidersHorizontal, Table2, Trash2, X } from "lucide-react";
 import { BASE, LARAVEL_BASE, STAFF_BASE } from "../../../services/config";
 
 const getStaffAuthHeaders = () => {
@@ -864,18 +864,20 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
 
                 {/* BUTTON */}
                 <div className="mt-auto flex h-8 w-full shrink-0 items-center gap-1.5 pt-1">
-                  <button onClick={() => openInventoryModal(product, "produce")} className="h-7 min-w-0 flex-1 overflow-hidden rounded-lg border border-[#eadfca] bg-[#fff8e9] px-1.5 py-1.5 text-[9px] font-semibold text-[#33251e] transition hover:border-[#e7c875] hover:bg-[#fff8df] hover:text-[#8d6a2e]">Produce</button>
-                  <button onClick={() => openInventoryModal(product, "adjust")} className="h-7 min-w-0 flex-1 overflow-hidden rounded-lg border border-[#eadfd8] bg-white px-1.5 py-1.5 text-[9px] font-semibold text-[#765d50] transition hover:border-[#e7c875] hover:bg-[#fff8df]">Adjust</button>
+                  <button type="button" onClick={() => openInventoryModal(product, "produce")} title={`Produce ${product.name}`} aria-label={`Produce ${product.name}`} className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-[#eadfca] bg-[#fff8e9] text-[#33251e] transition hover:border-[#e7c875] hover:bg-[#fff8df] hover:text-[#8d6a2e]"><ChefHat size={14} aria-hidden="true" /></button>
+                  <button type="button" onClick={() => openInventoryModal(product, "adjust")} title={`Adjust ${product.name} stock`} aria-label={`Adjust ${product.name} stock`} className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-[#eadfd8] bg-white text-[#765d50] transition hover:border-[#e7c875] hover:bg-[#fff8df]"><SlidersHorizontal size={14} aria-hidden="true" /></button>
                   {canEditCatalog && (
                     <button
                       type="button"
                       onClick={() => openEditProductModal(product)}
-                      className="h-7 rounded-lg border border-[#eadfd8] bg-white px-2 py-1.5 text-[9px] font-semibold leading-none text-[#5f514a] transition hover:bg-[#fff8df]"
+                      title={`Edit ${product.name}`}
+                      aria-label={`Edit ${product.name}`}
+                      className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-[#eadfd8] bg-white text-[#5f514a] transition hover:bg-[#fff8df]"
                     >
-                      Edit
+                      <Pencil size={13} aria-hidden="true" />
                     </button>
                   )}
-                  <button onClick={() => openInventoryModal(product, "history")} aria-label={`View ${product.name} history`} className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-[#eadfd8] bg-white text-[#765d50] transition hover:bg-[#fff8df]"><History size={13} /></button>
+                  <button type="button" onClick={() => openInventoryModal(product, "history")} title={`View ${product.name} history`} aria-label={`View ${product.name} history`} className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-[#eadfd8] bg-white text-[#765d50] transition hover:bg-[#fff8df]"><History size={13} aria-hidden="true" /></button>
                 </div>
 
               </div>
@@ -936,19 +938,21 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
                     <p className="text-[9px] text-red-700 mt-1">{getProductionStatus(product).reason}</p>
                   )}
                 </div>
-                <div aria-label={`Actions for ${product.name}`} className="grid grid-cols-4 items-center gap-2 px-4 py-4">
-                  <button onClick={() => openInventoryModal(product, "produce")} className="w-full whitespace-nowrap rounded-lg bg-[#33251e] px-2 py-2 text-[11px] text-white transition hover:bg-[#5b4540]">Produce</button>
-                  <button onClick={() => openInventoryModal(product, "adjust")} className="w-full whitespace-nowrap rounded-lg border border-[#eadfd8] bg-white px-2 py-2 text-[11px] text-[#5f514a] transition hover:bg-[#fff8df]">Adjust</button>
+                <div aria-label={`Actions for ${product.name}`} className="flex items-center justify-center gap-2 px-4 py-4">
+                  <button type="button" onClick={() => openInventoryModal(product, "produce")} title={`Produce ${product.name}`} aria-label={`Produce ${product.name}`} className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-[#33251e] text-white transition hover:bg-[#5b4540]"><ChefHat size={15} aria-hidden="true" /></button>
+                  <button type="button" onClick={() => openInventoryModal(product, "adjust")} title={`Adjust ${product.name} stock`} aria-label={`Adjust ${product.name} stock`} className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[#eadfd8] bg-white text-[#5f514a] transition hover:bg-[#fff8df]"><SlidersHorizontal size={15} aria-hidden="true" /></button>
                   {canEditCatalog ? (
                     <button
                       type="button"
                       onClick={() => openEditProductModal(product)}
-                      className="w-full whitespace-nowrap rounded-lg border border-[#eadfd8] bg-white px-2 py-2 text-[11px] leading-none text-[#5f514a] transition hover:bg-[#fff8df]"
+                      title={`Edit ${product.name}`}
+                      aria-label={`Edit ${product.name}`}
+                      className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[#eadfd8] bg-white text-[#5f514a] transition hover:bg-[#fff8df]"
                     >
-                      Edit
+                      <Pencil size={15} aria-hidden="true" />
                     </button>
                   ) : <span aria-hidden="true" />}
-                  <button onClick={() => openInventoryModal(product, "history")} aria-label={`View ${product.name} history`} className="inline-flex w-full items-center justify-center rounded-lg border border-[#eadfd8] bg-white px-2 py-2 text-[#765d50] transition hover:bg-[#fff8df]"><History size={15} /></button>
+                  <button type="button" onClick={() => openInventoryModal(product, "history")} title={`View ${product.name} history`} aria-label={`View ${product.name} history`} className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[#eadfd8] bg-white text-[#765d50] transition hover:bg-[#fff8df]"><History size={15} aria-hidden="true" /></button>
                 </div>
               </div>
             ))}
@@ -1373,7 +1377,7 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
                       <h2 className="mt-1 font-serif text-[22px] text-[#33251e]">Edit Product</h2>
                       <p className="mt-1 text-[12px] text-[#74675f]">Update product details, image, and recipe mapping.</p>
                     </div>
-                    <button onClick={() => setEditOpen(false)} className="rounded-lg border border-[#eadfd8] bg-white px-3 py-2 text-[11px] font-semibold text-[#765d50] transition hover:bg-[#fff8df]">Close</button>
+                    <button type="button" onClick={() => setEditOpen(false)} title="Close edit product" aria-label="Close edit product" className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-[#eadfd8] bg-white text-[#765d50] transition hover:bg-[#fff8df]"><X size={16} aria-hidden="true" /></button>
                   </div>
                 </div>
 
@@ -1456,9 +1460,11 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
                     <button
                       type="button"
                       onClick={addRecipeRow}
-                      className="rounded-lg bg-[#33251e] px-3 py-2 text-[11px] font-semibold text-white transition hover:bg-[#5b4540]"
+                      title="Add ingredient"
+                      aria-label="Add ingredient"
+                      className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-[#33251e] text-white transition hover:bg-[#5b4540]"
                     >
-                      Add Ingredient
+                      <Plus size={16} aria-hidden="true" />
                     </button>
                   </div>
                   <div>
@@ -1491,7 +1497,7 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
                           className="w-full rounded-xl border border-black/10 bg-white px-3 py-2 text-xs text-black"
                           placeholder="Qty"
                         />
-                        <button type="button" onClick={() => removeRecipeRow(index)} className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-600">Remove</button>
+                        <button type="button" onClick={() => removeRecipeRow(index)} title={`Remove recipe ingredient ${index + 1}`} aria-label={`Remove recipe ingredient ${index + 1}`} className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-red-200 bg-red-50 text-red-600"><Trash2 size={14} aria-hidden="true" /></button>
                       </div>
                     ))}
                   </div>
