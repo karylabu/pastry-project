@@ -163,7 +163,7 @@ describe('Products admin catalog', () => {
 
     await waitFor(() => {
       expect(screen.getByText('Cake size: Big')).toBeInTheDocument();
-      expect(screen.getByText('Production: ✓ Available')).toBeInTheDocument();
+      expect(screen.getByText(/Production:.*Available/)).toBeInTheDocument();
     });
     expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
     expect(global.fetch).toHaveBeenCalledWith(
@@ -203,7 +203,7 @@ describe('Products admin catalog', () => {
     fireEvent.click(screen.getAllByRole('button', { name: 'Produce' })[0]);
     await waitFor(() => {
       expect(screen.getByText('Cake size: Small')).toBeInTheDocument();
-      expect(screen.getByText('Production: ✓ Available')).toBeInTheDocument();
+      expect(screen.getByText(/Production:.*Available/)).toBeInTheDocument();
     });
     expect(global.fetch).toHaveBeenCalledWith(
       expect.stringContaining('production/availability/1?product_size_id=11'),

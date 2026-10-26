@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useLocation, useNavigate } from "react-router-dom";
-import { Search, Trash2, History, RefreshCw } from "lucide-react";
+import { AlertTriangle, CircleCheck, CircleX, History, ImagePlus, LayoutGrid, Plus, RefreshCw, Search, Table2, Trash2, X } from "lucide-react";
 import { BASE, LARAVEL_BASE, STAFF_BASE } from "../../../services/config";
 
 const getStaffAuthHeaders = () => {
@@ -601,9 +601,9 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
     const size = canManageCatalog ? getProductSizeForCategory(product, activeCat) : null;
     const stock = canManageCatalog ? Number(size?.stock_quantity ?? 0) : Number(product.stock || 0);
     const minimum = Number(size?.threshold ?? product.minimum_stock ?? 0);
-    if (stock <= 0) return { label: "Out of Stock", icon: "🔴", classes: "bg-[#FEE2E2] text-[#991B1B]" };
-    if (stock <= minimum) return { label: "Low Stock", icon: "🟡", classes: "bg-[#FEF3C7] text-[#92400E]" };
-    return { label: "In Stock", icon: "🟢", classes: "bg-[#DCFCE7] text-[#166534]" };
+    if (stock <= 0) return { label: "Out of Stock", icon: <CircleX size={12} aria-hidden="true" />, classes: "bg-[#FEE2E2] text-[#991B1B]" };
+    if (stock <= minimum) return { label: "Low Stock", icon: <AlertTriangle size={12} aria-hidden="true" />, classes: "bg-[#FEF3C7] text-[#92400E]" };
+    return { label: "In Stock", icon: <CircleCheck size={12} aria-hidden="true" />, classes: "bg-[#DCFCE7] text-[#166534]" };
   };
 
   const getDisplayedStock = (product) => {
@@ -742,7 +742,7 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
                     className="absolute right-20 top-1/2 -translate-y-1/2 text-[#9b8c83] hover:text-[#33251e]"
                     aria-label="Clear search"
                   >
-                    ✕
+                    <X size={14} aria-hidden="true" />
                   </button>
                 )}
                 <button
@@ -763,20 +763,20 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
                 onClick={() => setViewMode("cards")}
                 className={`rounded-lg px-3 py-2 text-[11px] font-semibold transition ${viewMode === "cards" ? "bg-[#33251e] text-white" : "border border-[#eadfd8] bg-white text-[#765d50] hover:bg-[#fff8df]"}`}
               >
-                ⊞ Cards
+                <LayoutGrid size={14} aria-hidden="true" /> Cards
               </button>
               <button
                 type="button"
                 onClick={() => setViewMode("table")}
                 className={`rounded-lg px-3 py-2 text-[11px] font-semibold transition ${viewMode === "table" ? "bg-[#33251e] text-white" : "border border-[#eadfd8] bg-white text-[#765d50] hover:bg-[#fff8df]"}`}
               >
-                ☰ Table
+                <Table2 size={14} aria-hidden="true" /> Table
               </button>
               {canManageCatalog && <button
                 onClick={openAddProductModal}
                 className="whitespace-nowrap rounded-lg bg-[#f5c451] px-4 py-2 text-[11px] font-semibold text-[#5c4310] transition hover:bg-[#eab63d]"
               >
-                ➕ Add New
+                <Plus size={14} aria-hidden="true" /> Add New
               </button>}
             </div>
           </div>
@@ -797,7 +797,7 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
 
         {feedback && (
           <div className={`mb-6 rounded-xl border p-3 text-sm ${feedback.type === "success" ? "border-[#d8e7d5] bg-[#edf5eb] text-[#4f7654]" : "border-[#efd8ce] bg-[#fff0eb] text-[#9a5947]"}`} role="status">
-            {feedback.type === "success" ? "✓" : "⚠"} {feedback.text}
+            {feedback.type === "success" ? <CircleCheck size={16} aria-hidden="true" /> : <AlertTriangle size={16} aria-hidden="true" />} {feedback.text}
           </div>
         )}
 
@@ -854,7 +854,8 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
                 {/* PRODUCTION AVAILABILITY */}
                 <div className="mb-1 text-left">
                   <span className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-[9px] font-semibold ${getProductionStatus(product).is_producible ? 'bg-[#edf5eb] text-[#4f7654]' : 'bg-[#fff0eb] text-[#9a5947]'}`}>
-                    {getProductionStatus(product).is_producible ? '✓ Can Produce' : '✗ Cannot Produce'}
+                    {getProductionStatus(product).is_producible ? <CircleCheck size={11} aria-hidden="true" /> : <CircleX size={11} aria-hidden="true" />}
+                    {getProductionStatus(product).is_producible ? 'Can Produce' : 'Cannot Produce'}
                   </span>
                   {!getProductionStatus(product).is_producible && getProductionStatus(product).reason && (
                     <p className="mt-1 line-clamp-1 text-[9px] text-[#9a5947]">{getProductionStatus(product).reason}</p>
@@ -928,7 +929,8 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
                 </div>
                 <div className="px-4 py-4">
                   <div className={`inline-flex rounded-full px-2 py-1 text-[10px] font-semibold ${getProductionStatus(product).is_producible ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                    {getProductionStatus(product).is_producible ? '✓ Available' : '✗ Unavailable'}
+                    {getProductionStatus(product).is_producible ? <CircleCheck size={12} aria-hidden="true" /> : <CircleX size={12} aria-hidden="true" />}
+                    {getProductionStatus(product).is_producible ? 'Available' : 'Unavailable'}
                   </div>
                   {!getProductionStatus(product).is_producible && getProductionStatus(product).reason && (
                     <p className="text-[9px] text-red-700 mt-1">{getProductionStatus(product).reason}</p>
@@ -1033,7 +1035,10 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
                   {/* AVAILABILITY STATUS */}
                   <div className={`rounded-xl p-3 ${productionAvailability.is_producible ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
                     <p className={`text-[11px] font-semibold ${productionAvailability.is_producible ? 'text-green-800' : 'text-red-800'}`}>
-                      Production: {productionAvailability.is_producible ? '✓ Available' : '✗ Unavailable'}
+                      <span className="inline-flex items-center gap-1">
+                        Production: {productionAvailability.is_producible ? <CircleCheck size={12} aria-hidden="true" /> : <CircleX size={12} aria-hidden="true" />}
+                        {productionAvailability.is_producible ? 'Available' : 'Unavailable'}
+                      </span>
                     </p>
                     {!productionAvailability.is_producible && productionAvailability.reason && (
                       <p className="text-[10px] text-red-700 mt-1">{productionAvailability.reason}</p>
@@ -1088,7 +1093,7 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
                     <p className="text-red-500 text-xs">{bomError}</p>
                   )}
                   {recipeLines.some((line) => Number(line.usable_stock) < Number(line.qty) * Number(bomQty || 1)) && (
-                    <p className="text-xs font-semibold text-red-600">⚠ Insufficient ingredient stock. Reduce the quantity or replenish ingredients.</p>
+                    <p className="inline-flex items-start gap-1.5 text-xs font-semibold text-red-600"><AlertTriangle size={14} className="mt-0.5 shrink-0" aria-hidden="true" /> Insufficient ingredient stock. Reduce the quantity or replenish ingredients.</p>
                   )}
                 </div>}
 
@@ -1241,7 +1246,7 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
                         onClick={() => newImageInputRef.current?.click()}
                         className="inline-flex items-center rounded-[12px] bg-black px-3.5 py-2 text-[13px] font-medium text-white hover:bg-black/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37]"
                       >
-                        📷 Upload Product Image
+                        <ImagePlus size={15} className="mr-1.5" aria-hidden="true" /> Upload Product Image
                       </button>
                       <p className="mt-2 text-xs text-black/50">{newImage ? newImage.name : 'No image selected'}</p>
                       <p className="mt-1 text-xs text-black/40">JPG, PNG • Up to 5 MB</p>
@@ -1422,7 +1427,7 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
                         onClick={() => editImageInputRef.current?.click()}
                         className="rounded-lg bg-[#fff8e9] px-3 py-2 text-[11px] font-semibold text-[#5c4310] transition hover:bg-[#fff4cd]"
                       >
-                        📷 Upload Product Image
+                        <ImagePlus size={14} className="mr-1.5" aria-hidden="true" /> Upload Product Image
                       </button>
                       <span className="truncate text-[11px] text-[#9b8c83]">{editImage ? editImage.name : (editProduct.image || 'No image selected')}</span>
                     </div>

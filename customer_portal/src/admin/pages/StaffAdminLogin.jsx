@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { AlertCircle, Eye, EyeOff, Lock, Mail } from "lucide-react";
+import { AlertCircle, CakeSlice, Croissant, Eye, EyeOff, Leaf, Lock, Mail } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import ForgotPassword from "../../customer/pages/ForgotPassword";
 import { LARAVEL_BASE, ROOT_BASE } from "../../services/config";
@@ -443,9 +443,9 @@ export default function StaffAdminLogin() {
       `}</style>
 
       <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden">
-        <span className="absolute -left-12 top-1/3 text-7xl opacity-[.08]">🥐</span>
-        <span className="absolute right-8 top-8 text-7xl opacity-[.08]">🌿</span>
-        <span className="absolute bottom-10 left-1/3 text-7xl opacity-[.08]">🧁</span>
+        <Croissant className="absolute -left-12 top-1/3 h-20 w-20 opacity-[.08]" strokeWidth={1.25} />
+        <Leaf className="absolute right-8 top-8 h-20 w-20 opacity-[.08]" strokeWidth={1.25} />
+        <CakeSlice className="absolute bottom-10 left-1/3 h-20 w-20 opacity-[.08]" strokeWidth={1.25} />
       </div>
 
       <div className="admin-login-main relative z-10 mx-auto flex w-full flex-col items-center justify-center">

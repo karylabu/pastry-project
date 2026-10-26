@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { AlertTriangle, Clock3, PackageCheck, RefreshCw, Search, ShoppingBag, X } from "lucide-react";
+import { AlertTriangle, CircleCheck, Clock3, PackageCheck, RefreshCw, Search, ShoppingBag, X } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 
 /* STAFF NAVBAR */
@@ -66,7 +66,7 @@ function Toast({ toasts }) {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 10 }}
-            className={`max-w-xs rounded-2xl px-5 py-3 text-sm shadow-lg text-white ${
+            className={`flex max-w-xs items-start gap-2 rounded-2xl px-5 py-3 text-sm shadow-lg text-white ${
               t.type === "success"
                 ? "bg-black"
                 : t.type === "sms_fail"
@@ -74,7 +74,8 @@ function Toast({ toasts }) {
                 : "bg-black"
             }`}
           >
-            {t.message}
+            {t.type === "success" ? <CircleCheck size={16} className="mt-0.5 shrink-0" aria-hidden="true" /> : <AlertTriangle size={16} className="mt-0.5 shrink-0" aria-hidden="true" />}
+            <span>{t.message}</span>
           </motion.div>
         ))}
       </AnimatePresence>
@@ -398,7 +399,7 @@ export default function Orders() {
           fetchOrders(true);
           if (status === "Ready for Pickup") {
             if (data.sms_sent) {
-              addToast(`✓ Order #${id} updated — SMS sent to customer`, "success");
+              addToast(`Order #${id} updated — SMS sent to customer`, "success");
             } else {
               addToast(`Order #${id} updated, but SMS failed: ${data.sms_error ?? "Unknown error"}`, "sms_fail");
             }
