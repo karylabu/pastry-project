@@ -1449,7 +1449,7 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="fixed inset-x-0 bottom-0 top-[72px] z-[9997] flex items-start justify-center overflow-y-auto bg-black/40 p-3 sm:p-6"
+              className="fixed inset-x-0 bottom-0 top-[72px] z-[9997] flex items-start justify-center overflow-y-auto bg-black/40 px-3 py-0 sm:px-6"
             >
               <motion.div
                 initial={{ scale: 0.95 }}
