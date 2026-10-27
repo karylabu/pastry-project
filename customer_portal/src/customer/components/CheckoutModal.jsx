@@ -1245,6 +1245,7 @@ export default function CheckoutModal({
                   <button
                     key={paymentOption.value}
                     type="button"
+                    aria-label={paymentOption.value === "QRPh" ? "QRPh" : paymentOption.label}
                     onClick={() =>
                       setCheckoutData({
                         ...checkoutData,
@@ -1262,7 +1263,7 @@ export default function CheckoutModal({
                       {paymentOption.value === "QRPh" && (
                         <img src="/qr-ph-logo.svg" alt="" aria-hidden="true" className="h-5 w-auto" />
                       )}
-                      {paymentOption.label}
+                      {paymentOption.value !== "QRPh" && paymentOption.label}
                     </span>
                   </button>
                 ))}
