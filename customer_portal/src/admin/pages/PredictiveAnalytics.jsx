@@ -790,7 +790,7 @@ export default function PredictiveAnalytics() {
 
   return (
     <div className="min-h-screen bg-[#fbfaf5]">
-      <div className="lg:pl-[260px] pt-[72px]">
+      <div className="lg:pl-[260px] pt-[88px]">
         <div className="mx-auto max-w-[1400px] px-4 py-5 sm:px-6 md:px-8 lg:px-10 lg:py-7">
           <div className="mb-4 flex flex-col gap-4 border-b border-[#e8dfd4] pb-4 lg:flex-row lg:items-end lg:justify-between">
             <div>

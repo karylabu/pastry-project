@@ -78,7 +78,7 @@ function getIngredientCategory(ingredient) {
 }
 
 export default function Ingredients({
-  pageContainerClassName = "lg:pl-[260px] pt-[72px]",
+  pageContainerClassName = "lg:pl-[260px] pt-[88px]",
   contentClassName = "max-w-[1400px] mx-auto px-6 md:px-10 py-8",
 }) {
   const location = useLocation();

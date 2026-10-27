@@ -718,7 +718,7 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
     <div className="min-h-screen bg-[#fbfaf5] font-['DM_Sans'] text-[#33251e]">
 
 
-      <div className="lg:pl-[260px] pt-[72px]">
+      <div className="lg:pl-[260px] pt-[88px]">
         <div className="mx-auto max-w-[1400px] px-4 py-6 sm:px-6 md:px-8 lg:py-8">
 
         {/* HEADER */}
@@ -1026,7 +1026,7 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="fixed inset-x-0 bottom-0 top-[72px] z-50 flex items-center justify-center overflow-y-auto bg-black/40 p-4"
+              className="fixed inset-x-0 bottom-0 top-[88px] z-50 flex items-center justify-center overflow-y-auto bg-black/40 p-4"
               role="dialog"
               aria-modal="true"
               aria-labelledby="inventory-modal-title"
@@ -1449,7 +1449,7 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="fixed inset-x-0 bottom-0 top-[72px] z-[9997] flex items-start justify-center overflow-y-auto bg-black/40 px-3 py-0 sm:px-6"
+              className="fixed inset-x-0 bottom-0 top-[88px] z-[9997] flex items-start justify-center overflow-y-auto bg-black/40 px-3 py-0 sm:px-6"
             >
               <motion.div
                 initial={{ scale: 0.95 }}

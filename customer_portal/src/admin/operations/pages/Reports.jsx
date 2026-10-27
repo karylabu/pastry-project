@@ -1529,7 +1529,7 @@ export default function Reports() {
     <>
     <div className="min-h-screen font-['DM_Sans']" style={{ background: C.bg, "--admin-card-accent": "#c9a94f" }}>
 
-      <div className="lg:pl-[260px] pt-[72px]">
+      <div className="lg:pl-[260px] pt-[88px]">
         <div className="mx-auto max-w-[1400px] px-4 py-5 sm:px-6 md:px-8 lg:px-10 lg:py-7">
 
           <div className="admin-sales-report-header mb-5 flex flex-col gap-4 border-b border-[#e8dfd4] pb-5 sm:flex-row sm:items-end sm:justify-between">

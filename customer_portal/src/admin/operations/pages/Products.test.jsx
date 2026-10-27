@@ -232,7 +232,7 @@ describe('Products admin catalog', () => {
     fireEvent.click(screen.getAllByRole('button', { name: /^Produce / })[0]);
 
     const dialog = await screen.findByRole('dialog');
-    expect(dialog).toHaveClass('top-[72px]');
+    expect(dialog).toHaveClass('top-[88px]');
     expect(dialog.firstElementChild).toHaveClass('max-w-[600px]', 'max-h-full', 'overflow-y-auto');
 
     await waitFor(() => {

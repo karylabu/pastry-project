@@ -186,7 +186,7 @@ export default function Schedule() {
   const todayLabel = todayDate.toLocaleDateString([], { weekday: "long", month: "long", day: "numeric", year: "numeric" });
 
   return (
-    <div className="min-h-screen bg-[#fbfaf5] pt-[72px] lg:pl-[260px]">
+    <div className="min-h-screen bg-[#fbfaf5] pt-[88px] lg:pl-[260px]">
       <div className="mx-auto max-w-[1400px] px-4 py-5 sm:px-6 lg:px-8 lg:py-7">
         <div className="mb-5 flex flex-col gap-4 border-b border-[#e8dfd4] pb-5 sm:flex-row sm:items-end sm:justify-between">
           <div>

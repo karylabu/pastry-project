@@ -345,7 +345,7 @@ export default function WasteTracking() {
 
   return (
     <div className="min-h-screen font-['DM_Sans']" style={{ background: C.bg }}>
-      <div className="lg:pl-[260px] pt-[72px]">
+      <div className="lg:pl-[260px] pt-[88px]">
         <div className="mx-auto max-w-[1400px] px-4 py-4 sm:px-6 md:px-8 lg:px-10 lg:py-5">
 
           <div className="mb-4 flex flex-col gap-3 border-b border-[#e8dfd4] pb-4 md:flex-row md:items-end md:justify-between">

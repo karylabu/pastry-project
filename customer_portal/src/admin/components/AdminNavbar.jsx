@@ -318,7 +318,7 @@ export default function AdminNavbar({ onSidebarChange }) {
       </aside>
 
       {sidebarOpen && <button type="button" aria-label="Close admin navigation" onClick={() => setSidebarOpen(false)} className="fixed inset-0 z-[9999] bg-black/30 lg:hidden" />}
-      <header className={`fixed right-0 top-0 z-[9998] flex h-[72px] items-center justify-between border-b border-[#eadfd8] bg-[#fbfaf5]/95 px-4 backdrop-blur-xl transition-[left] duration-300 ease-out sm:px-6 lg:px-8 ${sidebarOpen ? "left-0 lg:left-[260px]" : "left-0 lg:left-0"}`}>
+      <header className={`fixed right-0 top-0 z-[9998] flex h-[88px] items-center justify-between border-b border-[#eadfd8] bg-[#fbfaf5] px-4 transition-[left] duration-300 ease-out sm:px-6 lg:px-8 ${sidebarOpen ? "left-0 lg:left-[260px]" : "left-0 lg:left-0"}`}>
         <div className="flex min-w-0 items-center gap-2 sm:gap-3">
           <button
             type="button"
