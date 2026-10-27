@@ -9,8 +9,8 @@ import {
   Plus,
   Trash2,
   TrendingUp,
-  UploadCloud,
 } from "lucide-react";
+import { Link } from "react-router-dom";
 import { LARAVEL_BASE, ROOT_BASE } from "../../services/config";
 import { getAuthHeaders } from "../../services/api";
 
@@ -519,7 +519,6 @@ export default function PredictiveAnalytics() {
   const [actionsPage, setActionsPage] = useState(1);
   const [coveragePage, setCoveragePage] = useState(1);
   const [reorderPage, setReorderPage] = useState(1);
-  const [overlapMode, setOverlapMode] = useState("deduplicate_live");
   const [aliases, setAliases] = useState([]);
   const [aliasProducts, setAliasProducts] = useState([]);
   const [aliasName, setAliasName] = useState("");
@@ -592,13 +591,13 @@ export default function PredictiveAnalytics() {
       const headers = {
         Accept: "application/json",
         ...getAuthHeaders(),
-        ...(!options.formData && options.action === "refresh" ? { "Content-Type": "application/json" } : {}),
+        ...(options.action === "refresh" ? { "Content-Type": "application/json" } : {}),
       };
       const response = await fetch(`${ROOT_BASE}/admin/api/api_predictive_analytics.php?${query.toString()}`, {
         method: options.action === "refresh" ? "POST" : "GET",
         credentials: "include",
         headers,
-        body: options.formData ? options.formData : (options.action === "refresh" ? JSON.stringify({ action: "refresh", period }) : undefined),
+        body: options.action === "refresh" ? JSON.stringify({ action: "refresh", period }) : undefined,
       });
       const data = await response.json().catch(() => ({}));
 
@@ -607,7 +606,7 @@ export default function PredictiveAnalytics() {
       }
 
       setForecast(data.forecast || { products: [], summary: { totalProjectedDemand: 0, highPriorityCount: 0, recommendationCount: 0 }, recommendations: [], alerts: [] });
-      setStatusMessage(options.action === "import" ? "Imported and processed sales data successfully." : "Live forecast data refreshed.");
+      setStatusMessage("Forecast refreshed from live orders and completed Sales Reports imports.");
     } catch (error) {
       setErrorMessage(error.message || "Failed to load forecast data.");
       setStatusMessage("The forecast could not be refreshed.");
@@ -678,44 +677,6 @@ export default function PredictiveAnalytics() {
     setReorderPage(1);
   }, [forecast.actions, forecast.products, forecast.recommendations]);
 
-  const handleFileUpload = async (event) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    const formData = new FormData();
-    formData.append("action", "import");
-    formData.append("period", String(period));
-    formData.append("overlap_mode", overlapMode);
-    formData.append("file", file);
-
-    setIsWorking(true);
-    setStatusMessage(`Processing ${file.name}...`);
-    setErrorMessage("");
-
-    try {
-      const response = await fetch(`${ROOT_BASE}/admin/api/api_predictive_analytics.php`, {
-        method: "POST",
-        credentials: "include",
-        headers: { Accept: "application/json", ...getAuthHeaders() },
-        body: formData,
-      });
-      const data = await response.json().catch(() => ({}));
-
-      if (!data.success) {
-        throw new Error(data.message || "The file could not be processed.");
-      }
-
-      setForecast(data.forecast || { products: [], summary: { totalProjectedDemand: 0, highPriorityCount: 0, recommendationCount: 0 }, recommendations: [], alerts: [] });
-      setStatusMessage(`Imported ${data.historyCount || 0} sales rows from ${file.name}.`);
-    } catch (error) {
-      setErrorMessage(error.message || "The file could not be processed.");
-      setStatusMessage("The upload failed.");
-    } finally {
-      setIsWorking(false);
-      event.target.value = "";
-    }
-  };
-
   const handleRunForecast = () => {
     loadForecast({ action: "refresh" });
   };
@@ -747,26 +708,53 @@ export default function PredictiveAnalytics() {
                 <Calculator size={16} className="mr-2" />
                 Run Forecast
               </button>
-              <label className="flex h-10 cursor-pointer items-center gap-2 rounded-md border border-[#e8dfd4] bg-white px-3.5 text-[11px] font-semibold text-[#65574d] transition hover:bg-[#faf7f2]">
-                <UploadCloud size={16} />
-                <span>Upload CSV</span>
-                <input type="file" accept=".csv" className="hidden" onChange={handleFileUpload} />
-              </label>
-              <label className="flex h-10 items-center gap-2 rounded-md border border-[#e8dfd4] bg-white px-2.5 text-[10px] font-semibold text-[#65574d]">
-                CSV overlap
-                <select aria-label="CSV overlap handling" value={overlapMode} onChange={(event) => setOverlapMode(event.target.value)} className="max-w-[180px] bg-transparent text-[10px] outline-none">
-                  <option value="deduplicate_live">Skip live-order overlaps</option>
-                  <option value="supplement">Add as additional sales</option>
-                </select>
-              </label>
             </div>
           </div>
 
           <div className="mb-5 flex flex-wrap items-center justify-between gap-2 border-b border-[#e8dfd4] pb-3 text-[11px]">
             <p className="flex items-center gap-2 text-[#65574d]" role="status" aria-live="polite"><span className={`h-2 w-2 rounded-full ${isWorking ? "animate-pulse bg-[#d4af37]" : "bg-[#81906c]"}`} />{statusMessage}</p>
-            <p className="inline-flex items-center gap-1.5 text-[#74675f]"><FileText size={13} /> Live orders and ingredient inventory</p>
+            <p className="inline-flex items-center gap-1.5 text-[#74675f]"><FileText size={13} /> Live orders, completed sales imports, and ingredient inventory</p>
             {errorMessage ? <p className="w-full rounded-md bg-[#fff4cd] px-3 py-2 text-[11px] text-[#33251e]">{errorMessage}</p> : null}
           </div>
+
+          <section aria-labelledby="forecast-workflow-title" className="mb-5 rounded-[24px] border border-black/10 bg-white p-5 shadow-sm">
+            <div className="mb-4">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.25em] text-black/50">Forecast workflow</p>
+              <h2 id="forecast-workflow-title" className="text-lg font-semibold text-black">From sales import to production forecast</h2>
+              <p className="mt-1 text-sm leading-6 text-black/60">
+                Import sales once in Sales Reports. Completed imports are shared with forecasting and other reports.
+              </p>
+            </div>
+            <ol className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+              <li className="rounded-xl border border-[#e9dfc9] bg-[#fffaf0] p-3">
+                <p className="text-xs font-bold text-[#8b6a12]">1. Import sales</p>
+                <p className="mt-1 text-xs leading-5 text-black/60">Upload the sales CSV from Sales Reports.</p>
+                <Link to="/admin/reports" className="mt-2 inline-flex text-xs font-semibold text-[#765d18] underline underline-offset-2 hover:text-black">
+                  Open Sales Reports
+                </Link>
+              </li>
+              <li className="rounded-xl border border-black/10 bg-[#fafaf8] p-3">
+                <p className="text-xs font-bold text-black">2. Clean and prepare data</p>
+                <p className="mt-1 text-xs leading-5 text-black/60">The import process checks dates, missing values, duplicates, and product names.</p>
+              </li>
+              <li className="rounded-xl border border-black/10 bg-[#fafaf8] p-3">
+                <p className="text-xs font-bold text-black">3. Split chronologically</p>
+                <p className="mt-1 text-xs leading-5 text-black/60">Earlier daily sales train the model; the latest 7 days are held out for testing.</p>
+              </li>
+              <li className="rounded-xl border border-black/10 bg-[#fafaf8] p-3">
+                <p className="text-xs font-bold text-black">4. Train forecasting methods</p>
+                <p className="mt-1 text-xs leading-5 text-black/60">Compare a linear trend, 7-day average, last day, and same weekday last week.</p>
+              </li>
+              <li className="rounded-xl border border-black/10 bg-[#fafaf8] p-3">
+                <p className="text-xs font-bold text-black">5. Evaluate predictions</p>
+                <p className="mt-1 text-xs leading-5 text-black/60">Compare MAE, RMSE, WAPE, and MAPE; the lowest shop-total WAPE selects the forecast method.</p>
+              </li>
+              <li className="rounded-xl border border-black/10 bg-[#fafaf8] p-3">
+                <p className="text-xs font-bold text-black">6. Review results</p>
+                <p className="mt-1 text-xs leading-5 text-black/60">See the demand chart, product estimates, and inventory preparation recommendations below.</p>
+              </li>
+            </ol>
+          </section>
 
           <div className="mb-5 grid grid-cols-2 gap-2.5 sm:grid-cols-3 xl:grid-cols-5">
             <div className="min-w-0 rounded-lg border border-t-[3px] border-[#e9e1d9] border-t-[#c9a94f] bg-white px-3.5 py-3">
