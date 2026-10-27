@@ -113,3 +113,51 @@ test('keeps balance payment and proof actions available after a proof was submit
   expect(screen.getByText('Pay the remaining balance or submit proof for review')).toBeInTheDocument();
   expect(screen.queryByText('Payment submitted — balance not confirmed')).not.toBeInTheDocument();
 });
+
+test('shows Awaiting Payment only for customized orders in the customer status filter', async () => {
+  global.fetch = jest.fn((url) => {
+    if (String(url).includes('/api/customer/products')) {
+      return Promise.resolve({ ok: true, json: async () => [] });
+    }
+
+    return Promise.resolve({
+      ok: true,
+      json: async () => ({
+        success: true,
+        orders: [
+          {
+            id: 601,
+            user_id: 7,
+            customer: 'Customer',
+            status: 'Awaiting Payment',
+            payment: 'QRPh',
+            payment_status: 'pending',
+            total: 1800,
+            items: [{ name: 'Customized Cake', qty: 1, price: 1800 }],
+            custom_cake_details: { cake_flavor: 'Vanilla', cake_size: '8 inches' },
+          },
+          {
+            id: 602,
+            user_id: 7,
+            customer: 'Customer',
+            status: 'Awaiting Payment',
+            payment: 'QRPh',
+            payment_status: 'pending',
+            total: 500,
+            items: [{ name: 'Blueberry Cheesecake', qty: 1, price: 500 }],
+          },
+        ],
+      }),
+    });
+  });
+
+  render(<Orders />);
+
+  const awaitingPaymentTab = await screen.findByRole('button', { name: /Awaiting Payment \(1\)/ });
+  expect(screen.getByText('Customized Cake')).toBeInTheDocument();
+  expect(screen.queryByText('Blueberry Cheesecake')).not.toBeInTheDocument();
+
+  fireEvent.click(awaitingPaymentTab);
+  expect(screen.getByText('Customized Cake')).toBeInTheDocument();
+  expect(screen.queryByText('Blueberry Cheesecake')).not.toBeInTheDocument();
+});

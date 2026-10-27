@@ -1152,10 +1152,13 @@ export default function Orders() {
   }
 
   // ── Helpers ─────────────────────────────────────────────────────────────────
-  const statusOptions = ["All", "Pending", "Preparing", "Awaiting Balance Payment", "Ready for Pickup", "Completed", "Cancelled"];
+  const statusOptions = ["All", "Awaiting Payment", "Pending", "Preparing", "Awaiting Balance Payment", "Ready for Pickup", "Completed", "Cancelled"];
 
   const statusCounts = statusOptions.reduce((acc, s) => {
-    acc[s] = s === 'All' ? orders.length : orders.filter((o) => String(o.status || '').toLowerCase() === s.toLowerCase()).length;
+    acc[s] = s === 'All' ? orders.length : orders.filter((o) => (
+      String(o.status || '').toLowerCase() === s.toLowerCase()
+      && (s !== 'Awaiting Payment' || o.is_customized)
+    )).length;
     return acc;
   }, {});
 
@@ -1171,7 +1174,8 @@ export default function Orders() {
   const filteredOrders = orders.filter((o) => {
     const matchesStatus = !statusFilter || statusFilter === 'All'
       ? true
-      : String(o.status || '').toLowerCase() === String(statusFilter || '').toLowerCase();
+      : String(o.status || '').toLowerCase() === String(statusFilter || '').toLowerCase()
+        && (statusFilter !== 'Awaiting Payment' || o.is_customized);
     if (!matchesStatus) return false;
     if (!search.trim()) return true;
     const q = search.trim().toLowerCase();
