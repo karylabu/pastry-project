@@ -1325,12 +1325,17 @@ export default function Orders() {
             <div className="divide-y divide-gray-100">
               {sortedOrders.map((order, idx) => {
                 const isCancelled  = order.status === "Cancelled";
+                const paymentMethodKey = String(order.payment || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+                const supportsPaymentProof = ['gcash', 'qrph'].includes(paymentMethodKey)
+                  || (Boolean(order.is_customized)
+                    && ['maya', 'maribank', 'visamastercard', 'onlinebanking'].includes(paymentMethodKey));
                 const isAwaitingPayment = order.status === 'Awaiting Payment'
                   && (Boolean(order.is_customized) || ['gcash', 'qrph'].includes(String(order.payment || '').toLowerCase()));
                 const isAwaitingBalancePayment = order.status === 'Awaiting Balance Payment'
                   && (Boolean(order.is_customized) || ['gcash', 'qrph'].includes(String(order.payment || '').toLowerCase()));
                 const hasPaymentSubmission = String(order.payment_status || '').toLowerCase() === 'proof_submitted';
                 const isPending    = order.status === "Pending";
+                const isPendingQrPayment = isPending && supportsPaymentProof;
                 const isToReceive  = String(order.status || '').toLowerCase() === "ready for pickup";
                 const isCompleted  = order.status === "Completed";
                 const hasReturnRefundRequest = Boolean(order.return_refund_request);
@@ -1400,7 +1405,11 @@ export default function Orders() {
                   : isPickupDownpaymentPaid
                   ? '50% downpayment paid — balance due at counter on pickup'
                   : isPending
-                  ? 'Please complete before pickup'
+                  ? isPendingQrPayment
+                    ? hasPaymentSubmission
+                      ? 'Payment details submitted — awaiting Admin review'
+                      : 'Send payment proof for review'
+                    : 'Please complete before pickup'
                   : isPreparing
                   ? 'Being prepared in kitchen'
                   : isToReceive
@@ -1598,6 +1607,17 @@ export default function Orders() {
                               Submit proof / reference
                             </button>}
                         </>
+                      )}
+                      {isPendingQrPayment && (
+                        hasPaymentSubmission
+                          ? <span className="text-right text-[11px] font-semibold text-amber-700">Payment details submitted</span>
+                          : <button
+                            type="button"
+                            onClick={() => { setPaymentProofError(''); setPaymentProofTarget(order); }}
+                            className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-3.5 py-2 text-[12px] font-semibold text-white hover:bg-slate-800 transition-colors"
+                          >
+                            Submit proof / reference
+                          </button>
                       )}
                       {isToReceive && (
                         <>

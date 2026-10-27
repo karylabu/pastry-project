@@ -59,7 +59,7 @@ class PaymentProofSecurityTest extends TestCase
             DB::table('orders')->insert([
                 'id' => $orderId,
                 'user_id' => 9,
-                'status' => 'Awaiting Payment',
+                'status' => $orderId === 7 ? 'Pending' : 'Awaiting Payment',
                 'payment' => 'QRPh',
                 'payment_status' => 'pending',
                 'order_type' => 'Standard',

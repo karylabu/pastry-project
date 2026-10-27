@@ -698,7 +698,7 @@ class OrderController extends Controller
             : in_array($paymentMethodKey, ['gcash', 'qrph'], true);
 
         if (!$supportedPaymentMethod
-            || !in_array($order->status, ['Awaiting Payment', 'Awaiting Balance Payment'], true)
+            || !in_array($order->status, ['Pending', 'Awaiting Payment', 'Awaiting Balance Payment'], true)
             || in_array(strtolower((string) $order->payment_status), ['failed', 'paid', 'proof_submitted'], true)) {
             return response()->json(['success' => false, 'message' => 'This order is not awaiting a QR payment.'], 409);
         }
