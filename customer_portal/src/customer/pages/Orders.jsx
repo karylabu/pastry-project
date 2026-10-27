@@ -1583,9 +1583,9 @@ export default function Orders() {
                             </button>}
                         </>
                       )}
-                      {isAwaitingBalancePayment && isCustomized && (
+                      {isAwaitingBalancePayment && (
                         <>
-                          {!hasPaymentSubmission && (
+                          {isCustomized && !hasPaymentSubmission && (
                             <button
                               type="button"
                               onClick={() => handlePayCustomizedDownpayment(order, 'balance')}
