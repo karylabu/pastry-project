@@ -181,6 +181,35 @@ class PaymentProofSecurityTest extends TestCase
         ]);
     }
 
+    public function test_customer_can_resubmit_balance_proof_while_awaiting_admin_review(): void
+    {
+        DB::table('orders')->insert([
+            'id' => 10,
+            'user_id' => 9,
+            'status' => 'Awaiting Balance Payment',
+            'payment' => 'QRPh',
+            'payment_status' => 'proof_submitted',
+            'order_type' => 'Standard',
+            'is_customized' => false,
+            'customer_payment_reference' => 'OLD_BALANCE_REFERENCE',
+        ]);
+        RateLimiter::clear('payment-proof:' . hash('sha256', '9:10'));
+
+        $this->withHeader('X-Auth-Token', 'proof-customer-token')
+            ->postJson('/api/orders/10/payment-proof', [
+                'customer_payment_reference' => 'NEW_BALANCE_REFERENCE',
+            ])
+            ->assertOk()
+            ->assertJsonPath('payment_status', 'proof_submitted');
+
+        $this->assertDatabaseHas('orders', [
+            'id' => 10,
+            'status' => 'Awaiting Balance Payment',
+            'payment_status' => 'proof_submitted',
+            'customer_payment_reference' => 'NEW_BALANCE_REFERENCE',
+        ]);
+    }
+
     public function test_customer_must_submit_at_least_one_payment_proof_type_and_can_submit_both(): void
     {
         $this->withHeader('X-Auth-Token', 'proof-customer-token')

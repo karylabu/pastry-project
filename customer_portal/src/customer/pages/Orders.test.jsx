@@ -63,7 +63,7 @@ afterEach(() => {
 test('shows the remaining pickup balance and starts balance payment', async () => {
   render(<Orders />);
 
-  const payBalanceButton = await screen.findByRole('button', { name: 'Pay balance ₱500.00' });
+  const payBalanceButton = await screen.findByRole('button', { name: 'Pay ₱500.00' });
   expect(screen.getByText('Deposit paid: ₱500 · Balance due: ₱500')).toBeInTheDocument();
   expect(screen.getByText('Pay the remaining balance or submit proof for review')).toBeInTheDocument();
   expect(screen.getByRole('button', { name: 'Submit proof / reference' })).toBeInTheDocument();
@@ -79,7 +79,7 @@ test('shows the remaining pickup balance and starts balance payment', async () =
   });
 });
 
-test('clarifies that submitted balance details are awaiting verification, not paid', async () => {
+test('keeps balance payment and proof actions available after a proof was submitted', async () => {
   global.fetch = jest.fn((url) => {
     if (String(url).includes('/api/customer/products')) {
       return Promise.resolve({ ok: true, json: async () => [] });
@@ -108,7 +108,8 @@ test('clarifies that submitted balance details are awaiting verification, not pa
 
   render(<Orders />);
 
-  expect(await screen.findByText('Payment submitted — balance not confirmed')).toBeInTheDocument();
-  expect(screen.getByText('Payment details submitted — balance not confirmed; awaiting Admin verification')).toBeInTheDocument();
-  expect(screen.queryByText('Balance details submitted')).not.toBeInTheDocument();
+  expect(await screen.findByRole('button', { name: 'Pay ₱500.00' })).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Submit proof / reference' })).toBeInTheDocument();
+  expect(screen.getByText('Pay the remaining balance or submit proof for review')).toBeInTheDocument();
+  expect(screen.queryByText('Payment submitted — balance not confirmed')).not.toBeInTheDocument();
 });

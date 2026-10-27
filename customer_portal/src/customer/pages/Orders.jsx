@@ -1444,9 +1444,7 @@ export default function Orders() {
                     ? 'Payment details submitted — awaiting Admin review'
                     : 'Send payment proof for review'
                   : isAwaitingBalancePayment
-                  ? hasPaymentSubmission
-                    ? 'Payment details submitted — balance not confirmed; awaiting Admin verification'
-                    : 'Pay the remaining balance or submit proof for review'
+                  ? 'Pay the remaining balance or submit proof for review'
                   : isPickupDownpaymentPaid
                   ? '50% downpayment paid — balance due at counter on pickup'
                   : isPending
@@ -1630,7 +1628,7 @@ export default function Orders() {
                       )}
                       {isAwaitingBalancePayment && (
                         <>
-                          {(isCustomized || canPayPickupBalance) && !hasPaymentSubmission && (
+                          {(isCustomized || canPayPickupBalance) && (
                             <button
                               type="button"
                               onClick={() => handleCreatePaymentLink(order, 'balance')}
@@ -1645,18 +1643,16 @@ export default function Orders() {
                               <CreditCard size={14} />
                               {payingOrderId === order.id
                                 ? 'Opening…'
-                                : `Pay balance ₱${(isCustomized ? balanceBreakdown.total : remainingBalanceAmount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                                : `Pay ₱${(isCustomized ? balanceBreakdown.total : remainingBalanceAmount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
                             </button>
                           )}
-                          {hasPaymentSubmission
-                            ? <span className="text-right text-[11px] font-semibold text-amber-700">Payment submitted — balance not confirmed</span>
-                            : <button
+                          <button
                               type="button"
                               onClick={() => { setPaymentProofError(''); setPaymentProofTarget(order); }}
                               className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-3.5 py-2 text-[12px] font-semibold text-white hover:bg-slate-800 transition-colors"
                             >
                               Submit proof / reference
-                            </button>}
+                            </button>
                         </>
                       )}
                       {isPendingQrPayment && (
