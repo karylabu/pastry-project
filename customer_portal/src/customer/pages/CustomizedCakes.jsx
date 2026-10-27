@@ -915,7 +915,7 @@ export default function CustomizedCakes() {
                         if (option === 'Pickup') setDeliveryService('');
                       }}
                       aria-pressed={deliveryMethod === option}
-                      className={`min-h-10 rounded-lg border px-3 py-1.5 text-xs font-semibold transition ${
+                      className={`min-h-9 rounded-lg border px-2 py-1 text-[11px] font-semibold transition ${
                         deliveryMethod === option
                           ? 'border-[#c9972d] bg-[#fff1bd] text-[#5f4715] shadow-sm'
                           : 'border-[#eadfd8] bg-white text-[#5f514a] hover:border-[#d4af37] hover:bg-[#fffaf0]'
@@ -941,7 +941,7 @@ export default function CustomizedCakes() {
                             type="button"
                             aria-pressed={deliveryService === service}
                             onClick={() => setDeliveryService(service)}
-                            className={`min-h-10 rounded-lg border px-3 py-1.5 text-xs font-semibold transition ${deliveryService === service ? 'border-[#c9972d] bg-[#fff1bd] text-[#5f4715] shadow-sm' : 'border-[#eadfd8] bg-white text-[#5f514a] hover:border-[#d4af37] hover:bg-[#fffaf0]'}`}
+                            className={`min-h-9 rounded-lg border px-2 py-1 text-[11px] font-semibold transition ${deliveryService === service ? 'border-[#c9972d] bg-[#fff1bd] text-[#5f4715] shadow-sm' : 'border-[#eadfd8] bg-white text-[#5f514a] hover:border-[#d4af37] hover:bg-[#fffaf0]'}`}
                           >
                             {service}
                           </button>
@@ -1035,7 +1035,7 @@ export default function CustomizedCakes() {
                       key={value}
                       type="button"
                       onClick={() => setCakeType(value)}
-                      className={`min-h-10 rounded-lg border px-3 py-1.5 text-xs font-semibold transition ${
+                      className={`min-h-9 rounded-lg border px-2 py-1 text-[11px] font-semibold transition ${
                         cakeType === value
                           ? 'border-[#c9972d] bg-[#fff1bd] text-[#5f4715] shadow-sm'
                           : 'border-[#eadfd8] bg-white text-[#5f514a] hover:border-[#d4af37] hover:bg-[#fffaf0]'
