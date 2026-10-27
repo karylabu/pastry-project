@@ -39,7 +39,7 @@ function CancelDialog({ order, onConfirm, onDismiss, isLoading }) {
           Cancel Order #{order.order_number ?? order.id}?
         </h3>
         <p className="text-[12px] text-gray-400 text-center leading-relaxed mb-8">
-          This action cannot be undone. Your pending order will be permanently cancelled.
+          Cancelling a paid order starts a PayMongo refund when available. Cash or direct-transfer refunds must be completed manually by the shop.
         </p>
         <div className="flex gap-3">
           <button
@@ -522,7 +522,10 @@ export default function Orders() {
       });
       const data = await safeParseJson(res);
       if (data.success) {
-        updateLocalStatus(cancelTarget.id, "Cancelled");
+        updateLocalStatus(cancelTarget.id, "Cancelled", {
+          refund_status: data.refund_status,
+          refund_amount: data.refund_amount,
+        });
         setStatusFilter("Cancelled");
       } else {
         setActionError(data.message || "Failed to cancel order.");
@@ -645,15 +648,15 @@ export default function Orders() {
     setFeedbackTarget(null);
   };
 
-  const updateLocalStatus = (id, newStatus) => {
+  const updateLocalStatus = (id, newStatus, extra = {}) => {
     setOrders((prev) =>
-      prev.map((o) => (o.id === id ? { ...o, status: newStatus } : o))
+      prev.map((o) => (o.id === id ? { ...o, status: newStatus, ...extra } : o))
     );
 
     try {
       const storedOrders = JSON.parse(localStorage.getItem(storageKey) || "[]");
       const updatedOrders = storedOrders.map((o) =>
-        o.id === id ? { ...o, status: newStatus } : o
+        o.id === id ? { ...o, status: newStatus, ...extra } : o
       );
       localStorage.setItem(storageKey, JSON.stringify(updatedOrders));
     } catch {
@@ -1556,7 +1559,15 @@ export default function Orders() {
                       )}
 
                       {isCancelled && (
-                        <span className="text-[12px] font-semibold text-slate-500">Cancelled</span>
+                        <span className="text-[12px] font-semibold text-slate-500">
+                          {order.refund_status === 'pending'
+                            ? 'Cancelled · Refund processing'
+                            : order.refund_status === 'manual_required'
+                            ? 'Cancelled · Refund pending from shop'
+                            : ['succeeded', 'refunded'].includes(order.refund_status)
+                            ? 'Cancelled · Refund confirmed'
+                            : 'Cancelled'}
+                        </span>
                       )}
                     </div>
                   </motion.div>

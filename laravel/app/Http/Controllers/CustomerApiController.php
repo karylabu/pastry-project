@@ -701,37 +701,11 @@ class CustomerApiController extends Controller
             return $this->corsResponse(['success' => false, 'message' => 'Invalid order ID.']);
         }
 
-        $status = DB::table('orders')
-            ->where('id', $orderId)
-            ->where('user_id', $user->id)
-            ->value('status');
-        if (!$status) {
-            return $this->corsResponse(['success' => false, 'message' => 'Order not found.']);
-        }
-
-        if ($status !== 'Pending') {
-            return $this->corsResponse(['success' => false, 'message' => 'Only pending orders can be cancelled.']);
-        }
-
-        DB::transaction(function () use ($orderId, $user) {
-            DB::table('orders')
-            ->where('id', $orderId)
-            ->where('user_id', $user->id)
-            ->update(['status' => 'Cancelled']);
-            if (Schema::hasTable('notifications')) {
-                DB::table('notifications')->insert([
-                    'user_id' => $user->id,
-                    'title' => 'Order Cancelled',
-                    'message' => "Your order #{$orderId} has been cancelled.",
-                    'type' => 'Warning',
-                    'is_read' => 0,
-                    'action_url' => '/customer/orders',
-                    'created_at' => now(),
-                ]);
-            }
-        });
-        app(\App\Services\RealtimeEventPublisher::class)->orderUpdated((int) $user->id, $orderId);
-        return $this->corsResponse(['success' => true]);
+        $response = app(OrderController::class)->cancel($request, $orderId);
+        return $this->corsResponse(
+            (array) $response->getData(true),
+            $response->getStatusCode()
+        );
     }
 
     public function confirmReceived(Request $request)

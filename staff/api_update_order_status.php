@@ -82,7 +82,140 @@ function insertCustomerNotification(mysqli $conn, int $userId, string $title, st
     }
 }
 
-function sendOrderStatusSms(?string $phone, int $orderId, string $status, bool $isCustomCakeOrder = false, ?float $downpaymentAmount = null): array {
+function getPayMongoSecretForRefund(): ?string {
+    foreach (['PAYMONGO_SECRET'] as $key) {
+        $value = getenv($key) ?: ($_SERVER[$key] ?? '') ?: ($_ENV[$key] ?? '');
+        if ($value !== '') {
+            return $value;
+        }
+    }
+
+    foreach ([__DIR__ . '/../customer/.env', __DIR__ . '/../.env', __DIR__ . '/../laravel/.env'] as $envFile) {
+        if (!is_readable($envFile)) {
+            continue;
+        }
+        foreach (file($envFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {
+            $line = trim($line);
+            if ($line === '' || $line[0] === '#') {
+                continue;
+            }
+            [$key, $value] = array_pad(explode('=', $line, 2), 2, '');
+            if (trim($key) === 'PAYMONGO_SECRET') {
+                return trim($value, " \t\r\n\"'");
+            }
+        }
+    }
+
+    return null;
+}
+
+function requestPayMongoOrderRefund(array $orderRow, int $orderId): array {
+    $paymentStatus = strtolower(trim((string) ($orderRow['payment_status'] ?? '')));
+    if (!in_array($paymentStatus, ['paid', 'downpayment_paid'], true)) {
+        return ['status' => null, 'amount' => null];
+    }
+
+    $amount = (float) ($orderRow['total'] ?? 0);
+    $downpaymentAmount = (float) ($orderRow['downpayment_amount'] ?? 0);
+    if (
+        $downpaymentAmount > 0
+        && (
+            $paymentStatus === 'downpayment_paid'
+            || (int) ($orderRow['is_customized'] ?? 0) === 1
+            || strcasecmp((string) ($orderRow['order_type'] ?? ''), 'Customized') === 0
+        )
+    ) {
+        $amount = $downpaymentAmount;
+    }
+
+    $paymentMethod = strtolower((string) preg_replace('/[^a-z0-9]/i', '', (string) ($orderRow['payment'] ?? '')));
+    $paymentReference = trim((string) ($orderRow['payment_reference'] ?? ''));
+    $refundReference = null;
+    $refundStatus = 'manual_required';
+
+    if (in_array($paymentMethod, ['gcash', 'qrph'], true) && $paymentReference !== '') {
+        $secret = getPayMongoSecretForRefund();
+        if (!$secret || !function_exists('curl_init')) {
+            throw new RuntimeException('PayMongo refund service is unavailable.');
+        }
+
+        $fetchPayments = curl_init('https://api.paymongo.com/v1/payment_links/' . rawurlencode($paymentReference) . '/payments');
+        curl_setopt_array($fetchPayments, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_HTTPAUTH => CURLAUTH_BASIC,
+            CURLOPT_USERPWD => $secret . ':',
+            CURLOPT_HTTPHEADER => ['Accept: application/json'],
+            CURLOPT_TIMEOUT => 15,
+        ]);
+        $paymentsBody = curl_exec($fetchPayments);
+        $paymentsStatus = (int) curl_getinfo($fetchPayments, CURLINFO_HTTP_CODE);
+        $paymentsError = curl_error($fetchPayments);
+        curl_close($fetchPayments);
+        $paymentsData = is_string($paymentsBody) ? json_decode($paymentsBody, true) : null;
+        if ($paymentsBody === false || $paymentsStatus < 200 || $paymentsStatus >= 300 || !is_array($paymentsData['data'] ?? null)) {
+            error_log("PayMongo payment lookup failed for cancellation of order #{$orderId}: {$paymentsStatus} {$paymentsError}");
+            throw new RuntimeException('Unable to verify the PayMongo payment for refund.');
+        }
+
+        $payment = null;
+        foreach ($paymentsData['data'] as $candidate) {
+            $attributes = $candidate['attributes'] ?? $candidate;
+            if (in_array(strtolower((string) ($attributes['status'] ?? '')), ['paid', 'succeeded'], true)) {
+                $payment = ['id' => $candidate['id'] ?? '', 'amount' => $attributes['amount'] ?? 0];
+                break;
+            }
+        }
+        $paymentId = (string) ($payment['id'] ?? '');
+        $refundAmount = (int) ($payment['amount'] ?? 0);
+        if ($paymentId === '' || $refundAmount < 100) {
+            throw new RuntimeException('No refundable completed PayMongo payment was found.');
+        }
+
+        $refundRequest = curl_init('https://api.paymongo.com/v1/refunds');
+        curl_setopt_array($refundRequest, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_POST => true,
+            CURLOPT_POSTFIELDS => json_encode([
+                'data' => [
+                    'attributes' => [
+                        'amount' => $refundAmount,
+                        'payment_id' => $paymentId,
+                        'reason' => 'requested_by_customer',
+                        'notes' => "Order #{$orderId} cancelled by admin",
+                    ],
+                ],
+            ]),
+            CURLOPT_HTTPAUTH => CURLAUTH_BASIC,
+            CURLOPT_USERPWD => $secret . ':',
+            CURLOPT_HTTPHEADER => ['Accept: application/json', 'Content-Type: application/json'],
+            CURLOPT_TIMEOUT => 15,
+        ]);
+        $refundBody = curl_exec($refundRequest);
+        $refundHttpStatus = (int) curl_getinfo($refundRequest, CURLINFO_HTTP_CODE);
+        $refundError = curl_error($refundRequest);
+        curl_close($refundRequest);
+        $refundData = is_string($refundBody) ? json_decode($refundBody, true) : null;
+        if ($refundBody === false || $refundHttpStatus < 200 || $refundHttpStatus >= 300) {
+            error_log("PayMongo refund failed for cancellation of order #{$orderId}: {$refundHttpStatus} {$refundError}");
+            throw new RuntimeException('PayMongo did not accept the refund request.');
+        }
+
+        $refundReference = (string) ($refundData['data']['id'] ?? '');
+        $refundStatus = strtolower((string) ($refundData['data']['attributes']['status'] ?? 'pending'));
+        if ($refundReference === '' || !in_array($refundStatus, ['pending', 'succeeded', 'refunded'], true)) {
+            throw new RuntimeException('PayMongo returned an invalid refund response.');
+        }
+        $amount = $refundAmount / 100;
+    }
+
+    return [
+        'status' => $refundStatus,
+        'reference' => $refundReference,
+        'amount' => $amount,
+    ];
+}
+
+function sendOrderStatusSms(?string $phone, int $orderId, string $status, bool $isCustomCakeOrder = false, ?float $downpaymentAmount = null, ?string $messageOverride = null): array {
     if (empty($phone)) {
         return ['sent' => false, 'error' => 'No phone number found'];
     }
@@ -129,8 +262,34 @@ function sendOrderStatusSms(?string $phone, int $orderId, string $status, bool $
     } else {
         $message = "Pastry Project: Your order #{$orderId} {$statusMessage}.";
     }
+    if ($messageOverride !== null) {
+        $message = $messageOverride;
+    }
+    $apiToken = getenv('IPROGSMS_API_TOKEN') ?: ($_SERVER['IPROGSMS_API_TOKEN'] ?? '') ?: ($_ENV['IPROGSMS_API_TOKEN'] ?? '');
+    if ($apiToken === '') {
+        foreach ([__DIR__ . '/../customer/.env', __DIR__ . '/../.env', __DIR__ . '/../laravel/.env'] as $envFile) {
+            if (!is_readable($envFile)) {
+                continue;
+            }
+            foreach (file($envFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {
+                $line = trim($line);
+                if ($line === '' || $line[0] === '#') {
+                    continue;
+                }
+                [$key, $value] = array_pad(explode('=', $line, 2), 2, '');
+                if (trim($key) === 'IPROGSMS_API_TOKEN') {
+                    $apiToken = trim($value, " \t\r\n\"'");
+                    break 2;
+                }
+            }
+        }
+    }
+    if ($apiToken === '') {
+        error_log("Order status SMS was not sent for order #{$orderId}: iProgSMS token is not configured.");
+        return ['sent' => false, 'error' => 'SMS provider is not configured.'];
+    }
     $payload = json_encode([
-        'api_token' => '3e0c021fc064ea07bb524064e62125caf19f511e',
+        'api_token' => $apiToken,
         'phone_number' => $phone,
         'message' => $message,
     ]);
@@ -896,7 +1055,7 @@ if (($pickupOutcome === 'picked_up' && $status !== 'Completed') || ($pickupOutco
 ========================= */
 try {
     $conn->begin_transaction();
-    $orderStmt = $conn->prepare("SELECT status, items, total, downpayment_amount, user_id, email, phone, payment, payment_status, payment_proof_path, delivery_date, pickup_outcome FROM orders WHERE id = ? LIMIT 1 FOR UPDATE");
+    $orderStmt = $conn->prepare("SELECT status, items, total, downpayment_amount, user_id, email, phone, payment, payment_status, payment_reference, payment_proof_path, is_customized, order_type, delivery_date, pickup_outcome FROM orders WHERE id = ? LIMIT 1 FOR UPDATE");
     if (!$orderStmt) {
         throw new Exception("Order lookup failed");
     }
@@ -956,10 +1115,10 @@ try {
         }
     }
 
-    $isGcashOrder = strtolower(trim((string) ($orderRow['payment'] ?? ''))) === 'gcash';
+    $isGcashOrder = in_array(strtolower(trim((string) ($orderRow['payment'] ?? ''))), ['gcash', 'qrph'], true);
     $paymentStatus = strtolower(trim((string) ($orderRow['payment_status'] ?? 'pending')));
     if ($isGcashOrder && $status === 'Preparing' && !in_array($paymentStatus, ['paid', 'proof_submitted'], true)) {
-        throw new Exception('Verify GCash payment before preparing this order');
+        throw new Exception('Verify QR payment before preparing this order');
     }
     if ($isGcashOrder && $status === 'Preparing' && $paymentStatus === 'proof_submitted' && empty($orderRow['payment_proof_path'])) {
         throw new Exception('Payment proof is missing for this order');
@@ -1054,7 +1213,9 @@ try {
         }
     }
 
-    if (shouldDeductInventory($oldStatus, $status) && !$isCustomCakeOrder) {
+    $paymentAccepted = $isAcceptingDownpayment || $isAcceptingBalancePayment || $isReviewingGcashProof;
+    $shouldDeductOrderStock = shouldDeductInventory($oldStatus, $status) || $paymentAccepted;
+    if ($shouldDeductOrderStock && !$isCustomCakeOrder) {
         // Idempotency guard: skip deduction when this order's stock is
         // already deducted (deductions > restorations). Prevents double
         // deduction on status flip-flops like Confirmed -> Pending -> Confirmed.
@@ -1095,6 +1256,31 @@ try {
             ? collectCustomCakeIngredientRequirements($conn, $id)
             : collectOrderIngredientRequirements($conn, $ingredientOrderLines);
         deductOrderIngredients($conn, $id, $ingredientRequirements, $currentUserId);
+    }
+
+    $refundResult = ['status' => null, 'amount' => null];
+    if ($status === 'Cancelled' && $oldStatus !== 'Cancelled') {
+        $refundResult = requestPayMongoOrderRefund($orderRow, $id);
+
+        if ($refundResult['status'] === 'manual_required') {
+            $adminStmt = $conn->prepare("SELECT id FROM users WHERE LOWER(role) = 'admin'");
+            if ($adminStmt && $adminStmt->execute()) {
+                $adminResult = $adminStmt->get_result();
+                while ($admin = $adminResult->fetch_assoc()) {
+                    insertCustomerNotification(
+                        $conn,
+                        (int) $admin['id'],
+                        "Manual refund required for order #{$id}",
+                        "Order #{$id} was cancelled after payment. Please refund ₱" . number_format((float) $refundResult['amount'], 2) . ' manually.',
+                        'Warning',
+                        '/staff/orders.php'
+                    );
+                }
+                $adminStmt->close();
+            } elseif ($adminStmt) {
+                $adminStmt->close();
+            }
+        }
     }
 
     if ($status === 'Cancelled' && $oldStatus !== 'Cancelled' && $oldStatus !== 'Ready for Pickup') {
@@ -1457,6 +1643,13 @@ try {
 
                 if ($oldStatus !== $status) {
                     $notifMessage = "Your order #{$id} status changed from {$oldStatus} to {$status}.";
+                    if ($status === 'Cancelled' && $refundResult['status'] === 'pending') {
+                        $notifMessage .= ' Your PayMongo refund request is being processed.';
+                    } elseif ($status === 'Cancelled' && in_array($refundResult['status'], ['succeeded', 'refunded'], true)) {
+                        $notifMessage .= ' PayMongo confirmed the refund.';
+                    } elseif ($status === 'Cancelled' && $refundResult['status'] === 'manual_required') {
+                        $notifMessage .= ' The shop will process your refund manually.';
+                    }
                     if (!insertCustomerNotification($conn, $notifUserId, $notifTitle, $notifMessage, $notifType, '/customer/orders')) {
                         error_log("api_update_order_status: notification insert failed for order #{$id}, user #{$notifUserId}, status {$status}");
                     }
@@ -1471,14 +1664,22 @@ try {
     $notificationPaymentAmount = $isRequestingBalancePayment
         ? max(0, (float) $orderRow['total'] - $storedDownpaymentAmount)
         : $downpaymentAmount;
+    $refundSmsMessage = match ($refundResult['status']) {
+        'pending' => "Order #{$id} cancelled. Your refund request is being processed by PayMongo.",
+        'succeeded', 'refunded' => "Order #{$id} cancelled. PayMongo confirmed your refund was returned.",
+        'manual_required' => "Order #{$id} cancelled. Your refund is not yet returned; the shop has been asked to process it manually.",
+        default => null,
+    };
     $smsResult = $oldStatus !== $status
-        ? sendOrderStatusSms($orderRow['phone'] ?? null, $id, $status, $isCustomCakeOrder, $notificationPaymentAmount)
+        ? sendOrderStatusSms($orderRow['phone'] ?? null, $id, $status, $isCustomCakeOrder, $notificationPaymentAmount, $refundSmsMessage)
         : ['sent' => false, 'error' => 'Status did not change'];
 
     $conn->close();
     sendJson(true, "Order updated", [
         "id" => $id,
         "status" => $status,
+        "refund_status" => $refundResult['status'],
+        "refund_amount" => $refundResult['amount'],
         "pickup_outcome" => $pickupOutcome !== '' ? $pickupOutcome : ($orderRow['pickup_outcome'] ?? null),
         "sms_sent" => $smsResult['sent'],
         "sms_error" => $smsResult['error']

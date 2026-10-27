@@ -2,6 +2,8 @@
 
 namespace Tests\Feature;
 
+use App\Http\Controllers\OrderController;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
@@ -18,6 +20,7 @@ class CustomerOrdersApiTest extends TestCase
             $table->string('email');
             $table->string('password');
             $table->string('role');
+            $table->string('status')->default('active');
             $table->timestamps();
         });
         Schema::create('user_sessions', function ($table) {
@@ -35,6 +38,7 @@ class CustomerOrdersApiTest extends TestCase
             $table->decimal('subtotal', 10, 2)->default(0);
             $table->decimal('delivery_fee', 10, 2)->default(0);
             $table->decimal('total', 10, 2)->default(0);
+            $table->decimal('downpayment_amount', 10, 2)->nullable();
             $table->string('method')->nullable();
             $table->string('delivery_service')->nullable();
             $table->string('rider_name', 120)->nullable();
@@ -47,6 +51,7 @@ class CustomerOrdersApiTest extends TestCase
             $table->decimal('lng', 10, 7)->nullable();
             $table->string('status');
             $table->string('payment_status')->nullable();
+            $table->string('payment_reference')->nullable();
             $table->boolean('is_customized')->default(false);
             $table->string('order_type')->nullable();
             $table->timestamp('created_at')->nullable();
@@ -172,6 +177,32 @@ class CustomerOrdersApiTest extends TestCase
             ->assertJsonPath('success', true);
 
         $this->assertDatabaseHas('orders', ['id' => 10, 'status' => 'Cancelled']);
+    }
+
+    public function test_cancelled_paid_counter_order_reports_manual_refund_without_schema_changes(): void
+    {
+        DB::table('orders')->insert([
+            'id' => 14,
+            'user_id' => 7,
+            'payment' => 'Counter',
+            'payment_status' => 'paid',
+            'total' => 500,
+            'status' => 'Pending',
+        ]);
+
+        $request = Request::create('/api/orders/14/cancel', 'POST', [], [], [], [
+            'HTTP_X_AUTH_TOKEN' => 'test-customer-token',
+        ]);
+        $response = app(OrderController::class)->cancel($request, 14);
+
+        $this->assertSame(200, $response->getStatusCode());
+        $this->assertSame('manual_required', $response->getData(true)['refund_status']);
+        $this->assertEquals(500, $response->getData(true)['refund_amount']);
+
+        $this->assertDatabaseHas('orders', [
+            'id' => 14,
+            'status' => 'Cancelled',
+        ]);
     }
 
     public function test_customer_can_confirm_a_ready_order_as_received(): void

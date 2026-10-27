@@ -6,6 +6,7 @@ ini_set('display_errors', 0);
 require_once __DIR__ . '/../includes/api_auth.php';
 require_once __DIR__ . '/../includes/inventory.php';
 require_once __DIR__ . '/../includes/realtime_events.php';
+require_once __DIR__ . '/../includes/paymongo_order_refund.php';
 
 $user = requireApiRole(['customer']);
 
@@ -34,7 +35,7 @@ try {
 
     // Lock the order and ensure a customer can only cancel their own order.
     $check = $conn->prepare(
-        "SELECT id, status, items FROM orders
+        "SELECT id, status, items, total, downpayment_amount, payment, payment_status, payment_reference, is_customized, order_type, phone FROM orders
          WHERE id = ? AND (user_id = ? OR (user_id IS NULL AND email = ?))
          LIMIT 1 FOR UPDATE"
     );
@@ -64,6 +65,8 @@ try {
         echo json_encode(["success" => false, "message" => "This order can no longer be cancelled."]);
         exit;
     }
+
+    $refundResult = requestPayMongoOrderRefund($row, $order_id);
 
     // Restore only movements created by a prior inventory deduction.
     $items = json_decode((string) ($row['items'] ?? '[]'), true);
@@ -113,14 +116,49 @@ try {
     }
 
     $updateOrder = $conn->prepare("UPDATE orders SET status = 'Cancelled' WHERE id = ?");
+    if (!$updateOrder) {
+        throw new Exception('Failed to prepare cancelled order update.');
+    }
     $updateOrder->bind_param('i', $order_id);
     $result = $updateOrder->execute();
     $updateOrder->close();
 
     if ($result) {
+        if ($refundResult['status'] === 'manual_required') {
+            $admins = $conn->query("SELECT id FROM users WHERE LOWER(role) = 'admin'");
+            if ($admins) {
+                while ($admin = $admins->fetch_assoc()) {
+                    $notification = $conn->prepare('INSERT INTO notifications (user_id, title, message, type, is_read, action_url, created_at) VALUES (?, ?, ?, ?, 0, ?, NOW())');
+                    if ($notification) {
+                        $title = "Manual refund required for order #{$order_id}";
+                        $message = "Order #{$order_id} was cancelled after payment. Please refund ₱" . number_format((float) $refundResult['amount'], 2) . ' manually.';
+                        $type = 'Warning';
+                        $actionUrl = '/staff/orders.php';
+                        $adminId = (int) $admin['id'];
+                        $notification->bind_param('issss', $adminId, $title, $message, $type, $actionUrl);
+                        $notification->execute();
+                        $notification->close();
+                    }
+                }
+                $admins->free();
+            }
+        }
+
         $conn->commit();
         publishRealtimeEvent($conn, 'order.updated', $userId, $order_id);
-        echo json_encode(["success" => true]);
+        sendPayMongoOrderRefundSms($row['phone'] ?? null, $order_id, $refundResult);
+        $message = match ($refundResult['status']) {
+            'pending' => 'Order cancelled. Your PayMongo refund request is being processed.',
+            'succeeded', 'refunded' => 'Order cancelled. PayMongo confirmed the refund.',
+            'manual_required' => 'Order cancelled. The shop will process your refund manually.',
+            default => 'Order cancelled successfully.',
+        };
+        echo json_encode([
+            'success' => true,
+            'message' => $message,
+            'refund_status' => $refundResult['status'],
+            'refund_amount' => $refundResult['amount'],
+        ]);
     } else {
         throw new Exception("SQL Error: " . mysqli_error($conn));
     }

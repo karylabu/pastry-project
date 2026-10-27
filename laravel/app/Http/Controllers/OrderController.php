@@ -805,6 +805,10 @@ class OrderController extends Controller
                         'status' => 'Pending',
                         'payment_status' => $isStandardPickupDownpayment ? 'downpayment_paid' : 'paid',
                     ]);
+                    if (!$this->orderHasActiveStockDeduction((int) $lockedOrder->id)) {
+                        $this->deductOrderSizeStock($lockedOrder->items ?? [], (int) $lockedOrder->id, (int) $user->id);
+                        $this->deductOrderProductStock($lockedOrder, (int) $user->id);
+                    }
 
                     if (Schema::hasTable('notifications')) {
                         $notification = DB::table('notifications')
@@ -1143,7 +1147,7 @@ class OrderController extends Controller
         }
 
         try {
-            DB::transaction(function () use ($id, $user) {
+            $refundResult = DB::transaction(function () use ($id, $user) {
                 $order = Order::query()->whereKey($id)->lockForUpdate()->first();
                 if (!$order || (int) $order->user_id !== (int) $user->id) {
                     throw new RuntimeException('Order not found.');
@@ -1151,7 +1155,10 @@ class OrderController extends Controller
                 if ($order->status !== 'Pending') {
                     throw new RuntimeException('Only pending orders can be cancelled.');
                 }
+
+                $refundResult = $this->refundPaidOrderIfNeeded($order);
                 $this->restoreOrderSizeStock($order, (int) $user->id);
+                $this->restoreOrderProductStock($order, (int) $user->id);
                 $order->update(['status' => 'Cancelled']);
 
                 if (Schema::hasTable('notifications')) {
@@ -1165,16 +1172,147 @@ class OrderController extends Controller
                         'created_at' => now(),
                     ]);
                 }
+
+                if ($refundResult['status'] === 'manual_required') {
+                    AdminNotification::notifyRoles(['admin'], [
+                        'type' => 'refund_required',
+                        'title' => "Manual refund required for order #{$order->id}",
+                        'message' => "Order #{$order->id} was cancelled after payment. Please refund ₱" . number_format($refundResult['amount'], 2) . ' manually.',
+                        'data' => ['order_id' => (int) $order->id, 'refund_amount' => $refundResult['amount']],
+                        'action_url' => '/admin/orders',
+                        'is_read' => false,
+                        'created_at' => now(),
+                    ]);
+                }
+
+                return $refundResult;
             });
         } catch (\Throwable $exception) {
-            $status = $exception->getMessage() === 'Order not found.' ? 404 : 400;
+            $status = $exception->getMessage() === 'Order not found.'
+                ? 404
+                : (str_starts_with($exception->getMessage(), 'Unable to process payment refund') ? 502 : 400);
             return response()->json(['success' => false, 'message' => $exception->getMessage()], $status);
         }
 
+        app(\App\Services\RealtimeEventPublisher::class)->orderUpdated((int) $user->id, $id);
+
+        $order = Order::query()->findOrFail($id);
+        $smsMessage = match ($refundResult['status']) {
+            'pending' => "Order #{$id} cancelled. Your refund request is being processed by PayMongo.",
+            'succeeded', 'refunded' => "Order #{$id} cancelled. PayMongo confirmed your refund was returned.",
+            'manual_required' => "Order #{$id} cancelled. Your refund is not yet returned; the shop has been asked to process it manually.",
+            default => "Order #{$id} has been cancelled.",
+        };
+        $this->sendSmsNotification($order, 'Cancelled', $smsMessage);
+
+        $message = match ($refundResult['status']) {
+            'pending' => 'Order cancelled. Your refund request was submitted to PayMongo and is being processed.',
+            'succeeded', 'refunded' => 'Order cancelled. PayMongo confirmed the refund.',
+            'manual_required' => 'Order cancelled. The admin has been notified to refund your payment manually.',
+            default => 'Order cancelled successfully.',
+        };
+
         return response()->json([
             'success' => true,
-            'message' => 'Order cancelled successfully.'
+            'message' => $message,
+            'refund_status' => $refundResult['status'],
+            'refund_amount' => $refundResult['amount'],
         ]);
+    }
+
+    private function refundPaidOrderIfNeeded(Order $order): array
+    {
+        $paymentStatus = strtolower(trim((string) $order->payment_status));
+        if (!in_array($paymentStatus, ['paid', 'downpayment_paid'], true)) {
+            return ['status' => null, 'amount' => null];
+        }
+
+        $amount = (float) ($order->total ?? 0);
+        $downpaymentAmount = (float) ($order->downpayment_amount ?? 0);
+        if (
+            $downpaymentAmount > 0
+            && (
+                $paymentStatus === 'downpayment_paid'
+                || (bool) $order->is_customized
+                || strcasecmp((string) $order->order_type, 'Customized') === 0
+            )
+        ) {
+            $amount = $downpaymentAmount;
+        }
+        $paymentMethod = strtolower((string) preg_replace('/[^a-z0-9]/i', '', (string) $order->payment));
+        if (!in_array($paymentMethod, ['gcash', 'qrph'], true) || empty($order->payment_reference)) {
+            return ['status' => 'manual_required', 'amount' => $amount];
+        }
+
+        $secretKey = config('services.paymongo.secret');
+        if (!$secretKey) {
+            throw new RuntimeException('Unable to process payment refund right now. Please try again later.');
+        }
+
+        try {
+            $paymentsResponse = Http::withBasicAuth($secretKey, '')
+                ->acceptJson()
+                ->timeout(15)
+                ->get('https://api.paymongo.com/v1/payment_links/' . rawurlencode((string) $order->payment_reference) . '/payments');
+
+            if (!$paymentsResponse->successful() || !is_array($paymentsResponse->json('data'))) {
+                throw new RuntimeException('Unable to verify the payment with PayMongo.');
+            }
+
+            $payment = collect($paymentsResponse->json('data'))->first(function ($payment) {
+                $attributes = $payment['attributes'] ?? $payment;
+                return in_array(strtolower((string) ($attributes['status'] ?? '')), ['paid', 'succeeded'], true);
+            });
+            if (!$payment) {
+                throw new RuntimeException('No completed PayMongo payment was found for this order.');
+            }
+
+            $attributes = $payment['attributes'] ?? $payment;
+            $paymentId = (string) ($payment['id'] ?? '');
+            $refundAmount = (int) ($attributes['amount'] ?? 0);
+            if ($paymentId === '' || $refundAmount < 100) {
+                throw new RuntimeException('The completed PayMongo payment has invalid refund details.');
+            }
+
+            $refundResponse = Http::withBasicAuth($secretKey, '')
+                ->acceptJson()
+                ->timeout(15)
+                ->post('https://api.paymongo.com/v1/refunds', [
+                    'data' => [
+                        'attributes' => [
+                            'amount' => $refundAmount,
+                            'payment_id' => $paymentId,
+                            'reason' => 'requested_by_customer',
+                            'notes' => "Customer cancellation for order #{$order->id}",
+                        ],
+                    ],
+                ]);
+
+            if (!$refundResponse->successful()) {
+                Log::warning('PayMongo refund request failed.', [
+                    'order_id' => $order->id,
+                    'http_status' => $refundResponse->status(),
+                ]);
+                throw new RuntimeException('PayMongo did not accept the refund request.');
+            }
+
+            $refundData = $refundResponse->json('data');
+            $refundId = (string) ($refundData['id'] ?? '');
+            $refundStatus = strtolower((string) ($refundData['attributes']['status'] ?? 'pending'));
+            if ($refundId === '' || !in_array($refundStatus, ['pending', 'succeeded', 'refunded'], true)) {
+                throw new RuntimeException('PayMongo returned an unrecognized refund status.');
+            }
+
+            $amount = $refundAmount / 100;
+            return ['status' => $refundStatus, 'amount' => $amount];
+        } catch (\Throwable $exception) {
+            Log::error('Payment refund could not be completed for order.', [
+                'order_id' => $order->id,
+                'exception' => get_class($exception),
+                'message' => $exception->getMessage(),
+            ]);
+            throw new RuntimeException('Unable to process payment refund right now. Your order was not cancelled; please try again or contact the shop.');
+        }
     }
 
     public function confirmReceived(Request $request, int $id)
@@ -1381,14 +1519,20 @@ class OrderController extends Controller
                 $newStatus = $request->status;
                 $previousStatus = $oldStatus;
                 $approvedStatuses = ['confirmed', 'approved', 'preparing'];
-                $stockDeductedStatuses = array_merge($approvedStatuses, ['return/refund']);
-                $wasApproved = in_array(strtolower(trim($oldStatus)), $stockDeductedStatuses, true);
                 $isApproved = in_array(strtolower(trim($newStatus)), $approvedStatuses, true);
+                $hasDeductedStock = $this->orderHasActiveStockDeduction((int) $order->id);
 
-                if (!$wasApproved && $isApproved) {
+                if (
+                    strtolower(trim($newStatus)) === 'cancelled'
+                    && strtolower(trim((string) $oldStatus)) !== 'cancelled'
+                ) {
+                    $this->refundPaidOrderIfNeeded($order);
+                }
+
+                if ($isApproved && !$hasDeductedStock) {
                     $this->deductOrderSizeStock($order->items ?? [], (int) $order->id, (int) $user->id);
                     $this->deductOrderProductStock($order, (int) $user->id);
-                } elseif ($wasApproved && strtolower(trim($newStatus)) === 'cancelled') {
+                } elseif ($hasDeductedStock && strtolower(trim($newStatus)) === 'cancelled') {
                     $this->restoreOrderSizeStock($order, (int) $user->id);
                     $this->restoreOrderProductStock($order, (int) $user->id);
                 }
@@ -1503,6 +1647,20 @@ class OrderController extends Controller
         }
 
         return $lines;
+    }
+
+    private function orderHasActiveStockDeduction(int $orderId): bool
+    {
+        return Schema::hasTable('product_inventory_movements')
+            && DB::table('product_inventory_movements')
+                ->select('product_id', 'product_size_id')
+                ->selectRaw('SUM(quantity) as net_quantity')
+                ->where('reference_type', 'order')
+                ->where('reference_id', $orderId)
+                ->whereIn('movement_type', ['Order', 'Cancellation', 'Reservation Release'])
+                ->groupBy('product_id', 'product_size_id')
+                ->havingRaw('SUM(quantity) < 0')
+                ->exists();
     }
 
     private function deductOrderSizeStock(array $items, int $orderId, int $userId): void
@@ -1662,6 +1820,10 @@ class OrderController extends Controller
 
     private function restoreOrderProductStock(Order $order, int $userId): void
     {
+        if (!Schema::hasTable('product_inventory_movements')) {
+            return;
+        }
+
         $deductions = DB::table('product_inventory_movements')
             ->select('product_id', DB::raw('SUM(quantity) as net_quantity'))
             ->where('reference_type', 'order')
@@ -1701,7 +1863,7 @@ class OrderController extends Controller
     /**
      * Send SMS notification via iProgSMS.
      */
-    private function sendSmsNotification(Order $order, string $status)
+    private function sendSmsNotification(Order $order, string $status, ?string $messageOverride = null)
     {
         try {
             $phone = $order->phone;
@@ -1724,7 +1886,7 @@ class OrderController extends Controller
                 'cancelled' => 'has been cancelled',
                 default => "status is now {$status}",
             };
-            $message = "Pastry Project: Your order #{$order->id} {$statusMessage}.";
+            $message = $messageOverride ?? "Pastry Project: Your order #{$order->id} {$statusMessage}.";
             $apiToken = config('services.iprogsms.api_token');
             if (!is_string($apiToken) || trim($apiToken) === '') {
                 Log::warning("iProgSMS token is not configured; order status SMS was not sent.", [

@@ -1258,7 +1258,12 @@ export default function CheckoutModal({
                         : "border-[#eee5db] bg-white text-[#765d50] hover:border-[#e7c875] hover:bg-[#fffaf0]"
                     }`}
                   >
-                    {paymentOption.label}
+                    <span className="flex items-center justify-center gap-2">
+                      {paymentOption.value === "QRPh" && (
+                        <img src="/qr-ph-logo.svg" alt="" aria-hidden="true" className="h-5 w-auto" />
+                      )}
+                      {paymentOption.label}
+                    </span>
                   </button>
                 ))}
               </div>

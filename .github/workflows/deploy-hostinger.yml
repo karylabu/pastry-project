@@ -219,7 +219,7 @@ jobs:
             "mkdir -p '$REMOTE_ROOT/includes'"
           rsync -az \
             -e "ssh -i ~/.ssh/id_ed25519 -p $SSH_PORT -o IdentitiesOnly=yes -o BatchMode=yes -o ConnectTimeout=20 -o ConnectionAttempts=3" \
-            includes/api_auth.php includes/db.php includes/inventory.php includes/session_security.php includes/predictive_forecasting.php \
+            includes/api_auth.php includes/db.php includes/inventory.php includes/session_security.php includes/predictive_forecasting.php includes/paymongo_order_refund.php \
             "$SSH_USERNAME@$SSH_HOST:$REMOTE_ROOT/includes/"
 
       - name: Deploy waste logging handler
@@ -232,14 +232,14 @@ jobs:
             staff/api_waste_log.php \
             "$SSH_USERNAME@$SSH_HOST:$REMOTE_ROOT/staff/api_waste_log.php"
 
-      - name: Deploy customer registration and order handlers
+      - name: Deploy customer order handlers
         run: |
           set -eu
           ssh -i ~/.ssh/id_ed25519 -p "$SSH_PORT" -o IdentitiesOnly=yes -o BatchMode=yes -o ConnectTimeout=20 -o ConnectionAttempts=3 "$SSH_USERNAME@$SSH_HOST" \
             "mkdir -p '$REMOTE_ROOT/customer'"
           rsync -az \
             -e "ssh -i ~/.ssh/id_ed25519 -p $SSH_PORT -o IdentitiesOnly=yes -o BatchMode=yes -o ConnectTimeout=20 -o ConnectionAttempts=3" \
-            customer/api_register.php customer/api_place_order.php \
+            customer/api_register.php customer/api_place_order.php customer/api_cancel_order.php customer/paymongo_webhook.php \
             "$SSH_USERNAME@$SSH_HOST:$REMOTE_ROOT/customer/"
 
       - name: Deploy React production build

@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Http\Controllers\OrderController;
 use App\Http\Requests\StoreOrderRequest;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
@@ -66,6 +67,7 @@ class RewardCodeCheckoutTest extends TestCase
             $table->decimal('lng', 10, 7)->nullable();
             $table->string('status')->nullable();
             $table->string('payment_status')->nullable();
+            $table->string('payment_reference')->nullable();
             $table->string('order_type')->nullable();
             $table->boolean('is_customized')->default(false);
             $table->timestamp('created_at')->nullable();
@@ -446,6 +448,66 @@ class RewardCodeCheckoutTest extends TestCase
             'quantity' => 2,
             'reference_id' => $orderId,
         ]);
+    }
+
+    public function test_successful_payment_deducts_stock_and_admin_approval_does_not_deduct_twice(): void
+    {
+        DB::table('orders')->insert([
+            'id' => 52,
+            'user_id' => 7,
+            'items' => json_encode([['product_id' => 11, 'qty' => 2]]),
+            'total' => 6000,
+            'payment' => 'QRPh',
+            'payment_status' => 'pending',
+            'payment_reference' => 'link_paid_stock_test',
+            'status' => 'Awaiting Payment',
+            'order_type' => 'Standard',
+            'is_customized' => false,
+        ]);
+        DB::table('order_items')->insert([
+            'order_id' => 52,
+            'product_id' => 11,
+            'product' => 'Celebration Cake',
+            'qty' => 2,
+            'price' => 3000,
+        ]);
+        Http::fake([
+            'https://api.paymongo.com/v1/payment_links/link_paid_stock_test/payments' => Http::response([
+                'data' => [['id' => 'pay_stock_test', 'status' => 'paid']],
+            ], 200),
+        ]);
+        config(['services.paymongo.secret' => 'sk_test_stock_payment']);
+
+        $paymentResponse = $this->withHeader('X-Auth-Token', 'test-customer-token')
+            ->postJson('/api/orders/52/payment-failure');
+
+        $paymentResponse->assertOk()->assertJsonPath('payment_status', 'paid');
+        $this->assertSame(18, (int) DB::table('products')->where('id', 11)->value('stock'));
+        $this->assertSame(1, DB::table('product_inventory_movements')
+            ->where('reference_id', 52)
+            ->where('movement_type', 'Order')
+            ->count());
+
+        DB::table('users')->insert([
+            'id' => 99,
+            'name' => 'Test Admin',
+            'email' => 'admin@example.com',
+            'password' => 'unused',
+            'role' => 'admin',
+            'status' => 'active',
+        ]);
+        DB::table('user_sessions')->insert([
+            'user_id' => 99,
+            'token' => 'test-admin-token',
+            'expires_at' => now()->addHour(),
+        ]);
+
+        $this->assertSame(200, $this->updateOrderStatus(52, 'Preparing')->getStatusCode());
+        $this->assertSame(18, (int) DB::table('products')->where('id', 11)->value('stock'));
+        $this->assertSame(1, DB::table('product_inventory_movements')
+            ->where('reference_id', 52)
+            ->where('movement_type', 'Order')
+            ->count());
     }
 
     public function test_migration_releases_previously_deducted_stock_from_pending_orders_once(): void
