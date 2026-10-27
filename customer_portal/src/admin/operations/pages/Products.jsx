@@ -1450,24 +1450,26 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               className="fixed inset-x-0 bottom-0 top-[88px] z-[9997] flex items-start justify-center overflow-y-auto bg-black/40 px-3 py-0 sm:px-6"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="edit-product-title"
             >
               <motion.div
                 initial={{ scale: 0.95 }}
                 animate={{ scale: 1 }}
                 exit={{ scale: 0.95 }}
-                className="max-h-full w-full max-w-[680px] overflow-y-auto rounded-2xl border border-[#eadfd8] bg-[#fffdfa] p-5 shadow-[0_20px_60px_rgba(91,64,39,0.2)] sm:p-6"
+                className="max-h-full w-full max-w-[680px] overflow-y-auto rounded-3xl border border-[#eadfd8] bg-[#fffdfa] shadow-[0_24px_70px_rgba(38,25,16,0.28)]"
               >
-                <div className="sticky top-0 z-20 mb-5 border-b border-[#f0e7e0] bg-[#fffdfa] pb-4 pt-1">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="text-[10px] font-bold uppercase tracking-[0.28em] text-[#9b7810]">Product Catalog</p>
-                      <h2 className="mt-1 font-serif text-[22px] text-[#33251e]">Edit Product</h2>
-                      <p className="mt-1 text-[12px] text-[#74675f]">Update product details, image, and recipe mapping.</p>
-                    </div>
-                    <button type="button" onClick={() => setEditOpen(false)} title="Close edit product" aria-label="Close edit product" className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-[#eadfd8] bg-white text-[#765d50] transition hover:bg-[#fff8df]"><X size={16} aria-hidden="true" /></button>
+                <div className="sticky top-0 z-20 flex items-start justify-between gap-4 border-b border-[#f0e7e0] bg-[#fffdfa]/95 px-5 py-4 backdrop-blur sm:px-7">
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-[0.24em] text-[#9b7810]">Product catalog</p>
+                    <h2 id="edit-product-title" className="mt-1 font-serif text-[24px] text-[#33251e]">Edit Product</h2>
+                    <p className="mt-1 text-[12px] text-[#74675f]">Update product details, image, and recipe mapping.</p>
                   </div>
+                  <button type="button" onClick={() => setEditOpen(false)} title="Close edit product" aria-label="Close edit product" className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[#eadfd8] bg-white text-[#765d50] transition hover:bg-[#fff4cd] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d4af37]"><X size={16} aria-hidden="true" /></button>
                 </div>
 
+                <div className="px-5 py-5 sm:px-7 sm:py-6">
                 <div className="grid gap-3 md:grid-cols-2">
                   <div className="space-y-2">
                     <label htmlFor="edit-product-name" className="block text-[10px] font-bold uppercase tracking-[0.16em] text-[#8f8076]">Product Name</label>
@@ -1657,6 +1659,7 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
                   </button>
 
                   <button onClick={() => setEditOpen(false)} className="rounded-xl border border-black/10 bg-white px-4 py-2 text-xs font-medium text-black hover:bg-black/5">Cancel</button>
+                </div>
                 </div>
               </motion.div>
             </motion.div>
