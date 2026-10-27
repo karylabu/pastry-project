@@ -1615,7 +1615,7 @@ export default function Orders() {
                               onClick={() => handleCreatePaymentLink(order)}
                               disabled={payingOrderId === order.id || customDownpaymentAmount <= 0}
                               title={customDownpaymentAmount <= 0 ? 'Ask Admin to enter a downpayment amount.' : `Pay the ₱${customDownpaymentAmount.toFixed(2)} downpayment plus ₱${downpaymentBreakdown.fee.toFixed(2)} ${customPaymentMethod} fee`}
-                              className="inline-flex min-h-9 w-auto flex-none items-center justify-center gap-1.5 rounded-lg bg-amber-500 px-3 py-2 text-center text-[11px] font-semibold leading-4 text-slate-950 transition-colors hover:bg-amber-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-700 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                              className="inline-flex min-h-9 min-w-[126px] w-auto flex-none items-center justify-center gap-1.5 rounded-lg bg-[#fff1bd] px-3 py-2 text-center text-[11px] font-semibold leading-4 text-[#6b4f1d] transition-colors hover:bg-[#ffe79a] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#b89646] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                             >
                               <CreditCard size={14} />
                               {payingOrderId === order.id ? 'Opening…' : `Pay ₱${downpaymentBreakdown.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
@@ -1625,9 +1625,9 @@ export default function Orders() {
                             ? <span className="text-right text-[11px] font-semibold text-amber-700">Payment details submitted</span>
                             : <button
                               onClick={() => { setPaymentProofError(''); setPaymentProofTarget(order); }}
-                              className="inline-flex min-h-9 w-auto flex-none items-center justify-center gap-1.5 rounded-lg bg-slate-900 px-3 py-2 text-center text-[11px] font-semibold leading-4 text-white transition-colors hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-700 focus-visible:ring-offset-2"
+                              className="inline-flex min-h-9 min-w-[126px] w-auto flex-none items-center justify-center gap-1.5 rounded-lg bg-slate-900 px-3 py-2 text-center text-[11px] font-semibold leading-4 text-white transition-colors hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-700 focus-visible:ring-offset-2"
                             >
-                              Submit proof / reference
+                              Send proof
                             </button>}
                         </>
                       )}
@@ -1643,7 +1643,7 @@ export default function Orders() {
                                   ? 'The order has no remaining balance.'
                                   : `Pay the ₱${customBalanceAmount.toFixed(2)} balance plus ₱${balanceBreakdown.fee.toFixed(2)} ${customPaymentMethod} fee`
                                 : `Pay the remaining balance of ₱${remainingBalanceAmount.toFixed(2)}`}
-                              className="inline-flex min-h-9 w-auto flex-none items-center justify-center gap-1.5 rounded-lg bg-amber-500 px-3 py-2 text-center text-[11px] font-semibold leading-4 text-slate-950 transition-colors hover:bg-amber-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-700 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                              className="inline-flex min-h-9 min-w-[126px] w-auto flex-none items-center justify-center gap-1.5 rounded-lg bg-[#fff1bd] px-3 py-2 text-center text-[11px] font-semibold leading-4 text-[#6b4f1d] transition-colors hover:bg-[#ffe79a] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#b89646] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                             >
                               <CreditCard size={14} />
                               {payingOrderId === order.id
@@ -1654,9 +1654,9 @@ export default function Orders() {
                           <button
                               type="button"
                               onClick={() => { setPaymentProofError(''); setPaymentProofTarget(order); }}
-                              className="inline-flex min-h-9 w-auto flex-none items-center justify-center gap-1.5 rounded-lg bg-slate-900 px-3 py-2 text-center text-[11px] font-semibold leading-4 text-white transition-colors hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-700 focus-visible:ring-offset-2"
+                              className="inline-flex min-h-9 min-w-[126px] w-auto flex-none items-center justify-center gap-1.5 rounded-lg bg-slate-900 px-3 py-2 text-center text-[11px] font-semibold leading-4 text-white transition-colors hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-700 focus-visible:ring-offset-2"
                             >
-                              Submit proof / reference
+                              Send proof
                             </button>
                         </>
                       )}
@@ -1666,9 +1666,9 @@ export default function Orders() {
                           : <button
                             type="button"
                             onClick={() => { setPaymentProofError(''); setPaymentProofTarget(order); }}
-                            className="inline-flex min-h-9 w-auto flex-none items-center justify-center gap-1.5 rounded-lg bg-slate-900 px-3 py-2 text-center text-[11px] font-semibold leading-4 text-white transition-colors hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-700 focus-visible:ring-offset-2"
+                            className="inline-flex min-h-9 min-w-[126px] w-auto flex-none items-center justify-center gap-1.5 rounded-lg bg-slate-900 px-3 py-2 text-center text-[11px] font-semibold leading-4 text-white transition-colors hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-700 focus-visible:ring-offset-2"
                           >
-                            Submit proof / reference
+                            Send proof
                           </button>
                       )}
                       {isToReceive && (
