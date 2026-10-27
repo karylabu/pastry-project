@@ -123,6 +123,17 @@ function PaymentProofDialog({ order, onSubmit, onDismiss, isLoading, error }) {
   const [reference, setReference] = useState('');
   const [fileError, setFileError] = useState('');
   const [previewUrl, setPreviewUrl] = useState('');
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+
+  useEffect(() => {
+    if (!isPreviewOpen) return undefined;
+
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') setIsPreviewOpen(false);
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isPreviewOpen]);
 
   useEffect(() => {
     if (!file) {
@@ -164,7 +175,7 @@ function PaymentProofDialog({ order, onSubmit, onDismiss, isLoading, error }) {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 p-6 backdrop-blur-sm"
+      className="fixed inset-x-0 bottom-0 top-[64px] z-[50001] flex items-start justify-center overflow-y-auto bg-black/40 px-4 py-4 backdrop-blur-sm sm:top-[88px] sm:py-6"
       onClick={onDismiss}
     >
       <motion.form
@@ -191,11 +202,19 @@ function PaymentProofDialog({ order, onSubmit, onDismiss, isLoading, error }) {
         />
         {file && <p className="mt-2 truncate text-xs text-slate-500">{file.name}</p>}
         {previewUrl && (
-          <img
-            src={previewUrl}
-            alt="Payment screenshot preview"
-            className="mt-3 max-h-48 w-full rounded-lg border border-slate-200 bg-slate-50 object-contain"
-          />
+          <button
+            type="button"
+            onClick={() => setIsPreviewOpen(true)}
+            className="mt-3 block w-full cursor-zoom-in"
+            aria-label="Open payment screenshot preview"
+          >
+            <img
+              src={previewUrl}
+              alt="Payment screenshot preview"
+              className="max-h-48 w-full rounded-lg border border-slate-200 bg-slate-50 object-contain"
+            />
+            <span className="mt-1 block text-center text-xs text-slate-500">Click to enlarge</span>
+          </button>
         )}
         <label className="mt-4 block text-sm font-medium text-slate-700" htmlFor="payment-reference-number">Payment reference number (optional)</label>
         <input
@@ -215,6 +234,36 @@ function PaymentProofDialog({ order, onSubmit, onDismiss, isLoading, error }) {
           </button>
         </div>
       </motion.form>
+      {isPreviewOpen && previewUrl && (
+        <div
+          className="fixed inset-0 z-[60000] flex items-center justify-center bg-black/85 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Payment screenshot preview"
+          onClick={(event) => {
+            event.stopPropagation();
+            setIsPreviewOpen(false);
+          }}
+        >
+          <button
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation();
+              setIsPreviewOpen(false);
+            }}
+            className="absolute right-4 top-4 rounded-full bg-white px-3 py-2 text-sm font-semibold text-slate-900"
+            aria-label="Close image preview"
+          >
+            Close
+          </button>
+          <img
+            src={previewUrl}
+            alt="Payment screenshot enlarged"
+            className="max-h-[90vh] max-w-full rounded-lg object-contain"
+            onClick={(event) => event.stopPropagation()}
+          />
+        </div>
+      )}
     </motion.div>
   );
 }
