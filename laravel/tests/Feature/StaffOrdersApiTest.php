@@ -211,6 +211,30 @@ class StaffOrdersApiTest extends TestCase
             ->assertJsonPath('orders.0.items.0.size', 'Big');
     }
 
+    public function test_admin_can_see_cancelled_unpaid_gcash_orders(): void
+    {
+        DB::table('orders')->insert([
+            'id' => 23,
+            'customer' => 'Cancelled Customer',
+            'payment' => 'GCash',
+            'payment_status' => 'pending',
+            'status' => 'Cancelled',
+            'created_at' => now(),
+        ]);
+
+        $response = app(StaffApiController::class)->getOrders(Request::create(
+            '/api/staff/orders',
+            'GET',
+            [],
+            [],
+            [],
+            ['HTTP_AUTHORIZATION' => 'Bearer test-admin-token'],
+        ));
+
+        $this->assertSame(200, $response->getStatusCode());
+        $this->assertSame('Cancelled', $response->getData(true)['orders'][0]['status']);
+    }
+
     public function test_admin_can_review_private_discount_id_but_customers_cannot(): void
     {
         Storage::fake('local');
