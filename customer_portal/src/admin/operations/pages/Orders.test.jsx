@@ -131,8 +131,15 @@ test("opens an enlarged payment proof from live order details", async () => {
   );
 });
 
-test("shows the balance amount after the balance is confirmed paid", async () => {
+test("shows balance amount and payment proof after balance is confirmed paid", async () => {
   global.fetch = jest.fn((url) => {
+    if (String(url).includes("/api/staff/orders/111/payment-proof")) {
+      return Promise.resolve({
+        ok: true,
+        blob: async () => new Blob(["paid balance proof"], { type: "image/png" }),
+      });
+    }
+
     if (String(url).includes("/inventory/ingredients")) {
       return Promise.resolve({ ok: true, json: async () => ({ ingredients: [] }) });
     }
@@ -160,9 +167,13 @@ test("shows the balance amount after the balance is confirmed paid", async () =>
 
   expect(within(orderCard).getByText("Balance payment proof")).toBeInTheDocument();
   expect(within(orderCard).getByText("Balance paid · ₱500")).toBeInTheDocument();
+  fireEvent.click(within(orderCard).getByRole("button", {
+    name: "View balance payment proof for order 111",
+  }));
+  expect(await screen.findByRole("dialog", { name: "Payment proof for order 111" })).toBeInTheDocument();
 });
 
-test("keeps balance proof available but hides the unpaid balance amount", async () => {
+test("hides balance proof and amount until the balance is paid", async () => {
   global.fetch = jest.fn((url) => {
     if (String(url).includes("/api/staff/orders/109/payment-proof")) {
       return Promise.resolve({
@@ -198,18 +209,14 @@ test("keeps balance proof available but hides the unpaid balance amount", async 
   fireEvent.click(within(orderCard).getByRole("button", { name: "View details for order 109" }));
 
   expect(screen.queryByRole("dialog", { name: "Payment proof for order 109" })).not.toBeInTheDocument();
-  expect(within(orderCard).getByText("Balance payment proof")).toBeInTheDocument();
+  expect(within(orderCard).queryByText("Balance payment proof")).not.toBeInTheDocument();
   expect(within(orderCard).queryByText(/Balance paid ·/)).not.toBeInTheDocument();
   expect(within(orderCard).queryByText("Balance due")).not.toBeInTheDocument();
-  fireEvent.click(within(orderCard).getByRole("button", {
+  expect(within(orderCard).queryByRole("button", {
     name: "View balance payment proof for order 109",
-  }));
-
-  const preview = await screen.findByRole("dialog", { name: "Payment proof for order 109" });
-  expect(within(preview).getByRole("img", { name: "Enlarged payment proof for order 109" })).toBeInTheDocument();
-  expect(within(orderCard).queryByRole("img", { name: "Payment proof for order 109" })).not.toBeInTheDocument();
+  })).not.toBeInTheDocument();
   expect(within(orderCard).getAllByText("BALANCE-109")).not.toHaveLength(0);
-  expect(global.fetch).toHaveBeenCalledWith(
+  expect(global.fetch).not.toHaveBeenCalledWith(
     "https://example.test/laravel/api/staff/orders/109/payment-proof",
     expect.any(Object),
   );
@@ -242,11 +249,10 @@ test("does not allow opening a balance proof before the customer submits it", as
   const orderCard = (await screen.findAllByText("Customer 110"))[0].closest("article");
   fireEvent.click(within(orderCard).getByRole("button", { name: "View details for order 110" }));
 
-  const balanceCards = within(orderCard).getAllByRole("button", {
+  const balanceCard = within(orderCard).queryByRole("button", {
     name: "View balance payment proof for order 110",
   });
-  expect(balanceCards.length).toBeGreaterThan(0);
-  balanceCards.forEach((card) => expect(card).toBeDisabled());
+  expect(balanceCard).not.toBeInTheDocument();
   expect(global.fetch).not.toHaveBeenCalledWith(
     "https://example.test/laravel/api/staff/orders/110/payment-proof",
     expect.any(Object),
@@ -290,7 +296,7 @@ test("lets admin verify a submitted balance before marking an order ready", asyn
   fireEvent.click(within(orderCard).getByRole("button", { name: "View details for order 107" }));
   expect(within(orderCard).getByText("Order summary")).toBeInTheDocument();
   expect(within(orderCard).getByText("Deposit received")).toBeInTheDocument();
-  expect(within(orderCard).getByText("Balance payment proof")).toBeInTheDocument();
+  expect(within(orderCard).queryByText("Balance payment proof")).not.toBeInTheDocument();
   expect(within(orderCard).queryByText("Balance due")).not.toBeInTheDocument();
   expect(within(orderCard).queryByText(/Balance paid ·/)).not.toBeInTheDocument();
   expect(within(orderCard).getByText("Balance needs verification")).toBeInTheDocument();
