@@ -689,7 +689,7 @@ export default function Orders() {
     }
   };
 
-  const handlePayCustomizedDownpayment = async (order, paymentType = 'downpayment') => {
+  const handleCreatePaymentLink = async (order, paymentType = 'downpayment') => {
     setPayingOrderId(order.id);
     setActionError(null);
     try {
@@ -1428,9 +1428,14 @@ export default function Orders() {
                   ? quotedDownpayment
                   : Number((Number(order.total || 0) * downpaymentPercent / 100).toFixed(2));
                 const customBalanceAmount = Math.max(0, Number((Number(order.total || 0) - customDownpaymentAmount).toFixed(2)));
+                const remainingBalanceAmount = Math.max(0, Number((Number(order.total || 0) - Number(order.downpayment_amount || 0)).toFixed(2)));
                 const customPaymentMethod = isCustomized ? 'QR Ph' : (order.payment || customPaymentDetails.payment_method || '—');
                 const downpaymentBreakdown = getCustomCakePaymentBreakdown(customDownpaymentAmount);
                 const balanceBreakdown = getCustomCakePaymentBreakdown(customBalanceAmount);
+                const canPayPickupBalance = !isCustomized
+                  && paymentMethodKey === 'qrph'
+                  && isPickupDownpaymentPaid
+                  && remainingBalanceAmount > 0;
                 const primaryProductImage = getProductThumbnail(order, primaryItem);
                 const paymentHint = isCancelled
                   ? 'Order cancelled'
@@ -1604,7 +1609,7 @@ export default function Orders() {
                           {isCustomized && !hasPaymentSubmission && (
                             <button
                               type="button"
-                              onClick={() => handlePayCustomizedDownpayment(order)}
+                              onClick={() => handleCreatePaymentLink(order)}
                               disabled={payingOrderId === order.id || customDownpaymentAmount <= 0}
                               title={customDownpaymentAmount <= 0 ? 'Ask Admin to enter a downpayment amount.' : `Pay the ₱${customDownpaymentAmount.toFixed(2)} downpayment plus ₱${downpaymentBreakdown.fee.toFixed(2)} ${customPaymentMethod} fee`}
                               className="inline-flex items-center gap-1.5 rounded-lg bg-amber-500 px-3.5 py-2 text-[12px] font-semibold text-slate-950 transition-colors hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-50"
@@ -1625,16 +1630,22 @@ export default function Orders() {
                       )}
                       {isAwaitingBalancePayment && (
                         <>
-                          {isCustomized && !hasPaymentSubmission && (
+                          {(isCustomized || canPayPickupBalance) && !hasPaymentSubmission && (
                             <button
                               type="button"
-                              onClick={() => handlePayCustomizedDownpayment(order, 'balance')}
-                              disabled={payingOrderId === order.id || customBalanceAmount <= 0}
-                              title={customBalanceAmount <= 0 ? 'The order has no remaining balance.' : `Pay the ₱${customBalanceAmount.toFixed(2)} balance plus ₱${balanceBreakdown.fee.toFixed(2)} ${customPaymentMethod} fee`}
+                              onClick={() => handleCreatePaymentLink(order, 'balance')}
+                              disabled={payingOrderId === order.id || (isCustomized ? customBalanceAmount : remainingBalanceAmount) <= 0}
+                              title={isCustomized
+                                ? customBalanceAmount <= 0
+                                  ? 'The order has no remaining balance.'
+                                  : `Pay the ₱${customBalanceAmount.toFixed(2)} balance plus ₱${balanceBreakdown.fee.toFixed(2)} ${customPaymentMethod} fee`
+                                : `Pay the remaining balance of ₱${remainingBalanceAmount.toFixed(2)}`}
                               className="inline-flex items-center gap-1.5 rounded-lg bg-amber-500 px-3.5 py-2 text-[12px] font-semibold text-slate-950 transition-colors hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-50"
                             >
                               <CreditCard size={14} />
-                              {payingOrderId === order.id ? 'Opening…' : `Pay balance ₱${balanceBreakdown.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                              {payingOrderId === order.id
+                                ? 'Opening…'
+                                : `Pay balance ₱${(isCustomized ? balanceBreakdown.total : remainingBalanceAmount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
                             </button>
                           )}
                           {hasPaymentSubmission

@@ -1635,7 +1635,9 @@ PROMPT;
 
         $amount = 0.0;
         if ($paymentType === 'balance') {
-            if (!$customOrder || $order->status !== 'Awaiting Balance Payment' || $downpaymentAmount <= 0) {
+            if ((!$customOrder && !$pickupDownpayment)
+                || $order->status !== 'Awaiting Balance Payment'
+                || $downpaymentAmount <= 0) {
                 return $this->corsResponse(['error' => 'The remaining balance is not available for this order.'], 409);
             }
             $amount = round((float) $order->total - $downpaymentAmount, 2);
@@ -1722,7 +1724,7 @@ PROMPT;
                 'currency' => 'PHP',
                 'description' => $description,
                 'remarks' => match ($paymentType) {
-                    'balance' => 'Custom cake order remaining balance',
+                    'balance' => $customOrder ? 'Custom cake order remaining balance' : 'Pickup order remaining balance',
                     'downpayment' => 'Pastry Shop Order downpayment',
                     default => 'Pastry Shop Order full payment',
                 },

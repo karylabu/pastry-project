@@ -137,6 +137,41 @@ class CustomCakeBalancePaymentTest extends TestCase
         Http::assertNothingSent();
     }
 
+    public function test_standard_pickup_balance_link_uses_server_calculated_remaining_amount(): void
+    {
+        \Illuminate\Support\Facades\DB::table('orders')->insert([
+            'id' => 46,
+            'user_id' => 9,
+            'status' => 'Awaiting Balance Payment',
+            'total' => 1000,
+            'downpayment_amount' => 500,
+            'method' => 'Pickup',
+            'payment' => 'QRPh',
+            'payment_status' => 'downpayment_paid',
+            'is_customized' => false,
+            'order_type' => 'Standard',
+        ]);
+
+        $customer = new User();
+        $customer->id = 9;
+        $customer->role = 'customer';
+
+        $this->actingAs($customer)
+            ->postJson('/create_payment.php', [
+                'order_id' => 46,
+                'payment_type' => 'balance',
+            ])
+            ->assertOk()
+            ->assertJsonPath('data.url', 'https://checkout.example.test/pickup-deposit');
+
+        Http::assertSent(fn (ClientRequest $request) =>
+            $request->url() === 'https://api.paymongo.com/v1/payment_links'
+            && $request['amount'] === 50000
+            && $request['remarks'] === 'Pickup order remaining balance'
+            && str_contains($request['description'], 'Remaining Balance')
+        );
+    }
+
     public function test_standard_pickup_downpayment_link_uses_server_stored_half_total(): void
     {
         \Illuminate\Support\Facades\DB::table('orders')->insert([
