@@ -90,6 +90,19 @@ test("shows the oldest order first by default across all statuses", async () => 
   expect(container.querySelector("article")).toHaveTextContent("#105");
 });
 
+test("does not show waste actions for completed orders", async () => {
+  const { container } = renderOrders();
+  await screen.findAllByText("Customer 104");
+
+  const orderCard = Array.from(container.querySelectorAll("article")).find((card) => card.textContent.includes("#104"));
+  const orderRow = Array.from(container.querySelectorAll("tr")).find((row) => row.textContent.includes("#104"));
+
+  expect(orderCard).toBeTruthy();
+  expect(orderRow).toBeTruthy();
+  expect(within(orderCard).queryByRole("button", { name: "Waste" })).not.toBeInTheDocument();
+  expect(within(orderRow).queryByRole("button", { name: "Waste" })).not.toBeInTheDocument();
+});
+
 test("sorts orders newest-first from the status filter toolbar", async () => {
   const { container } = renderOrders();
   await screen.findAllByText("Customer 101");
