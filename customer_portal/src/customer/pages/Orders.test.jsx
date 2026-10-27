@@ -78,3 +78,37 @@ test('shows the remaining pickup balance and starts balance payment', async () =
     });
   });
 });
+
+test('clarifies that submitted balance details are awaiting verification, not paid', async () => {
+  global.fetch = jest.fn((url) => {
+    if (String(url).includes('/api/customer/products')) {
+      return Promise.resolve({ ok: true, json: async () => [] });
+    }
+
+    return Promise.resolve({
+      ok: true,
+      json: async () => ({
+        success: true,
+        orders: [{
+          id: 501,
+          user_id: 7,
+          customer: 'Customer',
+          status: 'Awaiting Balance Payment',
+          payment: 'QRPh',
+          payment_status: 'proof_submitted',
+          customer_payment_reference: 'BALANCE-501',
+          method: 'Pickup',
+          total: 1000,
+          downpayment_amount: 500,
+          items: [{ name: 'Blueberry Cheesecake', qty: 1, price: 1000 }],
+        }],
+      }),
+    });
+  });
+
+  render(<Orders />);
+
+  expect(await screen.findByText('Payment submitted — balance not confirmed')).toBeInTheDocument();
+  expect(screen.getByText('Payment details submitted — balance not confirmed; awaiting Admin verification')).toBeInTheDocument();
+  expect(screen.queryByText('Balance details submitted')).not.toBeInTheDocument();
+});

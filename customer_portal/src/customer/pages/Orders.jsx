@@ -1445,7 +1445,7 @@ export default function Orders() {
                     : 'Send payment proof for review'
                   : isAwaitingBalancePayment
                   ? hasPaymentSubmission
-                    ? 'Balance details submitted — awaiting Admin review'
+                    ? 'Payment details submitted — balance not confirmed; awaiting Admin verification'
                     : 'Pay the remaining balance or submit proof for review'
                   : isPickupDownpaymentPaid
                   ? '50% downpayment paid — balance due at counter on pickup'
@@ -1649,7 +1649,7 @@ export default function Orders() {
                             </button>
                           )}
                           {hasPaymentSubmission
-                            ? <span className="text-right text-[11px] font-semibold text-amber-700">Balance details submitted</span>
+                            ? <span className="text-right text-[11px] font-semibold text-amber-700">Payment submitted — balance not confirmed</span>
                             : <button
                               type="button"
                               onClick={() => { setPaymentProofError(''); setPaymentProofTarget(order); }}
