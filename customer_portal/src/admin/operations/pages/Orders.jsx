@@ -209,8 +209,11 @@ export default function Orders() {
     }
   };
 
-  const viewPaymentProof = async (orderId) => {
-    if (paymentProofPreviewUrlsRef.current[orderId]) return;
+  const viewPaymentProof = async (orderId, openLightbox = false) => {
+    if (paymentProofPreviewUrlsRef.current[orderId]) {
+      if (openLightbox) setPaymentProofLightboxOrderId(orderId);
+      return;
+    }
 
     setPaymentProofLoading(orderId);
     try {
@@ -220,6 +223,7 @@ export default function Orders() {
       const previewUrl = URL.createObjectURL(await response.blob());
       paymentProofPreviewUrlsRef.current[orderId] = previewUrl;
       setPaymentProofPreviews((current) => ({ ...current, [orderId]: previewUrl }));
+      if (openLightbox) setPaymentProofLightboxOrderId(orderId);
     } catch (error) {
       addToast(error.message || 'Unable to load the private payment proof.', 'error');
     } finally {
@@ -231,6 +235,17 @@ export default function Orders() {
     const isShowing = paymentProofDetailsOrderId === order.id;
     setPaymentProofDetailsOrderId(isShowing ? null : order.id);
     if (!isShowing && order.has_payment_proof) viewPaymentProof(order.id);
+  };
+
+  const toggleOrderDetails = (order, isExpanded) => {
+    setExpandedOrderId(isExpanded ? null : order.id);
+    if (isExpanded || !isQrPayment(order.payment)) return;
+
+    const hasSubmittedPaymentDetails = order.has_payment_proof || order.customer_payment_reference;
+    if (!hasSubmittedPaymentDetails) return;
+
+    setPaymentProofDetailsOrderId(order.id);
+    if (order.has_payment_proof) viewPaymentProof(order.id, true);
   };
 
   const markOrderAsWaste = async (order) => {
@@ -725,7 +740,7 @@ export default function Orders() {
                       </div>
                       <div className="mt-3 flex flex-wrap gap-1.5">
                         {!order.is_wasted && <>
-                          <button type="button" onClick={() => setExpandedOrderId(isExpanded ? null : order.id)} title={`${isExpanded ? "Hide" : "View"} details for order ${order.order_number || order.id}`} aria-label={`${isExpanded ? "Hide" : "View"} details for order ${order.order_number || order.id}`} className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-[#e8dfd4] bg-white text-[#65574d] transition hover:bg-[#faf7f2]">{isExpanded ? <ChevronUp size={15} aria-hidden="true" /> : <ChevronDown size={15} aria-hidden="true" />}</button>
+                          <button type="button" onClick={() => toggleOrderDetails(order, isExpanded)} title={`${isExpanded ? "Hide" : "View"} details for order ${order.order_number || order.id}`} aria-label={`${isExpanded ? "Hide" : "View"} details for order ${order.order_number || order.id}`} className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-[#e8dfd4] bg-white text-[#65574d] transition hover:bg-[#faf7f2]">{isExpanded ? <ChevronUp size={15} aria-hidden="true" /> : <ChevronDown size={15} aria-hidden="true" />}</button>
                           {canAdvance && <button type="button" onClick={() => advanceOrder(order)} disabled={updatingId === order.id} className="rounded-md bg-black px-2.5 py-1.5 text-[10px] font-semibold text-white disabled:opacity-50">{updatingId === order.id ? "Updating..." : needsPaymentReview ? "Review payment" : needsBalancePaymentReview ? "Verify balance" : order.status === "Pending" ? "Accept" : order.status === "Preparing" ? needsBalancePayment ? "Pay Balance" : "Ready" : "Complete"}</button>}
                           {order.return_refund_request?.status === "Pending Review"
                             ? <button type="button" onClick={() => { setRejectModalOrderId(order.id); setRejectReason(""); }} disabled={updatingId === order.id} className="rounded-md border border-red-200 bg-red-50 px-2.5 py-1.5 text-[10px] font-semibold text-red-700 disabled:opacity-50">Reject</button>
@@ -906,7 +921,7 @@ export default function Orders() {
                           <td className="px-4 py-4">
                             <div className="flex min-w-[210px] flex-wrap justify-end gap-1.5">
                               {!order.is_wasted && <>
-                                <button type="button" onClick={() => setExpandedOrderId(isExpanded ? null : order.id)} className="rounded-md border border-[#e8dfd4] bg-white px-2.5 py-1.5 text-[10px] font-semibold text-[#65574d] transition hover:border-[#c9b895] hover:bg-[#faf7f2]">{isExpanded ? "Hide" : "View"}</button>
+                                <button type="button" onClick={() => toggleOrderDetails(order, isExpanded)} className="rounded-md border border-[#e8dfd4] bg-white px-2.5 py-1.5 text-[10px] font-semibold text-[#65574d] transition hover:border-[#c9b895] hover:bg-[#faf7f2]">{isExpanded ? "Hide" : "View"}</button>
                                 {(!(order.status === "Completed" || order.status === "Cancelled") && (order.status !== 'Awaiting Payment' || needsPaymentReview) && (order.status !== 'Awaiting Balance Payment' || needsBalancePaymentReview)) && <button type="button" onClick={() => advanceOrder(order)} disabled={updatingId === order.id} className="rounded-md bg-[#33251e] px-2.5 py-1.5 text-[10px] font-semibold text-white transition hover:bg-black disabled:opacity-50">{needsPaymentReview ? "Verify payment" : needsBalancePaymentReview ? "Verify balance" : order.status === "Pending" ? "Accept" : order.status === "Preparing" ? needsBalancePayment ? "Pay Balance" : "Ready" : "Complete"}</button>}
                                 {order.return_refund_request?.status === "Pending Review"
                                   ? <button type="button" onClick={() => { setRejectModalOrderId(order.id); setRejectReason(""); }} disabled={updatingId === order.id || rejectSubmitting} className="rounded-md border border-red-200 bg-red-50 px-2.5 py-1.5 text-[10px] font-semibold text-red-700 transition hover:bg-red-100 disabled:opacity-50">Reject</button>

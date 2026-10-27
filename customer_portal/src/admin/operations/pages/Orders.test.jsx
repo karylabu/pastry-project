@@ -113,21 +113,21 @@ test("does not show waste actions for completed orders", async () => {
   expect(within(orderRow).queryByRole("button", { name: "Waste" })).not.toBeInTheDocument();
 });
 
-test("opens an enlarged payment proof from live order details", async () => {
+test("opens submitted QR payment proof automatically when live order details expand", async () => {
   renderOrders();
   const orderCard = (await screen.findAllByText("Customer 103"))[0].closest("article");
 
   fireEvent.click(within(orderCard).getByRole("button", { name: /View details for order 103/i }));
-  fireEvent.click(within(orderCard).getByRole("button", { name: "View payment proof" }));
-
-  const enlargeButton = await within(orderCard).findByRole("button", { name: "Enlarge payment proof for order 103" });
-  fireEvent.click(enlargeButton);
 
   expect(await screen.findByRole("dialog", { name: "Payment proof for order 103" })).toBeInTheDocument();
   expect(within(screen.getByRole("dialog")).getByRole("img", { name: "Enlarged payment proof for order 103" })).toBeInTheDocument();
+  expect(global.fetch).toHaveBeenCalledWith(
+    "https://example.test/laravel/api/staff/orders/103/payment-proof",
+    expect.any(Object),
+  );
 });
 
-test("shows the submitted payment proof and reference when a deposit or balance amount is selected", async () => {
+test("shows submitted payment proof and reference automatically when balance order details expand", async () => {
   global.fetch = jest.fn((url) => {
     if (String(url).includes("/api/staff/orders/109/payment-proof")) {
       return Promise.resolve({
@@ -162,15 +162,8 @@ test("shows the submitted payment proof and reference when a deposit or balance 
   const orderCard = (await screen.findAllByText("Customer 109"))[0].closest("article");
   fireEvent.click(within(orderCard).getByRole("button", { name: "View details for order 109" }));
 
-  const depositButtons = within(orderCard).getAllByRole("button", {
-    name: "View payment proof for order 109: Deposit received",
-  });
-  expect(depositButtons).toHaveLength(1);
-  expect(screen.getAllByRole("button", {
-    name: "View payment proof for order 109: Deposit received",
-  })).toHaveLength(2);
-  fireEvent.click(depositButtons[0]);
-
+  expect(await screen.findByRole("dialog", { name: "Payment proof for order 109" })).toBeInTheDocument();
+  expect(within(screen.getByRole("dialog")).getByRole("img", { name: "Enlarged payment proof for order 109" })).toBeInTheDocument();
   expect(await within(orderCard).findAllByRole("img", { name: "Payment proof for order 109" })).not.toHaveLength(0);
   expect(within(orderCard).getAllByText("BALANCE-109")).not.toHaveLength(0);
   expect(global.fetch).toHaveBeenCalledWith(
