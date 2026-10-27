@@ -840,8 +840,8 @@ export default function CustomizedCakes() {
               </div>
               <p className="mt-3 text-center text-sm font-semibold text-[#4b3b33]">{featuredPreview.name}</p>
               <div className="mt-4 flex gap-2">
-                <button type="button" onClick={() => setFeaturedPreview(null)} className="flex-1 rounded-xl border border-[#f0d98a] bg-white px-3 py-2 text-sm font-semibold text-[#6b4f1d]">Cancel</button>
-                <button type="button" onClick={() => { void addGalleryReferenceImage(featuredPreview); setFeaturedPreview(null); }} className="flex-1 rounded-xl border border-[#e5bd45] bg-[#ffe89a] px-3 py-2 text-sm font-semibold text-[#6b4f1d]">Use this image</button>
+                <button type="button" onClick={() => setFeaturedPreview(null)} className="flex-1 rounded-lg border border-[#f0d98a] bg-white px-3 py-1.5 text-xs font-semibold text-[#6b4f1d]">Cancel</button>
+                <button type="button" onClick={() => { void addGalleryReferenceImage(featuredPreview); setFeaturedPreview(null); }} className="flex-1 rounded-lg border border-[#e5bd45] bg-[#ffe89a] px-3 py-1.5 text-xs font-semibold text-[#6b4f1d]">Use this image</button>
               </div>
             </div>
           </div>
@@ -915,7 +915,7 @@ export default function CustomizedCakes() {
                         if (option === 'Pickup') setDeliveryService('');
                       }}
                       aria-pressed={deliveryMethod === option}
-                      className={`min-h-11 rounded-xl border px-3 py-2 text-sm font-semibold transition ${
+                      className={`min-h-10 rounded-lg border px-3 py-1.5 text-xs font-semibold transition ${
                         deliveryMethod === option
                           ? 'border-[#c9972d] bg-[#fff1bd] text-[#5f4715] shadow-sm'
                           : 'border-[#eadfd8] bg-white text-[#5f514a] hover:border-[#d4af37] hover:bg-[#fffaf0]'
@@ -941,7 +941,7 @@ export default function CustomizedCakes() {
                             type="button"
                             aria-pressed={deliveryService === service}
                             onClick={() => setDeliveryService(service)}
-                            className={`min-h-11 rounded-xl border px-3 py-2 text-sm font-semibold transition ${deliveryService === service ? 'border-[#c9972d] bg-[#fff1bd] text-[#5f4715] shadow-sm' : 'border-[#eadfd8] bg-white text-[#5f514a] hover:border-[#d4af37] hover:bg-[#fffaf0]'}`}
+                            className={`min-h-10 rounded-lg border px-3 py-1.5 text-xs font-semibold transition ${deliveryService === service ? 'border-[#c9972d] bg-[#fff1bd] text-[#5f4715] shadow-sm' : 'border-[#eadfd8] bg-white text-[#5f514a] hover:border-[#d4af37] hover:bg-[#fffaf0]'}`}
                           >
                             {service}
                           </button>
@@ -1035,7 +1035,7 @@ export default function CustomizedCakes() {
                       key={value}
                       type="button"
                       onClick={() => setCakeType(value)}
-                      className={`min-h-11 rounded-xl border px-3 py-2 text-sm font-semibold transition ${
+                      className={`min-h-10 rounded-lg border px-3 py-1.5 text-xs font-semibold transition ${
                         cakeType === value
                           ? 'border-[#c9972d] bg-[#fff1bd] text-[#5f4715] shadow-sm'
                           : 'border-[#eadfd8] bg-white text-[#5f514a] hover:border-[#d4af37] hover:bg-[#fffaf0]'
@@ -1051,7 +1051,7 @@ export default function CustomizedCakes() {
                     <p className="text-xs font-semibold text-[#7b5b3a]">Flavor</p>
                     <div className="grid grid-cols-3 gap-2">
                       {flavorCatalog.map((flavor) => (
-                        <button key={flavor.id} type="button" onClick={() => setFlavorId(String(flavor.id))} aria-pressed={flavorId === String(flavor.id)} className={`min-h-10 rounded-xl border px-2 py-2 text-xs font-semibold transition ${flavorId === String(flavor.id) ? 'border-[#c9972d] bg-[#fff1bd] text-[#5f4715]' : 'border-[#eadfd8] bg-white text-[#5f514a] hover:border-[#d4af37] hover:bg-[#fffaf0]'}`}>
+                        <button key={flavor.id} type="button" onClick={() => setFlavorId(String(flavor.id))} aria-pressed={flavorId === String(flavor.id)} className={`min-h-9 rounded-lg border px-2 py-1.5 text-[11px] font-semibold transition ${flavorId === String(flavor.id) ? 'border-[#c9972d] bg-[#fff1bd] text-[#5f4715]' : 'border-[#eadfd8] bg-white text-[#5f514a] hover:border-[#d4af37] hover:bg-[#fffaf0]'}`}>
                           {flavor.name}
                         </button>
                       ))}
@@ -1059,7 +1059,7 @@ export default function CustomizedCakes() {
                     <p className="text-xs font-semibold text-[#7b5b3a]">Size</p>
                     <div className="grid grid-cols-3 gap-2">
                       {sizeCatalog.map((size) => (
-                        <button key={size.id} type="button" onClick={() => setSingleSizeId(String(size.id))} aria-pressed={singleSizeId === String(size.id)} className={`min-h-10 rounded-xl border px-2 py-2 text-xs font-semibold transition ${singleSizeId === String(size.id) ? 'border-[#c9972d] bg-[#fff1bd] text-[#5f4715]' : 'border-[#eadfd8] bg-white text-[#5f514a] hover:border-[#d4af37] hover:bg-[#fffaf0]'}`}>
+                        <button key={size.id} type="button" onClick={() => setSingleSizeId(String(size.id))} aria-pressed={singleSizeId === String(size.id)} className={`min-h-9 rounded-lg border px-2 py-1.5 text-[11px] font-semibold transition ${singleSizeId === String(size.id) ? 'border-[#c9972d] bg-[#fff1bd] text-[#5f4715]' : 'border-[#eadfd8] bg-white text-[#5f514a] hover:border-[#d4af37] hover:bg-[#fffaf0]'}`}>
                           {size.label}
                         </button>
                       ))}
@@ -1075,7 +1075,7 @@ export default function CustomizedCakes() {
                           type="button"
                           onClick={() => setTwoTierPreset(value)}
                           aria-pressed={twoTierPreset === value}
-                          className={`min-h-16 rounded-xl border px-3 py-3 text-left transition ${twoTierPreset === value ? 'border-[#c9972d] bg-[#fff1bd] text-[#5f4715]' : 'border-[#eadfd8] bg-white text-[#5f514a] hover:border-[#d4af37] hover:bg-[#fffaf0]'}`}
+                          className={`min-h-14 rounded-lg border px-3 py-2 text-left transition ${twoTierPreset === value ? 'border-[#c9972d] bg-[#fff1bd] text-[#5f4715]' : 'border-[#eadfd8] bg-white text-[#5f514a] hover:border-[#d4af37] hover:bg-[#fffaf0]'}`}
                         >
                           <span className="block text-xs font-bold">{preset.label}</span>
                           <span className="block mt-1 text-[11px] opacity-80">{sizeByCode(preset.top)?.label || preset.top} / {sizeByCode(preset.bottom)?.label || preset.bottom}</span>
@@ -1087,7 +1087,7 @@ export default function CustomizedCakes() {
                       <p className="mb-2 text-xs font-semibold text-[#7b5b3a]">Flavor for both tiers</p>
                       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                         {flavorCatalog.map((flavor) => (
-                          <button key={flavor.id} type="button" onClick={() => setFlavorId(String(flavor.id))} aria-pressed={flavorId === String(flavor.id)} className={`min-h-10 rounded-xl border px-3 py-2 text-xs font-semibold transition ${flavorId === String(flavor.id) ? 'border-[#c9972d] bg-[#fff1bd] text-[#5f4715]' : 'border-[#eadfd8] bg-white text-[#5f514a] hover:border-[#d4af37] hover:bg-[#fffaf0]'}`}>
+                          <button key={flavor.id} type="button" onClick={() => setFlavorId(String(flavor.id))} aria-pressed={flavorId === String(flavor.id)} className={`min-h-9 rounded-lg border px-3 py-1.5 text-[11px] font-semibold transition ${flavorId === String(flavor.id) ? 'border-[#c9972d] bg-[#fff1bd] text-[#5f4715]' : 'border-[#eadfd8] bg-white text-[#5f514a] hover:border-[#d4af37] hover:bg-[#fffaf0]'}`}>
                             {flavor.name}
                           </button>
                         ))}
@@ -1107,10 +1107,10 @@ export default function CustomizedCakes() {
               <p className="mb-2 text-[11px] text-[#9b8c83]">Add an example or upload as many images as you need.</p>
               <input id="custom-cake-reference-files" type="file" multiple accept="image/*" onChange={handleFiles} className="sr-only" />
               <div className="flex flex-wrap items-center gap-2">
-                <label htmlFor="custom-cake-reference-files" className="inline-flex cursor-pointer rounded-lg border border-[#e5bd45] bg-[#ffe89a] px-4 py-2 text-[12px] font-bold text-[#6b4f1d] transition hover:bg-[#ffedb5]">
+                <label htmlFor="custom-cake-reference-files" className="inline-flex min-h-9 cursor-pointer items-center rounded-lg border border-[#e5bd45] bg-[#ffe89a] px-3 py-1.5 text-[11px] font-bold text-[#6b4f1d] transition hover:bg-[#ffedb5]">
                   {files.length > 0 ? `Add Images (${files.length + galleryReferences.length} selected)` : 'Choose Images'}
                 </label>
-                <button type="button" onClick={openReferenceGallery} className="rounded-lg border border-[#eadfd8] bg-white px-4 py-2 text-[12px] font-bold text-[#8d6a2e] hover:bg-[#fffaf0]">Browse Examples</button>
+                <button type="button" onClick={openReferenceGallery} className="min-h-9 rounded-lg border border-[#eadfd8] bg-white px-3 py-1.5 text-[11px] font-bold text-[#8d6a2e] hover:bg-[#fffaf0]">Browse Examples</button>
                 {!referenceImage && <div className="grid min-h-28 flex-1 place-items-center rounded-lg border border-dashed border-[#eadfd8] bg-white px-3 py-4 text-center text-xs text-[#9b8060]">No reference selected</div>}
               </div>
 
@@ -1265,16 +1265,16 @@ export default function CustomizedCakes() {
                   {message}
                 </div>
               )}
-              <div className="mt-4 flex justify-end gap-2 border-t border-[#f3ece6] pt-3">
-                <button type="button" onClick={() => { setCakeType('single'); setSingleSizeId(sizeCatalog[0] ? String(sizeCatalog[0].id) : ''); setTwoTierPreset('standard'); setFlavorId(flavorCatalog[0] ? String(flavorCatalog[0].id) : ''); setCakeStyle(''); setPackaging('Standard'); setAddons([]); setCupcakeQuantity(12); setBudget(''); setFiles([]); setGalleryReferences([]); setReferenceImage(null); window.sessionStorage.removeItem(referenceStorageKey); window.sessionStorage.removeItem('customCakeReferenceImage'); setMessage(''); }} className="rounded-xl border border-[#f0d98a] bg-white px-4 py-2 text-sm font-semibold text-[#6b4f1d] hover:border-[#e5bd45]">
+              <div className="mt-4 flex flex-wrap justify-end gap-2 border-t border-[#f3ece6] pt-3">
+                <button type="button" onClick={() => { setCakeType('single'); setSingleSizeId(sizeCatalog[0] ? String(sizeCatalog[0].id) : ''); setTwoTierPreset('standard'); setFlavorId(flavorCatalog[0] ? String(flavorCatalog[0].id) : ''); setCakeStyle(''); setPackaging('Standard'); setAddons([]); setCupcakeQuantity(12); setBudget(''); setFiles([]); setGalleryReferences([]); setReferenceImage(null); window.sessionStorage.removeItem(referenceStorageKey); window.sessionStorage.removeItem('customCakeReferenceImage'); setMessage(''); }} className="min-h-9 rounded-lg border border-[#f0d98a] bg-white px-3 py-1.5 text-xs font-semibold text-[#6b4f1d] transition hover:border-[#e5bd45] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#b89646]">
                   Reset
                 </button>
                 {userId > 0 ? (
-                  <button disabled={requestFormDisabled} type="submit" className="rounded-xl border border-[#e5bd45] bg-[#ffe89a] px-4 py-2 text-sm font-semibold text-[#6b4f1d] transition hover:bg-[#ffedb5] disabled:cursor-not-allowed disabled:opacity-50">
+                  <button disabled={requestFormDisabled} type="submit" className="min-h-9 rounded-lg border border-[#e5bd45] bg-[#ffe89a] px-3 py-1.5 text-xs font-semibold text-[#6b4f1d] transition hover:bg-[#ffedb5] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#b89646] disabled:cursor-not-allowed disabled:opacity-50">
                     {loading ? 'Sending...' : 'Send Request'}
                   </button>
                 ) : (
-                  <button type="button" onClick={() => navigate('/customer/login')} className="rounded-xl border border-[#e5bd45] bg-[#ffe89a] px-4 py-2 text-sm font-semibold text-[#6b4f1d] transition hover:bg-[#ffedb5]">
+                  <button type="button" onClick={() => navigate('/customer/login')} className="min-h-9 rounded-lg border border-[#e5bd45] bg-[#ffe89a] px-3 py-1.5 text-xs font-semibold text-[#6b4f1d] transition hover:bg-[#ffedb5] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#b89646]">
                     Log in to Send Request
                   </button>
                 )}

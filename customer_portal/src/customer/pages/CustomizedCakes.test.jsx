@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import { buildCustomizedCakeSubmissionPayload, buildTierSelections } from './customizedCakePayload';
 import CustomizedCakes from './CustomizedCakes';
 
@@ -131,6 +131,9 @@ describe('CustomizedCakes availability', () => {
     expect(await screen.findByText('Custom cake requests are currently closed. The form is disabled.')).toBeInTheDocument();
 
     const form = screen.getByRole('button', { name: 'Send Request' }).closest('form');
+    expect(within(form).getByRole('button', { name: 'Pickup' })).toHaveClass('min-h-10', 'rounded-lg');
+    expect(within(form).getByRole('button', { name: 'Single Tier' })).toHaveClass('min-h-10', 'rounded-lg');
+    expect(within(form).getByRole('button', { name: 'Send Request' })).toHaveClass('min-h-9', 'text-xs');
     expect(form.querySelector('fieldset')).toBeDisabled();
     expect(form.querySelector('fieldset')).toHaveClass('disabled:opacity-50');
     expect(screen.getByPlaceholderText('Enter full name')).toBeDisabled();
