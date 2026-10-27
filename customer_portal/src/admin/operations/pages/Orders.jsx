@@ -380,7 +380,7 @@ export default function Orders() {
   };
 
   const sortableHeader = (label, column, align = "left") => (
-    <th aria-sort={sortBy === column ? (sortDirection === "asc" ? "ascending" : "descending") : "none"} className={`px-4 py-3 ${align === "right" ? "text-right" : "text-left"} font-semibold`}>
+    <th aria-sort={sortBy === column ? (sortDirection === "asc" ? "ascending" : "descending") : "none"} className={`px-4 py-3.5 ${align === "right" ? "text-right" : "text-left"} font-semibold`}>
       <button type="button" onClick={() => requestSort(column)} className={`inline-flex items-center gap-1 hover:text-black ${align === "right" ? "ml-auto" : ""}`}>
         {label}
         <span className="text-[10px]" aria-hidden="true">{sortBy === column ? (sortDirection === "asc" ? "↑" : "↓") : "↕"}</span>
@@ -723,17 +723,17 @@ export default function Orders() {
                 );
               })}
             </div>
-            <div className="hidden overflow-x-auto rounded-lg border border-[#e9e1d9] bg-white shadow-[0_3px_12px_rgba(60,42,28,0.035)] xl:block">
-              <table className="w-full min-w-[1200px] border-collapse">
-                <thead className="bg-[#FAFAFA] text-left text-[10px] uppercase tracking-[0.16em] text-black/50">
-                  <tr className="border-b border-black/10">
+            <div className="hidden overflow-x-auto rounded-2xl border border-[#e8dfd4] bg-white shadow-[0_8px_28px_rgba(60,42,28,0.06)] xl:block">
+              <table aria-label="Live orders" className="w-full min-w-[1200px] border-collapse">
+                <thead className="sticky top-[88px] z-10 bg-[#f7f4ef] text-left text-[10px] uppercase tracking-[0.12em] text-[#74675f] shadow-[0_1px_0_#e8dfd4]">
+                  <tr>
                     {sortableHeader("Order", "order")}
-                    <th className="px-4 py-3 text-left font-semibold">Date &amp; Time</th>
+                    <th className="px-4 py-3.5 text-left font-semibold">Date &amp; Time</th>
                     {sortableHeader("Customer", "customer")}
                     {sortableHeader("Items", "items")}
-                    {sortableHeader("Total", "total")}
+                    {sortableHeader("Total", "total", "right")}
                     {sortableHeader("Status", "status")}
-                    <th className="px-4 py-3 text-right font-semibold">Action</th>
+                    <th className="px-4 py-3.5 text-right font-semibold">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -744,7 +744,7 @@ export default function Orders() {
                       && order.has_payment_proof;
                     const orderTiming = getOrderTiming(order);
                     const customerLabel = order.customer || order.customer_name || order.name || order.phone || "";
-                    const itemNames = (order.items || []).slice(0, 2).map((item) => `${item.name} x${item.qty}`).join(", ");
+                    const itemNames = (order.items || []).slice(0, 2).map((item) => `${item.name || "Item"} ×${item.qty || 1}`).join(", ");
                     const itemLabel = order.items?.length
                       ? `${order.items.length} item${order.items.length > 1 ? "s" : ""}${itemNames ? ` • ${itemNames}` : ""}`
                       : "Cake order";
@@ -752,38 +752,42 @@ export default function Orders() {
 
                     return (
                       <React.Fragment key={order.id}>
-                        <tr className={`border-b border-black/10 align-middle transition hover:bg-[#FFFDF7] ${orderTiming.isRushOrder ? "bg-[#FFF9E8]" : "bg-white"}`}>
-                          <td className="px-4 py-3 text-[13px] font-semibold text-black">#{order.order_number ?? order.id}</td>
-                          <td className="px-4 py-3 text-[11px] text-black/60"><time dateTime={order.created_at || undefined}>{formatOrderDateTime(order.created_at)}</time></td>
-                          <td className="px-4 py-3">
-                            <p className="text-[13px] font-semibold text-black">{customerLabel}</p>
-                            <p className="mt-0.5 text-[11px] text-black/50">{order.method || "N/A"} · {order.source}</p>
+                        <tr className={`border-b border-[#eee8df] align-middle transition-colors last:border-b-0 hover:bg-[#fcfaf6] ${orderTiming.isRushOrder ? "bg-[#fffaf0]" : "bg-white"}`}>
+                          <td className="whitespace-nowrap px-4 py-4">
+                            <span className="inline-flex rounded-md bg-[#f5f1e9] px-2.5 py-1.5 text-[12px] font-bold text-[#4c392b]">#{order.order_number ?? order.id}</span>
                           </td>
-                          <td className="max-w-[260px] px-4 py-3 text-[12px] text-black/65" title={itemLabel}>{itemLabel}</td>
-                          <td className="px-4 py-3 text-[13px] font-semibold text-black">₱{Number(order.total || 0).toLocaleString()}</td>
-                          <td className="px-4 py-3">
-                            <div className="flex flex-col items-start gap-1.5">
+                          <td className="whitespace-nowrap px-4 py-4 text-[11px] text-[#74675f]"><time dateTime={order.created_at || undefined}>{formatOrderDateTime(order.created_at)}</time></td>
+                          <td className="max-w-[230px] px-4 py-4">
+                            <p className="truncate text-[12px] font-semibold text-[#33251e]" title={customerLabel}>{customerLabel || "Customer"}</p>
+                            <p className="mt-1 truncate text-[10px] text-[#8f8076]" title={[order.phone, order.method || "N/A", order.source].filter(Boolean).join(" · ")}>
+                              {[order.phone, order.method || "N/A", order.source].filter(Boolean).join(" · ")}
+                            </p>
+                          </td>
+                          <td className="max-w-[260px] px-4 py-4 text-[11px] leading-5 text-[#65574d]" title={itemLabel}><p className="truncate">{itemLabel}</p></td>
+                          <td className="whitespace-nowrap px-4 py-4 text-right text-[13px] font-bold text-[#33251e]">₱{Number(order.total || 0).toLocaleString()}</td>
+                          <td className="px-4 py-4">
+                            <div className="flex min-w-[130px] flex-col items-start gap-1.5">
                               <span className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-semibold ${statusColors[order.status] ?? "bg-black/5 text-black"}`}>{order.status}</span>
                               {orderTiming.isRushOrder && <span className="inline-flex rounded-full bg-[#fff3d1] px-2.5 py-1 text-[9px] font-semibold text-[#80600a]">Rush order</span>}
-                              {order.return_refund_request && <span className="rounded bg-amber-100 px-2 py-1 text-[9px] font-semibold text-amber-900">Customer request · {order.return_refund_request.status}</span>}
+                              {order.return_refund_request && <span className="rounded-md bg-amber-50 px-2 py-1 text-[9px] font-semibold text-amber-900">Customer request · {order.return_refund_request.status}</span>}
                             </div>
                           </td>
-                          <td className="px-4 py-3">
-                            <div className="flex flex-wrap justify-end gap-2">
+                          <td className="px-4 py-4">
+                            <div className="flex min-w-[210px] flex-wrap justify-end gap-1.5">
                               {!order.is_wasted && <>
-                                <button type="button" onClick={() => setExpandedOrderId(isExpanded ? null : order.id)} className="rounded-full border border-black/10 bg-white px-3 py-1.5 text-[11px] font-semibold text-black hover:bg-black hover:text-white">{isExpanded ? "Hide" : "View"}</button>
-                                {(!(order.status === "Completed" || order.status === "Cancelled") && (order.status !== 'Awaiting Payment' || needsPaymentReview)) && <button type="button" onClick={() => advanceOrder(order)} disabled={updatingId === order.id} className="rounded-full bg-black px-3 py-1.5 text-[11px] font-semibold text-white hover:bg-black/80 disabled:opacity-50">{needsPaymentReview ? "Verify & move to Pending" : order.status === "Pending" ? "Accept" : order.status === "Preparing" ? "Ready" : "Complete"}</button>}
+                                <button type="button" onClick={() => setExpandedOrderId(isExpanded ? null : order.id)} className="rounded-md border border-[#e8dfd4] bg-white px-2.5 py-1.5 text-[10px] font-semibold text-[#65574d] transition hover:border-[#c9b895] hover:bg-[#faf7f2]">{isExpanded ? "Hide" : "View"}</button>
+                                {(!(order.status === "Completed" || order.status === "Cancelled") && (order.status !== 'Awaiting Payment' || needsPaymentReview)) && <button type="button" onClick={() => advanceOrder(order)} disabled={updatingId === order.id} className="rounded-md bg-[#33251e] px-2.5 py-1.5 text-[10px] font-semibold text-white transition hover:bg-black disabled:opacity-50">{needsPaymentReview ? "Verify payment" : order.status === "Pending" ? "Accept" : order.status === "Preparing" ? "Ready" : "Complete"}</button>}
                                 {order.return_refund_request?.status === "Pending Review"
-                                  ? order.return_refund_request?.status === "Pending Review" && <button type="button" onClick={() => { setRejectModalOrderId(order.id); setRejectReason(""); }} disabled={updatingId === order.id || rejectSubmitting} className="rounded-full border border-red-200 bg-red-50 px-3 py-1.5 text-[11px] font-semibold text-red-600 hover:bg-red-100 disabled:opacity-50">Reject</button>
-                                  : !["Completed", "Cancelled"].includes(order.status) && <button type="button" onClick={() => updateStatus(order.id, "Cancelled")} disabled={updatingId === order.id} className="rounded-full border border-red-200 bg-red-50 px-3 py-1.5 text-[11px] font-semibold text-red-600 hover:bg-red-100 disabled:opacity-50">Cancel</button>}
+                                  ? <button type="button" onClick={() => { setRejectModalOrderId(order.id); setRejectReason(""); }} disabled={updatingId === order.id || rejectSubmitting} className="rounded-md border border-red-200 bg-red-50 px-2.5 py-1.5 text-[10px] font-semibold text-red-700 transition hover:bg-red-100 disabled:opacity-50">Reject</button>
+                                  : !["Completed", "Cancelled"].includes(order.status) && <button type="button" onClick={() => updateStatus(order.id, "Cancelled")} disabled={updatingId === order.id} className="rounded-md border border-red-200 bg-white px-2.5 py-1.5 text-[10px] font-semibold text-red-700 transition hover:bg-red-50 disabled:opacity-50">Cancel</button>}
                               </>}
-                              {order.status !== "Completed" && <button type="button" onClick={() => markOrderAsWaste(order)} disabled={order.is_wasted} className="rounded-full border border-black/10 bg-[#F7F5EE] px-3 py-1.5 text-[11px] font-semibold text-black hover:bg-black hover:text-white disabled:cursor-not-allowed disabled:opacity-50">{order.is_wasted ? "Counted as waste" : "Waste"}</button>}
+                              {order.status !== "Completed" && <button type="button" onClick={() => markOrderAsWaste(order)} disabled={order.is_wasted} className="rounded-md border border-[#e8dfd4] bg-[#f7f5ee] px-2.5 py-1.5 text-[10px] font-semibold text-[#65574d] transition hover:border-[#c9b895] hover:bg-[#eee8dc] disabled:cursor-not-allowed disabled:opacity-50">{order.is_wasted ? "Counted as waste" : "Waste"}</button>}
                             </div>
                           </td>
                         </tr>
                         {isExpanded && (
-                          <tr className="border-b border-black/10 bg-[#FFFDF7]">
-                            <td colSpan="7" className="px-4 py-4 text-[11px] leading-5 text-black/70">
+                          <tr className="border-b border-[#eee8df] bg-[#fcfaf6]">
+                            <td colSpan="7" className="px-6 py-5 text-[11px] leading-5 text-[#65574d]">
                               {order.return_refund_request && (
                                 <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-3">
                                   <p className="text-[9px] uppercase tracking-[0.2em] text-amber-800">Customer request · {order.return_refund_request.status}</p>
