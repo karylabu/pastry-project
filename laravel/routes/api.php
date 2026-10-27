@@ -78,6 +78,7 @@ Route::get('orders/first-order-discount', [OrderController::class, 'firstOrderDi
 Route::post('orders', [OrderController::class, 'store']);
 Route::put('orders/{orderId}/rider-information', [OrderController::class, 'updateRiderInformation'])->whereNumber('orderId');
 Route::post('orders/{orderId}/cancel', [OrderController::class, 'cancel']);
+Route::put('staff/orders/{id}/status', [OrderController::class, 'updateStatus'])->whereNumber('id');
 Route::post('orders/{orderId}/confirm-received', [OrderController::class, 'confirmReceived']);
 Route::post('orders/{orderId}/return-refund-request', [OrderController::class, 'requestReturnRefund']);
 Route::post('staff/orders/{orderId}/return-refund/reject', [OrderController::class, 'rejectReturnRefundRequest']);

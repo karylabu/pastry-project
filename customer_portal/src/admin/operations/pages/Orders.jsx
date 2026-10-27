@@ -4,15 +4,9 @@ import { AlertTriangle, ChevronDown, ChevronUp, CircleCheck, Clock3, PackageChec
 import { useLocation, useNavigate } from "react-router-dom";
 
 /* STAFF NAVBAR */
-import { STAFF_BASE, LARAVEL_BASE } from "../../../services/config";
-import { getAuthHeaders } from "../../../services/api";
+import { LARAVEL_BASE } from "../../../services/config";
 import { subscribeRealtime } from "../../../services/realtime";
 
-const staffFetch = (url, options = {}) => fetch(url, {
-  credentials: "include",
-  ...options,
-  headers: { ...getAuthHeaders(), ...(options.headers || {}) },
-});
 const laravelStaffFetch = (url, options = {}) => {
   let token = '';
   try { token = JSON.parse(localStorage.getItem('user') || 'null')?.token || ''; } catch (_) { /* no-op */ }
@@ -394,32 +388,26 @@ export default function Orders() {
     </th>
   );
 
-  const updateStatus = (id, status) => {
+  const updateStatus = async (id, status) => {
     setUpdatingId(id);
-    staffFetch(`${STAFF_BASE}/api_update_order_status.php`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id, status }),
-    })
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.success) {
-          fetchOrders(true);
-          if (status === "Ready for Pickup") {
-            if (data.sms_sent) {
-              addToast(`Order #${id} updated — SMS sent to customer`, "success");
-            } else {
-              addToast(`Order #${id} updated, but SMS failed: ${data.sms_error ?? "Unknown error"}`, "sms_fail");
-            }
-          } else {
-            addToast(`Order #${id} → ${status}`, "success");
-          }
-        } else {
-          addToast(`Update failed: ${data.message}`, "error");
-        }
-      })
-      .catch(() => addToast("Network error — could not update order.", "error"))
-      .finally(() => setUpdatingId(null));
+    try {
+      const response = await laravelStaffFetch(`${LARAVEL_BASE}/api/staff/orders/${id}/status`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status }),
+      });
+      const data = await response.json();
+      if (!response.ok || !data?.success) {
+        throw new Error(data?.message || "Unable to update order status.");
+      }
+
+      fetchOrders(true);
+      addToast(`Order #${id} → ${status}`, "success");
+    } catch (error) {
+      addToast(`Update failed: ${error.message || "Network error — could not update order."}`, "error");
+    } finally {
+      setUpdatingId(null);
+    }
   };
 
   const submitReturnRefundRejection = async (event) => {

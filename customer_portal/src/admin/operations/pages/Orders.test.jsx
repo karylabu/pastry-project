@@ -101,6 +101,51 @@ test("sorts orders newest-first from the status filter toolbar", async () => {
   await waitFor(() => expect(container.querySelector("article")).toHaveTextContent("#106"));
 });
 
+test("accepts a pending order through the Laravel status endpoint", async () => {
+  let orderStatus = "Pending";
+  let statusRequest;
+  global.fetch.mockImplementation((url, options = {}) => {
+    if (String(url).includes("/api/staff/orders/101/status")) {
+      statusRequest = { url: String(url), options };
+      orderStatus = "Preparing";
+      return Promise.resolve({ ok: true, json: async () => ({ success: true }) });
+    }
+
+    if (String(url).includes("/inventory/ingredients")) {
+      return Promise.resolve({ ok: true, json: async () => ({ ingredients: [] }) });
+    }
+
+    return Promise.resolve({
+      ok: true,
+      json: async () => ({
+        success: true,
+        orders: [
+          orderFixture(101, orderStatus, 30),
+          orderFixture(102, "Preparing", 35),
+          orderFixture(103, "Awaiting Payment", 10, {
+            payment_status: "proof_submitted",
+            has_payment_proof: true,
+          }),
+          orderFixture(104, "Completed", 60),
+          orderFixture(105, "Cancelled", 61),
+          orderFixture(106, "Pending", 2, { order_type: "Urgent" }),
+        ],
+      }),
+    });
+  });
+
+  const { container } = renderOrders();
+  const orderCard = (await screen.findAllByText("Customer 101"))[0].closest("article");
+  fireEvent.click(within(orderCard).getByRole("button", { name: "Accept" }));
+
+  await waitFor(() => expect(statusRequest).toBeDefined());
+  expect(statusRequest.url).toContain("/api/staff/orders/101/status");
+  expect(statusRequest.options.method).toBe("PUT");
+  expect(JSON.parse(statusRequest.options.body)).toEqual({ status: "Preparing" });
+  await waitFor(() => expect(within(orderCard).getByRole("button", { name: "Ready" })).toBeInTheDocument());
+  expect(container).toHaveTextContent("Order #101 → Preparing");
+});
+
 test("shows placed and cancelled timestamps in cancelled order details", async () => {
   const { container } = renderOrders();
   const orderCard = (await screen.findAllByText("Customer 105"))[0].closest("article");
