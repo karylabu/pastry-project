@@ -1581,6 +1581,19 @@ class OrderController extends Controller
                     }
                 }
 
+                if (
+                    strtolower($newStatus) === 'pending'
+                    && $normalizedOldStatus === 'awaiting payment'
+                    && $paymentStatus === 'proof_submitted'
+                ) {
+                    $isStandardPickupDownpayment = strtolower((string) $order->method) === 'pickup'
+                        && !(bool) $order->is_customized
+                        && strcasecmp((string) $order->order_type, 'Customized') !== 0
+                        && $downpaymentAmount > 0
+                        && (float) $order->total > $downpaymentAmount;
+                    $orderUpdatePaymentStatus = $isStandardPickupDownpayment ? 'downpayment_paid' : 'paid';
+                }
+
                 $approvedStatuses = ['confirmed', 'approved', 'preparing'];
                 $isApproved = in_array(strtolower(trim($newStatus)), $approvedStatuses, true);
                 $hasDeductedStock = $this->orderHasActiveStockDeduction((int) $order->id);

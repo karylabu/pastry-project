@@ -24,6 +24,8 @@ class OrderStockoutNotificationTest extends TestCase
             $table->string('method')->nullable();
             $table->string('payment')->nullable();
             $table->string('payment_status')->nullable();
+            $table->boolean('is_customized')->default(false);
+            $table->string('order_type')->nullable();
             $table->string('phone')->nullable();
             $table->string('status');
         });
@@ -139,6 +141,52 @@ class OrderStockoutNotificationTest extends TestCase
             'id' => 43,
             'status' => 'Ready for Pickup',
             'payment_status' => 'paid',
+        ]);
+    }
+
+    public function test_admin_verification_records_manual_deposit_before_balance_status(): void
+    {
+        DB::table('orders')->insert([
+            'id' => 44,
+            'user_id' => 7,
+            'status' => 'Awaiting Payment',
+            'total' => 1000,
+            'downpayment_amount' => 500,
+            'method' => 'Pickup',
+            'payment' => 'QRPh',
+            'payment_status' => 'proof_submitted',
+            'is_customized' => false,
+            'order_type' => 'Standard',
+        ]);
+
+        $admin = new User();
+        $admin->id = 99;
+        $admin->role = 'admin';
+        $admin->status = 'active';
+        $this->actingAs($admin);
+
+        $response = app(OrderController::class)->updateStatus(
+            Request::create('/orders/44/status', 'PUT', ['status' => 'Pending']),
+            44
+        );
+        $this->assertSame(200, $response->getStatusCode());
+        $this->assertDatabaseHas('orders', [
+            'id' => 44,
+            'status' => 'Pending',
+            'payment_status' => 'downpayment_paid',
+        ]);
+
+        DB::table('orders')->where('id', 44)->update(['status' => 'Preparing']);
+        $response = app(OrderController::class)->updateStatus(
+            Request::create('/orders/44/status', 'PUT', ['status' => 'Ready for Pickup']),
+            44
+        );
+        $this->assertSame(200, $response->getStatusCode(), json_encode($response->getData(true)));
+        $this->assertSame('Awaiting Balance Payment', $response->getData(true)['status']);
+        $this->assertDatabaseHas('orders', [
+            'id' => 44,
+            'status' => 'Awaiting Balance Payment',
+            'payment_status' => 'downpayment_paid',
         ]);
     }
 }
