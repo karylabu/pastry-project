@@ -179,6 +179,24 @@ class CustomerOrdersApiTest extends TestCase
         $this->assertDatabaseHas('orders', ['id' => 10, 'status' => 'Cancelled']);
     }
 
+    public function test_customer_order_number_matches_order_id(): void
+    {
+        DB::table('orders')->insert([
+            'id' => 42,
+            'user_id' => 7,
+            'email' => 'customer@example.com',
+            'status' => 'Pending',
+        ]);
+
+        $request = Request::create('/api/orders', 'GET', [], [], [], [
+            'HTTP_X_AUTH_TOKEN' => 'test-customer-token',
+        ]);
+        $response = app(OrderController::class)->index($request);
+
+        $this->assertSame(200, $response->getStatusCode());
+        $this->assertSame(42, $response->getData(true)['orders'][0]['order_number']);
+    }
+
     public function test_cancelled_paid_counter_order_reports_manual_refund_without_schema_changes(): void
     {
         DB::table('orders')->insert([

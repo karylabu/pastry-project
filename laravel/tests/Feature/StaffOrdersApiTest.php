@@ -202,7 +202,7 @@ class StaffOrdersApiTest extends TestCase
             ->assertJsonPath('success', true)
             ->assertJsonCount(1, 'orders')
             ->assertJsonPath('orders.0.id', 21)
-            ->assertJsonPath('orders.0.order_number', 1)
+            ->assertJsonPath('orders.0.order_number', 21)
             ->assertJsonPath('orders.0.is_customized', false)
             ->assertJsonPath('orders.0.order_type', 'Standard')
             ->assertJsonPath('orders.0.has_payment_proof', true)
@@ -232,6 +232,7 @@ class StaffOrdersApiTest extends TestCase
         ));
 
         $this->assertSame(200, $response->getStatusCode());
+        $this->assertSame(23, $response->getData(true)['orders'][0]['order_number']);
         $this->assertSame('Cancelled', $response->getData(true)['orders'][0]['status']);
     }
 

@@ -101,6 +101,26 @@ test("sorts orders newest-first from the status filter toolbar", async () => {
   await waitFor(() => expect(container.querySelector("article")).toHaveTextContent("#106"));
 });
 
+test("shows the exact order date and time in live order cards", async () => {
+  const createdAt = "2026-10-27T01:02:00.000Z";
+  const orderFixtureWithTimestamp = orderFixture(106, "Pending", 2, { created_at: createdAt });
+  global.fetch.mockImplementation((url) => {
+    if (String(url).includes("/inventory/ingredients")) {
+      return Promise.resolve({ ok: true, json: async () => ({ ingredients: [] }) });
+    }
+
+    return Promise.resolve({
+      ok: true,
+      json: async () => ({ success: true, orders: [orderFixtureWithTimestamp] }),
+    });
+  });
+
+  const { container } = renderOrders();
+  await screen.findAllByText("Customer 106");
+
+  expect(container.querySelector(`time[datetime="${createdAt}"]`)).toBeInTheDocument();
+});
+
 test("removes view, approval, and cancel actions after an order is counted as waste", async () => {
   const { container } = renderOrders();
   const orderCard = (await screen.findAllByText("Customer 106"))[0].closest("article");

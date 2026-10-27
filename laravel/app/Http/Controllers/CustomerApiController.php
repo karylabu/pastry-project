@@ -663,6 +663,7 @@ class CustomerApiController extends Controller
 
             return [
                 'id' => $row->id,
+                'order_number' => (int) $row->id,
                 'user_id' => $row->user_id,
                 'customer' => $row->customer,
                 'email' => $row->email,

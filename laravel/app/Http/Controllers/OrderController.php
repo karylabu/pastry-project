@@ -137,6 +137,10 @@ class OrderController extends Controller
             }
         }
 
+        foreach ($orders as $order) {
+            $order->setAttribute('order_number', (int) $order->id);
+        }
+
         return response()->json([
             'success' => true,
             'orders' => $orders

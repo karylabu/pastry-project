@@ -25,6 +25,14 @@ const laravelStaffFetch = (url, options = {}) => {
 
 const POLL_INTERVAL = 15000;
 
+const formatOrderDateTime = (value) => {
+  if (!value) return "Date and time unavailable";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime())
+    ? "Date and time unavailable"
+    : date.toLocaleString([], { dateStyle: "medium", timeStyle: "short" });
+};
+
 const BOARD_COLUMNS = [
   {
     key: "Pending",
@@ -671,6 +679,7 @@ export default function Orders() {
                           </div>
                           <p className="mt-2 truncate text-[13px] font-semibold text-[#33251e]">{customerLabel}</p>
                           <p className="mt-0.5 text-[10px] text-[#8f8076]">{order.method || "N/A"} · {order.source || "Order"}{order.phone ? ` · ${order.phone}` : ""}</p>
+                          <time dateTime={order.created_at || undefined} className="mt-1 block text-[10px] text-[#8f8076]">{formatOrderDateTime(order.created_at)}</time>
                         </div>
                         <p className="shrink-0 text-[14px] font-bold text-[#33251e]">₱{Number(order.total || 0).toLocaleString()}</p>
                       </div>
@@ -727,10 +736,11 @@ export default function Orders() {
               })}
             </div>
             <div className="hidden overflow-x-auto rounded-lg border border-[#e9e1d9] bg-white shadow-[0_3px_12px_rgba(60,42,28,0.035)] xl:block">
-              <table className="w-full min-w-[1120px] border-collapse">
+              <table className="w-full min-w-[1200px] border-collapse">
                 <thead className="bg-[#FAFAFA] text-left text-[10px] uppercase tracking-[0.16em] text-black/50">
                   <tr className="border-b border-black/10">
                     {sortableHeader("Order", "order")}
+                    <th className="px-4 py-3 text-left font-semibold">Date &amp; Time</th>
                     {sortableHeader("Customer", "customer")}
                     {sortableHeader("Items", "items")}
                     {sortableHeader("Total", "total")}
@@ -756,6 +766,7 @@ export default function Orders() {
                       <React.Fragment key={order.id}>
                         <tr className={`border-b border-black/10 align-middle transition hover:bg-[#FFFDF7] ${orderTiming.isRushOrder ? "bg-[#FFF9E8]" : "bg-white"}`}>
                           <td className="px-4 py-3 text-[13px] font-semibold text-black">#{order.order_number ?? order.id}</td>
+                          <td className="px-4 py-3 text-[11px] text-black/60"><time dateTime={order.created_at || undefined}>{formatOrderDateTime(order.created_at)}</time></td>
                           <td className="px-4 py-3">
                             <p className="text-[13px] font-semibold text-black">{customerLabel}</p>
                             <p className="mt-0.5 text-[11px] text-black/50">{order.method || "N/A"} · {order.source}</p>
@@ -784,7 +795,7 @@ export default function Orders() {
                         </tr>
                         {isExpanded && (
                           <tr className="border-b border-black/10 bg-[#FFFDF7]">
-                            <td colSpan="6" className="px-4 py-4 text-[11px] leading-5 text-black/70">
+                            <td colSpan="7" className="px-4 py-4 text-[11px] leading-5 text-black/70">
                               {order.return_refund_request && (
                                 <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-3">
                                   <p className="text-[9px] uppercase tracking-[0.2em] text-amber-800">Customer request · {order.return_refund_request.status}</p>

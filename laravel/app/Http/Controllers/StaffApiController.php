@@ -240,12 +240,6 @@ class StaffApiController extends Controller
                     ->pluck('reference_id')
                     ->flip()
                 : collect();
-            $orderNumbers = DB::table('orders')
-                ->orderBy('created_at')
-                ->orderBy('id')
-                ->pluck('id')
-                ->flip()
-                ->map(fn (int $index): int => $index + 1);
             $itemsByOrder = collect();
             $legacyCustomByOrder = collect();
             $customizedByOrder = collect();
@@ -297,7 +291,7 @@ class StaffApiController extends Controller
                 }
             }
 
-            $orders = $orders->map(function ($order) use ($orderNumbers, $itemsByOrder, $productSizesById, $legacyCustomByOrder, $customizedByOrder, $returnRefundRequestsByOrder, $wastedOrderIds) {
+            $orders = $orders->map(function ($order) use ($itemsByOrder, $productSizesById, $legacyCustomByOrder, $customizedByOrder, $returnRefundRequestsByOrder, $wastedOrderIds) {
                 $rawItems = json_decode((string) ($order->items ?? '[]'), true);
                 $items = $itemsByOrder->get($order->id, collect())
                     ->map(function ($item) use ($productSizesById) {
@@ -372,7 +366,7 @@ class StaffApiController extends Controller
                     ? $legacyImages
                     : (is_array($customizedImages) ? $customizedImages : []);
 
-                $order->order_number = $orderNumbers[$order->id] ?? (int) $order->id;
+                $order->order_number = (int) $order->id;
                 $order->customer = $order->customer ?: $order->email ?: 'Guest';
                 $order->has_discount_id = !empty($order->discount_id_path);
                 $order->has_payment_proof = !empty($order->payment_proof_path)
