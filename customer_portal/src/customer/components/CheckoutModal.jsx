@@ -154,7 +154,6 @@ export default function CheckoutModal({
   const [selectedAddressId, setSelectedAddressId] = useState(null);
   const defaultAddressAppliedRef = useRef(false);
   const [addressesLoading, setAddressesLoading] = useState(false);
-  const [addressFetchError, setAddressFetchError] = useState('');
   const [showPhoneSuggestions, setShowPhoneSuggestions] = useState(false);
   const [showAddressSuggestions, setShowAddressSuggestions] = useState(false);
   const pickupMapElementRef = useRef(null);
@@ -408,7 +407,6 @@ export default function CheckoutModal({
   const loadSavedAddresses = useCallback(async () => {
     if (userId <= 0) return;
     setAddressesLoading(true);
-    setAddressFetchError('');
 
     try {
       const res = await fetch(`${CUSTOMER_BASE}/api/addresses`, {
@@ -425,7 +423,6 @@ export default function CheckoutModal({
       setSavedAddresses(data.addresses || []);
     } catch (err) {
       console.error('Failed to load addresses', err);
-      setAddressFetchError('Unable to fetch saved addresses.');
       setSavedAddresses([]);
     } finally {
       setAddressesLoading(false);
@@ -1016,9 +1013,6 @@ export default function CheckoutModal({
                         <span className="text-xs text-gray-500">Loading…</span>
                       )}
                     </div>
-                    {addressFetchError && (
-                      <p className="text-xs text-red-700">{addressFetchError}</p>
-                    )}
                   </div>
 
                   <div className="relative">
@@ -1456,12 +1450,6 @@ export default function CheckoutModal({
                     : 'This offer cannot be combined with a promotion coupon, reward code, or Senior Citizen / PWD discount.'}
                 </p>
               )}
-              {firstOrderEligibility.status === 'error' && (
-                <p role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-xs text-red-700">
-                  We couldn’t verify your first-order offer. Refresh checkout to check your eligibility.
-                </p>
-              )}
-
               <div className="flex justify-between text-sm text-gray-500">
                 <span>Subtotal</span>
                 <span>₱{subtotal}</span>
@@ -1556,11 +1544,6 @@ export default function CheckoutModal({
                           Redeem 5% off your subtotal, up to ₱100. Reward codes cannot be combined with promotion coupons or Senior Citizen / PWD discounts.
                         </p>
                       </div>
-                    )}
-                    {rewardEligibility.status === 'error' && (
-                      <p role="alert" className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
-                        We couldn’t verify reward code eligibility. Refresh checkout to try again.
-                      </p>
                     )}
                   </div>
                 )}
