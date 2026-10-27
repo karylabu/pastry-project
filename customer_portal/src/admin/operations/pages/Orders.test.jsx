@@ -104,7 +104,7 @@ test("sorts orders newest-first from the status filter toolbar", async () => {
 test("removes view, approval, and cancel actions after an order is counted as waste", async () => {
   const { container } = renderOrders();
   const orderCard = (await screen.findAllByText("Customer 106"))[0].closest("article");
-  expect(within(orderCard).getByRole("button", { name: "Approve" })).toBeInTheDocument();
+  expect(within(orderCard).getByRole("button", { name: "Accept" })).toBeInTheDocument();
   expect(within(orderCard).getByRole("button", { name: "Cancel" })).toBeInTheDocument();
   expect(within(orderCard).getByRole("button", { name: /View details for order/ })).toBeInTheDocument();
 
@@ -112,7 +112,7 @@ test("removes view, approval, and cancel actions after an order is counted as wa
 
   await waitFor(() => {
     expect(within(orderCard).getByRole("button", { name: "Counted as waste" })).toBeDisabled();
-    expect(within(orderCard).queryByRole("button", { name: "Approve" })).not.toBeInTheDocument();
+    expect(within(orderCard).queryByRole("button", { name: "Accept" })).not.toBeInTheDocument();
     expect(within(orderCard).queryByRole("button", { name: "Cancel" })).not.toBeInTheDocument();
     expect(within(orderCard).queryByRole("button", { name: /View details for order/ })).not.toBeInTheDocument();
   });
@@ -120,7 +120,7 @@ test("removes view, approval, and cancel actions after an order is counted as wa
   const orderRow = Array.from(container.querySelectorAll("tr")).find((row) => row.textContent.includes("#106"));
   expect(orderRow).toBeTruthy();
   expect(within(orderRow).getByRole("button", { name: "Counted as waste" })).toBeDisabled();
-  expect(within(orderRow).queryByRole("button", { name: "Approve" })).not.toBeInTheDocument();
+  expect(within(orderRow).queryByRole("button", { name: "Accept" })).not.toBeInTheDocument();
   expect(within(orderRow).queryByRole("button", { name: "Cancel" })).not.toBeInTheDocument();
   expect(within(orderRow).queryByRole("button", { name: "View" })).not.toBeInTheDocument();
 });
