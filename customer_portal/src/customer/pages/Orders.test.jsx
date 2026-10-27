@@ -64,6 +64,9 @@ test('shows the remaining pickup balance and starts balance payment', async () =
   render(<Orders />);
 
   const payBalanceButton = await screen.findByRole('button', { name: 'Pay balance ₱500.00' });
+  expect(screen.getByText('Deposit paid: ₱500 · Balance due: ₱500')).toBeInTheDocument();
+  expect(screen.getByText('Pay the remaining balance or submit proof for review')).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Submit proof / reference' })).toBeInTheDocument();
   fireEvent.click(payBalanceButton);
 
   await waitFor(() => {

@@ -1446,7 +1446,7 @@ export default function Orders() {
                   : isAwaitingBalancePayment
                   ? hasPaymentSubmission
                     ? 'Balance details submitted — awaiting Admin review'
-                    : 'Remaining balance payment required'
+                    : 'Pay the remaining balance or submit proof for review'
                   : isPickupDownpaymentPaid
                   ? '50% downpayment paid — balance due at counter on pickup'
                   : isPending
@@ -1585,9 +1585,9 @@ export default function Orders() {
                     <div>
                       <p className="text-sm text-gray-700">{isCustomized ? customPaymentMethod : order.payment || order.method || '—'}</p>
                       {paymentHint && <p className={`text-xs mt-0.5 ${isCancelled ? 'text-slate-500' : isCompleted ? 'text-slate-500' : 'text-gray-400'}`}>{paymentHint}</p>}
-                      {isPickupDownpaymentPaid && (
+                      {(isPickupDownpaymentPaid || (isCustomized && isAwaitingBalancePayment)) && (
                         <p className="mt-1 text-[10px] leading-4 text-gray-500">
-                          Deposit: ₱{Number(order.downpayment_amount).toLocaleString()} · Balance: ₱{Math.max(0, Number(order.total || 0) - Number(order.downpayment_amount)).toLocaleString()}
+                          Deposit paid: ₱{customDownpaymentAmount.toLocaleString()} · Balance due: ₱{remainingBalanceAmount.toLocaleString()}
                         </p>
                       )}
                       {isCustomized && isAwaitingPayment && customDownpaymentAmount > 0 && (
