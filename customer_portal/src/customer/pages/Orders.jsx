@@ -273,6 +273,7 @@ export default function Orders() {
   const [payingOrderId, setPayingOrderId] = useState(null);
   const [paymentProofError, setPaymentProofError] = useState('');
   const [actionError, setActionError]     = useState(null);
+  const [cancellationNotice, setCancellationNotice] = useState('');
   const [catalogProducts, setCatalogProducts] = useState([]);
   const [feedbackTarget, setFeedbackTarget] = useState(null);
   const [feedbackSubmitting, setFeedbackSubmitting] = useState(false);
@@ -530,6 +531,7 @@ export default function Orders() {
       });
       const data = await safeParseJson(res);
       if (data.success) {
+        setCancellationNotice(`Your order #${cancelTarget.id} is already cancelled.`);
         updateLocalStatus(cancelTarget.id, "Cancelled", {
           refund_status: data.refund_status,
           refund_amount: data.refund_amount,
@@ -1158,6 +1160,24 @@ export default function Orders() {
             <p className="mt-1 text-xs text-[#9b8c83]">Check all your orders in one place. It's easy to manage.</p>
           </div>
         </div>
+
+        {cancellationNotice && (
+          <div
+            role="status"
+            aria-live="polite"
+            className="mb-5 flex items-center justify-between gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-5 py-3 text-emerald-800"
+          >
+            <p className="text-sm font-semibold">{cancellationNotice}</p>
+            <button
+              type="button"
+              onClick={() => setCancellationNotice('')}
+              aria-label="Dismiss cancellation notice"
+              className="shrink-0 rounded p-1 text-emerald-700 hover:bg-emerald-100"
+            >
+              <X size={15} />
+            </button>
+          </div>
+        )}
 
         {/* TABS + SEARCH */}
         <div className="sticky top-[96px] z-30 mb-4 flex min-w-0 max-w-full flex-col gap-4 overflow-x-clip border-b border-[#eadfd8] bg-[#fbfaf5]/95 backdrop-blur-sm md:static md:flex-row md:items-center md:justify-between md:overflow-visible md:bg-transparent md:backdrop-blur-none">
