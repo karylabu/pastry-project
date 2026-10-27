@@ -18,6 +18,10 @@ class StoreOrderRequest extends FormRequest
         if (is_string($deliveryDate) && trim($deliveryDate) === '') {
             $this->merge(['delivery_date' => null]);
         }
+
+        if ($this->input('method') === 'Pickup' && !$this->has('payment_type')) {
+            $this->merge(['payment_type' => 'downpayment']);
+        }
     }
 
     public function authorize(): bool
@@ -53,6 +57,9 @@ class StoreOrderRequest extends FormRequest
             'payment' => $this->input('method') === 'Pickup'
                 ? 'required|string|in:QRPh'
                 : 'required|string',
+            'payment_type' => $this->input('method') === 'Pickup'
+                ? 'sometimes|string|in:full,downpayment'
+                : 'prohibited',
             'address' => 'required_if:method,Delivery,Deliver|string|nullable',
             'phone' => 'required|string',
             'lat' => 'nullable|numeric',

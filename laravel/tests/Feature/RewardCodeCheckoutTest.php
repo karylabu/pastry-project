@@ -688,6 +688,25 @@ class RewardCodeCheckoutTest extends TestCase
         $this->assertSame(round((float) $order->total / 2, 2), (float) $order->downpayment_amount);
     }
 
+    public function test_qrph_pickup_order_can_choose_full_payment(): void
+    {
+        $response = $this->placeOrder('', 'none', '', null, '', now()->addDay()->toDateString(), 'QRPh', 'Pickup', 'full');
+
+        $this->assertSame(201, $response->getStatusCode());
+        $this->assertNull(DB::table('orders')->value('downpayment_amount'));
+    }
+
+    public function test_pickup_order_rejects_an_unsupported_payment_option(): void
+    {
+        $request = StoreOrderRequest::create('/api/orders', 'POST', ['method' => 'Pickup']);
+        $paymentTypeRule = $request->rules()['payment_type'];
+
+        $this->assertTrue(Validator::make(
+            ['payment_type' => 'partial'],
+            ['payment_type' => $paymentTypeRule]
+        )->fails());
+    }
+
     public function test_first_order_discount_is_applied_once_and_reported_by_eligibility_endpoint(): void
     {
         $this->assertTrue($this->firstOrderDiscountEligibility()['eligible']);
@@ -802,10 +821,11 @@ class RewardCodeCheckoutTest extends TestCase
         string $promotionCouponCode = '',
         ?string $deliveryDate = null,
         string $payment = 'Counter',
-        string $method = 'Pickup'
+        string $method = 'Pickup',
+        ?string $paymentType = null
     )
     {
-        $request = StoreOrderRequest::create('/api/orders', 'POST', [
+        $payload = [
             'items' => $items ?? [['product_id' => 11, 'qty' => 1]],
             'method' => $method,
             'delivery_service' => in_array($method, ['Delivery', 'Deliver'], true) ? 'Lalamove' : null,
@@ -818,7 +838,12 @@ class RewardCodeCheckoutTest extends TestCase
             'discount_type' => $discountType,
             'reward_code' => $rewardCode,
             'promotion_coupon_code' => $promotionCouponCode,
-        ], [], [], [
+        ];
+        if ($paymentType !== null) {
+            $payload['payment_type'] = $paymentType;
+        }
+
+        $request = StoreOrderRequest::create('/api/orders', 'POST', $payload, [], [], [
             'HTTP_ACCEPT' => 'application/json',
             'HTTP_AUTHORIZATION' => 'Bearer test-customer-token',
         ]);

@@ -1627,9 +1627,6 @@ PROMPT;
             || in_array(strtolower((string) $order->payment), ['qrph', 'gcash'], true);
         $currentStageAlreadyPaid = $order->status === 'Awaiting Payment'
             && in_array($paymentStatus, ['paid', 'downpayment_paid', 'proof_submitted'], true);
-        if ($pickupDownpayment && $paymentType !== 'downpayment') {
-            return $this->corsResponse(['error' => 'Pickup orders must be paid using the 50% downpayment.'], 409);
-        }
         if (!$supportedOrderPayment
             || !in_array($order->status, ['Awaiting Payment', 'Awaiting Balance Payment'], true)
             || $currentStageAlreadyPaid) {
@@ -1684,7 +1681,11 @@ PROMPT;
             $checkoutAmountCents = (int) ceil(($checkoutAmount * 100) - 1e-8);
         }
 
-        $description = 'Pastry Order #' . $orderId . ($paymentType === 'balance' ? ' Remaining Balance' : ' Downpayment');
+        $description = 'Pastry Order #' . $orderId . match ($paymentType) {
+            'balance' => ' Remaining Balance',
+            'downpayment' => ' Downpayment',
+            default => ' Full Payment',
+        };
         if ($customOrder) {
             $appUrl = parse_url((string) config('app.url'));
             $portalOrigin = isset($appUrl['scheme'], $appUrl['host'])
@@ -1720,7 +1721,11 @@ PROMPT;
                 'amount' => $amountCents,
                 'currency' => 'PHP',
                 'description' => $description,
-                'remarks' => $paymentType === 'balance' ? 'Custom cake order remaining balance' : 'Pastry Shop Order',
+                'remarks' => match ($paymentType) {
+                    'balance' => 'Custom cake order remaining balance',
+                    'downpayment' => 'Pastry Shop Order downpayment',
+                    default => 'Pastry Shop Order full payment',
+                },
             ];
             $paymentEndpoint = 'https://api.paymongo.com/v1/payment_links';
         }

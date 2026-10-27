@@ -516,6 +516,7 @@ class OrderController extends Controller
                 $initialStatus = $requiresQrPayment ? 'Awaiting Payment' : 'Pending';
                 $pickupDownpayment = strcasecmp((string) $request->method, 'Pickup') === 0
                     && strtolower((string) $request->payment) === 'qrph'
+                    && strtolower((string) $request->input('payment_type', 'downpayment')) === 'downpayment'
                     ? round($total * 0.5, 2)
                     : null;
                 $deliveryTime = trim((string) $request->input('delivery_time', ''));

@@ -142,6 +142,7 @@ export default function CheckoutModal({
     pickupDate: "",
     deliveryTime: "",
     payment: "QRPh",
+    pickupPaymentType: "downpayment",
     orderType: "Standard",
     address: "",
     phone: "",
@@ -725,6 +726,7 @@ export default function CheckoutModal({
         delivery_date: checkoutData.method === "Pickup" ? checkoutData.pickupDate : "",
         delivery_time: checkoutData.deliveryTime,
         payment: checkoutData.payment,
+        ...(checkoutData.method === "Pickup" ? { payment_type: checkoutData.pickupPaymentType } : {}),
         order_type: checkoutData.orderType || "Standard",
         discount_type: discountType,
         reward_code: rewardCode,
@@ -826,8 +828,10 @@ export default function CheckoutModal({
             },
             body: JSON.stringify({
               order_id: result.order_id,
-              amount: Number(result.total ?? total) * (checkoutData.method === "Pickup" ? 0.5 : 1),
-              payment_type: checkoutData.method === "Pickup" ? "downpayment" : "full",
+              amount: checkoutData.method === "Pickup" && checkoutData.pickupPaymentType === "downpayment"
+                ? Number(result.total ?? total) * 0.5
+                : Number(result.total ?? total),
+              payment_type: checkoutData.method === "Pickup" ? checkoutData.pickupPaymentType : "full",
               payment_method: checkoutData.payment,
             }),
           }
@@ -1263,9 +1267,35 @@ export default function CheckoutModal({
                 ))}
               </div>
               {checkoutData.method === "Pickup" && (
-                <p className="rounded-xl border border-[#e9d8ae] bg-[#fffaf0] px-3 py-2.5 text-xs leading-5 text-[#6b4f1d]">
-                  Pay a 50% downpayment via QRPh to confirm your pickup order. The remaining balance is due at the counter when you pick it up.
-                </p>
+                <section className="mt-4 space-y-2" aria-labelledby="pickup-payment-option-heading">
+                  <p id="pickup-payment-option-heading" className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">Pickup Payment Option</p>
+                  <div className="grid grid-cols-2 gap-2" role="group" aria-labelledby="pickup-payment-option-heading">
+                    {[
+                      { value: "downpayment", label: "50% Downpayment", amount: total * 0.5 },
+                      { value: "full", label: "Full Payment", amount: total },
+                    ].map((option) => (
+                      <button
+                        key={option.value}
+                        type="button"
+                        aria-pressed={checkoutData.pickupPaymentType === option.value}
+                        onClick={() => setCheckoutData((current) => ({ ...current, pickupPaymentType: option.value }))}
+                        className={`rounded-xl border px-3 py-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e7c875] ${
+                          checkoutData.pickupPaymentType === option.value
+                            ? "border-[#c9972d] bg-[#fff1bd] text-[#5f4715] shadow-sm"
+                            : "border-[#eee5db] bg-white text-[#765d50] hover:border-[#e7c875] hover:bg-[#fffaf0]"
+                        }`}
+                      >
+                        <span className="block text-xs font-semibold">{option.label}</span>
+                        <span className="mt-1 block text-[11px]">₱{option.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                      </button>
+                    ))}
+                  </div>
+                  <p className="rounded-xl border border-[#e9d8ae] bg-[#fffaf0] px-3 py-2.5 text-xs leading-5 text-[#6b4f1d]">
+                    {checkoutData.pickupPaymentType === "downpayment"
+                      ? "Pay 50% via QRPh now to confirm your pickup order. The remaining balance is due at the counter when you pick it up."
+                      : "Pay the full amount via QRPh now to confirm your pickup order."}
+                  </p>
+                </section>
               )}
 
             </div>
@@ -1637,8 +1667,8 @@ export default function CheckoutModal({
               </div>
               {checkoutData.method === "Pickup" && (
                 <div className="flex justify-between px-1 text-sm font-semibold text-[#6b4f1d]">
-                  <span>Pay now (50% downpayment)</span>
-                  <span>₱{(total * 0.5).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                  <span>{checkoutData.pickupPaymentType === "downpayment" ? "Pay now (50% downpayment)" : "Pay now (full payment)"}</span>
+                  <span>₱{(checkoutData.pickupPaymentType === "downpayment" ? total * 0.5 : total).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                 </div>
               )}
 
@@ -1651,7 +1681,7 @@ export default function CheckoutModal({
                   ? checkoutData.payment === "QRPh"
                     ? "REDIRECTING..."
                     : "SAVING..."
-                  : shopOpen === true ? belowMinimumOrder ? "MINIMUM ORDER NOT MET" : checkoutData.method === "Pickup" ? "PAY 50% DOWNPAYMENT" : "PLACE ORDER" : shopOpen === false ? "SHOP CLOSED" : "CHECKING HOURS"}
+                  : shopOpen === true ? belowMinimumOrder ? "MINIMUM ORDER NOT MET" : checkoutData.method === "Pickup" ? checkoutData.pickupPaymentType === "downpayment" ? "PAY 50% DOWNPAYMENT" : "PAY IN FULL" : "PLACE ORDER" : shopOpen === false ? "SHOP CLOSED" : "CHECKING HOURS"}
               </button>
 
             </div>
