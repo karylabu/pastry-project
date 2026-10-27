@@ -32,7 +32,16 @@ const orderFixture = (id, status, ageMinutes, extra = {}) => ({
 });
 
 beforeEach(() => {
+  URL.createObjectURL = jest.fn(() => "blob:payment-proof");
+  URL.revokeObjectURL = jest.fn();
   global.fetch = jest.fn((url) => {
+    if (String(url).includes("/api/staff/orders/103/payment-proof")) {
+      return Promise.resolve({
+        ok: true,
+        blob: async () => new Blob(["payment proof"], { type: "image/png" }),
+      });
+    }
+
     if (String(url).includes("/orders/106/waste")) {
       return Promise.resolve({
         ok: true,
@@ -63,6 +72,7 @@ beforeEach(() => {
           orderFixture(101, "Pending", 30),
           orderFixture(102, "Preparing", 35),
           orderFixture(103, "Awaiting Payment", 10, {
+            payment: "QR Ph",
             payment_status: "proof_submitted",
             has_payment_proof: true,
           }),
@@ -101,6 +111,20 @@ test("does not show waste actions for completed orders", async () => {
   expect(orderRow).toBeTruthy();
   expect(within(orderCard).queryByRole("button", { name: "Waste" })).not.toBeInTheDocument();
   expect(within(orderRow).queryByRole("button", { name: "Waste" })).not.toBeInTheDocument();
+});
+
+test("opens an enlarged payment proof from live order details", async () => {
+  renderOrders();
+  const orderCard = (await screen.findAllByText("Customer 103"))[0].closest("article");
+
+  fireEvent.click(within(orderCard).getByRole("button", { name: /View details for order 103/i }));
+  fireEvent.click(within(orderCard).getByRole("button", { name: "View payment proof" }));
+
+  const enlargeButton = await within(orderCard).findByRole("button", { name: "Enlarge payment proof for order 103" });
+  fireEvent.click(enlargeButton);
+
+  expect(await screen.findByRole("dialog", { name: "Payment proof for order 103" })).toBeInTheDocument();
+  expect(within(screen.getByRole("dialog")).getByRole("img", { name: "Enlarged payment proof for order 103" })).toBeInTheDocument();
 });
 
 test("keeps the Live Orders table header in normal page flow while scrolling", async () => {

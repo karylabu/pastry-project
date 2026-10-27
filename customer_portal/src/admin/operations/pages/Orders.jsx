@@ -110,6 +110,7 @@ export default function Orders() {
   const [discountIdLoading, setDiscountIdLoading] = useState(null);
   const [paymentProofPreviews, setPaymentProofPreviews] = useState({});
   const [paymentProofLoading, setPaymentProofLoading] = useState(null);
+  const [paymentProofLightboxOrderId, setPaymentProofLightboxOrderId] = useState(null);
   const [connectionIssue, setConnectionIssue] = useState(false);
   const [rejectModalOrderId, setRejectModalOrderId] = useState(null);
   const [rejectReason, setRejectReason] = useState("");
@@ -122,6 +123,15 @@ export default function Orders() {
     Object.values(discountIdPreviewUrlsRef.current).forEach((url) => URL.revokeObjectURL(url));
     Object.values(paymentProofPreviewUrlsRef.current).forEach((url) => URL.revokeObjectURL(url));
   }, []);
+
+  useEffect(() => {
+    if (paymentProofLightboxOrderId === null) return undefined;
+    const handleKeyDown = (event) => {
+      if (event.key === "Escape") setPaymentProofLightboxOrderId(null);
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [paymentProofLightboxOrderId]);
 
   const statusFilterOptions = ["All", "Awaiting Payment", "Pending", "Preparing", "Ready for Pickup", "Completed", "Cancelled"];
 
@@ -702,7 +712,7 @@ export default function Orders() {
                         <div><p className="text-[9px] font-semibold uppercase tracking-[0.14em] text-[#9b8c83]">Order details</p><p className="mt-1 font-semibold text-[#33251e]">{customerLabel}</p><p>{order.email || "No email provided"}</p><p>{order.phone || "No phone provided"}</p><p>{addressLabel}</p><p>Payment: {order.payment || "N/A"}</p><p>Placed: {formatOrderDateTime(order.created_at)}</p>{order.status === "Cancelled" && <p>Cancelled: {formatOrderDateTime(order.cancelled_at)}</p>}</div>
                         <div><p className="text-[9px] font-semibold uppercase tracking-[0.14em] text-[#9b8c83]">Items</p>{(order.items || []).map((item, index) => <div key={`${order.id}-mobile-${index}`} className="flex justify-between gap-3 border-b border-[#eee6de] py-1.5 last:border-0"><span>{item.name || "Item"} · Qty {item.qty || 1}</span><strong className="shrink-0 text-[#33251e]">₱{Number(item.price || 0).toLocaleString()}</strong></div>)}</div>
                       </div>
-                      {isQrPayment(order.payment) && <div className="mt-3 rounded-md border border-amber-200 bg-amber-50/70 p-3"><p className="text-[9px] font-semibold uppercase tracking-[0.14em] text-amber-800">QRPh payment · {String(order.payment_status || "pending").replaceAll("_", " ")}</p>{String(order.payment_status || '').toLowerCase() === 'downpayment_paid' && Number(order.downpayment_amount) > 0 && <p className="mt-1 text-[10px] text-amber-900">Deposit received: ₱{Number(order.downpayment_amount).toLocaleString()} · collect ₱{Math.max(0, Number(order.total || 0) - Number(order.downpayment_amount)).toLocaleString()} at pickup</p>}{order.has_payment_proof && paymentProofPreviews[order.id] && <img src={paymentProofPreviews[order.id]} alt={`Payment proof for order ${order.id}`} className="mt-2 max-h-64 w-full rounded border border-black/10 bg-white object-contain" />}{order.has_payment_proof && !paymentProofPreviews[order.id] && <button type="button" onClick={() => viewPaymentProof(order.id)} disabled={paymentProofLoading === order.id} className="mt-2 rounded-md bg-black px-3 py-2 text-[10px] font-semibold text-white disabled:opacity-60">{paymentProofLoading === order.id ? "Loading proof..." : "View payment proof"}</button>}{order.customer_payment_reference && <p className="mt-2 text-[10px] text-amber-950">Customer reference: <span className="font-semibold">{order.customer_payment_reference}</span></p>}{!order.has_payment_proof && !order.customer_payment_reference && <p className="mt-1 text-[10px] text-amber-900">Waiting for customer payment proof.</p>}</div>}
+                      {isQrPayment(order.payment) && <div className="mt-3 rounded-md border border-amber-200 bg-amber-50/70 p-3"><p className="text-[9px] font-semibold uppercase tracking-[0.14em] text-amber-800">QRPh payment · {String(order.payment_status || "pending").replaceAll("_", " ")}</p>{String(order.payment_status || '').toLowerCase() === 'downpayment_paid' && Number(order.downpayment_amount) > 0 && <p className="mt-1 text-[10px] text-amber-900">Deposit received: ₱{Number(order.downpayment_amount).toLocaleString()} · collect ₱{Math.max(0, Number(order.total || 0) - Number(order.downpayment_amount)).toLocaleString()} at pickup</p>}{order.has_payment_proof && paymentProofPreviews[order.id] && <button type="button" onClick={() => setPaymentProofLightboxOrderId(order.id)} className="mt-2 inline-flex w-fit max-w-full cursor-zoom-in rounded border border-black/10 bg-white p-1" aria-label={`Enlarge payment proof for order ${order.id}`}><img src={paymentProofPreviews[order.id]} alt={`Payment proof for order ${order.id}`} className="block max-h-64 max-w-full rounded object-contain" /></button>}{order.has_payment_proof && !paymentProofPreviews[order.id] && <button type="button" onClick={() => viewPaymentProof(order.id)} disabled={paymentProofLoading === order.id} className="mt-2 rounded-md bg-black px-3 py-2 text-[10px] font-semibold text-white disabled:opacity-60">{paymentProofLoading === order.id ? "Loading proof..." : "View payment proof"}</button>}{order.customer_payment_reference && <p className="mt-2 text-[10px] text-amber-950">Customer reference: <span className="font-semibold">{order.customer_payment_reference}</span></p>}{!order.has_payment_proof && !order.customer_payment_reference && <p className="mt-1 text-[10px] text-amber-900">Waiting for customer payment proof.</p>}</div>}
                       {order.discount_type && order.discount_type !== "none" && (
                         <div className="mt-3 rounded-md border border-[#e8dfd4] bg-white p-3">
                           <p className="text-[9px] font-semibold uppercase tracking-[0.14em] text-[#8f8076]">
@@ -814,11 +824,18 @@ export default function Orders() {
                                       Deposit received: ₱{Number(order.downpayment_amount).toLocaleString()} · collect ₱{Math.max(0, Number(order.total || 0) - Number(order.downpayment_amount)).toLocaleString()} at pickup
                                     </p>
                                   ) : order.has_payment_proof && paymentProofPreviews[order.id] ? (
-                                    <img
-                                      src={paymentProofPreviews[order.id]}
-                                      alt={`Payment proof for order ${order.id}`}
-                                      className="mt-3 max-h-96 w-full rounded-lg border border-black/10 bg-white object-contain"
-                                    />
+                                    <button
+                                      type="button"
+                                      onClick={() => setPaymentProofLightboxOrderId(order.id)}
+                                      className="mt-3 inline-flex w-fit max-w-full cursor-zoom-in rounded-lg border border-black/10 bg-white p-1"
+                                      aria-label={`Enlarge payment proof for order ${order.id}`}
+                                    >
+                                      <img
+                                        src={paymentProofPreviews[order.id]}
+                                        alt={`Payment proof for order ${order.id}`}
+                                        className="block max-h-96 max-w-[min(100%,32rem)] rounded object-contain"
+                                      />
+                                    </button>
                                   ) : order.has_payment_proof ? (
                                     <button
                                       type="button"
@@ -1065,6 +1082,33 @@ export default function Orders() {
       </div>
 
       <AnimatePresence>
+        {paymentProofLightboxOrderId !== null && paymentProofPreviews[paymentProofLightboxOrderId] && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100002] flex items-center justify-center bg-black/85 p-4"
+            role="dialog"
+            aria-modal="true"
+            aria-label={`Payment proof for order ${paymentProofLightboxOrderId}`}
+            onClick={() => setPaymentProofLightboxOrderId(null)}
+          >
+            <button
+              type="button"
+              onClick={() => setPaymentProofLightboxOrderId(null)}
+              className="absolute right-4 top-4 rounded-full bg-white px-3 py-2 text-sm font-semibold text-black"
+              aria-label="Close payment proof preview"
+            >
+              Close
+            </button>
+            <img
+              src={paymentProofPreviews[paymentProofLightboxOrderId]}
+              alt={`Enlarged payment proof for order ${paymentProofLightboxOrderId}`}
+              className="max-h-[90vh] max-w-full rounded-lg object-contain"
+              onClick={(event) => event.stopPropagation()}
+            />
+          </motion.div>
+        )}
         {rejectModalOrderId && (
           <motion.div
             initial={{ opacity: 0 }}
