@@ -1615,7 +1615,7 @@ export default function Orders() {
                               onClick={() => handleCreatePaymentLink(order)}
                               disabled={payingOrderId === order.id || customDownpaymentAmount <= 0}
                               title={customDownpaymentAmount <= 0 ? 'Ask Admin to enter a downpayment amount.' : `Pay the ₱${customDownpaymentAmount.toFixed(2)} downpayment plus ₱${downpaymentBreakdown.fee.toFixed(2)} ${customPaymentMethod} fee`}
-                              className="inline-flex min-h-9 min-w-[126px] w-auto flex-none items-center justify-center gap-1.5 rounded-lg bg-[#fff1bd] px-3 py-2 text-center text-[11px] font-semibold leading-4 text-[#6b4f1d] transition-colors hover:bg-[#ffe79a] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#b89646] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                              className="inline-flex h-9 w-[126px] shrink-0 items-center justify-center gap-1.5 rounded-lg bg-[#fff1bd] px-3 py-2 text-center text-[11px] font-semibold leading-4 text-[#6b4f1d] transition-colors hover:bg-[#ffe79a] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#b89646] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                             >
                               <CreditCard size={14} />
                               {payingOrderId === order.id ? 'Opening…' : `Pay ₱${downpaymentBreakdown.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
@@ -1625,7 +1625,7 @@ export default function Orders() {
                             ? <span className="text-right text-[11px] font-semibold text-amber-700">Payment details submitted</span>
                             : <button
                               onClick={() => { setPaymentProofError(''); setPaymentProofTarget(order); }}
-                              className="inline-flex min-h-9 min-w-[126px] w-auto flex-none items-center justify-center gap-1.5 rounded-lg bg-slate-900 px-3 py-2 text-center text-[11px] font-semibold leading-4 text-white transition-colors hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-700 focus-visible:ring-offset-2"
+                              className="inline-flex h-9 w-[126px] shrink-0 items-center justify-center gap-1.5 rounded-lg bg-slate-900 px-3 py-2 text-center text-[11px] font-semibold leading-4 text-white transition-colors hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-700 focus-visible:ring-offset-2"
                             >
                               Send proof
                             </button>}
@@ -1643,7 +1643,7 @@ export default function Orders() {
                                   ? 'The order has no remaining balance.'
                                   : `Pay the ₱${customBalanceAmount.toFixed(2)} balance plus ₱${balanceBreakdown.fee.toFixed(2)} ${customPaymentMethod} fee`
                                 : `Pay the remaining balance of ₱${remainingBalanceAmount.toFixed(2)}`}
-                              className="inline-flex min-h-9 min-w-[126px] w-auto flex-none items-center justify-center gap-1.5 rounded-lg bg-[#fff1bd] px-3 py-2 text-center text-[11px] font-semibold leading-4 text-[#6b4f1d] transition-colors hover:bg-[#ffe79a] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#b89646] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                              className="inline-flex h-9 w-[126px] shrink-0 items-center justify-center gap-1.5 rounded-lg bg-[#fff1bd] px-3 py-2 text-center text-[11px] font-semibold leading-4 text-[#6b4f1d] transition-colors hover:bg-[#ffe79a] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#b89646] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                             >
                               <CreditCard size={14} />
                               {payingOrderId === order.id
@@ -1654,7 +1654,7 @@ export default function Orders() {
                           <button
                               type="button"
                               onClick={() => { setPaymentProofError(''); setPaymentProofTarget(order); }}
-                              className="inline-flex min-h-9 min-w-[126px] w-auto flex-none items-center justify-center gap-1.5 rounded-lg bg-slate-900 px-3 py-2 text-center text-[11px] font-semibold leading-4 text-white transition-colors hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-700 focus-visible:ring-offset-2"
+                              className="inline-flex h-9 w-[126px] shrink-0 items-center justify-center gap-1.5 rounded-lg bg-slate-900 px-3 py-2 text-center text-[11px] font-semibold leading-4 text-white transition-colors hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-700 focus-visible:ring-offset-2"
                             >
                               Send proof
                             </button>
@@ -1666,7 +1666,7 @@ export default function Orders() {
                           : <button
                             type="button"
                             onClick={() => { setPaymentProofError(''); setPaymentProofTarget(order); }}
-                            className="inline-flex min-h-9 min-w-[126px] w-auto flex-none items-center justify-center gap-1.5 rounded-lg bg-slate-900 px-3 py-2 text-center text-[11px] font-semibold leading-4 text-white transition-colors hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-700 focus-visible:ring-offset-2"
+                            className="inline-flex h-9 w-[126px] shrink-0 items-center justify-center gap-1.5 rounded-lg bg-slate-900 px-3 py-2 text-center text-[11px] font-semibold leading-4 text-white transition-colors hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-700 focus-visible:ring-offset-2"
                           >
                             Send proof
                           </button>
@@ -1677,7 +1677,7 @@ export default function Orders() {
                             <button
                               type="button"
                               onClick={() => openRiderInfo(order, riderInformation)}
-                              className="inline-flex min-h-9 w-auto flex-none items-center justify-center gap-1.5 rounded-lg border border-[#e9d8ae] bg-[#fffaf0] px-3 py-2 text-center text-[11px] font-semibold leading-4 text-[#6b4f1d] transition-colors hover:bg-[#fff1bd] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#b89646] focus-visible:ring-offset-2"
+                              className="inline-flex h-9 w-[126px] shrink-0 items-center justify-center gap-1.5 rounded-lg border border-[#e9d8ae] bg-[#fffaf0] px-3 py-2 text-center text-[11px] font-semibold leading-4 text-[#6b4f1d] transition-colors hover:bg-[#fff1bd] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#b89646] focus-visible:ring-offset-2"
                               aria-label="View delivery rider information"
                             >
                               <PackageCheck size={14} /> Rider Info
@@ -1686,7 +1686,7 @@ export default function Orders() {
                           <button
                             onClick={() => setReceivedTarget(order)}
                             disabled={processingId === order.id}
-                            className="inline-flex min-h-9 w-auto flex-none items-center justify-center gap-1.5 rounded-lg bg-slate-900 px-3 py-2 text-center text-[11px] font-semibold leading-4 text-white transition-colors hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-700 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-40"
+                            className="inline-flex h-9 w-[126px] shrink-0 items-center justify-center gap-1.5 rounded-lg bg-slate-900 px-3 py-2 text-center text-[11px] font-semibold leading-4 text-white transition-colors hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-700 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-40"
                           >
                             {processingId === order.id ? 'Confirming…' : 'Confirm Receipt'}
                           </button>
@@ -1699,7 +1699,7 @@ export default function Orders() {
                           onClick={() => setSelectedOrder(order)}
                           title={`Print receipt for order ${order.order_number ?? order.id}`}
                           aria-label={`Print receipt for order ${order.order_number ?? order.id}`}
-                          className="inline-flex min-h-9 w-auto flex-none items-center justify-center gap-1.5 rounded-lg border border-slate-300 px-3 py-2 text-[11px] font-semibold text-slate-900 transition-colors hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-700 focus-visible:ring-offset-2"
+                          className="inline-flex h-9 w-[126px] shrink-0 items-center justify-center gap-1.5 rounded-lg border border-slate-300 px-3 py-2 text-[11px] font-semibold text-slate-900 transition-colors hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-700 focus-visible:ring-offset-2"
                         >
                           <Printer size={15} aria-hidden="true" />
                           <span>Print receipt</span>
@@ -1710,7 +1710,7 @@ export default function Orders() {
                         <button
                           onClick={() => setCancelTarget(order)}
                           disabled={processingId === order.id}
-                          className="inline-flex min-h-9 w-auto flex-none items-center justify-center gap-1.5 rounded-lg border border-gray-300 px-3 py-2 text-center text-[11px] font-semibold leading-4 text-slate-900 transition-colors hover:bg-gray-100 hover:border-gray-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-700 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-40"
+                          className="inline-flex h-9 w-[126px] shrink-0 items-center justify-center gap-1.5 rounded-lg border border-gray-300 px-3 py-2 text-center text-[11px] font-semibold leading-4 text-slate-900 transition-colors hover:bg-gray-100 hover:border-gray-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-700 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-40"
                         >
                           {processingId === order.id ? 'Cancelling…' : 'Cancel Order'}
                         </button>
