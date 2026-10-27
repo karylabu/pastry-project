@@ -817,6 +817,12 @@ class SalesImportController extends Controller
         $now = now();
 
         return DB::transaction(function () use ($rows, $fileName, $sourceName, $rowsReceived, $now, $sourceHash, $salesType, $cleaningReport): int {
+            $saleDates = array_values(array_filter(array_map(
+                static fn (array $row): string => (string) ($row['sale_date'] ?? ''),
+                $rows
+            )));
+            $coverageStartDate = $saleDates ? min($saleDates) : null;
+            $coverageEndDate = $saleDates ? max($saleDates) : null;
             $importId = (int) DB::table('analytics_imports')->insertGetId([
                 'file_name' => basename($fileName),
                 'source_name' => $sourceName,
@@ -828,6 +834,12 @@ class SalesImportController extends Controller
                 'source_hash' => $sourceHash,
                 ...(Schema::hasColumn('analytics_imports', 'cleaning_report') && $cleaningReport !== null
                     ? ['cleaning_report' => json_encode($cleaningReport, JSON_THROW_ON_ERROR)]
+                    : []),
+                ...(Schema::hasColumn('analytics_imports', 'coverage_start_date')
+                    ? ['coverage_start_date' => $coverageStartDate]
+                    : []),
+                ...(Schema::hasColumn('analytics_imports', 'coverage_end_date')
+                    ? ['coverage_end_date' => $coverageEndDate]
                     : []),
             ]);
 

@@ -82,6 +82,8 @@ CREATE TABLE `analytics_imports` (
   `status` varchar(20) NOT NULL DEFAULT 'completed',
   `rows_received` int(11) NOT NULL DEFAULT 0,
   `rows_processed` int(11) NOT NULL DEFAULT 0,
+  `coverage_start_date` date DEFAULT NULL,
+  `coverage_end_date` date DEFAULT NULL,
   `error_message` text DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 

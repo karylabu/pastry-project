@@ -1,5 +1,65 @@
 <?php
 
+function mergeForecastCoverageIntervals(array $intervals): array
+{
+    $valid = [];
+    foreach ($intervals as $interval) {
+        $start = (string) ($interval['start'] ?? '');
+        $end = (string) ($interval['end'] ?? '');
+        $startDate = DateTimeImmutable::createFromFormat('!Y-m-d', $start);
+        $endDate = DateTimeImmutable::createFromFormat('!Y-m-d', $end);
+        if (!$startDate || !$endDate || $startDate->format('Y-m-d') !== $start || $endDate->format('Y-m-d') !== $end || $start > $end) {
+            continue;
+        }
+        $valid[] = ['start' => $start, 'end' => $end];
+    }
+
+    usort($valid, static fn (array $a, array $b): int => strcmp($a['start'], $b['start']));
+    $merged = [];
+    foreach ($valid as $interval) {
+        $lastIndex = count($merged) - 1;
+        if ($lastIndex < 0) {
+            $merged[] = $interval;
+            continue;
+        }
+
+        $lastEnd = new DateTimeImmutable($merged[$lastIndex]['end']);
+        if (new DateTimeImmutable($interval['start']) <= $lastEnd->modify('+1 day')) {
+            if ($interval['end'] > $merged[$lastIndex]['end']) {
+                $merged[$lastIndex]['end'] = $interval['end'];
+            }
+            continue;
+        }
+        $merged[] = $interval;
+    }
+
+    return $merged;
+}
+
+function buildCoveredDailySeries(array $daily, string $startDate, string $endDate, ?string $firstSaleDate = null): array
+{
+    $start = DateTimeImmutable::createFromFormat('!Y-m-d', $startDate);
+    $end = DateTimeImmutable::createFromFormat('!Y-m-d', $endDate);
+    if (!$start || !$end || $start->format('Y-m-d') !== $startDate || $end->format('Y-m-d') !== $endDate || $start > $end) {
+        return [];
+    }
+
+    if ($firstSaleDate !== null) {
+        $firstSale = DateTimeImmutable::createFromFormat('!Y-m-d', $firstSaleDate);
+        if ($firstSale && $firstSale->format('Y-m-d') === $firstSaleDate && $firstSale > $start) {
+            $start = $firstSale;
+        }
+    }
+
+    $series = [];
+    for ($date = $start; $date <= $end; $date = $date->modify('+1 day')) {
+        $key = $date->format('Y-m-d');
+        $series[$key] = (float) max(0, (float) ($daily[$key] ?? 0));
+    }
+
+    return $series;
+}
+
 function emptyValidationMetrics(): array {
     return ['absolute' => [], 'squared' => [], 'percentage' => [], 'actual' => []];
 }

@@ -177,6 +177,59 @@ function getSalesHistory(mysqli $conn): array {
     return $history;
 }
 
+function getSalesCoverageIntervals(mysqli $conn): array {
+    $intervals = [];
+    $coverageColumns = mysqli_query($conn, "SHOW COLUMNS FROM analytics_imports LIKE 'coverage_start_date'");
+    $hasCoverageColumns = $coverageColumns && mysqli_num_rows($coverageColumns) > 0;
+    if ($coverageColumns) {
+        mysqli_free_result($coverageColumns);
+    }
+
+    $importSql = $hasCoverageColumns
+        ? "SELECT coverage_start_date AS start_date, coverage_end_date AS end_date
+           FROM analytics_imports
+           WHERE status = 'completed' AND coverage_start_date IS NOT NULL AND coverage_end_date IS NOT NULL"
+        : "SELECT MIN(history.sale_date) AS start_date, MAX(history.sale_date) AS end_date
+           FROM analytics_sales_history AS history
+           INNER JOIN analytics_imports AS imports ON imports.id = history.import_id
+           WHERE imports.status = 'completed'
+           GROUP BY imports.id";
+    $imports = mysqli_query($conn, $importSql);
+    if (!$imports) {
+        throw new Exception('Could not read completed sales-import date coverage.');
+    }
+    while ($row = mysqli_fetch_assoc($imports)) {
+        if (!empty($row['start_date']) && !empty($row['end_date'])) {
+            $intervals[] = ['start' => $row['start_date'], 'end' => $row['end_date']];
+        }
+    }
+    mysqli_free_result($imports);
+
+    $ordersTable = mysqli_query($conn, "SHOW TABLES LIKE 'orders'");
+    if (!$ordersTable) {
+        throw new Exception('Could not check live-order date coverage.');
+    }
+    $hasOrders = mysqli_num_rows($ordersTable) > 0;
+    mysqli_free_result($ordersTable);
+    if ($hasOrders) {
+        $orders = mysqli_query($conn, "
+            SELECT MIN(DATE(created_at)) AS start_date, MAX(DATE(created_at)) AS end_date
+            FROM orders
+            WHERE status IS NULL OR status NOT IN ('Cancelled', 'cancelled')
+        ");
+        if (!$orders) {
+            throw new Exception('Could not read live-order date coverage.');
+        }
+        $row = mysqli_fetch_assoc($orders);
+        if (!empty($row['start_date']) && !empty($row['end_date'])) {
+            $intervals[] = ['start' => $row['start_date'], 'end' => $row['end_date']];
+        }
+        mysqli_free_result($orders);
+    }
+
+    return mergeForecastCoverageIntervals($intervals);
+}
+
 function getIngredientStock(mysqli $conn): array {
     $result = mysqli_query($conn, "SELECT id, name, stock, threshold, unit FROM ingredients ORDER BY name ASC");
     if (!$result) {
@@ -458,12 +511,10 @@ function buildForecastPayload(array $history, array $ingredientStock, array $rec
     ];
 }
 
-function buildDetailedForecastPayload(array $history, array $products, array $ingredientStock, array $recipes, int $period): array {
+function buildDetailedForecastPayload(array $history, array $products, array $ingredientStock, array $recipes, array $coverageIntervals, int $period): array {
     $period = in_array($period, [7, 14, 30], true) ? $period : 7;
     $today = new DateTimeImmutable('today');
     $historyByProduct = [];
-    $historicalStartDate = null;
-    $historicalEndDate = null;
 
     foreach ($history as $entry) {
         $product = normalizeProductName($entry['product'] ?? '');
@@ -471,13 +522,12 @@ function buildDetailedForecastPayload(array $history, array $products, array $in
         $quantity = max(0, (float) ($entry['quantity'] ?? 0));
         if ($product === '' || $date === '' || $quantity <= 0) continue;
         $historyByProduct[$product][$date] = ($historyByProduct[$product][$date] ?? 0) + $quantity;
-        $historicalStartDate = $historicalStartDate === null || $date < $historicalStartDate ? $date : $historicalStartDate;
-        $historicalEndDate = $historicalEndDate === null || $date > $historicalEndDate ? $date : $historicalEndDate;
     }
 
-    $latestDate = $historicalEndDate !== null ? new DateTimeImmutable($historicalEndDate) : null;
-    $historicalEnd = $latestDate ?: $today;
-    $historicalStart = $historicalStartDate !== null ? new DateTimeImmutable($historicalStartDate) : null;
+    $coverageIntervals = mergeForecastCoverageIntervals($coverageIntervals);
+    $latestCoverage = $coverageIntervals ? $coverageIntervals[count($coverageIntervals) - 1] : null;
+    $historicalStart = $latestCoverage ? new DateTimeImmutable($latestCoverage['start']) : null;
+    $historicalEnd = $latestCoverage ? new DateTimeImmutable($latestCoverage['end']) : $today;
     $productByName = [];
     foreach ($products as $product) $productByName[strtolower($product['name'])] = $product;
 
@@ -496,16 +546,23 @@ function buildDetailedForecastPayload(array $history, array $products, array $in
     $aggPred = [];
     $minTrainDays = 14;          // products need this much history before the holdout
     $evaluatedProducts = 0;
+    $insufficientHistoryProducts = 0;
+    $inactiveProducts = 0;
 
     foreach ($historyByProduct as $daily) {
-        $firstDate = new DateTimeImmutable(min(array_keys($daily)));
-        $values = [];
-        for ($date = $firstDate; $date <= $historicalEnd; $date = $date->modify('+1 day')) {
-            $dateKey = $date->format('Y-m-d');
-            $values[] = (float) ($daily[$dateKey] ?? 0);
+        if (!$latestCoverage) {
+            $insufficientHistoryProducts++;
+            continue;
         }
+        $values = array_values(buildCoveredDailySeries(
+            $daily,
+            $latestCoverage['start'],
+            $latestCoverage['end'],
+            min(array_keys($daily))
+        ));
 
         if (count($values) < $minTrainDays + 7) {
+            $insufficientHistoryProducts++;
             continue;
         }
 
@@ -513,6 +570,7 @@ function buildDetailedForecastPayload(array $history, array $products, array $in
         $holdout = array_slice($values, -7);
         $isActive = array_sum(array_slice($trainingValues, -28)) > 0 || array_sum($holdout) > 0;
         if (!$isActive) {
+            $inactiveProducts++;
             continue;
         }
 
@@ -577,15 +635,18 @@ function buildDetailedForecastPayload(array $history, array $products, array $in
     }
 
     foreach ($historyByProduct as $productName => $daily) {
-        $dateKeys = array_keys($daily);
-        $firstDate = new DateTimeImmutable(min($dateKeys));
-        // Fill zeros up to the latest date in the whole dataset (not this product's
-        // last sale) so products that stopped selling show their recent zero days.
-        $lastDate = $historicalEnd;
-        for ($date = $firstDate; $date <= $lastDate; $date = $date->modify('+1 day')) {
-            $daily[$date->format('Y-m-d')] = $daily[$date->format('Y-m-d')] ?? 0;
+        if (!$latestCoverage) {
+            continue;
         }
-        ksort($daily);
+        $daily = buildCoveredDailySeries(
+            $daily,
+            $latestCoverage['start'],
+            $latestCoverage['end'],
+            min(array_keys($daily))
+        );
+        if (!$daily) {
+            continue;
+        }
         $values = array_values($daily);
         foreach ($daily as $date => $quantity) {
             $historicalDayTotals[$date] = ($historicalDayTotals[$date] ?? 0) + $quantity;
@@ -607,6 +668,7 @@ function buildDetailedForecastPayload(array $history, array $products, array $in
         $previousEquivalent = count($values) >= $period * 2 ? array_sum(array_slice($values, -$period * 2, $period)) : 0;
         $previousEquivalentTotal += $previousEquivalent;
         $recipe = $recipes[strtolower($productName)] ?? [];
+        $recipeMapped = array_key_exists(strtolower($productName), $recipes);
         $ingredientRows = [];
         foreach ($recipe as $ingredient) {
             $usage = max(0, (float) ($ingredient['usage'] ?? 0));
@@ -631,7 +693,7 @@ function buildDetailedForecastPayload(array $history, array $products, array $in
             'trendPercent' => $previousEquivalent > 0 ? round((($totalForecast - $previousEquivalent) / $previousEquivalent) * 100, 2) : null,
             'currentStock' => (float) ($catalogue['stock'] ?? 0), 'recommendedProduction' => $recommendedProduction,
             'recommendedPreorderQuantity' => $recommendedPreorderQuantity,
-            'priority' => $priority, 'ingredients' => $ingredientRows, 'history' => array_slice(array_values($daily), -7),
+            'priority' => $priority, 'ingredients' => $ingredientRows, 'recipeMapped' => $recipeMapped, 'history' => array_slice(array_values($daily), -7),
         ];
     }
 
@@ -657,15 +719,25 @@ function buildDetailedForecastPayload(array $history, array $products, array $in
         : null;
 
     // How stale the data is: forecast day 1 is the day after the last day with data.
-    $dataAgeDays = max(0, (int) $historicalEnd->diff($today)->format('%r%a'));
+    $dataAgeDays = $latestCoverage ? max(0, (int) $historicalEnd->diff($today)->format('%r%a')) : null;
+    $missingRecipeProducts = array_values(array_map(
+        static fn (array $item): string => $item['product'],
+        array_filter($forecastProducts, static fn (array $item): bool => empty($item['recipeMapped']))
+    ));
 
     return [
         'period' => $period, 'products' => $forecastProducts, 'ingredients' => array_values($risks), 'risks' => $risks, 'actions' => $actions, 'alerts' => [], 'recommendations' => [],
         'dataEndDate' => $historicalEnd->format('Y-m-d'),
         'dataAgeDays' => $dataAgeDays,
+        'coverageAvailable' => $latestCoverage !== null,
+        'coverage' => $latestCoverage ? [
+            'start' => $latestCoverage['start'],
+            'end' => $latestCoverage['end'],
+            'days' => (int) $historicalStart->diff($historicalEnd)->format('%a') + 1,
+        ] : null,
         'history' => array_map(static fn($date, $demand) => ['date' => $date, 'demand' => round($demand, 2)], array_slice(array_keys($historicalDayTotals), -7), array_slice(array_values($historicalDayTotals), -7)),
         'daily' => array_map(static fn($day, $value) => ['day' => $day, 'date' => $historicalEnd->modify("+{$day} days")->format('Y-m-d'), 'forecast' => round($value, 2)], array_keys($forecastDayTotals), $forecastDayTotals),
-        'summary' => ['totalProjectedDemand' => round($totalForecast, 2), 'highPriorityCount' => count(array_filter($forecastProducts, static fn($item) => $item['priority'] === 'High')), 'recommendationCount' => count($actions), 'trendPercent' => $trendPercent, 'peakDay' => !empty($forecastDayTotals) ? array_search(max($forecastDayTotals), $forecastDayTotals, true) : null],
+        'summary' => ['totalProjectedDemand' => round($totalForecast, 2), 'previousEquivalentDemand' => round($previousEquivalentTotal, 2), 'highPriorityCount' => count(array_filter($forecastProducts, static fn($item) => $item['priority'] === 'High')), 'recommendationCount' => count($actions), 'trendPercent' => $trendPercent, 'peakDay' => !empty($forecastDayTotals) ? array_search(max($forecastDayTotals), $forecastDayTotals, true) : null],
         'model' => [
             'name' => 'Selected by shop-total WAPE',
             'selected_forecast_method' => $selectedForecastMethod,
@@ -679,36 +751,18 @@ function buildDetailedForecastPayload(array $history, array $products, array $in
             'records' => array_sum(array_map(static fn($entry) => (int) ($entry['record_count'] ?? 1), $history)),
             'training_start' => $historicalStart?->format('Y-m-d'),
             'training_end' => $historicalEnd->format('Y-m-d'),
+            'coverage_days' => $latestCoverage ? (int) $historicalStart->diff($historicalEnd)->format('%a') + 1 : 0,
             'validation_records' => $selectedMetrics['records'],
             'validation_products' => $evaluatedProducts,
+            'products_count' => count($historyByProduct),
+            'validation_excluded_products' => max(0, count($historyByProduct) - $evaluatedProducts),
+            'validation_insufficient_history_products' => $insufficientHistoryProducts,
+            'validation_inactive_products' => $inactiveProducts,
+            'recipe_missing_products' => $missingRecipeProducts,
         ],
         'drivers' => ['Historical product demand', 'Recent sales average', 'Lowest shop-total WAPE among tested methods'],
-        'insights' => array_values(array_filter([ $trendPercent !== null ? 'Expected demand is ' . ($trendPercent >= 0 ? 'increasing' : 'decreasing') . ' by ' . abs($trendPercent) . '% compared with the previous equivalent period.' : null, !empty($forecastProducts) ? $forecastProducts[array_search(max(array_column($forecastProducts, 'totalForecast')), array_column($forecastProducts, 'totalForecast'), true)]['product'] . ' has the highest projected demand.' : null, !empty($risks) && count(array_filter($risks, static fn($item) => $item['riskStatus'] === 'HIGH')) ? 'One or more ingredients may run out based on projected consumption.' : null])),
+        'insights' => array_values(array_filter([ $trendPercent !== null ? 'Forecast demand is ' . abs($trendPercent) . '% ' . ($trendPercent >= 0 ? 'higher' : 'lower') . ' than the previous equivalent period.' : null, !empty($forecastProducts) ? $forecastProducts[array_search(max(array_column($forecastProducts, 'totalForecast')), array_column($forecastProducts, 'totalForecast'), true)]['product'] . ' has the highest projected demand.' : null, !empty($risks) && count(array_filter($risks, static fn($item) => $item['riskStatus'] === 'HIGH')) ? 'One or more ingredients may run out based on projected consumption.' : null])),
     ];
-}
-
-/**
- * Save the rows of an uploaded CSV into analytics_sales_history so that
- * getSalesHistory() can merge them with live orders.
- */
-function insertImportedHistory(mysqli $conn, array $history, int $importId): void {
-    $stmt = mysqli_prepare($conn, "INSERT INTO analytics_sales_history (import_id, product_name, sale_date, units_sold) VALUES (?, ?, ?, ?)");
-    if (!$stmt) {
-        throw new Exception('Could not save the imported sales rows.');
-    }
-
-    foreach ($history as $entry) {
-        $product = normalizeProductName($entry['product'] ?? '');
-        $date = $entry['date'] ?? '';
-        $qty = (float) ($entry['quantity'] ?? 0);
-        if (!$product || !$date) {
-            continue;
-        }
-        mysqli_stmt_bind_param($stmt, 'issd', $importId, $product, $date, $qty);
-        mysqli_stmt_execute($stmt);
-    }
-
-    mysqli_stmt_close($stmt);
 }
 
 function persistForecastData(mysqli $conn, array $history, array $forecastPayload, int $importId = 0): void {
@@ -816,7 +870,7 @@ if ($method === 'GET') {
         $data = json_decode($body, true) ?: [];
         $action = $data['action'] ?? 'refresh';
     } else {
-        $action = $_POST['action'] ?? 'import';
+        $action = $_POST['action'] ?? '';
     }
 }
 
@@ -828,88 +882,21 @@ if (!$conn) {
 
 try {
     if ($method === 'POST' && $action === 'import') {
-        if (!isset($_FILES['file']) || !is_uploaded_file($_FILES['file']['tmp_name'])) {
-            throw new Exception('Please upload a valid CSV file.');
-        }
-        $overlapMode = (string) ($_POST['overlap_mode'] ?? 'deduplicate_live');
-        if (!in_array($overlapMode, ['deduplicate_live', 'supplement'], true)) {
-            throw new Exception('Choose whether this CSV overlaps live orders or contains additional sales.');
-        }
-
-        $filePath = $_FILES['file']['tmp_name'];
-        $fileName = basename($_FILES['file']['name']);
-        $csvText = file_get_contents($filePath);
-        $rows = array_filter(array_map('trim', preg_split('/\r\n|\r|\n/', $csvText)));
-        if (empty($rows)) {
-            throw new Exception('The uploaded file is empty.');
-        }
-
-        // array_filter keeps the original keys, so re-index before reading $rows[0].
-        $rows = array_values($rows);
-
-        $headers = array_map(function ($header) {
-            return strtolower(trim(preg_replace('/^\xEF\xBB\xBF/', '', $header)));
-        }, str_getcsv($rows[0]));
-
-        $history = [];
-        for ($i = 1; $i < count($rows); $i++) {
-            $values = str_getcsv($rows[$i]);
-            $entry = [];
-            foreach ($headers as $index => $header) {
-                $entry[$header] = $values[$index] ?? '';
-            }
-
-            $date = $entry['date'] ?? $entry['sale_date'] ?? $entry['timestamp'] ?? '';
-            $product = normalizeProductName($entry['product'] ?? $entry['item'] ?? $entry['name'] ?? $entry['product_name'] ?? '');
-            $quantity = (float) ($entry['quantity'] ?? $entry['qty'] ?? $entry['units_sold'] ?? $entry['sales'] ?? 0);
-            if ($date && $product && $quantity > 0) {
-                $history[] = ['date' => date('Y-m-d', strtotime($date)), 'product' => $product, 'quantity' => $quantity];
-            }
-        }
-
-        if (empty($history)) {
-            throw new Exception('The uploaded CSV did not contain usable sales rows.');
-        }
-
-        mysqli_query($conn, 'START TRANSACTION');
-        $importStmt = mysqli_prepare($conn, "INSERT INTO analytics_imports (file_name, source_name, overlap_mode, rows_received, rows_processed, status) VALUES (?, ?, ?, ?, ?, 'completed')");
-        mysqli_stmt_bind_param($importStmt, 'sssii', $fileName, $sourceName, $overlapMode, $rowsReceived, $rowsProcessed);
-        $sourceName = 'POS Export';
-        $rowsReceived = count($rows) - 1;
-        $rowsProcessed = count($history);
-        mysqli_stmt_execute($importStmt);
-        $importId = mysqli_insert_id($conn);
-        mysqli_stmt_close($importStmt);
-
-        // 1) Save the CSV rows, 2) rebuild merged sales history using the import's
-        // overlap policy, 3) forecast from the merged history.
-        insertImportedHistory($conn, $history, (int) $importId);
-
-        $period = (int) ($_POST['period'] ?? 7);
-        $mergedHistory = getSalesHistory($conn);
-        $products = getProducts($conn);
-        $ingredientStock = getIngredientStock($conn);
-        $recipes = getProductRecipes($conn);
-        $forecastPayload = buildDetailedForecastPayload($mergedHistory, $products, $ingredientStock, $recipes, $period);
-        persistForecastData($conn, $mergedHistory, $forecastPayload, 0);
-        mysqli_query($conn, 'COMMIT');
-
+        http_response_code(410);
         echo json_encode([
-            'success' => true,
-            'message' => 'CSV imported successfully.',
-            'importId' => $importId,
-            'historyCount' => count($history),
-            'forecast' => $forecastPayload,
+            'success' => false,
+            'message' => 'Import sales CSV files from Sales Reports so cleaning and date coverage are shared across analytics.',
         ]);
         exit;
     }
 
     $history = getSalesHistory($conn);
+    $coverageIntervals = getSalesCoverageIntervals($conn);
     $period = (int) ($_GET['period'] ?? 7);
     $products = getProducts($conn);
     $ingredientStock = getIngredientStock($conn);
     $recipes = getProductRecipes($conn);
-    $forecastPayload = buildDetailedForecastPayload($history, $products, $ingredientStock, $recipes, $period);
+    $forecastPayload = buildDetailedForecastPayload($history, $products, $ingredientStock, $recipes, $coverageIntervals, $period);
 
     if ($method === 'POST' && $action === 'refresh') {
         persistForecastData($conn, $history, $forecastPayload, 0);

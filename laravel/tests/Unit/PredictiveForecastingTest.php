@@ -8,6 +8,47 @@ require_once __DIR__ . '/../../../includes/predictive_forecasting.php';
 
 class PredictiveForecastingTest extends TestCase
 {
+    public function test_merges_overlapping_and_adjacent_coverage_without_bridging_unknown_gaps(): void
+    {
+        $this->assertSame([
+            ['start' => '2025-01-01', 'end' => '2025-01-04'],
+            ['start' => '2025-01-10', 'end' => '2025-01-12'],
+        ], mergeForecastCoverageIntervals([
+            ['start' => '2025-01-03', 'end' => '2025-01-04'],
+            ['start' => '2025-01-01', 'end' => '2025-01-02'],
+            ['start' => '2025-01-10', 'end' => '2025-01-12'],
+            ['start' => 'not-a-date', 'end' => '2025-01-20'],
+        ]));
+    }
+
+    public function test_fills_missing_days_with_zero_only_within_covered_range(): void
+    {
+        $series = buildCoveredDailySeries(
+            ['2025-01-02' => 3, '2025-01-04' => 2],
+            '2025-01-01',
+            '2025-01-05',
+            '2025-01-02'
+        );
+
+        $this->assertSame([
+            '2025-01-02' => 3.0,
+            '2025-01-03' => 0.0,
+            '2025-01-04' => 2.0,
+            '2025-01-05' => 0.0,
+        ], $series);
+        $this->assertArrayNotHasKey('2025-01-01', $series);
+        $this->assertArrayNotHasKey('2025-01-06', $series);
+    }
+
+    public function test_does_not_create_zero_sales_days_for_invalid_coverage(): void
+    {
+        $this->assertSame([], buildCoveredDailySeries(
+            ['2025-01-02' => 3],
+            '2025-01-03',
+            '2025-01-01'
+        ));
+    }
+
     public function test_selects_lowest_shop_total_wape_and_excludes_zero_forecast(): void
     {
         $metrics = [

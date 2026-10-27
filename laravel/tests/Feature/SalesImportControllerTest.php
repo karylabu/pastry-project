@@ -53,6 +53,8 @@ class SalesImportControllerTest extends TestCase
             $table->integer('rows_processed')->default(0);
             $table->text('error_message')->nullable();
             $table->longText('cleaning_report')->nullable();
+            $table->date('coverage_start_date')->nullable();
+            $table->date('coverage_end_date')->nullable();
             $table->char('source_hash', 64)->nullable()->unique();
             $table->string('stored_path')->nullable();
             $table->unsignedBigInteger('queue_job_id')->nullable();
@@ -112,6 +114,34 @@ class SalesImportControllerTest extends TestCase
         });
     }
 
+    public function test_sales_coverage_migration_backfills_completed_import_dates(): void
+    {
+        $importId = DB::table('analytics_imports')->insertGetId([
+            'file_name' => 'legacy-history.csv',
+            'source_name' => 'POS CSV',
+            'uploaded_at' => now(),
+            'status' => 'completed',
+        ]);
+        DB::table('analytics_sales_history')->insert([
+            ['import_id' => $importId, 'product_name' => 'Croissant', 'sale_date' => '2025-03-02', 'units_sold' => 2, 'revenue' => 20],
+            ['import_id' => $importId, 'product_name' => 'Bread', 'sale_date' => '2025-03-05', 'units_sold' => 1, 'revenue' => 15],
+        ]);
+        Schema::table('analytics_imports', function (Blueprint $table) {
+            $table->dropColumn(['coverage_start_date', 'coverage_end_date']);
+        });
+
+        $migration = require database_path('migrations/2026_10_27_000001_add_sales_coverage_to_analytics_imports.php');
+        $migration->up();
+
+        $this->assertTrue(Schema::hasColumn('analytics_imports', 'coverage_start_date'));
+        $this->assertTrue(Schema::hasColumn('analytics_imports', 'coverage_end_date'));
+        $this->assertDatabaseHas('analytics_imports', [
+            'id' => $importId,
+            'coverage_start_date' => '2025-03-02',
+            'coverage_end_date' => '2025-03-05',
+        ]);
+    }
+
     public function test_admin_import_is_persisted_and_returned_as_history(): void
     {
         $admin = User::factory()->createOne(['role' => 'admin']);
@@ -137,6 +167,8 @@ class SalesImportControllerTest extends TestCase
             'sales_type' => 'customized_cake',
             'rows_received' => 2,
             'rows_processed' => 2,
+            'coverage_start_date' => '2026-09-30',
+            'coverage_end_date' => '2026-09-30',
         ]);
         $this->assertDatabaseHas('analytics_sales_history', [
             'import_id' => $importId,
@@ -485,6 +517,8 @@ class SalesImportControllerTest extends TestCase
             'status' => 'completed',
             'rows_received' => 36500,
             'rows_processed' => 36500,
+            'coverage_start_date' => '2021-01-01',
+            'coverage_end_date' => '2025-12-30',
         ]);
 
         $this->actingAs($admin)
@@ -529,6 +563,8 @@ class SalesImportControllerTest extends TestCase
             'status' => 'completed',
             'rows_received' => 1,
             'rows_processed' => 1,
+            'coverage_start_date' => '2026-10-01',
+            'coverage_end_date' => '2026-10-01',
         ]);
 
         $this->actingAs($admin);
@@ -538,6 +574,33 @@ class SalesImportControllerTest extends TestCase
         $this->assertSame(200, $response->getStatusCode());
         $this->assertSame('8 inch', $payload['sales'][0]['size']);
         $this->assertSame('design-sales.csv', $payload['imports'][0]['file_name']);
+    }
+
+    public function test_csv_coverage_keeps_valid_dates_from_zero_quantity_rows(): void
+    {
+        Storage::fake('local');
+        $importId = DB::table('analytics_imports')->insertGetId([
+            'file_name' => 'zero-sales-day.csv',
+            'source_name' => 'POS CSV',
+            'uploaded_at' => now(),
+            'status' => 'queued',
+            'rows_received' => 0,
+            'rows_processed' => 0,
+        ]);
+        Storage::disk('local')->put(
+            'sales-imports/zero-sales-day.csv',
+            "sale_date,product,quantity,price,total\n2026-09-30,Croissant,0,10,0\n2026-10-01,Croissant,1,10,10\n"
+        );
+
+        (new ProcessSalesCsvImport($importId, 'sales-imports/zero-sales-day.csv'))->handle();
+
+        $this->assertDatabaseCount('analytics_sales_history', 1);
+        $this->assertDatabaseHas('analytics_imports', [
+            'id' => $importId,
+            'status' => 'completed',
+            'coverage_start_date' => '2026-09-30',
+            'coverage_end_date' => '2026-10-01',
+        ]);
     }
 
     public function test_csv_job_uses_dimensions_in_product_name_when_size_is_missing(): void

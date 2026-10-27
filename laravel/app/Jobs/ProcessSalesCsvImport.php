@@ -121,6 +121,8 @@ class ProcessSalesCsvImport implements ShouldQueue
             $cancelled = false;
             $now = now();
             $seenRows = [];
+            $coverageStartDate = null;
+            $coverageEndDate = null;
 
             while (($values = fgetcsv($handle)) !== false) {
                 if ($values === [null] || $values === []) continue;
@@ -136,6 +138,15 @@ class ProcessSalesCsvImport implements ShouldQueue
                 $row = [];
                 foreach ($columns as $field => $index) {
                     $row[$field] = trim((string) ($values[$index] ?? ''));
+                }
+                $coverageDate = SalesImportCleaner::parseSaleDate((string) ($row['date'] ?? ''));
+                if ($coverageDate !== null) {
+                    $coverageStartDate = $coverageStartDate === null || $coverageDate < $coverageStartDate
+                        ? $coverageDate
+                        : $coverageStartDate;
+                    $coverageEndDate = $coverageEndDate === null || $coverageDate > $coverageEndDate
+                        ? $coverageDate
+                        : $coverageEndDate;
                 }
                 $rowNumber = $rowsReceived + 1;
                 $normalized = $this->normalizeRow($row, $aliases);
@@ -203,7 +214,14 @@ class ProcessSalesCsvImport implements ShouldQueue
 
             if (!$cancelled) {
                 unset($cleaningReport['_last_warning_row']);
-                $result = $this->finishImport($batch, $rowsReceived, $rowsProcessed, $cleaningReport);
+                $result = $this->finishImport(
+                    $batch,
+                    $rowsReceived,
+                    $rowsProcessed,
+                    $cleaningReport,
+                    $coverageStartDate,
+                    $coverageEndDate
+                );
                 $cancelled = $result !== 'completed';
             }
         } finally {
@@ -291,9 +309,23 @@ class ProcessSalesCsvImport implements ShouldQueue
         });
     }
 
-    private function finishImport(array $batch, int $rowsReceived, int $rowsProcessed, array $cleaningReport): string
+    private function finishImport(
+        array $batch,
+        int $rowsReceived,
+        int $rowsProcessed,
+        array $cleaningReport,
+        ?string $coverageStartDate,
+        ?string $coverageEndDate
+    ): string
     {
-        return DB::transaction(function () use ($batch, $rowsReceived, $rowsProcessed, $cleaningReport): string {
+        return DB::transaction(function () use (
+            $batch,
+            $rowsReceived,
+            $rowsProcessed,
+            $cleaningReport,
+            $coverageStartDate,
+            $coverageEndDate
+        ): string {
             $import = DB::table('analytics_imports')
                 ->where('id', $this->importId)
                 ->lockForUpdate()
@@ -329,6 +361,12 @@ class ProcessSalesCsvImport implements ShouldQueue
                     : []),
                 'stored_path' => null,
                 'queue_job_id' => null,
+                ...(Schema::hasColumn('analytics_imports', 'coverage_start_date')
+                    ? ['coverage_start_date' => $coverageStartDate]
+                    : []),
+                ...(Schema::hasColumn('analytics_imports', 'coverage_end_date')
+                    ? ['coverage_end_date' => $coverageEndDate]
+                    : []),
             ]);
 
             return 'completed';

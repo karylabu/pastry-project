@@ -94,6 +94,12 @@ function ValidationMetrics({ model }) {
   const forecastMethod = model?.selected_forecast_method || "linear";
   const forecastMetrics = metrics[forecastMethod] || linearMetrics;
   const forecastMethodLabel = FORECAST_METHOD_LABELS[forecastMethod] || "Linear trend";
+  const forecastMethodNote = {
+    moving_average_7: "The 7-day average repeats the same average value for each forecast day.",
+    same_weekday_last_week: "Each forecast day repeats the sales from that weekday last week.",
+    yesterday: "Each forecast day repeats the last observed daily sales value.",
+    linear: "The linear trend extends the recent sales direction, with its slope damped.",
+  }[forecastMethod];
 
   const rows = VALIDATION_METHODS.map((method) => {
     const raw = metrics[method.key]?.[selected];
@@ -127,8 +133,12 @@ function ValidationMetrics({ model }) {
     <div className="flex flex-1 flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-xs text-black/55">
-          {model?.name || "—"} · {model?.records ?? 0} records
-          {model?.validation_products != null ? ` · ${model.validation_products} products tested` : ""}
+          {model?.name || "—"} · {model?.records ?? 0} sales rows
+          {model?.products_count != null ? ` · ${model.products_count} products in data` : ""}
+          {model?.validation_products != null ? ` · ${model.validation_products} tested` : ""}
+          {model?.validation_excluded_products > 0
+            ? ` · ${model.validation_excluded_products} not tested (${model.validation_insufficient_history_products || 0} with insufficient covered history, ${model.validation_inactive_products || 0} inactive)`
+            : ""}
         </p>
         {hasAggregate && (
           <div className="inline-flex rounded-lg border border-black/10 bg-white p-0.5" role="group" aria-label="Validation scope">
@@ -152,6 +162,9 @@ function ValidationMetrics({ model }) {
           ? ` (${formatMetric(model.selected_forecast_method_wape, "%")} on the last 7-day holdout).`
           : " when holdout data is available; linear trend is the fallback."}
       </p>
+      {forecastMethodNote && (
+        <p className="text-[11px] text-black/55">{forecastMethodNote}</p>
+      )}
 
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         {tiles.map(([label, value]) => (
@@ -735,7 +748,7 @@ export default function PredictiveAnalytics() {
               </li>
               <li className="rounded-xl border border-black/10 bg-[#fafaf8] p-3">
                 <p className="text-xs font-bold text-black">2. Clean and prepare data</p>
-                <p className="mt-1 text-xs leading-5 text-black/60">The import process checks dates, missing values, duplicates, and product names.</p>
+                <p className="mt-1 text-xs leading-5 text-black/60">Missing product sales inside a continuous covered date range count as zero. Dates outside coverage or between separate ranges remain unknown.</p>
               </li>
               <li className="rounded-xl border border-black/10 bg-[#fafaf8] p-3">
                 <p className="text-xs font-bold text-black">3. Split chronologically</p>
@@ -762,9 +775,12 @@ export default function PredictiveAnalytics() {
               <p className="mt-2 text-[22px] font-bold text-black">{forecast.summary.totalProjectedDemand.toFixed(1)} units</p>
             </div>
             <div className="min-w-0 rounded-lg border border-t-[3px] border-[#e9e1d9] border-t-[#81906c] bg-white px-3.5 py-3">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-black/55">Demand trend</p>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-black/55">Forecast vs previous period</p>
               <p className={`mt-2 text-[22px] font-bold ${Number(forecast.summary.trendPercent) >= 0 ? "text-[#68815d]" : "text-black"}`}>
                 {forecast.summary.trendPercent == null ? "—" : `${forecast.summary.trendPercent >= 0 ? "↑" : "↓"} ${Math.abs(forecast.summary.trendPercent)}%`}
+              </p>
+              <p className="mt-1 text-[10px] text-black/50">
+                Forecast {Number(forecast.summary.totalProjectedDemand || 0).toFixed(1)} vs previous {Number(forecast.summary.previousEquivalentDemand || 0).toFixed(1)} units
               </p>
             </div>
             <div className="min-w-0 rounded-lg border border-t-[3px] border-[#e9e1d9] border-t-[#c87954] bg-white px-3.5 py-3">
@@ -782,6 +798,12 @@ export default function PredictiveAnalytics() {
               </p>
             </div>
           </div>
+
+          {forecast.coverageAvailable === false && (
+            <div role="status" className="mb-5 rounded-xl border border-[#d6b85a]/40 bg-[#fff9e8] px-4 py-3 text-sm text-black/70">
+              A forecast cannot be calculated because no continuous sales-date range is available. Import a complete report from Sales Reports first.
+            </div>
+          )}
 
           {/* Row 1: chart + alerts */}
           <div className="mb-6 grid items-stretch gap-4 xl:grid-cols-[1.25fr_0.75fr]">
@@ -823,7 +845,7 @@ export default function PredictiveAnalytics() {
             <Card
               eyebrow="Forecast Insights"
               title="What the model is seeing"
-              action={<span className="text-xs text-black/45">{forecast.model?.records || 0} records used</span>}
+              action={<span className="text-xs text-black/45">{forecast.model?.records || 0} sales rows</span>}
             >
               {forecast.insights?.length ? (
                 <div className="grid gap-3 md:grid-cols-3">
@@ -1004,6 +1026,13 @@ export default function PredictiveAnalytics() {
           {/* Row 3: ingredient demand + actions */}
           <div className="mb-6 grid items-stretch gap-4 xl:grid-cols-2">
             <Card eyebrow="Ingredient Demand Forecast" title="Recipe-based consumption and risk">
+              {forecast.model?.recipe_missing_products?.length > 0 && (
+                <p className="mb-3 rounded-lg bg-[#fff4cd] px-3 py-2 text-xs leading-5 text-black/70">
+                  No active recipe mapping for {forecast.model.recipe_missing_products.length} forecast product(s):{" "}
+                  {forecast.model.recipe_missing_products.slice(0, 5).join(", ")}
+                  {forecast.model.recipe_missing_products.length > 5 ? ", and more" : ""}. Ingredient demand for these products is not included.
+                </p>
+              )}
               <div className="overflow-x-auto">
                 <table className="min-w-[680px] text-left text-sm">
                   <thead>
@@ -1063,6 +1092,17 @@ export default function PredictiveAnalytics() {
                 <div>
                   <dt className="text-black/50">Training window</dt>
                   <dd className="mt-0.5 font-semibold text-black">{forecast.model?.training_start || "—"} to {forecast.model?.training_end || "—"}</dd>
+                </div>
+                <div>
+                  <dt className="text-black/50">Latest continuous sales coverage</dt>
+                  <dd className="mt-0.5 font-semibold text-black">
+                    {forecast.coverage?.start && forecast.coverage?.end
+                      ? `${forecast.coverage.start} to ${forecast.coverage.end} (${forecast.coverage.days} days)`
+                      : "Not available"}
+                  </dd>
+                  {forecast.coverage && (
+                    <dd className="mt-1 text-[10px] leading-4 text-black/50">Import boundaries use valid dates found in the CSV.</dd>
+                  )}
                 </div>
                 <div>
                   <dt className="text-black/50">Latest data</dt>
