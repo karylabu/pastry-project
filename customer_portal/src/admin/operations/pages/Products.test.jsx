@@ -356,6 +356,36 @@ describe('Products admin catalog', () => {
     );
   });
 
+  test('shows the saved product image in the edit form and previews a replacement', async () => {
+    URL.createObjectURL = jest.fn(() => 'blob:edit-product-preview');
+    URL.revokeObjectURL = jest.fn();
+    const { container } = render(<Products allowCatalogManagement />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Strawberry Cake')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getAllByRole('button', { name: /^Edit / })[0]);
+    expect(screen.getByAltText('Current product image')).toHaveAttribute(
+      'src',
+      expect.stringContaining('/uploads/cake.jpg'),
+    );
+
+    const imageInput = container.querySelector('input[type="file"][accept*="image/png"]');
+    fireEvent.change(imageInput, {
+      target: { files: [new File(['replacement-image'], 'new-cake.jpg', { type: 'image/jpeg' })] },
+    });
+
+    expect(await screen.findByAltText('Selected product preview')).toHaveAttribute(
+      'src',
+      'blob:edit-product-preview',
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Close edit product' }));
+    await waitFor(() => {
+      expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:edit-product-preview');
+    });
+  });
+
   test('loads and saves the recipe for the selected cake tab without a size picker', async () => {
     render(<Products allowCatalogManagement />);
 

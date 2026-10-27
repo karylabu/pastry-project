@@ -91,6 +91,7 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
   const [editOpen, setEditOpen] = useState(false);
   const [editProduct, setEditProduct] = useState(null);
   const [editImage, setEditImage] = useState(null);
+  const [editImagePreview, setEditImagePreview] = useState("");
   const [editSaving, setEditSaving] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [recipeLines, setRecipeLines] = useState([]);
@@ -134,6 +135,17 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
     setNewImagePreview(previewUrl);
     return () => URL.revokeObjectURL(previewUrl);
   }, [newImage]);
+
+  useEffect(() => {
+    if (!editOpen || !editImage) {
+      setEditImagePreview("");
+      return undefined;
+    }
+
+    const previewUrl = URL.createObjectURL(editImage);
+    setEditImagePreview(previewUrl);
+    return () => URL.revokeObjectURL(previewUrl);
+  }, [editImage, editOpen]);
 
   const location = useLocation();
   const navigate = useNavigate();
@@ -1500,15 +1512,27 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
 
                   <div className="space-y-2">
                     <label className="block text-[10px] font-bold uppercase tracking-[0.16em] text-[#8f8076]">Image</label>
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-3 rounded-xl border border-dashed border-[#d8c9b5] bg-[#fbf7f2] p-3">
+                      <div className="grid h-20 w-20 shrink-0 place-items-center overflow-hidden rounded-lg border border-[#eadfd8] bg-white">
+                        {editImagePreview || editProduct.image
+                          ? <img
+                              src={editImagePreview || `${BASE}/uploads/${editProduct.image}`}
+                              alt={editImage ? "Selected product preview" : "Current product image"}
+                              className="h-full w-full object-cover"
+                            />
+                          : <ImagePlus size={24} className="text-[#b7a69c]" aria-hidden="true" />}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-[11px] text-[#9b8c83]">{editImage ? editImage.name : (editProduct.image || 'No image selected')}</p>
+                        <p className="mt-1 text-[10px] text-[#8f8076]">JPG, PNG, or GIF</p>
+                      </div>
                       <button
                         type="button"
                         onClick={() => editImageInputRef.current?.click()}
-                        className="rounded-lg bg-[#fff8e9] px-3 py-2 text-[11px] font-semibold text-[#5c4310] transition hover:bg-[#fff4cd]"
+                        className="shrink-0 rounded-lg bg-[#fff8e9] px-3 py-2 text-[11px] font-semibold text-[#5c4310] transition hover:bg-[#fff4cd]"
                       >
                         <ImagePlus size={14} className="mr-1.5" aria-hidden="true" /> Upload Product Image
                       </button>
-                      <span className="truncate text-[11px] text-[#9b8c83]">{editImage ? editImage.name : (editProduct.image || 'No image selected')}</span>
                     </div>
                     <input
                       ref={editImageInputRef}
