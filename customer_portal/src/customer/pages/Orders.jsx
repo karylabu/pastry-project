@@ -262,6 +262,7 @@ export default function Orders() {
   const [riderForm, setRiderForm] = useState({ name: '', contact: '', plateNumber: '' });
   const [riderInfoSaving, setRiderInfoSaving] = useState(false);
   const [riderInfoError, setRiderInfoError] = useState('');
+  const [riderInfoSaved, setRiderInfoSaved] = useState(false);
   const [statusFilter, setStatusFilter] = useState('All');
   const [sortBy, setSortBy]           = useState('newest');
   const [search, setSearch]           = useState('');
@@ -290,6 +291,7 @@ export default function Orders() {
       plateNumber: riderInformation.plateNumber || '',
     });
     setRiderInfoError('');
+    setRiderInfoSaved(false);
     setRiderInfoTarget({ order, riderInformation });
   };
 
@@ -332,8 +334,10 @@ export default function Orders() {
         return nextOrders;
       });
       setRiderInfoTarget({ order: updatedOrder, riderInformation });
+      setRiderInfoSaved(true);
     } catch (error) {
       setRiderInfoError(error.message || 'Unable to save rider information.');
+      setRiderInfoSaved(false);
     } finally {
       setRiderInfoSaving(false);
     }
@@ -1677,6 +1681,7 @@ export default function Orders() {
                 ))}
               </div>
               {riderInfoError && <p className="mt-3 text-sm text-red-700" role="alert">{riderInfoError}</p>}
+              {riderInfoSaved && <p className="mt-3 text-sm font-semibold text-emerald-700" role="status">Rider information saved.</p>}
               <div className="mt-5 flex gap-2">
                 <button type="button" onClick={() => setRiderInfoTarget(null)} disabled={riderInfoSaving} className="flex-1 rounded-xl border border-[#eadfd8] px-4 py-2.5 text-sm font-semibold text-[#765d50] transition hover:bg-[#fffaf0] disabled:opacity-50">Close</button>
                 <button type="submit" disabled={riderInfoSaving} className="flex-1 rounded-xl bg-[#f0b94d] px-4 py-2.5 text-sm font-semibold text-black transition hover:bg-[#e5ae3d] disabled:opacity-50">{riderInfoSaving ? 'Saving...' : 'Save rider info'}</button>

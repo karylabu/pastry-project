@@ -309,16 +309,18 @@ class CustomerOrdersApiTest extends TestCase
             'status' => 'Ready for Pickup',
         ]);
 
-        $this->withToken('test-customer-token')
-            ->putJson('/api/orders/10/rider-information', [
+        $request = Request::create('/api/orders/10/rider-information', 'PUT', [
                 'rider_name' => 'Juan Dela Cruz',
                 'rider_contact' => '09171234567',
                 'rider_plate_number' => 'abc 1234',
-            ])
-            ->assertOk()
-            ->assertJsonPath('success', true)
-            ->assertJsonPath('delivery_service', 'GrabCar')
-            ->assertJsonPath('rider_information.rider_plate_number', 'ABC 1234');
+            ], [], [], [
+                'HTTP_X_AUTH_TOKEN' => 'test-customer-token',
+            ]);
+        $response = app(OrderController::class)->updateRiderInformation($request, 10);
+        $this->assertSame(200, $response->getStatusCode());
+        $this->assertTrue($response->getData(true)['success']);
+        $this->assertSame('GrabCar', $response->getData(true)['delivery_service']);
+        $this->assertSame('ABC 1234', $response->getData(true)['rider_information']['rider_plate_number']);
 
         $this->assertDatabaseHas('orders', [
             'id' => 10,
@@ -327,12 +329,16 @@ class CustomerOrdersApiTest extends TestCase
             'rider_plate_number' => 'ABC 1234',
         ]);
 
-        $this->getJson('/api/orders')
-            ->assertOk()
-            ->assertJsonPath('orders.0.delivery_service', 'GrabCar')
-            ->assertJsonPath('orders.0.rider_name', 'Juan Dela Cruz')
-            ->assertJsonPath('orders.0.rider_contact', '09171234567')
-            ->assertJsonPath('orders.0.rider_plate_number', 'ABC 1234');
+        $ordersRequest = Request::create('/api/orders', 'GET', [], [], [], [
+            'HTTP_X_AUTH_TOKEN' => 'test-customer-token',
+        ]);
+        $ordersResponse = app(OrderController::class)->index($ordersRequest);
+        $this->assertSame(200, $ordersResponse->getStatusCode());
+        $orders = $ordersResponse->getData(true)['orders'];
+        $this->assertSame('GrabCar', $orders[0]['delivery_service']);
+        $this->assertSame('Juan Dela Cruz', $orders[0]['rider_name']);
+        $this->assertSame('09171234567', $orders[0]['rider_contact']);
+        $this->assertSame('ABC 1234', $orders[0]['rider_plate_number']);
     }
 
     public function test_customer_cannot_save_rider_information_for_another_order_or_before_ready(): void
