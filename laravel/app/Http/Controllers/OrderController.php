@@ -675,10 +675,10 @@ class OrderController extends Controller
         ]);
         $hasPaymentProof = $request->hasFile('payment_proof');
         $paymentReference = trim((string) $request->input('customer_payment_reference', ''));
-        if ($hasPaymentProof === ($paymentReference !== '')) {
+        if (!$hasPaymentProof && $paymentReference === '') {
             return response()->json([
                 'success' => false,
-                'message' => 'Submit either a payment screenshot or a reference number.',
+                'message' => 'Upload a screenshot, enter a reference number, or provide both.',
             ], 422);
         }
 

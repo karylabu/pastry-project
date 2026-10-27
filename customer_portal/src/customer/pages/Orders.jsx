@@ -119,24 +119,31 @@ function ReceivedDialog({ order, onConfirm, onDismiss, isLoading }) {
 }
 
 function PaymentProofDialog({ order, onSubmit, onDismiss, isLoading, error }) {
-  const [submissionType, setSubmissionType] = useState('screenshot');
   const [file, setFile] = useState(null);
   const [reference, setReference] = useState('');
   const [fileError, setFileError] = useState('');
+  const [previewUrl, setPreviewUrl] = useState('');
+
+  useEffect(() => {
+    if (!file) {
+      setPreviewUrl('');
+      return undefined;
+    }
+
+    const url = URL.createObjectURL(file);
+    setPreviewUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [file]);
 
   const handleSubmit = (event) => {
     event.preventDefault();
-    if (submissionType === 'screenshot' && !file) {
-      setFileError('Choose a screenshot or photo of your completed payment.');
-      return;
-    }
-    if (submissionType === 'reference' && !reference.trim()) {
-      setFileError('Enter the reference number from your payment receipt.');
+    if (!file && !reference.trim()) {
+      setFileError('Upload a screenshot, enter a reference number, or provide both.');
       return;
     }
     onSubmit({
-      file: submissionType === 'screenshot' ? file : null,
-      reference: submissionType === 'reference' ? reference.trim() : '',
+      file,
+      reference: reference.trim(),
     });
   };
 
@@ -144,6 +151,7 @@ function PaymentProofDialog({ order, onSubmit, onDismiss, isLoading, error }) {
     const selected = event.target.files?.[0] || null;
     if (selected && selected.size > 5 * 1024 * 1024) {
       setFile(null);
+      event.target.value = '';
       setFileError('The image must be 5 MB or smaller.');
       return;
     }
@@ -171,58 +179,38 @@ function PaymentProofDialog({ order, onSubmit, onDismiss, isLoading, error }) {
         <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#9b7b3d]">QRPh payment</p>
         <h2 className="mt-2 text-xl font-semibold text-slate-900">Send payment proof</h2>
         <p className="mt-2 text-sm leading-6 text-slate-600">
-          Send a screenshot or enter the reference number for your payment on Order #{order.id}. Admin will review it before preparing your order.
+          Upload a screenshot, enter the payment reference number, or provide both for Order #{order.id}. Admin will review your payment details.
         </p>
-        <div className="mt-5 grid grid-cols-2 gap-2" role="group" aria-label="Payment proof type">
-          {[
-            { value: 'screenshot', label: 'Upload screenshot' },
-            { value: 'reference', label: 'Reference number' },
-          ].map((option) => (
-            <button
-              key={option.value}
-              type="button"
-              aria-pressed={submissionType === option.value}
-              onClick={() => { setSubmissionType(option.value); setFileError(''); }}
-              className={`rounded-lg border px-3 py-2 text-xs font-semibold transition ${
-                submissionType === option.value
-                  ? 'border-slate-900 bg-slate-900 text-white'
-                  : 'border-slate-200 text-slate-600 hover:bg-slate-50'
-              }`}
-            >
-              {option.label}
-            </button>
-          ))}
-        </div>
-        {submissionType === 'screenshot' ? (
-          <>
-            <label className="mt-4 block text-sm font-medium text-slate-700" htmlFor="payment-proof-file">Payment screenshot</label>
-            <input
-              id="payment-proof-file"
-              type="file"
-              accept="image/jpeg,image/png,image/webp"
-              onChange={handleFileChange}
-              className="mt-2 block w-full text-sm text-slate-700 file:mr-3 file:rounded-lg file:border-0 file:bg-slate-900 file:px-3 file:py-2 file:text-xs file:font-semibold file:text-white"
-            />
-            {file && <p className="mt-2 truncate text-xs text-slate-500">{file.name}</p>}
-          </>
-        ) : (
-          <>
-            <label className="mt-4 block text-sm font-medium text-slate-700" htmlFor="payment-reference-number">Payment reference number</label>
-            <input
-              id="payment-reference-number"
-              type="text"
-              maxLength={100}
-              value={reference}
-              onChange={(event) => { setReference(event.target.value); setFileError(''); }}
-              placeholder="Enter the reference number from your receipt"
-              className="mt-2 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-800 outline-none focus:border-slate-500 focus:ring-2 focus:ring-slate-200"
-            />
-          </>
+        <label className="mt-5 block text-sm font-medium text-slate-700" htmlFor="payment-proof-file">Payment screenshot or photo</label>
+        <input
+          id="payment-proof-file"
+          type="file"
+          accept="image/jpeg,image/png,image/webp"
+          onChange={handleFileChange}
+          className="mt-2 block w-full text-sm text-slate-700 file:mr-3 file:rounded-lg file:border-0 file:bg-slate-900 file:px-3 file:py-2 file:text-xs file:font-semibold file:text-white"
+        />
+        {file && <p className="mt-2 truncate text-xs text-slate-500">{file.name}</p>}
+        {previewUrl && (
+          <img
+            src={previewUrl}
+            alt="Payment screenshot preview"
+            className="mt-3 max-h-48 w-full rounded-lg border border-slate-200 bg-slate-50 object-contain"
+          />
         )}
+        <label className="mt-4 block text-sm font-medium text-slate-700" htmlFor="payment-reference-number">Payment reference number (optional)</label>
+        <input
+          id="payment-reference-number"
+          type="text"
+          maxLength={100}
+          value={reference}
+          onChange={(event) => { setReference(event.target.value); setFileError(''); }}
+          placeholder="Enter the reference number from your receipt"
+          className="mt-2 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-800 outline-none focus:border-slate-500 focus:ring-2 focus:ring-slate-200"
+        />
         {(fileError || error) && <p className="mt-3 text-sm text-red-700">{fileError || error}</p>}
         <div className="mt-6 flex justify-end gap-2">
           <button type="button" onClick={onDismiss} className="rounded-lg border border-slate-200 px-4 py-2 text-sm text-slate-700" disabled={isLoading}>Cancel</button>
-          <button type="submit" disabled={isLoading || (submissionType === 'screenshot' ? !file : !reference.trim())} className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">
+          <button type="submit" disabled={isLoading || (!file && !reference.trim())} className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">
             {isLoading ? 'Sending…' : 'Submit payment details'}
           </button>
         </div>

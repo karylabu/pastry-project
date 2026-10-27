@@ -153,19 +153,26 @@ class PaymentProofSecurityTest extends TestCase
         ]);
     }
 
-    public function test_customer_must_submit_exactly_one_payment_proof_type(): void
+    public function test_customer_must_submit_at_least_one_payment_proof_type_and_can_submit_both(): void
     {
         $this->withHeader('X-Auth-Token', 'proof-customer-token')
             ->postJson('/api/orders/8/payment-proof')
             ->assertUnprocessable()
-            ->assertJsonPath('message', 'Submit either a payment screenshot or a reference number.');
+            ->assertJsonPath('message', 'Upload a screenshot, enter a reference number, or provide both.');
 
         $this->withHeader('X-Auth-Token', 'proof-customer-token')
             ->post('/api/orders/8/payment-proof', [
                 'payment_proof' => $this->fakePng(),
                 'customer_payment_reference' => 'QRPH_ABC-123',
             ])
-            ->assertUnprocessable()
-            ->assertJsonPath('message', 'Submit either a payment screenshot or a reference number.');
+            ->assertOk()
+            ->assertJsonPath('payment_status', 'proof_submitted');
+
+        $this->assertDatabaseHas('orders', [
+            'id' => 8,
+            'payment_status' => 'proof_submitted',
+            'customer_payment_reference' => 'QRPH_ABC-123',
+        ]);
+        Storage::disk('local')->assertExists(DB::table('orders')->where('id', 8)->value('payment_proof_path'));
     }
 }
