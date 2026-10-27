@@ -64,9 +64,11 @@ test('shows the remaining pickup balance and starts balance payment', async () =
   render(<Orders />);
 
   const payBalanceButton = await screen.findByRole('button', { name: 'Pay ₱500.00' });
+  expect(payBalanceButton).toHaveClass('min-h-11', 'focus-visible:ring-2');
   expect(screen.getByText('Deposit paid: ₱500 · Balance due: ₱500')).toBeInTheDocument();
   expect(screen.getByText('Pay the remaining balance or submit proof for review')).toBeInTheDocument();
-  expect(screen.getByRole('button', { name: 'Submit proof / reference' })).toBeInTheDocument();
+  const submitProofButton = screen.getByRole('button', { name: 'Submit proof / reference' });
+  expect(submitProofButton).toHaveClass('min-h-11', 'focus-visible:ring-2');
   fireEvent.click(payBalanceButton);
 
   await waitFor(() => {
@@ -160,6 +162,7 @@ test('shows Awaiting Payment only for customized orders in the customer status f
   expect(screen.queryByText('Blueberry Cheesecake')).not.toBeInTheDocument();
 
   fireEvent.click(awaitingPaymentTab);
+  expect(awaitingPaymentTab).toHaveAttribute('aria-pressed', 'true');
   expect(screen.getByText('Customized Cake')).toBeInTheDocument();
   expect(screen.queryByText('Blueberry Cheesecake')).not.toBeInTheDocument();
 });
