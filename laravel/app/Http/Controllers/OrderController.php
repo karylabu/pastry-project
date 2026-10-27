@@ -1194,7 +1194,7 @@ class OrderController extends Controller
         } catch (\Throwable $exception) {
             $status = $exception->getMessage() === 'Order not found.'
                 ? 404
-                : (str_starts_with($exception->getMessage(), 'Unable to process payment refund') ? 502 : 400);
+                : 400;
             return response()->json(['success' => false, 'message' => $exception->getMessage()], $status);
         }
 
@@ -1250,7 +1250,10 @@ class OrderController extends Controller
 
         $secretKey = config('services.paymongo.secret');
         if (!$secretKey) {
-            throw new RuntimeException('Unable to process payment refund right now. Please try again later.');
+            Log::warning('PayMongo refund could not be attempted because the secret key is missing.', [
+                'order_id' => $order->id,
+            ]);
+            return ['status' => 'manual_required', 'amount' => $amount];
         }
 
         try {
@@ -1315,7 +1318,7 @@ class OrderController extends Controller
                 'exception' => get_class($exception),
                 'message' => $exception->getMessage(),
             ]);
-            throw new RuntimeException('Unable to process payment refund right now. Your order was not cancelled; please try again or contact the shop.');
+            return ['status' => 'manual_required', 'amount' => $amount];
         }
     }
 

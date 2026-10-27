@@ -205,6 +205,30 @@ class CustomerOrdersApiTest extends TestCase
         ]);
     }
 
+    public function test_customer_cancellation_succeeds_when_paymongo_refund_credentials_are_missing(): void
+    {
+        config(['services.paymongo.secret' => null]);
+        DB::table('orders')->insert([
+            'id' => 15,
+            'user_id' => 7,
+            'payment' => 'GCash',
+            'payment_status' => 'paid',
+            'payment_reference' => 'payment-link-15',
+            'total' => 500,
+            'status' => 'Pending',
+        ]);
+
+        $request = Request::create('/api/orders/15/cancel', 'POST', [], [], [], [
+            'HTTP_X_AUTH_TOKEN' => 'test-customer-token',
+        ]);
+        $response = app(OrderController::class)->cancel($request, 15);
+
+        $this->assertSame(200, $response->getStatusCode());
+        $this->assertTrue($response->getData(true)['success']);
+        $this->assertSame('manual_required', $response->getData(true)['refund_status']);
+        $this->assertDatabaseHas('orders', ['id' => 15, 'status' => 'Cancelled']);
+    }
+
     public function test_customer_can_confirm_a_ready_order_as_received(): void
     {
         DB::table('orders')->insert([
