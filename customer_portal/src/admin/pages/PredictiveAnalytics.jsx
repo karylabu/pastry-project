@@ -76,6 +76,13 @@ const FORECAST_METHOD_LABELS = Object.fromEntries(
   VALIDATION_METHODS.filter((method) => method.key !== "zero").map(({ key, label }) => [key, label])
 );
 
+const COMPARISON_METHODS = [
+  { key: "linear", label: "Linear Trend", color: "#b4901f" },
+  { key: "moving_average_7", label: "7-Day Moving Average", color: "#6b8f71" },
+  { key: "same_weekday_last_week", label: "Same Weekday Last Week", color: "#81906c" },
+  { key: "yesterday", label: "Yesterday / Last Known Day", color: "#718096" },
+];
+
 const formatMetric = (value, suffix) =>
   value == null || !Number.isFinite(Number(value)) ? "—" : `${Number(value)}${suffix}`;
 
@@ -445,6 +452,85 @@ function ForecastChart({ historical, forecast }) {
   );
 }
 
+function MethodForecastChart({ product, method, period }) {
+  const actual = product?.comparison?.actual || [];
+  const forecast = product?.comparison?.methods?.[method.key] || [];
+  const values = [...actual.map((point) => Number(point.quantity) || 0), ...forecast.map((value) => Number(value) || 0)];
+  const width = 460;
+  const height = 190;
+  const padding = { top: 12, right: 12, bottom: 24, left: 34 };
+  const innerWidth = width - padding.left - padding.right;
+  const innerHeight = height - padding.top - padding.bottom;
+  const yMax = niceMax(Math.max(...values, 1) * 1.15);
+  const x = (index) => padding.left + index * (innerWidth / Math.max(values.length - 1, 1));
+  const y = (value) => padding.top + innerHeight - (value / yMax) * innerHeight;
+  const actualPoints = actual.map((point, index) => [x(index), y(Number(point.quantity) || 0)]);
+  const forecastPoints = forecast.map((value, index) => [x(actual.length + index), y(Number(value) || 0)]);
+  const forecastPath = actualPoints.length
+    ? [actualPoints[actualPoints.length - 1], ...forecastPoints]
+    : forecastPoints;
+  const path = (points) => points.map((point) => point.join(",")).join(" L ");
+  const baseline = padding.top + innerHeight;
+  const actualLine = actualPoints.length ? `M ${path(actualPoints)}` : "";
+  const forecastLine = forecastPath.length ? `M ${path(forecastPath)}` : "";
+  const tickStride = Math.max(1, Math.ceil(values.length / 6));
+
+  return (
+    <article className="flex h-full min-w-0 flex-col rounded-2xl border border-black/10 bg-white p-3">
+      <div className="mb-1 flex min-h-10 items-center justify-between gap-2">
+        <h3 className="text-sm font-semibold leading-5 text-black">{method.label}</h3>
+        <span className="shrink-0 rounded-full bg-[#f7f2e8] px-2 py-1 text-[10px] font-semibold text-black/60">
+          Next {period} days
+        </span>
+      </div>
+      {actual.length && forecast.length ? (
+        <>
+          <svg viewBox={`0 0 ${width} ${height}`} className="h-[190px] w-full" role="img" aria-label={`${method.label} compared with actual daily sales for ${product.product}`}>
+            {Array.from({ length: 4 }, (_, index) => {
+              const value = (yMax / 3) * index;
+              const gridY = y(value);
+              return (
+                <g key={index}>
+                  <line x1={padding.left} y1={gridY} x2={width - padding.right} y2={gridY} stroke="#e5e7eb" />
+                  <text x={padding.left - 5} y={gridY + 3} textAnchor="end" fontSize="8" fill="#9ca3af">{Math.round(value)}</text>
+                </g>
+              );
+            })}
+            <line x1={x(actual.length - 1)} y1={padding.top} x2={x(actual.length - 1)} y2={baseline} stroke="#c9c9c9" strokeDasharray="3 3" />
+            {actualLine && <path d={actualLine} fill="none" stroke="#111827" strokeWidth="2.25" strokeLinejoin="round" />}
+            {forecastLine && <path d={forecastLine} fill="none" stroke={method.color} strokeWidth="2.5" strokeDasharray="5 4" strokeLinejoin="round" />}
+            {actualPoints.map(([cx, cy], index) => (
+              <circle key={`actual-${index}`} cx={cx} cy={cy} r="2.5" fill="#111827">
+                <title>{`${actual[index].date}: ${Number(actual[index].quantity).toFixed(1)} actual units`}</title>
+              </circle>
+            ))}
+            {forecastPoints.map(([cx, cy], index) => (
+              <circle key={`forecast-${index}`} cx={cx} cy={cy} r="2.5" fill={method.color}>
+                <title>{`Day ${index + 1} forecast: ${Number(forecast[index]).toFixed(1)} units`}</title>
+              </circle>
+            ))}
+            {values.map((_, index) => (
+              index % tickStride === 0 || index === values.length - 1 ? (
+                <text key={`tick-${index}`} x={x(index)} y={height - 5} textAnchor="middle" fontSize="8" fill="#9ca3af">
+                  {index < actual.length ? actual[index]?.date?.slice(5) : `+${index - actual.length + 1}`}
+                </text>
+              ) : null
+            ))}
+          </svg>
+          <div className="mt-auto flex flex-wrap items-center gap-x-4 gap-y-1 pt-2 text-[10px] text-black/55">
+            <span className="inline-flex items-center gap-1.5"><span className="h-0.5 w-3 bg-[#111827]" />Actual sales</span>
+            <span className="inline-flex items-center gap-1.5"><span className="w-3 border-t-2 border-dashed" style={{ borderColor: method.color }} />{method.label}</span>
+          </div>
+        </>
+      ) : (
+        <div className="flex min-h-[190px] flex-1 items-center justify-center rounded-xl bg-[#fafaf8] px-4 text-center text-xs text-black/50">
+          No continuous actual-sales history is available for this product.
+        </div>
+      )}
+    </article>
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Inventory coverage — bars now read as a risk gauge, not a uniform gold bar.
 // ---------------------------------------------------------------------------
@@ -527,6 +613,10 @@ export default function PredictiveAnalytics() {
   const [period, setPeriod] = useState(7);
   const [productFilter, setProductFilter] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
+  const [comparisonProductName, setComparisonProductName] = useState("");
+  const [visibleComparisonMethods, setVisibleComparisonMethods] = useState(
+    Object.fromEntries(COMPARISON_METHODS.map(({ key }) => [key, true]))
+  );
   const [salesPage, setSalesPage] = useState(1);
   const [preparationPage, setPreparationPage] = useState(1);
   const [actionsPage, setActionsPage] = useState(1);
@@ -635,6 +725,10 @@ export default function PredictiveAnalytics() {
   const filteredProducts = useMemo(() => forecast.products.filter((product) =>
     (!productFilter || product.product === productFilter) && (!categoryFilter || product.category === categoryFilter)
   ), [forecast.products, productFilter, categoryFilter]);
+  const comparisonProducts = useMemo(() => forecast.products.filter((product) => product.comparison?.actual?.length), [forecast.products]);
+  const comparisonProduct = comparisonProducts.find((product) => product.product === comparisonProductName)
+    || comparisonProducts[0]
+    || null;
   const sortedFilteredProducts = useMemo(() => [...filteredProducts].sort((a, b) =>
     Number(b.totalForecast || 0) - Number(a.totalForecast || 0) || a.product.localeCompare(b.product)
   ), [filteredProducts]);
@@ -804,6 +898,67 @@ export default function PredictiveAnalytics() {
               A forecast cannot be calculated because no continuous sales-date range is available. Import a complete report from Sales Reports first.
             </div>
           )}
+
+          <section aria-labelledby="method-comparison-title" className="mb-6 rounded-[24px] border border-black/10 bg-[#fcfbf7] p-4 sm:p-5">
+            <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-black/50">Product Forecast Comparison</p>
+                <h2 id="method-comparison-title" className="text-lg font-semibold text-black">Actual sales and forecast methods</h2>
+                <p className="mt-1 text-xs leading-5 text-black/55">Compare each method with the same product’s recent actual sales.</p>
+              </div>
+              <label className="flex w-full flex-col gap-1 text-xs font-semibold text-black/60 lg:max-w-xs">
+                Product
+                <select
+                  aria-label="Select product for forecast comparison"
+                  value={comparisonProduct?.product || ""}
+                  onChange={(event) => setComparisonProductName(event.target.value)}
+                  disabled={!comparisonProducts.length}
+                  className="h-10 w-full rounded-lg border border-black/15 bg-white px-3 text-sm text-black disabled:opacity-50"
+                >
+                  {comparisonProducts.length
+                    ? comparisonProducts.map((product) => <option key={product.product} value={product.product}>{product.product}</option>)
+                    : <option value="">No products with sales history</option>}
+                </select>
+              </label>
+            </div>
+
+            <div className="mb-4 flex flex-wrap gap-2" role="group" aria-label="Toggle forecast methods">
+              {COMPARISON_METHODS.map((method) => (
+                <label key={method.key} className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-black/10 bg-white px-3 py-2 text-xs font-medium text-black/70">
+                  <input
+                    type="checkbox"
+                    checked={visibleComparisonMethods[method.key]}
+                    onChange={(event) => setVisibleComparisonMethods((current) => ({ ...current, [method.key]: event.target.checked }))}
+                    className="accent-[#8b6a12]"
+                  />
+                  <span className="h-2 w-2 rounded-full" style={{ backgroundColor: method.color }} />
+                  {method.label}
+                </label>
+              ))}
+            </div>
+
+            {comparisonProduct ? (
+              <div className="grid auto-rows-fr gap-3 sm:grid-cols-2">
+                {COMPARISON_METHODS.filter((method) => visibleComparisonMethods[method.key]).map((method) => (
+                  <MethodForecastChart
+                    key={`${comparisonProduct.product}-${method.key}`}
+                    product={comparisonProduct}
+                    method={method}
+                    period={period}
+                  />
+                ))}
+                {!COMPARISON_METHODS.some((method) => visibleComparisonMethods[method.key]) && (
+                  <p className="rounded-xl border border-dashed border-black/15 bg-white p-5 text-center text-sm text-black/50 sm:col-span-2">
+                    Turn on at least one forecast method to show its chart.
+                  </p>
+                )}
+              </div>
+            ) : (
+              <div className="rounded-xl border border-dashed border-black/15 bg-white p-6 text-center text-sm text-black/50">
+                Product comparison charts will appear when continuous sales history is available.
+              </div>
+            )}
+          </section>
 
           {/* Row 1: chart + alerts */}
           <div className="mb-6 grid items-stretch gap-4 xl:grid-cols-[1.25fr_0.75fr]">

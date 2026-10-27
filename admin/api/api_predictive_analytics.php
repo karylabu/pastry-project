@@ -667,6 +667,11 @@ function buildDetailedForecastPayload(array $history, array $products, array $in
         $totalForecast = round(array_sum($forecastSeries), 2);
         $previousEquivalent = count($values) >= $period * 2 ? array_sum(array_slice($values, -$period * 2, $period)) : 0;
         $previousEquivalentTotal += $previousEquivalent;
+        $comparisonMethods = [];
+        foreach (['linear', 'moving_average_7', 'same_weekday_last_week', 'yesterday'] as $method) {
+            $comparisonMethods[$method] = forecastSeriesForMethod($method, $values, $period);
+        }
+        $actualSeries = array_slice($daily, -28, null, true);
         $recipe = $recipes[strtolower($productName)] ?? [];
         $recipeMapped = array_key_exists(strtolower($productName), $recipes);
         $ingredientRows = [];
@@ -693,7 +698,16 @@ function buildDetailedForecastPayload(array $history, array $products, array $in
             'trendPercent' => $previousEquivalent > 0 ? round((($totalForecast - $previousEquivalent) / $previousEquivalent) * 100, 2) : null,
             'currentStock' => (float) ($catalogue['stock'] ?? 0), 'recommendedProduction' => $recommendedProduction,
             'recommendedPreorderQuantity' => $recommendedPreorderQuantity,
-            'priority' => $priority, 'ingredients' => $ingredientRows, 'recipeMapped' => $recipeMapped, 'history' => array_slice(array_values($daily), -7),
+            'priority' => $priority, 'ingredients' => $ingredientRows, 'recipeMapped' => $recipeMapped,
+            'history' => array_slice(array_values($daily), -7),
+            'comparison' => [
+                'actual' => array_map(
+                    static fn (string $date, float|int $quantity): array => ['date' => $date, 'quantity' => (float) $quantity],
+                    array_keys($actualSeries),
+                    array_values($actualSeries)
+                ),
+                'methods' => $comparisonMethods,
+            ],
         ];
     }
 
