@@ -62,4 +62,41 @@ describe("Ingredients alerts", () => {
       expect.objectContaining({ method: "POST" })
     );
   });
+
+  test("shows ten ingredients per page and navigates to the next page", async () => {
+    global.fetch.mockImplementation((url) => {
+      if (String(url).includes("/api/staff/inventory/ingredients")) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            success: true,
+            ingredients: Array.from({ length: 12 }, (_, index) => ({
+              id: index + 1,
+              name: `Ingredient ${String(index + 1).padStart(2, "0")}`,
+              unit: "kg",
+              stock: 5,
+              usable_stock: 5,
+              threshold: 1,
+            })),
+          }),
+        });
+      }
+      if (String(url).includes("/api/staff/inventory/batches")) {
+        return Promise.resolve({ ok: true, json: async () => ({ success: true, batches: [] }) });
+      }
+      return Promise.resolve({ ok: true, json: async () => ({ success: true }) });
+    });
+
+    render(<Ingredients />);
+
+    expect(await screen.findByText("Ingredient 10")).toBeInTheDocument();
+    expect(screen.queryByText("Ingredient 11")).not.toBeInTheDocument();
+    expect(screen.getByText("Showing 1–10 of 12 ingredients")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Next" }));
+
+    expect(await screen.findByText("Ingredient 11")).toBeInTheDocument();
+    expect(screen.getByText("Ingredient 12")).toBeInTheDocument();
+    expect(screen.getByText("Showing 11–12 of 12 ingredients")).toBeInTheDocument();
+  });
 });

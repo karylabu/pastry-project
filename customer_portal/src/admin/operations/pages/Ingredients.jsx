@@ -105,6 +105,8 @@ export default function Ingredients({
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [unitFilter, setUnitFilter] = useState('all');
   const [sortBy, setSortBy] = useState('name'); // name | stock_asc | stock_desc | threshold
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 10;
   const [batches, setBatches] = useState([]);
   const [batchLoading, setBatchLoading] = useState(false);
   const [batchForm, setBatchForm] = useState({ ingredient_id: '', quantity: '', batch_number: '', purchase_date: '', expiry_date: '', supplier: '', unit_cost: '', notes: '' });
@@ -471,6 +473,16 @@ export default function Ingredients({
     return res;
   }, [ingredients, query, stockFilter, categoryFilter, unitFilter, sortBy, expiryByIngredient]);
 
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [query, stockFilter, categoryFilter, unitFilter, sortBy]);
+
+  const pageCount = Math.max(1, Math.ceil(filteredIngredients.length / pageSize));
+  const visiblePage = Math.min(currentPage, pageCount);
+  const pageIngredients = filteredIngredients.slice((visiblePage - 1) * pageSize, visiblePage * pageSize);
+  const firstVisibleIngredient = filteredIngredients.length ? (visiblePage - 1) * pageSize + 1 : 0;
+  const lastVisibleIngredient = Math.min(visiblePage * pageSize, filteredIngredients.length);
+
   const lowStockCount = ingredients.filter((item) => Number(item.threshold) > 0 && Number(item.usable_stock) > 0 && Number(item.usable_stock) <= Number(item.threshold)).length;
   const nearExpiryCount = ingredients.filter((item) => expiryByIngredient.get(Number(item.id))?.daysRemaining <= 7).length;
   const outOfStockCount = ingredients.filter((item) => Number(item.usable_stock) <= 0).length;
@@ -585,7 +597,7 @@ export default function Ingredients({
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredIngredients.map((item) => {
+                  {pageIngredients.map((item) => {
                     const isExpired = Boolean(item.has_expired_batches) && Number(item.usable_stock) <= 0;
                     const nearestExpiry = expiryByIngredient.get(Number(item.id));
                     const thresholdInvalid = Number(item.threshold) <= 0;
@@ -654,6 +666,34 @@ export default function Ingredients({
             </div>
           )}
         </div>
+        {filteredIngredients.length > pageSize && (
+          <nav className="mt-4 flex flex-wrap items-center justify-between gap-3" aria-label="Ingredients pagination">
+            <p className="text-[11px] text-[#8f8076]">
+              Showing {firstVisibleIngredient}–{lastVisibleIngredient} of {filteredIngredients.length} ingredients
+            </p>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setCurrentPage(visiblePage - 1)}
+                disabled={visiblePage === 1}
+                className="rounded-lg border border-[#eadfd8] bg-white px-3 py-2 text-[11px] font-semibold text-[#5f514a] transition hover:bg-[#fff8df] disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Previous
+              </button>
+              <span className="text-[11px] font-semibold text-[#6a5a50]" aria-live="polite">
+                Page {visiblePage} of {pageCount}
+              </span>
+              <button
+                type="button"
+                onClick={() => setCurrentPage(visiblePage + 1)}
+                disabled={visiblePage === pageCount}
+                className="rounded-lg border border-[#eadfd8] bg-white px-3 py-2 text-[11px] font-semibold text-[#5f514a] transition hover:bg-[#fff8df] disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Next
+              </button>
+            </div>
+          </nav>
+        )}
         {modalOpen && (
           <div className="fixed inset-0 z-[10001] flex items-center justify-center bg-black/40 px-3 py-4">
             <div className="w-full max-w-lg bg-white rounded-2xl p-3 mx-2">
