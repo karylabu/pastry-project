@@ -160,6 +160,12 @@ test("lets admin verify a submitted balance before marking an order ready", asyn
   const orderCard = (await screen.findAllByText("Customer 107"))[0].closest("article");
   expect(screen.getByRole("button", { name: /Pay Balance Before Ready/ })).toBeInTheDocument();
   expect(within(orderCard).getByText("Pay Balance Before Ready")).toBeInTheDocument();
+  fireEvent.click(within(orderCard).getByRole("button", { name: "View details for order 107" }));
+  expect(within(orderCard).getByText("Order summary")).toBeInTheDocument();
+  expect(within(orderCard).getByText("Deposit received")).toBeInTheDocument();
+  expect(within(orderCard).getByText("Balance due")).toBeInTheDocument();
+  expect(within(orderCard).getByText("Balance needs verification")).toBeInTheDocument();
+  expect(within(orderCard).getByText("Confirm the balance payment before marking this order ready for pickup.")).toBeInTheDocument();
   fireEvent.click(within(orderCard).getByRole("button", { name: "Verify balance" }));
 
   await waitFor(() => expect(statusRequest).toBeDefined());
@@ -306,8 +312,8 @@ test("shows placed and cancelled timestamps in cancelled order details", async (
 
   fireEvent.click(within(orderCard).getByRole("button", { name: /View details for order 105/i }));
 
-  expect(within(orderCard).getByText(/Placed:/)).toBeInTheDocument();
-  expect(within(orderCard).getByText(/Cancelled:/)).toBeInTheDocument();
+  expect(within(orderCard).getByText("Placed")).toBeInTheDocument();
+  expect(within(orderCard).getByText("Cancelled", { selector: "dt" })).toBeInTheDocument();
   expect(container.querySelectorAll("time[datetime]").length).toBeGreaterThan(0);
 });
 

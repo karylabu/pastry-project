@@ -734,10 +734,75 @@ export default function Orders() {
                         </div>
                       )}
                       <div className="grid gap-3 sm:grid-cols-2">
-                        <div><p className="text-[9px] font-semibold uppercase tracking-[0.14em] text-[#9b8c83]">Order details</p><p className="mt-1 font-semibold text-[#33251e]">{customerLabel}</p><p>{order.email || "No email provided"}</p><p>{order.phone || "No phone provided"}</p><p>{addressLabel}</p><p>Payment: {order.payment || "N/A"}</p><p>Placed: {formatOrderDateTime(order.created_at)}</p>{order.status === "Cancelled" && <p>Cancelled: {formatOrderDateTime(order.cancelled_at)}</p>}</div>
-                        <div><p className="text-[9px] font-semibold uppercase tracking-[0.14em] text-[#9b8c83]">Items</p>{(order.items || []).map((item, index) => <div key={`${order.id}-mobile-${index}`} className="flex justify-between gap-3 border-b border-[#eee6de] py-1.5 last:border-0"><span>{item.name || "Item"} · Qty {item.qty || 1}</span><strong className="shrink-0 text-[#33251e]">₱{Number(item.price || 0).toLocaleString()}</strong></div>)}</div>
+                        <section className="rounded-xl border border-[#eee6de] bg-white p-3.5">
+                          <div className="flex items-start justify-between gap-3">
+                            <div>
+                              <p className="text-[9px] font-bold uppercase tracking-[0.16em] text-[#9b8c83]">Order summary</p>
+                              <p className="mt-1 text-[13px] font-bold text-[#33251e]">Order #{order.order_number ?? order.id}</p>
+                            </div>
+                            <span className={`rounded-full px-2 py-1 text-[9px] font-semibold ${statusColors[order.status] ?? "bg-black/5 text-black"}`}>{statusLabel(order.status)}</span>
+                          </div>
+                          <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-3 gap-y-2 text-[10px] leading-4">
+                            <dt className="text-[#9b8c83]">Customer</dt><dd className="text-right font-semibold text-[#33251e]">{customerLabel || "Customer"}</dd>
+                            <dt className="text-[#9b8c83]">Phone</dt><dd className="text-right text-[#65574d]">{order.phone || "Not provided"}</dd>
+                            <dt className="text-[#9b8c83]">Email</dt><dd className="break-all text-right text-[#65574d]">{order.email || "Not provided"}</dd>
+                            <dt className="text-[#9b8c83]">Fulfillment</dt><dd className="text-right text-[#65574d]">{order.method || "N/A"}</dd>
+                            <dt className="text-[#9b8c83]">Address</dt><dd className="text-right text-[#65574d]">{addressLabel}</dd>
+                            <dt className="text-[#9b8c83]">Payment</dt><dd className="text-right text-[#65574d]">{order.payment || "N/A"}</dd>
+                            <dt className="text-[#9b8c83]">Placed</dt><dd className="text-right text-[#65574d]">{formatOrderDateTime(order.created_at)}</dd>
+                            {order.status === "Cancelled" && <><dt className="text-[#9b8c83]">Cancelled</dt><dd className="text-right text-[#65574d]">{formatOrderDateTime(order.cancelled_at)}</dd></>}
+                          </dl>
+                        </section>
+                        <section className="rounded-xl border border-[#eee6de] bg-white p-3.5">
+                          <div className="flex items-center justify-between gap-2">
+                            <p className="text-[9px] font-bold uppercase tracking-[0.16em] text-[#9b8c83]">Items</p>
+                            <span className="text-[9px] text-[#9b8c83]">{(order.items || []).length} item{(order.items || []).length === 1 ? "" : "s"}</span>
+                          </div>
+                          <div className="mt-2 divide-y divide-[#f1ece5]">
+                            {(order.items || []).map((item, index) => (
+                              <div key={`${order.id}-mobile-${index}`} className="flex items-start justify-between gap-3 py-2 first:pt-0 last:pb-0">
+                                <div className="min-w-0">
+                                  <p className="text-[11px] font-semibold leading-4 text-[#33251e]">{item.name || "Item"}</p>
+                                  <p className="mt-0.5 text-[9px] text-[#8f8076]">Qty {item.qty || 1} · ₱{Number(item.price || 0).toLocaleString()} each</p>
+                                </div>
+                                <strong className="shrink-0 text-[11px] text-[#33251e]">₱{(Number(item.price || 0) * Number(item.qty || 1)).toLocaleString()}</strong>
+                              </div>
+                            ))}
+                          </div>
+                          <div className="mt-3 flex items-center justify-between border-t border-[#eee6de] pt-2.5 text-[11px] font-bold text-[#33251e]">
+                            <span>Total</span><span>₱{Number(order.total || 0).toLocaleString()}</span>
+                          </div>
+                        </section>
                       </div>
-                      {isQrPayment(order.payment) && <div className="mt-3 rounded-md border border-amber-200 bg-amber-50/70 p-3"><p className="text-[9px] font-semibold uppercase tracking-[0.14em] text-amber-800">QRPh payment · {String(order.payment_status || "pending").replaceAll("_", " ")}</p>{(String(order.payment_status || '').toLowerCase() === 'downpayment_paid' || order.status === "Awaiting Balance Payment") && Number(order.downpayment_amount) > 0 && <p className="mt-1 text-[10px] text-amber-900">Deposit received: ₱{Number(order.downpayment_amount).toLocaleString()} · balance due: ₱{Math.max(0, Number(order.total || 0) - Number(order.downpayment_amount)).toLocaleString()}</p>}{order.has_payment_proof && paymentProofPreviews[order.id] && <button type="button" onClick={() => setPaymentProofLightboxOrderId(order.id)} className="mt-2 inline-flex w-fit max-w-full cursor-zoom-in rounded border border-black/10 bg-white p-1" aria-label={`Enlarge payment proof for order ${order.id}`}><img src={paymentProofPreviews[order.id]} alt={`Payment proof for order ${order.id}`} className="block max-h-64 max-w-full rounded object-contain" /></button>}{order.has_payment_proof && !paymentProofPreviews[order.id] && <button type="button" onClick={() => viewPaymentProof(order.id)} disabled={paymentProofLoading === order.id} className="mt-2 rounded-md bg-black px-3 py-2 text-[10px] font-semibold text-white disabled:opacity-60">{paymentProofLoading === order.id ? "Loading proof..." : "View payment proof"}</button>}{order.customer_payment_reference && <p className="mt-2 text-[10px] text-amber-950">Customer reference: <span className="font-semibold">{order.customer_payment_reference}</span></p>}{!order.has_payment_proof && !order.customer_payment_reference && <p className="mt-1 text-[10px] text-amber-900">Waiting for customer payment proof.</p>}</div>}
+                      {isQrPayment(order.payment) && (
+                        <section className="mt-3 rounded-xl border border-amber-200 bg-[#fffaf0] p-3.5">
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <div>
+                              <p className="text-[9px] font-bold uppercase tracking-[0.16em] text-amber-800">QRPh payment</p>
+                              <p className="mt-0.5 text-[10px] capitalize text-amber-950">{String(order.payment_status || "pending").replaceAll("_", " ")}</p>
+                            </div>
+                            {needsBalancePaymentReview && <span className="rounded-full bg-amber-100 px-2.5 py-1 text-[9px] font-semibold text-amber-900">Balance needs verification</span>}
+                          </div>
+                          {(String(order.payment_status || '').toLowerCase() === 'downpayment_paid' || order.status === "Awaiting Balance Payment") && Number(order.downpayment_amount) > 0 && (
+                            <div className="mt-3 grid grid-cols-2 gap-2">
+                              <div className="rounded-lg border border-amber-100 bg-white/80 p-2.5">
+                                <p className="text-[9px] text-[#8f8076]">Deposit received</p>
+                                <p className="mt-0.5 text-[13px] font-bold text-[#33251e]">₱{Number(order.downpayment_amount).toLocaleString()}</p>
+                              </div>
+                              <div className="rounded-lg border border-amber-100 bg-white/80 p-2.5">
+                                <p className="text-[9px] text-[#8f8076]">Balance due</p>
+                                <p className="mt-0.5 text-[13px] font-bold text-amber-900">₱{Math.max(0, Number(order.total || 0) - Number(order.downpayment_amount)).toLocaleString()}</p>
+                              </div>
+                            </div>
+                          )}
+                          {order.has_payment_proof && paymentProofPreviews[order.id] && <button type="button" onClick={() => setPaymentProofLightboxOrderId(order.id)} className="mt-3 inline-flex w-fit max-w-full cursor-zoom-in rounded-lg border border-amber-100 bg-white p-1" aria-label={`Enlarge payment proof for order ${order.id}`}><img src={paymentProofPreviews[order.id]} alt={`Payment proof for order ${order.id}`} className="block max-h-64 max-w-full rounded object-contain" /></button>}
+                          {order.has_payment_proof && !paymentProofPreviews[order.id] && <button type="button" onClick={() => viewPaymentProof(order.id)} disabled={paymentProofLoading === order.id} className="mt-3 rounded-lg bg-[#33251e] px-3 py-2 text-[10px] font-semibold text-white transition hover:bg-black disabled:opacity-60">{paymentProofLoading === order.id ? "Loading proof..." : "View payment proof"}</button>}
+                          {order.customer_payment_reference && <p className="mt-3 rounded-lg border border-amber-100 bg-white/80 px-2.5 py-2 text-[10px] text-amber-950">Customer reference <span className="ml-1 font-semibold">{order.customer_payment_reference}</span></p>}
+                          {!order.has_payment_proof && !order.customer_payment_reference && <p className="mt-2 text-[10px] text-amber-900">Waiting for customer payment proof.</p>}
+                          {needsBalancePaymentReview && <p className="mt-3 rounded-lg bg-amber-100/70 px-3 py-2 text-[10px] leading-4 text-amber-950">Confirm the balance payment before marking this order ready for pickup.</p>}
+                          {needsPaymentReview && <p className="mt-3 rounded-lg bg-amber-100/70 px-3 py-2 text-[10px] leading-4 text-amber-950">Review the payment proof, then mark the order paid to begin preparation.</p>}
+                        </section>
+                      )}
                       {order.discount_type && order.discount_type !== "none" && (
                         <div className="mt-3 rounded-md border border-[#e8dfd4] bg-white p-3">
                           <p className="text-[9px] font-semibold uppercase tracking-[0.14em] text-[#8f8076]">
@@ -839,19 +904,64 @@ export default function Orders() {
                                 </div>
                               )}
                               <div className="grid gap-4 md:grid-cols-2">
-                                <div><p className="text-[9px] uppercase tracking-[0.2em] text-black/50">Order details</p><p className="mt-1 font-semibold text-black">Order #{order.order_number ?? order.id}</p><p>{customerLabel}</p><p>{order.method || "N/A"}</p><p>{addressLabel}</p><p>Payment: {order.payment || "N/A"}</p><p>Placed: {formatOrderDateTime(order.created_at)}</p>{order.status === "Cancelled" && <p>Cancelled: {formatOrderDateTime(order.cancelled_at)}</p>}</div>
-                                <div><p className="text-[9px] uppercase tracking-[0.2em] text-black/50">Items</p>{(order.items || []).map((item, index) => <div key={`${order.id}-${index}`} className="flex justify-between border-b border-black/10 py-1 last:border-0"><span>{item.name || "Item"} · Qty {item.qty || 1}</span><strong>₱{Number(item.price || 0).toLocaleString()}</strong></div>)}<div className="mt-2 flex justify-between font-semibold text-black"><span>Total</span><span>₱{Number(order.total || 0).toLocaleString()}</span></div></div>
+                                <section className="rounded-xl border border-black/10 bg-white p-4">
+                                  <div className="flex items-start justify-between gap-3">
+                                    <div>
+                                      <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-black/45">Order summary</p>
+                                      <p className="mt-1 text-[13px] font-bold text-black">Order #{order.order_number ?? order.id}</p>
+                                    </div>
+                                    <span className={`rounded-full px-2.5 py-1 text-[9px] font-semibold ${statusColors[order.status] ?? "bg-black/5 text-black"}`}>{statusLabel(order.status)}</span>
+                                  </div>
+                                  <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-5 gap-y-2 text-[11px] leading-4">
+                                    <dt className="text-black/45">Customer</dt><dd className="text-right font-semibold text-black">{customerLabel || "Customer"}</dd>
+                                    <dt className="text-black/45">Email</dt><dd className="break-all text-right text-black/70">{order.email || "Not provided"}</dd>
+                                    <dt className="text-black/45">Phone</dt><dd className="text-right text-black/70">{order.phone || "Not provided"}</dd>
+                                    <dt className="text-black/45">Fulfillment</dt><dd className="text-right text-black/70">{order.method || "N/A"}</dd>
+                                    <dt className="text-black/45">Address</dt><dd className="text-right text-black/70">{addressLabel}</dd>
+                                    <dt className="text-black/45">Payment</dt><dd className="text-right text-black/70">{order.payment || "N/A"}</dd>
+                                    <dt className="text-black/45">Placed</dt><dd className="text-right text-black/70">{formatOrderDateTime(order.created_at)}</dd>
+                                    {order.status === "Cancelled" && <><dt className="text-black/45">Cancelled</dt><dd className="text-right text-black/70">{formatOrderDateTime(order.cancelled_at)}</dd></>}
+                                  </dl>
+                                </section>
+                                <section className="rounded-xl border border-black/10 bg-white p-4">
+                                  <div className="flex items-center justify-between gap-2">
+                                    <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-black/45">Items</p>
+                                    <span className="text-[10px] text-black/45">{(order.items || []).length} item{(order.items || []).length === 1 ? "" : "s"}</span>
+                                  </div>
+                                  <div className="mt-3 divide-y divide-black/[0.06]">
+                                    {(order.items || []).map((item, index) => (
+                                      <div key={`${order.id}-${index}`} className="flex items-start justify-between gap-4 py-2 first:pt-0 last:pb-0">
+                                        <div>
+                                          <p className="font-semibold text-black">{item.name || "Item"}</p>
+                                          <p className="mt-0.5 text-[10px] text-black/50">Qty {item.qty || 1} · ₱{Number(item.price || 0).toLocaleString()} each</p>
+                                        </div>
+                                        <strong className="shrink-0 text-black">₱{(Number(item.price || 0) * Number(item.qty || 1)).toLocaleString()}</strong>
+                                      </div>
+                                    ))}
+                                  </div>
+                                  <div className="mt-3 flex justify-between border-t border-black/10 pt-3 font-bold text-black"><span>Total</span><span>₱{Number(order.total || 0).toLocaleString()}</span></div>
+                                </section>
                               </div>
                               {isQrPayment(order.payment) && (
-                                <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50/70 p-3">
-                                  <p className="text-[9px] uppercase tracking-[0.2em] text-amber-800">QRPh payment</p>
-                                  <p className="mt-1 font-semibold text-black">
-                                    {String(order.payment_status || 'pending').replaceAll('_', ' ')}
-                                  </p>
+                                <section className="mt-4 rounded-xl border border-amber-200 bg-[#fffaf0] p-4">
+                                  <div className="flex flex-wrap items-center justify-between gap-2">
+                                    <div>
+                                      <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-amber-800">QRPh payment</p>
+                                      <p className="mt-1 text-[11px] capitalize text-amber-950">{String(order.payment_status || 'pending').replaceAll('_', ' ')}</p>
+                                    </div>
+                                    {needsBalancePaymentReview && <span className="rounded-full bg-amber-100 px-3 py-1 text-[10px] font-semibold text-amber-900">Balance needs verification</span>}
+                                  </div>
                                   {(String(order.payment_status || '').toLowerCase() === 'downpayment_paid' || order.status === "Awaiting Balance Payment") && Number(order.downpayment_amount) > 0 ? (
-                                    <p className="mt-1 text-xs text-amber-900">
-                                      Deposit received: ₱{Number(order.downpayment_amount).toLocaleString()} · balance due: ₱{Math.max(0, Number(order.total || 0) - Number(order.downpayment_amount)).toLocaleString()}
-                                    </p>
+                                    <div className="mt-3 grid max-w-lg grid-cols-2 gap-3">
+                                      <div className="rounded-lg border border-amber-100 bg-white/80 p-3">
+                                        <p className="text-[10px] text-black/50">Deposit received</p>
+                                        <p className="mt-1 text-base font-bold text-black">₱{Number(order.downpayment_amount).toLocaleString()}</p>
+                                      </div>
+                                      <div className="rounded-lg border border-amber-100 bg-white/80 p-3">
+                                        <p className="text-[10px] text-black/50">Balance due</p>
+                                        <p className="mt-1 text-base font-bold text-amber-900">₱{Math.max(0, Number(order.total || 0) - Number(order.downpayment_amount)).toLocaleString()}</p>
+                                      </div>
+                                    </div>
                                   ) : order.has_payment_proof && paymentProofPreviews[order.id] ? (
                                     <button
                                       type="button"
@@ -882,9 +992,9 @@ export default function Orders() {
                                       Customer reference: <span className="font-semibold">{order.customer_payment_reference}</span>
                                     </p>
                                   )}
-                                  {needsPaymentReview && <p className="mt-2 text-xs text-amber-900">Review the proof, then mark paid and prepare the order.</p>}
-                                  {needsBalancePaymentReview && <p className="mt-2 text-xs text-amber-900">Verify the remaining balance payment before marking this order ready for pickup.</p>}
-                                </div>
+                                  {needsPaymentReview && <p className="mt-3 max-w-2xl rounded-lg bg-amber-100/70 px-3 py-2 text-[11px] leading-5 text-amber-950">Review the payment proof, then mark the order paid to begin preparation.</p>}
+                                  {needsBalancePaymentReview && <p className="mt-3 max-w-2xl rounded-lg bg-amber-100/70 px-3 py-2 text-[11px] leading-5 text-amber-950">Confirm the balance payment before marking this order ready for pickup.</p>}
+                                </section>
                               )}
                               {order.discount_type && order.discount_type !== 'none' && (
                                 <div className="mt-4 rounded-xl border border-black/10 bg-white p-3">
