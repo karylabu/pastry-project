@@ -251,6 +251,10 @@ jobs:
             -e "ssh -i ~/.ssh/id_ed25519 -p $SSH_PORT -o IdentitiesOnly=yes -o BatchMode=yes -o ConnectTimeout=20 -o ConnectionAttempts=3" \
             customer_portal/build/ \
             "$SSH_USERNAME@$SSH_HOST:$REMOTE_ROOT/customer_portal/build/"
+          rsync -az \
+            -e "ssh -i ~/.ssh/id_ed25519 -p $SSH_PORT -o IdentitiesOnly=yes -o BatchMode=yes -o ConnectTimeout=20 -o ConnectionAttempts=3" \
+            customer_portal/build/qr-ph-logo.svg \
+            "$SSH_USERNAME@$SSH_HOST:$REMOTE_ROOT/qr-ph-logo.svg"
 
       - name: Deploy About Us image
         run: |
