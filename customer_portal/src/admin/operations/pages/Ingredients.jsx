@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useLocation } from "react-router-dom";
-import { AlertTriangle, CalendarDays, Package, PackagePlus, Plus, Search, Trash2 } from "lucide-react";
+import { AlertTriangle, CalendarDays, CircleAlert, History, Package, PackagePlus, Pencil, Plus, Search, Trash2, X } from "lucide-react";
 import { LARAVEL_BASE, STAFF_BASE } from "../../../services/config";
 
 const staffFetch = (url, options = {}) => fetch(url, { credentials: "include", ...options });
@@ -25,6 +25,46 @@ function normalizeIngredientName(name) {
   return String(name || "").trim().toLocaleLowerCase().replace(/[\p{P}\p{Z}\s]+/gu, "");
 }
 
+function getFriendlyErrorMessage(data, fallback) {
+  const validationMessage = Object.values(data?.errors || {}).flat()[0];
+  const message = String(validationMessage || data?.message || "").trim();
+  if (!message) return fallback;
+
+  const normalized = message.toLowerCase();
+  if (normalized.includes("batch number already exists")) {
+    return "That batch or lot number is already used for this ingredient. Enter a different number.";
+  }
+  if (normalized.includes("expiry") && normalized.includes("purchase")) {
+    return "The expiry date must be the same as or later than the purchase date. Please check both dates.";
+  }
+  if (normalized.includes("expiry_date") || normalized.includes("expiry date")) {
+    return "Enter a valid expiry date for this ingredient batch.";
+  }
+  if (normalized.includes("purchase_date") || normalized.includes("purchase date")) {
+    return "Enter a valid purchase date for this ingredient batch.";
+  }
+  if (normalized.includes("quantity_received") || normalized.includes("quantity received")) {
+    return "Enter a stock quantity greater than zero.";
+  }
+  if (normalized.includes("ingredient_id") || normalized.includes("ingredient id")) {
+    return "Choose an ingredient from the matching results.";
+  }
+  if (normalized.includes("no usable batches") || normalized.includes("insufficient usable batch stock")) {
+    return "There is not enough unexpired stock available. Check the remaining quantities and expiry dates.";
+  }
+  if (normalized.includes("selected batch does not belong")) {
+    return "The selected batch does not match this ingredient. Choose the batch again and retry.";
+  }
+  if (normalized.includes("discard request is already pending")) {
+    return "There is already a discard request waiting for this batch.";
+  }
+  if (/sqlstate|sql error|queryexception|stack trace| at .*\\.php:\\d+|failed to create manual stock-in batch/i.test(message)) {
+    return fallback;
+  }
+
+  return message;
+}
+
 function getIngredientCategory(ingredient) {
   const explicitCategory = String(ingredient?.category || ingredient?.group || "").trim();
   if (explicitCategory) return explicitCategory;
@@ -47,6 +87,7 @@ export default function Ingredients({
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
+  const [alertDialog, setAlertDialog] = useState(null);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [deletingIngredient, setDeletingIngredient] = useState(false);
   const [modalType, setModalType] = useState(''); // 'create' | 'edit' | 'in' | 'out' | 'history'
@@ -73,6 +114,7 @@ export default function Ingredients({
   const [batchSubmitting, setBatchSubmitting] = useState(false);
   const [ingredientSearch, setIngredientSearch] = useState('');
   const [pendingRequests, setPendingRequests] = useState([]);
+  const showAlert = (message, variant = 'error') => setAlertDialog({ message, variant });
   const currentUser = (() => { try { return JSON.parse(window.localStorage.getItem('user') || 'null'); } catch (e) { return null; } })();
   const canApproveDiscard = String(currentUser?.role || '').toLowerCase() === 'admin';
   const normalizedModalName = normalizeIngredientName(modalName);
@@ -114,9 +156,9 @@ export default function Ingredients({
       const endpoint = action === 'approve' ? 'approve' : 'reject';
       const res = await laravelStaffFetch(`${LARAVEL_BASE}/api/staff/inventory/discards/${encodeURIComponent(requestId)}/${endpoint}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(action === 'reject' ? { rejection_note: '' } : {}) });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok || !data.success) throw new Error(data.message || 'Unable to process discard request.');
+      if (!res.ok || !data.success) throw new Error(getFriendlyErrorMessage(data, 'We could not update this discard request. Please try again.'));
       await loadPendingRequests(); await loadIngredients();
-    } catch (e) { alert(e.message || 'Unable to process discard request.'); }
+    } catch (e) { showAlert(e.message || 'We could not update this discard request. Check your connection and try again.'); }
     finally { setBatchSubmitting(false); }
   };
 
@@ -199,32 +241,43 @@ export default function Ingredients({
     const quantity = Number(batchForm.quantity);
     const exactIngredient = ingredients.find((ingredient) => ingredient.name.trim().toLowerCase() === ingredientSearch.trim().toLowerCase());
     const ingredientId = batchForm.ingredient_id || (exactIngredient ? String(exactIngredient.id) : '');
-    if (!ingredientId) { alert('Choose an ingredient from the matching results, or enter its exact name.'); return; }
-    if (!Number.isFinite(quantity) || quantity <= 0) { alert('Enter a quantity greater than zero.'); return; }
-    if (!batchForm.batch_number.trim()) { alert('Enter a batch or lot number.'); return; }
+    if (!ingredientId) { showAlert('Choose an ingredient from the matching results, or enter its exact name.'); return; }
+    if (!Number.isFinite(quantity) || quantity <= 0) { showAlert('Enter a quantity greater than zero.'); return; }
+    if (!batchForm.batch_number.trim()) { showAlert('Enter a batch or lot number.'); return; }
+    if (!batchForm.expiry_date) { showAlert('Enter the ingredient batch expiry date.'); return; }
+    if (batchForm.purchase_date && batchForm.expiry_date < batchForm.purchase_date) {
+      showAlert('The expiry date must be the same as or later than the purchase date. Please check both dates.');
+      return;
+    }
     setBatchSubmitting(true);
     try {
       const res = await laravelStaffFetch(`${LARAVEL_BASE}/api/staff/inventory/batches`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...batchForm, ingredient_id: ingredientId, quantity_received: quantity }) });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok || !data.success) throw new Error(data.message || 'Unable to add stock. Please try again.');
+      if (!res.ok || !data.success) throw new Error(getFriendlyErrorMessage(data, 'We could not add this stock batch. Check the ingredient, quantity, and dates, then try again.'));
       await loadIngredients(); closeModal();
-    } catch (e) { alert(e.message || 'Unable to add stock. Please try again.'); }
+    } catch (e) {
+      const fallback = 'We could not add this stock batch. Check your connection and try again.';
+      showAlert(e?.name === 'TypeError' ? fallback : e.message || fallback);
+    }
     finally { setBatchSubmitting(false); }
   };
 
   const submitDiscardRequest = async () => {
     const quantity = Number(discardForm.quantity);
-    if (!discardForm.batch_id || quantity <= 0) { alert('Select a batch and enter a positive quantity.'); return; }
+    if (!discardForm.batch_id || quantity <= 0) { showAlert('Select a batch and enter a positive quantity.'); return; }
     setBatchSubmitting(true);
     try {
       const res = await laravelStaffFetch(`${LARAVEL_BASE}/api/staff/inventory/discards`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ingredient_id: Number(modalIngredient?.id), ingredient_batch_id: Number(discardForm.batch_id), quantity, reason: discardForm.reason, notes: discardForm.notes }) });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok || !data.success) throw new Error(data.message || 'Unable to submit discard request.');
-      alert(data.auto_approved ? 'Expired ingredient discarded and added to waste analytics.' : 'Discard request submitted for owner approval.');
+      if (!res.ok || !data.success) throw new Error(getFriendlyErrorMessage(data, 'We could not submit this discard request. Please check the batch details and try again.'));
+      showAlert(data.auto_approved ? 'Expired ingredient discarded and added to waste analytics.' : 'Discard request submitted for owner approval.', 'success');
       closeModal();
       await loadIngredients();
       await loadPendingRequests();
-    } catch (e) { alert(e.message || 'Unable to submit discard request.'); }
+    } catch (e) {
+      const fallback = 'We could not submit this discard request. Check your connection and try again.';
+      showAlert(e?.name === 'TypeError' ? fallback : e.message || fallback);
+    }
     finally { setBatchSubmitting(false); }
   };
 
@@ -242,11 +295,11 @@ export default function Ingredients({
     if (!modalIngredient) return;
     const qty = Number(modalQty || 0);
     if (qty <= 0) {
-      alert('Quantity must be greater than zero.');
+      showAlert('Quantity must be greater than zero.');
       return;
     }
     if (modalType === 'out' && qty > Number(modalIngredient.stock || 0)) {
-      alert('Cannot stock out more than current balance.');
+      showAlert('Cannot stock out more than current balance.');
       return;
     }
     const action = modalType === 'in' ? 'stock_in' : 'stock_out';
@@ -262,9 +315,9 @@ export default function Ingredients({
         closeModal();
         return;
       }
-      alert(j.message || 'Failed to update stock');
+      showAlert(getFriendlyErrorMessage(j, 'We could not update the ingredient stock. Please try again.'));
     } catch (e) {
-      alert('Network error while updating stock');
+      showAlert('We could not update the ingredient stock. Check your connection and try again.');
     }
   };
 
@@ -274,11 +327,11 @@ export default function Ingredients({
     const initialStock = Number(modalStock || 0);
     const unitCost = Number(modalUnitCost || 0);
     if (thresholdValue <= 0) {
-      alert('Threshold must be greater than zero.');
+      showAlert('Threshold must be greater than zero.');
       return;
     }
     if (!Number.isFinite(initialStock) || initialStock < 0 || !Number.isFinite(unitCost) || unitCost < 0) {
-      alert('Initial stock and unit price must be zero or greater.');
+      showAlert('Initial stock and unit price must be zero or greater.');
       return;
     }
     const payload = {
@@ -300,14 +353,14 @@ export default function Ingredients({
         closeModal();
         return;
       }
-      const errorMessage = j.errors?.name?.[0] || j.message || 'Failed to create ingredient';
+      const errorMessage = getFriendlyErrorMessage(j, 'We could not create this ingredient. Please check the details and try again.');
       if (errorMessage.toLowerCase().includes('already exists')) {
         setCreateIngredientError(errorMessage);
         return;
       }
-      alert(errorMessage);
+      showAlert(errorMessage);
     } catch (e) {
-      alert('Network error while creating ingredient');
+      showAlert('We could not create this ingredient. Check your connection and try again.');
     }
   };
 
@@ -315,12 +368,12 @@ export default function Ingredients({
     if (!modalIngredient) return;
     const thresholdValue = Number(modalThreshold || 0);
     if (thresholdValue <= 0) {
-      alert('Threshold must be greater than zero.');
+      showAlert('Threshold must be greater than zero.');
       return;
     }
     const unitCost = Number(modalUnitCost || 0);
     if (!Number.isFinite(unitCost) || unitCost < 0) {
-      alert('Unit price must be zero or greater.');
+      showAlert('Unit price must be zero or greater.');
       return;
     }
     const payload = {
@@ -340,9 +393,9 @@ export default function Ingredients({
         closeModal();
         return;
       }
-      alert(j.message || 'Failed to update ingredient');
+      showAlert(getFriendlyErrorMessage(j, 'We could not update this ingredient. Please try again.'));
     } catch (e) {
-      alert('Network error while updating ingredient');
+      showAlert('We could not update this ingredient. Check your connection and try again.');
     }
   };
 
@@ -364,9 +417,9 @@ export default function Ingredients({
         await loadIngredients();
         return true;
       }
-      alert(j.message || 'Failed to delete ingredient');
+      showAlert(getFriendlyErrorMessage(j, 'We could not delete this ingredient. Please try again.'));
     } catch (e) {
-      alert('Network error while deleting ingredient');
+      showAlert('We could not delete this ingredient. Check your connection and try again.');
     } finally {
       setDeletingIngredient(false);
     }
@@ -610,9 +663,9 @@ export default function Ingredients({
                         </td>
                         <td className="px-6 py-4">
                           <div className="flex items-center gap-2">
-                            <button onClick={() => openModal('edit', item)} className="rounded-md bg-[#33251e] px-2.5 py-1.5 text-[10px] font-semibold text-white hover:bg-[#5b4540]">Edit</button>
+                            <button type="button" onClick={() => openModal('edit', item)} title={`Edit ${item.name}`} aria-label={`Edit ${item.name}`} className="inline-flex h-8 w-8 items-center justify-center rounded-md bg-[#33251e] text-white transition hover:bg-[#5b4540]"><Pencil size={14} aria-hidden="true" /></button>
                             {Number(item.expired_batch_count) > 0 && Number(item.pending_discard_count) === 0 && <button onClick={() => openModal('history', item)} className="rounded-md border border-[#eadfca] bg-[#fff4cd] px-2.5 py-1.5 text-[10px] font-semibold text-[#80600a]">Discard expired</button>}
-                            <button onClick={() => openModal('history', item)} className="rounded-md border border-[#eee4de] bg-white px-2.5 py-1.5 text-[10px] font-semibold text-[#6a5a50] hover:bg-[#fff8df]">History</button>
+                            <button type="button" onClick={() => openModal('history', item)} title={`View ${item.name} history`} aria-label={`View ${item.name} history`} className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-[#eee4de] bg-white text-[#6a5a50] transition hover:bg-[#fff8df]"><History size={14} aria-hidden="true" /></button>
                           </div>
                         </td>
                       </tr>
@@ -640,7 +693,7 @@ export default function Ingredients({
                     ? 'Stock In'
                     : 'Stock Out'}
                 </h3>
-                <button onClick={closeModal} className="text-gray-500">Close</button>
+                <button type="button" onClick={closeModal} title="Close ingredient modal" aria-label="Close ingredient modal" className="inline-flex h-8 w-8 items-center justify-center rounded-full text-gray-500 transition hover:bg-gray-100 hover:text-gray-800"><X size={16} aria-hidden="true" /></button>
               </div>
               <div className="mt-4">
                 {modalType === 'history' && (
@@ -686,11 +739,11 @@ export default function Ingredients({
                 {modalType === 'batch_add' && (
                   <div className="mt-2 grid gap-2">
                     <label className="text-xs text-gray-600">Ingredient</label>
-                    <input value={ingredientSearch} onChange={(e) => { const value = e.target.value; const exactMatch = ingredients.find((item) => item.name.trim().toLowerCase() === value.trim().toLowerCase()); setIngredientSearch(value); setBatchForm((current) => ({ ...current, ingredient_id: exactMatch ? String(exactMatch.id) : '' })); }} placeholder="Type ingredient name and select a match" autoComplete="off" className="w-full rounded-xl border px-2 py-2 text-xs" />
+                    <input aria-label="Ingredient" value={ingredientSearch} onChange={(e) => { const value = e.target.value; const exactMatch = ingredients.find((item) => item.name.trim().toLowerCase() === value.trim().toLowerCase()); setIngredientSearch(value); setBatchForm((current) => ({ ...current, ingredient_id: exactMatch ? String(exactMatch.id) : '' })); }} placeholder="Type ingredient name and select a match" autoComplete="off" className="w-full rounded-xl border px-2 py-2 text-xs" />
                     {ingredientSearch && !batchForm.ingredient_id && <div className="max-h-40 overflow-y-auto rounded-xl border bg-white">{ingredients.filter((item) => item.name.toLowerCase().includes(ingredientSearch.toLowerCase())).map((item) => <button type="button" key={item.id} onClick={() => { setIngredientSearch(item.name); setBatchForm((current) => ({ ...current, ingredient_id: String(item.id) })); }} className="block w-full px-3 py-2 text-left text-xs hover:bg-black/5">{item.name} ({item.unit})</button>)}</div>}
-                    <label className="text-xs text-gray-600">Quantity</label><input type="number" min="0.001" step="0.001" value={batchForm.quantity} onChange={(e) => setBatchForm({ ...batchForm, quantity: e.target.value })} className="rounded-xl border px-2 py-2 text-xs" />
-                    <label className="text-xs text-gray-600">Batch / Lot Number</label><input value={batchForm.batch_number} onChange={(e) => setBatchForm({ ...batchForm, batch_number: e.target.value })} className="rounded-xl border px-2 py-2 text-xs" />
-                    <div className="grid grid-cols-2 gap-2"><div><label className="text-xs text-gray-600">Purchase Date</label><input type="date" value={batchForm.purchase_date} onChange={(e) => setBatchForm({ ...batchForm, purchase_date: e.target.value })} className="w-full rounded-xl border px-2 py-2 text-xs" /></div><div><label className="text-xs text-gray-600">Expiry Date *</label><input required type="date" value={batchForm.expiry_date} onChange={(e) => setBatchForm({ ...batchForm, expiry_date: e.target.value })} className="w-full rounded-xl border px-2 py-2 text-xs" /></div></div>
+                    <label className="text-xs text-gray-600">Quantity</label><input aria-label="Quantity" type="number" min="0.001" step="0.001" value={batchForm.quantity} onChange={(e) => setBatchForm({ ...batchForm, quantity: e.target.value })} className="rounded-xl border px-2 py-2 text-xs" />
+                    <label className="text-xs text-gray-600">Batch / Lot Number</label><input aria-label="Batch / Lot Number" value={batchForm.batch_number} onChange={(e) => setBatchForm({ ...batchForm, batch_number: e.target.value })} className="rounded-xl border px-2 py-2 text-xs" />
+                    <div className="grid grid-cols-2 gap-2"><div><label className="text-xs text-gray-600">Purchase Date</label><input aria-label="Purchase Date" type="date" value={batchForm.purchase_date} onChange={(e) => setBatchForm({ ...batchForm, purchase_date: e.target.value })} className="w-full rounded-xl border px-2 py-2 text-xs" /></div><div><label className="text-xs text-gray-600">Expiry Date *</label><input aria-label="Expiry Date *" required type="date" value={batchForm.expiry_date} onChange={(e) => setBatchForm({ ...batchForm, expiry_date: e.target.value })} className="w-full rounded-xl border px-2 py-2 text-xs" /></div></div>
                     <label className="text-xs text-gray-600">Supplier (optional)</label><input value={batchForm.supplier} onChange={(e) => setBatchForm({ ...batchForm, supplier: e.target.value })} className="rounded-xl border px-2 py-2 text-xs" />
                     <label className="text-xs text-gray-600">Unit Cost (optional)</label><input type="number" min="0" step="0.01" value={batchForm.unit_cost} onChange={(e) => setBatchForm({ ...batchForm, unit_cost: e.target.value })} className="rounded-xl border px-2 py-2 text-xs" />
                     <label className="text-xs text-gray-600">Notes</label><textarea value={batchForm.notes} onChange={(e) => setBatchForm({ ...batchForm, notes: e.target.value })} className="rounded-xl border px-2 py-2 text-xs" />
@@ -825,6 +878,54 @@ export default function Ingredients({
                 )}
               </div>
             </div>
+          </div>
+        )}
+        {alertDialog && (
+          <div
+            className="fixed inset-0 z-[10003] flex items-center justify-center bg-[#241812]/55 px-4 py-5 backdrop-blur-[2px]"
+            onMouseDown={(event) => {
+              if (event.target === event.currentTarget) setAlertDialog(null);
+            }}
+          >
+            <section
+              role="alertdialog"
+              aria-modal="true"
+              aria-labelledby="ingredient-alert-title"
+              aria-describedby="ingredient-alert-description"
+              className="w-full max-w-md overflow-hidden rounded-2xl border border-[#eee4de] bg-white shadow-[0_24px_70px_rgba(38,25,16,0.28)]"
+            >
+              <div className="flex items-start gap-4 p-5 sm:p-6">
+                <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full ${alertDialog.variant === 'success' ? 'bg-emerald-50 text-emerald-600' : 'bg-[#fff1e9] text-[#a64d31]'}`}>
+                  {alertDialog.variant === 'success' ? <Package size={19} /> : <CircleAlert size={19} />}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <h2 id="ingredient-alert-title" className="text-base font-semibold text-[#33251e]">
+                    {alertDialog.variant === 'success' ? 'Done' : 'Please check this'}
+                  </h2>
+                  <p id="ingredient-alert-description" className="mt-1.5 text-sm leading-6 text-[#74675f]">
+                    {alertDialog.message}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setAlertDialog(null)}
+                  aria-label="Close alert"
+                  className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[#8f8076] transition hover:bg-[#f6f1ec] hover:text-[#33251e]"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+              <div className="flex justify-end border-t border-[#f0e7e0] bg-[#fbfaf5] p-4">
+                <button
+                  type="button"
+                  autoFocus
+                  onClick={() => setAlertDialog(null)}
+                  className="rounded-lg bg-[#8f432d] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-[#713522] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#c87a5c] focus-visible:ring-offset-2"
+                >
+                  Got it
+                </button>
+              </div>
+            </section>
           </div>
         )}
         </div>

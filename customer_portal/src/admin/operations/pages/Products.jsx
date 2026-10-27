@@ -1,8 +1,9 @@
 import React, { useEffect, useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useLocation, useNavigate } from "react-router-dom";
-import { AlertTriangle, CircleCheck, CircleX, History, ImagePlus, LayoutGrid, Plus, RefreshCw, Search, Table2, Trash2, X } from "lucide-react";
+import { AlertTriangle, ChefHat, CircleCheck, CircleX, History, ImagePlus, LayoutGrid, Pencil, Plus, RefreshCw, Search, SlidersHorizontal, Table2, Trash2, X } from "lucide-react";
 import { BASE, LARAVEL_BASE, STAFF_BASE } from "../../../services/config";
+import AdminDialog from "../../components/AdminDialog";
 
 const getStaffAuthHeaders = () => {
   let token = '';
@@ -81,6 +82,7 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState(null);
+  const [adminDialog, setAdminDialog] = useState(null);
 
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [qty, setQty] = useState("");
@@ -113,12 +115,25 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
   const [addProductOpen, setAddProductOpen] = useState(false);
   const [productSaving, setProductSaving] = useState(false);
   const [productFormError, setProductFormError] = useState(null);
-  const [newProduct, setNewProduct] = useState({ name: "", category: catalogCategory, price: "", stock: "0", description: "" });
+  const [productImageError, setProductImageError] = useState("");
+  const [newProduct, setNewProduct] = useState({ name: "", category: catalogCategory, size: "Big", price: "", stock: "0", description: "" });
   const [viewMode, setViewMode] = useState("cards");
   const [newImage, setNewImage] = useState(null);
   const newImageInputRef = useRef(null);
+  const [newImagePreview, setNewImagePreview] = useState("");
   const [recipeRows, setRecipeRows] = useState([{ ingredient_id: "", qty: "" }]);
   const editImageInputRef = useRef(null);
+
+  useEffect(() => {
+    if (!newImage) {
+      setNewImagePreview("");
+      return undefined;
+    }
+
+    const previewUrl = URL.createObjectURL(newImage);
+    setNewImagePreview(previewUrl);
+    return () => URL.revokeObjectURL(previewUrl);
+  }, [newImage]);
 
   const location = useLocation();
   const navigate = useNavigate();
@@ -239,6 +254,7 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
     setNewProduct({
       name: "",
       category: canManageCatalog ? "Cakes" : catalogCategory,
+      size: activeCat === "Small Cakes" ? "Small" : "Big",
       price: "",
       stock: "0",
       description: ""
@@ -246,6 +262,7 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
     setNewImage(null);
     setRecipeRows([{ ingredient_id: "", qty: "" }]);
     setProductFormError(null);
+    setProductImageError("");
     setProductSaving(false);
   };
 
@@ -286,10 +303,15 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
       setProductFormError("Enter a valid base price.");
       return;
     }
+    if (!newImage) {
+      setProductFormError("Choose a product image so customers can see it in the menu.");
+      return;
+    }
 
     const formData = new FormData();
     formData.append("name", newProduct.name.trim());
     formData.append("category", newProduct.category.trim());
+    formData.append("size", newProduct.size);
     formData.append("price", Number(newProduct.price));
     formData.append("stock", Number(newProduct.stock) || 0);
     formData.append("description", newProduct.description.trim());
@@ -307,22 +329,42 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
     setProductSaving(true);
 
     try {
-      const res = await staffFetch(`${STAFF_BASE}/api_products.php?action=create`, {
+      const res = await laravelStaffFetch(`${LARAVEL_BASE}/api/staff/products`, {
         method: "POST",
         body: formData
       });
-      const data = await res.json();
-      if (data.success) {
-        await fetchProducts();
-        closeAddProductModal();
-      } else {
-        setProductFormError(data.error || "Failed to add product.");
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data?.success) {
+        throw new Error(data?.message || "We couldn’t add the product. Check the details and try again.");
       }
-    } catch (err) {
-      setProductFormError("Server error while adding product.");
+
+      await fetchProducts();
+      closeAddProductModal();
+    } catch (error) {
+      setProductFormError(error.message || "We couldn’t connect to save the product. Please try again.");
     } finally {
       setProductSaving(false);
     }
+  };
+
+  const handleNewImageChange = (event) => {
+    const file = event.target.files?.[0] || null;
+    if (!file) return;
+
+    if (!["image/jpeg", "image/png", "image/gif"].includes(file.type)) {
+      setProductImageError("Choose a JPG, PNG, or GIF image.");
+      event.target.value = "";
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setProductImageError("Choose an image that is 5 MB or smaller.");
+      event.target.value = "";
+      return;
+    }
+
+    setProductImageError("");
+    setProductFormError(null);
+    setNewImage(file);
   };
 
   const handleSearchSubmit = (e) => {
@@ -645,6 +687,7 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
   const filteredProducts = products.filter((p) => {
     const matchesCategory = canManageCatalog
       ? ["cake", "cakes"].includes(p.category?.trim().toLowerCase())
+        && Boolean(getProductSizeForCategory(p, activeCat))
       : activeCat === "All" || p.category?.toLowerCase() === activeCat.toLowerCase();
 
     const query = searchTerm.trim().toLowerCase();
@@ -733,7 +776,7 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   placeholder="Search products"
-                  className="w-full rounded-lg border border-[#eadfd8] bg-white py-2.5 pl-10 pr-24 text-[12px] text-[#33251e] outline-none placeholder:text-[#b7a69c] focus:border-[#d4af37] focus:ring-2 focus:ring-[#d4af37]/15"
+                  className="w-full rounded-xl border border-[#eadfd8] bg-white py-2.5 pl-10 pr-24 text-[12px] text-[#33251e] outline-none placeholder:text-[#b7a69c] focus:border-[#d4af37] focus:ring-2 focus:ring-[#d4af37]/15"
                 />
                 {searchTerm && (
                   <button
@@ -864,18 +907,20 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
 
                 {/* BUTTON */}
                 <div className="mt-auto flex h-8 w-full shrink-0 items-center gap-1.5 pt-1">
-                  <button onClick={() => openInventoryModal(product, "produce")} className="h-7 min-w-0 flex-1 overflow-hidden rounded-lg border border-[#eadfca] bg-[#fff8e9] px-1.5 py-1.5 text-[9px] font-semibold text-[#33251e] transition hover:border-[#e7c875] hover:bg-[#fff8df] hover:text-[#8d6a2e]">Produce</button>
-                  <button onClick={() => openInventoryModal(product, "adjust")} className="h-7 min-w-0 flex-1 overflow-hidden rounded-lg border border-[#eadfd8] bg-white px-1.5 py-1.5 text-[9px] font-semibold text-[#765d50] transition hover:border-[#e7c875] hover:bg-[#fff8df]">Adjust</button>
+                  <button type="button" onClick={() => openInventoryModal(product, "produce")} title={`Produce ${product.name}`} aria-label={`Produce ${product.name}`} className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-[#eadfca] bg-[#fff8e9] text-[#33251e] transition hover:border-[#e7c875] hover:bg-[#fff8df] hover:text-[#8d6a2e]"><ChefHat size={14} aria-hidden="true" /></button>
+                  <button type="button" onClick={() => openInventoryModal(product, "adjust")} title={`Adjust ${product.name} stock`} aria-label={`Adjust ${product.name} stock`} className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-[#eadfd8] bg-white text-[#765d50] transition hover:border-[#e7c875] hover:bg-[#fff8df]"><SlidersHorizontal size={14} aria-hidden="true" /></button>
                   {canEditCatalog && (
                     <button
                       type="button"
                       onClick={() => openEditProductModal(product)}
-                      className="h-7 rounded-lg border border-[#eadfd8] bg-white px-2 py-1.5 text-[9px] font-semibold leading-none text-[#5f514a] transition hover:bg-[#fff8df]"
+                      title={`Edit ${product.name}`}
+                      aria-label={`Edit ${product.name}`}
+                      className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-[#eadfd8] bg-white text-[#5f514a] transition hover:bg-[#fff8df]"
                     >
-                      Edit
+                      <Pencil size={13} aria-hidden="true" />
                     </button>
                   )}
-                  <button onClick={() => openInventoryModal(product, "history")} aria-label={`View ${product.name} history`} className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-[#eadfd8] bg-white text-[#765d50] transition hover:bg-[#fff8df]"><History size={13} /></button>
+                  <button type="button" onClick={() => openInventoryModal(product, "history")} title={`View ${product.name} history`} aria-label={`View ${product.name} history`} className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-[#eadfd8] bg-white text-[#765d50] transition hover:bg-[#fff8df]"><History size={13} aria-hidden="true" /></button>
                 </div>
 
               </div>
@@ -936,19 +981,21 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
                     <p className="text-[9px] text-red-700 mt-1">{getProductionStatus(product).reason}</p>
                   )}
                 </div>
-                <div aria-label={`Actions for ${product.name}`} className="grid grid-cols-4 items-center gap-2 px-4 py-4">
-                  <button onClick={() => openInventoryModal(product, "produce")} className="w-full whitespace-nowrap rounded-lg bg-[#33251e] px-2 py-2 text-[11px] text-white transition hover:bg-[#5b4540]">Produce</button>
-                  <button onClick={() => openInventoryModal(product, "adjust")} className="w-full whitespace-nowrap rounded-lg border border-[#eadfd8] bg-white px-2 py-2 text-[11px] text-[#5f514a] transition hover:bg-[#fff8df]">Adjust</button>
+                <div aria-label={`Actions for ${product.name}`} className="flex items-center justify-center gap-2 px-4 py-4">
+                  <button type="button" onClick={() => openInventoryModal(product, "produce")} title={`Produce ${product.name}`} aria-label={`Produce ${product.name}`} className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-[#33251e] text-white transition hover:bg-[#5b4540]"><ChefHat size={15} aria-hidden="true" /></button>
+                  <button type="button" onClick={() => openInventoryModal(product, "adjust")} title={`Adjust ${product.name} stock`} aria-label={`Adjust ${product.name} stock`} className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[#eadfd8] bg-white text-[#5f514a] transition hover:bg-[#fff8df]"><SlidersHorizontal size={15} aria-hidden="true" /></button>
                   {canEditCatalog ? (
                     <button
                       type="button"
                       onClick={() => openEditProductModal(product)}
-                      className="w-full whitespace-nowrap rounded-lg border border-[#eadfd8] bg-white px-2 py-2 text-[11px] leading-none text-[#5f514a] transition hover:bg-[#fff8df]"
+                      title={`Edit ${product.name}`}
+                      aria-label={`Edit ${product.name}`}
+                      className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[#eadfd8] bg-white text-[#5f514a] transition hover:bg-[#fff8df]"
                     >
-                      Edit
+                      <Pencil size={15} aria-hidden="true" />
                     </button>
                   ) : <span aria-hidden="true" />}
-                  <button onClick={() => openInventoryModal(product, "history")} aria-label={`View ${product.name} history`} className="inline-flex w-full items-center justify-center rounded-lg border border-[#eadfd8] bg-white px-2 py-2 text-[#765d50] transition hover:bg-[#fff8df]"><History size={15} /></button>
+                  <button type="button" onClick={() => openInventoryModal(product, "history")} title={`View ${product.name} history`} aria-label={`View ${product.name} history`} className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[#eadfd8] bg-white text-[#765d50] transition hover:bg-[#fff8df]"><History size={15} aria-hidden="true" /></button>
                 </div>
               </div>
             ))}
@@ -1165,133 +1212,162 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="fixed inset-0 z-[10001] flex items-start justify-center overflow-y-auto bg-[#33251e]/45 px-4 py-6 backdrop-blur-[2px] sm:py-10"
+              className="fixed inset-0 z-[10001] flex items-center justify-center overflow-y-auto bg-[#241812]/55 p-3 backdrop-blur-sm sm:p-6"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="add-product-title"
             >
               <motion.div
                 initial={{ scale: 0.95 }}
                 animate={{ scale: 1 }}
                 exit={{ scale: 0.95 }}
-                className="bg-white w-full max-w-[420px] rounded-[18px] p-4 shadow-xl border border-black/10 max-h-[80vh] overflow-y-auto"
+                className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-3xl border border-[#eadfd8] bg-[#fffdfa] shadow-[0_24px_70px_rgba(38,25,16,0.28)]"
               >
-                <div className="sticky top-0 z-20 bg-white pt-3 pb-4 mb-5 border-b border-black/5">
-                  <div className="flex flex-col gap-2">
-                    <div>
-                      <h2 className="text-[20px] font-semibold text-black">Add New Product</h2>
-                      <p className="text-[11px] text-black/60 mt-1">Create a new pastry and map its inventory recipe.</p>
-                    </div>
+                <div className="sticky top-0 z-20 flex items-start justify-between gap-4 border-b border-[#f0e7e0] bg-[#fffdfa]/95 px-5 py-4 backdrop-blur sm:px-7">
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-[0.24em] text-[#9b7810]">Product catalog</p>
+                    <h2 id="add-product-title" className="mt-1 font-serif text-[24px] text-[#33251e]">Add New Product</h2>
+                    <p className="mt-1 text-[12px] text-[#74675f]">Add product details, a customer-facing image, and its recipe.</p>
                   </div>
                   <button
+                    type="button"
                     onClick={closeAddProductModal}
-                    className="mt-3 inline-flex items-center rounded-[12px] border border-black/10 bg-white px-3.5 py-1.5 text-[13px] font-medium text-black hover:bg-black/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37]"
+                    title="Close add product"
+                    aria-label="Close add product"
+                    className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[#eadfd8] bg-white text-[#765d50] transition hover:bg-[#fff4cd] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d4af37]"
                   >
-                    Close
+                    <X size={17} aria-hidden="true" />
                   </button>
                 </div>
 
-                <div className="grid gap-3 grid-cols-1 sm:grid-cols-2">
-                  <div className="space-y-3">
-                    <label className="block text-[11px] font-medium text-black/70">Product Name</label>
+                <div className="space-y-6 px-5 py-5 sm:px-7 sm:py-6">
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <label htmlFor="new-product-name" className="block text-[10px] font-bold uppercase tracking-[0.15em] text-[#8f8076]">Product Name</label>
                     <input
+                      id="new-product-name"
                       type="text"
                       value={newProduct.name}
                       onChange={(e) => setNewProduct((prev) => ({ ...prev, name: e.target.value }))}
-                      className="w-full rounded-[12px] border border-black/10 px-3 py-2.5 text-[12px] text-black outline-none focus:ring-2 focus:ring-[#D4AF37] focus:ring-offset-2 focus:ring-offset-white"
+                      className="w-full rounded-xl border border-[#eadfd8] bg-white px-3.5 py-3 text-[13px] text-[#33251e] outline-none transition placeholder:text-[#b7a69c] focus:border-[#d4af37] focus:ring-2 focus:ring-[#d4af37]/15"
                       placeholder="Chocolate Oreo Cake"
+                      required
                     />
                   </div>
 
-                  <div className="space-y-3">
-                    <label className="block text-[11px] font-medium text-black/70">Category</label>
+                  <div className="space-y-2">
+                    <label htmlFor="new-product-size" className="block text-[10px] font-bold uppercase tracking-[0.15em] text-[#8f8076]">Cake Size</label>
                     <select
-                      value={newProduct.category}
-                      onChange={(e) => setNewProduct((prev) => ({ ...prev, category: e.target.value }))}
-                      className="w-full rounded-[12px] border border-black/10 px-3 py-2.5 text-[12px] text-black outline-none focus:ring-2 focus:ring-[#D4AF37] focus:ring-offset-2 focus:ring-offset-white"
+                      id="new-product-size"
+                      value={newProduct.size}
+                      onChange={(e) => setNewProduct((prev) => ({ ...prev, size: e.target.value }))}
+                      className="w-full rounded-xl border border-[#eadfd8] bg-white px-3.5 py-3 text-[13px] text-[#33251e] outline-none transition focus:border-[#d4af37] focus:ring-2 focus:ring-[#d4af37]/15"
                     >
-                      {(canManageCatalog ? ["Cakes"] : ["Cakes", "Small Cakes", "Meals", "Pasta", "Starter"]).map((category) => (
-                        <option key={category}>{category}</option>
-                      ))}
+                      <option value="Big">Big Cake</option>
+                      <option value="Small">Small Cake</option>
                     </select>
                   </div>
 
-                  <div className="space-y-3">
-                    <label className="block text-[11px] font-medium text-black/70">Base Price (Big Cake)</label>
+                  <div className="space-y-2">
+                    <label htmlFor="new-product-price" className="block text-[10px] font-bold uppercase tracking-[0.15em] text-[#8f8076]">Price ({newProduct.size} Cake)</label>
                     <input
+                      id="new-product-price"
                       type="number"
                       min="0"
                       step="0.01"
                       value={newProduct.price}
                       onChange={(e) => setNewProduct((prev) => ({ ...prev, price: e.target.value }))}
-                      className="w-full rounded-[12px] border border-black/10 px-3 py-2.5 text-[12px] text-black outline-none focus:ring-2 focus:ring-[#D4AF37] focus:ring-offset-2 focus:ring-offset-white"
+                      className="w-full rounded-xl border border-[#eadfd8] bg-white px-3.5 py-3 text-[13px] text-[#33251e] outline-none transition focus:border-[#d4af37] focus:ring-2 focus:ring-[#d4af37]/15"
                       placeholder="100.00"
+                      required
                     />
                   </div>
 
-                  <div className="space-y-3">
-                    <label className="block text-[11px] font-medium text-black/70">Starting Stock</label>
+                  <div className="space-y-2">
+                    <label htmlFor="new-product-stock" className="block text-[10px] font-bold uppercase tracking-[0.15em] text-[#8f8076]">Starting Stock</label>
                     <input
+                      id="new-product-stock"
                       type="number"
                       min="0"
+                      step="1"
                       value={newProduct.stock}
                       onChange={(e) => setNewProduct((prev) => ({ ...prev, stock: e.target.value }))}
-                      className="w-full rounded-[12px] border border-black/10 px-3 py-2.5 text-[12px] text-black outline-none focus:ring-2 focus:ring-[#D4AF37] focus:ring-offset-2 focus:ring-offset-white"
+                      className="w-full rounded-xl border border-[#eadfd8] bg-white px-3.5 py-3 text-[13px] text-[#33251e] outline-none transition focus:border-[#d4af37] focus:ring-2 focus:ring-[#d4af37]/15"
                       placeholder="10"
+                      required
                     />
                   </div>
 
-                  <div className="space-y-3">
-                    <label className="block text-[11px] font-medium text-black/70">Image</label>
-                    <div className="rounded-[12px] border border-black/10 bg-black/5 p-3">
+                  <div className="space-y-2 sm:col-span-2">
+                    <label className="block text-[10px] font-bold uppercase tracking-[0.15em] text-[#8f8076]">Product Image <span className="normal-case tracking-normal text-[#b07a39]">Required for the customer menu</span></label>
+                    <div className="flex items-center gap-4 rounded-2xl border border-dashed border-[#d8c9b5] bg-[#fbf7f2] p-3.5">
+                      <div className="grid h-24 w-24 shrink-0 place-items-center overflow-hidden rounded-xl border border-[#eadfd8] bg-white">
+                        {newImagePreview
+                          ? <img src={newImagePreview} alt="Selected product preview" className="h-full w-full object-cover" />
+                          : <ImagePlus size={26} className="text-[#b7a69c]" aria-hidden="true" />}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-[12px] font-semibold text-[#5f514a]">{newImage?.name || "No image selected"}</p>
+                        <p className="mt-1 text-[11px] text-[#8f8076]">JPG, PNG, or GIF · Maximum 5 MB</p>
+                        {productImageError && <p className="mt-1 text-[11px] font-medium text-red-700" role="alert">{productImageError}</p>}
+                      </div>
                       <button
                         type="button"
                         onClick={() => newImageInputRef.current?.click()}
-                        className="inline-flex items-center rounded-[12px] bg-black px-3.5 py-2 text-[13px] font-medium text-white hover:bg-black/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37]"
+                        title={newImage ? "Change product image" : "Choose product image"}
+                        aria-label={newImage ? "Change product image" : "Choose product image"}
+                        className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#33251e] text-white transition hover:bg-[#5b4540] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d4af37] focus-visible:ring-offset-2"
                       >
-                        <ImagePlus size={15} className="mr-1.5" aria-hidden="true" /> Upload Product Image
+                        <ImagePlus size={18} aria-hidden="true" />
                       </button>
-                      <p className="mt-2 text-xs text-black/50">{newImage ? newImage.name : 'No image selected'}</p>
-                      <p className="mt-1 text-xs text-black/40">JPG, PNG • Up to 5 MB</p>
                     </div>
                     <input
                       ref={newImageInputRef}
                       type="file"
                       accept="image/png,image/jpeg,image/jpg,image/gif"
-                      onChange={(e) => setNewImage(e.target.files?.[0] || null)}
+                      onChange={handleNewImageChange}
                       className="hidden"
                     />
                   </div>
-                </div>
+                  </div>
 
-                <div className="mt-6 space-y-3">
-                  <label className="block text-[12px] font-medium text-black/70">Description</label>
+                <div className="space-y-2">
+                  <label htmlFor="new-product-description" className="block text-[10px] font-bold uppercase tracking-[0.15em] text-[#8f8076]">Description</label>
                   <textarea
+                    id="new-product-description"
                     value={newProduct.description}
                     onChange={(e) => setNewProduct((prev) => ({ ...prev, description: e.target.value }))}
-                    className="w-full min-h-[120px] rounded-[12px] border border-black/10 px-3.5 py-2.5 text-[13px] text-black outline-none focus:ring-2 focus:ring-[#D4AF37] focus:ring-offset-2 focus:ring-offset-white"
+                    className="min-h-[110px] w-full rounded-xl border border-[#eadfd8] bg-white px-3.5 py-3 text-[13px] text-[#33251e] outline-none transition placeholder:text-[#b7a69c] focus:border-[#d4af37] focus:ring-2 focus:ring-[#d4af37]/15"
                     placeholder="Short product description"
                   />
                 </div>
 
-                <div className="mt-6 space-y-4">
+                <div className="space-y-4">
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <h3 className="text-base font-semibold text-black">Recipe Ingredients</h3>
+                    <div>
+                      <h3 className="font-serif text-[18px] text-[#33251e]">Recipe Ingredients</h3>
+                      <p className="mt-0.5 text-[11px] text-[#8f8076]">Optional · Define ingredients used for production.</p>
+                    </div>
                     <button
                       type="button"
                       onClick={addRecipeRow}
-                      className="inline-flex items-center justify-center rounded-[12px] bg-black px-3.5 py-1.5 text-[13px] font-medium text-white hover:bg-black/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37]"
+                      title="Add ingredient"
+                      aria-label="Add ingredient"
+                      className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-[#eadfd8] bg-white text-[#765d50] transition hover:bg-[#fff4cd] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d4af37]"
                     >
-                      Add Ingredient
+                      <Plus size={16} aria-hidden="true" />
                     </button>
                   </div>
 
                   <div className="space-y-3">
                     {recipeRows.map((row, index) => (
-                      <div key={index} className="grid gap-3 md:grid-cols-[1.4fr_0.9fr_auto] items-end rounded-[12px] border border-black/10 bg-black/5 p-3">
+                      <div key={index} className="grid items-end gap-3 rounded-2xl border border-[#eadfd8] bg-white p-3 sm:grid-cols-[1.4fr_0.9fr_auto]">
                         <div>
-                          <label className="sr-only">Ingredient</label>
+                          <label className="mb-1.5 block text-[10px] font-semibold text-[#8f8076]">Ingredient</label>
                           <select
                             value={row.ingredient_id}
                             onChange={(e) => updateRecipeRow(index, 'ingredient_id', e.target.value)}
-                            className="w-full rounded-[12px] border border-black/10 bg-white px-4 py-3 text-sm text-black outline-none focus:ring-2 focus:ring-[#D4AF37] focus:ring-offset-2 focus:ring-offset-white"
+                            className="w-full rounded-xl border border-[#eadfd8] bg-white px-3 py-2.5 text-[12px] text-[#33251e] outline-none transition focus:border-[#d4af37] focus:ring-2 focus:ring-[#d4af37]/15"
                           >
                             <option value="">Select ingredient</option>
                             {ingredients.map((ing) => (
@@ -1302,24 +1378,25 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
                           </select>
                         </div>
                         <div>
-                          <label className="sr-only">Qty</label>
+                          <label className="mb-1.5 block text-[10px] font-semibold text-[#8f8076]">Quantity</label>
                           <input
                             type="number"
                             min="0"
                             step="0.01"
                             value={row.qty}
                             onChange={(e) => updateRecipeRow(index, 'qty', e.target.value)}
-                            className="w-full rounded-[12px] border border-black/10 bg-white px-4 py-3 text-sm text-black outline-none focus:ring-2 focus:ring-[#D4AF37] focus:ring-offset-2 focus:ring-offset-white"
-                            placeholder="Qty"
+                            className="w-full rounded-xl border border-[#eadfd8] bg-white px-3 py-2.5 text-[12px] text-[#33251e] outline-none transition focus:border-[#d4af37] focus:ring-2 focus:ring-[#d4af37]/15"
+                            placeholder="0"
                           />
                         </div>
                         <button
                           type="button"
                           onClick={() => removeRecipeRow(index)}
-                          className="inline-flex items-center justify-center rounded-[12px] border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-300"
+                          title={`Remove ingredient ${index + 1}`}
+                          aria-label={`Remove ingredient ${index + 1}`}
+                          className="inline-flex h-10 w-10 items-center justify-center justify-self-end rounded-full border border-red-200 bg-red-50 text-red-600 transition hover:bg-red-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-300"
                         >
-                          <Trash2 size={16} className="mr-2" />
-                          Remove
+                          <Trash2 size={16} aria-hidden="true" />
                         </button>
                       </div>
                     ))}
@@ -1327,27 +1404,29 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
                 </div>
 
                 {productFormError && (
-                  <div className="rounded-2xl bg-red-50 border border-red-200 p-3 text-sm text-red-700 mt-5">
+                  <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-[12px] text-red-700" role="alert">
                     {productFormError}
                   </div>
                 )}
 
-                <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end sm:gap-4">
+                <div className="flex flex-col-reverse gap-2 border-t border-[#f0e7e0] pt-4 sm:flex-row sm:justify-end">
                   <button
                     type="button"
                     onClick={closeAddProductModal}
-                    className="w-full sm:w-auto rounded-[12px] border border-black/10 bg-white px-5 py-2.5 text-[13px] font-medium text-black hover:bg-black/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37]"
+                    className="rounded-xl border border-[#eadfd8] bg-white px-5 py-2.5 text-[12px] font-semibold text-[#765d50] transition hover:bg-[#fbf7f2] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d4af37]"
                   >
                     Cancel
                   </button>
 
                   <button
+                    type="button"
                     onClick={submitNewProduct}
-                    disabled={productSaving}
-                    className="w-full sm:w-auto rounded-[12px] bg-black px-5 py-2.5 text-[13px] font-medium text-white hover:bg-black/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37] disabled:cursor-not-allowed disabled:bg-black/40"
+                    disabled={productSaving || !newImage}
+                    className="rounded-xl bg-[#33251e] px-5 py-2.5 text-[12px] font-semibold text-white transition hover:bg-[#5b4540] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d4af37] disabled:cursor-not-allowed disabled:opacity-50"
                   >
-                    {productSaving ? 'Saving...' : 'Create Product'}
+                    {productSaving ? 'Adding product…' : 'Create Product'}
                   </button>
+                </div>
                 </div>
               </motion.div>
             </motion.div>
@@ -1373,7 +1452,7 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
                       <h2 className="mt-1 font-serif text-[22px] text-[#33251e]">Edit Product</h2>
                       <p className="mt-1 text-[12px] text-[#74675f]">Update product details, image, and recipe mapping.</p>
                     </div>
-                    <button onClick={() => setEditOpen(false)} className="rounded-lg border border-[#eadfd8] bg-white px-3 py-2 text-[11px] font-semibold text-[#765d50] transition hover:bg-[#fff8df]">Close</button>
+                    <button type="button" onClick={() => setEditOpen(false)} title="Close edit product" aria-label="Close edit product" className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-[#eadfd8] bg-white text-[#765d50] transition hover:bg-[#fff8df]"><X size={16} aria-hidden="true" /></button>
                   </div>
                 </div>
 
@@ -1385,7 +1464,7 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
                       type="text"
                       value={editProduct.name}
                       onChange={(e) => setEditProduct((p) => ({ ...p, name: e.target.value }))}
-                      className="w-full rounded-lg border border-[#eadfd8] bg-white px-3 py-2.5 text-[12px] text-[#33251e] outline-none transition focus:border-[#d4af37] focus:ring-2 focus:ring-[#d4af37]/15"
+                      className="w-full rounded-xl border border-[#eadfd8] bg-white px-3 py-2.5 text-[12px] text-[#33251e] outline-none transition focus:border-[#d4af37] focus:ring-2 focus:ring-[#d4af37]/15"
                     />
                   </div>
 
@@ -1395,7 +1474,7 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
                       id="edit-product-category"
                       value={editProduct.category}
                       onChange={(e) => setEditProduct((p) => ({ ...p, category: e.target.value }))}
-                      className="w-full rounded-lg border border-[#eadfd8] bg-white px-3 py-2.5 text-[12px] text-[#33251e] outline-none transition focus:border-[#d4af37] focus:ring-2 focus:ring-[#d4af37]/15"
+                      className="w-full rounded-xl border border-[#eadfd8] bg-white px-3 py-2.5 text-[12px] text-[#33251e] outline-none transition focus:border-[#d4af37] focus:ring-2 focus:ring-[#d4af37]/15"
                     >
                       {[...new Set([
                         ...(canManageCatalog ? ["Cakes", "Small Cakes"] : ["Cakes", "Small Cakes", "Meals", "Pasta", "Starter"]),
@@ -1415,7 +1494,7 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
                       step="0.01"
                       value={editProduct.price}
                       onChange={(e) => setEditProduct((p) => ({ ...p, price: e.target.value }))}
-                      className="w-full rounded-lg border border-[#eadfd8] bg-white px-3 py-2.5 text-[12px] text-[#33251e] outline-none transition focus:border-[#d4af37] focus:ring-2 focus:ring-[#d4af37]/15"
+                      className="w-full rounded-xl border border-[#eadfd8] bg-white px-3 py-2.5 text-[12px] text-[#33251e] outline-none transition focus:border-[#d4af37] focus:ring-2 focus:ring-[#d4af37]/15"
                     />
                   </div>
 
@@ -1446,7 +1525,7 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
                   <textarea
                     value={editProduct.description}
                     onChange={(e) => setEditProduct((p) => ({ ...p, description: e.target.value }))}
-                    className="min-h-[120px] w-full rounded-lg border border-[#eadfd8] bg-white px-3 py-2.5 text-[12px] text-[#33251e] outline-none transition focus:border-[#d4af37] focus:ring-2 focus:ring-[#d4af37]/15"
+                    className="min-h-[120px] w-full rounded-xl border border-[#eadfd8] bg-white px-3 py-2.5 text-[12px] text-[#33251e] outline-none transition focus:border-[#d4af37] focus:ring-2 focus:ring-[#d4af37]/15"
                   />
                 </div>
 
@@ -1456,9 +1535,11 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
                     <button
                       type="button"
                       onClick={addRecipeRow}
-                      className="rounded-lg bg-[#33251e] px-3 py-2 text-[11px] font-semibold text-white transition hover:bg-[#5b4540]"
+                      title="Add ingredient"
+                      aria-label="Add ingredient"
+                      className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-[#33251e] text-white transition hover:bg-[#5b4540]"
                     >
-                      Add Ingredient
+                      <Plus size={16} aria-hidden="true" />
                     </button>
                   </div>
                   <div>
@@ -1491,7 +1572,7 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
                           className="w-full rounded-xl border border-black/10 bg-white px-3 py-2 text-xs text-black"
                           placeholder="Qty"
                         />
-                        <button type="button" onClick={() => removeRecipeRow(index)} className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-600">Remove</button>
+                        <button type="button" onClick={() => removeRecipeRow(index)} title={`Remove recipe ingredient ${index + 1}`} aria-label={`Remove recipe ingredient ${index + 1}`} className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-red-200 bg-red-50 text-red-600"><Trash2 size={14} aria-hidden="true" /></button>
                       </div>
                     ))}
                   </div>
@@ -1537,7 +1618,10 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
                           throw new Error(data.error || data.message || 'Product update failed.');
                         }
                       } catch (err) {
-                        alert(err.message || 'Server error while updating product.');
+                        setAdminDialog({
+                          title: "Product not updated",
+                          message: err.message || "We could not update the product. Please try again.",
+                        });
                       } finally {
                         setEditSaving(false);
                       }
@@ -1555,6 +1639,7 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
           )}
 
         </AnimatePresence>
+        <AdminDialog dialog={adminDialog} onClose={() => setAdminDialog(null)} />
 
       </div>
 

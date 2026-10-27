@@ -49,10 +49,13 @@ describe("Promotions campaign history", () => {
   });
 
   test("deletes the selected campaign after confirmation", async () => {
-    const confirm = jest.spyOn(window, "confirm").mockReturnValue(true);
     render(<Promotions />);
 
     fireEvent.click(await screen.findByRole("button", { name: "Delete Weekend Special" }));
+    expect(await screen.findByRole("alertdialog")).toHaveTextContent(
+      "Delete \"Weekend Special\"? This will permanently remove the campaign and its delivery history, and disable its coupon."
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Delete campaign" }));
 
     await waitFor(() => {
       expect(global.fetch).toHaveBeenCalledWith(
@@ -60,7 +63,6 @@ describe("Promotions campaign history", () => {
         expect.objectContaining({ method: "DELETE" }),
       );
     });
-    expect(confirm).toHaveBeenCalledWith(expect.stringContaining("disable its coupon"));
     expect(await screen.findByText("Campaign and delivery history deleted.")).toBeInTheDocument();
   });
 });

@@ -1,5 +1,5 @@
 ﻿import React, { useEffect, useMemo, useState } from 'react';
-import { CUSTOMER_BASE } from '../../services/config';
+import { CUSTOMER_BASE, ROOT_BASE } from '../../services/config';
 import { Heart } from 'lucide-react';
 
 const PIZZA_IMAGE_FALLBACKS = {
@@ -297,6 +297,12 @@ export default function ProductCard({
           src={resolveProductImage(product)}
           alt={product.name}
           onError={(event) => {
+            const image = event.currentTarget;
+            if (product?.image && !image.dataset.rootUploadFallbackAttempted) {
+              image.dataset.rootUploadFallbackAttempted = 'true';
+              image.src = `${ROOT_BASE}/uploads/${encodeURIComponent(product.image)}`;
+              return;
+            }
             const fallback = category.includes('coffee')
               ? 'americano.png'
               : category.includes('drink')
@@ -304,7 +310,6 @@ export default function ProductCard({
               : category.includes('pizza')
               ? 'pepperoni.png'
               : 'americano.png';
-              const image = event.currentTarget;
               const fallbackUrl = productImageUrl(fallback);
               if (image.dataset.fallbackAttempted || image.src === fallbackUrl) {
                 image.style.visibility = 'hidden';

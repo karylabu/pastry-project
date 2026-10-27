@@ -8,6 +8,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use App\Services\ProductionService;
 use Throwable;
@@ -20,10 +21,23 @@ class ProductController extends Controller
             return;
         }
 
-        $path = base_path('../uploads/' . $imageName);
-        if (is_file($path) && !unlink($path)) {
-            Log::warning('Unable to remove an uncommitted product image.', ['product_id' => $productId, 'image' => $imageName]);
+        foreach ([base_path('../uploads/' . $imageName), public_path('uploads/' . $imageName)] as $path) {
+            if (is_file($path) && !unlink($path)) {
+                Log::warning('Unable to remove an uncommitted product image.', ['product_id' => $productId, 'image' => $imageName]);
+            }
         }
+    }
+
+    private function copyProductImageToCustomerUploads(string $imageName): bool
+    {
+        $customerUploadDirectory = public_path('uploads');
+        if (!is_dir($customerUploadDirectory)
+            && !mkdir($customerUploadDirectory, 0755, true)
+            && !is_dir($customerUploadDirectory)) {
+            return false;
+        }
+
+        return copy(base_path('../uploads/' . $imageName), $customerUploadDirectory . DIRECTORY_SEPARATOR . $imageName);
     }
 
     public function staffIndex(Request $request, ProductionService $production): JsonResponse
@@ -66,6 +80,147 @@ class ProductController extends Controller
         return response()->json($products);
     }
 
+    public function storeStaff(Request $request): JsonResponse
+    {
+        $admin = $this->requireRole($request, 'admin');
+        if (!$admin instanceof \App\Models\User) {
+            return $admin;
+        }
+
+        if (!Schema::hasTable('product_sizes')) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Product size storage is unavailable. Please contact support.',
+            ], 500);
+        }
+
+        $data = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'category' => ['required', 'string', 'max:100'],
+            'size' => ['required', 'in:Small,Big'],
+            'description' => ['nullable', 'string'],
+            'price' => ['required', 'numeric', 'gt:0'],
+            'stock' => ['required', 'integer', 'min:0'],
+            'image' => ['required', 'image', 'mimes:jpg,jpeg,png,gif', 'max:5120'],
+            'ingredient_id' => ['sometimes', 'array'],
+            'ingredient_id.*' => ['required', 'integer', 'exists:ingredients,id'],
+            'ingredient_qty' => ['sometimes', 'array'],
+            'ingredient_qty.*' => ['required', 'numeric', 'gt:0'],
+        ]);
+
+        if (count($data['ingredient_id'] ?? []) !== count($data['ingredient_qty'] ?? [])) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Check that every recipe ingredient has a quantity.',
+            ], 422);
+        }
+
+        $uploadDirectory = base_path('../uploads');
+        if (!is_dir($uploadDirectory) && !mkdir($uploadDirectory, 0755, true) && !is_dir($uploadDirectory)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unable to prepare image storage. Please try again later.',
+            ], 500);
+        }
+
+        $image = $request->file('image');
+        $imageName = 'p' . Str::uuid() . '.' . $image->extension();
+        try {
+            $image->move($uploadDirectory, $imageName);
+        } catch (Throwable $exception) {
+            Log::error('Product image upload failed.', ['exception' => $exception]);
+            return response()->json([
+                'success' => false,
+                'message' => 'Unable to save the product image. Please choose another image and try again.',
+            ], 500);
+        }
+        if (!$this->copyProductImageToCustomerUploads($imageName)) {
+            $this->removeFailedProductImage($imageName, 0);
+            Log::error('Product image could not be copied to customer-facing storage.', ['image' => $imageName]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Unable to make the product image available to customers. Please try again.',
+            ], 500);
+        }
+
+        try {
+            $productId = DB::transaction(function () use ($data, $imageName) {
+                $now = now();
+                $productAttributes = [
+                    'name' => trim($data['name']),
+                    'category' => trim($data['category']),
+                    'price' => $data['price'],
+                    'big_price' => $data['price'],
+                    'stock' => (int) $data['stock'],
+                    'image' => $imageName,
+                    'description' => trim((string) ($data['description'] ?? '')) ?: null,
+                    'available' => true,
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ];
+                $productAttributes = array_filter(
+                    $productAttributes,
+                    fn ($value, $column) => Schema::hasColumn('products', $column),
+                    ARRAY_FILTER_USE_BOTH
+                );
+                $productId = (int) DB::table('products')->insertGetId($productAttributes);
+
+                $sizeAttributes = [
+                    'product_id' => $productId,
+                    'size' => $data['size'],
+                    'price' => $data['price'],
+                    'stock_quantity' => (int) $data['stock'],
+                    'available' => true,
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ];
+                $sizeAttributes = array_filter(
+                    $sizeAttributes,
+                    fn ($value, $column) => Schema::hasColumn('product_sizes', $column),
+                    ARRAY_FILTER_USE_BOTH
+                );
+                $sizeId = (int) DB::table('product_sizes')->insertGetId($sizeAttributes);
+
+                if (Schema::hasTable('product_recipes')) {
+                    foreach ($data['ingredient_id'] ?? [] as $index => $ingredientId) {
+                        $recipeAttributes = [
+                            'product_id' => $productId,
+                            'product_size_id' => $sizeId,
+                            'ingredient_id' => (int) $ingredientId,
+                            'qty' => $data['ingredient_qty'][$index],
+                            'active' => true,
+                            'created_at' => $now,
+                            'updated_at' => $now,
+                        ];
+                        $recipeAttributes = array_filter(
+                            $recipeAttributes,
+                            fn ($value, $column) => Schema::hasColumn('product_recipes', $column),
+                            ARRAY_FILTER_USE_BOTH
+                        );
+                        DB::table('product_recipes')->insert($recipeAttributes);
+                    }
+                }
+
+                return $productId;
+            });
+        } catch (Throwable $exception) {
+            $this->removeFailedProductImage($imageName, 0);
+            Log::error('Product creation failed.', ['exception' => $exception]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Unable to add the product. Please review the details and try again.',
+            ], 500);
+        }
+
+        return response()->json([
+            'success' => true,
+            'product_id' => $productId,
+            'message' => 'Product added to the customer menu.',
+        ], 201);
+    }
+
     public function updateStaff(Request $request, Product $product): JsonResponse
     {
         $admin = $this->requireRole($request, 'admin');
@@ -96,6 +251,15 @@ class ProductController extends Controller
             } catch (Throwable $exception) {
                 Log::error('Product image upload failed.', ['product_id' => $product->id, 'exception' => $exception]);
                 return response()->json(['success' => false, 'message' => 'Unable to save the product image.'], 500);
+            }
+            if (!$this->copyProductImageToCustomerUploads($imageName)) {
+                $this->removeFailedProductImage($imageName, (int) $product->id);
+                Log::error('Updated product image could not be copied to customer-facing storage.', [
+                    'product_id' => $product->id,
+                    'image' => $imageName,
+                ]);
+
+                return response()->json(['success' => false, 'message' => 'Unable to make the product image available to customers.'], 500);
             }
         }
 

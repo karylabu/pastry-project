@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { AlertTriangle, CircleCheck, Clock3, PackageCheck, RefreshCw, Search, ShoppingBag, X } from "lucide-react";
+import { AlertTriangle, ChevronDown, ChevronUp, CircleCheck, Clock3, PackageCheck, RefreshCw, Search, ShoppingBag, X } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 
 /* STAFF NAVBAR */
@@ -493,9 +493,11 @@ export default function Orders() {
                     fetchIngredients();
                   }}
                   disabled={loading}
-                  className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-lg bg-black px-4 text-[12px] font-semibold text-white transition hover:bg-black/90 disabled:cursor-wait disabled:opacity-60"
+                  title="Refresh orders"
+                  aria-label="Refresh orders"
+                  className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-black text-white transition hover:bg-black/90 disabled:cursor-wait disabled:opacity-60"
                 >
-                  <RefreshCw size={14} className={loading ? "animate-spin" : ""} /> Refresh
+                  <RefreshCw size={16} className={loading ? "animate-spin" : ""} aria-hidden="true" />
                 </button>
               </div>
             </div>
@@ -678,7 +680,7 @@ export default function Orders() {
                       </div>
                       <div className="mt-3 flex flex-wrap gap-1.5">
                         {!order.is_wasted && <>
-                          <button type="button" onClick={() => setExpandedOrderId(isExpanded ? null : order.id)} className="rounded-md border border-[#e8dfd4] bg-white px-2.5 py-1.5 text-[10px] font-semibold text-[#65574d] hover:bg-[#faf7f2]">{isExpanded ? "Hide details" : "View details"}</button>
+                          <button type="button" onClick={() => setExpandedOrderId(isExpanded ? null : order.id)} title={`${isExpanded ? "Hide" : "View"} details for order ${order.order_number || order.id}`} aria-label={`${isExpanded ? "Hide" : "View"} details for order ${order.order_number || order.id}`} className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-[#e8dfd4] bg-white text-[#65574d] transition hover:bg-[#faf7f2]">{isExpanded ? <ChevronUp size={15} aria-hidden="true" /> : <ChevronDown size={15} aria-hidden="true" />}</button>
                           {canAdvance && <button type="button" onClick={() => advanceOrder(order)} disabled={updatingId === order.id} className="rounded-md bg-black px-2.5 py-1.5 text-[10px] font-semibold text-white disabled:opacity-50">{updatingId === order.id ? "Updating..." : needsPaymentReview ? "Review payment" : order.status === "Pending" ? "Approve" : order.status === "Preparing" ? "Ready" : "Complete"}</button>}
                           {order.return_refund_request?.status === "Pending Review"
                             ? <button type="button" onClick={() => { setRejectModalOrderId(order.id); setRejectReason(""); }} disabled={updatingId === order.id} className="rounded-md border border-red-200 bg-red-50 px-2.5 py-1.5 text-[10px] font-semibold text-red-700 disabled:opacity-50">Reject</button>

@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { CalendarDays, CheckCircle2, ImagePlus, Loader2, Megaphone, Pencil, Send, Tag, Trash2, XCircle } from "lucide-react";
 import { LARAVEL_BASE } from "../../services/config";
 import { getAuthHeaders } from "../../services/api";
+import AdminDialog from "../components/AdminDialog";
 
 function StatsStrip({ stats }) {
   return (
@@ -84,6 +85,7 @@ export default function Promotions() {
   const [editingPromotion, setEditingPromotion] = useState(null);
   const [sendingDraftId, setSendingDraftId] = useState(null);
   const [deletingPromotionId, setDeletingPromotionId] = useState(null);
+  const [adminDialog, setAdminDialog] = useState(null);
 
   const metrics = useMemo(() => {
     const sent = promotions.filter((item) => item.status === "sent").length;
@@ -174,8 +176,16 @@ export default function Promotions() {
   };
 
   const handleSendDraft = async (promotion) => {
-    if (!window.confirm(`Send "${promotion.title}" to all subscribed customers now?`)) return;
+    setAdminDialog({
+      kind: "confirm",
+      title: "Send this promotion?",
+      message: `Send "${promotion.title}" to all subscribed customers now?`,
+      confirmLabel: "Send promotion",
+      onConfirm: () => executeSendDraft(promotion),
+    });
+  };
 
+  const executeSendDraft = async (promotion) => {
     try {
       setSendingDraftId(promotion.id);
       setError("");
@@ -202,11 +212,16 @@ export default function Promotions() {
   };
 
   const handleDeletePromotion = async (promotion) => {
-    const confirmed = window.confirm(
-      `Delete "${promotion.title}"? This will permanently remove the campaign and its delivery history${promotion.coupon_code ? ", and disable its coupon" : ""}.`
-    );
-    if (!confirmed) return;
+    setAdminDialog({
+      kind: "confirm",
+      title: "Delete this campaign?",
+      message: `Delete "${promotion.title}"? This will permanently remove the campaign and its delivery history${promotion.coupon_code ? ", and disable its coupon" : ""}.`,
+      confirmLabel: "Delete campaign",
+      onConfirm: () => executeDeletePromotion(promotion),
+    });
+  };
 
+  const executeDeletePromotion = async (promotion) => {
     try {
       setDeletingPromotionId(promotion.id);
       setError("");
@@ -566,6 +581,15 @@ export default function Promotions() {
           </div>
         </div>
       </div>
+      <AdminDialog
+        dialog={adminDialog}
+        onClose={() => setAdminDialog(null)}
+        onConfirm={() => {
+          const action = adminDialog?.onConfirm;
+          setAdminDialog(null);
+          void action?.();
+        }}
+      />
     </div>
   );
 }

@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  TrendingUp, TrendingDown, DollarSign, Wallet, AlertTriangle, Trash2,
+  TrendingUp, TrendingDown, Wallet, AlertTriangle, Trash2,
   Download, Package, ChevronDown, ChevronUp, Flame, Clock, XCircle, CalendarClock,
   UploadCloud, FileSpreadsheet, CheckCircle2, AlertCircle
 } from 'lucide-react';
@@ -9,6 +9,7 @@ import SalesImportDropzone from './SalesImportDropzone';
 import { ROOT_BASE, STAFF_BASE, LARAVEL_BASE } from '../../../services/config';
 import { subscribeRealtime } from '../../../services/realtime';
 import { useLocation } from 'react-router-dom';
+import AdminDialog from '../../components/AdminDialog';
 
 const staffFetch = (url, options = {}) => {
   let token = '';
@@ -51,7 +52,13 @@ const C = {
 };
 
 function fmt(n)  { return Number(n || 0).toLocaleString(undefined, { maximumFractionDigits: 0 }); }
-function peso(n) { return `₱${Number(n || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}`; }
+export function peso(n) {
+  return `₱${Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+function PesoSign({ size = 16, style }) {
+  return <span aria-hidden="true" className="font-semibold leading-none" style={{ fontSize: size, ...style }}>₱</span>;
+}
 
 /* Used only for the "Total Waste Cost" KPI card estimate — there's no
    real spoilage log yet, so this is a rough sample, not tied to the
@@ -594,6 +601,7 @@ export default function Reports() {
   const [previewPagination, setPreviewPagination] = useState({ current_page: 1, last_page: 1, total: 0 });
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState('');
+  const [adminDialog, setAdminDialog] = useState(null);
 
   const refreshAnalyticsAfterImport = () => {
     setSalesPage(1);
@@ -873,11 +881,20 @@ export default function Reports() {
     return () => { isCurrentRequest = false; };
   }, [previewImport, previewPage]);
 
-  const deleteCsvImport = async (importFile) => {
+  const deleteCsvImport = (importFile) => {
     const confirmation = importFile.status === 'processing'
       ? `Cancel "${importFile.file_name}" and remove any rows imported from this file? The worker will stop at its next safe checkpoint.`
       : `Delete "${importFile.file_name}" and its associated imported sales records? This cannot be undone.`;
-    if (!window.confirm(confirmation)) return;
+    setAdminDialog({
+      kind: "confirm",
+      title: importFile.status === 'processing' ? "Cancel this import?" : "Delete this import?",
+      message: confirmation,
+      confirmLabel: importFile.status === 'processing' ? "Cancel import" : "Delete import",
+      onConfirm: () => executeDeleteCsvImport(importFile),
+    });
+  };
+
+  const executeDeleteCsvImport = async (importFile) => {
     setDeletingImportId(importFile.id);
     setImportDeleteError('');
     try {
@@ -1202,13 +1219,22 @@ export default function Reports() {
       window.setTimeout(() => URL.revokeObjectURL(url), 0);
     } catch (error) {
       console.error('Unable to create the business analytics CSV report:', error);
-      window.alert(error.message || 'Unable to create the business analytics CSV report.');
+      setAdminDialog({
+        title: "Report not downloaded",
+        message: error.message || 'Unable to create the business analytics CSV report.',
+      });
     }
   };
 
   const exportReport = () => {
     const w = window.open('', '_blank');
-    if (!w) return alert('Unable to open print preview. Please allow popups for this site.');
+    if (!w) {
+      setAdminDialog({
+        title: "Print preview blocked",
+        message: "Your browser blocked the report preview. Allow popups for this site, then try again.",
+      });
+      return;
+    }
 
     const renderExportStatus = (message, isError = false) => {
       if (w.closed) return;
@@ -1484,6 +1510,10 @@ export default function Reports() {
     }).catch((error) => {
       console.error('Unable to create the business analytics report:', error);
       renderExportStatus(error.message || 'Unable to create the business analytics report.', true);
+      setAdminDialog({
+        title: "Report preview unavailable",
+        message: error.message || 'Unable to create the business analytics report.',
+      });
     });
   };
 
@@ -1523,7 +1553,7 @@ export default function Reports() {
 
           <div className="admin-sales-report-summary grid grid-cols-1 gap-2.5 sm:grid-cols-2 xl:grid-cols-4 mb-5">
             <StatCard
-              title="Total Revenue" icon={DollarSign} color={C.violet} soft={C.violetSoft}
+              title="Total Revenue" icon={PesoSign} color={C.violet} soft={C.violetSoft}
               value={analyticsLoading ? '…' : analytics ? peso(analytics.summary.revenue) : '—'}
               sub={analyticsLoading ? `${revenuePeriodLabel} · updating` : analytics ? `${analytics.filters.start_date} to ${analytics.filters.end_date}` : 'Analytics unavailable'}
             />
@@ -2083,6 +2113,15 @@ export default function Reports() {
         </section>
       </div>
     )}
+    <AdminDialog
+      dialog={adminDialog}
+      onClose={() => setAdminDialog(null)}
+      onConfirm={() => {
+        const action = adminDialog?.onConfirm;
+        setAdminDialog(null);
+        void action?.();
+      }}
+    />
     </>
   );
 }

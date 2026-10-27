@@ -7,6 +7,7 @@ import {
   Mail,
   MapPin,
   MapPinned,
+  Pencil,
   Phone,
   Settings,
   ShieldCheck,
@@ -144,9 +145,11 @@ export default function Profile() {
             </div>
             <Link
               to="/customer/account-settings?section=profile"
-              className="text-xs font-bold text-slate-500 transition hover:text-slate-900"
+              title="Edit personal information"
+              aria-label="Edit personal information"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 text-slate-500 transition hover:bg-slate-50 hover:text-slate-900"
             >
-              Edit
+              <Pencil size={15} aria-hidden="true" />
             </Link>
           </div>
           <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-4">
@@ -165,9 +168,11 @@ export default function Profile() {
             </div>
             <Link
               to="/customer/account-settings?section=profile#address"
-              className="text-xs font-bold text-slate-500 transition hover:text-slate-900"
+              title="Edit address"
+              aria-label="Edit address"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 text-slate-500 transition hover:bg-slate-50 hover:text-slate-900"
             >
-              Edit
+              <Pencil size={15} aria-hidden="true" />
             </Link>
           </div>
           <div className="grid gap-3">

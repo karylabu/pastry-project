@@ -1,5 +1,5 @@
 import React from "react";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import CustomCakes from "./CustomCakes";
 
 jest.mock("../../../services/config", () => ({
@@ -40,8 +40,15 @@ describe("CustomCakes", () => {
             payment_status: "paid",
             customer: "Mila Customer",
             name: "Mila Customer",
+            customer_name: "Mila Customer",
+            phone: "09260771217",
             total: 1200,
-            details: "Blue ocean theme",
+            details: JSON.stringify({
+              customer_name: "Mila Customer",
+              cake_size: "8 inches",
+              cake_flavor: "Vanilla",
+              theme: "Blue ocean theme",
+            }),
             items: [{ name: "Customized Cake", qty: 1, price: 1200 }],
             custom_details: { cake_size: "8 inches", cake_flavor: "Vanilla" },
             custom_inspo_images: [],
@@ -61,7 +68,14 @@ describe("CustomCakes", () => {
     render(<CustomCakes />);
 
     expect((await screen.findAllByText("Mila Customer")).length).toBeGreaterThan(0);
-    expect(screen.getAllByText("Blue ocean theme").length).toBeGreaterThan(0);
+    const orderRow = screen.getByRole("row", { name: /#31/ });
+    const customerCell = within(orderRow).getAllByRole("cell")[1];
+    expect(customerCell).toHaveTextContent("Mila Customer");
+    expect(customerCell).not.toHaveTextContent("09260771217");
+    expect(orderRow).not.toHaveTextContent('{"customer_name"');
+    expect(orderRow).toHaveTextContent("Blue ocean theme");
+    expect(orderRow).toHaveTextContent("8 inches");
+    expect(orderRow).toHaveTextContent("Vanilla");
     await waitFor(() => {
       expect(global.fetch).toHaveBeenCalledWith(
         "https://example.test/laravel/public/api/staff/orders?custom=1",

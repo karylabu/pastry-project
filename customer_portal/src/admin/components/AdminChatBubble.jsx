@@ -3,6 +3,7 @@ import { Bot, Menu, MessageCircle, Paperclip, RefreshCw, Search, Send, UserRound
 import { CUSTOMER_BASE, LARAVEL_BASE } from "../../services/config";
 import { getAuthHeaders, safeParseJson } from "../../services/api";
 import { subscribeRealtime } from "../../services/realtime";
+import AdminDialog from "./AdminDialog";
 
 const getImageUrl = (value) => {
   if (!value) return null;
@@ -22,6 +23,7 @@ export default function AdminChatBubble() {
   const [sending, setSending] = useState(false);
   const [mobilePanel, setMobilePanel] = useState("conversation");
   const [messageAlertsEnabled, setMessageAlertsEnabled] = useState(true);
+  const [adminDialog, setAdminDialog] = useState(null);
 
   const selectedConversation = useMemo(
     () => conversations.find((item) => String(item.conversation_key) === String(selectedConversationKey)),
@@ -149,7 +151,10 @@ export default function AdminChatBubble() {
       setAttachment(null);
       await Promise.all([fetchMessages(selectedConversation), fetchConversations()]);
     } catch (error) {
-      window.alert(error.message || "Unable to send reply.");
+      setAdminDialog({
+        title: "Message not sent",
+        message: error.message || "Unable to send reply. Please try again.",
+      });
     } finally {
       setSending(false);
     }
@@ -244,6 +249,7 @@ export default function AdminChatBubble() {
       )}
 
       <button type="button" onClick={() => setOpen((value) => !value)} className="fixed bottom-5 right-5 z-[10001] grid h-12 w-12 place-items-center rounded-full bg-[#f0b94d] text-black shadow-xl transition hover:scale-105 hover:bg-[#e5ae3d]" title="Customer Chat" aria-label="Customer Chat"><MessageCircle size={21} />{unreadCount > 0 && <span className="absolute -right-1 -top-1 grid h-5 min-w-5 place-items-center rounded-full bg-black px-1 text-[10px] font-bold text-white">{unreadCount > 99 ? "99+" : unreadCount}</span>}</button>
+      <AdminDialog dialog={adminDialog} onClose={() => setAdminDialog(null)} />
     </>
   );
 }

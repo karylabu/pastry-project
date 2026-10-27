@@ -4,6 +4,7 @@ import * as XLSX from "xlsx";
 import { Calculator, CakeSlice, CheckCircle2, Package, Plus, Search, Save, Trash2, Upload } from "lucide-react";
 import { LARAVEL_BASE } from "../../services/config";
 import { safeParseJson } from "../../services/api";
+import AdminDialog from "../components/AdminDialog";
 
 const emptyLine = { ingredient_id: "", quantity: "", unit: "g" };
 
@@ -21,6 +22,7 @@ export default function CakeRecipes() {
     { flavor_id: "", size_id: "" },
   ]);
   const [preview, setPreview] = useState(null);
+  const [adminDialog, setAdminDialog] = useState(null);
 
   const request = async (path, options = {}) => {
     let storedUser = null;
@@ -170,7 +172,19 @@ export default function CakeRecipes() {
       });
 
       const hasDraft = recipeLines.some((line) => line.ingredient_id || line.quantity);
-      if (hasDraft && !window.confirm("Replace the current recipe draft with the imported file?")) return;
+      if (hasDraft) {
+        setAdminDialog({
+          kind: "confirm",
+          title: "Replace recipe draft?",
+          message: "Importing this file will replace the ingredients currently in the recipe draft.",
+          confirmLabel: "Replace draft",
+          onConfirm: () => {
+            setRecipeLines(importedLines);
+            setStatus(`Imported ${importedLines.length} ingredients for ${selectedFlavor?.name || "this flavor"}. Review the recipe, then save it.`);
+          },
+        });
+        return;
+      }
 
       setRecipeLines(importedLines);
       setStatus(`Imported ${importedLines.length} ingredients for ${selectedFlavor?.name || "this flavor"}. Review the recipe, then save it.`);
@@ -377,7 +391,7 @@ export default function CakeRecipes() {
               )}
 
               <div className="flex flex-wrap items-center justify-between gap-2 border-t border-[#f0e7e0] pt-3">
-                <button type="button" disabled={!selectedFlavorId} onClick={() => setRecipeLines((lines) => [...lines, { ...emptyLine }])} className="inline-flex items-center gap-1.5 rounded-md border border-[#eadfd8] bg-white px-3 py-2 text-[10px] font-semibold text-[#5f514a] transition hover:border-[#d4af37] hover:bg-[#fff8e9] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d4af37] disabled:cursor-not-allowed disabled:opacity-40"><Plus size={13} /> Add ingredient</button>
+                <button type="button" title="Add ingredient" aria-label="Add ingredient" disabled={!selectedFlavorId} onClick={() => setRecipeLines((lines) => [...lines, { ...emptyLine }])} className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-[#eadfd8] bg-white text-[#5f514a] transition hover:border-[#d4af37] hover:bg-[#fff8e9] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d4af37] disabled:cursor-not-allowed disabled:opacity-40"><Plus size={16} aria-hidden="true" /></button>
                 <button type="submit" disabled={loading || !selectedFlavorId} className="inline-flex items-center gap-1.5 rounded-md bg-[#33251e] px-4 py-2 text-[10px] font-semibold text-white transition hover:bg-[#5b4540] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d4af37] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-40"><Save size={13} /> Save recipe</button>
               </div>
             </form>
@@ -427,6 +441,15 @@ export default function CakeRecipes() {
           )}
         </section>
       </div>
+      <AdminDialog
+        dialog={adminDialog}
+        onClose={() => setAdminDialog(null)}
+        onConfirm={() => {
+          const action = adminDialog?.onConfirm;
+          setAdminDialog(null);
+          action?.();
+        }}
+      />
     </div>
   );
 }

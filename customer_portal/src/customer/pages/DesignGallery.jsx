@@ -117,8 +117,8 @@ export default function DesignGallery({ category, folder, backPath = '/customer/
 
   return (
     <PageShell background="bg-[#fffaf3]" padding="px-4 py-6 md:px-10" innerClassName="max-w-6xl">
-      <button type="button" onClick={returnToCustomize} className="mb-5 inline-flex items-center gap-2 text-xs font-bold text-[#765d50] transition hover:text-[#8d6a2e]">
-        <ArrowLeft size={15} /> Back to customize
+      <button type="button" onClick={returnToCustomize} title="Back to customize" aria-label="Back to customize" className="mb-5 inline-flex h-9 w-9 items-center justify-center rounded-full border border-[#eadfd8] bg-white text-[#765d50] transition hover:bg-[#fff8df] hover:text-[#8d6a2e]">
+        <ArrowLeft size={16} aria-hidden="true" />
       </button>
       {selectedReferenceIds.length > 0 && (
         <button
