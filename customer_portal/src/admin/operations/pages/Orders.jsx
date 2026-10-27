@@ -122,7 +122,6 @@ export default function Orders() {
   const [discountIdLoading, setDiscountIdLoading] = useState(null);
   const [paymentProofPreviews, setPaymentProofPreviews] = useState({});
   const [paymentProofLoading, setPaymentProofLoading] = useState(null);
-  const [paymentProofDetailsOrderId, setPaymentProofDetailsOrderId] = useState(null);
   const [paymentProofLightboxOrderId, setPaymentProofLightboxOrderId] = useState(null);
   const [connectionIssue, setConnectionIssue] = useState(false);
   const [rejectModalOrderId, setRejectModalOrderId] = useState(null);
@@ -209,8 +208,11 @@ export default function Orders() {
     }
   };
 
-  const viewPaymentProof = async (orderId) => {
-    if (paymentProofPreviewUrlsRef.current[orderId]) return;
+  const viewPaymentProof = async (orderId, openPreview = false) => {
+    if (paymentProofPreviewUrlsRef.current[orderId]) {
+      if (openPreview) setPaymentProofLightboxOrderId(orderId);
+      return;
+    }
 
     setPaymentProofLoading(orderId);
     try {
@@ -220,17 +222,12 @@ export default function Orders() {
       const previewUrl = URL.createObjectURL(await response.blob());
       paymentProofPreviewUrlsRef.current[orderId] = previewUrl;
       setPaymentProofPreviews((current) => ({ ...current, [orderId]: previewUrl }));
+      if (openPreview) setPaymentProofLightboxOrderId(orderId);
     } catch (error) {
       addToast(error.message || 'Unable to load the private payment proof.', 'error');
     } finally {
       setPaymentProofLoading(null);
     }
-  };
-
-  const togglePaymentProofDetails = (order) => {
-    const isShowing = paymentProofDetailsOrderId === order.id;
-    setPaymentProofDetailsOrderId(isShowing ? null : order.id);
-    if (!isShowing && order.has_payment_proof) viewPaymentProof(order.id);
   };
 
   const toggleOrderDetails = (order, isExpanded) => {
@@ -798,28 +795,18 @@ export default function Orders() {
                           </div>
                           {hasPaymentBreakdown && (
                             <div className="mt-3 grid grid-cols-2 gap-2">
-                              <button type="button" onClick={() => togglePaymentProofDetails(order)} aria-expanded={paymentProofDetailsOrderId === order.id} aria-label={`View payment proof for order ${order.id}: Deposit received`} className="rounded-lg border border-amber-100 bg-white/80 p-2.5 text-left transition hover:border-amber-300 hover:bg-white focus:outline-none focus:ring-2 focus:ring-amber-300">
+                              <button type="button" onClick={() => order.has_payment_proof && viewPaymentProof(order.id, true)} disabled={!order.has_payment_proof || paymentProofLoading === order.id} aria-label={`View payment proof for order ${order.id}: Deposit received`} className="rounded-lg border border-amber-100 bg-white/80 p-2.5 text-left transition hover:border-amber-300 hover:bg-white focus:outline-none focus:ring-2 focus:ring-amber-300 disabled:cursor-default">
                                 <p className="text-[9px] text-[#8f8076]">Deposit received</p>
                                 <p className="mt-0.5 text-[13px] font-bold text-[#33251e]">₱{Number(order.downpayment_amount).toLocaleString()}</p>
                               </button>
-                              <button type="button" onClick={() => togglePaymentProofDetails(order)} aria-expanded={paymentProofDetailsOrderId === order.id} aria-label={`View payment proof for order ${order.id}: Balance due`} className="rounded-lg border border-amber-100 bg-white/80 p-2.5 text-left transition hover:border-amber-300 hover:bg-white focus:outline-none focus:ring-2 focus:ring-amber-300">
+                              <button type="button" onClick={() => order.has_payment_proof && viewPaymentProof(order.id, true)} disabled={!order.has_payment_proof || paymentProofLoading === order.id} aria-label={`View payment proof for order ${order.id}: Balance due`} className="rounded-lg border border-amber-100 bg-white/80 p-2.5 text-left transition hover:border-amber-300 hover:bg-white focus:outline-none focus:ring-2 focus:ring-amber-300 disabled:cursor-default">
                                 <p className="text-[9px] text-[#8f8076]">Balance due</p>
                                 <p className="mt-0.5 text-[13px] font-bold text-amber-900">₱{Math.max(0, Number(order.total || 0) - Number(order.downpayment_amount)).toLocaleString()}</p>
                               </button>
                             </div>
                           )}
-                          {paymentProofDetailsOrderId === order.id && (
-                            <div className="mt-3 rounded-lg border border-amber-100 bg-white/80 p-3">
-                              <p className="text-[9px] font-bold uppercase tracking-[0.14em] text-amber-800">Submitted QRPh proof / reference</p>
-                              {order.has_payment_proof && paymentProofPreviews[order.id] ? (
-                                <button type="button" onClick={() => setPaymentProofLightboxOrderId(order.id)} className="mt-2 inline-flex w-fit max-w-full cursor-zoom-in rounded-lg border border-amber-100 bg-white p-1" aria-label={`Enlarge payment proof for order ${order.id}`}><img src={paymentProofPreviews[order.id]} alt={`Payment proof for order ${order.id}`} className="block max-h-64 max-w-full rounded object-contain" /></button>
-                              ) : order.has_payment_proof ? (
-                                <p className="mt-2 text-[10px] text-amber-900" role="status">{paymentProofLoading === order.id ? "Loading payment proof..." : "Payment proof could not be loaded."}</p>
-                              ) : null}
-                              {order.customer_payment_reference && <p className="mt-2 break-all text-[10px] text-amber-950">Customer reference: <span className="font-semibold">{order.customer_payment_reference}</span></p>}
-                              {!order.has_payment_proof && !order.customer_payment_reference && <p className="mt-2 text-[10px] text-amber-900">No payment proof or reference was submitted.</p>}
-                            </div>
-                          )}
+                          {order.customer_payment_reference && <p className="mt-3 rounded-lg border border-amber-100 bg-white/80 px-2.5 py-2 text-[10px] text-amber-950">Customer reference <span className="ml-1 font-semibold">{order.customer_payment_reference}</span></p>}
+                          {hasPaymentBreakdown && !order.has_payment_proof && !order.customer_payment_reference && <p className="mt-2 text-[10px] text-amber-900">Waiting for customer payment proof.</p>}
                           {!hasPaymentBreakdown && order.has_payment_proof && paymentProofPreviews[order.id] && <button type="button" onClick={() => setPaymentProofLightboxOrderId(order.id)} className="mt-3 inline-flex w-fit max-w-full cursor-zoom-in rounded-lg border border-amber-100 bg-white p-1" aria-label={`Enlarge payment proof for order ${order.id}`}><img src={paymentProofPreviews[order.id]} alt={`Payment proof for order ${order.id}`} className="block max-h-64 max-w-full rounded object-contain" /></button>}
                           {!hasPaymentBreakdown && order.has_payment_proof && !paymentProofPreviews[order.id] && <button type="button" onClick={() => viewPaymentProof(order.id)} disabled={paymentProofLoading === order.id} className="mt-3 rounded-lg bg-[#33251e] px-3 py-2 text-[10px] font-semibold text-white transition hover:bg-black disabled:opacity-60">{paymentProofLoading === order.id ? "Loading proof..." : "View payment proof"}</button>}
                           {!hasPaymentBreakdown && order.customer_payment_reference && <p className="mt-3 rounded-lg border border-amber-100 bg-white/80 px-2.5 py-2 text-[10px] text-amber-950">Customer reference <span className="ml-1 font-semibold">{order.customer_payment_reference}</span></p>}
@@ -980,11 +967,11 @@ export default function Orders() {
                                   </div>
                                   {hasPaymentBreakdown ? (
                                     <div className="mt-3 grid max-w-lg grid-cols-2 gap-3">
-                                      <button type="button" onClick={() => togglePaymentProofDetails(order)} aria-expanded={paymentProofDetailsOrderId === order.id} aria-label={`View payment proof for order ${order.id}: Deposit received`} className="rounded-lg border border-amber-100 bg-white/80 p-3 text-left transition hover:border-amber-300 hover:bg-white focus:outline-none focus:ring-2 focus:ring-amber-300">
+                                      <button type="button" onClick={() => order.has_payment_proof && viewPaymentProof(order.id, true)} disabled={!order.has_payment_proof || paymentProofLoading === order.id} aria-label={`View payment proof for order ${order.id}: Deposit received`} className="rounded-lg border border-amber-100 bg-white/80 p-3 text-left transition hover:border-amber-300 hover:bg-white focus:outline-none focus:ring-2 focus:ring-amber-300 disabled:cursor-default">
                                         <p className="text-[10px] text-black/50">Deposit received</p>
                                         <p className="mt-1 text-base font-bold text-black">₱{Number(order.downpayment_amount).toLocaleString()}</p>
                                       </button>
-                                      <button type="button" onClick={() => togglePaymentProofDetails(order)} aria-expanded={paymentProofDetailsOrderId === order.id} aria-label={`View payment proof for order ${order.id}: Balance due`} className="rounded-lg border border-amber-100 bg-white/80 p-3 text-left transition hover:border-amber-300 hover:bg-white focus:outline-none focus:ring-2 focus:ring-amber-300">
+                                      <button type="button" onClick={() => order.has_payment_proof && viewPaymentProof(order.id, true)} disabled={!order.has_payment_proof || paymentProofLoading === order.id} aria-label={`View payment proof for order ${order.id}: Balance due`} className="rounded-lg border border-amber-100 bg-white/80 p-3 text-left transition hover:border-amber-300 hover:bg-white focus:outline-none focus:ring-2 focus:ring-amber-300 disabled:cursor-default">
                                         <p className="text-[10px] text-black/50">Balance due</p>
                                         <p className="mt-1 text-base font-bold text-amber-900">₱{Math.max(0, Number(order.total || 0) - Number(order.downpayment_amount)).toLocaleString()}</p>
                                       </button>
@@ -1014,36 +1001,10 @@ export default function Orders() {
                                   ) : !order.customer_payment_reference ? (
                                     <p className="mt-1 text-xs text-amber-900">Waiting for customer payment proof.</p>
                                   ) : null}
-                                  {paymentProofDetailsOrderId === order.id && (
-                                    <div className="mt-3 max-w-lg rounded-lg border border-amber-100 bg-white/80 p-3">
-                                      <p className="text-[9px] font-bold uppercase tracking-[0.16em] text-amber-800">Submitted QRPh proof / reference</p>
-                                      {order.has_payment_proof && paymentProofPreviews[order.id] ? (
-                                        <button
-                                          type="button"
-                                          onClick={() => setPaymentProofLightboxOrderId(order.id)}
-                                          className="mt-2 inline-flex w-fit max-w-full cursor-zoom-in rounded-lg border border-black/10 bg-white p-1"
-                                          aria-label={`Enlarge payment proof for order ${order.id}`}
-                                        >
-                                          <img
-                                            src={paymentProofPreviews[order.id]}
-                                            alt={`Payment proof for order ${order.id}`}
-                                            className="block max-h-96 max-w-[min(100%,32rem)] rounded object-contain"
-                                          />
-                                        </button>
-                                      ) : order.has_payment_proof ? (
-                                        <p className="mt-2 text-xs text-amber-900" role="status">
-                                          {paymentProofLoading === order.id ? 'Loading payment proof...' : 'Payment proof could not be loaded.'}
-                                        </p>
-                                      ) : null}
-                                      {!hasPaymentBreakdown && order.customer_payment_reference && (
-                                        <p className="mt-2 break-all text-xs text-amber-950">
-                                          Customer reference: <span className="font-semibold">{order.customer_payment_reference}</span>
-                                        </p>
-                                      )}
-                                      {!order.has_payment_proof && !order.customer_payment_reference && (
-                                        <p className="mt-2 text-xs text-amber-900">No payment proof or reference was submitted.</p>
-                                      )}
-                                    </div>
+                                  {hasPaymentBreakdown && order.customer_payment_reference && (
+                                    <p className="mt-3 max-w-lg break-all rounded-lg border border-amber-100 bg-white/80 px-3 py-2 text-xs text-amber-950">
+                                      Customer reference: <span className="font-semibold">{order.customer_payment_reference}</span>
+                                    </p>
                                   )}
                                   {needsPaymentReview && <p className="mt-3 max-w-2xl rounded-lg bg-amber-100/70 px-3 py-2 text-[11px] leading-5 text-amber-950">Review the payment proof, then mark the order paid to begin preparation.</p>}
                                   {needsBalancePaymentReview && <p className="mt-3 max-w-2xl rounded-lg bg-amber-100/70 px-3 py-2 text-[11px] leading-5 text-amber-950">Confirm the balance payment before marking this order ready for pickup.</p>}

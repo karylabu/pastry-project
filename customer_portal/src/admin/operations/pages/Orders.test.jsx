@@ -131,7 +131,7 @@ test("opens an enlarged payment proof from live order details", async () => {
   );
 });
 
-test("shows submitted payment proof and reference when a deposit or balance card is clicked", async () => {
+test("opens submitted payment proof in the preview when a deposit or balance card is clicked", async () => {
   global.fetch = jest.fn((url) => {
     if (String(url).includes("/api/staff/orders/109/payment-proof")) {
       return Promise.resolve({
@@ -171,9 +171,10 @@ test("shows submitted payment proof and reference when a deposit or balance card
     name: "View payment proof for order 109: Deposit received",
   }));
 
-  expect(await within(orderCard).findAllByRole("img", { name: "Payment proof for order 109" })).not.toHaveLength(0);
+  const preview = await screen.findByRole("dialog", { name: "Payment proof for order 109" });
+  expect(within(preview).getByRole("img", { name: "Enlarged payment proof for order 109" })).toBeInTheDocument();
+  expect(within(orderCard).queryByRole("img", { name: "Payment proof for order 109" })).not.toBeInTheDocument();
   expect(within(orderCard).getAllByText("BALANCE-109")).not.toHaveLength(0);
-  expect(screen.queryByRole("dialog", { name: "Payment proof for order 109" })).not.toBeInTheDocument();
   expect(global.fetch).toHaveBeenCalledWith(
     "https://example.test/laravel/api/staff/orders/109/payment-proof",
     expect.any(Object),
