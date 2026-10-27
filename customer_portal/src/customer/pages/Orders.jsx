@@ -1152,7 +1152,7 @@ export default function Orders() {
   }
 
   // ── Helpers ─────────────────────────────────────────────────────────────────
-  const statusOptions = ["All", "Awaiting Payment", "Pending", "Preparing", "Awaiting Balance Payment", "Ready for Pickup", "Completed", "Cancelled"];
+  const statusOptions = ["All", "Pending", "Awaiting Payment", "Preparing", "Awaiting Balance Payment", "Ready for Pickup", "Completed", "Cancelled"];
 
   const statusCounts = statusOptions.reduce((acc, s) => {
     acc[s] = s === 'All' ? orders.length : orders.filter((o) => (

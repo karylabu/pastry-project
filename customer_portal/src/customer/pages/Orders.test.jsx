@@ -153,7 +153,9 @@ test('shows Awaiting Payment only for customized orders in the customer status f
 
   render(<Orders />);
 
+  const pendingTab = await screen.findByRole('button', { name: /Pending \(0\)/ });
   const awaitingPaymentTab = await screen.findByRole('button', { name: /Awaiting Payment \(1\)/ });
+  expect(pendingTab.compareDocumentPosition(awaitingPaymentTab) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   expect(screen.getByText('Customized Cake')).toBeInTheDocument();
   expect(screen.queryByText('Blueberry Cheesecake')).not.toBeInTheDocument();
 
