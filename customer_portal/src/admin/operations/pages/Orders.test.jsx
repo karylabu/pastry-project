@@ -127,6 +127,58 @@ test("opens an enlarged payment proof from live order details", async () => {
   expect(within(screen.getByRole("dialog")).getByRole("img", { name: "Enlarged payment proof for order 103" })).toBeInTheDocument();
 });
 
+test("shows the submitted payment proof and reference when a deposit or balance amount is selected", async () => {
+  global.fetch = jest.fn((url) => {
+    if (String(url).includes("/api/staff/orders/109/payment-proof")) {
+      return Promise.resolve({
+        ok: true,
+        blob: async () => new Blob(["balance payment proof"], { type: "image/png" }),
+      });
+    }
+
+    if (String(url).includes("/inventory/ingredients")) {
+      return Promise.resolve({ ok: true, json: async () => ({ ingredients: [] }) });
+    }
+
+    return Promise.resolve({
+      ok: true,
+      json: async () => ({
+        success: true,
+        orders: [
+          orderFixture(109, "Awaiting Balance Payment", 10, {
+            payment: "QR Ph",
+            payment_status: "proof_submitted",
+            has_payment_proof: true,
+            customer_payment_reference: "BALANCE-109",
+            downpayment_amount: 1,
+            total: 2,
+          }),
+        ],
+      }),
+    });
+  });
+
+  renderOrders();
+  const orderCard = (await screen.findAllByText("Customer 109"))[0].closest("article");
+  fireEvent.click(within(orderCard).getByRole("button", { name: "View details for order 109" }));
+
+  const depositButtons = within(orderCard).getAllByRole("button", {
+    name: "View payment proof for order 109: Deposit received",
+  });
+  expect(depositButtons).toHaveLength(1);
+  expect(screen.getAllByRole("button", {
+    name: "View payment proof for order 109: Deposit received",
+  })).toHaveLength(2);
+  fireEvent.click(depositButtons[0]);
+
+  expect(await within(orderCard).findAllByRole("img", { name: "Payment proof for order 109" })).not.toHaveLength(0);
+  expect(within(orderCard).getAllByText("BALANCE-109")).not.toHaveLength(0);
+  expect(global.fetch).toHaveBeenCalledWith(
+    "https://example.test/laravel/api/staff/orders/109/payment-proof",
+    expect.any(Object),
+  );
+});
+
 test("lets admin verify a submitted balance before marking an order ready", async () => {
   let statusRequest;
   global.fetch = jest.fn((url, options = {}) => {
