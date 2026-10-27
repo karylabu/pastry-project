@@ -725,7 +725,7 @@ export default function Orders() {
             </div>
             <div className="hidden overflow-x-auto rounded-2xl border border-[#e8dfd4] bg-white shadow-[0_8px_28px_rgba(60,42,28,0.06)] xl:block">
               <table aria-label="Live orders" className="w-full min-w-[1200px] border-collapse">
-                <thead className="sticky top-[88px] z-10 bg-[#f7f4ef] text-left text-[10px] uppercase tracking-[0.12em] text-[#74675f] shadow-[0_1px_0_#e8dfd4]">
+                <thead className="bg-[#f7f4ef] text-left text-[10px] uppercase tracking-[0.12em] text-[#74675f] shadow-[0_1px_0_#e8dfd4]">
                   <tr>
                     {sortableHeader("Order", "order")}
                     <th className="px-4 py-3.5 text-left font-semibold">Date &amp; Time</th>

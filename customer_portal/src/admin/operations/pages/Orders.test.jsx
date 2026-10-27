@@ -103,6 +103,14 @@ test("does not show waste actions for completed orders", async () => {
   expect(within(orderRow).queryByRole("button", { name: "Waste" })).not.toBeInTheDocument();
 });
 
+test("keeps the Live Orders table header in normal page flow while scrolling", async () => {
+  renderOrders();
+  await screen.findAllByText("Customer 101");
+
+  const table = screen.getByRole("table", { name: "Live orders" });
+  expect(table.querySelector("thead")).not.toHaveClass("sticky");
+});
+
 test("sorts orders newest-first from the status filter toolbar", async () => {
   const { container } = renderOrders();
   await screen.findAllByText("Customer 101");
