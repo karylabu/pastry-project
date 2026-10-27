@@ -548,6 +548,9 @@ class OrderController extends Controller
                     'created_at' => now(),
                 ]);
 
+                $this->deductOrderSizeStock($order->items ?? [], (int) $order->id, (int) $user->id);
+                $this->deductOrderProductStock($order, (int) $user->id);
+
                 if ($rewardTransactionId !== null) {
                     $claimedReward = DB::table('loyalty_transactions')
                         ->where('id', $rewardTransactionId)
@@ -845,6 +848,7 @@ class OrderController extends Controller
                     'payment_status' => 'failed',
                 ]);
                 $this->restoreOrderSizeStock($lockedOrder, (int) $user->id);
+                $this->restoreOrderProductStock($lockedOrder, (int) $user->id);
 
                 if (Schema::hasTable('notifications')) {
                     DB::table('notifications')
@@ -1800,7 +1804,9 @@ class OrderController extends Controller
             $previousStock = (float) $product->stock;
             if ($previousStock < $quantity) throw new RuntimeException("Insufficient stock for {$product->name}.");
             $newStock = $previousStock - $quantity;
-            if (!$product->update(['stock' => $newStock])) throw new RuntimeException('Failed to update product stock.');
+            if (DB::table('products')->where('id', $productId)->update(['stock' => $newStock]) !== 1) {
+                throw new RuntimeException('Failed to update product stock.');
+            }
 
             $inserted = DB::table('product_inventory_movements')->insert([
                 'product_id' => $productId,
@@ -1808,7 +1814,7 @@ class OrderController extends Controller
                 'quantity' => -$quantity,
                 'previous_stock' => $previousStock,
                 'new_stock' => $newStock,
-                'reason' => "Order #{$order->id} confirmed",
+                'reason' => "Order #{$order->id} placed",
                 'reference_type' => 'order',
                 'reference_id' => $order->id,
                 'user_id' => $userId,
@@ -1842,7 +1848,9 @@ class OrderController extends Controller
 
             $previousStock = (float) $product->stock;
             $newStock = $previousStock + $restoreQuantity;
-            if (!$product->update(['stock' => $newStock])) throw new RuntimeException('Failed to restore product stock.');
+            if (DB::table('products')->where('id', $product->id)->update(['stock' => $newStock]) !== 1) {
+                throw new RuntimeException('Failed to restore product stock.');
+            }
 
             $inserted = DB::table('product_inventory_movements')->insert([
                 'product_id' => $product->id,

@@ -378,7 +378,7 @@ class RewardCodeCheckoutTest extends TestCase
         $this->assertSame(0, DB::table('orders')->count());
     }
 
-    public function test_checkout_does_not_deduct_stock_before_admin_approval(): void
+    public function test_checkout_reserves_size_stock_before_admin_approval(): void
     {
         DB::table('product_sizes')->insert([
             ['id' => 31, 'product_id' => 11, 'size' => 'Small', 'price' => 200, 'stock_quantity' => 5, 'available' => true],
@@ -392,9 +392,12 @@ class RewardCodeCheckoutTest extends TestCase
         $orderId = $response->getData(true)['order_id'];
 
         $this->assertSame(201, $response->getStatusCode());
-        $this->assertSame(5, (int) DB::table('product_sizes')->where('id', 31)->value('stock_quantity'));
-        $this->assertSame(7, (int) DB::table('product_sizes')->where('id', 32)->value('stock_quantity'));
-        $this->assertSame(0, DB::table('product_inventory_movements')->where('reference_id', $orderId)->count());
+        $this->assertSame(3, (int) DB::table('product_sizes')->where('id', 31)->value('stock_quantity'));
+        $this->assertSame(4, (int) DB::table('product_sizes')->where('id', 32)->value('stock_quantity'));
+        $this->assertSame(2, DB::table('product_inventory_movements')
+            ->where('reference_id', $orderId)
+            ->where('movement_type', 'Order')
+            ->count());
     }
 
     public function test_admin_approval_deducts_size_stock_and_cancellation_restores_it_once(): void
@@ -413,7 +416,7 @@ class RewardCodeCheckoutTest extends TestCase
         $orderId = $response->getData(true)['order_id'];
 
         $this->assertSame(201, $response->getStatusCode());
-        $this->assertSame(5, (int) DB::table('product_sizes')->where('id', 31)->value('stock_quantity'));
+        $this->assertSame(3, (int) DB::table('product_sizes')->where('id', 31)->value('stock_quantity'));
 
         DB::table('users')->insert([
             'id' => 99,
@@ -448,6 +451,23 @@ class RewardCodeCheckoutTest extends TestCase
             'quantity' => 2,
             'reference_id' => $orderId,
         ]);
+    }
+
+    public function test_later_checkout_is_rejected_when_another_order_reserved_the_remaining_finished_stock(): void
+    {
+        DB::table('products')->where('id', 11)->update(['stock' => 2]);
+
+        $firstOrder = $this->placeOrder('', 'none', '', [['product_id' => 11, 'qty' => 2]]);
+        $this->assertSame(201, $firstOrder->getStatusCode());
+        $this->assertSame(0, (int) DB::table('products')->where('id', 11)->value('stock'));
+
+        $secondOrder = $this->placeOrder('', 'none', '', [['product_id' => 11, 'qty' => 1]]);
+        $this->assertSame(422, $secondOrder->getStatusCode());
+        $this->assertSame('You ordered more than the stock available.', $secondOrder->getData(true)['message']);
+        $this->assertSame(1, DB::table('orders')->count());
+        $this->assertSame(1, DB::table('product_inventory_movements')
+            ->where('movement_type', 'Order')
+            ->count());
     }
 
     public function test_successful_payment_deducts_stock_and_admin_approval_does_not_deduct_twice(): void
@@ -508,6 +528,51 @@ class RewardCodeCheckoutTest extends TestCase
             ->where('reference_id', 52)
             ->where('movement_type', 'Order')
             ->count());
+    }
+
+    public function test_failed_payment_releases_product_stock_reserved_at_checkout(): void
+    {
+        DB::table('products')->where('id', 11)->update(['stock' => 18]);
+        DB::table('orders')->insert([
+            'id' => 53,
+            'user_id' => 7,
+            'items' => json_encode([['product_id' => 11, 'qty' => 2]]),
+            'total' => 6000,
+            'payment' => 'QRPh',
+            'payment_status' => 'pending',
+            'payment_reference' => 'link_failed_stock_test',
+            'status' => 'Awaiting Payment',
+            'order_type' => 'Standard',
+            'is_customized' => false,
+        ]);
+        DB::table('product_inventory_movements')->insert([
+            'product_id' => 11,
+            'movement_type' => 'Order',
+            'quantity' => -2,
+            'previous_stock' => 20,
+            'new_stock' => 18,
+            'reason' => 'Order #53 placed',
+            'reference_type' => 'order',
+            'reference_id' => 53,
+            'user_id' => 7,
+            'created_at' => now(),
+        ]);
+        Http::fake([
+            'https://api.paymongo.com/v1/payment_links/link_failed_stock_test/payments' => Http::response(['data' => []], 200),
+            'https://api.paymongo.com/v1/payment_links/link_failed_stock_test' => Http::response(['data' => ['id' => 'link_failed_stock_test']], 200),
+        ]);
+        config(['services.paymongo.secret' => 'sk_test_stock_payment']);
+
+        $response = $this->withHeader('X-Auth-Token', 'test-customer-token')
+            ->postJson('/api/orders/53/payment-failure');
+
+        $response->assertOk()->assertJsonPath('payment_status', 'failed');
+        $this->assertSame(20, (int) DB::table('products')->where('id', 11)->value('stock'));
+        $this->assertDatabaseHas('product_inventory_movements', [
+            'reference_id' => 53,
+            'movement_type' => 'Cancellation',
+            'quantity' => 2,
+        ]);
     }
 
     public function test_migration_releases_previously_deducted_stock_from_pending_orders_once(): void
@@ -683,6 +748,8 @@ class RewardCodeCheckoutTest extends TestCase
 
     public function test_twenty_units_are_allowed_but_later_checkouts_remain_limited(): void
     {
+        DB::table('products')->where('id', 11)->update(['stock' => 100]);
+
         $firstOrder = $this->placeOrder('', 'none', '', [['product_id' => 11, 'qty' => 20]]);
         $this->assertSame(201, $firstOrder->getStatusCode());
 
