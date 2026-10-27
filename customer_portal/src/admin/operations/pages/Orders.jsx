@@ -31,10 +31,17 @@ const formatOrderDateTime = (value) => {
     : date.toLocaleString([], { dateStyle: "medium", timeStyle: "short" });
 };
 
-const hasUnpaidBalance = (order) =>
-  String(order.payment_status || "").toLowerCase() === "downpayment_paid"
-  && Number(order.downpayment_amount) > 0
-  && Number(order.total) > Number(order.downpayment_amount);
+const hasUnpaidBalance = (order) => {
+  const paymentStatus = String(order.payment_status || "").trim().toLowerCase();
+  const downpaymentAmount = Number(order.downpayment_amount);
+  const total = Number(order.total);
+
+  return paymentStatus !== "paid"
+    && Number.isFinite(downpaymentAmount)
+    && downpaymentAmount > 0
+    && Number.isFinite(total)
+    && total > downpaymentAmount;
+};
 
 const BOARD_COLUMNS = [
   {

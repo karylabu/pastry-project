@@ -202,6 +202,40 @@ test("moves a partially paid order from preparing to pay balance before ready", 
   expect(JSON.parse(statusRequest.body)).toEqual({ status: "Awaiting Balance Payment" });
 });
 
+test("shows Pay Balance before Ready when a preparing order has an outstanding downpayment balance", async () => {
+  let statusRequest;
+  global.fetch = jest.fn((url, options = {}) => {
+    if (String(url).includes("/inventory/ingredients")) {
+      return Promise.resolve({ ok: true, json: async () => ({ ingredients: [] }) });
+    }
+
+    if (String(url).includes("/api/staff/orders/109/status")) {
+      statusRequest = options;
+      return Promise.resolve({ ok: true, json: async () => ({ success: true, status: "Awaiting Balance Payment" }) });
+    }
+
+    return Promise.resolve({
+      ok: true,
+      json: async () => ({
+        success: true,
+        orders: [orderFixture(109, "Preparing", 10, {
+          payment: "QR Ph",
+          payment_status: "pending",
+          downpayment_amount: 500,
+          total: 1000,
+        })],
+      }),
+    });
+  });
+
+  renderOrders();
+  const orderCard = (await screen.findAllByText("Customer 109"))[0].closest("article");
+  fireEvent.click(within(orderCard).getByRole("button", { name: "Pay Balance" }));
+
+  await waitFor(() => expect(statusRequest).toBeDefined());
+  expect(JSON.parse(statusRequest.body)).toEqual({ status: "Awaiting Balance Payment" });
+});
+
 test("keeps the Live Orders table header in normal page flow while scrolling", async () => {
   renderOrders();
   await screen.findAllByText("Customer 101");

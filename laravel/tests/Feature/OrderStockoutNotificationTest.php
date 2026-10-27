@@ -189,4 +189,37 @@ class OrderStockoutNotificationTest extends TestCase
             'payment_status' => 'downpayment_paid',
         ]);
     }
+
+    public function test_order_with_unpaid_downpayment_balance_cannot_skip_to_ready(): void
+    {
+        DB::table('orders')->insert([
+            'id' => 45,
+            'user_id' => 7,
+            'status' => 'Preparing',
+            'total' => 1000,
+            'downpayment_amount' => 500,
+            'method' => 'Pickup',
+            'payment' => 'QRPh',
+            'payment_status' => 'pending',
+        ]);
+
+        $admin = new User();
+        $admin->id = 99;
+        $admin->role = 'admin';
+        $admin->status = 'active';
+        $this->actingAs($admin);
+
+        $response = app(OrderController::class)->updateStatus(
+            Request::create('/orders/45/status', 'PUT', ['status' => 'Ready for Pickup']),
+            45
+        );
+
+        $this->assertSame(200, $response->getStatusCode());
+        $this->assertSame('Awaiting Balance Payment', $response->getData(true)['status']);
+        $this->assertDatabaseHas('orders', [
+            'id' => 45,
+            'status' => 'Awaiting Balance Payment',
+            'payment_status' => 'pending',
+        ]);
+    }
 }

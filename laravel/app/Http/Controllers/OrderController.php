@@ -1563,7 +1563,7 @@ class OrderController extends Controller
                 $paymentStatus = strtolower(trim((string) $order->payment_status));
                 $downpaymentAmount = (float) ($order->downpayment_amount ?? 0);
                 $orderUpdatePaymentStatus = null;
-                $hasUnpaidBalance = $paymentStatus === 'downpayment_paid'
+                $hasUnpaidBalance = $paymentStatus !== 'paid'
                     && $downpaymentAmount > 0
                     && (float) $order->total > $downpaymentAmount;
 
