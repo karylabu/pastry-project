@@ -119,16 +119,25 @@ function ReceivedDialog({ order, onConfirm, onDismiss, isLoading }) {
 }
 
 function PaymentProofDialog({ order, onSubmit, onDismiss, isLoading, error }) {
+  const [submissionType, setSubmissionType] = useState('screenshot');
   const [file, setFile] = useState(null);
+  const [reference, setReference] = useState('');
   const [fileError, setFileError] = useState('');
 
   const handleSubmit = (event) => {
     event.preventDefault();
-    if (!file) {
+    if (submissionType === 'screenshot' && !file) {
       setFileError('Choose a screenshot or photo of your completed payment.');
       return;
     }
-    onSubmit(file);
+    if (submissionType === 'reference' && !reference.trim()) {
+      setFileError('Enter the reference number from your payment receipt.');
+      return;
+    }
+    onSubmit({
+      file: submissionType === 'screenshot' ? file : null,
+      reference: submissionType === 'reference' ? reference.trim() : '',
+    });
   };
 
   const handleFileChange = (event) => {
@@ -162,22 +171,59 @@ function PaymentProofDialog({ order, onSubmit, onDismiss, isLoading, error }) {
         <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#9b7b3d]">QRPh payment</p>
         <h2 className="mt-2 text-xl font-semibold text-slate-900">Send payment proof</h2>
         <p className="mt-2 text-sm leading-6 text-slate-600">
-          Upload a screenshot or photo of your completed transfer for Order #{order.id}. Admin will review it before preparing your order.
+          Send a screenshot or enter the reference number for your payment on Order #{order.id}. Admin will review it before preparing your order.
         </p>
-        <label className="mt-5 block text-sm font-medium text-slate-700" htmlFor="payment-proof-file">Payment screenshot</label>
-        <input
-          id="payment-proof-file"
-          type="file"
-          accept="image/jpeg,image/png,image/webp"
-          onChange={handleFileChange}
-          className="mt-2 block w-full text-sm text-slate-700 file:mr-3 file:rounded-lg file:border-0 file:bg-slate-900 file:px-3 file:py-2 file:text-xs file:font-semibold file:text-white"
-        />
-        {file && <p className="mt-2 truncate text-xs text-slate-500">{file.name}</p>}
+        <div className="mt-5 grid grid-cols-2 gap-2" role="group" aria-label="Payment proof type">
+          {[
+            { value: 'screenshot', label: 'Upload screenshot' },
+            { value: 'reference', label: 'Reference number' },
+          ].map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              aria-pressed={submissionType === option.value}
+              onClick={() => { setSubmissionType(option.value); setFileError(''); }}
+              className={`rounded-lg border px-3 py-2 text-xs font-semibold transition ${
+                submissionType === option.value
+                  ? 'border-slate-900 bg-slate-900 text-white'
+                  : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+              }`}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+        {submissionType === 'screenshot' ? (
+          <>
+            <label className="mt-4 block text-sm font-medium text-slate-700" htmlFor="payment-proof-file">Payment screenshot</label>
+            <input
+              id="payment-proof-file"
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              onChange={handleFileChange}
+              className="mt-2 block w-full text-sm text-slate-700 file:mr-3 file:rounded-lg file:border-0 file:bg-slate-900 file:px-3 file:py-2 file:text-xs file:font-semibold file:text-white"
+            />
+            {file && <p className="mt-2 truncate text-xs text-slate-500">{file.name}</p>}
+          </>
+        ) : (
+          <>
+            <label className="mt-4 block text-sm font-medium text-slate-700" htmlFor="payment-reference-number">Payment reference number</label>
+            <input
+              id="payment-reference-number"
+              type="text"
+              maxLength={100}
+              value={reference}
+              onChange={(event) => { setReference(event.target.value); setFileError(''); }}
+              placeholder="Enter the reference number from your receipt"
+              className="mt-2 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-800 outline-none focus:border-slate-500 focus:ring-2 focus:ring-slate-200"
+            />
+          </>
+        )}
         {(fileError || error) && <p className="mt-3 text-sm text-red-700">{fileError || error}</p>}
         <div className="mt-6 flex justify-end gap-2">
           <button type="button" onClick={onDismiss} className="rounded-lg border border-slate-200 px-4 py-2 text-sm text-slate-700" disabled={isLoading}>Cancel</button>
-          <button type="submit" disabled={isLoading || !file} className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">
-            {isLoading ? 'Sending…' : 'Submit proof'}
+          <button type="submit" disabled={isLoading || (submissionType === 'screenshot' ? !file : !reference.trim())} className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">
+            {isLoading ? 'Sending…' : 'Submit payment details'}
           </button>
         </div>
       </motion.form>
@@ -579,13 +625,14 @@ export default function Orders() {
     }
   };
 
-  const handlePaymentProofSubmit = async (file) => {
+  const handlePaymentProofSubmit = async ({ file, reference }) => {
     if (!paymentProofTarget) return;
     setProcessingId(paymentProofTarget.id);
     setPaymentProofError('');
     try {
       const formData = new FormData();
-      formData.append('payment_proof', file);
+      if (file) formData.append('payment_proof', file);
+      if (reference) formData.append('customer_payment_reference', reference);
       const response = await fetch(`${LARAVEL_BASE}/api/orders/${paymentProofTarget.id}/payment-proof`, {
         method: 'POST',
         credentials: 'include',
@@ -1282,7 +1329,7 @@ export default function Orders() {
                   && (Boolean(order.is_customized) || ['gcash', 'qrph'].includes(String(order.payment || '').toLowerCase()));
                 const isAwaitingBalancePayment = order.status === 'Awaiting Balance Payment'
                   && (Boolean(order.is_customized) || ['gcash', 'qrph'].includes(String(order.payment || '').toLowerCase()));
-                const hasPaymentProof = String(order.payment_status || '').toLowerCase() === 'proof_submitted';
+                const hasPaymentSubmission = String(order.payment_status || '').toLowerCase() === 'proof_submitted';
                 const isPending    = order.status === "Pending";
                 const isToReceive  = String(order.status || '').toLowerCase() === "ready for pickup";
                 const isCompleted  = order.status === "Completed";
@@ -1343,12 +1390,12 @@ export default function Orders() {
                 const paymentHint = isCancelled
                   ? 'Order cancelled'
                   : isAwaitingPayment
-                  ? hasPaymentProof
-                    ? 'Proof submitted — awaiting Admin review'
+                  ? hasPaymentSubmission
+                    ? 'Payment details submitted — awaiting Admin review'
                     : 'Send payment proof for review'
                   : isAwaitingBalancePayment
-                  ? hasPaymentProof
-                    ? 'Balance proof submitted — awaiting Admin review'
+                  ? hasPaymentSubmission
+                    ? 'Balance details submitted — awaiting Admin review'
                     : 'Remaining balance payment required'
                   : isPickupDownpaymentPaid
                   ? '50% downpayment paid — balance due at counter on pickup'
@@ -1505,7 +1552,7 @@ export default function Orders() {
                     <div className="flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
                       {isAwaitingPayment && (
                         <>
-                          {isCustomized && !hasPaymentProof && (
+                          {isCustomized && !hasPaymentSubmission && (
                             <button
                               type="button"
                               onClick={() => handlePayCustomizedDownpayment(order)}
@@ -1517,19 +1564,19 @@ export default function Orders() {
                               {payingOrderId === order.id ? 'Opening…' : `Pay ₱${downpaymentBreakdown.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
                             </button>
                           )}
-                          {hasPaymentProof
-                            ? <span className="text-right text-[11px] font-semibold text-amber-700">Proof submitted</span>
+                          {hasPaymentSubmission
+                            ? <span className="text-right text-[11px] font-semibold text-amber-700">Payment details submitted</span>
                             : <button
                               onClick={() => { setPaymentProofError(''); setPaymentProofTarget(order); }}
                               className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-3.5 py-2 text-[12px] font-semibold text-white hover:bg-slate-800 transition-colors"
                             >
-                              Submit proof
+                              Submit proof / reference
                             </button>}
                         </>
                       )}
                       {isAwaitingBalancePayment && isCustomized && (
                         <>
-                          {!hasPaymentProof && (
+                          {!hasPaymentSubmission && (
                             <button
                               type="button"
                               onClick={() => handlePayCustomizedDownpayment(order, 'balance')}
@@ -1541,14 +1588,14 @@ export default function Orders() {
                               {payingOrderId === order.id ? 'Opening…' : `Pay balance ₱${balanceBreakdown.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
                             </button>
                           )}
-                          {hasPaymentProof
-                            ? <span className="text-right text-[11px] font-semibold text-amber-700">Balance proof submitted</span>
+                          {hasPaymentSubmission
+                            ? <span className="text-right text-[11px] font-semibold text-amber-700">Balance details submitted</span>
                             : <button
                               type="button"
                               onClick={() => { setPaymentProofError(''); setPaymentProofTarget(order); }}
                               className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-3.5 py-2 text-[12px] font-semibold text-white hover:bg-slate-800 transition-colors"
                             >
-                              Submit proof
+                              Submit proof / reference
                             </button>}
                         </>
                       )}

@@ -824,6 +824,10 @@ export default function Orders() {
                                     >
                                       {paymentProofLoading === order.id ? 'Loading proof...' : 'View payment proof'}
                                     </button>
+                                  ) : order.customer_payment_reference ? (
+                                    <p className="mt-2 text-xs text-amber-950">
+                                      Customer reference: <span className="font-semibold">{order.customer_payment_reference}</span>
+                                    </p>
                                   ) : (
                                     <p className="mt-1 text-xs text-amber-900">Waiting for customer payment proof.</p>
                                   )}

@@ -48,6 +48,7 @@ class StaffOrdersApiTest extends TestCase
             $table->decimal('discount', 10, 2)->default(0);
             $table->string('discount_id_path')->nullable();
             $table->string('payment_proof_path')->nullable();
+            $table->string('customer_payment_reference', 100)->nullable();
             $table->timestamp('created_at')->nullable();
             $table->timestamp('cancelled_at')->nullable();
         });
@@ -172,6 +173,7 @@ class StaffOrdersApiTest extends TestCase
             'payment_status' => 'proof_submitted',
             'status' => 'Awaiting Payment',
             'payment_proof_path' => 'payment-proofs/order-21.jpg',
+            'customer_payment_reference' => 'QRPH_ABC-123',
             'created_at' => now(),
         ]);
         DB::table('products')->insert(['id' => 3, 'category' => 'Cakes']);
@@ -207,9 +209,31 @@ class StaffOrdersApiTest extends TestCase
             ->assertJsonPath('orders.0.is_customized', false)
             ->assertJsonPath('orders.0.order_type', 'Standard')
             ->assertJsonPath('orders.0.has_payment_proof', true)
+            ->assertJsonPath('orders.0.customer_payment_reference', 'QRPH_ABC-123')
+            ->assertJsonPath('orders.0.has_payment_reference', true)
             ->assertJsonPath('orders.0.items.0.name', 'Chocolate Cake')
             ->assertJsonPath('orders.0.items.0.qty', 2)
             ->assertJsonPath('orders.0.items.0.size', 'Big');
+    }
+
+    public function test_admin_order_response_includes_customer_payment_reference(): void
+    {
+        DB::table('orders')->insert([
+            'id' => 24,
+            'customer' => 'Reference Customer',
+            'items' => '[]',
+            'payment' => 'QRPh',
+            'payment_status' => 'proof_submitted',
+            'customer_payment_reference' => 'QRPH_ABC-123',
+            'status' => 'Awaiting Payment',
+            'created_at' => now(),
+        ]);
+
+        $this->withHeader('X-Auth-Token', 'test-admin-token')
+            ->getJson('/api/staff/orders')
+            ->assertOk()
+            ->assertJsonPath('orders.0.customer_payment_reference', 'QRPH_ABC-123')
+            ->assertJsonPath('orders.0.has_payment_reference', true);
     }
 
     public function test_admin_can_see_cancelled_unpaid_gcash_orders(): void

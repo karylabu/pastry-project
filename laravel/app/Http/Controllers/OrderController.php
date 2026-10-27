@@ -664,14 +664,23 @@ class OrderController extends Controller
 
         $request->validate([
             'payment_proof' => [
-                'required',
+                'nullable',
                 'file',
                 'image',
                 'mimes:jpeg,jpg,png,webp',
                 $this->allowedFileExtensions(['jpg', 'jpeg', 'png', 'webp']),
                 'max:5120',
             ],
+            'customer_payment_reference' => ['nullable', 'string', 'max:100', 'regex:/^[A-Za-z0-9_-]+$/'],
         ]);
+        $hasPaymentProof = $request->hasFile('payment_proof');
+        $paymentReference = trim((string) $request->input('customer_payment_reference', ''));
+        if ($hasPaymentProof === ($paymentReference !== '')) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Submit either a payment screenshot or a reference number.',
+            ], 422);
+        }
 
         $order = Order::query()->whereKey($orderId)->where('user_id', $user->id)->first();
         if (!$order) {
@@ -694,19 +703,25 @@ class OrderController extends Controller
             return response()->json(['success' => false, 'message' => 'This order is not awaiting a QR payment.'], 409);
         }
 
-        $newPath = $request->file('payment_proof')->store('payment-proofs', 'local');
-        if (!$newPath) {
-            return response()->json(['success' => false, 'message' => 'Unable to save payment proof.'], 500);
+        $newPath = null;
+        if ($hasPaymentProof) {
+            $newPath = $request->file('payment_proof')->store('payment-proofs', 'local');
+            if (!$newPath) {
+                return response()->json(['success' => false, 'message' => 'Unable to save payment proof.'], 500);
+            }
         }
 
         $oldPath = $order->payment_proof_path;
         try {
             $order->update([
                 'payment_proof_path' => $newPath,
+                'customer_payment_reference' => $paymentReference !== '' ? $paymentReference : null,
                 'payment_status' => 'proof_submitted',
             ]);
         } catch (\Throwable $exception) {
-            Storage::disk('local')->delete($newPath);
+            if ($newPath) {
+                Storage::disk('local')->delete($newPath);
+            }
             Log::error('Payment proof save failed: ' . $exception->getMessage());
             return response()->json(['success' => false, 'message' => 'Unable to save payment proof.'], 500);
         }

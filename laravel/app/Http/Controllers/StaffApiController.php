@@ -371,6 +371,8 @@ class StaffApiController extends Controller
                 $order->has_discount_id = !empty($order->discount_id_path);
                 $order->has_payment_proof = !empty($order->payment_proof_path)
                     && strtolower((string) ($order->payment_status ?? '')) === 'proof_submitted';
+                $order->has_payment_reference = !empty($order->customer_payment_reference)
+                    && strtolower((string) ($order->payment_status ?? '')) === 'proof_submitted';
                 unset($order->discount_id_path, $order->payment_proof_path);
                 $order->items = $items;
                 $order->is_customized = $isCustomCakeRequest;

@@ -39,6 +39,7 @@ class PaymentProofSecurityTest extends TestCase
             $table->string('order_type')->nullable();
             $table->boolean('is_customized')->default(false);
             $table->string('payment_proof_path')->nullable();
+            $table->string('customer_payment_reference', 100)->nullable();
         });
 
         DB::table('users')->insert([
@@ -54,7 +55,7 @@ class PaymentProofSecurityTest extends TestCase
             'token' => 'proof-customer-token',
             'expires_at' => now()->addHour(),
         ]);
-        foreach ([5, 6] as $orderId) {
+        foreach ([5, 6, 7, 8] as $orderId) {
             DB::table('orders')->insert([
                 'id' => $orderId,
                 'user_id' => 9,
@@ -80,11 +81,19 @@ class PaymentProofSecurityTest extends TestCase
         parent::tearDown();
     }
 
+    private function fakePng(): UploadedFile
+    {
+        return UploadedFile::fake()->createWithContent(
+            'proof.png',
+            base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/l3sAAAAASUVORK5CYII=')
+        );
+    }
+
     public function test_payment_proof_is_saved_privately_and_only_an_admin_can_view_it(): void
     {
         $this->withHeader('X-Auth-Token', 'proof-customer-token')
             ->post('/api/orders/5/payment-proof', [
-                'payment_proof' => UploadedFile::fake()->image('proof.png'),
+                'payment_proof' => $this->fakePng(),
             ])
             ->assertOk()
             ->assertJsonPath('payment_status', 'proof_submitted');
@@ -114,7 +123,7 @@ class PaymentProofSecurityTest extends TestCase
 
         $this->withHeader('X-Auth-Token', 'proof-customer-token')
             ->post('/api/orders/6/payment-proof', [
-                'payment_proof' => UploadedFile::fake()->image('proof.png'),
+                'payment_proof' => $this->fakePng(),
             ])
             ->assertStatus(429)
             ->assertHeader('Retry-After');
@@ -125,5 +134,38 @@ class PaymentProofSecurityTest extends TestCase
             'payment_proof_path' => null,
         ]);
         Storage::disk('local')->assertDirectoryEmpty('payment-proofs');
+    }
+
+    public function test_customer_payment_reference_can_be_submitted_for_admin_review(): void
+    {
+        $this->withHeader('X-Auth-Token', 'proof-customer-token')
+            ->postJson('/api/orders/7/payment-proof', [
+                'customer_payment_reference' => 'QRPH_ABC-123',
+            ])
+            ->assertOk()
+            ->assertJsonPath('payment_status', 'proof_submitted');
+
+        $this->assertDatabaseHas('orders', [
+            'id' => 7,
+            'payment_status' => 'proof_submitted',
+            'customer_payment_reference' => 'QRPH_ABC-123',
+            'payment_proof_path' => null,
+        ]);
+    }
+
+    public function test_customer_must_submit_exactly_one_payment_proof_type(): void
+    {
+        $this->withHeader('X-Auth-Token', 'proof-customer-token')
+            ->postJson('/api/orders/8/payment-proof')
+            ->assertUnprocessable()
+            ->assertJsonPath('message', 'Submit either a payment screenshot or a reference number.');
+
+        $this->withHeader('X-Auth-Token', 'proof-customer-token')
+            ->post('/api/orders/8/payment-proof', [
+                'payment_proof' => $this->fakePng(),
+                'customer_payment_reference' => 'QRPH_ABC-123',
+            ])
+            ->assertUnprocessable()
+            ->assertJsonPath('message', 'Submit either a payment screenshot or a reference number.');
     }
 }

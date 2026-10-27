@@ -44,6 +44,7 @@ class Order extends Model
         'discount',
         'discount_id_path',
         'payment_proof_path',
+        'customer_payment_reference',
         'cancelled_at',
     ];
 
