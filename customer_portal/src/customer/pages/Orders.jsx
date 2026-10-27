@@ -1330,9 +1330,9 @@ export default function Orders() {
                   || (Boolean(order.is_customized)
                     && ['maya', 'maribank', 'visamastercard', 'onlinebanking'].includes(paymentMethodKey));
                 const isAwaitingPayment = order.status === 'Awaiting Payment'
-                  && (Boolean(order.is_customized) || ['gcash', 'qrph'].includes(String(order.payment || '').toLowerCase()));
+                  && supportsPaymentProof;
                 const isAwaitingBalancePayment = order.status === 'Awaiting Balance Payment'
-                  && (Boolean(order.is_customized) || ['gcash', 'qrph'].includes(String(order.payment || '').toLowerCase()));
+                  && supportsPaymentProof;
                 const hasPaymentSubmission = String(order.payment_status || '').toLowerCase() === 'proof_submitted';
                 const isPending    = order.status === "Pending";
                 const isPendingQrPayment = isPending && supportsPaymentProof;
