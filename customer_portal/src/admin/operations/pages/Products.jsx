@@ -1449,13 +1449,13 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="fixed inset-0 bg-black/40 flex items-start justify-center py-6 z-[10001] overflow-y-auto"
+              className="fixed inset-x-0 bottom-0 top-[72px] z-[9997] flex items-start justify-center overflow-y-auto bg-black/40 p-3 sm:p-6"
             >
               <motion.div
                 initial={{ scale: 0.95 }}
                 animate={{ scale: 1 }}
                 exit={{ scale: 0.95 }}
-                className="max-h-[92vh] w-full max-w-[680px] overflow-y-auto rounded-2xl border border-[#eadfd8] bg-[#fffdfa] p-5 shadow-[0_20px_60px_rgba(91,64,39,0.2)] sm:p-6"
+                className="max-h-full w-full max-w-[680px] overflow-y-auto rounded-2xl border border-[#eadfd8] bg-[#fffdfa] p-5 shadow-[0_20px_60px_rgba(91,64,39,0.2)] sm:p-6"
               >
                 <div className="sticky top-0 z-20 mb-5 border-b border-[#f0e7e0] bg-[#fffdfa] pb-4 pt-1">
                   <div className="flex items-start justify-between gap-3">
