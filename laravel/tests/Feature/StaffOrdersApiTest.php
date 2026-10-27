@@ -236,6 +236,24 @@ class StaffOrdersApiTest extends TestCase
             ->assertJsonPath('orders.0.has_payment_reference', true);
     }
 
+    public function test_admin_can_see_gcash_orders_with_paid_downpayments(): void
+    {
+        DB::table('orders')->insert([
+            'id' => 25,
+            'customer' => 'Deposit Customer',
+            'payment' => 'GCash',
+            'payment_status' => 'downpayment_paid',
+            'status' => 'Pending',
+            'created_at' => now(),
+        ]);
+
+        $this->withHeader('X-Auth-Token', 'test-admin-token')
+            ->getJson('/api/staff/orders')
+            ->assertOk()
+            ->assertJsonPath('orders.0.id', '25')
+            ->assertJsonPath('orders.0.payment_status', 'downpayment_paid');
+    }
+
     public function test_admin_can_see_cancelled_unpaid_gcash_orders(): void
     {
         DB::table('orders')->insert([

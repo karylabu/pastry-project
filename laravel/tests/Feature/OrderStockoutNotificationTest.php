@@ -19,6 +19,12 @@ class OrderStockoutNotificationTest extends TestCase
             $table->id();
             $table->unsignedBigInteger('user_id')->nullable();
             $table->text('items')->nullable();
+            $table->decimal('total', 10, 2)->default(0);
+            $table->decimal('downpayment_amount', 10, 2)->nullable();
+            $table->string('method')->nullable();
+            $table->string('payment')->nullable();
+            $table->string('payment_status')->nullable();
+            $table->string('phone')->nullable();
             $table->string('status');
         });
         Schema::create('products', function ($table) {
@@ -81,5 +87,58 @@ class OrderStockoutNotificationTest extends TestCase
             'action_url' => '/customer/orders',
         ]);
         $this->assertDatabaseMissing('notifications', ['title' => 'Order Confirmed']);
+    }
+
+    public function test_partially_paid_order_waits_for_balance_proof_before_ready(): void
+    {
+        DB::table('orders')->insert([
+            'id' => 43,
+            'user_id' => 7,
+            'status' => 'Preparing',
+            'total' => 1000,
+            'downpayment_amount' => 500,
+            'method' => 'Pickup',
+            'payment' => 'QRPh',
+            'payment_status' => 'downpayment_paid',
+        ]);
+
+        $admin = new User();
+        $admin->id = 99;
+        $admin->role = 'admin';
+        $admin->status = 'active';
+        $this->actingAs($admin);
+
+        $response = app(OrderController::class)->updateStatus(
+            Request::create('/orders/43/status', 'PUT', ['status' => 'Ready for Pickup']),
+            43
+        );
+
+        $this->assertSame(200, $response->getStatusCode());
+        $this->assertSame('Awaiting Balance Payment', $response->getData(true)['status']);
+        $this->assertDatabaseHas('orders', [
+            'id' => 43,
+            'status' => 'Awaiting Balance Payment',
+            'payment_status' => 'downpayment_paid',
+        ]);
+
+        $response = app(OrderController::class)->updateStatus(
+            Request::create('/orders/43/status', 'PUT', ['status' => 'Ready for Pickup']),
+            43
+        );
+        $this->assertSame(409, $response->getStatusCode());
+
+        DB::table('orders')->where('id', 43)->update(['payment_status' => 'proof_submitted']);
+        $response = app(OrderController::class)->updateStatus(
+            Request::create('/orders/43/status', 'PUT', ['status' => 'Ready for Pickup']),
+            43
+        );
+
+        $this->assertSame(200, $response->getStatusCode());
+        $this->assertSame('Ready for Pickup', $response->getData(true)['status']);
+        $this->assertDatabaseHas('orders', [
+            'id' => 43,
+            'status' => 'Ready for Pickup',
+            'payment_status' => 'paid',
+        ]);
     }
 }

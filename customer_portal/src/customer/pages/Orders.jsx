@@ -793,10 +793,12 @@ export default function Orders() {
         ['Order type', formatReceiptValue(o.order_type || rawCustomDetails.cake_type)],
         ['Payment method', formatReceiptValue(o.payment)],
         ['Payment status', String(o.payment_status || '').toLowerCase() === 'downpayment_paid'
+          || o.status === 'Awaiting Balance Payment'
           ? '50% downpayment paid; balance due at counter on pickup'
           : formatReceiptValue(o.payment_status)],
         ['Downpayment', Number(o.downpayment_amount || 0) > 0 ? `₱${Number(o.downpayment_amount).toLocaleString()}` : ''],
-        ['Balance due at pickup', String(o.payment_status || '').toLowerCase() === 'downpayment_paid'
+        ['Balance due at pickup', (String(o.payment_status || '').toLowerCase() === 'downpayment_paid'
+          || o.status === 'Awaiting Balance Payment')
           && String(o.method || '').toLowerCase() === 'pickup'
           ? `₱${Math.max(0, Number(o.total || 0) - Number(o.downpayment_amount || 0)).toLocaleString()}`
           : ''],
@@ -1389,7 +1391,8 @@ export default function Orders() {
                 );
                 const isPickupDownpaymentPaid = !isCustomized
                   && String(order.method || '').toLowerCase() === 'pickup'
-                  && String(order.payment_status || '').toLowerCase() === 'downpayment_paid'
+                  && (String(order.payment_status || '').toLowerCase() === 'downpayment_paid'
+                    || order.status === 'Awaiting Balance Payment')
                   && Number(order.downpayment_amount) > 0;
                 const cakeSize = isCustomized
                   ? getCustomCakeDetails(order).cake_size

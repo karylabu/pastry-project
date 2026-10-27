@@ -1557,8 +1557,30 @@ class OrderController extends Controller
                 }
 
                 $oldStatus = $order->status;
-                $newStatus = $request->status;
+                $normalizedOldStatus = strtolower(trim((string) $oldStatus));
+                $newStatus = trim((string) $request->status);
                 $previousStatus = $oldStatus;
+                $paymentStatus = strtolower(trim((string) $order->payment_status));
+                $downpaymentAmount = (float) ($order->downpayment_amount ?? 0);
+                $orderUpdatePaymentStatus = null;
+                $hasUnpaidBalance = $paymentStatus === 'downpayment_paid'
+                    && $downpaymentAmount > 0
+                    && (float) $order->total > $downpaymentAmount;
+
+                if (strtolower($newStatus) === 'ready for pickup') {
+                    if ($normalizedOldStatus === 'awaiting balance payment') {
+                        if ($paymentStatus === 'proof_submitted') {
+                            $orderUpdatePaymentStatus = 'paid';
+                        } elseif ($paymentStatus !== 'paid') {
+                            throw new RuntimeException('Submit and verify the remaining balance payment before marking this order ready for pickup.');
+                        }
+                    } elseif ($hasUnpaidBalance && $normalizedOldStatus === 'preparing') {
+                        $newStatus = 'Awaiting Balance Payment';
+                    } elseif ($hasUnpaidBalance) {
+                        throw new RuntimeException('The order must be prepared before it can move to balance payment.');
+                    }
+                }
+
                 $approvedStatuses = ['confirmed', 'approved', 'preparing'];
                 $isApproved = in_array(strtolower(trim($newStatus)), $approvedStatuses, true);
                 $hasDeductedStock = $this->orderHasActiveStockDeduction((int) $order->id);
@@ -1593,6 +1615,9 @@ class OrderController extends Controller
                 }
 
                 $orderUpdate = ['status' => $newStatus];
+                if ($orderUpdatePaymentStatus !== null) {
+                    $orderUpdate['payment_status'] = $orderUpdatePaymentStatus;
+                }
                 if (
                     strtolower(trim($newStatus)) === 'cancelled'
                     && strtolower(trim((string) $oldStatus)) !== 'cancelled'
@@ -1642,7 +1667,7 @@ class OrderController extends Controller
 
         $order = $order->fresh();
         $oldStatus = (string) ($previousStatus ?? $order->status);
-        $newStatus = (string) $request->status;
+        $newStatus = (string) $order->status;
 
         if ($oldStatus !== $newStatus) {
             $this->sendSmsNotification($order, $newStatus);
@@ -1654,7 +1679,9 @@ class OrderController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Order status updated successfully.'
+            'message' => 'Order status updated successfully.',
+            'status' => $order->status,
+            'payment_status' => $order->payment_status,
         ]);
     }
 

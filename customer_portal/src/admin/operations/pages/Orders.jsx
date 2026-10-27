@@ -133,10 +133,11 @@ export default function Orders() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [paymentProofLightboxOrderId]);
 
-  const statusFilterOptions = ["All", "Awaiting Payment", "Pending", "Preparing", "Ready for Pickup", "Completed", "Cancelled"];
+  const statusFilterOptions = ["All", "Awaiting Payment", "Pending", "Preparing", "Awaiting Balance Payment", "Ready for Pickup", "Completed", "Cancelled"];
 
   const statusColors = {
     "Awaiting Payment": "bg-amber-50 text-amber-800 border border-amber-200",
+    "Awaiting Balance Payment": "bg-amber-50 text-amber-800 border border-amber-200",
     Pending: "bg-[#D4AF37]/15 text-black border border-[#D4AF37]/30",
     Preparing: "bg-black/5 text-black border border-black/15",
     "Ready for Pickup": "bg-[#D4AF37]/10 text-black border border-[#D4AF37]/20",
@@ -148,9 +149,10 @@ export default function Orders() {
     "Awaiting Payment": -1,
     Pending: 0,
     Preparing: 1,
-    "Ready for Pickup": 2,
-    Completed: 3,
-    Cancelled: 4,
+    "Awaiting Balance Payment": 2,
+    "Ready for Pickup": 3,
+    Completed: 4,
+    Cancelled: 5,
   };
 
   const isLowStockIngredient = (ingredient) => {
@@ -416,7 +418,7 @@ export default function Orders() {
       }
 
       fetchOrders(true);
-      addToast(`Order #${id} → ${status}`, "success");
+      addToast(`Order #${id} → ${data.status || status}`, "success");
     } catch (error) {
       addToast(`Update failed: ${error.message || "Network error — could not update order."}`, "error");
     } finally {
@@ -458,10 +460,15 @@ export default function Orders() {
   const advanceOrder = (order) => {
     const hasReviewableProof = order.status === 'Awaiting Payment'
       && String(order.payment_status || '').toLowerCase() === 'proof_submitted'
-      && order.has_payment_proof;
+      && (order.has_payment_proof || order.customer_payment_reference);
+    const hasReviewableBalanceProof = order.status === 'Awaiting Balance Payment'
+      && String(order.payment_status || '').toLowerCase() === 'proof_submitted'
+      && (order.has_payment_proof || order.customer_payment_reference);
     const nextStatus = hasReviewableProof
       ? 'Pending'
-      : order.status === "Pending" ? "Preparing" : order.status === "Preparing" ? "Ready for Pickup" : order.status === "Ready for Pickup" ? "Completed" : null;
+      : hasReviewableBalanceProof
+        ? 'Ready for Pickup'
+        : order.status === "Pending" ? "Preparing" : order.status === "Preparing" ? "Ready for Pickup" : order.status === "Ready for Pickup" ? "Completed" : null;
     if (nextStatus) updateStatus(order.id, nextStatus);
   };
 
@@ -661,12 +668,16 @@ export default function Orders() {
                 const isExpanded = expandedOrderId === order.id;
                 const needsPaymentReview = order.status === "Awaiting Payment"
                   && String(order.payment_status || "").toLowerCase() === "proof_submitted"
-                  && order.has_payment_proof;
+                  && (order.has_payment_proof || order.customer_payment_reference);
+                const needsBalancePaymentReview = order.status === "Awaiting Balance Payment"
+                  && String(order.payment_status || "").toLowerCase() === "proof_submitted"
+                  && (order.has_payment_proof || order.customer_payment_reference);
                 const orderTiming = getOrderTiming(order);
                 const customerLabel = order.customer || order.customer_name || order.name || order.phone || "Customer";
                 const addressLabel = order.address || order.delivery_address || order.customer_address || "No address provided";
                 const canAdvance = !["Completed", "Cancelled"].includes(order.status)
-                  && (order.status !== "Awaiting Payment" || needsPaymentReview);
+                  && (order.status !== "Awaiting Payment" || needsPaymentReview)
+                  && (order.status !== "Awaiting Balance Payment" || needsBalancePaymentReview);
 
                 return (
                   <article key={order.id} className={`overflow-hidden rounded-lg border bg-white shadow-[0_3px_12px_rgba(60,42,28,0.035)] ${orderTiming.isRushOrder ? "border-[#d4af37]/60" : "border-[#e9e1d9]"}`}>
@@ -692,7 +703,7 @@ export default function Orders() {
                       <div className="mt-3 flex flex-wrap gap-1.5">
                         {!order.is_wasted && <>
                           <button type="button" onClick={() => setExpandedOrderId(isExpanded ? null : order.id)} title={`${isExpanded ? "Hide" : "View"} details for order ${order.order_number || order.id}`} aria-label={`${isExpanded ? "Hide" : "View"} details for order ${order.order_number || order.id}`} className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-[#e8dfd4] bg-white text-[#65574d] transition hover:bg-[#faf7f2]">{isExpanded ? <ChevronUp size={15} aria-hidden="true" /> : <ChevronDown size={15} aria-hidden="true" />}</button>
-                          {canAdvance && <button type="button" onClick={() => advanceOrder(order)} disabled={updatingId === order.id} className="rounded-md bg-black px-2.5 py-1.5 text-[10px] font-semibold text-white disabled:opacity-50">{updatingId === order.id ? "Updating..." : needsPaymentReview ? "Review payment" : order.status === "Pending" ? "Accept" : order.status === "Preparing" ? "Ready" : "Complete"}</button>}
+                          {canAdvance && <button type="button" onClick={() => advanceOrder(order)} disabled={updatingId === order.id} className="rounded-md bg-black px-2.5 py-1.5 text-[10px] font-semibold text-white disabled:opacity-50">{updatingId === order.id ? "Updating..." : needsPaymentReview ? "Review payment" : needsBalancePaymentReview ? "Verify balance" : order.status === "Pending" ? "Accept" : order.status === "Preparing" ? "Ready" : "Complete"}</button>}
                           {order.return_refund_request?.status === "Pending Review"
                             ? <button type="button" onClick={() => { setRejectModalOrderId(order.id); setRejectReason(""); }} disabled={updatingId === order.id} className="rounded-md border border-red-200 bg-red-50 px-2.5 py-1.5 text-[10px] font-semibold text-red-700 disabled:opacity-50">Reject</button>
                             : !["Completed", "Cancelled"].includes(order.status) && <button type="button" onClick={() => updateStatus(order.id, "Cancelled")} disabled={updatingId === order.id} className="rounded-md border border-red-200 bg-red-50 px-2.5 py-1.5 text-[10px] font-semibold text-red-700 disabled:opacity-50">Cancel</button>}
@@ -712,7 +723,7 @@ export default function Orders() {
                         <div><p className="text-[9px] font-semibold uppercase tracking-[0.14em] text-[#9b8c83]">Order details</p><p className="mt-1 font-semibold text-[#33251e]">{customerLabel}</p><p>{order.email || "No email provided"}</p><p>{order.phone || "No phone provided"}</p><p>{addressLabel}</p><p>Payment: {order.payment || "N/A"}</p><p>Placed: {formatOrderDateTime(order.created_at)}</p>{order.status === "Cancelled" && <p>Cancelled: {formatOrderDateTime(order.cancelled_at)}</p>}</div>
                         <div><p className="text-[9px] font-semibold uppercase tracking-[0.14em] text-[#9b8c83]">Items</p>{(order.items || []).map((item, index) => <div key={`${order.id}-mobile-${index}`} className="flex justify-between gap-3 border-b border-[#eee6de] py-1.5 last:border-0"><span>{item.name || "Item"} · Qty {item.qty || 1}</span><strong className="shrink-0 text-[#33251e]">₱{Number(item.price || 0).toLocaleString()}</strong></div>)}</div>
                       </div>
-                      {isQrPayment(order.payment) && <div className="mt-3 rounded-md border border-amber-200 bg-amber-50/70 p-3"><p className="text-[9px] font-semibold uppercase tracking-[0.14em] text-amber-800">QRPh payment · {String(order.payment_status || "pending").replaceAll("_", " ")}</p>{String(order.payment_status || '').toLowerCase() === 'downpayment_paid' && Number(order.downpayment_amount) > 0 && <p className="mt-1 text-[10px] text-amber-900">Deposit received: ₱{Number(order.downpayment_amount).toLocaleString()} · collect ₱{Math.max(0, Number(order.total || 0) - Number(order.downpayment_amount)).toLocaleString()} at pickup</p>}{order.has_payment_proof && paymentProofPreviews[order.id] && <button type="button" onClick={() => setPaymentProofLightboxOrderId(order.id)} className="mt-2 inline-flex w-fit max-w-full cursor-zoom-in rounded border border-black/10 bg-white p-1" aria-label={`Enlarge payment proof for order ${order.id}`}><img src={paymentProofPreviews[order.id]} alt={`Payment proof for order ${order.id}`} className="block max-h-64 max-w-full rounded object-contain" /></button>}{order.has_payment_proof && !paymentProofPreviews[order.id] && <button type="button" onClick={() => viewPaymentProof(order.id)} disabled={paymentProofLoading === order.id} className="mt-2 rounded-md bg-black px-3 py-2 text-[10px] font-semibold text-white disabled:opacity-60">{paymentProofLoading === order.id ? "Loading proof..." : "View payment proof"}</button>}{order.customer_payment_reference && <p className="mt-2 text-[10px] text-amber-950">Customer reference: <span className="font-semibold">{order.customer_payment_reference}</span></p>}{!order.has_payment_proof && !order.customer_payment_reference && <p className="mt-1 text-[10px] text-amber-900">Waiting for customer payment proof.</p>}</div>}
+                      {isQrPayment(order.payment) && <div className="mt-3 rounded-md border border-amber-200 bg-amber-50/70 p-3"><p className="text-[9px] font-semibold uppercase tracking-[0.14em] text-amber-800">QRPh payment · {String(order.payment_status || "pending").replaceAll("_", " ")}</p>{(String(order.payment_status || '').toLowerCase() === 'downpayment_paid' || order.status === "Awaiting Balance Payment") && Number(order.downpayment_amount) > 0 && <p className="mt-1 text-[10px] text-amber-900">Deposit received: ₱{Number(order.downpayment_amount).toLocaleString()} · balance due: ₱{Math.max(0, Number(order.total || 0) - Number(order.downpayment_amount)).toLocaleString()}</p>}{order.has_payment_proof && paymentProofPreviews[order.id] && <button type="button" onClick={() => setPaymentProofLightboxOrderId(order.id)} className="mt-2 inline-flex w-fit max-w-full cursor-zoom-in rounded border border-black/10 bg-white p-1" aria-label={`Enlarge payment proof for order ${order.id}`}><img src={paymentProofPreviews[order.id]} alt={`Payment proof for order ${order.id}`} className="block max-h-64 max-w-full rounded object-contain" /></button>}{order.has_payment_proof && !paymentProofPreviews[order.id] && <button type="button" onClick={() => viewPaymentProof(order.id)} disabled={paymentProofLoading === order.id} className="mt-2 rounded-md bg-black px-3 py-2 text-[10px] font-semibold text-white disabled:opacity-60">{paymentProofLoading === order.id ? "Loading proof..." : "View payment proof"}</button>}{order.customer_payment_reference && <p className="mt-2 text-[10px] text-amber-950">Customer reference: <span className="font-semibold">{order.customer_payment_reference}</span></p>}{!order.has_payment_proof && !order.customer_payment_reference && <p className="mt-1 text-[10px] text-amber-900">Waiting for customer payment proof.</p>}</div>}
                       {order.discount_type && order.discount_type !== "none" && (
                         <div className="mt-3 rounded-md border border-[#e8dfd4] bg-white p-3">
                           <p className="text-[9px] font-semibold uppercase tracking-[0.14em] text-[#8f8076]">
@@ -755,7 +766,10 @@ export default function Orders() {
                     const isExpanded = expandedOrderId === order.id;
                     const needsPaymentReview = order.status === 'Awaiting Payment'
                       && String(order.payment_status || '').toLowerCase() === 'proof_submitted'
-                      && order.has_payment_proof;
+                      && (order.has_payment_proof || order.customer_payment_reference);
+                    const needsBalancePaymentReview = order.status === 'Awaiting Balance Payment'
+                      && String(order.payment_status || '').toLowerCase() === 'proof_submitted'
+                      && (order.has_payment_proof || order.customer_payment_reference);
                     const orderTiming = getOrderTiming(order);
                     const customerLabel = order.customer || order.customer_name || order.name || order.phone || "";
                     const itemNames = (order.items || []).slice(0, 2).map((item) => `${item.name || "Item"} ×${item.qty || 1}`).join(", ");
@@ -790,7 +804,7 @@ export default function Orders() {
                             <div className="flex min-w-[210px] flex-wrap justify-end gap-1.5">
                               {!order.is_wasted && <>
                                 <button type="button" onClick={() => setExpandedOrderId(isExpanded ? null : order.id)} className="rounded-md border border-[#e8dfd4] bg-white px-2.5 py-1.5 text-[10px] font-semibold text-[#65574d] transition hover:border-[#c9b895] hover:bg-[#faf7f2]">{isExpanded ? "Hide" : "View"}</button>
-                                {(!(order.status === "Completed" || order.status === "Cancelled") && (order.status !== 'Awaiting Payment' || needsPaymentReview)) && <button type="button" onClick={() => advanceOrder(order)} disabled={updatingId === order.id} className="rounded-md bg-[#33251e] px-2.5 py-1.5 text-[10px] font-semibold text-white transition hover:bg-black disabled:opacity-50">{needsPaymentReview ? "Verify payment" : order.status === "Pending" ? "Accept" : order.status === "Preparing" ? "Ready" : "Complete"}</button>}
+                                {(!(order.status === "Completed" || order.status === "Cancelled") && (order.status !== 'Awaiting Payment' || needsPaymentReview) && (order.status !== 'Awaiting Balance Payment' || needsBalancePaymentReview)) && <button type="button" onClick={() => advanceOrder(order)} disabled={updatingId === order.id} className="rounded-md bg-[#33251e] px-2.5 py-1.5 text-[10px] font-semibold text-white transition hover:bg-black disabled:opacity-50">{needsPaymentReview ? "Verify payment" : needsBalancePaymentReview ? "Verify balance" : order.status === "Pending" ? "Accept" : order.status === "Preparing" ? "Ready" : "Complete"}</button>}
                                 {order.return_refund_request?.status === "Pending Review"
                                   ? <button type="button" onClick={() => { setRejectModalOrderId(order.id); setRejectReason(""); }} disabled={updatingId === order.id || rejectSubmitting} className="rounded-md border border-red-200 bg-red-50 px-2.5 py-1.5 text-[10px] font-semibold text-red-700 transition hover:bg-red-100 disabled:opacity-50">Reject</button>
                                   : !["Completed", "Cancelled"].includes(order.status) && <button type="button" onClick={() => updateStatus(order.id, "Cancelled")} disabled={updatingId === order.id} className="rounded-md border border-red-200 bg-white px-2.5 py-1.5 text-[10px] font-semibold text-red-700 transition hover:bg-red-50 disabled:opacity-50">Cancel</button>}
@@ -819,9 +833,9 @@ export default function Orders() {
                                   <p className="mt-1 font-semibold text-black">
                                     {String(order.payment_status || 'pending').replaceAll('_', ' ')}
                                   </p>
-                                  {String(order.payment_status || '').toLowerCase() === 'downpayment_paid' && Number(order.downpayment_amount) > 0 ? (
+                                  {(String(order.payment_status || '').toLowerCase() === 'downpayment_paid' || order.status === "Awaiting Balance Payment") && Number(order.downpayment_amount) > 0 ? (
                                     <p className="mt-1 text-xs text-amber-900">
-                                      Deposit received: ₱{Number(order.downpayment_amount).toLocaleString()} · collect ₱{Math.max(0, Number(order.total || 0) - Number(order.downpayment_amount)).toLocaleString()} at pickup
+                                      Deposit received: ₱{Number(order.downpayment_amount).toLocaleString()} · balance due: ₱{Math.max(0, Number(order.total || 0) - Number(order.downpayment_amount)).toLocaleString()}
                                     </p>
                                   ) : order.has_payment_proof && paymentProofPreviews[order.id] ? (
                                     <button
@@ -854,6 +868,7 @@ export default function Orders() {
                                     </p>
                                   )}
                                   {needsPaymentReview && <p className="mt-2 text-xs text-amber-900">Review the proof, then mark paid and prepare the order.</p>}
+                                  {needsBalancePaymentReview && <p className="mt-2 text-xs text-amber-900">Verify the remaining balance payment before marking this order ready for pickup.</p>}
                                 </div>
                               )}
                               {order.discount_type && order.discount_type !== 'none' && (

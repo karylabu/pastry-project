@@ -220,7 +220,7 @@ class StaffApiController extends Controller
             if (!$customOnly) {
                 $query->where(function ($paymentQuery) {
                     $paymentQuery->whereRaw("LOWER(COALESCE(payment, '')) != 'gcash'")
-                        ->orWhereRaw("LOWER(COALESCE(payment_status, 'pending')) IN ('paid', 'proof_submitted')")
+                        ->orWhereRaw("LOWER(COALESCE(payment_status, 'pending')) IN ('paid', 'proof_submitted', 'downpayment_paid')")
                         ->orWhereRaw("LOWER(COALESCE(status, '')) IN ('cancelled', 'canceled')");
                 });
             }

@@ -127,6 +127,44 @@ test("opens an enlarged payment proof from live order details", async () => {
   expect(within(screen.getByRole("dialog")).getByRole("img", { name: "Enlarged payment proof for order 103" })).toBeInTheDocument();
 });
 
+test("lets admin verify a submitted balance before marking an order ready", async () => {
+  let statusRequest;
+  global.fetch = jest.fn((url, options = {}) => {
+    if (String(url).includes("/inventory/ingredients")) {
+      return Promise.resolve({ ok: true, json: async () => ({ ingredients: [] }) });
+    }
+
+    if (String(url).includes("/api/staff/orders/107/status")) {
+      statusRequest = options;
+      return Promise.resolve({ ok: true, json: async () => ({ success: true, status: "Ready for Pickup" }) });
+    }
+
+    return Promise.resolve({
+      ok: true,
+      json: async () => ({
+        success: true,
+        orders: [
+          orderFixture(107, "Awaiting Balance Payment", 10, {
+            payment: "QR Ph",
+            payment_status: "proof_submitted",
+            customer_payment_reference: "BALANCE-107",
+            downpayment_amount: 500,
+            total: 1000,
+          }),
+        ],
+      }),
+    });
+  });
+
+  renderOrders();
+  const orderCard = (await screen.findAllByText("Customer 107"))[0].closest("article");
+  fireEvent.click(within(orderCard).getByRole("button", { name: "Verify balance" }));
+
+  await waitFor(() => expect(statusRequest).toBeDefined());
+  expect(statusRequest.method).toBe("PUT");
+  expect(JSON.parse(statusRequest.body)).toEqual({ status: "Ready for Pickup" });
+});
+
 test("keeps the Live Orders table header in normal page flow while scrolling", async () => {
   renderOrders();
   await screen.findAllByText("Customer 101");
