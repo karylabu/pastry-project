@@ -694,8 +694,13 @@ export default function Orders() {
                   && String(order.payment_status || "").toLowerCase() === "proof_submitted"
                   && (order.has_payment_proof || order.customer_payment_reference);
                 const needsBalancePayment = order.status === "Preparing" && hasUnpaidBalance(order);
-                const hasPaymentBreakdown = (String(order.payment_status || "").toLowerCase() === "downpayment_paid"
+                const isBalancePaid = String(order.payment_status || "").toLowerCase() === "paid";
+                const hasPaymentBreakdown = (isBalancePaid
+                  || String(order.payment_status || "").toLowerCase() === "downpayment_paid"
                   || order.status === "Awaiting Balance Payment") && Number(order.downpayment_amount) > 0;
+                const hasSubmittedBalanceProof = order.status === "Awaiting Balance Payment"
+                  && String(order.payment_status || "").toLowerCase() === "proof_submitted"
+                  && order.has_payment_proof;
                 const orderTiming = getOrderTiming(order);
                 const customerLabel = order.customer || order.customer_name || order.name || order.phone || "Customer";
                 const addressLabel = order.address || order.delivery_address || order.customer_address || "No address provided";
@@ -799,9 +804,9 @@ export default function Orders() {
                                 <p className="text-[9px] text-[#8f8076]">Deposit received</p>
                                 <p className="mt-0.5 text-[13px] font-bold text-[#33251e]">₱{Number(order.downpayment_amount).toLocaleString()}</p>
                               </button>
-                              <button type="button" onClick={() => order.has_payment_proof && viewPaymentProof(order.id, true)} disabled={!order.has_payment_proof || paymentProofLoading === order.id} aria-label={`View payment proof for order ${order.id}: Balance due`} className="rounded-lg border border-amber-100 bg-white/80 p-2.5 text-left transition hover:border-amber-300 hover:bg-white focus:outline-none focus:ring-2 focus:ring-amber-300 disabled:cursor-default">
-                                <p className="text-[9px] text-[#8f8076]">Balance due</p>
-                                <p className="mt-0.5 text-[13px] font-bold text-amber-900">₱{Math.max(0, Number(order.total || 0) - Number(order.downpayment_amount)).toLocaleString()}</p>
+                              <button type="button" onClick={() => hasSubmittedBalanceProof && viewPaymentProof(order.id, true)} disabled={!hasSubmittedBalanceProof || paymentProofLoading === order.id} aria-label={`View balance payment proof for order ${order.id}`} className="rounded-lg border border-amber-100 bg-white/80 p-2.5 text-left transition hover:border-amber-300 hover:bg-white focus:outline-none focus:ring-2 focus:ring-amber-300 disabled:cursor-default">
+                                <p className="text-[9px] text-[#8f8076]">Balance payment proof</p>
+                                {isBalancePaid && <p className="mt-0.5 text-[13px] font-bold text-amber-900">Balance paid · ₱{Math.max(0, Number(order.total || 0) - Number(order.downpayment_amount)).toLocaleString()}</p>}
                               </button>
                             </div>
                           )}
@@ -862,8 +867,13 @@ export default function Orders() {
                       && String(order.payment_status || '').toLowerCase() === 'proof_submitted'
                       && (order.has_payment_proof || order.customer_payment_reference);
                     const needsBalancePayment = order.status === "Preparing" && hasUnpaidBalance(order);
-                    const hasPaymentBreakdown = (String(order.payment_status || '').toLowerCase() === 'downpayment_paid'
+                    const isBalancePaid = String(order.payment_status || "").toLowerCase() === "paid";
+                    const hasPaymentBreakdown = (isBalancePaid
+                      || String(order.payment_status || '').toLowerCase() === 'downpayment_paid'
                       || order.status === "Awaiting Balance Payment") && Number(order.downpayment_amount) > 0;
+                    const hasSubmittedBalanceProof = order.status === "Awaiting Balance Payment"
+                      && String(order.payment_status || "").toLowerCase() === "proof_submitted"
+                      && order.has_payment_proof;
                     const orderTiming = getOrderTiming(order);
                     const customerLabel = order.customer || order.customer_name || order.name || order.phone || "";
                     const itemNames = (order.items || []).slice(0, 2).map((item) => `${item.name || "Item"} ×${item.qty || 1}`).join(", ");
@@ -971,9 +981,9 @@ export default function Orders() {
                                         <p className="text-[10px] text-black/50">Deposit received</p>
                                         <p className="mt-1 text-base font-bold text-black">₱{Number(order.downpayment_amount).toLocaleString()}</p>
                                       </button>
-                                      <button type="button" onClick={() => order.has_payment_proof && viewPaymentProof(order.id, true)} disabled={!order.has_payment_proof || paymentProofLoading === order.id} aria-label={`View payment proof for order ${order.id}: Balance due`} className="rounded-lg border border-amber-100 bg-white/80 p-3 text-left transition hover:border-amber-300 hover:bg-white focus:outline-none focus:ring-2 focus:ring-amber-300 disabled:cursor-default">
-                                        <p className="text-[10px] text-black/50">Balance due</p>
-                                        <p className="mt-1 text-base font-bold text-amber-900">₱{Math.max(0, Number(order.total || 0) - Number(order.downpayment_amount)).toLocaleString()}</p>
+                                      <button type="button" onClick={() => hasSubmittedBalanceProof && viewPaymentProof(order.id, true)} disabled={!hasSubmittedBalanceProof || paymentProofLoading === order.id} aria-label={`View balance payment proof for order ${order.id}`} className="rounded-lg border border-amber-100 bg-white/80 p-3 text-left transition hover:border-amber-300 hover:bg-white focus:outline-none focus:ring-2 focus:ring-amber-300 disabled:cursor-default">
+                                        <p className="text-[10px] text-black/50">Balance payment proof</p>
+                                        {isBalancePaid && <p className="mt-1 text-base font-bold text-amber-900">Balance paid · ₱{Math.max(0, Number(order.total || 0) - Number(order.downpayment_amount)).toLocaleString()}</p>}
                                       </button>
                                     </div>
                                   ) : order.has_payment_proof && paymentProofPreviews[order.id] ? (

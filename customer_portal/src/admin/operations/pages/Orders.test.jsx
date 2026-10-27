@@ -131,7 +131,38 @@ test("opens an enlarged payment proof from live order details", async () => {
   );
 });
 
-test("opens submitted payment proof in the preview when a deposit or balance card is clicked", async () => {
+test("shows the balance amount after the balance is confirmed paid", async () => {
+  global.fetch = jest.fn((url) => {
+    if (String(url).includes("/inventory/ingredients")) {
+      return Promise.resolve({ ok: true, json: async () => ({ ingredients: [] }) });
+    }
+
+    return Promise.resolve({
+      ok: true,
+      json: async () => ({
+        success: true,
+        orders: [
+          orderFixture(111, "Ready for Pickup", 10, {
+            payment: "QR Ph",
+            payment_status: "paid",
+            has_payment_proof: true,
+            downpayment_amount: 500,
+            total: 1000,
+          }),
+        ],
+      }),
+    });
+  });
+
+  renderOrders();
+  const orderCard = (await screen.findAllByText("Customer 111"))[0].closest("article");
+  fireEvent.click(within(orderCard).getByRole("button", { name: "View details for order 111" }));
+
+  expect(within(orderCard).getByText("Balance payment proof")).toBeInTheDocument();
+  expect(within(orderCard).getByText("Balance paid · ₱500")).toBeInTheDocument();
+});
+
+test("keeps balance proof available but hides the unpaid balance amount", async () => {
   global.fetch = jest.fn((url) => {
     if (String(url).includes("/api/staff/orders/109/payment-proof")) {
       return Promise.resolve({
@@ -167,8 +198,11 @@ test("opens submitted payment proof in the preview when a deposit or balance car
   fireEvent.click(within(orderCard).getByRole("button", { name: "View details for order 109" }));
 
   expect(screen.queryByRole("dialog", { name: "Payment proof for order 109" })).not.toBeInTheDocument();
+  expect(within(orderCard).getByText("Balance payment proof")).toBeInTheDocument();
+  expect(within(orderCard).queryByText(/Balance paid ·/)).not.toBeInTheDocument();
+  expect(within(orderCard).queryByText("Balance due")).not.toBeInTheDocument();
   fireEvent.click(within(orderCard).getByRole("button", {
-    name: "View payment proof for order 109: Deposit received",
+    name: "View balance payment proof for order 109",
   }));
 
   const preview = await screen.findByRole("dialog", { name: "Payment proof for order 109" });
@@ -179,6 +213,45 @@ test("opens submitted payment proof in the preview when a deposit or balance car
     "https://example.test/laravel/api/staff/orders/109/payment-proof",
     expect.any(Object),
   );
+});
+
+test("does not allow opening a balance proof before the customer submits it", async () => {
+  global.fetch = jest.fn((url) => {
+    if (String(url).includes("/inventory/ingredients")) {
+      return Promise.resolve({ ok: true, json: async () => ({ ingredients: [] }) });
+    }
+
+    return Promise.resolve({
+      ok: true,
+      json: async () => ({
+        success: true,
+        orders: [
+          orderFixture(110, "Awaiting Balance Payment", 10, {
+            payment: "QR Ph",
+            payment_status: "downpayment_paid",
+            has_payment_proof: false,
+            downpayment_amount: 1,
+            total: 2,
+          }),
+        ],
+      }),
+    });
+  });
+
+  renderOrders();
+  const orderCard = (await screen.findAllByText("Customer 110"))[0].closest("article");
+  fireEvent.click(within(orderCard).getByRole("button", { name: "View details for order 110" }));
+
+  const balanceCards = within(orderCard).getAllByRole("button", {
+    name: "View balance payment proof for order 110",
+  });
+  expect(balanceCards.length).toBeGreaterThan(0);
+  balanceCards.forEach((card) => expect(card).toBeDisabled());
+  expect(global.fetch).not.toHaveBeenCalledWith(
+    "https://example.test/laravel/api/staff/orders/110/payment-proof",
+    expect.any(Object),
+  );
+  expect(screen.queryByRole("dialog", { name: "Payment proof for order 110" })).not.toBeInTheDocument();
 });
 
 test("lets admin verify a submitted balance before marking an order ready", async () => {
@@ -217,7 +290,9 @@ test("lets admin verify a submitted balance before marking an order ready", asyn
   fireEvent.click(within(orderCard).getByRole("button", { name: "View details for order 107" }));
   expect(within(orderCard).getByText("Order summary")).toBeInTheDocument();
   expect(within(orderCard).getByText("Deposit received")).toBeInTheDocument();
-  expect(within(orderCard).getByText("Balance due")).toBeInTheDocument();
+  expect(within(orderCard).getByText("Balance payment proof")).toBeInTheDocument();
+  expect(within(orderCard).queryByText("Balance due")).not.toBeInTheDocument();
+  expect(within(orderCard).queryByText(/Balance paid ·/)).not.toBeInTheDocument();
   expect(within(orderCard).getByText("Balance needs verification")).toBeInTheDocument();
   expect(within(orderCard).getByText("Confirm the balance payment before marking this order ready for pickup.")).toBeInTheDocument();
   fireEvent.click(within(orderCard).getByRole("button", { name: "Verify balance" }));
