@@ -209,11 +209,8 @@ export default function Orders() {
     }
   };
 
-  const viewPaymentProof = async (orderId, openLightbox = false) => {
-    if (paymentProofPreviewUrlsRef.current[orderId]) {
-      if (openLightbox) setPaymentProofLightboxOrderId(orderId);
-      return;
-    }
+  const viewPaymentProof = async (orderId) => {
+    if (paymentProofPreviewUrlsRef.current[orderId]) return;
 
     setPaymentProofLoading(orderId);
     try {
@@ -223,7 +220,6 @@ export default function Orders() {
       const previewUrl = URL.createObjectURL(await response.blob());
       paymentProofPreviewUrlsRef.current[orderId] = previewUrl;
       setPaymentProofPreviews((current) => ({ ...current, [orderId]: previewUrl }));
-      if (openLightbox) setPaymentProofLightboxOrderId(orderId);
     } catch (error) {
       addToast(error.message || 'Unable to load the private payment proof.', 'error');
     } finally {
@@ -239,13 +235,6 @@ export default function Orders() {
 
   const toggleOrderDetails = (order, isExpanded) => {
     setExpandedOrderId(isExpanded ? null : order.id);
-    if (isExpanded || !isQrPayment(order.payment)) return;
-
-    const hasSubmittedPaymentDetails = order.has_payment_proof || order.customer_payment_reference;
-    if (!hasSubmittedPaymentDetails) return;
-
-    setPaymentProofDetailsOrderId(order.id);
-    if (order.has_payment_proof) viewPaymentProof(order.id, true);
   };
 
   const markOrderAsWaste = async (order) => {
