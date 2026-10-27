@@ -38,6 +38,7 @@ class ExpireUnpaidOrders extends Command
 
                 DB::table('orders')->where('id', $order->id)->update([
                     'status' => 'Cancelled',
+                    'cancelled_at' => now(),
                 ]);
 
                 if (Schema::hasTable('notifications') && $order->user_id) {
@@ -49,8 +50,8 @@ class ExpireUnpaidOrders extends Command
 
                     DB::table('notifications')->insert([
                         'user_id' => $order->user_id,
-                        'title' => 'Order Expired',
-                        'message' => "Order #{$order->id} was automatically cancelled because it remained Pending or Awaiting Payment for over 24 hours.",
+                        'title' => 'Order Cancelled',
+                        'message' => 'Your order was cancelled.',
                         'type' => 'Warning',
                         'is_read' => 0,
                         'action_url' => '/customer/orders',

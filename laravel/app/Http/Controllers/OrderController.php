@@ -1167,16 +1167,29 @@ class OrderController extends Controller
                 $refundResult = $this->refundPaidOrderIfNeeded($order);
                 $this->restoreOrderSizeStock($order, (int) $user->id);
                 $this->restoreOrderProductStock($order, (int) $user->id);
-                $order->update(['status' => 'Cancelled']);
+                $order->update([
+                    'status' => 'Cancelled',
+                    'cancelled_at' => now(),
+                ]);
 
                 if (Schema::hasTable('notifications')) {
                     DB::table('notifications')->insert([
                         'user_id' => $user->id,
                         'title' => 'Order Cancelled',
-                        'message' => "Your order #{$order->id} has been cancelled.",
+                        'message' => 'Your order was cancelled.',
                         'type' => 'Warning',
                         'is_read' => 0,
                         'action_url' => '/customer/orders',
+                        'created_at' => now(),
+                    ]);
+
+                    AdminNotification::notifyRoles(['admin'], [
+                        'type' => 'order_cancelled',
+                        'title' => 'Order Cancelled',
+                        'message' => "Order #{$order->id} was cancelled by the customer.",
+                        'data' => ['order_id' => (int) $order->id],
+                        'action_url' => '/admin/orders',
+                        'is_read' => false,
                         'created_at' => now(),
                     ]);
                 }
@@ -1225,6 +1238,7 @@ class OrderController extends Controller
             'message' => $message,
             'refund_status' => $refundResult['status'],
             'refund_amount' => $refundResult['amount'],
+            'cancelled_at' => $order->cancelled_at,
         ]);
     }
 
@@ -1562,7 +1576,14 @@ class OrderController extends Controller
                     }
                 }
 
-                $order->update(['status' => $newStatus]);
+                $orderUpdate = ['status' => $newStatus];
+                if (
+                    strtolower(trim($newStatus)) === 'cancelled'
+                    && strtolower(trim((string) $oldStatus)) !== 'cancelled'
+                ) {
+                    $orderUpdate['cancelled_at'] = now();
+                }
+                $order->update($orderUpdate);
 
                 if (Schema::hasTable('order_return_refund_requests')
                     && in_array(strtolower(trim($newStatus)), ['completed', 'cancelled'], true)) {
@@ -1577,10 +1598,13 @@ class OrderController extends Controller
 
                 if ($oldStatus !== $newStatus && Schema::hasTable('notifications')) {
                     $type = strtolower($newStatus) === 'cancelled' ? 'Warning' : 'Success';
+                    $message = strtolower(trim($newStatus)) === 'cancelled'
+                        ? 'Your order was cancelled.'
+                        : "Your order #{$order->id} status has been updated to {$newStatus}.";
                     DB::table('notifications')->insert([
                         'user_id' => $order->user_id,
                         'title' => "Order {$newStatus}",
-                        'message' => "Your order #{$order->id} status has been updated to {$newStatus}.",
+                        'message' => $message,
                         'type' => $type,
                         'is_read' => 0,
                         'action_url' => '/customer/orders',

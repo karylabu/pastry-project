@@ -43,7 +43,8 @@ class Order extends Model
         'coupon_code',
         'discount',
         'discount_id_path',
-        'payment_proof_path'
+        'payment_proof_path',
+        'cancelled_at',
     ];
 
     protected $hidden = ['discount_id_path', 'payment_proof_path'];

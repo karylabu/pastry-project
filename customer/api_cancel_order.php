@@ -115,7 +115,7 @@ try {
         $update->close();
     }
 
-    $updateOrder = $conn->prepare("UPDATE orders SET status = 'Cancelled' WHERE id = ?");
+    $updateOrder = $conn->prepare("UPDATE orders SET status = 'Cancelled', cancelled_at = NOW() WHERE id = ?");
     if (!$updateOrder) {
         throw new Exception('Failed to prepare cancelled order update.');
     }
@@ -124,6 +124,46 @@ try {
     $updateOrder->close();
 
     if ($result) {
+        $customerNotification = $conn->prepare('INSERT INTO notifications (user_id, title, message, type, is_read, action_url, created_at) VALUES (?, ?, ?, ?, 0, ?, NOW())');
+        if (!$customerNotification) {
+            throw new Exception('Failed to prepare customer cancellation notification.');
+        }
+        $title = 'Order Cancelled';
+        $message = 'Your order was cancelled.';
+        $type = 'Warning';
+        $actionUrl = '/customer/orders';
+        $customerNotification->bind_param('issss', $userId, $title, $message, $type, $actionUrl);
+        if (!$customerNotification->execute()) {
+            $customerNotification->close();
+            throw new Exception('Failed to notify customer about cancelled order.');
+        }
+        $customerNotification->close();
+
+        $admins = $conn->query("SELECT id FROM users WHERE LOWER(role) = 'admin'");
+        if (!$admins) {
+            throw new Exception('Failed to load admins for cancellation notification.');
+        }
+        while ($admin = $admins->fetch_assoc()) {
+            $notification = $conn->prepare('INSERT INTO notifications (user_id, title, message, type, is_read, action_url, created_at) VALUES (?, ?, ?, ?, 0, ?, NOW())');
+            if (!$notification) {
+                $admins->free();
+                throw new Exception('Failed to prepare admin cancellation notification.');
+            }
+            $title = 'Order Cancelled';
+            $message = "Order #{$order_id} was cancelled by the customer.";
+            $type = 'Warning';
+            $actionUrl = '/admin/orders';
+            $adminId = (int) $admin['id'];
+            $notification->bind_param('issss', $adminId, $title, $message, $type, $actionUrl);
+            if (!$notification->execute()) {
+                $notification->close();
+                $admins->free();
+                throw new Exception('Failed to notify admin about cancelled order.');
+            }
+            $notification->close();
+        }
+        $admins->free();
+
         if ($refundResult['status'] === 'manual_required') {
             $admins = $conn->query("SELECT id FROM users WHERE LOWER(role) = 'admin'");
             if ($admins) {

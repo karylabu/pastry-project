@@ -49,6 +49,7 @@ class StaffOrdersApiTest extends TestCase
             $table->string('discount_id_path')->nullable();
             $table->string('payment_proof_path')->nullable();
             $table->timestamp('created_at')->nullable();
+            $table->timestamp('cancelled_at')->nullable();
         });
         Schema::create('products', function ($table) {
             $table->id();

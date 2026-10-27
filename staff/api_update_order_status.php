@@ -1374,6 +1374,8 @@ try {
         if ($stmt) $stmt->bind_param('sdi', $status, $storedDownpaymentAmount, $id);
     } elseif ($isAcceptingDownpayment || $isAcceptingBalancePayment || $isReviewingGcashProof || ($isGcashOrder && $status === 'Preparing' && $paymentStatus === 'proof_submitted')) {
         $stmt = $conn->prepare("UPDATE orders SET status=?, payment_status='paid' WHERE id=?");
+    } elseif ($status === 'Cancelled' && $oldStatus !== 'Cancelled') {
+        $stmt = $conn->prepare("UPDATE orders SET status=?, cancelled_at=NOW() WHERE id=?");
     } else {
         $stmt = $conn->prepare("UPDATE orders SET status=? WHERE id=?");
     }
@@ -1642,14 +1644,9 @@ try {
                 }
 
                 if ($oldStatus !== $status) {
-                    $notifMessage = "Your order #{$id} status changed from {$oldStatus} to {$status}.";
-                    if ($status === 'Cancelled' && $refundResult['status'] === 'pending') {
-                        $notifMessage .= ' Your PayMongo refund request is being processed.';
-                    } elseif ($status === 'Cancelled' && in_array($refundResult['status'], ['succeeded', 'refunded'], true)) {
-                        $notifMessage .= ' PayMongo confirmed the refund.';
-                    } elseif ($status === 'Cancelled' && $refundResult['status'] === 'manual_required') {
-                        $notifMessage .= ' The shop will process your refund manually.';
-                    }
+                    $notifMessage = $status === 'Cancelled'
+                        ? 'Your order was cancelled.'
+                        : "Your order #{$id} status changed from {$oldStatus} to {$status}.";
                     if (!insertCustomerNotification($conn, $notifUserId, $notifTitle, $notifMessage, $notifType, '/customer/orders')) {
                         error_log("api_update_order_status: notification insert failed for order #{$id}, user #{$notifUserId}, status {$status}");
                     }

@@ -675,6 +675,7 @@ class CustomerApiController extends Controller
                 'phone' => $row->phone,
                 'status' => $row->status ?? 'Pending',
                 'created_at' => $row->created_at,
+                'cancelled_at' => $row->cancelled_at,
                 'lat' => floatval($row->lat ?? 0),
                 'lng' => floatval($row->lng ?? 0),
                 'is_customized' => $row->is_customized,

@@ -55,6 +55,19 @@ class CustomerOrdersApiTest extends TestCase
             $table->boolean('is_customized')->default(false);
             $table->string('order_type')->nullable();
             $table->timestamp('created_at')->nullable();
+            $table->timestamp('cancelled_at')->nullable();
+        });
+        Schema::create('notifications', function ($table) {
+            $table->id();
+            $table->unsignedBigInteger('user_id')->nullable();
+            $table->string('title');
+            $table->text('message');
+            $table->string('type');
+            $table->json('data')->nullable();
+            $table->boolean('is_read')->default(false);
+            $table->timestamp('read_at')->nullable();
+            $table->string('action_url')->nullable();
+            $table->timestamp('created_at')->nullable();
         });
         Schema::create('order_items', function ($table) {
             $table->id();
@@ -73,6 +86,13 @@ class CustomerOrdersApiTest extends TestCase
             'password' => 'unused',
             'role' => 'customer',
         ]);
+        DB::table('users')->insert([
+            'id' => 8,
+            'name' => 'Test Admin',
+            'email' => 'admin@example.com',
+            'password' => 'unused',
+            'role' => 'admin',
+        ]);
         DB::table('user_sessions')->insert([
             'user_id' => 7,
             'token' => 'test-customer-token',
@@ -82,6 +102,7 @@ class CustomerOrdersApiTest extends TestCase
 
     protected function tearDown(): void
     {
+        Schema::dropIfExists('notifications');
         Schema::dropIfExists('custom_cake_orders');
         Schema::dropIfExists('order_items');
         Schema::dropIfExists('orders');
@@ -171,12 +192,25 @@ class CustomerOrdersApiTest extends TestCase
             'status' => 'Pending',
         ]);
 
-        $this->withHeader('Authorization', 'Bearer test-customer-token')
-            ->postJson('/api/orders/10/cancel')
-            ->assertOk()
-            ->assertJsonPath('success', true);
+        $request = Request::create('/api/orders/10/cancel', 'POST', [], [], [], [
+            'HTTP_X_AUTH_TOKEN' => 'test-customer-token',
+        ]);
+        $response = app(OrderController::class)->cancel($request, 10);
 
+        $this->assertSame(200, $response->getStatusCode());
+        $this->assertTrue($response->getData(true)['success']);
         $this->assertDatabaseHas('orders', ['id' => 10, 'status' => 'Cancelled']);
+        $this->assertNotNull(DB::table('orders')->where('id', 10)->value('cancelled_at'));
+        $this->assertDatabaseHas('notifications', [
+            'user_id' => 7,
+            'title' => 'Order Cancelled',
+            'message' => 'Your order was cancelled.',
+        ]);
+        $this->assertDatabaseHas('notifications', [
+            'user_id' => 8,
+            'title' => 'Order Cancelled',
+            'message' => 'Order #10 was cancelled by the customer.',
+        ]);
     }
 
     public function test_customer_order_number_matches_order_id(): void

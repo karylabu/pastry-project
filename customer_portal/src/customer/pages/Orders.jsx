@@ -14,6 +14,14 @@ import {
 import { getCustomCakePaymentBreakdown } from '../utils/customCakePayment';
 import { getReceiptItemTotal, getReceiptTotal } from '../utils/orderReceipt';
 
+const formatOrderTimestamp = (value) => {
+  if (!value) return 'Not available';
+  const date = new Date(value);
+  return Number.isNaN(date.getTime())
+    ? 'Not available'
+    : date.toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
+};
+
 // ── Cancel Confirmation Dialog ───────────────────────────────────────────────
 function CancelDialog({ order, onConfirm, onDismiss, isLoading }) {
   return (
@@ -525,6 +533,7 @@ export default function Orders() {
         updateLocalStatus(cancelTarget.id, "Cancelled", {
           refund_status: data.refund_status,
           refund_amount: data.refund_amount,
+          cancelled_at: data.cancelled_at,
         });
         setStatusFilter("Cancelled");
       } else {
@@ -919,7 +928,10 @@ export default function Orders() {
                     {order.status}
                   </span>
                 </div>
-                <p className="mt-1 text-sm text-gray-700">{displayDate}</p>
+                <p className="mt-1 text-sm text-gray-700">Placed: {displayDate}</p>
+                {order.status === 'Cancelled' && (
+                  <p className="mt-1 text-sm text-gray-700">Cancelled: {formatOrderTimestamp(order.cancelled_at)}</p>
+                )}
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 <button

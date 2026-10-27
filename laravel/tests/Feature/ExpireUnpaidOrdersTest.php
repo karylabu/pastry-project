@@ -23,6 +23,7 @@ class ExpireUnpaidOrdersTest extends TestCase
             $table->string('payment')->nullable();
             $table->string('payment_status')->nullable();
             $table->timestamp('created_at')->nullable();
+            $table->timestamp('cancelled_at')->nullable();
         });
         Schema::create('notifications', function ($table) {
             $table->id();
@@ -119,6 +120,7 @@ class ExpireUnpaidOrdersTest extends TestCase
         $this->artisan('orders:expire-unpaid')->assertExitCode(0);
 
         $this->assertDatabaseHas('orders', ['id' => 1, 'status' => 'Cancelled', 'payment_status' => 'pending']);
+        $this->assertNotNull(DB::table('orders')->where('id', 1)->value('cancelled_at'));
         $this->assertDatabaseHas('orders', ['id' => 2, 'status' => 'Awaiting Payment', 'payment_status' => 'paid']);
         $this->assertDatabaseHas('orders', ['id' => 3, 'status' => 'Awaiting Payment', 'payment_status' => 'pending']);
         $this->assertDatabaseHas('orders', ['id' => 4, 'status' => 'Cancelled', 'payment_status' => 'pending']);
@@ -133,8 +135,8 @@ class ExpireUnpaidOrdersTest extends TestCase
         $this->assertDatabaseMissing('notifications', ['message' => 'Your order #1 has been placed and is awaiting payment.']);
         $this->assertDatabaseHas('notifications', [
             'user_id' => 7,
-            'title' => 'Order Expired',
-            'message' => 'Order #1 was automatically cancelled because it remained Pending or Awaiting Payment for over 24 hours.',
+            'title' => 'Order Cancelled',
+            'message' => 'Your order was cancelled.',
             'type' => 'Warning',
             'action_url' => '/customer/orders',
         ]);

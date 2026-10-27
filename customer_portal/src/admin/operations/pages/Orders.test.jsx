@@ -67,7 +67,7 @@ beforeEach(() => {
             has_payment_proof: true,
           }),
           orderFixture(104, "Completed", 60),
-          orderFixture(105, "Cancelled", 61),
+          orderFixture(105, "Cancelled", 61, { cancelled_at: new Date(Date.now() - 30 * 60 * 1000).toISOString() }),
           orderFixture(106, "Pending", 2, { order_type: "Urgent" }),
         ],
       }),
@@ -99,6 +99,17 @@ test("sorts orders newest-first from the status filter toolbar", async () => {
   });
 
   await waitFor(() => expect(container.querySelector("article")).toHaveTextContent("#106"));
+});
+
+test("shows placed and cancelled timestamps in cancelled order details", async () => {
+  const { container } = renderOrders();
+  const orderCard = (await screen.findAllByText("Customer 105"))[0].closest("article");
+
+  fireEvent.click(within(orderCard).getByRole("button", { name: /View details for order 105/i }));
+
+  expect(within(orderCard).getByText(/Placed:/)).toBeInTheDocument();
+  expect(within(orderCard).getByText(/Cancelled:/)).toBeInTheDocument();
+  expect(container.querySelectorAll("time[datetime]").length).toBeGreaterThan(0);
 });
 
 test("shows the exact order date and time in live order cards", async () => {
