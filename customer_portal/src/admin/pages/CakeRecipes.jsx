@@ -408,7 +408,7 @@ export default function CakeRecipes() {
               </div>
 
               {recipeLines.length > 0 ? recipeLines.map((line, index) => (
-                <div key={`${selectedFlavorId}-${index}`} className="grid items-center gap-2 rounded-xl border border-[#e5d9d0] bg-white p-3 md:grid-cols-[minmax(0,1fr)_130px_90px_38px]">
+                <div key={`${selectedFlavorId}-${index}`} className="grid items-center gap-2 rounded-xl border border-t-0 border-[#e5d9d0] bg-white p-3 md:grid-cols-[minmax(0,1fr)_130px_90px_38px]">
                   <label className="min-w-0">
                     <span className="mb-1 block text-[9px] font-bold uppercase tracking-[0.14em] text-[#9b8c83] md:hidden">Ingredient</span>
                     <select value={line.ingredient_id} onChange={(event) => selectIngredient(index, event.target.value)} className="w-full rounded-md border border-[#eadfd8] bg-white px-2.5 py-2 text-[11px] text-[#33251e] outline-none transition focus:border-[#9b8c83] focus:ring-2 focus:ring-[#9b8c83]/15" required>
