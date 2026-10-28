@@ -368,6 +368,16 @@ export default function Orders() {
         ? firstValue.localeCompare(secondValue)
         : firstValue - secondValue;
       if (comparison !== 0) return sortDirection === "asc" ? comparison : -comparison;
+      if (sortBy === "date") {
+        const firstOrderNumber = Number(a.order_number);
+        const secondOrderNumber = Number(b.order_number);
+        if (Number.isFinite(firstOrderNumber) && Number.isFinite(secondOrderNumber) && firstOrderNumber !== secondOrderNumber) {
+          return firstOrderNumber - secondOrderNumber;
+        }
+        const idComparison = Number(a.id) - Number(b.id);
+        if (Number.isFinite(idComparison) && idComparison !== 0) return idComparison;
+        return 0;
+      }
       return (Date.parse(b.created_at || "") || 0) - (Date.parse(a.created_at || "") || 0);
     });
 
