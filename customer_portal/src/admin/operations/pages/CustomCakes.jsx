@@ -29,7 +29,7 @@ const laravelStaffFetch = (url, options = {}) => {
 
 const ACTION_BUTTON_BASE = "inline-flex h-8 w-full min-w-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-md px-2.5 text-[10px] font-semibold transition disabled:cursor-not-allowed disabled:opacity-50";
 const ACTION_BUTTON_PRIMARY = `${ACTION_BUTTON_BASE} bg-[#33251e] text-white hover:bg-[#5b4540]`;
-const ACTION_BUTTON_SECONDARY = `${ACTION_BUTTON_BASE} border border-[#e8dfd4] bg-white text-[#65574d] hover:bg-[#faf7f2]`;
+const ACTION_BUTTON_SECONDARY = `${ACTION_BUTTON_BASE} bg-[#33251e] text-white hover:bg-[#5b4540]`;
 const ACTION_BUTTON_DANGER = `${ACTION_BUTTON_BASE} border border-red-200 bg-red-50 text-red-700 hover:bg-red-100`;
 
 function Toast({ toasts }) {
@@ -895,7 +895,7 @@ export default function CustomCakes() {
                         <button type="button" onClick={() => openOrderDetails(order)} title={`View order ${order.order_number || order.id}`} aria-label={`View details for order ${order.order_number || order.id}`} className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-[#e8dfd4] bg-white text-[#65574d] transition hover:bg-[#faf7f2]"><Eye size={14} aria-hidden="true" /></button>
                         {pendingReview && <button type="button" onClick={() => openQuoteModal(order)} disabled={updatingId === order.id} className="inline-flex h-8 items-center justify-center rounded-md bg-[#33251e] px-2.5 text-[10px] font-semibold text-white transition hover:bg-[#5b4540] disabled:opacity-50">Set quote</button>}
                         {pendingReview && <button type="button" onClick={() => updateStatus(order.id, "Cancelled")} disabled={updatingId === order.id} className="inline-flex h-8 items-center justify-center rounded-md border border-red-200 bg-red-50 px-2.5 text-[10px] font-semibold text-red-700 disabled:opacity-50">Decline</button>}
-                        {order.status === "Awaiting Payment" && !paymentReview && <button type="button" onClick={() => openQuoteModal(order)} className="inline-flex h-8 items-center justify-center rounded-md border border-[#e8dfd4] bg-white px-2.5 text-[10px] font-semibold text-[#65574d]">Update quote</button>}
+                        {order.status === "Awaiting Payment" && !paymentReview && <button type="button" onClick={() => openQuoteModal(order)} className="inline-flex h-8 items-center justify-center rounded-md bg-[#33251e] px-2.5 text-[10px] font-semibold text-white transition hover:bg-[#5b4540]">Update quote</button>}
                         {paymentReview && <button type="button" onClick={() => updateStatus(order.id, order.status === "Awaiting Balance Payment" ? "Ready for Pickup" : "Pending")} disabled={updatingId === order.id} className="inline-flex h-8 items-center justify-center rounded-md bg-[#33251e] px-2.5 text-[10px] font-semibold text-white transition hover:bg-[#5b4540] disabled:opacity-50">{order.status === "Awaiting Balance Payment" ? "Accept balance proof" : "Accept downpayment"}</button>}
                         {nextStatus && <button type="button" onClick={() => updateStatus(order.id, nextStatus)} disabled={updatingId === order.id} className="inline-flex h-8 items-center justify-center gap-1 rounded-md bg-[#33251e] px-2.5 text-[10px] font-semibold text-white transition hover:bg-[#5b4540] disabled:opacity-50">{updatingId === order.id ? "Updating..." : nextStatus === "Preparing" ? "Start preparing" : nextStatus === "Awaiting Balance Payment" ? "Ready for pickup" : "Complete"}<ArrowRight size={12} /></button>}
                       </div>
