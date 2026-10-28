@@ -25,7 +25,7 @@ function Input({ type = "text", placeholder, value, onChange, maxLength, inputMo
           onChange={onChange}
           maxLength={maxLength}
           inputMode={inputMode}
-          className={`w-full h-[34px] bg-white border rounded-lg px-3 ${onTogglePassword ? "pr-9" : ""} text-[10px] text-black outline-none focus:border-[#F0B94D] focus:ring-2 focus:ring-[#F0B94D]/30 transition-all ${error ? "border-[#A8354A]" : "border-black/15"}`}
+          className={`w-full h-[34px] bg-white border rounded-lg px-3 ${onTogglePassword ? "password-toggle-input pr-9" : ""} text-[10px] text-black outline-none focus:border-[#F0B94D] focus:ring-2 focus:ring-[#F0B94D]/30 transition-all ${error ? "border-[#A8354A]" : "border-black/15"}`}
         />
         {onTogglePassword && (
           <button

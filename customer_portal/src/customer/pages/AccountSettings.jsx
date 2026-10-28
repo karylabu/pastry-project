@@ -818,14 +818,14 @@ export default function AccountSettings() {
                 <label className="block">
                   <span className="text-xs uppercase tracking-[0.16em] text-gray-600 font-bold">Current Password</span>
                   <div className="mt-2 flex items-center rounded-xl border border-gray-200 bg-gray-50 px-3 py-3 sm:px-4 sm:py-3.5">
-                    <input type={showPassword ? 'text' : 'password'} value={passwordForm.current_password} onChange={(e) => setPasswordForm({ ...passwordForm, current_password: e.target.value })} className="w-full bg-transparent text-sm text-gray-900 outline-none sm:text-base" />
+                    <input type={showPassword ? 'text' : 'password'} value={passwordForm.current_password} onChange={(e) => setPasswordForm({ ...passwordForm, current_password: e.target.value })} className="password-toggle-input w-full bg-transparent text-sm text-gray-900 outline-none sm:text-base" />
                     <button type="button" onClick={() => setShowPassword(!showPassword)} className="ml-2 text-gray-400">{showPassword ? <EyeOff size={16} /> : <Eye size={16} />}</button>
                   </div>
                 </label>
                 <label className="block">
                   <span className="text-xs uppercase tracking-[0.16em] text-gray-600 font-bold">New Password</span>
                   <div className="mt-2 flex items-center rounded-xl border border-gray-200 bg-gray-50 px-3 py-3 sm:px-4 sm:py-3.5">
-                    <input type={showNewPassword ? 'text' : 'password'} value={passwordForm.new_password} onChange={(e) => setPasswordForm({ ...passwordForm, new_password: e.target.value })} className="w-full bg-transparent text-sm text-gray-900 outline-none sm:text-base" />
+                    <input type={showNewPassword ? 'text' : 'password'} value={passwordForm.new_password} onChange={(e) => setPasswordForm({ ...passwordForm, new_password: e.target.value })} className="password-toggle-input w-full bg-transparent text-sm text-gray-900 outline-none sm:text-base" />
                     <button type="button" onClick={() => setShowNewPassword(!showNewPassword)} className="ml-2 text-gray-400">{showNewPassword ? <EyeOff size={16} /> : <Eye size={16} />}</button>
                   </div>
                 </label>
@@ -836,7 +836,7 @@ export default function AccountSettings() {
                       ? 'border-red-300 bg-red-50'
                       : 'border-gray-200 bg-gray-50'
                   }`}>
-                    <input type={showConfirmPassword ? 'text' : 'password'} value={passwordForm.confirm_password} onChange={(e) => setPasswordForm({ ...passwordForm, confirm_password: e.target.value })} className="w-full bg-transparent text-sm text-gray-900 outline-none sm:text-base" />
+                    <input type={showConfirmPassword ? 'text' : 'password'} value={passwordForm.confirm_password} onChange={(e) => setPasswordForm({ ...passwordForm, confirm_password: e.target.value })} className="password-toggle-input w-full bg-transparent text-sm text-gray-900 outline-none sm:text-base" />
                     <button type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)} className="ml-2 text-gray-400">{showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}</button>
                   </div>
                   {passwordForm.new_password && passwordForm.confirm_password && passwordForm.new_password !== passwordForm.confirm_password && (
