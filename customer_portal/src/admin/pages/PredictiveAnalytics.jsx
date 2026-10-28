@@ -142,9 +142,9 @@ function ValidationMetrics({ model }) {
         <p className="text-xs text-black/55">
           {model?.name || "—"} · {model?.records ?? 0} sales rows
           {model?.products_count != null ? ` · ${model.products_count} products in data` : ""}
-          {model?.validation_products != null ? ` · ${model.validation_products} tested` : ""}
+          {model?.validation_products != null ? ` · ${model.validation_products} validated` : ""}
           {model?.validation_excluded_products > 0
-            ? ` · ${model.validation_excluded_products} not tested (${model.validation_insufficient_history_products || 0} with insufficient covered history, ${model.validation_inactive_products || 0} inactive)`
+            ? ` · ${model.validation_excluded_products} need more history (${model.validation_insufficient_history_products || 0} with fewer than 2 covered days, ${model.validation_inactive_products || 0} inactive)`
             : ""}
         </p>
         {hasAggregate && (
@@ -254,7 +254,7 @@ function ValidationMetrics({ model }) {
       )}
 
       <p className="mt-auto text-[10px] text-black/45">
-        Chronological 7-day holdout, products with 14+ days of history.
+        Chronological holdout using up to 7 days per product; short histories use a shorter, lower-confidence holdout.
         {activeScope === "aggregate" ? " Shop total adds up all products per day." : " Per-product errors are pooled together."}{" "}
         The thin line marks the predict-zero baseline.
       </p>

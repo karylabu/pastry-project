@@ -534,7 +534,9 @@ function buildDetailedForecastPayload(array $history, array $products, array $in
     $forecastProducts = [];
     $previousEquivalentTotal = 0;
 
-    // Validation: every method is scored on the same chronological 7-day holdout.
+    // Validation uses the longest holdout available for each product, up to 7 days.
+    // Products with short histories are still evaluated instead of disappearing from
+    // the validation view; their results are marked as lower-confidence by the UI.
     // - $validation: errors pooled per product-day
     // - $aggActual / $aggPred: shop-level daily totals (what the bakery actually plans for)
     $validationMethods = ['linear', 'zero', 'yesterday', 'same_weekday_last_week', 'moving_average_7'];
@@ -544,7 +546,6 @@ function buildDetailedForecastPayload(array $history, array $products, array $in
     }
     $aggActual = [];
     $aggPred = [];
-    $minTrainDays = 14;          // products need this much history before the holdout
     $evaluatedProducts = 0;
     $insufficientHistoryProducts = 0;
     $inactiveProducts = 0;
@@ -561,13 +562,14 @@ function buildDetailedForecastPayload(array $history, array $products, array $in
             min(array_keys($daily))
         ));
 
-        if (count($values) < $minTrainDays + 7) {
+        if (count($values) < 2) {
             $insufficientHistoryProducts++;
             continue;
         }
 
-        $trainingValues = array_slice($values, 0, -7);
-        $holdout = array_slice($values, -7);
+        $holdoutDays = min(7, max(1, (int) floor(count($values) / 3)));
+        $trainingValues = array_slice($values, 0, -$holdoutDays);
+        $holdout = array_slice($values, -$holdoutDays);
         $isActive = array_sum(array_slice($trainingValues, -28)) > 0 || array_sum($holdout) > 0;
         if (!$isActive) {
             $inactiveProducts++;
@@ -577,7 +579,8 @@ function buildDetailedForecastPayload(array $history, array $products, array $in
         $evaluatedProducts++;
         $trainFit = fitTrend($trainingValues);
         $holdoutOffset = count($trainingValues);
-        $movingAverage7 = array_sum(array_slice($trainingValues, -7)) / 7;
+        $movingWindow = array_slice($trainingValues, -7);
+        $movingAverage7 = array_sum($movingWindow) / max(1, count($movingWindow));
         $lastKnownValue = (float) $trainingValues[count($trainingValues) - 1];
 
         foreach ($holdout as $i => $actual) {
@@ -586,7 +589,9 @@ function buildDetailedForecastPayload(array $history, array $products, array $in
                 'linear' => forecastAt($trainFit, $i + 1),
                 'zero' => 0.0,
                 'yesterday' => $lastKnownValue,
-                'same_weekday_last_week' => (float) $values[$targetIndex - 7],
+                'same_weekday_last_week' => $targetIndex >= 7
+                    ? (float) $values[$targetIndex - 7]
+                    : $lastKnownValue,
                 'moving_average_7' => (float) $movingAverage7,
             ];
 
