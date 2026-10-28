@@ -80,9 +80,6 @@ jobs:
           $(git diff --name-only "$BEFORE_SHA" "$GITHUB_SHA")
           EOF
 
-          if [ "$ui_files" -eq 0 ]; then
-            frontend_only=false
-          fi
           echo "frontend_only=$frontend_only" >> "$GITHUB_OUTPUT"
           echo "Frontend-only deployment: $frontend_only"
 
@@ -154,22 +151,27 @@ jobs:
           fi
 
       - name: Verify Hostinger deployment tools
-        if: steps.deployment_scope.outputs.frontend_only != 'true'
+        env:
+          FRONTEND_ONLY: ${{ steps.deployment_scope.outputs.frontend_only }}
         run: |
           set -eu
           attempt=1
-          max_attempts=5
+          max_attempts=8
           while [ "$attempt" -le "$max_attempts" ]; do
-            if ssh -i ~/.ssh/id_ed25519 -p "$SSH_PORT" -o IdentitiesOnly=yes -o BatchMode=yes -o ConnectTimeout=20 -o ConnectionAttempts=1 "$SSH_USERNAME@$SSH_HOST" \
-              "command -v rsync && command -v composer && command -v php"; then
+            if [ "$FRONTEND_ONLY" = "true" ]; then
+              remote_check="command -v rsync"
+            else
+              remote_check="command -v rsync && command -v composer && command -v php"
+            fi
+            if ssh -i ~/.ssh/id_ed25519 -p "$SSH_PORT" -o IdentitiesOnly=yes -o BatchMode=yes -o ConnectTimeout=20 -o ConnectionAttempts=1 "$SSH_USERNAME@$SSH_HOST" "$remote_check"; then
               break
             fi
             if [ "$attempt" -eq "$max_attempts" ]; then
-              echo "Unable to verify Hostinger deployment tools after $max_attempts SSH attempts."
+              echo "Unable to verify Hostinger deployment access after $max_attempts SSH attempts."
               exit 1
             fi
-            echo "Hostinger SSH check failed (attempt $attempt/$max_attempts); retrying in 10 seconds."
-            sleep 10
+            echo "Hostinger SSH check failed (attempt $attempt/$max_attempts); retrying in 15 seconds."
+            sleep 15
             attempt=$((attempt + 1))
           done
 
