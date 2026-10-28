@@ -42,6 +42,7 @@ Route::match(['get', 'options'], 'staff/dashboard', [StaffApiController::class, 
 Route::get('staff/products', [ProductController::class, 'staffIndex']);
 Route::post('staff/products', [ProductController::class, 'storeStaff']);
 Route::post('staff/products/{product}', [ProductController::class, 'updateStaff']);
+Route::patch('staff/products/{product}/archive', [ProductController::class, 'updateArchiveStaff']);
 Route::post('login', [AuthApiController::class, 'login'])
     ->middleware(\Illuminate\Routing\Middleware\ThrottleRequests::class . ':5,15');
 Route::post('login/two-factor', [CustomerTwoFactorController::class, 'verifyLogin'])

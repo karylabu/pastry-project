@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useLocation, useNavigate } from "react-router-dom";
-import { AlertTriangle, ChefHat, CircleCheck, CircleX, History, ImagePlus, LayoutGrid, Pencil, Plus, RefreshCw, Search, SlidersHorizontal, Table2, Trash2, X } from "lucide-react";
+import { AlertTriangle, Archive, ArchiveRestore, ChefHat, CircleCheck, CircleX, History, ImagePlus, LayoutGrid, Pencil, Plus, RefreshCw, Search, SlidersHorizontal, Table2, Trash2, X } from "lucide-react";
 import { BASE, LARAVEL_BASE, STAFF_BASE } from "../../../services/config";
 import AdminDialog from "../../components/AdminDialog";
 
@@ -101,6 +101,7 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
   const [bomError, setBomError] = useState(null);
   const [bomLoading, setBomLoading] = useState(false);
   const [operationLoading, setOperationLoading] = useState(false);
+  const [archivingProductId, setArchivingProductId] = useState(null);
   const [activeModal, setActiveModal] = useState(null);
   const [historyEntries, setHistoryEntries] = useState([]);
   const [historyLoading, setHistoryLoading] = useState(false);
@@ -206,6 +207,47 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
       })
       .finally(() => setLoading(false));
 
+  };
+
+  const updateProductArchive = async (product, isArchived) => {
+    try {
+      setArchivingProductId(product.id);
+      const response = await laravelStaffFetch(`${LARAVEL_BASE}/api/staff/products/${product.id}/archive`, {
+        method: "PATCH",
+        headers: { Accept: "application/json", "Content-Type": "application/json" },
+        body: JSON.stringify({ is_archived: isArchived }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !data.success) {
+        throw new Error(data.message || "Unable to update product visibility.");
+      }
+
+      setAdminDialog(null);
+      setFeedback({
+        type: "success",
+        text: isArchived ? `${product.name} is hidden from customers.` : `${product.name} is visible to customers again.`,
+      });
+      fetchProducts();
+    } catch (error) {
+      setFeedback({ type: "error", text: error.message || "Unable to update product visibility." });
+    } finally {
+      setArchivingProductId(null);
+    }
+  };
+
+  const handleArchiveProduct = (product) => {
+    if (product.is_archived) {
+      updateProductArchive(product, false);
+      return;
+    }
+
+    setAdminDialog({
+      kind: "confirm",
+      title: "Hide this product?",
+      message: `${product.name} will no longer appear in the customer menu. You can restore it later.`,
+      confirmLabel: "Hide product",
+      onConfirm: () => updateProductArchive(product, true),
+    });
   };
 
   const fetchInventorySummary = async () => {
@@ -890,6 +932,9 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
                 <p className="mb-1 text-[9px] uppercase tracking-[0.12em] text-[#9b8c83]">
                   {product.category}
                 </p>
+                {product.is_archived && (
+                  <span className="mb-1 inline-flex self-center rounded-full bg-[#f3e8e2] px-2 py-0.5 text-[9px] font-semibold text-[#8f432d]">Archived</span>
+                )}
 
                 <p className="mb-2 text-[11px] font-semibold text-[#33251e]">
                   ₱{formatProductPrice(product, activeCat)}
@@ -932,6 +977,18 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
                       <Pencil size={13} aria-hidden="true" />
                     </button>
                   )}
+                  {canEditCatalog && (
+                    <button
+                      type="button"
+                      onClick={() => handleArchiveProduct(product)}
+                      disabled={archivingProductId === product.id}
+                      title={product.is_archived ? `Restore ${product.name}` : `Hide ${product.name} from customers`}
+                      aria-label={product.is_archived ? `Restore ${product.name}` : `Hide ${product.name} from customers`}
+                      className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-[#eadfd8] bg-white text-[#765d50] transition hover:border-[#e7c875] hover:bg-[#fff8df] disabled:opacity-50"
+                    >
+                      {product.is_archived ? <ArchiveRestore size={13} aria-hidden="true" /> : <Archive size={13} aria-hidden="true" />}
+                    </button>
+                  )}
                   <button type="button" onClick={() => openInventoryModal(product, "history")} title={`View ${product.name} history`} aria-label={`View ${product.name} history`} className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-[#eadfd8] bg-white text-[#765d50] transition hover:bg-[#fff8df]"><History size={13} aria-hidden="true" /></button>
                 </div>
 
@@ -960,7 +1017,7 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
               <div className="px-4 py-3 font-semibold">Actions</div>
             </div>
             {filteredProducts.map((product) => (
-              <div key={product.id} className="grid min-w-[1040px] grid-cols-[minmax(240px,1.5fr)_minmax(100px,0.7fr)_minmax(100px,0.7fr)_minmax(90px,0.6fr)_minmax(150px,0.8fr)_minmax(280px,1.2fr)] gap-0 border-t border-[#f0e7e0] bg-white transition hover:bg-[#fffaf0]">
+              <div key={product.id} className="grid min-w-[1040px] grid-cols-[minmax(240px,1.5fr)_minmax(100px,0.7fr)_minmax(100px,0.7fr)_minmax(90px,0.6fr)_minmax(150px,0.8fr)_minmax(330px,1.2fr)] gap-0 border-t border-[#f0e7e0] bg-white transition hover:bg-[#fffaf0]">
                 <div className="px-4 py-4">
                   <div className="flex items-center gap-3">
                     <div className="h-14 w-14 overflow-hidden rounded-lg border border-[#eadfd8] bg-[#f5eee5]">
@@ -972,6 +1029,7 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
                     </div>
                     <div className="min-w-0">
                       <p className="truncate font-semibold text-sm text-[#33251e]">{product.name}</p>
+                      {product.is_archived && <span className="mt-1 inline-flex rounded-full bg-[#f3e8e2] px-2 py-0.5 text-[9px] font-semibold text-[#8f432d]">Archived</span>}
                       <p className="text-[11px] text-[#9b8c83]">{product.description || "No description"}</p>
                     </div>
                   </div>
@@ -1007,6 +1065,18 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
                       <Pencil size={15} aria-hidden="true" />
                     </button>
                   ) : <span aria-hidden="true" />}
+                  {canEditCatalog && (
+                    <button
+                      type="button"
+                      onClick={() => handleArchiveProduct(product)}
+                      disabled={archivingProductId === product.id}
+                      title={product.is_archived ? `Restore ${product.name}` : `Hide ${product.name} from customers`}
+                      aria-label={product.is_archived ? `Restore ${product.name}` : `Hide ${product.name} from customers`}
+                      className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[#eadfd8] bg-white text-[#765d50] transition hover:bg-[#fff8df] disabled:opacity-50"
+                    >
+                      {product.is_archived ? <ArchiveRestore size={15} aria-hidden="true" /> : <Archive size={15} aria-hidden="true" />}
+                    </button>
+                  )}
                   <button type="button" onClick={() => openInventoryModal(product, "history")} title={`View ${product.name} history`} aria-label={`View ${product.name} history`} className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[#eadfd8] bg-white text-[#765d50] transition hover:bg-[#fff8df]"><History size={15} aria-hidden="true" /></button>
                 </div>
               </div>
@@ -1666,7 +1736,7 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
           )}
 
         </AnimatePresence>
-        <AdminDialog dialog={adminDialog} onClose={() => setAdminDialog(null)} />
+        <AdminDialog dialog={adminDialog} onClose={() => setAdminDialog(null)} onConfirm={adminDialog?.onConfirm} />
 
       </div>
 

@@ -9,7 +9,7 @@ class CustomerProductCatalog
 {
     public function products(bool $availableOnly = true): array
     {
-        $query = DB::table('products')->orderBy('category')->orderBy('name');
+        $query = DB::table('products')->where('is_archived', false)->orderBy('category')->orderBy('name');
         if ($availableOnly) {
             $query->where('available', true);
         }
@@ -47,6 +47,7 @@ class CustomerProductCatalog
 
         $products = DB::table('products')
             ->where('available', true)
+            ->where('is_archived', false)
             ->where('stock', '>', 0)
             ->whereRaw("LOWER(category) IN ('cake', 'cakes')")
             ->get()
@@ -196,6 +197,7 @@ class CustomerProductCatalog
 
         $eligibleProducts = DB::table('products')
             ->where('available', true)
+            ->where('is_archived', false)
             ->where('stock', '>', 0)
             ->whereRaw("LOWER(category) IN ('cake', 'cakes')")
             ->orderBy('name')

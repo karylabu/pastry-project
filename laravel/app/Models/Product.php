@@ -19,6 +19,7 @@ class Product extends Model
         'image',
         'description',
         'available',
+        'is_archived',
         'slice_price',
         'small_price',
         'big_price',
@@ -33,6 +34,7 @@ class Product extends Model
         'price' => 'decimal:2',
         'stock' => 'integer',
         'available' => 'boolean',
+        'is_archived' => 'boolean',
         'is_custom' => 'boolean',
     ];
 

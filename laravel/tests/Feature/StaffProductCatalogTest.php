@@ -22,6 +22,7 @@ class StaffProductCatalogTest extends TestCase
             $table->integer('stock')->default(0);
             $table->integer('minimum_stock')->default(5);
             $table->boolean('available')->default(true);
+            $table->boolean('is_archived')->default(false);
             $table->string('description')->nullable();
             $table->string('image')->nullable();
             $table->timestamps();
@@ -183,6 +184,37 @@ class StaffProductCatalogTest extends TestCase
             ->assertJsonPath('0.sizes.1.stock_quantity', 2)
             ->assertJsonPath('0.sizes.1.is_producible', false)
             ->assertJsonMissingPath('0.sizes.2');
+    }
+
+    public function test_admin_can_archive_and_restore_a_product_without_changing_availability(): void
+    {
+        $admin = new User();
+        $admin->role = 'admin';
+        $admin->status = 'active';
+
+        $this->actingAs($admin)
+            ->patchJson('/api/staff/products/1/archive', ['is_archived' => true])
+            ->assertOk()
+            ->assertJsonPath('is_archived', true);
+
+        $this->assertDatabaseHas('products', ['id' => 1, 'available' => true, 'is_archived' => true]);
+        $this->getJson('/api/staff/products?action=list')
+            ->assertOk()
+            ->assertJsonCount(1)
+            ->assertJsonPath('0.is_archived', true);
+        $this->getJson('/api/customer/products?action=list')
+            ->assertOk()
+            ->assertJsonCount(0);
+
+        $this->actingAs($admin)
+            ->patchJson('/api/staff/products/1/archive', ['is_archived' => false])
+            ->assertOk()
+            ->assertJsonPath('is_archived', false);
+
+        $this->getJson('/api/customer/products?action=list')
+            ->assertOk()
+            ->assertJsonCount(1)
+            ->assertJsonPath('0.id', 1);
     }
 
     public function test_admin_can_create_a_cake_that_is_visible_in_the_customer_catalog(): void

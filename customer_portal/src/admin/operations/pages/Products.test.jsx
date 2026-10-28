@@ -11,8 +11,16 @@ import Products from './Products';
 describe('Products admin catalog', () => {
   beforeEach(() => {
     localStorage.setItem('user', JSON.stringify({ role: 'admin', token: 'test-admin-token' }));
+    const archivedProductIds = new Set();
 
-    global.fetch = jest.fn((url) => {
+    global.fetch = jest.fn((url, options = {}) => {
+      if (String(url).includes('/archive') && options.method === 'PATCH') {
+        const { is_archived: isArchived } = JSON.parse(options.body);
+        if (isArchived) archivedProductIds.add(1);
+        else archivedProductIds.delete(1);
+        return Promise.resolve({ ok: true, json: async () => ({ success: true, is_archived: isArchived }) });
+      }
+
       if (String(url).includes('action=list')) {
         return Promise.resolve({
           ok: true,
@@ -30,6 +38,7 @@ describe('Products admin catalog', () => {
               minimum_stock: 5,
               image: 'cake.jpg',
               description: 'Sweet and fruity',
+              is_archived: archivedProductIds.has(1),
             },
             {
               id: 2,
@@ -206,7 +215,7 @@ describe('Products admin catalog', () => {
     expect(screen.queryByText('Mini Chocolate Cake')).not.toBeInTheDocument();
   });
 
-  test('keeps table action buttons in a fixed four-column row', async () => {
+  test('keeps table action buttons in a fixed five-button row', async () => {
     render(<Products allowCatalogManagement />);
 
     await waitFor(() => {
@@ -216,9 +225,44 @@ describe('Products admin catalog', () => {
     fireEvent.click(screen.getByRole('button', { name: /table/i }));
     const actions = screen.getByLabelText('Actions for Strawberry Cake');
     expect(actions).toHaveClass('flex', 'items-center', 'justify-center');
-    expect(Array.from(actions.children)).toHaveLength(4);
+    expect(Array.from(actions.children)).toHaveLength(5);
     Array.from(actions.children).forEach((button) => {
       expect(button).toHaveClass('h-9', 'w-9');
+    });
+  });
+
+  test('archives a product from the customer menu and allows restoring it', async () => {
+    render(<Products allowCatalogManagement />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Strawberry Cake')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Hide Strawberry Cake from customers' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Hide product' }));
+
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringContaining('/api/staff/products/1/archive'),
+        expect.objectContaining({
+          method: 'PATCH',
+          body: JSON.stringify({ is_archived: true }),
+        }),
+      );
+      expect(screen.getByText('Archived')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Restore Strawberry Cake' }));
+
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringContaining('/api/staff/products/1/archive'),
+        expect.objectContaining({
+          method: 'PATCH',
+          body: JSON.stringify({ is_archived: false }),
+        }),
+      );
+      expect(screen.queryByText('Archived')).not.toBeInTheDocument();
     });
   });
 

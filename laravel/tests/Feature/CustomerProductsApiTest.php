@@ -29,6 +29,7 @@ class CustomerProductsApiTest extends TestCase
             $table->decimal('sharing_price', 10, 2)->default(0);
             $table->integer('stock')->default(0);
             $table->boolean('available')->default(true);
+            $table->boolean('is_archived')->default(false);
         });
         Schema::create('product_sizes', function ($table) {
             $table->id();
@@ -144,6 +145,19 @@ class CustomerProductsApiTest extends TestCase
             ->assertOk()
             ->assertJsonCount(2)
             ->assertJsonPath('1.id', 2);
+    }
+
+    public function test_archived_products_are_hidden_from_customer_catalog_actions(): void
+    {
+        DB::table('products')->where('id', 1)->update(['is_archived' => true]);
+
+        $this->getJson('/api/customer/products?action=list')
+            ->assertOk()
+            ->assertJsonCount(0);
+        $this->getJson('/api/customer/products?action=all')
+            ->assertOk()
+            ->assertJsonCount(1)
+            ->assertJsonPath('0.id', 2);
     }
 
     public function test_best_sellers_are_ranked_from_completed_orders(): void

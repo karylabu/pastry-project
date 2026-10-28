@@ -50,7 +50,9 @@ class ProductController extends Controller
         $products = Product::with(['sizes' => function ($query) {
             $query->whereRaw('LOWER(size) <> ?', ['slice']);
         }])
-            ->where('available', true)
+            ->where(function ($query) {
+                $query->where('available', true)->orWhere('is_archived', true);
+            })
             ->whereRaw('LOWER(category) IN (?, ?)', ['cake', 'cakes'])
             ->orderBy('name')
             ->get()
@@ -305,12 +307,34 @@ class ProductController extends Controller
         return response()->json(['success' => true, 'product_id' => (int) $product->id]);
     }
 
+    public function updateArchiveStaff(Request $request, Product $product): JsonResponse
+    {
+        $admin = $this->requireRole($request, 'admin');
+        if (!$admin instanceof \App\Models\User) {
+            return $admin;
+        }
+
+        $data = $request->validate([
+            'is_archived' => ['required', 'boolean'],
+        ]);
+
+        $product->is_archived = (bool) $data['is_archived'];
+        $product->save();
+
+        return response()->json([
+            'success' => true,
+            'product_id' => (int) $product->id,
+            'is_archived' => $product->is_archived,
+        ]);
+    }
+
     public function index(Request $request): JsonResponse
     {
         $filterCategory = strtolower(trim((string) $request->query('category', 'cakes')));
 
         $query = Product::with(['sizes'])
             ->where('available', true)
+            ->where('is_archived', false)
             ->whereRaw('LOWER(category) IN (?, ?)', ['cake', 'cakes']);
 
         if ($filterCategory !== 'all' && !in_array($filterCategory, ['cake', 'cakes'], true)) {
