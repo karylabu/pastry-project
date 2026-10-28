@@ -438,6 +438,50 @@ function MethodForecastChart({ product, method, period }) {
   );
 }
 
+function HighestDemandChart({ products }) {
+  const width = 620;
+  const height = 260;
+  const padding = { top: 12, right: 56, bottom: 12, left: 150 };
+  const plotWidth = width - padding.left - padding.right;
+  const rowHeight = (height - padding.top - padding.bottom) / Math.max(products.length, 1);
+  const maxValue = Math.max(...products.map((product) => Number(product.totalForecast) || 0), 1);
+
+  return (
+    <div className="flex min-h-[280px] flex-1 items-center">
+      <svg
+        viewBox={`0 0 ${width} ${height}`}
+        className="h-[280px] w-full"
+        role="img"
+        aria-label="Horizontal bar chart showing the products with the highest projected demand"
+      >
+        {products.map((product, index) => {
+          const value = Number(product.totalForecast) || 0;
+          const y = padding.top + index * rowHeight + rowHeight * 0.2;
+          const barHeight = rowHeight * 0.55;
+          const barWidth = (value / maxValue) * plotWidth;
+          const label = String(product.product || "");
+          const shortLabel = label.length > 23 ? `${label.slice(0, 21)}…` : label;
+
+          return (
+            <g key={product.product}>
+              <text x={padding.left - 10} y={y + barHeight * 0.72} textAnchor="end" fontSize="11" fill="#33251e">
+                {shortLabel}
+              </text>
+              <rect x={padding.left} y={y} width={plotWidth} height={barHeight} rx="5" fill="#f0ebe1" />
+              <rect x={padding.left} y={y} width={barWidth} height={barHeight} rx="5" fill="#D4AF37">
+                <title>{`${product.product}: ${value} projected units`}</title>
+              </rect>
+              <text x={padding.left + plotWidth + 8} y={y + barHeight * 0.72} fontSize="11" fontWeight="600" fill="#33251e">
+                {value}
+              </text>
+            </g>
+          );
+        })}
+      </svg>
+    </div>
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Validation metrics
 // ---------------------------------------------------------------------------
@@ -859,7 +903,6 @@ export default function PredictiveAnalytics() {
     () => [...forecast.products].sort((a, b) => b.totalForecast - a.totalForecast).slice(0, PAGE_SIZE),
     [forecast.products]
   );
-  const maxForecast = Math.max(...forecast.products.map((item) => item.totalForecast), 1);
   const ingredients = forecast.ingredients || [];
   const categories = useMemo(() => [...new Set(forecast.products.map((product) => product.category))], [forecast.products]);
 
@@ -1131,25 +1174,7 @@ export default function PredictiveAnalytics() {
 
               <Card title="Highest projected demand" description={`Top ${PAGE_SIZE} products by estimated total over ${period} days.`}>
                 {topProducts.length ? (
-                  <div className="flex-1">
-                    {topProducts.map((product) => (
-                      <div key={product.product} className={`flex flex-col justify-center border-b border-[#f0ebe1] ${ROW_HEIGHT}`}>
-                        <div className="mb-1.5 flex justify-between gap-3 text-sm">
-                          <span className="truncate font-medium text-[#33251e]" title={product.product}>{product.product}</span>
-                          <b className="tabular-nums text-[#33251e]">{product.totalForecast}</b>
-                        </div>
-                        <div className="h-2 rounded-full bg-[#f0ebe1]">
-                          <div
-                            className="h-2 rounded-full bg-[#D4AF37] transition-[width] duration-500"
-                            style={{ width: `${Math.min(100, (product.totalForecast / maxForecast) * 100)}%` }}
-                          />
-                        </div>
-                      </div>
-                    ))}
-                    {Array.from({ length: PAGE_SIZE - topProducts.length }, (_, index) => (
-                      <div key={`pad-${index}`} className={ROW_HEIGHT} aria-hidden="true" />
-                    ))}
-                  </div>
+                  <HighestDemandChart products={topProducts} />
                 ) : (
                   <EmptyState className="min-h-[280px]">Forecasts will appear once sales data is available.</EmptyState>
                 )}
