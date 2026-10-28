@@ -1300,11 +1300,7 @@ export default function PredictiveAnalytics() {
           </Section>
 
           {/* 4. Model quality */}
-          <Section title="Model quality" description="How the forecast was chosen and how accurate it has been.">
-            <Card title="Validation metrics" description="Each method tested on the last 7 days of real sales.">
-              <ValidationMetrics model={forecast.model} />
-            </Card>
-
+          <Section title="Model quality" description="Forecast configuration and data windows used by the system.">
             <Card title="Factors used by this model" description="Inputs and data windows behind the forecast.">
               {forecast.drivers?.length ? (
                 <div className="mb-4 flex flex-wrap gap-2">

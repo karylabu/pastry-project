@@ -616,6 +616,20 @@ function buildDetailedForecastPayload(array $history, array $products, array $in
                 : '');
     }
 
+    error_log(sprintf(
+        'Predictive analytics backtest: method=%s, shop_wape=%s, shop_mae=%s, shop_rmse=%s, shop_mape=%s, shop_bias=%s, folds=%d, horizon=%d, products=%d, validated=%d',
+        $selectedForecastMethod,
+        $selectedAggregate['wape'] ?? 'n/a',
+        $selectedAggregate['mae'] ?? 'n/a',
+        $selectedAggregate['rmse'] ?? 'n/a',
+        $selectedAggregate['mape'] ?? 'n/a',
+        $selectedAggregate['bias'] ?? 'n/a',
+        (int) $backtest['folds'],
+        (int) $backtest['horizon'],
+        count($historyByProduct),
+        (int) $backtest['evaluated']
+    ));
+
     return [
         'period' => $period,
         'products' => $forecastProducts,
