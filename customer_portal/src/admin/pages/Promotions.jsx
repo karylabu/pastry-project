@@ -329,7 +329,7 @@ export default function Promotions() {
             <Panel
               eyebrow="Campaign"
               title={editingPromotion ? "Edit promotion" : "Send promotion"}
-              className="ring-1 ring-[#c9a94f]/35"
+              className="border-t-[3px] border-t-[#c9a94f]"
               action={
                 <div className="inline-flex items-center gap-2 rounded-md border border-[#e9e1d9] bg-[#fffdfa] px-2.5 py-1.5 text-[9px] font-semibold uppercase tracking-[0.14em] text-[#65574d]">
                   <Megaphone size={11} />
