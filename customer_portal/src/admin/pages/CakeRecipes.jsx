@@ -291,7 +291,8 @@ export default function CakeRecipes() {
                 return (
                   <div
                     key={flavor.id}
-                      className={`flex min-h-[76px] min-w-0 items-center gap-2 rounded-md border px-3 py-3 transition ${isSelected ? "border-[#d4af37] bg-[#fff8e9]" : "border-[#eee4de] bg-white hover:border-[#c9a94f] hover:bg-[#fffdfa] hover:ring-1 hover:ring-[#d4af37]/20"}`}
+                    style={{ borderTopColor: recipe ? "#d4af37" : "#c98f6b" }}
+                    className={`group flex min-h-[76px] min-w-0 items-center gap-2 rounded-xl border border-t-[3px] bg-white px-3 py-3 shadow-[0_5px_18px_rgba(91,64,39,0.04)] transition hover:-translate-y-0.5 hover:border-[#c9a94f] hover:bg-white hover:ring-1 hover:ring-[#d4af37]/20 hover:shadow-[0_10px_24px_rgba(91,64,39,0.08)] ${isSelected ? "border-[#c9a94f] ring-1 ring-[#d4af37]/20" : "border-[#eee4de]"}`}
                   >
                     <button
                       type="button"
@@ -306,6 +307,7 @@ export default function CakeRecipes() {
                         <span className={`shrink-0 rounded-full px-1.5 py-0.5 text-[8px] font-semibold ${recipe ? "bg-[#edf5eb] text-[#4f7654]" : "bg-[#f4ece6] text-[#8f8076]"}`}>
                           {recipe ? "Saved" : "No recipe"}
                         </span>
+                        {isSelected ? <CheckCircle2 size={13} className="shrink-0 text-[#4f7654]" aria-label="Selected flavor" /> : null}
                       </div>
                       <p className="mt-0.5 text-[9px] leading-none text-[#9b8c83]">{ingredients.length} ingredients</p>
                     </button>
