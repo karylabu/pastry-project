@@ -183,8 +183,8 @@ export default function Reviews() {
                 <div className="flex items-center justify-between gap-3 border-t border-[#f0e9e2] bg-[#fcfaf7] px-4 py-3 sm:px-5">
                   <span className="text-[11px] text-[#8f8076]">Page {page} of {lastPage}</span>
                   <div className="flex gap-2">
-                    <button type="button" onClick={() => setPage((current) => Math.max(1, current - 1))} disabled={page <= 1 || loading} aria-label="Previous page" title="Previous page" className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-[#e8dfd4] bg-white text-[#5f514a] transition hover:border-[#c9a94f] hover:bg-[#fffaf0] disabled:cursor-not-allowed disabled:opacity-40"><ChevronLeft size={17} /></button>
-                    <button type="button" onClick={() => setPage((current) => Math.min(lastPage, current + 1))} disabled={page >= lastPage || loading} aria-label="Next page" title="Next page" className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-[#e8dfd4] bg-white text-[#5f514a] transition hover:border-[#c9a94f] hover:bg-[#fffaf0] disabled:cursor-not-allowed disabled:opacity-40"><ChevronRight size={17} /></button>
+                    <button type="button" onClick={() => setPage((current) => Math.max(1, current - 1))} disabled={page <= 1 || loading} aria-label="Previous page" title="Previous page" className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-[#e8dfd4] bg-white text-[#5f514a] transition hover:border-[#c9a94f] hover:bg-[#fff4cd] disabled:cursor-not-allowed disabled:opacity-40"><ChevronLeft size={17} /></button>
+                    <button type="button" onClick={() => setPage((current) => Math.min(lastPage, current + 1))} disabled={page >= lastPage || loading} aria-label="Next page" title="Next page" className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-[#e8dfd4] bg-white text-[#5f514a] transition hover:border-[#c9a94f] hover:bg-[#fff4cd] disabled:cursor-not-allowed disabled:opacity-40"><ChevronRight size={17} /></button>
                   </div>
                 </div>
               </section>
