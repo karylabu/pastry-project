@@ -8,6 +8,14 @@ import AdminDialog from "../components/AdminDialog";
 
 const emptyLine = { ingredient_id: "", quantity: "", unit: "g" };
 
+const getFlavorThumbnail = (name) => {
+  const flavorName = String(name || "").toLowerCase();
+  if (flavorName.includes("carrot")) return `${LARAVEL_BASE}/customer/images/carrot_cake.png`;
+  if (flavorName.includes("chocolate")) return `${LARAVEL_BASE}/customer/images/chocolate_ganache_cake.png`;
+  if (flavorName.includes("red velvet")) return `${LARAVEL_BASE}/customer/images/red_velvet_cake.png`;
+  return "";
+};
+
 export default function CakeRecipes() {
   const [catalog, setCatalog] = useState({ flavors: [], sizes: [], recipes: [], ingredients: [] });
   const [selectedFlavorId, setSelectedFlavorId] = useState("");
@@ -267,7 +275,7 @@ export default function CakeRecipes() {
 
         {status && <div role="status" className="flex items-start gap-2 rounded-xl border border-[#e7c875] bg-[#fff8e9] px-4 py-3 text-[13px] text-[#6f541d]"><CheckCircle2 size={16} className="mt-0.5 shrink-0" />{status}</div>}
 
-        <section className="overflow-hidden rounded-xl border border-[#eadfd8] bg-white shadow-[0_5px_18px_rgba(91,64,39,0.04)] transition hover:border-[#c9a94f] hover:ring-1 hover:ring-[#d4af37]/20">
+        <section className="overflow-hidden rounded-xl border border-[#eadfd8] bg-white shadow-[0_5px_18px_rgba(91,64,39,0.04)]">
           <div className="flex flex-col gap-3 border-b border-[#f0e7e0] bg-[#fffdfa] px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
             <div>
               <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#9b7810]">Saved recipes</p>
@@ -290,20 +298,29 @@ export default function CakeRecipes() {
           {loading ? (
             <div className="px-4 py-8 text-center text-[12px] text-[#8f8076]">Loading recipe catalog...</div>
           ) : (
-            <div className="grid max-h-[52vh] gap-2.5 overflow-y-auto p-3 sm:grid-cols-2 xl:grid-cols-3">
+            <div className="grid max-h-[52vh] gap-3 overflow-y-auto p-3 sm:grid-cols-2 xl:grid-cols-3">
               {visibleFlavors.map((flavor) => {
                 const recipe = recipeMap[String(flavor.id)] || null;
                 const ingredients = recipe?.ingredients || [];
                 const isSelected = String(selectedFlavorId) === String(flavor.id);
+                const thumbnail = getFlavorThumbnail(flavor.name);
 
                 return (
                   <div
                     key={flavor.id}
-                    style={{ borderTopColor: recipe ? "#d4af37" : "#c98f6b" }}
-                    className={`group flex min-h-[82px] min-w-0 items-center gap-3 rounded-xl border border-t-[3px] bg-white px-3.5 py-3 shadow-[0_5px_18px_rgba(91,64,39,0.04)] transition hover:-translate-y-0.5 hover:border-[#c9a94f] hover:ring-1 hover:ring-[#d4af37]/20 hover:shadow-[0_10px_24px_rgba(91,64,39,0.08)] ${isSelected ? "border-[#c9a94f] ring-1 ring-[#d4af37]/20" : "border-[#eee4de]"}`}
+                    className={`group flex min-h-[92px] min-w-0 items-center gap-3 rounded-xl border px-3.5 py-3 transition hover:shadow-[0_8px_20px_rgba(91,64,39,0.07)] ${isSelected ? "border-[#c9a94f] bg-[#fffaf0] shadow-[0_5px_18px_rgba(91,64,39,0.06)]" : "border-[#eee4de] bg-white hover:border-[#dfd1c5]"}`}
                   >
-                    <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full ${recipe ? "bg-[#fff4cd] text-[#9b7810]" : "bg-[#f4ece6] text-[#8f675e]"}`}>
+                    <span className="relative flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[#f4ece6] text-[#8f675e]">
                       <CakeSlice size={19} aria-hidden="true" />
+                      {thumbnail && (
+                        <img
+                          src={thumbnail}
+                          alt=""
+                          loading="lazy"
+                          className="absolute inset-0 h-full w-full object-cover"
+                          onError={(event) => { event.currentTarget.style.display = "none"; }}
+                        />
+                      )}
                     </span>
                     <button
                       type="button"
@@ -314,10 +331,13 @@ export default function CakeRecipes() {
                       }}
                       className="min-w-0 flex-1 rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d4af37] focus-visible:ring-offset-2"
                     >
-                      <div className="flex min-w-0 items-center gap-1.5">
+                      <div className="flex min-w-0 flex-wrap items-center gap-1.5">
                         <h3 className="truncate text-[12px] font-semibold leading-tight text-[#33251e]">{flavor.name}</h3>
+                        <span className={`rounded-full px-1.5 py-0.5 text-[8px] font-semibold ${recipe ? "bg-[#edf5eb] text-[#4f7654]" : "bg-[#f4ece6] text-[#8f8076]"}`}>
+                          {recipe ? "Recipe saved" : "No recipe"}
+                        </span>
                       </div>
-                      <p className="mt-1 text-[10px] text-[#9b8c83]">{ingredients.length} ingredients · {recipe ? "Recipe saved" : "No recipe yet"}</p>
+                      <p className="mt-1 text-[10px] text-[#9b8c83]">{ingredients.length} ingredients</p>
                     </button>
                     <button
                       type="button"
@@ -328,7 +348,7 @@ export default function CakeRecipes() {
                     >
                       {flavor.active ? "Active" : "Inactive"}
                     </button>
-                    <span className="shrink-0 text-[#a57c38]" aria-label={isSelected ? "Selected flavor" : undefined} title={isSelected ? "Selected flavor" : undefined}>
+                    <span className={`shrink-0 ${isSelected ? "text-[#9b7810]" : "text-[#a99687]"}`} aria-label={isSelected ? "Selected flavor" : undefined} title={isSelected ? "Selected flavor" : undefined}>
                       {isSelected ? <CheckCircle2 size={15} /> : <ChevronRight size={17} className="transition-transform group-hover:translate-x-0.5" />}
                     </span>
                   </div>
@@ -342,10 +362,20 @@ export default function CakeRecipes() {
         </section>
 
         {selectedFlavor && (
-          <section className="overflow-hidden rounded-xl border border-[#eadfd8] bg-white shadow-[0_5px_18px_rgba(91,64,39,0.04)] transition hover:border-[#c9a94f] hover:ring-1 hover:ring-[#d4af37]/20">
+          <section className="overflow-hidden rounded-xl border border-[#eadfd8] bg-white shadow-[0_5px_18px_rgba(91,64,39,0.04)]">
             <div className="flex flex-col gap-3 border-b border-[#f0e7e0] bg-[#fffdfa] px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
               <div className="flex min-w-0 items-center gap-3">
-                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#fff4cd] text-[#9b7810]"><CakeSlice size={18} /></span>
+                <span className="relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[#fff4cd] text-[#9b7810]">
+                  <CakeSlice size={18} />
+                  {getFlavorThumbnail(selectedFlavor.name) && (
+                    <img
+                      src={getFlavorThumbnail(selectedFlavor.name)}
+                      alt=""
+                      className="absolute inset-0 h-full w-full object-cover"
+                      onError={(event) => { event.currentTarget.style.display = "none"; }}
+                    />
+                  )}
+                </span>
                 <div className="min-w-0">
                 <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#9b7810]">Recipe editor</p>
                 <div className="mt-0.5 flex flex-wrap items-center gap-2">
@@ -356,7 +386,7 @@ export default function CakeRecipes() {
               </div>
               <div className="flex flex-wrap items-end gap-2">
                 <span className="inline-flex items-center gap-1 rounded-full bg-[#fff4cd] px-2.5 py-1 text-[9px] font-semibold text-[#80600a]"><Package size={12} /> Base 6x3</span>
-                <label title="Import recipe from CSV or Excel" className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-black bg-black px-2.5 py-2 text-[10px] font-semibold text-white transition hover:bg-black/90 focus-within:ring-2 focus-within:ring-[#d4af37]">
+                <label title="Import recipe from CSV or Excel" className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-[#33251e] bg-[#33251e] px-2.5 py-2 text-[10px] font-semibold text-white transition hover:bg-[#5b4540] focus-within:ring-2 focus-within:ring-[#d4af37]">
                   <Upload size={13} /> Import
                   <input type="file" accept=".csv,.xlsx,.xls" onChange={importRecipeFile} className="sr-only" />
                 </label>
@@ -422,12 +452,21 @@ export default function CakeRecipes() {
             <button type="button" onClick={calculatePreview} className="inline-flex items-center justify-center gap-2 rounded-md bg-[#33251e] px-3 py-2 text-[10px] font-semibold text-white transition hover:bg-[#5b4540] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d4af37]"><Calculator size={14} /> Calculate requirements</button>
           </div>
 
-          <div className="grid gap-2.5 p-4 sm:grid-cols-2 sm:p-5">
+          <div className="grid gap-3 p-4 md:grid-cols-2 sm:p-5">
             {previewTiers.map((tier, index) => (
-              <div key={index} className="grid gap-2 rounded-lg border border-[#eadfd8] bg-[#fffdfa] p-3">
-                <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-[#9b8c83]">Tier {index + 1}</p>
-                <select value={tier.flavor_id} onChange={(event) => setPreviewTiers((items) => items.map((item, itemIndex) => itemIndex === index ? { ...item, flavor_id: event.target.value } : item))} className="rounded-md border border-[#eadfd8] bg-white px-3 py-2 text-[11px] text-[#33251e] outline-none focus:border-[#d4af37] focus:ring-2 focus:ring-[#d4af37]/20"><option value="">Select flavor</option>{catalog.flavors.filter((flavor) => flavor.active).map((flavor) => <option key={flavor.id} value={flavor.id}>{flavor.name}</option>)}</select>
-                <select value={tier.size_id} onChange={(event) => setPreviewTiers((items) => items.map((item, itemIndex) => itemIndex === index ? { ...item, size_id: event.target.value } : item))} className="rounded-md border border-[#eadfd8] bg-white px-3 py-2 text-[11px] text-[#33251e] outline-none focus:border-[#d4af37] focus:ring-2 focus:ring-[#d4af37]/20"><option value="">Select size</option>{catalog.sizes.filter((size) => size.active).map((size) => <option key={size.id} value={size.id}>{size.label}</option>)}</select>
+              <div key={index} className="grid gap-3 rounded-xl border border-[#eadfd8] bg-[#fffaf3] p-4">
+                <div className="flex items-center gap-2 border-b border-[#eee4de] pb-2">
+                  <span className="flex h-7 w-7 items-center justify-center rounded-full bg-white text-[#9b7810]"><CakeSlice size={14} /></span>
+                  <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#5f514a]">Tier {index + 1}</p>
+                </div>
+                <label className="grid gap-1.5 text-[10px] font-semibold text-[#74675f]">
+                  Flavor
+                  <select value={tier.flavor_id} onChange={(event) => setPreviewTiers((items) => items.map((item, itemIndex) => itemIndex === index ? { ...item, flavor_id: event.target.value } : item))} className="min-h-10 rounded-lg border border-[#e5d9d0] bg-white px-3 py-2 text-[12px] font-normal text-[#33251e] outline-none focus:border-[#d4af37] focus:ring-2 focus:ring-[#d4af37]/20"><option value="">Select flavor</option>{catalog.flavors.filter((flavor) => flavor.active).map((flavor) => <option key={flavor.id} value={flavor.id}>{flavor.name}</option>)}</select>
+                </label>
+                <label className="grid gap-1.5 text-[10px] font-semibold text-[#74675f]">
+                  Size
+                  <select value={tier.size_id} onChange={(event) => setPreviewTiers((items) => items.map((item, itemIndex) => itemIndex === index ? { ...item, size_id: event.target.value } : item))} className="min-h-10 rounded-lg border border-[#e5d9d0] bg-white px-3 py-2 text-[12px] font-normal text-[#33251e] outline-none focus:border-[#d4af37] focus:ring-2 focus:ring-[#d4af37]/20"><option value="">Select size</option>{catalog.sizes.filter((size) => size.active).map((size) => <option key={size.id} value={size.id}>{size.label}</option>)}</select>
+                </label>
               </div>
             ))}
           </div>
