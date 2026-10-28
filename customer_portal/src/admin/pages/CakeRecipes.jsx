@@ -245,13 +245,11 @@ export default function CakeRecipes() {
   return (
     <div className="min-h-screen bg-[#fbfaf5] px-4 pb-8 pt-[84px] text-[#33251e] sm:px-6 lg:pl-[284px] lg:pr-8">
       <div className="mx-auto max-w-[1440px] space-y-4">
-        <header className="flex flex-col gap-4 border-b border-[#eadfd8] pb-5 lg:flex-row lg:items-end lg:justify-between">
+        <header className="mb-2 flex min-h-[72px] flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div className="max-w-2xl">
-            <div className="mb-2 inline-flex items-center gap-1.5 rounded-full border border-[#eadfca] bg-white px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.18em] text-[#9b7810]">
-              <CakeSlice size={12} /> Production setup
-            </div>
-            <h1 className="font-serif text-[28px] font-semibold leading-tight text-[#33251e] sm:text-[32px]">Customize Cakes Recipes</h1>
-            <p className="mt-1.5 text-[13px] leading-5 text-[#74675f]">Build and maintain ingredient recipes for customized cakes.</p>
+            <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.24em] text-[#92701e]">Production setup</p>
+            <h1 className="font-serif text-[27px] leading-tight text-[#33251e]">Customize Cakes Recipes</h1>
+            <p className="mt-1 text-[12px] leading-5 text-[#74675f]">Build and maintain ingredient recipes for customized cakes.</p>
           </div>
           <div className="grid w-full grid-cols-2 gap-2.5 sm:max-w-[440px]">
             <div className="rounded-xl border border-t-[3px] border-[#eee4de] border-t-[#d4af37] bg-white p-3.5 shadow-[0_5px_18px_rgba(91,64,39,0.04)]">

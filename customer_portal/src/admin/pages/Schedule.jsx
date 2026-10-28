@@ -188,11 +188,11 @@ export default function Schedule() {
   return (
     <div className="min-h-screen bg-[#fbfaf5] pt-[88px] lg:pl-[260px]">
       <div className="mx-auto max-w-[1400px] px-4 py-5 sm:px-6 lg:px-8 lg:py-7">
-        <div className="mb-5 flex flex-col gap-4 border-b border-[#e8dfd4] pb-5 sm:flex-row sm:items-end sm:justify-between">
+        <div className="mb-6 flex min-h-[72px] flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.24em] text-[#92701e]">Order management</p>
-            <h1 className="text-[26px] font-bold leading-tight text-[#33251e] sm:text-[30px]">Schedule</h1>
-            <p className="mt-1.5 text-[13px] text-[#74675f]">Pickup and delivery dates for customized cakes.</p>
+            <h1 className="mt-1 font-serif text-[27px] leading-tight text-[#33251e]">Schedule</h1>
+            <p className="mt-1 text-[12px] text-[#74675f]">Pickup and delivery dates for customized cakes.</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <div className="flex min-h-10 items-center gap-2.5 rounded-lg border border-[#e9e1d9] bg-white px-3 py-2">

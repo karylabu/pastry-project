@@ -212,11 +212,11 @@ export default function Settings() {
     <div className="min-h-screen bg-[#fbfaf5] font-['DM_Sans'] text-[#33251e]">
       <div className="pt-[88px] lg:pl-[260px]">
         <main className="mx-auto max-w-[1400px] px-4 py-5 sm:px-6 md:px-8 lg:px-10 lg:py-7">
-          <div className="mb-5 flex flex-col gap-4 border-b border-[#e8dfd4] pb-5 sm:flex-row sm:items-end sm:justify-between">
+          <div className="mb-6 flex min-h-[72px] flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.24em] text-[#92701e]">System</p>
-              <h1 className="text-[26px] font-bold leading-tight text-[#33251e] sm:text-[30px]">Admin Settings</h1>
-              <p className="mt-1.5 text-[13px] text-[#74675f]">Manage your account and operating preferences.</p>
+              <h1 className="mt-1 font-serif text-[27px] leading-tight text-[#33251e]">Admin Settings</h1>
+              <p className="mt-1 text-[12px] text-[#74675f]">Manage your account and operating preferences.</p>
             </div>
             <div className="flex flex-col items-stretch gap-2 self-start sm:items-end sm:self-auto">
               <div className="mr-1 flex min-w-0 items-center gap-2 text-[11px] text-[#74675f]">

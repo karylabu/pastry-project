@@ -865,10 +865,11 @@ export default function PredictiveAnalytics() {
       <div className="pt-[88px] lg:pl-[260px]">
         <div className="mx-auto max-w-[1400px] px-4 py-6 sm:px-6 md:px-8 lg:px-10 lg:py-8">
           {/* Header */}
-          <header className="mb-4 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+          <header className="mb-6 flex min-h-[72px] flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <div>
-              <h1 className="text-[28px] font-bold leading-tight text-[#33251e]">Predictive demand</h1>
-              <p className="mt-1 text-sm text-[#74675f]">Forecast pastry demand and plan production before stock runs low.</p>
+              <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.24em] text-[#92701e]">Business analytics</p>
+              <h1 className="mt-1 font-serif text-[27px] leading-tight text-[#33251e]">Predictive demand</h1>
+              <p className="mt-1 text-[12px] text-[#74675f]">Forecast pastry demand and plan production before stock runs low.</p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <Segmented

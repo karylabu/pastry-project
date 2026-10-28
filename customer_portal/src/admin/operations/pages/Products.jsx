@@ -722,11 +722,11 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
         <div className="mx-auto max-w-[1400px] px-4 py-6 sm:px-6 md:px-8 lg:py-8">
 
         {/* HEADER */}
-        <div className="mb-6">
+        <div className="mb-6 min-h-[72px]">
           <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-[#9b7810]">
             Inventory Control
           </p>
-          <h1 className="mt-1 font-serif text-[27px] text-[#33251e]">
+          <h1 className="mt-1 font-serif text-[27px] leading-tight text-[#33251e]">
             {catalogTitle}
           </h1>
           <p className="mt-1 text-[12px] text-[#74675f]">Manage finished products, production readiness, and stock movement.</p>

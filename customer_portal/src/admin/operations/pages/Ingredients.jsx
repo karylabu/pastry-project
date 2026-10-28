@@ -500,10 +500,10 @@ export default function Ingredients({
     <div className="min-h-screen bg-[#fbfaf5] text-[#33251e]">
       <div className={pageContainerClassName}>
         <div className={contentClassName}>
-        <header className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <header className="mb-6 flex min-h-[72px] flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <p className="text-[10px] font-bold uppercase tracking-[0.28em] text-[#9b7810]">Inventory Management</p>
-            <h1 className="mt-1 font-serif text-[27px] text-[#33251e]">Ingredients Stock</h1>
+            <h1 className="mt-1 font-serif text-[27px] leading-tight text-[#33251e]">Ingredients Stock</h1>
             <p className="mt-1 text-[12px] text-[#74675f]">Monitor stock levels, thresholds, and expiry dates.</p>
           </div>
           <p className="text-[11px] font-medium text-[#8f8076]">{filteredIngredients.length} of {ingredients.length} ingredients shown</p>
