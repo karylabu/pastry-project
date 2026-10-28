@@ -2,6 +2,8 @@
 require_once __DIR__ . '/../../customer/cors.php';
 require_once __DIR__ . '/../../includes/db.php';
 require_once __DIR__ . '/../../includes/api_auth.php';
+require_once __DIR__ . '/../../includes/predictive_forecasting.php'; // coverage helpers
+require_once __DIR__ . '/../../includes/forecast_engine.php';        // methods, metrics, backtest
 
 /*
 | SCHEMA NOTE: The analytics_* tables are created by the versioned migration
@@ -9,13 +11,36 @@ require_once __DIR__ . '/../../includes/api_auth.php';
 | run CREATE TABLE / ALTER TABLE statements at request time.
 */
 
+// ---------------------------------------------------------------------------
+// Name handling
+// ---------------------------------------------------------------------------
+
 function normalizeProductName(mixed $value): string {
-    return trim(preg_replace('/\s+/', ' ', (string) $value));
+    $text = (string) $value;
+    $collapsed = preg_replace('/[\s\x{00A0}]+/u', ' ', $text);
+    return trim($collapsed ?? $text);
+}
+
+/**
+ * Key used to match the same product across CSV imports, live orders, the catalogue and recipes.
+ * CSVs often use a curly apostrophe ("S’mores") while the catalogue uses a straight one, which
+ * previously made the same product look like two different products.
+ */
+function productMatchKey(mixed $value): string {
+    $name = normalizeProductName($value);
+    $name = str_replace(["\u{2019}", "\u{2018}", "\u{02BC}", "\u{00B4}", '`'], "'", $name);
+    $name = str_replace(["\u{201C}", "\u{201D}"], '"', $name);
+    return mb_strtolower($name, 'UTF-8');
+}
+
+function normalizeAliasKey(string $value): string {
+    return productMatchKey($value);
 }
 
 function getProductAliasMap(mysqli $conn): array {
     $table = mysqli_query($conn, "SHOW TABLES LIKE 'analytics_product_aliases'");
     if (!$table || mysqli_num_rows($table) === 0) {
+        if ($table) mysqli_free_result($table);
         return [];
     }
     mysqli_free_result($table);
@@ -44,17 +69,16 @@ function getProductAliasMap(mysqli $conn): array {
     return $aliases;
 }
 
-function normalizeAliasKey(string $value): string {
-    return mb_strtolower(normalizeProductName($value), 'UTF-8');
-}
-
-require_once __DIR__ . '/../../includes/predictive_forecasting.php';
+// ---------------------------------------------------------------------------
+// Data loading
+// ---------------------------------------------------------------------------
 
 function getSalesHistory(mysqli $conn): array {
     $history = [];
 
     $tables = mysqli_query($conn, "SHOW TABLES LIKE 'order_items'");
     $hasOrderItems = $tables && mysqli_num_rows($tables) > 0;
+    if ($tables) mysqli_free_result($tables);
 
     if ($hasOrderItems) {
         $sql = "
@@ -98,8 +122,7 @@ function getSalesHistory(mysqli $conn): array {
         }
 
         $orderDate = $row['order_date'] ?? '';
-        $itemsPayload = $row['items'] ?? '[]';
-        $items = json_decode($itemsPayload, true);
+        $items = json_decode($row['items'] ?? '[]', true);
         if (!is_array($items)) {
             continue;
         }
@@ -109,7 +132,7 @@ function getSalesHistory(mysqli $conn): array {
             $qty = max(0, (float) ($item['qty'] ?? $item['quantity'] ?? 0));
             if ($orderDate && $product && $qty > 0) {
                 $date = date('Y-m-d', strtotime($orderDate));
-                $key = $date . '|' . strtolower($product);
+                $key = $date . '|' . productMatchKey($product);
                 $dailyHistory[$key]['date'] = $date;
                 $dailyHistory[$key]['product'] = $product;
                 $dailyHistory[$key]['quantity'] = ($dailyHistory[$key]['quantity'] ?? 0) + $qty;
@@ -117,6 +140,7 @@ function getSalesHistory(mysqli $conn): array {
             }
         }
     }
+    mysqli_free_result($result);
     if (!$hasOrderItems && $dailyHistory) {
         $history = array_values($dailyHistory);
     }
@@ -124,7 +148,7 @@ function getSalesHistory(mysqli $conn): array {
     // Live-order keys use canonical names so aliases still participate in deduping.
     $seen = [];
     foreach ($history as $h) {
-        $seen[$h['date'] . '|' . normalizeAliasKey($h['product'])] = true;
+        $seen[$h['date'] . '|' . productMatchKey($h['product'])] = true;
     }
 
     $productAliases = getProductAliasMap($conn);
@@ -140,11 +164,21 @@ function getSalesHistory(mysqli $conn): array {
         }
         $overlapSelect = $hasOverlapMode ? 'imports.overlap_mode' : "'deduplicate_live' AS overlap_mode";
         $overlapGroupBy = $hasOverlapMode ? ', imports.overlap_mode' : '';
+
+        // Latest completed import wins per sale date. Previously every completed import was summed,
+        // so uploading the same period twice (or a corrected re-upload) silently doubled the sales.
         $importedResult = mysqli_query($conn, "
             SELECT history.product_name, history.sale_date, {$overlapSelect},
                    SUM(history.units_sold) AS units_sold, COUNT(*) AS record_count
             FROM analytics_sales_history AS history
             INNER JOIN analytics_imports AS imports ON imports.id = history.import_id
+            INNER JOIN (
+                SELECT h2.sale_date, MAX(h2.import_id) AS import_id
+                FROM analytics_sales_history AS h2
+                INNER JOIN analytics_imports AS i2 ON i2.id = h2.import_id
+                WHERE i2.status = 'completed' AND h2.units_sold > 0
+                GROUP BY h2.sale_date
+            ) AS latest ON latest.sale_date = history.sale_date AND latest.import_id = history.import_id
             WHERE imports.status = 'completed' AND history.units_sold > 0
             GROUP BY history.product_name, history.sale_date{$overlapGroupBy}
             ORDER BY history.sale_date ASC, history.product_name ASC
@@ -157,7 +191,7 @@ function getSalesHistory(mysqli $conn): array {
                 $date = (string) ($row['sale_date'] ?? '');
                 $quantity = max(0, (float) ($row['units_sold'] ?? 0));
                 if ($date !== '' && $product !== '' && $quantity > 0) {
-                    $key = $date . '|' . normalizeAliasKey($product);
+                    $key = $date . '|' . productMatchKey($product);
                     $overlapMode = (string) ($row['overlap_mode'] ?? 'deduplicate_live');
                     if ($overlapMode !== 'supplement' && isset($seen[$key])) {
                         continue;
@@ -171,8 +205,8 @@ function getSalesHistory(mysqli $conn): array {
             $history = array_merge($history, array_values($importedDaily));
             mysqli_free_result($importedResult);
         }
-        mysqli_free_result($historyTable);
     }
+    if ($historyTable) mysqli_free_result($historyTable);
 
     return $history;
 }
@@ -247,6 +281,7 @@ function getIngredientStock(mysqli $conn): array {
             'unit' => $row['unit'] ?? 'unit',
         ];
     }
+    mysqli_free_result($result);
 
     return $items;
 }
@@ -265,10 +300,12 @@ function getProducts(mysqli $conn): array {
             'minimum_stock' => (float) ($row['minimum_stock'] ?? 0),
         ];
     }
+    mysqli_free_result($result);
     return $products;
 }
 
 function getProductRecipes(mysqli $conn): array {
+    $recipes = [];
     $result = mysqli_query($conn, "
         SELECT p.name AS product_name, i.id AS ingredient_id, i.name AS ingredient_name, pr.qty AS usage
         FROM product_recipes pr
@@ -279,21 +316,20 @@ function getProductRecipes(mysqli $conn): array {
     ");
     if (!$result) {
         error_log('Predictive analytics product recipe query failed: ' . mysqli_error($conn));
-        $recipes = [];
     } else {
-        $recipes = [];
         while ($row = mysqli_fetch_assoc($result)) {
             $productName = normalizeProductName($row['product_name'] ?? '');
             $ingredientName = trim((string) ($row['ingredient_name'] ?? ''));
             $usage = max(0, (float) ($row['usage'] ?? 0));
             if ($productName && $ingredientName) {
-                $recipes[strtolower($productName)][] = [
+                $recipes[productMatchKey($productName)][] = [
                     'ingredient_id' => (int) ($row['ingredient_id'] ?? 0),
                     'name' => $ingredientName,
                     'usage' => $usage,
                 ];
             }
         }
+        mysqli_free_result($result);
     }
 
     $hasCakeRecipeTable = mysqli_query($conn, "SHOW TABLES LIKE 'cake_recipes'");
@@ -326,332 +362,95 @@ function getProductRecipes(mysqli $conn): array {
                 $productName = $productByFlavor[$flavor] ?? '';
                 $ingredientName = trim((string) ($row['ingredient_name'] ?? ''));
                 if ($productName !== '' && $ingredientName !== '') {
-                    $cakeRecipes[strtolower($productName)][] = [
+                    $cakeRecipes[productMatchKey($productName)][] = [
                         'ingredient_id' => (int) ($row['ingredient_id'] ?? 0),
                         'name' => $ingredientName,
                         'usage' => max(0, (float) ($row['usage'] ?? 0)),
                     ];
                 }
             }
-            foreach ($cakeRecipes as $productName => $recipe) {
-                if (empty($recipes[$productName])) {
-                    $recipes[$productName] = $recipe;
+            mysqli_free_result($cakeResult);
+            foreach ($cakeRecipes as $productKey => $recipe) {
+                if (empty($recipes[$productKey])) {
+                    $recipes[$productKey] = $recipe;
                 }
             }
         }
+    }
+    foreach ([$hasCakeRecipeTable, $hasCakeRecipes, $hasCakeCatalog] as $check) {
+        if ($check) mysqli_free_result($check);
     }
 
     return $recipes;
 }
 
-function inferFallbackRecipe(string $productName): array {
-    $normalized = strtolower($productName);
-    if (strpos($normalized, 'croissant') !== false) {
-        return [
-            ['name' => 'Butter', 'usage' => 0.25],
-            ['name' => 'Flour', 'usage' => 0.35],
-            ['name' => 'Sugar', 'usage' => 0.15],
-        ];
-    }
-
-    if (strpos($normalized, 'tart') !== false) {
-        return [
-            ['name' => 'Butter', 'usage' => 0.22],
-            ['name' => 'Cream', 'usage' => 0.2],
-            ['name' => 'Fruit', 'usage' => 0.3],
-        ];
-    }
-
-    if (strpos($normalized, 'eclair') !== false || strpos($normalized, 'éclair') !== false) {
-        return [
-            ['name' => 'Butter', 'usage' => 0.2],
-            ['name' => 'Flour', 'usage' => 0.3],
-            ['name' => 'Vanilla Cream', 'usage' => 0.25],
-        ];
-    }
-
-    return [
-        ['name' => 'Butter', 'usage' => 0.2],
-        ['name' => 'Flour', 'usage' => 0.25],
-        ['name' => 'Sugar', 'usage' => 0.15],
-    ];
-}
-
-function buildForecastPayload(array $history, array $ingredientStock, array $recipes): array {
-    $grouped = [];
-    foreach ($history as $entry) {
-        $product = normalizeProductName($entry['product'] ?? '');
-        if (!$product) {
-            continue;
-        }
-        $grouped[$product][] = $entry;
-    }
-
-    $products = [];
-    $recommendations = [];
-    $alerts = [];
-
-    foreach ($grouped as $product => $entries) {
-        usort($entries, function ($a, $b) {
-            return strcmp($a['date'], $b['date']);
-        });
-
-        $byDay = [];
-        foreach ($entries as $entry) {
-            $byDay[$entry['date']] = ($byDay[$entry['date']] ?? 0) + (float) $entry['quantity'];
-        }
-
-        $values = array_values($byDay);
-        $daysUsed = array_keys($byDay);
-        $avgDemand = count($values) > 0 ? array_sum($values) / count($values) : 0;
-        $first = $values[0] ?? 0;
-        $last = $values[count($values) - 1] ?? 0;
-        $trend = count($values) > 1 ? ($last - $first) / max(count($values) - 1, 1) : 0;
-
-        $projectedSeries = [];
-        for ($i = 1; $i <= 7; $i++) {
-            $forecastValue = max(0, $avgDemand + ($trend * $i));
-            $projectedSeries[] = round($forecastValue, 2);
-        }
-
-        $projectedDemand = round(array_sum($projectedSeries) + max(2, round($avgDemand * 0.25, 2)), 2);
-
-        $recipe = $recipes[$product] ?? inferFallbackRecipe($product);
-        $ingredientRows = [];
-        $highPriority = false;
-        $coverageScore = 1;
-
-        foreach ($recipe as $ingredient) {
-            $ingredientName = trim((string) $ingredient['name']);
-            $usage = max(0, (float) $ingredient['usage']);
-            $stockEntry = null;
-            foreach ($ingredientStock as $item) {
-                if (strtolower($item['name']) === strtolower($ingredientName)) {
-                    $stockEntry = $item;
-                    break;
-                }
-            }
-
-            $currentStock = $stockEntry['stock'] ?? 0;
-            $threshold = $stockEntry['threshold'] ?? 0;
-            $requiredQty = round($usage * $projectedDemand, 2);
-            $recommendedQty = max(0, round($requiredQty - $currentStock, 2));
-
-            if ($recommendedQty > 0 || ($currentStock <= $threshold && $threshold > 0)) {
-                $recommendations[] = [
-                    'product' => $product,
-                    'ingredient' => $ingredientName,
-                    'qty' => $recommendedQty,
-                    'priority' => ($avgDemand >= 8 && $currentStock <= $threshold) ? 'High' : 'Medium',
-                ];
-            }
-
-            $ingredientRows[] = [
-                'name' => $ingredientName,
-                'usage' => $usage,
-                'requiredQty' => $requiredQty,
-                'stock' => $currentStock,
-                'threshold' => $threshold,
-                'recommendedQty' => $recommendedQty,
-            ];
-
-            if ($currentStock <= $threshold && $threshold > 0) {
-                $highPriority = true;
-            }
-
-            if ($currentStock > 0) {
-                $coverageScore = min($coverageScore, $currentStock / max($requiredQty, 0.01));
-            }
-        }
-
-        $products[] = [
-            'product' => $product,
-            'avgDemand' => round($avgDemand, 2),
-            'trend' => round($trend, 2),
-            'projectedSeries' => $projectedSeries,
-            'projectedDemand' => $projectedDemand,
-            'daysUsed' => $daysUsed,
-            'ingredients' => $ingredientRows,
-            'coverageRatio' => round(max(0, min(1, $coverageScore)), 2),
-            'highPriority' => $avgDemand >= 8 && $highPriority,
-        ];
-
-        if ($avgDemand >= 8 && $highPriority) {
-            $alerts[] = [
-                'product' => $product,
-                'message' => $product . ' shows strong demand and is now flagged for priority procurement due to low ingredient coverage.',
-                'severity' => 'high',
-            ];
-        }
-    }
-
-    usort($products, function ($a, $b) {
-        return strcmp($a['product'], $b['product']);
-    });
-
-    usort($recommendations, function ($a, $b) {
-        return strcmp($a['product'], $b['product']);
-    });
-
-    $totalDemand = round(array_sum(array_map(function ($item) {
-        return (float) $item['projectedDemand'];
-    }, $products)), 2);
-
-    return [
-        'products' => $products,
-        'summary' => [
-            'totalProjectedDemand' => $totalDemand,
-            'highPriorityCount' => count(array_filter($products, function ($item) {
-                return $item['highPriority'];
-            })),
-            'recommendationCount' => count($recommendations),
-        ],
-        'recommendations' => $recommendations,
-        'alerts' => $alerts,
-    ];
-}
+// ---------------------------------------------------------------------------
+// Forecast payload
+// ---------------------------------------------------------------------------
 
 function buildDetailedForecastPayload(array $history, array $products, array $ingredientStock, array $recipes, array $coverageIntervals, int $period): array {
     $period = in_array($period, [7, 14, 30], true) ? $period : 7;
     $today = new DateTimeImmutable('today');
-    $historyByProduct = [];
 
+    $productByKey = [];
+    foreach ($products as $product) {
+        $productByKey[productMatchKey($product['name'])] = $product;
+    }
+
+    // Group by canonical product key so "S’mores" / "S'mores" or alias spellings are one product.
+    $historyByProduct = [];
+    $displayName = [];
     foreach ($history as $entry) {
-        $product = normalizeProductName($entry['product'] ?? '');
+        $name = normalizeProductName($entry['product'] ?? '');
         $date = (string) ($entry['date'] ?? '');
         $quantity = max(0, (float) ($entry['quantity'] ?? 0));
-        if ($product === '' || $date === '' || $quantity <= 0) continue;
-        $historyByProduct[$product][$date] = ($historyByProduct[$product][$date] ?? 0) + $quantity;
+        if ($name === '' || $date === '' || $quantity <= 0) continue;
+        $key = productMatchKey($name);
+        $displayName[$key] ??= $productByKey[$key]['name'] ?? $name;
+        $historyByProduct[$key][$date] = ($historyByProduct[$key][$date] ?? 0) + $quantity;
     }
 
     $coverageIntervals = mergeForecastCoverageIntervals($coverageIntervals);
     $latestCoverage = $coverageIntervals ? $coverageIntervals[count($coverageIntervals) - 1] : null;
     $historicalStart = $latestCoverage ? new DateTimeImmutable($latestCoverage['start']) : null;
     $historicalEnd = $latestCoverage ? new DateTimeImmutable($latestCoverage['end']) : $today;
-    $productByName = [];
-    foreach ($products as $product) $productByName[strtolower($product['name'])] = $product;
 
-    $forecastProducts = [];
-    $previousEquivalentTotal = 0;
-
-    // Validation uses the longest holdout available for each product, up to 7 days.
-    // Products with short histories are still evaluated instead of disappearing from
-    // the validation view; their results are marked as lower-confidence by the UI.
-    // - $validation: errors pooled per product-day
-    // - $aggActual / $aggPred: shop-level daily totals (what the bakery actually plans for)
-    $validationMethods = ['linear', 'zero', 'yesterday', 'same_weekday_last_week', 'moving_average_7'];
-    $validation = [];
-    foreach ($validationMethods as $method) {
-        $validation[$method] = emptyValidationMetrics();
-    }
-    $aggActual = [];
-    $aggPred = [];
-    $evaluatedProducts = 0;
-    $insufficientHistoryProducts = 0;
-    $inactiveProducts = 0;
-
-    foreach ($historyByProduct as $daily) {
-        if (!$latestCoverage) {
-            $insufficientHistoryProducts++;
-            continue;
-        }
-        $values = array_values(buildCoveredDailySeries(
-            $daily,
-            $latestCoverage['start'],
-            $latestCoverage['end'],
-            min(array_keys($daily))
-        ));
-
-        if (count($values) < 2) {
-            $insufficientHistoryProducts++;
-            continue;
-        }
-
-        $holdoutDays = min(7, max(1, (int) floor(count($values) / 3)));
-        $trainingValues = array_slice($values, 0, -$holdoutDays);
-        $holdout = array_slice($values, -$holdoutDays);
-        $isActive = array_sum(array_slice($trainingValues, -28)) > 0 || array_sum($holdout) > 0;
-        if (!$isActive) {
-            $inactiveProducts++;
-            continue;
-        }
-
-        $evaluatedProducts++;
-        $trainFit = fitTrend($trainingValues);
-        $holdoutOffset = count($trainingValues);
-        $movingWindow = array_slice($trainingValues, -7);
-        $movingAverage7 = array_sum($movingWindow) / max(1, count($movingWindow));
-        $lastKnownValue = (float) $trainingValues[count($trainingValues) - 1];
-
-        foreach ($holdout as $i => $actual) {
-            $targetIndex = $holdoutOffset + $i;
-            $predictions = [
-                'linear' => forecastAt($trainFit, $i + 1),
-                'zero' => 0.0,
-                'yesterday' => $lastKnownValue,
-                'same_weekday_last_week' => $targetIndex >= 7
-                    ? (float) $values[$targetIndex - 7]
-                    : $lastKnownValue,
-                'moving_average_7' => (float) $movingAverage7,
-            ];
-
-            foreach ($predictions as $method => $predicted) {
-                recordValidationError($validation[$method], (float) $actual, $predicted);
-                $aggPred[$method][$i] = ($aggPred[$method][$i] ?? 0) + max(0, $predicted);
+    // Continuous, zero-filled daily series per product inside the latest covered range.
+    $series = [];
+    if ($latestCoverage) {
+        foreach ($historyByProduct as $key => $daily) {
+            $covered = buildCoveredDailySeries($daily, $latestCoverage['start'], $latestCoverage['end'], min(array_keys($daily)));
+            if ($covered) {
+                $series[$key] = $covered;
             }
-            $aggActual[$i] = ($aggActual[$i] ?? 0) + (float) $actual;
         }
     }
 
-    // Shop totals choose the production method; zero remains a comparison-only baseline.
-    $aggregateValidationMetrics = [];
-    foreach ($aggPred as $method => $predictedByDay) {
-        $aggregateMetrics = emptyValidationMetrics();
-        foreach ($aggActual as $i => $actual) {
-            recordValidationError($aggregateMetrics, (float) $actual, (float) ($predictedByDay[$i] ?? 0));
-        }
-        $aggregateValidationMetrics[$method] = summarizeValidationMetrics($aggregateMetrics);
-    }
-    $selectedForecastMethod = selectForecastMethod($aggregateValidationMetrics);
+    // Rolling-origin validation with the SAME methods the forecast uses.
+    $backtest = fe_run_backtest($series, $period);
+    $aggregateValidationMetrics = $backtest['aggregate'];
+    $validationMetrics = $backtest['product'];
+    $selectedForecastMethod = fe_select_method($aggregateValidationMetrics);
+    $selectedAggregate = $aggregateValidationMetrics[$selectedForecastMethod] ?? [];
+    $selectedProductMetrics = $validationMetrics[$selectedForecastMethod] ?? [];
 
-    $forecastDayTotals = [];
-    $historicalDayTotals = [];
-    $ingredientTotals = [];
-    $actions = [];
-    $risks = [];
     $stockById = [];
     foreach ($ingredientStock as $stock) {
         $stockById[(int) $stock['id']] = $stock;
     }
 
-    foreach ($recipes as $recipe) {
-        foreach ($recipe as $ingredient) {
-            $ingredientName = trim((string) ($ingredient['name'] ?? ''));
-            if ($ingredientName === '') continue;
+    $forecastProducts = [];
+    $forecastDayTotals = [];
+    $historicalDayTotals = [];
+    $ingredientTotals = [];
+    $ingredientProductUse = [];   // ingredient id => product name => forecast consumption
+    $actions = [];
+    $previousTotal = 0.0;
+    $comparableForecastTotal = 0.0;
+    $comparisonMethodKeys = ['linear', 'moving_average_7', 'moving_average_28', 'same_weekday_last_week', 'yesterday'];
 
-            $stock = $stockById[(int) ($ingredient['ingredient_id'] ?? 0)] ?? null;
-            if (!$stock) continue;
-            $ingredientTotals[$stock['id']]['name'] = $stock['name'];
-            $ingredientTotals[$stock['id']]['unit'] = $stock['unit'];
-            $ingredientTotals[$stock['id']]['stock'] = $stock['stock'];
-            $ingredientTotals[$stock['id']]['threshold'] = $stock['threshold'];
-            $ingredientTotals[$stock['id']]['consumption'] ??= 0;
-        }
-    }
-
-    foreach ($historyByProduct as $productName => $daily) {
-        if (!$latestCoverage) {
-            continue;
-        }
-        $daily = buildCoveredDailySeries(
-            $daily,
-            $latestCoverage['start'],
-            $latestCoverage['end'],
-            min(array_keys($daily))
-        );
-        if (!$daily) {
-            continue;
-        }
+    foreach ($series as $key => $daily) {
+        $productName = $displayName[$key];
         $values = array_values($daily);
         foreach ($daily as $date => $quantity) {
             $historicalDayTotals[$date] = ($historicalDayTotals[$date] ?? 0) + $quantity;
@@ -660,51 +459,72 @@ function buildDetailedForecastPayload(array $history, array $products, array $in
         $recentValues = array_slice($values, -min(7, count($values)));
         $recentDemand = count($recentValues) ? array_sum($recentValues) / count($recentValues) : 0;
 
-        // Validation selects the forecast method using the lowest shop-total WAPE.
-        $fullFit = fitTrend($values);
-        $trend = $fullFit['slope'];
-        $forecastSeries = forecastSeriesForMethod($selectedForecastMethod, $values, $period);
+        $forecastSeries = array_map(static fn ($v) => round($v, 2), fe_forecast($selectedForecastMethod, $values, $period));
         foreach ($forecastSeries as $index => $value) {
             $forecastDayTotals[$index + 1] = ($forecastDayTotals[$index + 1] ?? 0) + $value;
         }
-
-        $catalogue = $productByName[strtolower($productName)] ?? ['name' => $productName, 'category' => 'Unknown', 'stock' => 0, 'minimum_stock' => 0];
         $totalForecast = round(array_sum($forecastSeries), 2);
-        $previousEquivalent = count($values) >= $period * 2 ? array_sum(array_slice($values, -$period * 2, $period)) : 0;
-        $previousEquivalentTotal += $previousEquivalent;
+
+        // Compare the forecast with the MOST RECENT equivalent period (the last N actual days).
+        $hasPrevious = count($values) >= $period;
+        $previousEquivalent = $hasPrevious ? array_sum(array_slice($values, -$period)) : 0;
+        if ($hasPrevious) {
+            $previousTotal += $previousEquivalent;
+            $comparableForecastTotal += $totalForecast;
+        }
+
         $comparisonMethods = [];
-        foreach (['linear', 'moving_average_7', 'same_weekday_last_week', 'yesterday'] as $method) {
-            $comparisonMethods[$method] = forecastSeriesForMethod($method, $values, $period);
+        foreach ($comparisonMethodKeys as $method) {
+            $comparisonMethods[$method] = array_map(static fn ($v) => round($v, 2), fe_forecast($method, $values, $period));
         }
         $actualSeries = array_slice($daily, -28, null, true);
-        $recipe = $recipes[strtolower($productName)] ?? [];
-        $recipeMapped = array_key_exists(strtolower($productName), $recipes);
+
+        $catalogue = $productByKey[$key] ?? ['name' => $productName, 'category' => 'Unknown', 'stock' => 0, 'minimum_stock' => 0];
+        $currentStock = max(0, (float) ($catalogue['stock'] ?? 0));
+
+        $recipe = $recipes[$key] ?? [];
+        $recipeMapped = array_key_exists($key, $recipes);
         $ingredientRows = [];
         foreach ($recipe as $ingredient) {
             $usage = max(0, (float) ($ingredient['usage'] ?? 0));
             $stock = $stockById[(int) ($ingredient['ingredient_id'] ?? 0)] ?? null;
             if (!$stock) continue;
             $consumption = round($usage * $totalForecast, 2);
-            $ingredientTotals[$stock['id']]['name'] = $stock['name'];
-            $ingredientTotals[$stock['id']]['unit'] = $stock['unit'];
-            $ingredientTotals[$stock['id']]['stock'] = $stock['stock'];
-            $ingredientTotals[$stock['id']]['threshold'] = $stock['threshold'];
-            $ingredientTotals[$stock['id']]['consumption'] = ($ingredientTotals[$stock['id']]['consumption'] ?? 0) + $consumption;
+            $id = $stock['id'];
+            $ingredientTotals[$id]['name'] = $stock['name'];
+            $ingredientTotals[$id]['unit'] = $stock['unit'];
+            $ingredientTotals[$id]['stock'] = $stock['stock'];
+            $ingredientTotals[$id]['threshold'] = $stock['threshold'];
+            $ingredientTotals[$id]['consumption'] = ($ingredientTotals[$id]['consumption'] ?? 0) + $consumption;
+            $ingredientProductUse[$id][$productName] = ($ingredientProductUse[$id][$productName] ?? 0) + $consumption;
             $ingredientRows[] = ['name' => $stock['name'], 'usage' => $usage, 'forecast_consumption' => $consumption];
         }
 
-        $recommendedProduction = max(0, round($totalForecast - (float) ($catalogue['stock'] ?? 0), 2));
-        $recommendedPreorderQuantity = max(0, (int) ceil($totalForecast - max(0, (float) ($catalogue['stock'] ?? 0))));
-        $priority = $recommendedProduction > max(1, (float) ($catalogue['stock'] ?? 0)) ? 'High' : ($recommendedProduction > 0 ? 'Medium' : 'Low');
-        if ($recommendedProduction > 0) $actions[] = ['type' => 'production', 'product' => $productName, 'message' => "Increase {$productName} production by {$recommendedProduction} units.", 'priority' => $priority];
+        // Finished-goods cover: how much of the forecast is already on the shelf.
+        $shortfall = max(0, round($totalForecast - $currentStock, 2));
+        $coverageRatio = $totalForecast > 0 ? max(0, min(1, $currentStock / $totalForecast)) : 1;
+        $recommendedPreorderQuantity = max(0, (int) ceil($totalForecast - $currentStock));
+        $priority = $shortfall <= 0 ? 'Low' : ($coverageRatio < 0.4 ? 'High' : 'Medium');
+        if ($shortfall > 0) {
+            $actions[] = ['type' => 'production', 'product' => $productName, 'message' => "Increase {$productName} production by {$shortfall} units.", 'priority' => $priority];
+        }
+
         $forecastProducts[] = [
-            'product' => $productName, 'category' => $catalogue['category'] ?? 'Unknown', 'recentDemand' => round($recentDemand, 2),
-            'forecast' => $forecastSeries, 'totalForecast' => $totalForecast, 'trend' => round($trend, 2),
+            'product' => $productName,
+            'category' => $catalogue['category'] ?? 'Unknown',
+            'recentDemand' => round($recentDemand, 2),
+            'forecast' => $forecastSeries,
+            'totalForecast' => $totalForecast,
+            'trend' => round(fe_trend_slope($values), 2),
             'trendPercent' => $previousEquivalent > 0 ? round((($totalForecast - $previousEquivalent) / $previousEquivalent) * 100, 2) : null,
-            'currentStock' => (float) ($catalogue['stock'] ?? 0), 'recommendedProduction' => $recommendedProduction,
+            'currentStock' => $currentStock,
+            'coverageRatio' => round($coverageRatio, 2),
+            'recommendedProduction' => $shortfall,
             'recommendedPreorderQuantity' => $recommendedPreorderQuantity,
-            'priority' => $priority, 'ingredients' => $ingredientRows, 'recipeMapped' => $recipeMapped,
-            'history' => array_slice(array_values($daily), -7),
+            'priority' => $priority,
+            'ingredients' => $ingredientRows,
+            'recipeMapped' => $recipeMapped,
+            'history' => array_slice($values, -7),
             'comparison' => [
                 'actual' => array_map(
                     static fn (string $date, float|int $quantity): array => ['date' => $date, 'quantity' => (float) $quantity],
@@ -716,36 +536,94 @@ function buildDetailedForecastPayload(array $history, array $products, array $in
         ];
     }
 
-    // Keys were inserted product by product, so sort by date before taking the last 7 days.
+    // Keys were inserted product by product, so sort by date before slicing the chart window.
     ksort($historicalDayTotals);
 
-    foreach ($ingredientTotals as $ingredient) {
-        $remaining = round($ingredient['stock'] - $ingredient['consumption'], 2);
+    // Ingredient risk, reorder recommendations and alerts.
+    $risks = [];
+    $recommendations = [];
+    $alerts = [];
+    foreach ($ingredientTotals as $id => $ingredient) {
+        $consumption = round($ingredient['consumption'] ?? 0, 2);
+        $remaining = round($ingredient['stock'] - $consumption, 2);
         $reorder = max(0, round($ingredient['threshold'] - $remaining, 2));
         $risk = $remaining <= 0 ? 'HIGH' : ($remaining <= $ingredient['threshold'] ? 'MEDIUM' : 'LOW');
-        $row = ['ingredient' => $ingredient['name'], 'unit' => $ingredient['unit'], 'currentStock' => $ingredient['stock'], 'forecastConsumption' => round($ingredient['consumption'], 2), 'projectedRemaining' => $remaining, 'reorderLevel' => $ingredient['threshold'], 'recommendedReorderQuantity' => $reorder, 'riskStatus' => $risk];
-        $risks[] = $row;
-        if ($reorder > 0) $actions[] = ['type' => 'ingredient', 'product' => $ingredient['name'], 'message' => "Reorder {$reorder} {$ingredient['unit']} of {$ingredient['name']}.", 'priority' => $risk];
+        $risks[] = [
+            'ingredient' => $ingredient['name'], 'unit' => $ingredient['unit'], 'currentStock' => $ingredient['stock'],
+            'forecastConsumption' => $consumption, 'projectedRemaining' => $remaining, 'reorderLevel' => $ingredient['threshold'],
+            'recommendedReorderQuantity' => $reorder, 'riskStatus' => $risk,
+        ];
+
+        if ($reorder > 0) {
+            $actions[] = ['type' => 'ingredient', 'product' => $ingredient['name'], 'message' => "Reorder {$reorder} {$ingredient['unit']} of {$ingredient['name']}.", 'priority' => $risk];
+
+            // Split the ingredient's reorder quantity across the products that use it.
+            $uses = $ingredientProductUse[$id] ?? [];
+            $useTotal = array_sum($uses);
+            foreach ($uses as $productName => $use) {
+                $share = $useTotal > 0 ? $use / $useTotal : 1 / max(1, count($uses));
+                $recommendations[] = [
+                    'product' => $productName, 'ingredient' => $ingredient['name'], 'unit' => $ingredient['unit'],
+                    'qty' => round($reorder * $share, 2), 'priority' => $risk === 'HIGH' ? 'High' : 'Medium',
+                ];
+            }
+        }
+        if ($risk === 'HIGH') {
+            $alerts[] = [
+                'type' => 'ingredient', 'product' => $ingredient['name'], 'ingredient' => $ingredient['name'], 'severity' => 'high',
+                'message' => "Projected use of {$ingredient['name']} is {$consumption} {$ingredient['unit']} against {$ingredient['stock']} {$ingredient['unit']} in stock. Reorder at least {$reorder} {$ingredient['unit']}.",
+            ];
+        }
     }
+    foreach ($forecastProducts as $item) {
+        if ($item['priority'] === 'High') {
+            $pct = round($item['coverageRatio'] * 100);
+            $alerts[] = [
+                'type' => 'product', 'product' => $item['product'], 'ingredient' => 'Inventory', 'severity' => 'high',
+                'message' => "Current stock covers about {$pct}% of the {$period}-day forecast ({$item['totalForecast']} units). Prepare {$item['recommendedProduction']} more.",
+            ];
+        }
+    }
+    usort($recommendations, static fn ($a, $b) => (($a['priority'] === 'High') <=> ($b['priority'] === 'High')) * -1 ?: ($b['qty'] <=> $a['qty']));
 
-    $validationMetrics = array_map('summarizeValidationMetrics', $validation);
-
-    $linearMetrics = $validationMetrics['linear'];
-    $selectedMetrics = $validationMetrics[$selectedForecastMethod] ?? $linearMetrics;
     $totalForecast = array_sum(array_column($forecastProducts, 'totalForecast'));
-    $trendPercent = $previousEquivalentTotal > 0
-        ? round((($totalForecast - $previousEquivalentTotal) / $previousEquivalentTotal) * 100, 2)
+    $trendPercent = $previousTotal > 0
+        ? round((($comparableForecastTotal - $previousTotal) / $previousTotal) * 100, 2)
         : null;
 
-    // How stale the data is: forecast day 1 is the day after the last day with data.
+    // Forecast day 1 is the day after the last day with data.
     $dataAgeDays = $latestCoverage ? max(0, (int) $historicalEnd->diff($today)->format('%r%a')) : null;
     $missingRecipeProducts = array_values(array_map(
         static fn (array $item): string => $item['product'],
         array_filter($forecastProducts, static fn (array $item): bool => empty($item['recipeMapped']))
     ));
 
+    $insights = [];
+    if ($trendPercent !== null) {
+        $insights[] = 'Forecast demand is ' . abs($trendPercent) . '% ' . ($trendPercent >= 0 ? 'higher' : 'lower') . " than the last {$period} days of actual sales.";
+    }
+    if ($forecastProducts) {
+        $totals = array_column($forecastProducts, 'totalForecast');
+        $insights[] = $forecastProducts[array_search(max($totals), $totals, true)]['product'] . ' has the highest projected demand.';
+    }
+    if (count(array_filter($risks, static fn ($item) => $item['riskStatus'] === 'HIGH'))) {
+        $insights[] = 'One or more ingredients may run out based on projected consumption.';
+    }
+    if (($selectedAggregate['wape'] ?? null) !== null) {
+        $insights[] = "Shop-wide daily forecasts have missed by about {$selectedAggregate['wape']}% in {$backtest['folds']} past tests. "
+            . (($selectedProductMetrics['wape'] ?? null) !== null
+                ? "Single products miss by about {$selectedProductMetrics['wape']}% per day because each sells only a few units a day, so read per-product numbers as period totals."
+                : '');
+    }
+
     return [
-        'period' => $period, 'products' => $forecastProducts, 'ingredients' => array_values($risks), 'risks' => $risks, 'actions' => $actions, 'alerts' => [], 'recommendations' => [],
+        'period' => $period,
+        'products' => $forecastProducts,
+        'ingredients' => array_values($risks),
+        'risks' => $risks,
+        'actions' => $actions,
+        'alerts' => $alerts,
+        'recommendations' => $recommendations,
         'dataEndDate' => $historicalEnd->format('Y-m-d'),
         'dataAgeDays' => $dataAgeDays,
         'coverageAvailable' => $latestCoverage !== null,
@@ -754,114 +632,135 @@ function buildDetailedForecastPayload(array $history, array $products, array $in
             'end' => $latestCoverage['end'],
             'days' => (int) $historicalStart->diff($historicalEnd)->format('%a') + 1,
         ] : null,
-        'history' => array_map(static fn($date, $demand) => ['date' => $date, 'demand' => round($demand, 2)], array_slice(array_keys($historicalDayTotals), -7), array_slice(array_values($historicalDayTotals), -7)),
-        'daily' => array_map(static fn($day, $value) => ['day' => $day, 'date' => $historicalEnd->modify("+{$day} days")->format('Y-m-d'), 'forecast' => round($value, 2)], array_keys($forecastDayTotals), $forecastDayTotals),
-        'summary' => ['totalProjectedDemand' => round($totalForecast, 2), 'previousEquivalentDemand' => round($previousEquivalentTotal, 2), 'highPriorityCount' => count(array_filter($forecastProducts, static fn($item) => $item['priority'] === 'High')), 'recommendationCount' => count($actions), 'trendPercent' => $trendPercent, 'peakDay' => !empty($forecastDayTotals) ? array_search(max($forecastDayTotals), $forecastDayTotals, true) : null],
+        'history' => array_map(
+            static fn ($date, $demand) => ['date' => $date, 'demand' => round($demand, 2)],
+            array_slice(array_keys($historicalDayTotals), -14),
+            array_slice(array_values($historicalDayTotals), -14)
+        ),
+        'daily' => array_map(
+            static fn ($day, $value) => ['day' => $day, 'date' => $historicalEnd->modify("+{$day} days")->format('Y-m-d'), 'forecast' => round($value, 2)],
+            array_keys($forecastDayTotals),
+            $forecastDayTotals
+        ),
+        'summary' => [
+            'totalProjectedDemand' => round($totalForecast, 2),
+            'previousEquivalentDemand' => round($previousTotal, 2),
+            'highPriorityCount' => count(array_filter($forecastProducts, static fn ($item) => $item['priority'] === 'High')),
+            'recommendationCount' => count($recommendations),
+            'trendPercent' => $trendPercent,
+            'peakDay' => !empty($forecastDayTotals) ? array_search(max($forecastDayTotals), $forecastDayTotals, true) : null,
+        ],
         'model' => [
-            'name' => 'Selected by shop-total WAPE',
+            'name' => 'Selected by shop-total WAPE (rolling backtest)',
             'selected_forecast_method' => $selectedForecastMethod,
-            'selected_forecast_method_wape' => $aggregateValidationMetrics[$selectedForecastMethod]['wape'] ?? null,
-            'mae' => $selectedMetrics['mae'],
-            'rmse' => $selectedMetrics['rmse'],
-            'mape' => $selectedMetrics['mape'],
-            'wape' => $selectedMetrics['wape'],
+            'selected_forecast_method_wape' => $selectedAggregate['wape'] ?? null,
+            'mae' => $selectedAggregate['mae'] ?? null,
+            'rmse' => $selectedAggregate['rmse'] ?? null,
+            'mape' => $selectedAggregate['mape'] ?? null,
+            'wape' => $selectedAggregate['wape'] ?? null,
+            'bias' => $selectedAggregate['bias'] ?? null,
             'validation_metrics' => $validationMetrics,
             'aggregate_validation_metrics' => $aggregateValidationMetrics,
-            'records' => array_sum(array_map(static fn($entry) => (int) ($entry['record_count'] ?? 1), $history)),
+            'validation_folds' => $backtest['folds'],
+            'validation_horizon_days' => $backtest['horizon'],
+            'records' => array_sum(array_map(static fn ($entry) => (int) ($entry['record_count'] ?? 1), $history)),
             'training_start' => $historicalStart?->format('Y-m-d'),
             'training_end' => $historicalEnd->format('Y-m-d'),
             'coverage_days' => $latestCoverage ? (int) $historicalStart->diff($historicalEnd)->format('%a') + 1 : 0,
-            'validation_records' => $selectedMetrics['records'],
-            'validation_products' => $evaluatedProducts,
+            'validation_records' => $selectedAggregate['records'] ?? 0,
+            'validation_products' => $backtest['evaluated'],
             'products_count' => count($historyByProduct),
-            'validation_excluded_products' => max(0, count($historyByProduct) - $evaluatedProducts),
-            'validation_insufficient_history_products' => $insufficientHistoryProducts,
-            'validation_inactive_products' => $inactiveProducts,
+            'validation_excluded_products' => max(0, count($historyByProduct) - $backtest['evaluated']),
+            'validation_insufficient_history_products' => $backtest['insufficient'] + max(0, count($historyByProduct) - count($series)),
+            'validation_inactive_products' => $backtest['inactive'],
             'recipe_missing_products' => $missingRecipeProducts,
         ],
-        'drivers' => ['Historical product demand', 'Recent sales average', 'Lowest shop-total WAPE among tested methods'],
-        'insights' => array_values(array_filter([ $trendPercent !== null ? 'Forecast demand is ' . abs($trendPercent) . '% ' . ($trendPercent >= 0 ? 'higher' : 'lower') . ' than the previous equivalent period.' : null, !empty($forecastProducts) ? $forecastProducts[array_search(max(array_column($forecastProducts, 'totalForecast')), array_column($forecastProducts, 'totalForecast'), true)]['product'] . ' has the highest projected demand.' : null, !empty($risks) && count(array_filter($risks, static fn($item) => $item['riskStatus'] === 'HIGH')) ? 'One or more ingredients may run out based on projected consumption.' : null])),
+        'drivers' => ['Historical product demand', 'Long-window sales average (28 days)', 'Lowest shop-total WAPE across rolling backtests'],
+        'insights' => $insights,
     ];
 }
 
-function persistForecastData(mysqli $conn, array $history, array $forecastPayload, int $importId = 0): void {
-    if (!$conn) {
-        return;
-    }
+function fe_trend_slope(array $values): float {
+    $window = array_values(array_slice($values, -FE_LINEAR_WINDOW_DAYS));
+    $w = count($window);
+    if ($w < 3) return 0.0;
+    $sumX = $w * ($w - 1) / 2;
+    $sumXX = ($w - 1) * $w * (2 * $w - 1) / 6;
+    $sumY = array_sum($window);
+    $sumXY = 0.0;
+    foreach ($window as $i => $y) $sumXY += $i * $y;
+    $den = $w * $sumXX - $sumX * $sumX;
+    return $den != 0 ? ($w * $sumXY - $sumX * $sumY) / $den : 0.0;
+}
 
-    mysqli_query($conn, "DELETE FROM analytics_forecasts");
-    mysqli_query($conn, "DELETE FROM analytics_reorder_logs");
-    mysqli_query($conn, "DELETE FROM analytics_procurement_alerts");
+function persistForecastData(mysqli $conn, array $forecastPayload): void {
+    $selected = $forecastPayload['model']['selected_forecast_method'] ?? 'moving_average_28';
+    $productWape = $forecastPayload['model']['validation_metrics'][$selected]['wape'] ?? null;
+    $shopWape = $forecastPayload['model']['selected_forecast_method_wape'] ?? null;
+    $wape = $productWape ?? $shopWape;
+    // Heuristic confidence: 1 - WAPE, shrinking a little for each day further out. Not a statistical interval.
+    $baseConfidence = $wape === null ? 0.5 : max(0.05, min(0.95, 1 - ((float) $wape) / 100));
 
-    if ($importId > 0) {
-        mysqli_query($conn, "UPDATE analytics_imports SET rows_processed = " . count($history) . " WHERE id = $importId");
-    }
-
-    $stmtHistory = $importId > 0
-        ? mysqli_prepare($conn, "INSERT INTO analytics_sales_history (import_id, product_name, sale_date, units_sold) VALUES (?, ?, ?, ?)")
-        : null;
-    $stmtForecast = mysqli_prepare($conn, "INSERT INTO analytics_forecasts (product_name, forecast_date, predicted_units, confidence_score) VALUES (?, ?, ?, ?)");
-    $stmtReorder = mysqli_prepare($conn, "INSERT INTO analytics_reorder_logs (product_name, ingredient_name, recommended_qty, status) VALUES (?, ?, ?, ?)");
-    $stmtAlert = mysqli_prepare($conn, "INSERT INTO analytics_procurement_alerts (product_name, ingredient_name, severity, message) VALUES (?, ?, ?, ?)");
-
-    if ($stmtHistory) {
-        foreach ($history as $entry) {
-            $product = normalizeProductName($entry['product'] ?? '');
-            $date = $entry['date'] ?? '';
-            $qty = (float) ($entry['quantity'] ?? 0);
-            if (!$product || !$date) {
-                continue;
+    mysqli_begin_transaction($conn);
+    try {
+        foreach (['analytics_forecasts', 'analytics_reorder_logs', 'analytics_procurement_alerts'] as $table) {
+            if (!mysqli_query($conn, "DELETE FROM {$table}")) {
+                throw new Exception("Could not clear {$table}: " . mysqli_error($conn));
             }
-            mysqli_stmt_bind_param($stmtHistory, 'issd', $importId, $product, $date, $qty);
-            mysqli_stmt_execute($stmtHistory);
         }
-    }
 
-    // Forecast dates follow the last day with data, matching the API's "daily" labels.
-    $forecastStart = new DateTimeImmutable($forecastPayload['dataEndDate'] ?? 'today');
-    foreach ($forecastPayload['products'] ?? [] as $productData) {
-        $productName = $productData['product'];
-        $series = $productData['forecast'] ?? ($productData['projectedSeries'] ?? []);
-        foreach ($series as $index => $value) {
-            $date = $forecastStart->modify('+' . ($index + 1) . ' day')->format('Y-m-d');
-            $confidence = 0.75 + ($index * 0.03);
-            mysqli_stmt_bind_param($stmtForecast, 'ssdd', $productName, $date, $value, $confidence);
-            mysqli_stmt_execute($stmtForecast);
+        $stmtForecast = mysqli_prepare($conn, "INSERT INTO analytics_forecasts (product_name, forecast_date, predicted_units, confidence_score) VALUES (?, ?, ?, ?)");
+        $stmtReorder = mysqli_prepare($conn, "INSERT INTO analytics_reorder_logs (product_name, ingredient_name, recommended_qty, status) VALUES (?, ?, ?, ?)");
+        $stmtAlert = mysqli_prepare($conn, "INSERT INTO analytics_procurement_alerts (product_name, ingredient_name, severity, message) VALUES (?, ?, ?, ?)");
+        if (!$stmtForecast || !$stmtReorder || !$stmtAlert) {
+            throw new Exception('Could not prepare forecast persistence statements.');
         }
-    }
 
-    foreach ($forecastPayload['recommendations'] ?? [] as $recommendation) {
-        $productName = $recommendation['product'] ?? '';
-        $ingredientName = $recommendation['ingredient'] ?? '';
-        $qty = (float) ($recommendation['qty'] ?? 0);
-        $status = $qty > 0 ? 'pending' : 'skipped';
-        mysqli_stmt_bind_param($stmtReorder, 'ssds', $productName, $ingredientName, $qty, $status);
-        mysqli_stmt_execute($stmtReorder);
-    }
+        // Forecast dates follow the last day with data, matching the API's "daily" labels.
+        $forecastStart = new DateTimeImmutable($forecastPayload['dataEndDate'] ?? 'today');
+        foreach ($forecastPayload['products'] ?? [] as $productData) {
+            $productName = $productData['product'];
+            foreach ($productData['forecast'] ?? [] as $index => $value) {
+                $date = $forecastStart->modify('+' . ($index + 1) . ' day')->format('Y-m-d');
+                $value = (float) $value;
+                $confidence = round($baseConfidence * max(0.5, 1 - 0.01 * $index), 2);
+                mysqli_stmt_bind_param($stmtForecast, 'ssdd', $productName, $date, $value, $confidence);
+                mysqli_stmt_execute($stmtForecast);
+            }
+        }
 
-    foreach ($forecastPayload['alerts'] ?? [] as $alert) {
-        $productName = $alert['product'] ?? '';
-        $ingredientName = 'Inventory';
-        $severity = $alert['severity'] ?? 'warning';
-        $message = $alert['message'] ?? '';
-        mysqli_stmt_bind_param($stmtAlert, 'ssss', $productName, $ingredientName, $severity, $message);
-        mysqli_stmt_execute($stmtAlert);
-    }
+        foreach ($forecastPayload['recommendations'] ?? [] as $recommendation) {
+            $productName = $recommendation['product'] ?? '';
+            $ingredientName = $recommendation['ingredient'] ?? '';
+            $qty = (float) ($recommendation['qty'] ?? 0);
+            $status = $qty > 0 ? 'pending' : 'skipped';
+            mysqli_stmt_bind_param($stmtReorder, 'ssds', $productName, $ingredientName, $qty, $status);
+            mysqli_stmt_execute($stmtReorder);
+        }
 
-    if ($stmtHistory) {
-        mysqli_stmt_close($stmtHistory);
-    }
-    if ($stmtForecast) {
+        foreach ($forecastPayload['alerts'] ?? [] as $alert) {
+            $productName = $alert['product'] ?? '';
+            $ingredientName = $alert['ingredient'] ?? 'Inventory';
+            $severity = $alert['severity'] ?? 'warning';
+            $message = $alert['message'] ?? '';
+            mysqli_stmt_bind_param($stmtAlert, 'ssss', $productName, $ingredientName, $severity, $message);
+            mysqli_stmt_execute($stmtAlert);
+        }
+
         mysqli_stmt_close($stmtForecast);
-    }
-    if ($stmtReorder) {
         mysqli_stmt_close($stmtReorder);
-    }
-    if ($stmtAlert) {
         mysqli_stmt_close($stmtAlert);
+        mysqli_commit($conn);
+    } catch (Throwable $e) {
+        mysqli_rollback($conn);
+        error_log('Predictive analytics persistence failed: ' . $e->getMessage());
+        throw $e;
     }
 }
 
+// ---------------------------------------------------------------------------
+// Request handling
+// ---------------------------------------------------------------------------
 
 $method = $_SERVER['REQUEST_METHOD'];
 $action = '';
@@ -918,7 +817,7 @@ try {
     $forecastPayload = buildDetailedForecastPayload($history, $products, $ingredientStock, $recipes, $coverageIntervals, $period);
 
     if ($method === 'POST' && $action === 'refresh') {
-        persistForecastData($conn, $history, $forecastPayload, 0);
+        persistForecastData($conn, $forecastPayload);
     }
 
     echo json_encode([
@@ -928,9 +827,6 @@ try {
         'forecast' => $forecastPayload,
     ]);
 } catch (Exception $e) {
-    if (isset($conn) && mysqli_errno($conn)) {
-        mysqli_query($conn, 'ROLLBACK');
-    }
     http_response_code(400);
     echo json_encode(['success' => false, 'message' => $e->getMessage()]);
 }

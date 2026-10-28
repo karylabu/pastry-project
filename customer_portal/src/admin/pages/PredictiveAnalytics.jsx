@@ -359,6 +359,7 @@ function ForecastChart({ historical, forecast }) {
 
 const COMPARISON_METHODS = [
   { key: "linear", label: "Linear Trend", color: "#b4901f" },
+  { key: "moving_average_28", label: "28-Day Moving Average", color: "#4f7a4a" },
   { key: "moving_average_7", label: "7-Day Moving Average", color: "#6b8f71" },
   { key: "same_weekday_last_week", label: "Same Weekday Last Week", color: "#81906c" },
   { key: "yesterday", label: "Yesterday / Last Known Day", color: "#718096" },
@@ -450,6 +451,7 @@ const METRIC_OPTIONS = {
 
 const VALIDATION_METHODS = [
   { key: "linear", label: "Linear trend", color: "#b4901f" },
+  { key: "moving_average_28", label: "28-day average", color: "#4f7a4a" },
   { key: "moving_average_7", label: "7-day average", color: "#6b8f71" },
   { key: "same_weekday_last_week", label: "Same weekday last week", color: "#81906c" },
   { key: "yesterday", label: "Last known day", color: "#718096" },
@@ -478,6 +480,7 @@ function ValidationMetrics({ model }) {
   const forecastMetrics = metrics[forecastMethod] || linearMetrics;
   const forecastMethodLabel = FORECAST_METHOD_LABELS[forecastMethod] || "Linear trend";
   const forecastMethodNote = {
+    moving_average_28: "The 28-day average repeats the average of the last 28 days for each forecast day. It smooths out day-to-day noise.",
     moving_average_7: "The 7-day average repeats the same average value for each forecast day.",
     same_weekday_last_week: "Each forecast day repeats the sales from that weekday last week.",
     yesterday: "Each forecast day repeats the last observed daily sales value.",
@@ -499,10 +502,11 @@ function ValidationMetrics({ model }) {
   const selectedMethodLoses = selectedMethod?.value != null && best && best.key !== forecastMethod;
 
   const tiles = [
-    ["MAE", formatMetric(forecastMetrics.mae, "")],
-    ["RMSE", formatMetric(forecastMetrics.rmse, "")],
+    ["MAE", formatMetric(forecastMetrics.mae, " units")],
+    ["RMSE", formatMetric(forecastMetrics.rmse, " units")],
     ["MAPE", formatMetric(forecastMetrics.mape, "%")],
     ["WAPE", formatMetric(forecastMetrics.wape, "%")],
+    ["Bias", formatMetric(forecastMetrics.bias, "%")],
   ];
 
   return (
@@ -533,13 +537,13 @@ function ValidationMetrics({ model }) {
         <p>
           Forecast uses <span className="font-semibold">{forecastMethodLabel}</span>, selected by shop-total WAPE
           {model?.selected_forecast_method_wape != null
-            ? ` (${formatMetric(model.selected_forecast_method_wape, "%")} on the last 7-day holdout).`
-            : " when holdout data is available; linear trend is the fallback."}
+            ? ` (${formatMetric(model.selected_forecast_method_wape, "%")} across ${model.validation_folds ?? 0} rolling tests of ${model.validation_horizon_days ?? 7} days).`
+            : " when backtest data is available; the 28-day average is the fallback."}
         </p>
         {forecastMethodNote && <p className="mt-1 text-[#74675f]">{forecastMethodNote}</p>}
       </div>
 
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
         {tiles.map(([label, value]) => (
           <div key={label} className="rounded-xl border border-[#e8dfd4] bg-[#faf8f3] px-4 py-3">
             <p className="text-xs font-medium text-[#74675f]">{label}</p>
@@ -605,7 +609,7 @@ function ValidationMetrics({ model }) {
       )}
 
       <p className="mt-auto text-[11px] leading-4 text-[#74675f]">
-        Chronological holdout using up to 7 days per product; short histories use a shorter, lower-confidence holdout.
+        Rolling backtest: the model is re-run at up to 12 past dates, one week apart, and scored on the days that followed. Bias above 0 means over-forecasting.
         {activeScope === "aggregate" ? " Shop total adds up all products per day." : " Per-product errors are pooled together."}{" "}
         The thin line marks the predict-zero baseline.
       </p>
@@ -656,9 +660,9 @@ const EMPTY_FORECAST = {
 const WORKFLOW_STEPS = [
   { title: "Import sales", body: "Upload the sales CSV from Sales Reports.", link: true },
   { title: "Clean and prepare data", body: "Missing product sales inside a continuous covered date range count as zero. Dates outside coverage or between separate ranges remain unknown." },
-  { title: "Split chronologically", body: "Earlier daily sales train the model; the latest 7 days are held out for testing." },
-  { title: "Train forecasting methods", body: "Compare a linear trend, 7-day average, last day, and same weekday last week." },
-  { title: "Evaluate predictions", body: "Compare MAE, RMSE, WAPE, and MAPE; the lowest shop-total WAPE selects the forecast method." },
+  { title: "Split chronologically", body: "Each test trains on sales before a past date and is scored on the days after it, repeated up to 12 times." },
+  { title: "Train forecasting methods", body: "Compare a linear trend, 28-day and 7-day averages, last day, and same weekday last week." },
+  { title: "Evaluate predictions", body: "Compare MAE, RMSE, WAPE, MAPE, and bias; the lowest shop-total WAPE selects the forecast method." },
   { title: "Review results", body: "See the demand chart, product estimates, and inventory preparation recommendations below." },
 ];
 
@@ -971,7 +975,7 @@ export default function PredictiveAnalytics() {
               label="Forecast vs previous period"
               value={trendPercent == null ? "—" : `${trendPercent >= 0 ? "↑" : "↓"} ${Math.abs(trendPercent)}%`}
               valueClass={trendPercent != null && trendPercent >= 0 ? "text-[#4f7a4a]" : "text-[#33251e]"}
-              note={`Forecast ${Number(summary.totalProjectedDemand || 0).toFixed(1)} vs previous ${Number(summary.previousEquivalentDemand || 0).toFixed(1)} units`}
+              note={`Forecast ${Number(summary.totalProjectedDemand || 0).toFixed(1)} vs last ${period} days ${Number(summary.previousEquivalentDemand || 0).toFixed(1)} units`}
             />
             <StatTile label="High priority" value={summary.highPriorityCount ?? 0} note="Products to prepare first" />
             <StatTile label="Reorder recommendations" value={summary.recommendationCount ?? 0} note="Ingredients to restock" />
@@ -1005,8 +1009,8 @@ export default function PredictiveAnalytics() {
                 <div className="relative min-h-[260px] flex-1">
                   <div className="absolute inset-0 space-y-2 overflow-y-auto pr-1">
                     {forecast.alerts?.length ? (
-                      forecast.alerts.map((alert) => (
-                        <div key={alert.product} className="rounded-xl border border-[#e8dfd4] bg-[#faf8f3] p-3">
+                      forecast.alerts.map((alert, index) => (
+                        <div key={`${alert.type}-${alert.product}-${index}`} className="rounded-xl border border-[#e8dfd4] bg-[#faf8f3] p-3">
                           <p className="text-sm font-semibold text-[#33251e]">{alert.product}</p>
                           <p className="mt-1 text-xs leading-5 text-[#74675f]">{alert.message}</p>
                         </div>
@@ -1271,7 +1275,7 @@ export default function PredictiveAnalytics() {
                     <div className="grid w-full grid-cols-[1.2fr_1.2fr_80px_80px] items-center gap-3 text-sm">
                       <span className="truncate text-[#33251e]" title={item.product}>{item.product}</span>
                       <span className="truncate text-[#74675f]" title={item.ingredient}>{item.ingredient}</span>
-                      <span className="text-right tabular-nums text-[#74675f]">{Number(item.qty || 0).toFixed(2)} kg</span>
+                      <span className="text-right tabular-nums text-[#74675f]">{Number(item.qty || 0).toFixed(2)} {item.unit || "kg"}</span>
                       <span className="flex justify-end"><Chip tone={item.priority === "High" ? "bad" : "neutral"}>{item.priority}</Chip></span>
                     </div>
                   )}
@@ -1331,11 +1335,11 @@ export default function PredictiveAnalytics() {
                 </div>
                 <div>
                   <dt className="text-[#74675f]">Trend window</dt>
-                  <dd className="mt-1 font-semibold text-[#33251e]">28 days, damped</dd>
+                  <dd className="mt-1 font-semibold text-[#33251e]">28 days (linear method)</dd>
                 </div>
                 <div>
-                  <dt className="text-[#74675f]">Holdout</dt>
-                  <dd className="mt-1 font-semibold text-[#33251e]">Last 7 days</dd>
+                  <dt className="text-[#74675f]">Backtest</dt>
+                  <dd className="mt-1 font-semibold text-[#33251e]">{forecast.model?.validation_folds ?? 0} tests × {forecast.model?.validation_horizon_days ?? period} days</dd>
                 </div>
               </dl>
             </Card>
