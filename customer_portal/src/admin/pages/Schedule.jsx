@@ -333,7 +333,7 @@ export default function Schedule() {
       </div>
       {selectedDay && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onMouseDown={(event) => { if (event.target === event.currentTarget) setSelectedDay(null); }}>
-          <section role="dialog" aria-modal="true" aria-labelledby="schedule-day-title" className="max-h-[80vh] w-full max-w-md overflow-y-auto rounded-2xl bg-white shadow-2xl">
+          <section role="dialog" aria-modal="true" aria-labelledby="schedule-day-title" className="max-h-[80vh] w-full max-w-md overflow-y-auto rounded-lg bg-white shadow-2xl">
             <header className="flex items-center justify-between border-b border-black/10 px-5 py-4">
               <h2 id="schedule-day-title" className="font-semibold text-black">Orders for {selectedDay.date.toLocaleDateString()}</h2>
               <button type="button" onClick={() => setSelectedDay(null)} aria-label="Close scheduled orders" className="flex h-9 w-9 items-center justify-center rounded-full border border-black/10 hover:bg-black/5"><X size={18} /></button>
@@ -362,7 +362,7 @@ export default function Schedule() {
         const customerName = selectedOrder.name || selectedOrder.customer_name || getCustomDetails(selectedOrder).customer_name || "Customer";
         return (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onMouseDown={(event) => { if (event.target === event.currentTarget) setSelectedOrder(null); }}>
-            <section role="dialog" aria-modal="true" aria-labelledby="schedule-order-title" className="max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white shadow-2xl">
+            <section role="dialog" aria-modal="true" aria-labelledby="schedule-order-title" className="max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-lg bg-white shadow-2xl">
               <header className="flex items-start justify-between border-b border-black/10 px-5 py-4">
                 <div className="min-w-0">
                   <p className="text-xs font-semibold uppercase tracking-wide text-[#9a7411]">Scheduled order #{selectedOrder.id}</p>

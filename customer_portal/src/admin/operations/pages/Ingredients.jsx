@@ -888,7 +888,7 @@ export default function Ingredients({
               aria-modal="true"
               aria-labelledby="ingredient-alert-title"
               aria-describedby="ingredient-alert-description"
-              className="w-full max-w-md overflow-hidden rounded-2xl border border-[#eee4de] bg-white shadow-[0_24px_70px_rgba(38,25,16,0.28)]"
+              className="w-full max-w-md overflow-hidden rounded-lg border border-[#eee4de] bg-white shadow-[0_24px_70px_rgba(38,25,16,0.28)]"
             >
               <div className="flex items-start gap-4 p-5 sm:p-6">
                 <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full ${alertDialog.variant === 'success' ? 'bg-emerald-50 text-emerald-600' : 'bg-[#fff1e9] text-[#a64d31]'}`}>

@@ -2036,7 +2036,7 @@ export default function Reports() {
           role="dialog"
           aria-modal="true"
           aria-labelledby="csv-preview-title"
-          className="csv-preview-dialog flex max-h-[90vh] w-full max-w-none flex-col overflow-hidden rounded-xl bg-white shadow-2xl"
+          className="csv-preview-dialog flex max-h-[90vh] w-full max-w-none flex-col overflow-hidden rounded-lg bg-white shadow-2xl"
         >
           <div className="csv-preview-header sticky top-0 z-10 flex shrink-0 items-start justify-between gap-4 border-b border-black/10 bg-white px-5 py-4">
             <div className="min-w-0">

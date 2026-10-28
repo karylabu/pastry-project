@@ -1106,7 +1106,7 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
                 initial={{ scale: 0.9 }}
                 animate={{ scale: 1 }}
                 exit={{ scale: 0.9 }}
-                className="max-h-full w-full max-w-[600px] overflow-y-auto rounded-2xl border border-black/10 bg-white p-6 shadow-xl"
+                className="max-h-full w-full max-w-[600px] overflow-y-auto rounded-lg border border-black/10 bg-white p-6 shadow-xl"
               >
 
                 <div className="mb-1 flex items-start justify-between gap-4">
@@ -1303,7 +1303,7 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
                 initial={{ scale: 0.95 }}
                 animate={{ scale: 1 }}
                 exit={{ scale: 0.95 }}
-                className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-3xl border border-[#eadfd8] bg-[#fffdfa] shadow-[0_24px_70px_rgba(38,25,16,0.28)]"
+                className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-lg border border-[#eadfd8] bg-[#fffdfa] shadow-[0_24px_70px_rgba(38,25,16,0.28)]"
               >
                 <div className="sticky top-0 z-20 flex items-start justify-between gap-4 border-b border-[#f0e7e0] bg-[#fffdfa]/95 px-5 py-4 backdrop-blur sm:px-7">
                   <div>
@@ -1528,7 +1528,7 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
                 initial={{ scale: 0.95 }}
                 animate={{ scale: 1 }}
                 exit={{ scale: 0.95 }}
-                className="max-h-full w-full max-w-[680px] overflow-y-auto rounded-3xl border border-[#eadfd8] bg-[#fffdfa] shadow-[0_24px_70px_rgba(38,25,16,0.28)]"
+                className="max-h-full w-full max-w-[680px] overflow-y-auto rounded-lg border border-[#eadfd8] bg-[#fffdfa] shadow-[0_24px_70px_rgba(38,25,16,0.28)]"
               >
                 <div className="sticky top-0 z-20 flex items-start justify-between gap-4 border-b border-[#f0e7e0] bg-[#fffdfa]/95 px-5 py-4 backdrop-blur sm:px-7">
                   <div>
