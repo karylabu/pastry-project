@@ -19,6 +19,8 @@ const laravelStaffFetch = (url, options = {}) => {
 };
 
 const POLL_INTERVAL = 15000;
+const DEFAULT_SORT_BY = "date";
+const DEFAULT_SORT_DIRECTION = "asc";
 
 const isQrPayment = (payment) => ['gcash', 'qrph'].includes(
   String(payment || '').toLowerCase().replace(/[^a-z0-9]/g, '')
@@ -111,8 +113,8 @@ export default function Orders() {
   const [statusFilter, setStatusFilter] = useState("All");
   const [dashboardFilter, setDashboardFilter] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [sortBy, setSortBy] = useState("date");
-  const [sortDirection, setSortDirection] = useState("asc");
+  const [sortBy, setSortBy] = useState(DEFAULT_SORT_BY);
+  const [sortDirection, setSortDirection] = useState(DEFAULT_SORT_DIRECTION);
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [updatingId, setUpdatingId] = useState(null);
