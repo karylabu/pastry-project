@@ -137,7 +137,7 @@ export default function OrderHistory() {
     setImportHistoryPage(1);
   }, [query, timeRange, startDate, endDate, orderTypeFilter, statusFilter]);
 
-  const filteredOrders = useMemo(() => {
+  const statusIndependentOrders = useMemo(() => {
     const term = query.trim().toLowerCase();
     const now = new Date();
     const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -173,23 +173,30 @@ export default function OrderHistory() {
             : orderTypeFilter === "Standard Order" ? !order.is_customized && !orderType.includes("urgent") && !orderType.includes("rush")
               : orderTypeFilter === "Urgent Rush Order" ? orderType.includes("urgent") || orderType.includes("rush")
                 : false);
-      const matchesStatus = statusFilter === "All" || order.status === statusFilter;
       const matchesDate = matchesTimeRange(order.completed_at || order.updated_at || order.created_at);
-      return matchesQuery && matchesType && matchesStatus && matchesDate;
+      return matchesQuery && matchesType && matchesDate;
     });
-  }, [orders, importedSales, query, orderTypeFilter, statusFilter, timeRange, startDate, endDate]);
+  }, [orders, importedSales, query, orderTypeFilter, timeRange, startDate, endDate]);
+
+  const filteredOrders = useMemo(
+    () => statusIndependentOrders.filter((order) => statusFilter === "All" || order.status === statusFilter),
+    [statusIndependentOrders, statusFilter]
+  );
 
   const summaryMetrics = useMemo(() => {
     const completedLiveCount = filteredOrders.filter((order) => order.status === "Completed" && !order.isImportedSales).length;
     const includeImportedCompleted = (orderTypeFilter === "All" || orderTypeFilter === "Imported Sales")
       && (statusFilter === "All" || statusFilter === "Imported");
     const completedCount = completedLiveCount + (includeImportedCompleted ? Number(importHistorySummary.records || 0) : 0);
-    const cancelledCount = filteredOrders.filter((order) => order.status === "Cancelled").length;
+    const completedRateCount = statusIndependentOrders.filter((order) => order.status === "Completed" && !order.isImportedSales).length;
+    const cancelledCount = statusIndependentOrders.filter((order) => order.status === "Cancelled").length;
+    const includeImportedForRate = orderTypeFilter === "All" || orderTypeFilter === "Imported Sales";
+    const importedCompletedForRate = includeImportedForRate ? Number(importHistorySummary.records || 0) : 0;
     const liveOrderRevenue = filteredOrders.filter((order) => !order.isImportedSales).reduce((sum, order) => sum + Number(order.total || 0), 0);
     const includeImportedSales = orderTypeFilter === "All" || orderTypeFilter === "Imported Sales";
     const totalRevenue = liveOrderRevenue + (includeImportedSales ? Number(importHistorySummary.total_sales || 0) : 0);
-    const realOrderCount = filteredOrders.filter((order) => !order.isImportedSales).length;
-    const cancellationRate = realOrderCount > 0 ? (cancelledCount / realOrderCount) * 100 : 0;
+    const rateBase = completedRateCount + cancelledCount + importedCompletedForRate;
+    const cancellationRate = rateBase > 0 ? (cancelledCount / rateBase) * 100 : 0;
 
     return {
       completedCount,
@@ -197,7 +204,7 @@ export default function OrderHistory() {
       cancelledCount,
       cancellationRate,
     };
-  }, [filteredOrders, importHistorySummary, orderTypeFilter, statusFilter]);
+  }, [filteredOrders, statusIndependentOrders, importHistorySummary, orderTypeFilter, statusFilter]);
 
   const getOrderTypeMeta = (order) => {
     if (order?.isImportedSales) return { label: "Imported Sales", isCustomCake: false, isUrgent: false };
