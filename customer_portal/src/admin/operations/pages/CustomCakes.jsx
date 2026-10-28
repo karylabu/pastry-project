@@ -784,9 +784,8 @@ export default function CustomCakes() {
 
       <div className="admin-operations-content lg:pl-[260px] pt-[88px]">
         <div className="mx-auto max-w-[1500px] px-4 py-5 sm:px-6 md:px-8 lg:px-10 lg:py-7">
-          <div className="admin-static-card admin-operations-header mb-5 flex flex-col gap-4 border-b border-[#e8dfd4] pb-5 lg:flex-row lg:items-end lg:justify-between">
+          <div className="mb-5 flex flex-col gap-4 border-b border-[#e8dfd4] pb-5 lg:flex-row lg:items-end lg:justify-between">
             <div>
-              <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.24em] text-[#92701e]">Order management</p>
               <h1 className="text-[26px] font-bold leading-tight text-[#33251e] sm:text-[30px]">Custom Cake Requests</h1>
               <p className="mt-1.5 text-[13px] text-[#74675f]">Review designs, set quotes, and track each request.</p>
             </div>
