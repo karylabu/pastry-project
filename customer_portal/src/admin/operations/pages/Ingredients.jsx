@@ -593,7 +593,7 @@ export default function Ingredients({
                     <th className="px-4 py-3 font-semibold">Stock Value</th>
                     <th className="px-4 py-3 font-semibold">Threshold</th>
                     <th className="px-6 py-3 font-semibold">Expiry</th>
-                    <th className="px-6 py-3 font-semibold">Action</th>
+                    <th className="px-6 py-3 text-right font-semibold">Action</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -651,8 +651,8 @@ export default function Ingredients({
                             <span className="inline-flex items-center rounded-full bg-[#fff0eb] px-2.5 py-1 text-[10px] font-semibold text-[#9a5947]">Expired batches</span>
                           ) : '—'}
                         </td>
-                        <td className="px-6 py-4">
-                          <div className="flex items-center gap-2">
+                        <td className="px-6 py-4 text-right">
+                          <div className="flex items-center justify-end gap-2">
                             <button type="button" onClick={() => openModal('edit', item)} title={`Edit ${item.name}`} aria-label={`Edit ${item.name}`} className="inline-flex h-8 w-8 items-center justify-center rounded-md bg-[#33251e] text-white transition hover:bg-[#5b4540]"><Pencil size={14} aria-hidden="true" /></button>
                             {Number(item.expired_batch_count) > 0 && Number(item.pending_discard_count) === 0 && <button onClick={() => openModal('history', item)} className="rounded-md border border-[#eadfca] bg-[#fff4cd] px-2.5 py-1.5 text-[10px] font-semibold text-[#80600a]">Discard expired</button>}
                             <button type="button" onClick={() => openModal('history', item)} title={`View ${item.name} history`} aria-label={`View ${item.name} history`} className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-[#eee4de] bg-white text-[#6a5a50] transition hover:bg-[#fff8df]"><History size={14} aria-hidden="true" /></button>
