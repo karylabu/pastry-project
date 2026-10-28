@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
   Calculator,
@@ -6,12 +6,10 @@ import {
   ChevronRight,
   FileText,
   Package2,
-  Plus,
-  Trash2,
   TrendingUp,
 } from "lucide-react";
 import { Link } from "react-router-dom";
-import { LARAVEL_BASE, ROOT_BASE } from "../../services/config";
+import { ROOT_BASE } from "../../services/config";
 import { getAuthHeaders } from "../../services/api";
 
 // ---------------------------------------------------------------------------
@@ -75,12 +73,12 @@ function Card({ title, description, action, children, className = "" }) {
 
 function Section({ title, description, children }) {
   return (
-    <section className="mb-10">
-      <div className="mb-4">
+      <section className="mb-4">
+        <div className="mb-3">
         <h2 className="text-lg font-bold text-[#33251e]">{title}</h2>
         {description && <p className="mt-0.5 text-sm text-[#74675f]">{description}</p>}
       </div>
-      <div className="space-y-4">{children}</div>
+        <div className="space-y-3">{children}</div>
     </section>
   );
 }
@@ -723,74 +721,10 @@ export default function PredictiveAnalytics() {
     Object.fromEntries(COMPARISON_METHODS.map(({ key }) => [key, true]))
   );
   const [salesPage, setSalesPage] = useState(1);
-  const [preparationPage, setPreparationPage] = useState(1);
   const [actionsPage, setActionsPage] = useState(1);
   const [coveragePage, setCoveragePage] = useState(1);
   const [reorderPage, setReorderPage] = useState(1);
   const [ingredientPage, setIngredientPage] = useState(1);
-  const [aliases, setAliases] = useState([]);
-  const [aliasProducts, setAliasProducts] = useState([]);
-  const [aliasName, setAliasName] = useState("");
-  const [aliasProductId, setAliasProductId] = useState("");
-  const [aliasError, setAliasError] = useState("");
-  const [savingAlias, setSavingAlias] = useState(false);
-
-  // ---- Aliases -------------------------------------------------------------
-
-  const loadProductAliases = useCallback(async () => {
-    const response = await fetch(`${LARAVEL_BASE}/api/admin/sales/product-aliases`, {
-      credentials: "include",
-      headers: { Accept: "application/json", ...getAuthHeaders() },
-    });
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok || !data.success) throw new Error(data.message || "Could not load product aliases.");
-    setAliases(data.aliases || []);
-    setAliasProducts(data.products || []);
-    setAliasProductId((current) => current || String(data.products?.[0]?.id || ""));
-  }, []);
-
-  useEffect(() => {
-    loadProductAliases().catch((error) => setAliasError(error.message));
-  }, [loadProductAliases]);
-
-  const saveProductAlias = async (event) => {
-    event.preventDefault();
-    setSavingAlias(true);
-    setAliasError("");
-    try {
-      const response = await fetch(`${LARAVEL_BASE}/api/admin/sales/product-aliases`, {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json", Accept: "application/json", ...getAuthHeaders() },
-        body: JSON.stringify({ alias_name: aliasName, product_id: aliasProductId }),
-      });
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok || !data.success) throw new Error(data.message || "Could not save product alias.");
-      setAliasName("");
-      await loadProductAliases();
-    } catch (error) {
-      setAliasError(error.message);
-    } finally {
-      setSavingAlias(false);
-    }
-  };
-
-  const removeProductAlias = async (aliasId) => {
-    setAliasError("");
-    try {
-      const response = await fetch(`${LARAVEL_BASE}/api/admin/sales/product-aliases/${aliasId}`, {
-        method: "DELETE",
-        credentials: "include",
-        headers: { Accept: "application/json", ...getAuthHeaders() },
-      });
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok || !data.success) throw new Error(data.message || "Could not delete product alias.");
-      setAliases((current) => current.filter((alias) => alias.id !== aliasId));
-    } catch (error) {
-      setAliasError(error.message);
-    }
-  };
-
   // ---- Forecast ------------------------------------------------------------
 
   const loadForecast = async (options = {}) => {
@@ -855,18 +789,6 @@ export default function PredictiveAnalytics() {
       ),
     [filteredProducts]
   );
-  const preparationProducts = useMemo(
-    () =>
-      filteredProducts
-        .filter((product) => Number(product.recommendedPreorderQuantity) > 0)
-        .sort(
-          (a, b) =>
-            Number(b.recommendedPreorderQuantity || 0) - Number(a.recommendedPreorderQuantity || 0) ||
-            Number(b.totalForecast || 0) - Number(a.totalForecast || 0) ||
-            a.product.localeCompare(b.product)
-        ),
-    [filteredProducts]
-  );
   const sortedActions = useMemo(
     () =>
       [...(forecast.actions || [])].sort((a, b) => {
@@ -908,7 +830,6 @@ export default function PredictiveAnalytics() {
 
   const pageCountOf = (list) => Math.max(1, Math.ceil(list.length / PAGE_SIZE));
   const salesPageCount = pageCountOf(sortedFilteredProducts);
-  const preparationPageCount = pageCountOf(preparationProducts);
   const actionsPageCount = pageCountOf(sortedActions);
   const coveragePageCount = pageCountOf(sortedCoverageProducts);
   const reorderPageCount = pageCountOf(sortedRecommendations);
@@ -920,7 +841,6 @@ export default function PredictiveAnalytics() {
 
   useEffect(() => {
     setSalesPage(1);
-    setPreparationPage(1);
   }, [categoryFilter, period, productFilter, forecast.products]);
 
   useEffect(() => {
@@ -1153,34 +1073,14 @@ export default function PredictiveAnalytics() {
               <Pagination page={salesPage} pageCount={salesPageCount} total={sortedFilteredProducts.length} onPageChange={setSalesPage} label="products" />
             </Card>
 
-            <div className="grid items-stretch gap-4 xl:grid-cols-2">
-              <Card title="Products that may need more stock" description="The suggested amount is the estimated demand not covered by current stock.">
-                <PagedRows
-                  items={preparationProducts}
-                  page={preparationPage}
-                  emptyText="Current stock appears to be enough for the estimated demand."
-                  renderRow={(product) => (
-                    <>
-                      <span className="min-w-0 flex-1 truncate text-sm font-semibold text-[#33251e]" title={product.product}>{product.product}</span>
-                      <span className="w-20 text-right text-sm tabular-nums text-[#33251e]">{product.recommendedPreorderQuantity} items</span>
-                      <span className="flex w-[116px] justify-end">
-                        <Chip tone={PRIORITY_TONE[product.priority] || "neutral"}>{PRIORITY_LABEL[product.priority] || product.priority}</Chip>
-                      </span>
-                    </>
-                  )}
-                />
-                <Pagination page={preparationPage} pageCount={preparationPageCount} total={preparationProducts.length} onPageChange={setPreparationPage} label="products" />
-              </Card>
-
-              <Card title="Highest projected demand" description={`Top ${PAGE_SIZE} products by estimated total over ${period} days.`}>
-                {topProducts.length ? (
-                  <HighestDemandChart products={topProducts} />
-                ) : (
-                  <EmptyState className="min-h-[280px]">Forecasts will appear once sales data is available.</EmptyState>
-                )}
-                <CardFooter text={`Top ${topProducts.length} of ${forecast.products.length} products`} />
-              </Card>
-            </div>
+            <Card title="Highest projected demand" description={`Top ${PAGE_SIZE} products by estimated total over ${period} days.`}>
+              {topProducts.length ? (
+                <HighestDemandChart products={topProducts} />
+              ) : (
+                <EmptyState className="min-h-[280px]">Forecasts will appear once sales data is available.</EmptyState>
+              )}
+              <CardFooter text={`Top ${topProducts.length} of ${forecast.products.length} products`} />
+            </Card>
 
             <Card
               title="Actual sales and forecast methods"
@@ -1324,85 +1224,6 @@ export default function PredictiveAnalytics() {
             </div>
           </Section>
 
-          {/* 4. Model quality */}
-          <Section title="Model quality" description="Forecast configuration and data windows used by the system.">
-            <Card title="Factors used by this model" description="Inputs and data windows behind the forecast.">
-              {forecast.drivers?.length ? (
-                <div className="mb-4 flex flex-wrap gap-2">
-                  {forecast.drivers.map((driver) => (
-                    <Chip key={driver}>{driver}</Chip>
-                  ))}
-                </div>
-              ) : null}
-              <dl className="grid grid-cols-2 gap-4 border-t border-[#f0ebe1] pt-4 text-xs md:grid-cols-5">
-                <div>
-                  <dt className="text-[#74675f]">Training window</dt>
-                  <dd className="mt-1 font-semibold text-[#33251e]">{forecast.model?.training_start || "—"} to {forecast.model?.training_end || "—"}</dd>
-                </div>
-                <div>
-                  <dt className="text-[#74675f]">Latest continuous sales coverage</dt>
-                  <dd className="mt-1 font-semibold text-[#33251e]">
-                    {forecast.coverage?.start && forecast.coverage?.end
-                      ? `${forecast.coverage.start} to ${forecast.coverage.end} (${forecast.coverage.days} days)`
-                      : "Not available"}
-                  </dd>
-                  {forecast.coverage && (
-                    <dd className="mt-1 text-[11px] leading-4 text-[#74675f]">Import boundaries use valid dates found in the CSV.</dd>
-                  )}
-                </div>
-                <div>
-                  <dt className="text-[#74675f]">Latest data</dt>
-                  <dd className="mt-1 font-semibold text-[#33251e]">{forecast.dataAgeDays == null ? "—" : `${forecast.dataAgeDays} day(s) old`}</dd>
-                </div>
-                <div>
-                  <dt className="text-[#74675f]">Trend window</dt>
-                  <dd className="mt-1 font-semibold text-[#33251e]">28 days (linear method)</dd>
-                </div>
-                <div>
-                  <dt className="text-[#74675f]">Backtest</dt>
-                  <dd className="mt-1 font-semibold text-[#33251e]">{forecast.model?.validation_folds ?? 0} tests × {forecast.model?.validation_horizon_days ?? period} days</dd>
-                </div>
-              </dl>
-            </Card>
-          </Section>
-
-          {/* 5. Data cleanup */}
-          <Section title="Data cleanup" description="Fix CSV labels so imported sales match your catalog.">
-            <Card
-              title="Product name aliases"
-              description="Map alternate CSV labels to a cake or customized cake catalog product. These mappings apply to imported sales in forecasts; they do not rename products."
-            >
-              <form onSubmit={saveProductAlias} className="grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
-                <input aria-label="Alternate CSV product name" value={aliasName} onChange={(event) => setAliasName(event.target.value)} maxLength={191} required placeholder="e.g. Choco Cake" className={FIELD_CLASS} />
-                <select aria-label="Catalog product for alias" value={aliasProductId} onChange={(event) => setAliasProductId(event.target.value)} required className={FIELD_CLASS}>
-                  {aliasProducts.map((product) => <option key={product.id} value={product.id}>{product.name}</option>)}
-                </select>
-                <button type="submit" disabled={savingAlias || !aliasProducts.length} className={BUTTON_PRIMARY}>
-                  <Plus size={14} />
-                  {savingAlias ? "Saving..." : "Add mapping"}
-                </button>
-              </form>
-              {aliasError && <p role="alert" className="mt-3 rounded-lg bg-[#fff4cd] px-3 py-2 text-xs text-[#33251e]">{aliasError}</p>}
-              {aliases.length > 0 ? (
-                <ul className="mt-4 max-h-[240px] divide-y divide-[#f0ebe1] overflow-y-auto rounded-xl border border-[#e8dfd4]">
-                  {aliases.map((alias) => (
-                    <li key={alias.id} className="flex h-12 items-center justify-between gap-3 px-4 text-sm">
-                      <span className="min-w-0 truncate text-[#33251e]">
-                        <strong>{alias.alias_name}</strong>
-                        <span className="mx-2 text-[#9a8f86]">→</span>
-                        {alias.product_name}
-                      </span>
-                      <button type="button" onClick={() => removeProductAlias(alias.id)} aria-label={`Remove alias ${alias.alias_name}`} className="rounded-md p-1.5 text-[#74675f] hover:bg-[#f4efe6] hover:text-[#33251e]">
-                        <Trash2 size={14} />
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="mt-4 text-xs text-[#74675f]">No aliases yet. Add one when a CSV label doesn’t match a catalog product.</p>
-              )}
-            </Card>
-          </Section>
         </div>
       </div>
     </div>
