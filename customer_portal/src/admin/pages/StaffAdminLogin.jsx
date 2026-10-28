@@ -540,7 +540,7 @@ export default function StaffAdminLogin() {
                             onChange={(event) => setEmail(event.target.value)}
                             placeholder="name@example.com"
                             required
-                            className="admin-login-input w-full bg-white"
+                            className="admin-login-input password-toggle-input w-full bg-white"
                           />
                         </div>
                       </div>

@@ -123,6 +123,21 @@ describe("Google registration", () => {
     expect(createAccountButton).toBeEnabled();
   });
 
+  it("shows one password visibility toggle for each password field", () => {
+    render(<Register />);
+
+    const [passwordInput, confirmPasswordInput] = screen.getAllByPlaceholderText("••••••••");
+    expect(passwordInput).toHaveClass("password-toggle-input");
+    expect(confirmPasswordInput).toHaveClass("password-toggle-input");
+
+    fireEvent.click(screen.getByRole("button", { name: "Show password" }));
+    expect(passwordInput).toHaveAttribute("type", "text");
+    expect(confirmPasswordInput).toHaveAttribute("type", "password");
+
+    fireEvent.click(screen.getByRole("button", { name: "Show confirm password" }));
+    expect(confirmPasswordInput).toHaveAttribute("type", "text");
+  });
+
   it("shows a login message and does not authenticate when the phone is already registered", async () => {
     global.fetch
       .mockResolvedValueOnce({

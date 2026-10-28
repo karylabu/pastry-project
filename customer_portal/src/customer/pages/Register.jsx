@@ -906,7 +906,7 @@ export default function Register() {
                             setErrors((prev) => ({ ...prev, password: validatePassword(e.target.value) }));
                           }
                         }}
-                        className="register-input w-full bg-white pr-10 text-[#171717]"
+                        className="register-input password-toggle-input w-full bg-white pr-10 text-[#171717]"
                       />
                       <button
                         type="button"
@@ -936,12 +936,12 @@ export default function Register() {
                             setErrors((prev) => ({ ...prev, confirmPassword: validateConfirmPassword(e.target.value, password) }));
                           }
                         }}
-                        className="register-input w-full bg-white pr-10 text-[#171717]"
+                        className="register-input password-toggle-input w-full bg-white pr-10 text-[#171717]"
                       />
                       <button
                         type="button"
                         onClick={() => setShowConfirmPassword(value => !value)}
-                        aria-label={showConfirmPassword ? "Hide password" : "Show password"}
+                        aria-label={showConfirmPassword ? "Hide confirm password" : "Show confirm password"}
                         className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
                       >
                         {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}

@@ -11,7 +11,9 @@
 }
 
 input.admin-password-input::-ms-reveal,
-input.admin-password-input::-ms-clear {
+input.admin-password-input::-ms-clear,
+input.password-toggle-input::-ms-reveal,
+input.password-toggle-input::-ms-clear {
   display: none;
 }
 

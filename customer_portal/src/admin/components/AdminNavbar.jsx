@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import {
   BarChart2,
   Bell,
@@ -14,7 +14,6 @@ import {
   Menu as MenuIcon,
   MessageSquare,
   Package,
-  Search,
   Settings,
   Tag,
   TrendingUp,
@@ -89,11 +88,8 @@ function getStoredUser() {
 }
 
 export default function AdminNavbar({ onSidebarChange }) {
-  const location = useLocation();
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(() => window.matchMedia("(min-width: 1024px)").matches);
-  const [searchOpen, setSearchOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -103,7 +99,6 @@ export default function AdminNavbar({ onSidebarChange }) {
   const [currentUser, setCurrentUser] = useState(() => getStoredUser());
   const [currentDateTime, setCurrentDateTime] = useState(() => new Date());
   const [adminDialog, setAdminDialog] = useState(null);
-  const searchRef = useRef(null);
   const notificationsRef = useRef(null);
   const accountRef = useRef(null);
 
@@ -130,13 +125,7 @@ export default function AdminNavbar({ onSidebarChange }) {
   }, []);
 
   useEffect(() => {
-    const params = new URLSearchParams(location.search);
-    setSearchQuery(params.get("search") || "");
-  }, [location.search]);
-
-  useEffect(() => {
     const handleClickOutside = (event) => {
-      if (searchRef.current && !searchRef.current.contains(event.target)) setSearchOpen(false);
       if (notificationsRef.current && !notificationsRef.current.contains(event.target)) setNotificationsOpen(false);
       if (accountRef.current && !accountRef.current.contains(event.target)) setAccountOpen(false);
     };
@@ -231,13 +220,6 @@ export default function AdminNavbar({ onSidebarChange }) {
     if (notifFilter === "All") return ordered;
     return ordered.filter((n) => getNotificationCategory(n) === notifFilter);
   }, [notifications, notifFilter]);
-
-  const handleSearchSubmit = (event) => {
-    event.preventDefault();
-    const query = searchQuery.trim();
-    setSearchOpen(false);
-    navigate(`/admin/products${query ? `?search=${encodeURIComponent(query)}` : ""}`);
-  };
 
   const closeSidebarAfterNavigation = () => {
     if (!window.matchMedia("(min-width: 1024px)").matches) setSidebarOpen(false);
@@ -354,21 +336,6 @@ export default function AdminNavbar({ onSidebarChange }) {
           </div>
 
         <div className="flex shrink-0 items-center gap-1 sm:gap-2">
-          <div ref={searchRef} className="relative">
-            <button type="button" onClick={() => setSearchOpen((open) => !open)} aria-label="Search products" title="Search" className="flex h-10 w-10 items-center justify-center rounded-full text-[#765d50] transition hover:bg-[#fff8df] hover:text-[#33251e]">
-              <Search size={18} />
-            </button>
-            {searchOpen && (
-              <form onSubmit={handleSearchSubmit} className="absolute right-0 top-[48px] z-[10001] w-[min(320px,calc(100vw-2rem))] rounded-lg border border-[#eadfd8] bg-[#fffdfa] p-3 shadow-xl">
-                <label htmlFor="admin-navbar-search" className="mb-1.5 block text-[10px] font-semibold text-[#65574d]">Search products</label>
-                <div className="flex gap-2">
-                  <input id="admin-navbar-search" type="search" autoFocus value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} placeholder="Product name" className="h-10 min-w-0 flex-1 rounded-md border border-[#e8dfd4] px-3 text-[12px] text-[#33251e] outline-none focus:border-[#b89646] focus:ring-2 focus:ring-[#d4af37]/15" />
-                  <button type="submit" className="h-10 rounded-md bg-[#33251e] px-3 text-[11px] font-semibold text-white transition hover:bg-[#5b4540]">Search</button>
-                </div>
-              </form>
-            )}
-          </div>
-
           <div ref={notificationsRef} className="relative">
             <button type="button" onClick={() => { setNotificationsOpen((open) => !open); fetchNotifications(); }} aria-label={`Notifications${unreadCount ? `, ${unreadCount} unread` : ""}`} title="Notifications" className="relative flex h-10 w-10 items-center justify-center rounded-full text-[#765d50] transition hover:bg-[#fff8df] hover:text-[#33251e]">
               <Bell size={18} />
