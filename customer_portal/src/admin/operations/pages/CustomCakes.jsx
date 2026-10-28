@@ -6,6 +6,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 
 import { ROOT_BASE, STAFF_BASE, LARAVEL_BASE } from "../../../services/config";
 import { subscribeRealtime } from "../../../services/realtime";
+import "./operationsPages.css";
 
 const staffFetch = (url, options = {}) => fetch(url, { credentials: "include", ...options });
 const laravelStaffFetch = (url, options = {}) => {
@@ -778,12 +779,12 @@ export default function CustomCakes() {
   ]));
 
   return (
-    <div className="min-h-screen bg-[#f5f1e8]">
+    <div className="admin-operations-page min-h-screen">
       <Toast toasts={toasts} />
 
-      <div className="lg:pl-[260px] pt-[88px]">
+      <div className="admin-operations-content lg:pl-[260px] pt-[88px]">
         <div className="mx-auto max-w-[1500px] px-4 py-5 sm:px-6 md:px-8 lg:px-10 lg:py-7">
-          <div className="mb-5 flex flex-col gap-4 border-b border-[#e8dfd4] pb-5 lg:flex-row lg:items-end lg:justify-between">
+          <div className="admin-static-card admin-operations-header mb-5 flex flex-col gap-4 border-b border-[#e8dfd4] pb-5 lg:flex-row lg:items-end lg:justify-between">
             <div>
               <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.24em] text-[#92701e]">Order management</p>
               <h1 className="text-[26px] font-bold leading-tight text-[#33251e] sm:text-[30px]">Custom Cake Requests</h1>
@@ -823,16 +824,16 @@ export default function CustomCakes() {
             </div>
           </div>
 
-          <div className="mb-5 grid grid-cols-2 gap-2.5 lg:grid-cols-4 lg:gap-3">
+          <div className="admin-operations-metrics mb-5 grid grid-cols-2 gap-2.5 lg:grid-cols-4 lg:gap-3">
             {requestMetrics.map(({ label, value, icon: Icon, accent }) => (
-              <div key={label} style={{ borderTopColor: accent }} className="rounded-lg border border-t-[3px] border-[#e9e1d9] bg-white px-3.5 py-3 shadow-[0_3px_12px_rgba(60,42,28,0.035)] sm:px-4">
+              <div key={label} style={{ borderTopColor: accent }} className="admin-static-card rounded-lg border border-t-[3px] border-[#e9e1d9] bg-white px-3.5 py-3 shadow-[0_3px_12px_rgba(60,42,28,0.035)] sm:px-4">
                 <div className="flex items-center justify-between gap-2"><p className="text-[10px] font-semibold uppercase tracking-[0.13em] text-[#74675f]">{label}</p><Icon size={15} className="shrink-0 text-[#8f7750]" aria-hidden="true" /></div>
                 <p className="mt-2 text-[23px] font-bold leading-none text-[#33251e]">{value}</p>
               </div>
             ))}
           </div>
 
-          <div className="mb-4 rounded-lg border border-[#e9e1d9] bg-white p-3 shadow-[0_3px_12px_rgba(60,42,28,0.035)] sm:p-4">
+          <div className="admin-static-card admin-operations-controls mb-4 rounded-lg border border-[#e9e1d9] bg-white p-3 shadow-[0_3px_12px_rgba(60,42,28,0.035)] sm:p-4">
             <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#65574d]">Request status</p>
               <label className="relative block w-full sm:max-w-[340px]">

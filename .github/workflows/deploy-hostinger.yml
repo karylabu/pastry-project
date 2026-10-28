@@ -49,6 +49,42 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Classify deployment scope
+        id: deployment_scope
+        env:
+          BEFORE_SHA: ${{ github.event.before }}
+        run: |
+          set -eu
+          if [ "${{ github.event_name }}" != "push" ] || [ -z "$BEFORE_SHA" ] || [ "$BEFORE_SHA" = "0000000000000000000000000000000000000000" ]; then
+            echo "frontend_only=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          frontend_only=true
+          ui_files=0
+          while IFS= read -r changed_file; do
+            case "$changed_file" in
+              customer_portal/src/admin/operations/pages/Orders.jsx|customer_portal/src/admin/operations/pages/OrderHistory.jsx|customer_portal/src/admin/operations/pages/CustomCakes.jsx|customer_portal/src/admin/operations/pages/operationsPages.css)
+                ui_files=$((ui_files + 1))
+                ;;
+              .github/workflows/deploy-hostinger.yml)
+                ;;
+              *)
+                frontend_only=false
+                ;;
+            esac
+          done <<EOF
+          $(git diff --name-only "$BEFORE_SHA" "$GITHUB_SHA")
+          EOF
+
+          if [ "$ui_files" -eq 0 ]; then
+            frontend_only=false
+          fi
+          echo "frontend_only=$frontend_only" >> "$GITHUB_OUTPUT"
+          echo "Frontend-only deployment: $frontend_only"
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -74,6 +110,7 @@ jobs:
           npm run build
 
       - name: Set up PHP for Laravel dependencies
+        if: steps.deployment_scope.outputs.frontend_only != 'true'
         uses: shivammathur/setup-php@v2
         with:
           php-version: "8.3"
@@ -82,10 +119,12 @@ jobs:
           coverage: none
 
       - name: Install Laravel production dependencies
+        if: steps.deployment_scope.outputs.frontend_only != 'true'
         working-directory: laravel
         run: composer install --no-dev --prefer-dist --optimize-autoloader --no-interaction
 
       - name: Configure SSH
+        if: steps.deployment_scope.outputs.frontend_only != 'true'
         run: |
           set -eu
           : "${SSH_HOST:?Missing HOSTINGER_SSH_HOST secret}"
@@ -116,6 +155,7 @@ jobs:
           fi
 
       - name: Verify Hostinger deployment tools
+        if: steps.deployment_scope.outputs.frontend_only != 'true'
         run: |
           set -eu
           attempt=1
@@ -135,6 +175,7 @@ jobs:
           done
 
       - name: Deploy Laravel application
+        if: steps.deployment_scope.outputs.frontend_only != 'true'
         run: |
           set -eu
           ssh -i ~/.ssh/id_ed25519 -p "$SSH_PORT" -o IdentitiesOnly=yes -o BatchMode=yes -o ConnectTimeout=20 -o ConnectionAttempts=3 "$SSH_USERNAME@$SSH_HOST" \
@@ -154,6 +195,7 @@ jobs:
             "$SSH_USERNAME@$SSH_HOST:$REMOTE_ROOT/laravel/"
 
       - name: Deploy order status notification handler
+        if: steps.deployment_scope.outputs.frontend_only != 'true'
         run: |
           set -eu
           ssh -i ~/.ssh/id_ed25519 -p "$SSH_PORT" -o IdentitiesOnly=yes -o BatchMode=yes -o ConnectTimeout=20 -o ConnectionAttempts=3 "$SSH_USERNAME@$SSH_HOST" \
@@ -164,6 +206,7 @@ jobs:
             "$SSH_USERNAME@$SSH_HOST:$REMOTE_ROOT/staff/api_update_order_status.php"
 
       - name: Deploy staff access rules and remove legacy SMS log
+        if: steps.deployment_scope.outputs.frontend_only != 'true'
         run: |
           set -eu
           scp -i ~/.ssh/id_ed25519 -P "$SSH_PORT" -o IdentitiesOnly=yes -o BatchMode=yes -o ConnectTimeout=20 -o ConnectionAttempts=3 \
@@ -173,6 +216,7 @@ jobs:
             "rm -f '$REMOTE_ROOT/staff/sms_log.txt'"
 
       - name: Deploy custom cake quote handler
+        if: steps.deployment_scope.outputs.frontend_only != 'true'
         run: |
           set -eu
           ssh -i ~/.ssh/id_ed25519 -p "$SSH_PORT" -o IdentitiesOnly=yes -o BatchMode=yes -o ConnectTimeout=20 -o ConnectionAttempts=3 "$SSH_USERNAME@$SSH_HOST" \
@@ -183,6 +227,7 @@ jobs:
             "$SSH_USERNAME@$SSH_HOST:$REMOTE_ROOT/staff/api_orders.php"
 
       - name: Deploy product stock history handler
+        if: steps.deployment_scope.outputs.frontend_only != 'true'
         run: |
           set -eu
           ssh -i ~/.ssh/id_ed25519 -p "$SSH_PORT" -o IdentitiesOnly=yes -o BatchMode=yes -o ConnectTimeout=20 -o ConnectionAttempts=3 "$SSH_USERNAME@$SSH_HOST" \
@@ -193,6 +238,7 @@ jobs:
             "$SSH_USERNAME@$SSH_HOST:$REMOTE_ROOT/staff/api_product_stock_history.php"
 
       - name: Deploy business analytics handler
+        if: steps.deployment_scope.outputs.frontend_only != 'true'
         run: |
           set -eu
           ssh -i ~/.ssh/id_ed25519 -p "$SSH_PORT" -o IdentitiesOnly=yes -o BatchMode=yes -o ConnectTimeout=20 -o ConnectionAttempts=3 "$SSH_USERNAME@$SSH_HOST" \
@@ -203,6 +249,7 @@ jobs:
             "$SSH_USERNAME@$SSH_HOST:$REMOTE_ROOT/staff/api_business_analytics.php"
 
       - name: Deploy predictive analytics handler
+        if: steps.deployment_scope.outputs.frontend_only != 'true'
         run: |
           set -eu
           ssh -i ~/.ssh/id_ed25519 -p "$SSH_PORT" -o IdentitiesOnly=yes -o BatchMode=yes -o ConnectTimeout=20 -o ConnectionAttempts=3 "$SSH_USERNAME@$SSH_HOST" \
@@ -213,6 +260,7 @@ jobs:
             "$SSH_USERNAME@$SSH_HOST:$REMOTE_ROOT/admin/api/api_predictive_analytics.php"
 
       - name: Deploy legacy database and authentication helpers
+        if: steps.deployment_scope.outputs.frontend_only != 'true'
         run: |
           set -eu
           ssh -i ~/.ssh/id_ed25519 -p "$SSH_PORT" -o IdentitiesOnly=yes -o BatchMode=yes -o ConnectTimeout=20 -o ConnectionAttempts=3 "$SSH_USERNAME@$SSH_HOST" \
@@ -223,6 +271,7 @@ jobs:
             "$SSH_USERNAME@$SSH_HOST:$REMOTE_ROOT/includes/"
 
       - name: Deploy waste logging handler
+        if: steps.deployment_scope.outputs.frontend_only != 'true'
         run: |
           set -eu
           ssh -i ~/.ssh/id_ed25519 -p "$SSH_PORT" -o IdentitiesOnly=yes -o BatchMode=yes -o ConnectTimeout=20 -o ConnectionAttempts=3 "$SSH_USERNAME@$SSH_HOST" \
@@ -233,6 +282,7 @@ jobs:
             "$SSH_USERNAME@$SSH_HOST:$REMOTE_ROOT/staff/api_waste_log.php"
 
       - name: Deploy customer order handlers
+        if: steps.deployment_scope.outputs.frontend_only != 'true'
         run: |
           set -eu
           ssh -i ~/.ssh/id_ed25519 -p "$SSH_PORT" -o IdentitiesOnly=yes -o BatchMode=yes -o ConnectTimeout=20 -o ConnectionAttempts=3 "$SSH_USERNAME@$SSH_HOST" \
@@ -257,6 +307,7 @@ jobs:
             "$SSH_USERNAME@$SSH_HOST:$REMOTE_ROOT/qr-ph-logo.svg"
 
       - name: Deploy About Us image
+        if: steps.deployment_scope.outputs.frontend_only != 'true'
         run: |
           set -eu
           ssh -i ~/.ssh/id_ed25519 -p "$SSH_PORT" -o IdentitiesOnly=yes -o BatchMode=yes -o ConnectTimeout=20 -o ConnectionAttempts=3 "$SSH_USERNAME@$SSH_HOST" \
@@ -267,6 +318,7 @@ jobs:
             "$SSH_USERNAME@$SSH_HOST:$REMOTE_ROOT/uploads/"
 
       - name: Deploy login cake image
+        if: steps.deployment_scope.outputs.frontend_only != 'true'
         run: |
           set -eu
           ssh -i ~/.ssh/id_ed25519 -p "$SSH_PORT" -o IdentitiesOnly=yes -o BatchMode=yes -o ConnectTimeout=20 -o ConnectionAttempts=3 "$SSH_USERNAME@$SSH_HOST" \
@@ -277,6 +329,7 @@ jobs:
             "$SSH_USERNAME@$SSH_HOST:$REMOTE_ROOT/uploads/"
 
       - name: Deploy root rewrite rules
+        if: steps.deployment_scope.outputs.frontend_only != 'true'
         run: |
           set -eu
           scp -i ~/.ssh/id_ed25519 -P "$SSH_PORT" -o IdentitiesOnly=yes -o BatchMode=yes -o ConnectTimeout=20 -o ConnectionAttempts=3 \
@@ -284,6 +337,7 @@ jobs:
             "$SSH_USERNAME@$SSH_HOST:$REMOTE_ROOT/.htaccess"
 
       - name: Apply application migrations and refresh config cache
+        if: steps.deployment_scope.outputs.frontend_only != 'true'
         run: |
           set -eu
           ssh -i ~/.ssh/id_ed25519 -p "$SSH_PORT" -o IdentitiesOnly=yes -o BatchMode=yes -o ConnectTimeout=20 -o ConnectionAttempts=3 "$SSH_USERNAME@$SSH_HOST" \

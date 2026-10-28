@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Archive, Ban, CheckCircle2, CircleDollarSign, Download, Eye, Search, X } from "lucide-react";
 import { LARAVEL_BASE } from "../../../services/config";
 import { getAuthHeaders } from "../../../services/api";
+import "./operationsPages.css";
 
 const laravelStaffFetch = (url, options = {}) => {
   let token = "";
@@ -346,10 +347,10 @@ export default function OrderHistory() {
   };
 
   return (
-    <div className="min-h-screen bg-white">
-      <div className="lg:pl-[260px] pt-[88px]">
-        <div className="mx-auto max-w-[1400px] px-4 py-5 sm:px-6 md:px-8 lg:px-10 lg:py-7">
-        <div className="mb-5 flex flex-col gap-4 border-b border-[#e8dfd4] pb-5 sm:flex-row sm:items-end sm:justify-between">
+    <div className="admin-operations-page min-h-screen">
+      <div className="admin-operations-content lg:pl-[260px] pt-[88px]">
+        <div className="mx-auto max-w-[1500px] px-4 py-5 sm:px-6 md:px-8 lg:px-10 lg:py-7">
+        <div className="admin-static-card admin-operations-header mb-5 flex flex-col gap-4 border-b border-[#e8dfd4] pb-5 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.24em] text-[#92701e]">Order management</p>
             <h1 className="text-[26px] font-bold leading-tight text-[#33251e] sm:text-[30px]">Order History</h1>
@@ -361,14 +362,14 @@ export default function OrderHistory() {
           </div>
         </div>
 
-        <div className="mb-5 grid grid-cols-2 gap-2.5 lg:grid-cols-4 lg:gap-3">
+        <div className="admin-operations-metrics mb-5 grid grid-cols-2 gap-2.5 lg:grid-cols-4 lg:gap-3">
           {[
             { label: "Completed / received", value: summaryMetrics.completedCount, icon: CheckCircle2, accent: "#81906c" },
             { label: `Revenue · ${timeRange}`, value: formatCurrency(summaryMetrics.totalRevenue), icon: CircleDollarSign, accent: "#d4af37" },
             { label: "Cancelled", value: summaryMetrics.cancelledCount, icon: Ban, accent: "#c87954" },
             { label: "Cancellation rate", value: `${summaryMetrics.cancellationRate.toFixed(1)}%`, icon: X, accent: "#c9a94f" },
           ].map(({ label, value, icon: Icon, accent }) => (
-            <div key={label} style={{ borderTopColor: accent }} className="rounded-lg border border-t-[3px] border-[#e9e1d9] bg-white px-3.5 py-3 shadow-[0_3px_12px_rgba(60,42,28,0.035)] sm:px-4">
+            <div key={label} style={{ borderTopColor: accent }} className="admin-static-card rounded-lg border border-t-[3px] border-[#e9e1d9] bg-white px-3.5 py-3 shadow-[0_3px_12px_rgba(60,42,28,0.035)] sm:px-4">
               <div className="flex items-center justify-between gap-2">
                 <p className="text-[10px] font-semibold uppercase tracking-[0.13em] text-[#74675f]">{label}</p>
                 <Icon size={15} className="shrink-0 text-[#8f7750]" aria-hidden="true" />
@@ -378,7 +379,7 @@ export default function OrderHistory() {
           ))}
         </div>
 
-        <div className="mb-4 rounded-lg border border-[#e9e1d9] bg-white p-3 shadow-[0_3px_12px_rgba(60,42,28,0.035)] sm:p-4">
+        <div className="admin-static-card admin-operations-controls mb-4 rounded-lg border border-[#e9e1d9] bg-white p-3 shadow-[0_3px_12px_rgba(60,42,28,0.035)] sm:p-4">
           <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-[minmax(240px,1.4fr)_minmax(170px,1fr)_minmax(170px,1fr)]">
             <label className="relative block">
               <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#9b8c83]" aria-hidden="true" />

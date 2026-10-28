@@ -1,0 +1,45 @@
+.admin-operations-page {
+  min-height: 100vh;
+  background: #f7f5f0;
+  color: #33251e;
+}
+
+.admin-operations-page .admin-operations-content {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 1500px;
+}
+
+.admin-operations-page .admin-operations-header {
+  border: 1px solid #e8dfd4;
+  border-left: 4px solid #c9a94f;
+  border-radius: 14px;
+  background: linear-gradient(115deg, #fffdfa 0%, #fff 72%);
+  box-shadow: 0 4px 16px rgba(60, 42, 28, 0.045);
+  padding: 1rem 1.125rem;
+}
+
+.admin-operations-page .admin-operations-metrics > * {
+  border-radius: 12px;
+  box-shadow: 0 3px 12px rgba(60, 42, 28, 0.045);
+}
+
+.admin-operations-page .admin-operations-metrics > button {
+  cursor: pointer;
+}
+
+.admin-operations-page .admin-operations-metrics > button:focus-visible {
+  outline: 2px solid #b89646;
+  outline-offset: 2px;
+}
+
+.admin-operations-page .admin-operations-controls {
+  border-radius: 12px;
+  box-shadow: 0 3px 12px rgba(60, 42, 28, 0.045);
+}
+
+@media (max-width: 639px) {
+  .admin-operations-page .admin-operations-header {
+    padding: 0.875rem;
+  }
+}
