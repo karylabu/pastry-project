@@ -470,6 +470,8 @@ describe('Products admin catalog', () => {
     expect(screen.getByText('Out of Stock').parentElement).toHaveTextContent('0');
     expect(screen.getByText("Today's Production").parentElement).toHaveTextContent('0');
     expect(screen.getByText("Today's Waste").parentElement).toHaveTextContent('0');
+    expect(lowStockCard).toHaveClass('border-t-[3px]');
+    expect(lowStockCard).toHaveStyle({ borderTopColor: '#c87954' });
     expect(global.fetch).toHaveBeenCalledWith(
       expect.stringContaining('/api/admin/stock/summary'),
       expect.objectContaining({ credentials: 'include' }),

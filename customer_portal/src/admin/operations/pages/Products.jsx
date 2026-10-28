@@ -734,12 +734,12 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
 
         <div className="mb-6 grid grid-cols-2 gap-2.5 sm:grid-cols-4">
           {[
-            ["Low Stock", inventorySummary?.low_stock],
-            ["Out of Stock", inventorySummary?.out_of_stock],
-            ["Today's Production", inventorySummary?.today_production],
-            ["Today's Waste", inventorySummary?.today_waste],
-          ].map(([label, value]) => (
-            <div key={label} className="rounded-xl border border-[#eee4de] bg-white p-4 shadow-[0_5px_18px_rgba(91,64,39,0.04)]">
+            { label: "Low Stock", value: inventorySummary?.low_stock, accent: "#c87954" },
+            { label: "Out of Stock", value: inventorySummary?.out_of_stock, accent: "#c8785f" },
+            { label: "Today's Production", value: inventorySummary?.today_production, accent: "#c9a94f" },
+            { label: "Today's Waste", value: inventorySummary?.today_waste, accent: "#81906c" },
+          ].map(({ label, value, accent }) => (
+            <div key={label} style={{ borderTopColor: accent }} className="rounded-xl border border-t-[3px] border-[#eee4de] bg-white p-4 shadow-[0_5px_18px_rgba(91,64,39,0.04)]">
               <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#9b8c83]">{label}</p>
               <p className="mt-2 text-[23px] font-bold leading-none text-[#33251e]">{inventorySummary ? value : "—"}</p>
             </div>
