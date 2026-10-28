@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useLocation } from "react-router-dom";
-import { AlertTriangle, CalendarDays, ChevronRight, CircleAlert, History, Package, PackagePlus, Pencil, Plus, Search, X } from "lucide-react";
+import { AlertTriangle, CalendarDays, Check, ChevronRight, CircleAlert, History, Package, PackagePlus, Pencil, Plus, Search, X } from "lucide-react";
 import { LARAVEL_BASE, STAFF_BASE } from "../../../services/config";
 
 const staffFetch = (url, options = {}) => fetch(url, { credentials: "include", ...options });
@@ -529,7 +529,13 @@ export default function Ingredients({
               >
                 <span className="flex items-center justify-between">
                   <span className={`flex h-8 w-8 items-center justify-center rounded-full ${stat.iconTone}`}><Icon size={16} /></span>
-                  <ChevronRight size={15} className="text-[#d1bfae] transition group-hover:translate-x-0.5 group-hover:text-[#a57c38]" />
+                  {isActive ? (
+                    <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#edf5eb] text-[#4f7654]" aria-label="Selected filter">
+                      <Check size={14} strokeWidth={2.5} />
+                    </span>
+                  ) : (
+                    <ChevronRight size={15} className="text-[#d1bfae] transition group-hover:translate-x-0.5 group-hover:text-[#a57c38]" />
+                  )}
                 </span>
                 <span className="mt-2 block text-[11px] font-semibold text-[#5d4a42]">{stat.label}</span>
                 <span className="mt-0.5 block text-[23px] font-bold leading-none text-[#33251e]">{stat.value}</span>
