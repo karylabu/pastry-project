@@ -15,17 +15,56 @@ import { LARAVEL_BASE, ROOT_BASE } from "../../services/config";
 import { getAuthHeaders } from "../../services/api";
 
 // ---------------------------------------------------------------------------
-// Shared card shell — every card uses this so padding, header height and
-// stretching behaviour are identical across rows.
+// Design tokens — one radius, one border, one spacing rhythm for the whole page.
 // ---------------------------------------------------------------------------
 
-function Card({ eyebrow, title, action, children, className = "", stretch = true }) {
+const PAGE_SIZE = 5;
+const ROW_HEIGHT = "h-14"; // every paginated row uses this so cards keep the same height
+
+const PRIORITY_LABEL = { High: "Prepare first", Medium: "Plan ahead", Low: "Stock is enough" };
+const PRIORITY_TONE = { High: "bad", Medium: "warn", Low: "good" };
+
+const CHIP_TONES = {
+  neutral: "bg-[#f4efe6] text-[#5b4a3f]",
+  good: "bg-[#e4f0e8] text-[#2c6244]",
+  warn: "bg-[#f7f0dc] text-[#8b6a12]",
+  bad: "bg-[#f7e6e2] text-[#a1402f]",
+};
+
+const FIELD_CLASS =
+  "h-10 w-full rounded-lg border border-[#e0d6c8] bg-white px-3 text-sm text-[#33251e] focus:outline-none focus:ring-2 focus:ring-[#d4af37]/40 disabled:opacity-50";
+const BUTTON_PRIMARY =
+  "inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-[#33251e] px-4 text-sm font-semibold text-white transition hover:bg-[#5b4540] disabled:cursor-not-allowed disabled:opacity-50";
+const BUTTON_GHOST =
+  "inline-flex h-9 items-center gap-1 rounded-lg border border-[#e0d6c8] bg-white px-3 text-xs font-semibold text-[#33251e] transition hover:bg-[#faf8f3] disabled:cursor-not-allowed disabled:opacity-40";
+
+const riskTone = (status) => {
+  const value = String(status || "").toLowerCase();
+  if (/(critical|high|short|out|risk)/.test(value)) return "bad";
+  if (/(watch|medium|low|warn)/.test(value)) return "warn";
+  if (/(ok|safe|healthy|enough|sufficient)/.test(value)) return "good";
+  return "neutral";
+};
+
+// ---------------------------------------------------------------------------
+// Shared building blocks
+// ---------------------------------------------------------------------------
+
+function Chip({ tone = "neutral", children }) {
   return (
-    <section className={`flex ${stretch ? "h-full" : "h-fit"} min-w-0 flex-col rounded-[24px] border border-black/10 bg-white p-5 shadow-sm ${className}`}>
-      <header className="mb-4 flex min-h-[52px] items-start justify-between gap-3">
-        <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.25em] text-black/50">{eyebrow}</p>
-          <h2 className="text-lg font-semibold leading-snug text-black">{title}</h2>
+    <span className={`inline-flex shrink-0 items-center whitespace-nowrap rounded-full px-2.5 py-1 text-[11px] font-semibold ${CHIP_TONES[tone]}`}>
+      {children}
+    </span>
+  );
+}
+
+function Card({ title, description, action, children, className = "" }) {
+  return (
+    <section className={`flex h-full min-w-0 flex-col rounded-2xl border border-[#e8dfd4] bg-white p-5 ${className}`}>
+      <header className="mb-4 flex min-h-[44px] items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h3 className="text-base font-semibold leading-snug text-[#33251e]">{title}</h3>
+          {description && <p className="mt-0.5 text-xs leading-5 text-[#74675f]">{description}</p>}
         </div>
         {action}
       </header>
@@ -34,9 +73,124 @@ function Card({ eyebrow, title, action, children, className = "", stretch = true
   );
 }
 
+function Section({ title, description, children }) {
+  return (
+    <section className="mb-10">
+      <div className="mb-4">
+        <h2 className="text-lg font-bold text-[#33251e]">{title}</h2>
+        {description && <p className="mt-0.5 text-sm text-[#74675f]">{description}</p>}
+      </div>
+      <div className="space-y-4">{children}</div>
+    </section>
+  );
+}
+
+function StatTile({ label, value, note, valueClass = "text-[#33251e]" }) {
+  return (
+    <div className="flex h-full min-h-[108px] min-w-0 flex-col rounded-2xl border border-[#e8dfd4] bg-white p-4">
+      <p className="text-xs font-medium text-[#74675f]">{label}</p>
+      <p className={`mt-2 text-2xl font-bold tabular-nums ${valueClass}`}>{value}</p>
+      <p className="mt-auto pt-2 text-[11px] leading-4 text-[#74675f]">{note}</p>
+    </div>
+  );
+}
+
+function EmptyState({ children, className = "" }) {
+  return (
+    <div className={`flex flex-1 items-center justify-center rounded-xl border border-dashed border-[#e0d6c8] bg-[#faf8f3] px-4 py-6 text-center text-sm text-[#74675f] ${className}`}>
+      {children}
+    </div>
+  );
+}
+
+function Segmented({ options, value, onChange, label }) {
+  return (
+    <div className="inline-flex h-10 items-center rounded-lg border border-[#e0d6c8] bg-white p-1" role="group" aria-label={label}>
+      {options.map((option) => (
+        <button
+          key={option.value}
+          type="button"
+          aria-pressed={value === option.value}
+          onClick={() => onChange(option.value)}
+          className={`h-8 rounded-md px-3 text-xs font-semibold transition-colors ${
+            value === option.value ? "bg-[#33251e] text-white" : "text-[#74675f] hover:bg-[#f4efe6]"
+          }`}
+        >
+          {option.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// Renders exactly PAGE_SIZE rows (padding with blanks) so paired cards never change height.
+function PagedRows({ items, page, emptyText, renderRow, rowClass = ROW_HEIGHT }) {
+  const start = (page - 1) * PAGE_SIZE;
+  const slice = items.slice(start, start + PAGE_SIZE);
+  if (!items.length) {
+    return <EmptyState className="min-h-[280px]">{emptyText}</EmptyState>;
+  }
+  return (
+    <div className="flex-1">
+      {slice.map((item, index) => (
+        <div key={index} className={`flex items-center gap-3 border-b border-[#f0ebe1] ${rowClass}`}>
+          {renderRow(item, start + index)}
+        </div>
+      ))}
+      {Array.from({ length: PAGE_SIZE - slice.length }, (_, index) => (
+        <div key={`pad-${index}`} className={rowClass} aria-hidden="true" />
+      ))}
+    </div>
+  );
+}
+
+function CardFooter({ children, text }) {
+  return (
+    <div className="mt-auto pt-4">
+      <div className="flex min-h-[53px] flex-wrap items-center justify-between gap-3 border-t border-[#f0ebe1] pt-4">
+        <span className="text-xs text-[#74675f]">{text}</span>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function Pagination({ page, pageCount, total, onPageChange, label }) {
+  const from = total ? (page - 1) * PAGE_SIZE + 1 : 0;
+  const to = Math.min(page * PAGE_SIZE, total);
+  return (
+    <CardFooter text={`Showing ${from}-${to} of ${total} ${label}`}>
+      <div className="flex items-center gap-2">
+        <span className="mr-1 text-xs text-[#74675f]">
+          Page {page} of {pageCount}
+        </span>
+        <button
+          type="button"
+          onClick={() => onPageChange((current) => Math.max(1, current - 1))}
+          disabled={page <= 1}
+          aria-label={`Previous ${label} page`}
+          className={BUTTON_GHOST}
+        >
+          <ChevronLeft size={14} />
+          Previous
+        </button>
+        <button
+          type="button"
+          onClick={() => onPageChange((current) => Math.min(pageCount, current + 1))}
+          disabled={page >= pageCount}
+          aria-label={`Next ${label} page`}
+          className={BUTTON_GHOST}
+        >
+          Next
+          <ChevronRight size={14} />
+        </button>
+      </div>
+    </CardFooter>
+  );
+}
+
 // ---------------------------------------------------------------------------
-// Forecast chart — historical actuals rendered as a solid area, forecast
-// rendered as a dashed projection, with a hoverable readout of exact values.
+// Forecast chart — solid area for actuals, dashed projection for forecast.
 // ---------------------------------------------------------------------------
 
 const CHART_WIDTH = 720;
@@ -52,9 +206,239 @@ function niceMax(value) {
   return step * magnitude;
 }
 
+function ForecastChart({ historical, forecast }) {
+  const [activeIndex, setActiveIndex] = useState(null);
+
+  const values = [...historical, ...forecast];
+  const innerWidth = CHART_WIDTH - CHART_PADDING.left - CHART_PADDING.right;
+  const innerHeight = CHART_HEIGHT - CHART_PADDING.top - CHART_PADDING.bottom;
+  const yMax = niceMax(Math.max(...values, 1) * 1.15);
+  const gridSteps = 4;
+
+  const xForIndex = (index) => CHART_PADDING.left + index * (innerWidth / Math.max(values.length - 1, 1));
+  const yForValue = (value) => CHART_PADDING.top + innerHeight - (value / yMax) * innerHeight;
+
+  const historicalPoints = historical.map((value, index) => [xForIndex(index), yForValue(value)]);
+  const forecastPoints = forecast.map((value, index) => [xForIndex(historical.length + index), yForValue(value)]);
+  const forecastPathPoints = historicalPoints.length
+    ? [historicalPoints[historicalPoints.length - 1], ...forecastPoints]
+    : forecastPoints;
+
+  const toPath = (points) => points.map((p) => p.join(",")).join(" L ");
+  const baseline = CHART_PADDING.top + innerHeight;
+
+  const historicalLine = historicalPoints.length ? `M ${toPath(historicalPoints)}` : "";
+  const historicalArea = historicalPoints.length
+    ? `M ${historicalPoints[0][0]},${baseline} L ${toPath(historicalPoints)} L ${historicalPoints[historicalPoints.length - 1][0]},${baseline} Z`
+    : "";
+  const forecastLine = forecastPathPoints.length ? `M ${toPath(forecastPathPoints)}` : "";
+  const forecastArea = forecastPathPoints.length
+    ? `M ${forecastPathPoints[0][0]},${baseline} L ${toPath(forecastPathPoints)} L ${forecastPathPoints[forecastPathPoints.length - 1][0]},${baseline} Z`
+    : "";
+
+  const allPoints = [...historicalPoints, ...forecastPoints];
+  const labels = values.map((_, index) =>
+    index < historical.length ? `D-${historical.length - index}` : `D+${index - historical.length + 1}`
+  );
+  const dividerX = historical.length > 0 && forecast.length > 0 ? xForIndex(historical.length - 1) : null;
+
+  if (!values.length || !allPoints.length) return null;
+
+  const active = activeIndex != null ? allPoints[activeIndex] : null;
+  const activeIsForecast = activeIndex != null && activeIndex >= historical.length;
+  const labelStride = values.length > 10 ? Math.ceil(values.length / 8) : 1;
+
+  return (
+    <div className="flex flex-1 flex-col">
+      <svg
+        viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`}
+        className="h-64 w-full overflow-visible"
+        onMouseLeave={() => setActiveIndex(null)}
+      >
+        <defs>
+          <linearGradient id="pa-historical-fill" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#33251e" stopOpacity="0.14" />
+            <stop offset="100%" stopColor="#33251e" stopOpacity="0" />
+          </linearGradient>
+          <linearGradient id="pa-forecast-fill" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#D4AF37" stopOpacity="0.26" />
+            <stop offset="100%" stopColor="#D4AF37" stopOpacity="0" />
+          </linearGradient>
+        </defs>
+
+        {Array.from({ length: gridSteps + 1 }, (_, step) => {
+          const value = (yMax / gridSteps) * step;
+          const y = yForValue(value);
+          return (
+            <g key={step}>
+              <line x1={CHART_PADDING.left} y1={y} x2={CHART_WIDTH - CHART_PADDING.right} y2={y} stroke="#f0ebe1" strokeWidth="1" />
+              <text x={CHART_PADDING.left - 8} y={y + 3} textAnchor="end" fontSize="9" fill="#9a8f86">
+                {Math.round(value)}
+              </text>
+            </g>
+          );
+        })}
+
+        {dividerX != null && (
+          <line x1={dividerX} y1={CHART_PADDING.top} x2={dividerX} y2={baseline} stroke="#c9bfb3" strokeDasharray="2 3" strokeWidth="1" />
+        )}
+
+        {historicalArea && <path d={historicalArea} fill="url(#pa-historical-fill)" />}
+        {forecastArea && <path d={forecastArea} fill="url(#pa-forecast-fill)" />}
+        {historicalLine && <path d={historicalLine} fill="none" stroke="#33251e" strokeWidth="2.5" strokeLinejoin="round" />}
+        {forecastLine && (
+          <path d={forecastLine} fill="none" stroke="#B4901F" strokeWidth="2.5" strokeDasharray="5 4" strokeLinejoin="round" />
+        )}
+
+        {allPoints.map(([x, y], index) => (
+          <circle
+            key={index}
+            cx={x}
+            cy={y}
+            r={activeIndex === index ? 5 : 3}
+            fill={index < historical.length ? "#33251e" : "#B4901F"}
+            stroke="#fff"
+            strokeWidth={activeIndex === index ? 1.5 : 0}
+          />
+        ))}
+
+        {active && (
+          <line x1={active[0]} y1={CHART_PADDING.top} x2={active[0]} y2={baseline} stroke="#33251e" strokeOpacity="0.15" strokeWidth="1" />
+        )}
+
+        {allPoints.map(([x], index) => (
+          <rect
+            key={`hit-${index}`}
+            x={x - innerWidth / Math.max(values.length - 1, 1) / 2}
+            y={CHART_PADDING.top}
+            width={innerWidth / Math.max(values.length - 1, 1)}
+            height={innerHeight}
+            fill="transparent"
+            onMouseEnter={() => setActiveIndex(index)}
+          />
+        ))}
+
+        {labels.map((label, index) =>
+          index % labelStride === 0 ? (
+            <text key={label + index} x={xForIndex(index)} y={CHART_HEIGHT - 8} textAnchor="middle" fontSize="9" fill="#9a8f86">
+              {label}
+            </text>
+          ) : null
+        )}
+      </svg>
+
+      <div className="mt-auto pt-3">
+        <div className="flex h-10 items-center justify-between rounded-xl bg-[#faf8f3] px-3">
+          {active ? (
+            <>
+              <span className="text-xs font-medium text-[#74675f]">{labels[activeIndex]}</span>
+              <span className={`text-sm font-semibold ${activeIsForecast ? "text-[#8b6a12]" : "text-[#33251e]"}`}>
+                {values[activeIndex]} units{activeIsForecast ? " (forecast)" : ""}
+              </span>
+            </>
+          ) : (
+            <span className="text-xs text-[#9a8f86]">Hover the chart for exact daily values</span>
+          )}
+        </div>
+        <div className="mt-3 flex items-center justify-between text-[11px] text-[#74675f]">
+          <span className="inline-flex items-center gap-1.5">
+            <span className="h-1.5 w-3 rounded-full bg-[#33251e]" /> Historical actual
+          </span>
+          <span className="inline-flex items-center gap-1.5 text-[#8b6a12]">
+            <span className="h-1.5 w-3 rounded-full border border-dashed border-[#B4901F]" /> Forecast D+1 to D+{forecast.length}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ---------------------------------------------------------------------------
-// Validation metrics — KPI tiles + method comparison with a predict-zero
-// reference line, a "Best" badge and a plain-language verdict.
+// Per-method comparison chart
+// ---------------------------------------------------------------------------
+
+const COMPARISON_METHODS = [
+  { key: "linear", label: "Linear Trend", color: "#b4901f" },
+  { key: "moving_average_7", label: "7-Day Moving Average", color: "#6b8f71" },
+  { key: "same_weekday_last_week", label: "Same Weekday Last Week", color: "#81906c" },
+  { key: "yesterday", label: "Yesterday / Last Known Day", color: "#718096" },
+];
+
+function MethodForecastChart({ product, method, period }) {
+  const actual = product?.comparison?.actual || [];
+  const forecast = product?.comparison?.methods?.[method.key] || [];
+  const values = [...actual.map((point) => Number(point.quantity) || 0), ...forecast.map((value) => Number(value) || 0)];
+  const width = 460;
+  const height = 190;
+  const padding = { top: 12, right: 12, bottom: 24, left: 34 };
+  const innerWidth = width - padding.left - padding.right;
+  const innerHeight = height - padding.top - padding.bottom;
+  const yMax = niceMax(Math.max(...values, 1) * 1.15);
+  const x = (index) => padding.left + index * (innerWidth / Math.max(values.length - 1, 1));
+  const y = (value) => padding.top + innerHeight - (value / yMax) * innerHeight;
+  const actualPoints = actual.map((point, index) => [x(index), y(Number(point.quantity) || 0)]);
+  const forecastPoints = forecast.map((value, index) => [x(actual.length + index), y(Number(value) || 0)]);
+  const forecastPath = actualPoints.length ? [actualPoints[actualPoints.length - 1], ...forecastPoints] : forecastPoints;
+  const path = (points) => points.map((point) => point.join(",")).join(" L ");
+  const baseline = padding.top + innerHeight;
+  const actualLine = actualPoints.length ? `M ${path(actualPoints)}` : "";
+  const forecastLine = forecastPath.length ? `M ${path(forecastPath)}` : "";
+  const tickStride = Math.max(1, Math.ceil(values.length / 6));
+
+  return (
+    <article className="flex h-full min-w-0 flex-col rounded-xl border border-[#e8dfd4] bg-[#faf8f3] p-4">
+      <div className="mb-2 flex min-h-8 items-center justify-between gap-2">
+        <h4 className="text-sm font-semibold text-[#33251e]">{method.label}</h4>
+        <Chip>Next {period} days</Chip>
+      </div>
+      {actual.length && forecast.length ? (
+        <>
+          <svg viewBox={`0 0 ${width} ${height}`} className="h-[190px] w-full" role="img" aria-label={`${method.label} compared with actual daily sales for ${product.product}`}>
+            {Array.from({ length: 4 }, (_, index) => {
+              const value = (yMax / 3) * index;
+              const gridY = y(value);
+              return (
+                <g key={index}>
+                  <line x1={padding.left} y1={gridY} x2={width - padding.right} y2={gridY} stroke="#ebe4d8" />
+                  <text x={padding.left - 5} y={gridY + 3} textAnchor="end" fontSize="8" fill="#9a8f86">{Math.round(value)}</text>
+                </g>
+              );
+            })}
+            <line x1={x(actual.length - 1)} y1={padding.top} x2={x(actual.length - 1)} y2={baseline} stroke="#c9bfb3" strokeDasharray="3 3" />
+            {actualLine && <path d={actualLine} fill="none" stroke="#33251e" strokeWidth="2.25" strokeLinejoin="round" />}
+            {forecastLine && <path d={forecastLine} fill="none" stroke={method.color} strokeWidth="2.5" strokeDasharray="5 4" strokeLinejoin="round" />}
+            {actualPoints.map(([cx, cy], index) => (
+              <circle key={`actual-${index}`} cx={cx} cy={cy} r="2.5" fill="#33251e">
+                <title>{`${actual[index].date}: ${Number(actual[index].quantity).toFixed(1)} actual units`}</title>
+              </circle>
+            ))}
+            {forecastPoints.map(([cx, cy], index) => (
+              <circle key={`forecast-${index}`} cx={cx} cy={cy} r="2.5" fill={method.color}>
+                <title>{`Day ${index + 1} forecast: ${Number(forecast[index]).toFixed(1)} units`}</title>
+              </circle>
+            ))}
+            {values.map((_, index) =>
+              index % tickStride === 0 || index === values.length - 1 ? (
+                <text key={`tick-${index}`} x={x(index)} y={height - 5} textAnchor="middle" fontSize="8" fill="#9a8f86">
+                  {index < actual.length ? actual[index]?.date?.slice(5) : `+${index - actual.length + 1}`}
+                </text>
+              ) : null
+            )}
+          </svg>
+          <div className="mt-auto flex flex-wrap items-center gap-x-4 gap-y-1 pt-2 text-[11px] text-[#74675f]">
+            <span className="inline-flex items-center gap-1.5"><span className="h-0.5 w-3 bg-[#33251e]" />Actual sales</span>
+            <span className="inline-flex items-center gap-1.5"><span className="w-3 border-t-2 border-dashed" style={{ borderColor: method.color }} />{method.label}</span>
+          </div>
+        </>
+      ) : (
+        <EmptyState className="min-h-[190px] bg-white">No continuous actual-sales history is available for this product.</EmptyState>
+      )}
+    </article>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Validation metrics
 // ---------------------------------------------------------------------------
 
 const METRIC_OPTIONS = {
@@ -76,13 +460,6 @@ const FORECAST_METHOD_LABELS = Object.fromEntries(
   VALIDATION_METHODS.filter((method) => method.key !== "zero").map(({ key, label }) => [key, label])
 );
 
-const COMPARISON_METHODS = [
-  { key: "linear", label: "Linear Trend", color: "#b4901f" },
-  { key: "moving_average_7", label: "7-Day Moving Average", color: "#6b8f71" },
-  { key: "same_weekday_last_week", label: "Same Weekday Last Week", color: "#81906c" },
-  { key: "yesterday", label: "Yesterday / Last Known Day", color: "#718096" },
-];
-
 const formatMetric = (value, suffix) =>
   value == null || !Number.isFinite(Number(value)) ? "—" : `${Number(value)}${suffix}`;
 
@@ -94,8 +471,7 @@ function ValidationMetrics({ model }) {
     model?.aggregate_validation_metrics && Object.keys(model.aggregate_validation_metrics).length
   );
   const activeScope = hasAggregate ? scope : "product";
-  const metrics =
-    (activeScope === "aggregate" ? model?.aggregate_validation_metrics : model?.validation_metrics) || {};
+  const metrics = (activeScope === "aggregate" ? model?.aggregate_validation_metrics : model?.validation_metrics) || {};
   const option = METRIC_OPTIONS[selected];
   const linearMetrics = metrics.linear || {};
   const forecastMethod = model?.selected_forecast_method || "linear";
@@ -116,9 +492,7 @@ function ValidationMetrics({ model }) {
   });
   const availableRows = rows.filter((row) => row.value != null);
   const maxValue = Math.max(...availableRows.map((row) => row.value), 0);
-  const best = availableRows.length
-    ? availableRows.reduce((winner, row) => (row.value < winner.value ? row : winner))
-    : null;
+  const best = availableRows.length ? availableRows.reduce((winner, row) => (row.value < winner.value ? row : winner)) : null;
   const zero = rows.find((row) => row.key === "zero");
   const zeroPosition = zero?.value != null && maxValue > 0 ? (zero.value / maxValue) * 100 : null;
   const selectedMethod = rows.find((row) => row.key === forecastMethod);
@@ -131,15 +505,10 @@ function ValidationMetrics({ model }) {
     ["WAPE", formatMetric(forecastMetrics.wape, "%")],
   ];
 
-  const scopeButtons = [
-    ["aggregate", "Shop total"],
-    ["product", "Per product"],
-  ];
-
   return (
-    <div className="flex flex-1 flex-col gap-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-xs text-black/55">
+    <div className="flex flex-1 flex-col gap-5">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="text-xs leading-5 text-[#74675f]">
           {model?.name || "—"} · {model?.records ?? 0} sales rows
           {model?.products_count != null ? ` · ${model.products_count} products in data` : ""}
           {model?.validation_products != null ? ` · ${model.validation_products} validated` : ""}
@@ -148,73 +517,59 @@ function ValidationMetrics({ model }) {
             : ""}
         </p>
         {hasAggregate && (
-          <div className="inline-flex rounded-lg border border-black/10 bg-white p-0.5" role="group" aria-label="Validation scope">
-            {scopeButtons.map(([key, label]) => (
-              <button
-                key={key}
-                type="button"
-                aria-pressed={activeScope === key}
-                onClick={() => setScope(key)}
-                className={`rounded-md px-2.5 py-1 text-[11px] font-semibold ${activeScope === key ? "bg-[#33251e] text-white" : "text-black/60 hover:bg-black/5"}`}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
+          <Segmented
+            label="Validation scope"
+            value={activeScope}
+            onChange={setScope}
+            options={[
+              { value: "aggregate", label: "Shop total" },
+              { value: "product", label: "Per product" },
+            ]}
+          />
         )}
       </div>
-      <p className="rounded-lg bg-[#f7f2e8] px-3 py-2 text-[11px] text-black/70">
-        Forecast uses <span className="font-semibold">{forecastMethodLabel}</span>, selected by shop-total WAPE
-        {model?.selected_forecast_method_wape != null
-          ? ` (${formatMetric(model.selected_forecast_method_wape, "%")} on the last 7-day holdout).`
-          : " when holdout data is available; linear trend is the fallback."}
-      </p>
-      {forecastMethodNote && (
-        <p className="text-[11px] text-black/55">{forecastMethodNote}</p>
-      )}
 
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+      <div className="rounded-xl bg-[#f7f2e8] px-4 py-3 text-xs leading-5 text-[#33251e]">
+        <p>
+          Forecast uses <span className="font-semibold">{forecastMethodLabel}</span>, selected by shop-total WAPE
+          {model?.selected_forecast_method_wape != null
+            ? ` (${formatMetric(model.selected_forecast_method_wape, "%")} on the last 7-day holdout).`
+            : " when holdout data is available; linear trend is the fallback."}
+        </p>
+        {forecastMethodNote && <p className="mt-1 text-[#74675f]">{forecastMethodNote}</p>}
+      </div>
+
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {tiles.map(([label, value]) => (
-          <div key={label} className="rounded-xl border border-black/10 bg-[#fafaf8] px-3 py-2.5">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-black/50">{label}</p>
-            <p className="mt-1 text-lg font-bold tabular-nums text-black">{value}</p>
+          <div key={label} className="rounded-xl border border-[#e8dfd4] bg-[#faf8f3] px-4 py-3">
+            <p className="text-xs font-medium text-[#74675f]">{label}</p>
+            <p className="mt-1 text-xl font-bold tabular-nums text-[#33251e]">{value}</p>
           </div>
         ))}
       </div>
 
-      <div className="flex flex-wrap items-center justify-between gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className="text-sm font-semibold text-black">{option.label} by method</p>
-          <p className="text-[11px] text-black/55">{option.description} Lower is better.</p>
+          <p className="text-sm font-semibold text-[#33251e]">{option.label} by method</p>
+          <p className="text-xs text-[#74675f]">{option.description} Lower is better.</p>
         </div>
-        <div className="inline-flex rounded-lg border border-black/10 bg-white p-0.5" role="group" aria-label="Select validation metric">
-          {Object.entries(METRIC_OPTIONS).map(([key, metric]) => (
-            <button
-              key={key}
-              type="button"
-              aria-pressed={selected === key}
-              onClick={() => setSelected(key)}
-              className={`rounded-md px-2.5 py-1 text-[11px] font-semibold ${selected === key ? "bg-[#33251e] text-white" : "text-black/60 hover:bg-black/5"}`}
-            >
-              {metric.label}
-            </button>
-          ))}
-        </div>
+        <Segmented
+          label="Select validation metric"
+          value={selected}
+          onChange={setSelected}
+          options={Object.entries(METRIC_OPTIONS).map(([key, metric]) => ({ value: key, label: metric.label }))}
+        />
       </div>
 
       {maxValue > 0 ? (
-        <div className="space-y-2.5">
+        <div className="space-y-3">
           {rows.map((row) => (
-            <div key={row.key} className="grid grid-cols-[150px_minmax(0,1fr)_76px] items-center gap-3">
-              <span className="flex items-center gap-1.5 truncate text-[11px] font-medium text-black/75" title={row.label}>
+            <div key={row.key} className="grid grid-cols-[150px_minmax(0,1fr)_90px] items-center gap-3">
+              <span className="flex items-center gap-2 truncate text-xs font-medium text-[#33251e]" title={row.label}>
                 <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: row.color }} />
                 {row.label}
               </span>
-              <div
-                className="relative h-3 rounded-full bg-black/5"
-                role="img"
-                aria-label={`${row.label}: ${formatMetric(row.value, option.suffix)}`}
-              >
+              <div className="relative h-3 rounded-full bg-[#f0ebe1]" role="img" aria-label={`${row.label}: ${formatMetric(row.value, option.suffix)}`}>
                 {row.value != null && (
                   <div
                     className="h-full rounded-full transition-[width] duration-500"
@@ -232,28 +587,24 @@ function ValidationMetrics({ model }) {
                   />
                 )}
               </div>
-              <span className="flex items-center justify-end gap-1 text-right text-[11px] font-semibold tabular-nums text-black/80">
+              <span className="flex items-center justify-end gap-1.5 text-right text-xs font-semibold tabular-nums text-[#33251e]">
                 {formatMetric(row.value, option.suffix)}
-                {best?.key === row.key && (
-                  <span className="rounded bg-[#e4f0e8] px-1 text-[9px] text-[#2c6244]">Best</span>
-                )}
+                {best?.key === row.key && <span className="rounded bg-[#e4f0e8] px-1.5 text-[10px] text-[#2c6244]">Best</span>}
               </span>
             </div>
           ))}
         </div>
       ) : (
-        <p className="rounded-lg border border-dashed border-black/10 px-3 py-4 text-center text-xs text-black/55">
-          Validation metrics will appear when there are enough historical sales days.
-        </p>
+        <EmptyState>Validation metrics will appear when there are enough historical sales days.</EmptyState>
       )}
 
       {selectedMethodLoses && (
-        <p className="rounded-lg bg-[#fff4cd] px-3 py-2 text-[11px] leading-5 text-[#33251e]">
+        <p className="rounded-xl bg-[#fff4cd] px-4 py-3 text-xs leading-5 text-[#33251e]">
           {forecastMethodLabel} is not the lowest-error method on {option.label} for this view. “{best.label}” performs better here.
         </p>
       )}
 
-      <p className="mt-auto text-[10px] text-black/45">
+      <p className="mt-auto text-[11px] leading-4 text-[#74675f]">
         Chronological holdout using up to 7 days per product; short histories use a shorter, lower-confidence holdout.
         {activeScope === "aggregate" ? " Shop total adds up all products per day." : " Per-product errors are pooled together."}{" "}
         The thin line marks the predict-zero baseline.
@@ -262,351 +613,57 @@ function ValidationMetrics({ model }) {
   );
 }
 
-function ForecastChart({ historical, forecast }) {
-  const [activeIndex, setActiveIndex] = useState(null);
-
-  const values = [...historical, ...forecast];
-  const innerWidth = CHART_WIDTH - CHART_PADDING.left - CHART_PADDING.right;
-  const innerHeight = CHART_HEIGHT - CHART_PADDING.top - CHART_PADDING.bottom;
-  const yMax = niceMax(Math.max(...values, 1) * 1.15);
-  const gridSteps = 4;
-
-  const xForIndex = (index) =>
-    CHART_PADDING.left + index * (innerWidth / Math.max(values.length - 1, 1));
-  const yForValue = (value) =>
-    CHART_PADDING.top + innerHeight - (value / yMax) * innerHeight;
-
-  const historicalPoints = historical.map((value, index) => [xForIndex(index), yForValue(value)]);
-  const forecastPoints = forecast.map((value, index) => [
-    xForIndex(historical.length + index),
-    yForValue(value),
-  ]);
-  // Bridge the two series so the dashed line continues seamlessly from the last actual.
-  const forecastPathPoints = historicalPoints.length
-    ? [historicalPoints[historicalPoints.length - 1], ...forecastPoints]
-    : forecastPoints;
-
-  const toPath = (points) => points.map((p) => p.join(",")).join(" L ");
-  const baseline = CHART_PADDING.top + innerHeight;
-
-  const historicalLine = historicalPoints.length ? `M ${toPath(historicalPoints)}` : "";
-  const historicalArea = historicalPoints.length
-    ? `M ${historicalPoints[0][0]},${baseline} L ${toPath(historicalPoints)} L ${
-        historicalPoints[historicalPoints.length - 1][0]
-      },${baseline} Z`
-    : "";
-  const forecastLine = forecastPathPoints.length ? `M ${toPath(forecastPathPoints)}` : "";
-  const forecastArea = forecastPathPoints.length
-    ? `M ${forecastPathPoints[0][0]},${baseline} L ${toPath(forecastPathPoints)} L ${
-        forecastPathPoints[forecastPathPoints.length - 1][0]
-      },${baseline} Z`
-    : "";
-
-  const allPoints = [...historicalPoints, ...forecastPoints];
-  const labels = values.map((_, index) =>
-    index < historical.length ? `D-${historical.length - index}` : `D+${index - historical.length + 1}`
-  );
-  const dividerX = historical.length > 0 && forecast.length > 0 ? xForIndex(historical.length - 1) : null;
-
-  if (!values.length || !allPoints.length) return null;
-
-  const active = activeIndex != null ? allPoints[activeIndex] : null;
-  const activeIsForecast = activeIndex != null && activeIndex >= historical.length;
-
-  // Only label every nth tick on narrower charts so text doesn't collide.
-  const labelStride = values.length > 10 ? Math.ceil(values.length / 8) : 1;
-
-  return (
-    <div className="rounded-2xl border border-black/10 bg-white p-4">
-      <svg
-        viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`}
-        className="h-56 w-full overflow-visible"
-        onMouseLeave={() => setActiveIndex(null)}
-      >
-        <defs>
-          <linearGradient id="pa-historical-fill" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#111827" stopOpacity="0.16" />
-            <stop offset="100%" stopColor="#111827" stopOpacity="0" />
-          </linearGradient>
-          <linearGradient id="pa-forecast-fill" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#D4AF37" stopOpacity="0.28" />
-            <stop offset="100%" stopColor="#D4AF37" stopOpacity="0" />
-          </linearGradient>
-        </defs>
-
-        {/* Gridlines + y-axis labels */}
-        {Array.from({ length: gridSteps + 1 }, (_, step) => {
-          const value = (yMax / gridSteps) * step;
-          const y = yForValue(value);
-          return (
-            <g key={step}>
-              <line
-                x1={CHART_PADDING.left}
-                y1={y}
-                x2={CHART_WIDTH - CHART_PADDING.right}
-                y2={y}
-                stroke="#e5e7eb"
-                strokeWidth="1"
-              />
-              <text x={CHART_PADDING.left - 8} y={y + 3} textAnchor="end" fontSize="9" fill="#9ca3af">
-                {Math.round(value)}
-              </text>
-            </g>
-          );
-        })}
-
-        {/* Divider between actuals and forecast */}
-        {dividerX != null && (
-          <line
-            x1={dividerX}
-            y1={CHART_PADDING.top}
-            x2={dividerX}
-            y2={baseline}
-            stroke="#c9c9c9"
-            strokeDasharray="2 3"
-            strokeWidth="1"
-          />
-        )}
-
-        {/* Areas */}
-        {historicalArea && <path d={historicalArea} fill="url(#pa-historical-fill)" />}
-        {forecastArea && <path d={forecastArea} fill="url(#pa-forecast-fill)" />}
-
-        {/* Lines */}
-        {historicalLine && <path d={historicalLine} fill="none" stroke="#111827" strokeWidth="2.5" strokeLinejoin="round" />}
-        {forecastLine && (
-          <path d={forecastLine} fill="none" stroke="#B4901F" strokeWidth="2.5" strokeDasharray="5 4" strokeLinejoin="round" />
-        )}
-
-        {/* Points */}
-        {allPoints.map(([x, y], index) => (
-          <circle
-            key={index}
-            cx={x}
-            cy={y}
-            r={activeIndex === index ? 5 : 3}
-            fill={index < historical.length ? "#111827" : "#B4901F"}
-            stroke="#fff"
-            strokeWidth={activeIndex === index ? 1.5 : 0}
-          />
-        ))}
-
-        {/* Hover guide */}
-        {active && (
-          <line x1={active[0]} y1={CHART_PADDING.top} x2={active[0]} y2={baseline} stroke="#111827" strokeOpacity="0.15" strokeWidth="1" />
-        )}
-
-        {/* Hover targets */}
-        {allPoints.map(([x], index) => (
-          <rect
-            key={`hit-${index}`}
-            x={x - innerWidth / Math.max(values.length - 1, 1) / 2}
-            y={CHART_PADDING.top}
-            width={innerWidth / Math.max(values.length - 1, 1)}
-            height={innerHeight}
-            fill="transparent"
-            onMouseEnter={() => setActiveIndex(index)}
-          />
-        ))}
-
-        {/* X-axis labels */}
-        {labels.map((label, index) =>
-          index % labelStride === 0 ? (
-            <text
-              key={label + index}
-              x={xForIndex(index)}
-              y={CHART_HEIGHT - 8}
-              textAnchor="middle"
-              fontSize="9"
-              fill="#9ca3af"
-            >
-              {label}
-            </text>
-          ) : null
-        )}
-      </svg>
-
-      {/* Tooltip readout */}
-      <div className="mt-3 flex h-9 items-center justify-between rounded-xl bg-[#fafaf8] px-3">
-        {active ? (
-          <>
-            <span className="text-xs font-medium text-black/70">{labels[activeIndex]}</span>
-            <span className={`text-sm font-semibold ${activeIsForecast ? "text-[#8b6a12]" : "text-black"}`}>
-              {values[activeIndex]} units{activeIsForecast ? " (forecast)" : ""}
-            </span>
-          </>
-        ) : (
-          <span className="text-xs text-black/40">Hover the chart for exact daily values</span>
-        )}
-      </div>
-
-      <div className="mt-3 flex items-center justify-between text-[11px] text-black/50">
-        <span className="inline-flex items-center gap-1.5">
-          <span className="h-1.5 w-3 rounded-full bg-black" /> Historical actual
-        </span>
-        <span className="inline-flex items-center gap-1.5 text-[#9d7b18]">
-          <span className="h-1.5 w-3 rounded-full border border-dashed border-[#B4901F]" /> Forecast D+1 to D+{forecast.length}
-        </span>
-      </div>
-    </div>
-  );
-}
-
-function MethodForecastChart({ product, method, period }) {
-  const actual = product?.comparison?.actual || [];
-  const forecast = product?.comparison?.methods?.[method.key] || [];
-  const values = [...actual.map((point) => Number(point.quantity) || 0), ...forecast.map((value) => Number(value) || 0)];
-  const width = 460;
-  const height = 190;
-  const padding = { top: 12, right: 12, bottom: 24, left: 34 };
-  const innerWidth = width - padding.left - padding.right;
-  const innerHeight = height - padding.top - padding.bottom;
-  const yMax = niceMax(Math.max(...values, 1) * 1.15);
-  const x = (index) => padding.left + index * (innerWidth / Math.max(values.length - 1, 1));
-  const y = (value) => padding.top + innerHeight - (value / yMax) * innerHeight;
-  const actualPoints = actual.map((point, index) => [x(index), y(Number(point.quantity) || 0)]);
-  const forecastPoints = forecast.map((value, index) => [x(actual.length + index), y(Number(value) || 0)]);
-  const forecastPath = actualPoints.length
-    ? [actualPoints[actualPoints.length - 1], ...forecastPoints]
-    : forecastPoints;
-  const path = (points) => points.map((point) => point.join(",")).join(" L ");
-  const baseline = padding.top + innerHeight;
-  const actualLine = actualPoints.length ? `M ${path(actualPoints)}` : "";
-  const forecastLine = forecastPath.length ? `M ${path(forecastPath)}` : "";
-  const tickStride = Math.max(1, Math.ceil(values.length / 6));
-
-  return (
-    <article className="flex h-full min-w-0 flex-col rounded-2xl border border-black/10 bg-white p-3">
-      <div className="mb-1 flex min-h-10 items-center justify-between gap-2">
-        <h3 className="text-sm font-semibold leading-5 text-black">{method.label}</h3>
-        <span className="shrink-0 rounded-full bg-[#f7f2e8] px-2 py-1 text-[10px] font-semibold text-black/60">
-          Next {period} days
-        </span>
-      </div>
-      {actual.length && forecast.length ? (
-        <>
-          <svg viewBox={`0 0 ${width} ${height}`} className="h-[190px] w-full" role="img" aria-label={`${method.label} compared with actual daily sales for ${product.product}`}>
-            {Array.from({ length: 4 }, (_, index) => {
-              const value = (yMax / 3) * index;
-              const gridY = y(value);
-              return (
-                <g key={index}>
-                  <line x1={padding.left} y1={gridY} x2={width - padding.right} y2={gridY} stroke="#e5e7eb" />
-                  <text x={padding.left - 5} y={gridY + 3} textAnchor="end" fontSize="8" fill="#9ca3af">{Math.round(value)}</text>
-                </g>
-              );
-            })}
-            <line x1={x(actual.length - 1)} y1={padding.top} x2={x(actual.length - 1)} y2={baseline} stroke="#c9c9c9" strokeDasharray="3 3" />
-            {actualLine && <path d={actualLine} fill="none" stroke="#111827" strokeWidth="2.25" strokeLinejoin="round" />}
-            {forecastLine && <path d={forecastLine} fill="none" stroke={method.color} strokeWidth="2.5" strokeDasharray="5 4" strokeLinejoin="round" />}
-            {actualPoints.map(([cx, cy], index) => (
-              <circle key={`actual-${index}`} cx={cx} cy={cy} r="2.5" fill="#111827">
-                <title>{`${actual[index].date}: ${Number(actual[index].quantity).toFixed(1)} actual units`}</title>
-              </circle>
-            ))}
-            {forecastPoints.map(([cx, cy], index) => (
-              <circle key={`forecast-${index}`} cx={cx} cy={cy} r="2.5" fill={method.color}>
-                <title>{`Day ${index + 1} forecast: ${Number(forecast[index]).toFixed(1)} units`}</title>
-              </circle>
-            ))}
-            {values.map((_, index) => (
-              index % tickStride === 0 || index === values.length - 1 ? (
-                <text key={`tick-${index}`} x={x(index)} y={height - 5} textAnchor="middle" fontSize="8" fill="#9ca3af">
-                  {index < actual.length ? actual[index]?.date?.slice(5) : `+${index - actual.length + 1}`}
-                </text>
-              ) : null
-            ))}
-          </svg>
-          <div className="mt-auto flex flex-wrap items-center gap-x-4 gap-y-1 pt-2 text-[10px] text-black/55">
-            <span className="inline-flex items-center gap-1.5"><span className="h-0.5 w-3 bg-[#111827]" />Actual sales</span>
-            <span className="inline-flex items-center gap-1.5"><span className="w-3 border-t-2 border-dashed" style={{ borderColor: method.color }} />{method.label}</span>
-          </div>
-        </>
-      ) : (
-        <div className="flex min-h-[190px] flex-1 items-center justify-center rounded-xl bg-[#fafaf8] px-4 text-center text-xs text-black/50">
-          No continuous actual-sales history is available for this product.
-        </div>
-      )}
-    </article>
-  );
-}
-
 // ---------------------------------------------------------------------------
-// Inventory coverage — bars now read as a risk gauge, not a uniform gold bar.
+// Inventory coverage
 // ---------------------------------------------------------------------------
 
 function coverageTone(coveragePercent) {
-  if (coveragePercent < 40) return { bar: "#C0503C", chip: "bg-[#f7e6e2] text-[#a1402f]", label: "Critical" };
-  if (coveragePercent < 75) return { bar: "#C99A2E", chip: "bg-[#f7f0dc] text-[#8b6a12]", label: "Watch" };
-  return { bar: "#3F7D58", chip: "bg-[#e4f0e8] text-[#2c6244]", label: "Healthy" };
+  if (coveragePercent < 40) return { bar: "#C0503C", chip: "bad", label: "Critical" };
+  if (coveragePercent < 75) return { bar: "#C99A2E", chip: "warn", label: "Watch" };
+  return { bar: "#3F7D58", chip: "good", label: "Healthy" };
 }
 
-function CoverageBars({ products }) {
+function CoverageRow({ item }) {
+  const coveragePercent = Math.max(0, Math.min(100, (item.coverageRatio || 0) * 100));
+  const tone = coverageTone(coveragePercent);
   return (
-    <div className="space-y-3">
-      {products.map((item) => {
-        const coveragePercent = Math.max(0, Math.min(100, (item.coverageRatio || 0) * 100));
-        const tone = coverageTone(coveragePercent);
-        return (
-          <div key={item.product} className="rounded-2xl border border-black/10 bg-[#fcfbf7] p-3">
-            <div className="mb-2 flex items-center justify-between gap-2">
-              <p className="truncate text-sm font-semibold text-black">{item.product}</p>
-              <div className="flex items-center gap-2">
-                <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${tone.chip}`}>{tone.label}</span>
-                <span className="text-xs tabular-nums text-black/60">{coveragePercent.toFixed(0)}%</span>
-              </div>
-            </div>
-            <div className="h-2.5 overflow-hidden rounded-full bg-slate-200">
-              <div
-                className="h-full rounded-full transition-[width] duration-500"
-                style={{ width: `${coveragePercent}%`, backgroundColor: tone.bar }}
-              />
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-// Pagination sits at the bottom of its card (mt-auto) so paired cards line up.
-function ListPagination({ page, pageCount, total, onPageChange, label }) {
-  return (
-    <div className="mt-auto pt-4">
-      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-black/10 pt-4">
-        <span className="text-xs text-black/55">
-          Showing {total ? (page - 1) * 5 + 1 : 0}-{Math.min(page * 5, total)} of {total} {label}
-        </span>
+    <div className="w-full">
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <p className="truncate text-sm font-semibold text-[#33251e]" title={item.product}>{item.product}</p>
         <div className="flex items-center gap-2">
-          <span className="mr-1 text-xs text-black/55">Page {page} of {pageCount}</span>
-          <button
-            type="button"
-            onClick={() => onPageChange((current) => Math.max(1, current - 1))}
-            disabled={page <= 1}
-            aria-label={`Previous ${label} page`}
-            className="inline-flex h-9 items-center gap-1 rounded-lg border border-black/10 bg-white px-3 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            <ChevronLeft size={15} />
-            Previous
-          </button>
-          <button
-            type="button"
-            onClick={() => onPageChange((current) => Math.min(pageCount, current + 1))}
-            disabled={page >= pageCount}
-            aria-label={`Next ${label} page`}
-            className="inline-flex h-9 items-center gap-1 rounded-lg border border-black/10 bg-white px-3 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            Next
-            <ChevronRight size={15} />
-          </button>
+          <Chip tone={tone.chip}>{tone.label}</Chip>
+          <span className="w-10 text-right text-xs tabular-nums text-[#74675f]">{coveragePercent.toFixed(0)}%</span>
         </div>
+      </div>
+      <div className="h-2 overflow-hidden rounded-full bg-[#f0ebe1]">
+        <div className="h-full rounded-full transition-[width] duration-500" style={{ width: `${coveragePercent}%`, backgroundColor: tone.bar }} />
       </div>
     </div>
   );
 }
 
+// ---------------------------------------------------------------------------
+// Page
+// ---------------------------------------------------------------------------
+
+const EMPTY_FORECAST = {
+  products: [],
+  summary: { totalProjectedDemand: 0, highPriorityCount: 0, recommendationCount: 0 },
+  recommendations: [],
+  alerts: [],
+};
+
+const WORKFLOW_STEPS = [
+  { title: "Import sales", body: "Upload the sales CSV from Sales Reports.", link: true },
+  { title: "Clean and prepare data", body: "Missing product sales inside a continuous covered date range count as zero. Dates outside coverage or between separate ranges remain unknown." },
+  { title: "Split chronologically", body: "Earlier daily sales train the model; the latest 7 days are held out for testing." },
+  { title: "Train forecasting methods", body: "Compare a linear trend, 7-day average, last day, and same weekday last week." },
+  { title: "Evaluate predictions", body: "Compare MAE, RMSE, WAPE, and MAPE; the lowest shop-total WAPE selects the forecast method." },
+  { title: "Review results", body: "See the demand chart, product estimates, and inventory preparation recommendations below." },
+];
+
 export default function PredictiveAnalytics() {
-  const [forecast, setForecast] = useState({ products: [], summary: { totalProjectedDemand: 0, highPriorityCount: 0, recommendationCount: 0 }, recommendations: [], alerts: [] });
+  const [forecast, setForecast] = useState(EMPTY_FORECAST);
   const [statusMessage, setStatusMessage] = useState("Loading live sales and inventory data...");
   const [isWorking, setIsWorking] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
@@ -622,12 +679,15 @@ export default function PredictiveAnalytics() {
   const [actionsPage, setActionsPage] = useState(1);
   const [coveragePage, setCoveragePage] = useState(1);
   const [reorderPage, setReorderPage] = useState(1);
+  const [ingredientPage, setIngredientPage] = useState(1);
   const [aliases, setAliases] = useState([]);
   const [aliasProducts, setAliasProducts] = useState([]);
   const [aliasName, setAliasName] = useState("");
   const [aliasProductId, setAliasProductId] = useState("");
   const [aliasError, setAliasError] = useState("");
   const [savingAlias, setSavingAlias] = useState(false);
+
+  // ---- Aliases -------------------------------------------------------------
 
   const loadProductAliases = useCallback(async () => {
     const response = await fetch(`${LARAVEL_BASE}/api/admin/sales/product-aliases`, {
@@ -683,6 +743,8 @@ export default function PredictiveAnalytics() {
     }
   };
 
+  // ---- Forecast ------------------------------------------------------------
+
   const loadForecast = async (options = {}) => {
     setIsWorking(true);
     setErrorMessage("");
@@ -708,7 +770,7 @@ export default function PredictiveAnalytics() {
         throw new Error(data.message || "Could not load forecast data.");
       }
 
-      setForecast(data.forecast || { products: [], summary: { totalProjectedDemand: 0, highPriorityCount: 0, recommendationCount: 0 }, recommendations: [], alerts: [] });
+      setForecast(data.forecast || EMPTY_FORECAST);
       setStatusMessage("Forecast refreshed from live orders and completed Sales Reports imports.");
     } catch (error) {
       setErrorMessage(error.message || "Failed to load forecast data.");
@@ -720,52 +782,92 @@ export default function PredictiveAnalytics() {
 
   useEffect(() => {
     loadForecast();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [period]);
 
-  const filteredProducts = useMemo(() => forecast.products.filter((product) =>
-    (!productFilter || product.product === productFilter) && (!categoryFilter || product.category === categoryFilter)
-  ), [forecast.products, productFilter, categoryFilter]);
-  const comparisonProducts = useMemo(() => forecast.products.filter((product) => product.comparison?.actual?.length), [forecast.products]);
-  const comparisonProduct = comparisonProducts.find((product) => product.product === comparisonProductName)
-    || comparisonProducts[0]
-    || null;
-  const sortedFilteredProducts = useMemo(() => [...filteredProducts].sort((a, b) =>
-    Number(b.totalForecast || 0) - Number(a.totalForecast || 0) || a.product.localeCompare(b.product)
-  ), [filteredProducts]);
-  const salesPageCount = Math.max(1, Math.ceil(sortedFilteredProducts.length / 5));
-  const paginatedProducts = sortedFilteredProducts.slice((salesPage - 1) * 5, salesPage * 5);
-  const preparationProducts = useMemo(() => filteredProducts
-    .filter((product) => Number(product.recommendedPreorderQuantity) > 0)
-    .sort((a, b) =>
-      Number(b.recommendedPreorderQuantity || 0) - Number(a.recommendedPreorderQuantity || 0)
-      || Number(b.totalForecast || 0) - Number(a.totalForecast || 0)
-      || a.product.localeCompare(b.product)
-    ), [filteredProducts]);
-  const sortedActions = useMemo(() => [...(forecast.actions || [])].sort((a, b) => {
-    const priorityRank = { high: 0, medium: 1, low: 2 };
-    const priorityDifference = (priorityRank[String(a.priority || "").toLowerCase()] ?? 3)
-      - (priorityRank[String(b.priority || "").toLowerCase()] ?? 3);
-    return priorityDifference
-      || String(a.product || "").localeCompare(String(b.product || ""))
-      || String(a.message || "").localeCompare(String(b.message || ""));
-  }), [forecast.actions]);
-  const sortedCoverageProducts = useMemo(() => [...forecast.products].sort((a, b) =>
-    Number(a.coverageRatio || 0) - Number(b.coverageRatio || 0)
-    || a.product.localeCompare(b.product)
-  ), [forecast.products]);
-  const sortedRecommendations = useMemo(() => [...(forecast.recommendations || [])].sort((a, b) =>
-    (a.priority === "High" ? 0 : 1) - (b.priority === "High" ? 0 : 1)
-    || Number(b.qty || 0) - Number(a.qty || 0)
-    || String(a.product || "").localeCompare(String(b.product || ""))
-  ), [forecast.recommendations]);
-  const preparationPageCount = Math.max(1, Math.ceil(preparationProducts.length / 5));
-  const actionsPageCount = Math.max(1, Math.ceil(sortedActions.length / 5));
-  const coveragePageCount = Math.max(1, Math.ceil(sortedCoverageProducts.length / 5));
-  const reorderPageCount = Math.max(1, Math.ceil(sortedRecommendations.length / 5));
-  const paginatedPreparationProducts = preparationProducts.slice((preparationPage - 1) * 5, preparationPage * 5);
-  const paginatedActions = sortedActions.slice((actionsPage - 1) * 5, actionsPage * 5);
-  const paginatedCoverageProducts = sortedCoverageProducts.slice((coveragePage - 1) * 5, coveragePage * 5);
-  const paginatedRecommendations = sortedRecommendations.slice((reorderPage - 1) * 5, reorderPage * 5);
+  // ---- Derived data --------------------------------------------------------
+
+  const filteredProducts = useMemo(
+    () =>
+      forecast.products.filter(
+        (product) => (!productFilter || product.product === productFilter) && (!categoryFilter || product.category === categoryFilter)
+      ),
+    [forecast.products, productFilter, categoryFilter]
+  );
+  const comparisonProducts = useMemo(
+    () => forecast.products.filter((product) => product.comparison?.actual?.length),
+    [forecast.products]
+  );
+  const comparisonProduct =
+    comparisonProducts.find((product) => product.product === comparisonProductName) || comparisonProducts[0] || null;
+  const sortedFilteredProducts = useMemo(
+    () =>
+      [...filteredProducts].sort(
+        (a, b) => Number(b.totalForecast || 0) - Number(a.totalForecast || 0) || a.product.localeCompare(b.product)
+      ),
+    [filteredProducts]
+  );
+  const preparationProducts = useMemo(
+    () =>
+      filteredProducts
+        .filter((product) => Number(product.recommendedPreorderQuantity) > 0)
+        .sort(
+          (a, b) =>
+            Number(b.recommendedPreorderQuantity || 0) - Number(a.recommendedPreorderQuantity || 0) ||
+            Number(b.totalForecast || 0) - Number(a.totalForecast || 0) ||
+            a.product.localeCompare(b.product)
+        ),
+    [filteredProducts]
+  );
+  const sortedActions = useMemo(
+    () =>
+      [...(forecast.actions || [])].sort((a, b) => {
+        const priorityRank = { high: 0, medium: 1, low: 2 };
+        const priorityDifference =
+          (priorityRank[String(a.priority || "").toLowerCase()] ?? 3) -
+          (priorityRank[String(b.priority || "").toLowerCase()] ?? 3);
+        return (
+          priorityDifference ||
+          String(a.product || "").localeCompare(String(b.product || "")) ||
+          String(a.message || "").localeCompare(String(b.message || ""))
+        );
+      }),
+    [forecast.actions]
+  );
+  const sortedCoverageProducts = useMemo(
+    () =>
+      [...forecast.products].sort(
+        (a, b) => Number(a.coverageRatio || 0) - Number(b.coverageRatio || 0) || a.product.localeCompare(b.product)
+      ),
+    [forecast.products]
+  );
+  const sortedRecommendations = useMemo(
+    () =>
+      [...(forecast.recommendations || [])].sort(
+        (a, b) =>
+          (a.priority === "High" ? 0 : 1) - (b.priority === "High" ? 0 : 1) ||
+          Number(b.qty || 0) - Number(a.qty || 0) ||
+          String(a.product || "").localeCompare(String(b.product || ""))
+      ),
+    [forecast.recommendations]
+  );
+  const topProducts = useMemo(
+    () => [...forecast.products].sort((a, b) => b.totalForecast - a.totalForecast).slice(0, PAGE_SIZE),
+    [forecast.products]
+  );
+  const maxForecast = Math.max(...forecast.products.map((item) => item.totalForecast), 1);
+  const ingredients = forecast.ingredients || [];
+  const categories = useMemo(() => [...new Set(forecast.products.map((product) => product.category))], [forecast.products]);
+
+  const pageCountOf = (list) => Math.max(1, Math.ceil(list.length / PAGE_SIZE));
+  const salesPageCount = pageCountOf(sortedFilteredProducts);
+  const preparationPageCount = pageCountOf(preparationProducts);
+  const actionsPageCount = pageCountOf(sortedActions);
+  const coveragePageCount = pageCountOf(sortedCoverageProducts);
+  const reorderPageCount = pageCountOf(sortedRecommendations);
+  const ingredientPageCount = pageCountOf(ingredients);
+  const paginatedProducts = sortedFilteredProducts.slice((salesPage - 1) * PAGE_SIZE, salesPage * PAGE_SIZE);
+
   const chartHistory = useMemo(() => (forecast.history || []).map((row) => Number(row.demand || 0)), [forecast.history]);
   const chartForecast = useMemo(() => (forecast.daily || []).map((row) => Number(row.forecast || 0)), [forecast.daily]);
 
@@ -782,318 +884,218 @@ export default function PredictiveAnalytics() {
     setActionsPage(1);
     setCoveragePage(1);
     setReorderPage(1);
-  }, [forecast.actions, forecast.products, forecast.recommendations]);
+    setIngredientPage(1);
+  }, [forecast.actions, forecast.products, forecast.recommendations, forecast.ingredients]);
 
-  const handleRunForecast = () => {
-    loadForecast({ action: "refresh" });
-  };
+  const summary = forecast.summary || EMPTY_FORECAST.summary;
+  const trendPercent = summary.trendPercent;
+  const anyMethodVisible = COMPARISON_METHODS.some((method) => visibleComparisonMethods[method.key]);
+
+  // ---- Render --------------------------------------------------------------
 
   return (
     <div className="min-h-screen bg-[#fbfaf5]">
-      <div className="lg:pl-[260px] pt-[88px]">
-        <div className="mx-auto max-w-[1400px] px-4 py-5 sm:px-6 md:px-8 lg:px-10 lg:py-7">
-          <div className="mb-4 flex flex-col gap-4 border-b border-[#e8dfd4] pb-4 lg:flex-row lg:items-end lg:justify-between">
+      <div className="pt-[88px] lg:pl-[260px]">
+        <div className="mx-auto max-w-[1400px] px-4 py-6 sm:px-6 md:px-8 lg:px-10 lg:py-8">
+          {/* Header */}
+          <header className="mb-4 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <div>
-              <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.24em] text-[#92701e]">Business analytics</p>
-              <h1 className="text-[26px] font-bold leading-tight text-[#33251e] sm:text-[30px]">Predictive Demand</h1>
-              <p className="mt-1.5 text-[13px] text-[#74675f]">Forecast pastry demand and plan production before stock runs low.</p>
+              <h1 className="text-[28px] font-bold leading-tight text-[#33251e]">Predictive demand</h1>
+              <p className="mt-1 text-sm text-[#74675f]">Forecast pastry demand and plan production before stock runs low.</p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              <div className="inline-flex h-10 items-center rounded-md border border-[#e8dfd4] bg-white p-1">
-                {[7, 14, 30].map((value) => (
-                  <button key={value} type="button" onClick={() => setPeriod(value)} aria-pressed={period === value} className={`h-8 rounded px-3 text-[11px] font-semibold transition-colors ${period === value ? "bg-[#fff4cd] text-[#33251e]" : "text-[#74675f] hover:text-[#33251e]"}`}>
-                    {value} Days
-                  </button>
-                ))}
-              </div>
-              <button
-                type="button"
-                onClick={handleRunForecast}
-                disabled={isWorking}
-                className="inline-flex h-10 items-center rounded-md bg-[#33251e] px-3.5 text-[11px] font-semibold text-white transition hover:bg-[#5b4540] disabled:opacity-50"
-              >
-                <Calculator size={16} className="mr-2" />
-                Run Forecast
+              <Segmented
+                label="Forecast period"
+                value={period}
+                onChange={setPeriod}
+                options={[7, 14, 30].map((value) => ({ value, label: `${value} days` }))}
+              />
+              <button type="button" onClick={() => loadForecast({ action: "refresh" })} disabled={isWorking} className={BUTTON_PRIMARY}>
+                <Calculator size={16} />
+                {isWorking ? "Running..." : "Run forecast"}
               </button>
             </div>
+          </header>
+
+          {/* Status bar */}
+          <div className="mb-6 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[#e8dfd4] bg-white px-4 py-3 text-xs">
+            <p className="flex items-center gap-2 text-[#33251e]" role="status" aria-live="polite">
+              <span className={`h-2 w-2 rounded-full ${isWorking ? "animate-pulse bg-[#d4af37]" : "bg-[#81906c]"}`} />
+              {statusMessage}
+            </p>
+            <p className="inline-flex items-center gap-1.5 text-[#74675f]">
+              <FileText size={13} /> Live orders, completed sales imports, and ingredient inventory
+            </p>
+            {errorMessage ? (
+              <p className="w-full rounded-lg bg-[#fff4cd] px-3 py-2 text-xs text-[#33251e]">{errorMessage}</p>
+            ) : null}
           </div>
 
-          <div className="mb-5 flex flex-wrap items-center justify-between gap-2 border-b border-[#e8dfd4] pb-3 text-[11px]">
-            <p className="flex items-center gap-2 text-[#65574d]" role="status" aria-live="polite"><span className={`h-2 w-2 rounded-full ${isWorking ? "animate-pulse bg-[#d4af37]" : "bg-[#81906c]"}`} />{statusMessage}</p>
-            <p className="inline-flex items-center gap-1.5 text-[#74675f]"><FileText size={13} /> Live orders, completed sales imports, and ingredient inventory</p>
-            {errorMessage ? <p className="w-full rounded-md bg-[#fff4cd] px-3 py-2 text-[11px] text-[#33251e]">{errorMessage}</p> : null}
-          </div>
-
-          <section aria-labelledby="forecast-workflow-title" className="mb-5 rounded-[24px] border border-black/10 bg-white p-5 shadow-sm">
-            <div className="mb-4">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.25em] text-black/50">Forecast workflow</p>
-              <h2 id="forecast-workflow-title" className="text-lg font-semibold text-black">From sales import to production forecast</h2>
-              <p className="mt-1 text-sm leading-6 text-black/60">
-                Import sales once in Sales Reports. Completed imports are shared with forecasting and other reports.
-              </p>
-            </div>
-            <ol className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
-              <li className="rounded-xl border border-[#e9dfc9] bg-[#fffaf0] p-3">
-                <p className="text-xs font-bold text-[#8b6a12]">1. Import sales</p>
-                <p className="mt-1 text-xs leading-5 text-black/60">Upload the sales CSV from Sales Reports.</p>
-                <Link to="/admin/reports" className="mt-2 inline-flex text-xs font-semibold text-[#765d18] underline underline-offset-2 hover:text-black">
-                  Open Sales Reports
-                </Link>
-              </li>
-              <li className="rounded-xl border border-black/10 bg-[#fafaf8] p-3">
-                <p className="text-xs font-bold text-black">2. Clean and prepare data</p>
-                <p className="mt-1 text-xs leading-5 text-black/60">Missing product sales inside a continuous covered date range count as zero. Dates outside coverage or between separate ranges remain unknown.</p>
-              </li>
-              <li className="rounded-xl border border-black/10 bg-[#fafaf8] p-3">
-                <p className="text-xs font-bold text-black">3. Split chronologically</p>
-                <p className="mt-1 text-xs leading-5 text-black/60">Earlier daily sales train the model; the latest 7 days are held out for testing.</p>
-              </li>
-              <li className="rounded-xl border border-black/10 bg-[#fafaf8] p-3">
-                <p className="text-xs font-bold text-black">4. Train forecasting methods</p>
-                <p className="mt-1 text-xs leading-5 text-black/60">Compare a linear trend, 7-day average, last day, and same weekday last week.</p>
-              </li>
-              <li className="rounded-xl border border-black/10 bg-[#fafaf8] p-3">
-                <p className="text-xs font-bold text-black">5. Evaluate predictions</p>
-                <p className="mt-1 text-xs leading-5 text-black/60">Compare MAE, RMSE, WAPE, and MAPE; the lowest shop-total WAPE selects the forecast method.</p>
-              </li>
-              <li className="rounded-xl border border-black/10 bg-[#fafaf8] p-3">
-                <p className="text-xs font-bold text-black">6. Review results</p>
-                <p className="mt-1 text-xs leading-5 text-black/60">See the demand chart, product estimates, and inventory preparation recommendations below.</p>
-              </li>
+          {/* How it works (collapsed by default) */}
+          <details className="group mb-8 rounded-2xl border border-[#e8dfd4] bg-white">
+            <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-5 py-4">
+              <div>
+                <p className="text-sm font-semibold text-[#33251e]">How the forecast is built</p>
+                <p className="mt-0.5 text-xs text-[#74675f]">
+                  Import sales once in Sales Reports. Completed imports are shared with forecasting and other reports.
+                </p>
+              </div>
+              <ChevronRight size={18} className="shrink-0 text-[#74675f] transition-transform group-open:rotate-90" />
+            </summary>
+            <ol className="grid gap-3 border-t border-[#f0ebe1] p-5 md:grid-cols-2 xl:grid-cols-3">
+              {WORKFLOW_STEPS.map((step, index) => (
+                <li key={step.title} className="rounded-xl bg-[#faf8f3] p-4">
+                  <p className="text-sm font-semibold text-[#33251e]">
+                    <span className="mr-2 text-[#8b6a12]">{index + 1}.</span>
+                    {step.title}
+                  </p>
+                  <p className="mt-1 text-xs leading-5 text-[#74675f]">{step.body}</p>
+                  {step.link && (
+                    <Link to="/admin/reports" className="mt-2 inline-flex text-xs font-semibold text-[#765d18] underline underline-offset-2 hover:text-black">
+                      Open Sales Reports
+                    </Link>
+                  )}
+                </li>
+              ))}
             </ol>
-          </section>
+          </details>
 
-          <div className="mb-5 grid grid-cols-2 gap-2.5 sm:grid-cols-3 xl:grid-cols-5">
-            <div className="min-w-0 rounded-lg border border-t-[3px] border-[#e9e1d9] border-t-[#c9a94f] bg-white px-3.5 py-3">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-black/55">Projected demand</p>
-              <p className="mt-2 text-[22px] font-bold text-black">{forecast.summary.totalProjectedDemand.toFixed(1)} units</p>
-            </div>
-            <div className="min-w-0 rounded-lg border border-t-[3px] border-[#e9e1d9] border-t-[#81906c] bg-white px-3.5 py-3">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-black/55">Forecast vs previous period</p>
-              <p className={`mt-2 text-[22px] font-bold ${Number(forecast.summary.trendPercent) >= 0 ? "text-[#68815d]" : "text-black"}`}>
-                {forecast.summary.trendPercent == null ? "—" : `${forecast.summary.trendPercent >= 0 ? "↑" : "↓"} ${Math.abs(forecast.summary.trendPercent)}%`}
-              </p>
-              <p className="mt-1 text-[10px] text-black/50">
-                Forecast {Number(forecast.summary.totalProjectedDemand || 0).toFixed(1)} vs previous {Number(forecast.summary.previousEquivalentDemand || 0).toFixed(1)} units
-              </p>
-            </div>
-            <div className="min-w-0 rounded-lg border border-t-[3px] border-[#e9e1d9] border-t-[#c87954] bg-white px-3.5 py-3">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-black/55">High priority</p>
-              <p className="mt-2 text-[22px] font-bold text-black">{forecast.summary.highPriorityCount}</p>
-            </div>
-            <div className="min-w-0 rounded-lg border border-t-[3px] border-[#e9e1d9] border-t-[#d4af37] bg-white px-3.5 py-3">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-black/55">Reorder recommendations</p>
-              <p className="mt-2 text-[22px] font-bold text-black">{forecast.summary.recommendationCount}</p>
-            </div>
-            <div className="min-w-0 rounded-lg border border-t-[3px] border-[#e9e1d9] border-t-black/30 bg-white px-3.5 py-3">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-black/55">Processing status</p>
-              <p className={`mt-2 text-[14px] font-bold ${isWorking ? "text-[#9b7810]" : "text-black"}`}>
-                {isWorking ? "Running" : "Ready"}
-              </p>
-            </div>
+          {/* KPIs */}
+          <div className="mb-8 grid grid-cols-2 gap-4 xl:grid-cols-4">
+            <StatTile
+              label="Projected demand"
+              value={`${Number(summary.totalProjectedDemand || 0).toFixed(1)} units`}
+              note={`Next ${period} days`}
+            />
+            <StatTile
+              label="Forecast vs previous period"
+              value={trendPercent == null ? "—" : `${trendPercent >= 0 ? "↑" : "↓"} ${Math.abs(trendPercent)}%`}
+              valueClass={trendPercent != null && trendPercent >= 0 ? "text-[#4f7a4a]" : "text-[#33251e]"}
+              note={`Forecast ${Number(summary.totalProjectedDemand || 0).toFixed(1)} vs previous ${Number(summary.previousEquivalentDemand || 0).toFixed(1)} units`}
+            />
+            <StatTile label="High priority" value={summary.highPriorityCount ?? 0} note="Products to prepare first" />
+            <StatTile label="Reorder recommendations" value={summary.recommendationCount ?? 0} note="Ingredients to restock" />
           </div>
 
           {forecast.coverageAvailable === false && (
-            <div role="status" className="mb-5 rounded-xl border border-[#d6b85a]/40 bg-[#fff9e8] px-4 py-3 text-sm text-black/70">
+            <div role="status" className="mb-8 rounded-xl border border-[#d6b85a]/40 bg-[#fff9e8] px-4 py-3 text-sm text-[#33251e]">
               A forecast cannot be calculated because no continuous sales-date range is available. Import a complete report from Sales Reports first.
             </div>
           )}
 
-          <section aria-labelledby="method-comparison-title" className="mb-6 rounded-[24px] border border-black/10 bg-[#fcfbf7] p-4 sm:p-5">
-            <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-              <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-black/50">Product Forecast Comparison</p>
-                <h2 id="method-comparison-title" className="text-lg font-semibold text-black">Actual sales and forecast methods</h2>
-                <p className="mt-1 text-xs leading-5 text-black/55">Compare each method with the same product’s recent actual sales.</p>
-              </div>
-              <label className="flex w-full flex-col gap-1 text-xs font-semibold text-black/60 lg:max-w-xs">
-                Product
-                <select
-                  aria-label="Select product for forecast comparison"
-                  value={comparisonProduct?.product || ""}
-                  onChange={(event) => setComparisonProductName(event.target.value)}
-                  disabled={!comparisonProducts.length}
-                  className="h-10 w-full rounded-lg border border-black/15 bg-white px-3 text-sm text-black disabled:opacity-50"
-                >
-                  {comparisonProducts.length
-                    ? comparisonProducts.map((product) => <option key={product.product} value={product.product}>{product.product}</option>)
-                    : <option value="">No products with sales history</option>}
-                </select>
-              </label>
-            </div>
-
-            <div className="mb-4 flex flex-wrap gap-2" role="group" aria-label="Toggle forecast methods">
-              {COMPARISON_METHODS.map((method) => (
-                <label key={method.key} className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-black/10 bg-white px-3 py-2 text-xs font-medium text-black/70">
-                  <input
-                    type="checkbox"
-                    checked={visibleComparisonMethods[method.key]}
-                    onChange={(event) => setVisibleComparisonMethods((current) => ({ ...current, [method.key]: event.target.checked }))}
-                    className="accent-[#8b6a12]"
-                  />
-                  <span className="h-2 w-2 rounded-full" style={{ backgroundColor: method.color }} />
-                  {method.label}
-                </label>
-              ))}
-            </div>
-
-            {comparisonProduct ? (
-              <div className="grid auto-rows-fr gap-3 sm:grid-cols-2">
-                {COMPARISON_METHODS.filter((method) => visibleComparisonMethods[method.key]).map((method) => (
-                  <MethodForecastChart
-                    key={`${comparisonProduct.product}-${method.key}`}
-                    product={comparisonProduct}
-                    method={method}
-                    period={period}
-                  />
-                ))}
-                {!COMPARISON_METHODS.some((method) => visibleComparisonMethods[method.key]) && (
-                  <p className="rounded-xl border border-dashed border-black/15 bg-white p-5 text-center text-sm text-black/50 sm:col-span-2">
-                    Turn on at least one forecast method to show its chart.
-                  </p>
-                )}
-              </div>
-            ) : (
-              <div className="rounded-xl border border-dashed border-black/15 bg-white p-6 text-center text-sm text-black/50">
-                Product comparison charts will appear when continuous sales history is available.
-              </div>
-            )}
-          </section>
-
-          {/* Row 1: chart + alerts */}
-          <div className="mb-6 grid items-stretch gap-4 xl:grid-cols-[1.25fr_0.75fr]">
-            <Card
-              eyebrow="Demand Forecast"
-              title={`${period}-day production outlook`}
-              action={<div className="rounded-full bg-[#f7f2e8] px-3 py-1 text-xs font-semibold text-[#8b6a12]">Live demand model</div>}
-            >
-              {chartHistory.length && chartForecast.length ? (
-                <ForecastChart historical={chartHistory} forecast={chartForecast} />
-              ) : (
-                <div className="rounded-2xl border border-dashed border-black/10 p-6 text-sm text-black/60">Insufficient historical data for reliable forecasting.</div>
-              )}
-            </Card>
-            <Card
-              eyebrow="Priority Alerts"
-              title="Procurement pressure"
-              action={<AlertTriangle size={18} className="text-[#D4AF37]" />}
-            >
-              <div className="space-y-3">
-                {forecast.alerts?.length ? (
-                  forecast.alerts.map((alert) => (
-                    <div key={alert.product} className="rounded-2xl border border-black/10 bg-[#fffdf8] p-3">
-                      <p className="text-sm font-semibold text-black">{alert.product}</p>
-                      <p className="mt-1 text-sm text-black/60">{alert.message}</p>
-                    </div>
-                  ))
+          {/* 1. Outlook */}
+          <Section title="Demand outlook" description="What the model expects over the selected period.">
+            <div className="grid items-stretch gap-4 xl:grid-cols-[1.6fr_1fr]">
+              <Card
+                title={`${period}-day production outlook`}
+                description="Past daily demand and the projected days ahead."
+                action={<Chip tone="warn">Live demand model</Chip>}
+              >
+                {chartHistory.length && chartForecast.length ? (
+                  <ForecastChart historical={chartHistory} forecast={chartForecast} />
                 ) : (
-                  <div className="rounded-2xl border border-dashed border-black/10 p-3 text-sm text-black/60">
-                    No high-priority alerts right now.
-                  </div>
+                  <EmptyState>Insufficient historical data for reliable forecasting.</EmptyState>
                 )}
-              </div>
-            </Card>
-          </div>
+              </Card>
+              <Card
+                title="Priority alerts"
+                description="Products under procurement pressure."
+                action={<AlertTriangle size={18} className="text-[#D4AF37]" />}
+              >
+                <div className="relative min-h-[260px] flex-1">
+                  <div className="absolute inset-0 space-y-2 overflow-y-auto pr-1">
+                    {forecast.alerts?.length ? (
+                      forecast.alerts.map((alert) => (
+                        <div key={alert.product} className="rounded-xl border border-[#e8dfd4] bg-[#faf8f3] p-3">
+                          <p className="text-sm font-semibold text-[#33251e]">{alert.product}</p>
+                          <p className="mt-1 text-xs leading-5 text-[#74675f]">{alert.message}</p>
+                        </div>
+                      ))
+                    ) : (
+                      <EmptyState className="h-full">No high-priority alerts right now.</EmptyState>
+                    )}
+                  </div>
+                </div>
+              </Card>
+            </div>
 
-          {/* Insights */}
-          <div className="mb-6">
             <Card
-              eyebrow="Forecast Insights"
               title="What the model is seeing"
-              action={<span className="text-xs text-black/45">{forecast.model?.records || 0} sales rows</span>}
+              description="Plain-language insights from your sales history."
+              action={<span className="text-xs text-[#74675f]">{forecast.model?.records || 0} sales rows</span>}
             >
               {forecast.insights?.length ? (
-                <div className="grid gap-3 md:grid-cols-3">
-                  {forecast.insights.map((insight) => (
-                    <div key={insight} className="rounded-2xl bg-[#fffaf0] p-4 text-sm leading-6 text-black/70">{insight}</div>
+                <div className="grid auto-rows-fr gap-3 md:grid-cols-3">
+                  {forecast.insights.map((insight, index) => (
+                    <div key={`${index}-${insight}`} className="rounded-xl bg-[#faf8f3] p-4 text-sm leading-6 text-[#33251e]/80">
+                      {insight}
+                    </div>
                   ))}
                 </div>
               ) : (
-                <p className="text-sm text-black/55">Insufficient historical data for reliable insights.</p>
+                <EmptyState>Insufficient historical data for reliable insights.</EmptyState>
               )}
             </Card>
-          </div>
+          </Section>
 
-          {/* CSV aliases */}
-          <div className="mb-6">
-            <section className="rounded-[24px] border border-black/10 bg-white p-5 shadow-sm">
-              <div className="mb-3">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.25em] text-black/50">CSV data quality</p>
-                <h2 className="text-lg font-semibold text-black">Product name aliases</h2>
-                <p className="mt-1 text-sm leading-6 text-black/60">Map alternate CSV labels to a cake or customized cake catalog product. These mappings apply to imported sales in forecasts; they do not rename products.</p>
-              </div>
-              <form onSubmit={saveProductAlias} className="grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
-                <input aria-label="Alternate CSV product name" value={aliasName} onChange={(event) => setAliasName(event.target.value)} maxLength={191} required placeholder="e.g. Choco Cake" className="h-10 rounded-lg border border-black/15 px-3 text-sm" />
-                <select aria-label="Catalog product for alias" value={aliasProductId} onChange={(event) => setAliasProductId(event.target.value)} required className="h-10 rounded-lg border border-black/15 px-3 text-sm">
-                  {aliasProducts.map((product) => <option key={product.id} value={product.id}>{product.name}</option>)}
-                </select>
-                <button type="submit" disabled={savingAlias || !aliasProducts.length} className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-[#33251e] px-4 text-xs font-semibold text-white disabled:opacity-50"><Plus size={14} />{savingAlias ? "Saving..." : "Add mapping"}</button>
-              </form>
-              {aliasError && <p role="alert" className="mt-2 rounded-md bg-[#fff4cd] px-3 py-2 text-xs text-[#33251e]">{aliasError}</p>}
-              {aliases.length > 0 && (
-                <ul className="mt-3 divide-y divide-black/5 rounded-lg border border-black/10">
-                  {aliases.map((alias) => (
-                    <li key={alias.id} className="flex items-center justify-between gap-3 px-3 py-2 text-xs">
-                      <span><strong>{alias.alias_name}</strong><span className="mx-2 text-black/40">→</span>{alias.product_name}</span>
-                      <button type="button" onClick={() => removeProductAlias(alias.id)} aria-label={`Remove alias ${alias.alias_name}`} className="rounded p-1 text-black/50 hover:bg-black/5 hover:text-black"><Trash2 size={14} /></button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </section>
-          </div>
-
-          {/* Estimated sales table */}
-          <div className="mb-6">
-            <section className="rounded-[24px] border border-black/10 bg-white p-5 shadow-sm">
-              <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.25em] text-black/50">Estimated Sales</p>
-                  <h2 className="text-lg font-semibold text-black">How many items might we sell?</h2>
-                  <p className="mt-1 max-w-2xl text-sm leading-6 text-black/60">
-                    This estimate uses past sales to help you prepare products. It is a guide, not a guaranteed number.
-                  </p>
+          {/* 2. Product forecasts */}
+          <Section title="Product forecasts" description="Estimated sales and what to prepare for each product.">
+            <Card
+              title="How many items might we sell?"
+              description="This estimate uses past sales to help you prepare products. It is a guide, not a guaranteed number."
+              action={
+                <div className="grid w-full shrink-0 grid-cols-2 gap-2 sm:w-[340px]">
+                  <select aria-label="Filter by product" value={productFilter} onChange={(event) => setProductFilter(event.target.value)} className={FIELD_CLASS}>
+                    <option value="">All products</option>
+                    {forecast.products.map((product) => <option key={product.product} value={product.product}>{product.product}</option>)}
+                  </select>
+                  <select aria-label="Filter by category" value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)} className={FIELD_CLASS}>
+                    <option value="">All categories</option>
+                    {categories.map((category) => <option key={category} value={category}>{category}</option>)}
+                  </select>
                 </div>
-                <div className="grid w-full shrink-0 grid-cols-2 gap-2 md:w-[320px]">
-                  <select aria-label="Filter by product" value={productFilter} onChange={(event) => setProductFilter(event.target.value)} className="h-10 w-full min-w-0 rounded-xl border border-black/10 px-3 text-xs"><option value="">All products</option>{forecast.products.map((product) => <option key={product.product} value={product.product}>{product.product}</option>)}</select>
-                  <select aria-label="Filter by category" value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)} className="h-10 w-full min-w-0 rounded-xl border border-black/10 px-3 text-xs"><option value="">All categories</option>{[...new Set(forecast.products.map((product) => product.category))].map((category) => <option key={category} value={category}>{category}</option>)}</select>
-                </div>
-              </div>
+              }
+            >
               <div className="overflow-x-auto">
-                <table className="min-w-[1020px] text-left text-sm">
+                <table className="w-full min-w-[900px] text-left text-sm">
                   <thead>
-                    <tr className="border-b border-black/10 text-[10px] uppercase tracking-[0.16em] text-black/50">
-                      <th className="py-3 pr-4">Product</th>
-                      <th className="py-3 pr-4">Recent daily sales</th>
+                    <tr className="border-b border-[#e8dfd4] text-xs text-[#74675f]">
+                      <th className="sticky left-0 z-10 bg-white py-3 pr-4 font-medium">Product</th>
+                      <th className="whitespace-nowrap px-3 py-3 text-center font-medium">Recent daily sales</th>
                       {Array.from({ length: period }, (_, index) => (
-                        <th key={index} className="py-3 pr-4">
+                        <th key={index} className="whitespace-nowrap px-3 py-3 text-center font-medium">
                           {index === 0 ? "Tomorrow" : `In ${index + 1} days`}
                         </th>
                       ))}
-                      <th className="py-3 pr-4">Estimated total</th>
-                      <th className="py-3 pr-4">Extra to prepare</th>
-                      <th className="whitespace-nowrap py-3">Action</th>
+                      <th className="whitespace-nowrap px-3 py-3 text-center font-medium">Estimated total</th>
+                      <th className="whitespace-nowrap px-3 py-3 text-center font-medium">Extra to prepare</th>
+                      <th className="whitespace-nowrap py-3 pl-3 font-medium">Action</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredProducts.length ? paginatedProducts.map((product) => (
-                      <tr key={product.product} className="border-b border-black/10 last:border-0 hover:bg-[#fafaf8]">
-                        <td className="py-3 pr-4 font-semibold text-black">{product.product}</td>
-                        <td className="py-3 pr-4 text-black/70">{product.recentDemand}</td>
-                        {product.forecast.map((value, index) => (
-                          <td key={index} className="py-3 pr-4 text-black/70">{value}</td>
+                    {filteredProducts.length ? (
+                      <>
+                        {paginatedProducts.map((product) => (
+                          <tr key={product.product} className={`${ROW_HEIGHT} border-b border-[#f0ebe1]`}>
+                            <td className="sticky left-0 z-10 max-w-[220px] truncate bg-white py-2 pr-4 font-semibold text-[#33251e]" title={product.product}>{product.product}</td>
+                            <td className="px-3 py-2 text-center tabular-nums text-[#74675f]">{product.recentDemand}</td>
+                            {product.forecast.map((value, index) => (
+                              <td key={index} className="px-3 py-2 text-center tabular-nums text-[#74675f]">{value}</td>
+                            ))}
+                            <td className="px-3 py-2 text-center font-semibold tabular-nums text-[#33251e]">{product.totalForecast}</td>
+                            <td className="px-3 py-2 text-center font-semibold tabular-nums text-[#33251e]">{product.recommendedPreorderQuantity ?? 0}</td>
+                            <td className="whitespace-nowrap py-2 pl-3">
+                              <Chip tone={PRIORITY_TONE[product.priority] || "neutral"}>{PRIORITY_LABEL[product.priority] || product.priority}</Chip>
+                            </td>
+                          </tr>
                         ))}
-                        <td className="py-3 pr-4 font-semibold">{product.totalForecast}</td>
-                        <td className="py-3 pr-4 font-semibold">{product.recommendedPreorderQuantity ?? 0}</td>
-                        <td className="whitespace-nowrap py-3">
-                          <span className="inline-flex whitespace-nowrap rounded-full bg-[#f7f2e8] px-2.5 py-1 text-[10px] font-semibold">
-                            {({ High: "Prepare first", Medium: "Plan ahead", Low: "Stock is enough" })[product.priority] || product.priority}
-                          </span>
-                        </td>
-                      </tr>
-                    )) : (
+                        {Array.from({ length: PAGE_SIZE - paginatedProducts.length }, (_, index) => (
+                          <tr key={`pad-${index}`} className={ROW_HEIGHT} aria-hidden="true"><td colSpan={period + 5} /></tr>
+                        ))}
+                      </>
+                    ) : (
                       <tr>
-                        <td colSpan={period + 5} className="py-6 text-center text-sm text-black/50">
+                        <td colSpan={period + 5} className="h-[280px] text-center text-sm text-[#74675f]">
                           There is not enough sales data to estimate product demand yet.
                         </td>
                       </tr>
@@ -1101,256 +1103,281 @@ export default function PredictiveAnalytics() {
                   </tbody>
                 </table>
               </div>
-              <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-black/10 pt-4">
-                <span className="text-xs text-black/55">
-                  Showing {sortedFilteredProducts.length ? (salesPage - 1) * 5 + 1 : 0}-
-                  {Math.min(salesPage * 5, sortedFilteredProducts.length)} of {sortedFilteredProducts.length} products
-                </span>
-                <div className="flex items-center gap-2">
-                  <span className="mr-1 text-xs text-black/55">Page {salesPage} of {salesPageCount}</span>
-                  <button
-                    type="button"
-                    onClick={() => setSalesPage((page) => Math.max(1, page - 1))}
-                    disabled={salesPage <= 1}
-                    aria-label="Previous estimated sales page"
-                    className="inline-flex h-9 items-center gap-1 rounded-lg border border-black/10 bg-white px-3 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-40"
-                  >
-                    <ChevronLeft size={15} />
-                    Previous
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setSalesPage((page) => Math.min(salesPageCount, page + 1))}
-                    disabled={salesPage >= salesPageCount}
-                    aria-label="Next estimated sales page"
-                    className="inline-flex h-9 items-center gap-1 rounded-lg border border-black/10 bg-white px-3 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-40"
-                  >
-                    Next
-                    <ChevronRight size={15} />
-                  </button>
-                </div>
-              </div>
-            </section>
-          </div>
+              <Pagination page={salesPage} pageCount={salesPageCount} total={sortedFilteredProducts.length} onPageChange={setSalesPage} label="products" />
+            </Card>
 
-          {/* Row 2: preparation + top products */}
-          <div className="mb-6 grid items-stretch gap-4 xl:grid-cols-2">
-            <Card eyebrow="Preparation Guide" title="Products that may need more stock">
-              <p className="mb-3 text-sm text-black/60">The suggested amount is the estimated demand not covered by current stock.</p>
-              <div className="flex-1 space-y-2">
-                {preparationProducts.length ? paginatedPreparationProducts.map((product) => (
-                  <div key={product.product} className="flex items-center justify-between border-b border-black/10 py-3 text-sm">
-                    <span className="font-semibold">{product.product}</span>
-                    <span>
-                      {product.recommendedPreorderQuantity} items
-                      <b className="ml-2 text-black/50">{({ High: "Prepare first", Medium: "Plan ahead", Low: "Stock is enough" })[product.priority] || product.priority}</b>
-                    </span>
+            <div className="grid items-stretch gap-4 xl:grid-cols-2">
+              <Card title="Products that may need more stock" description="The suggested amount is the estimated demand not covered by current stock.">
+                <PagedRows
+                  items={preparationProducts}
+                  page={preparationPage}
+                  emptyText="Current stock appears to be enough for the estimated demand."
+                  renderRow={(product) => (
+                    <>
+                      <span className="min-w-0 flex-1 truncate text-sm font-semibold text-[#33251e]" title={product.product}>{product.product}</span>
+                      <span className="w-20 text-right text-sm tabular-nums text-[#33251e]">{product.recommendedPreorderQuantity} items</span>
+                      <span className="flex w-[116px] justify-end">
+                        <Chip tone={PRIORITY_TONE[product.priority] || "neutral"}>{PRIORITY_LABEL[product.priority] || product.priority}</Chip>
+                      </span>
+                    </>
+                  )}
+                />
+                <Pagination page={preparationPage} pageCount={preparationPageCount} total={preparationProducts.length} onPageChange={setPreparationPage} label="products" />
+              </Card>
+
+              <Card title="Highest projected demand" description={`Top ${PAGE_SIZE} products by estimated total over ${period} days.`}>
+                {topProducts.length ? (
+                  <div className="flex-1">
+                    {topProducts.map((product) => (
+                      <div key={product.product} className={`flex flex-col justify-center border-b border-[#f0ebe1] ${ROW_HEIGHT}`}>
+                        <div className="mb-1.5 flex justify-between gap-3 text-sm">
+                          <span className="truncate font-medium text-[#33251e]" title={product.product}>{product.product}</span>
+                          <b className="tabular-nums text-[#33251e]">{product.totalForecast}</b>
+                        </div>
+                        <div className="h-2 rounded-full bg-[#f0ebe1]">
+                          <div
+                            className="h-2 rounded-full bg-[#D4AF37] transition-[width] duration-500"
+                            style={{ width: `${Math.min(100, (product.totalForecast / maxForecast) * 100)}%` }}
+                          />
+                        </div>
+                      </div>
+                    ))}
+                    {Array.from({ length: PAGE_SIZE - topProducts.length }, (_, index) => (
+                      <div key={`pad-${index}`} className={ROW_HEIGHT} aria-hidden="true" />
+                    ))}
                   </div>
-                )) : (
-                  <p className="text-sm text-black/50">Current stock appears to be enough for the estimated demand.</p>
+                ) : (
+                  <EmptyState className="min-h-[280px]">Forecasts will appear once sales data is available.</EmptyState>
                 )}
-              </div>
-              <ListPagination
-                page={preparationPage}
-                pageCount={preparationPageCount}
-                total={preparationProducts.length}
-                onPageChange={setPreparationPage}
-                label="products"
-              />
-            </Card>
-            <Card eyebrow="Top Forecasted Products" title="Highest projected demand">
-              <div className="space-y-4">
-                {[...forecast.products].sort((a, b) => b.totalForecast - a.totalForecast).slice(0, 5).map((product) => (
-                  <div key={product.product}>
-                    <div className="mb-1 flex justify-between gap-3 text-xs">
-                      <span className="truncate">{product.product}</span>
-                      <b className="tabular-nums">{product.totalForecast}</b>
-                    </div>
-                    <div className="h-2 rounded-full bg-slate-100">
-                      <div
-                        className="h-2 rounded-full bg-[#D4AF37] transition-[width] duration-500"
-                        style={{ width: `${Math.min(100, product.totalForecast / Math.max(...forecast.products.map((item) => item.totalForecast), 1) * 100)}%` }}
-                      />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </Card>
-          </div>
+                <CardFooter text={`Top ${topProducts.length} of ${forecast.products.length} products`} />
+              </Card>
+            </div>
 
-          {/* Row 3: ingredient demand + actions */}
-          <div className="mb-6 grid items-stretch gap-4 xl:grid-cols-2">
-            <Card eyebrow="Ingredient Demand Forecast" title="Recipe-based consumption and risk">
-              {forecast.model?.recipe_missing_products?.length > 0 && (
-                <p className="mb-3 rounded-lg bg-[#fff4cd] px-3 py-2 text-xs leading-5 text-black/70">
-                  No active recipe mapping for {forecast.model.recipe_missing_products.length} forecast product(s):{" "}
-                  {forecast.model.recipe_missing_products.slice(0, 5).join(", ")}
-                  {forecast.model.recipe_missing_products.length > 5 ? ", and more" : ""}. Ingredient demand for these products is not included.
-                </p>
-              )}
-              <div className="overflow-x-auto">
-                <table className="min-w-[680px] text-left text-sm">
-                  <thead>
-                    <tr className="border-b border-black/10 text-[10px] uppercase tracking-[0.16em] text-black/50">
-                      <th className="py-3">Ingredient</th>
-                      <th className="py-3">Stock</th>
-                      <th className="py-3">Consumption</th>
-                      <th className="py-3">Remaining</th>
-                      <th className="py-3">Risk</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {forecast.ingredients?.length ? forecast.ingredients.map((item) => (
-                      <tr key={item.ingredient} className="border-b border-black/10 last:border-0 hover:bg-[#fafaf8]">
-                        <td className="py-3 font-semibold">{item.ingredient}</td>
-                        <td className="py-3">{item.currentStock} {item.unit}</td>
-                        <td className="py-3">{item.forecastConsumption} {item.unit}</td>
-                        <td className="py-3">{item.projectedRemaining} {item.unit}</td>
-                        <td className="py-3"><span className="rounded-full bg-[#f7f2e8] px-2 py-1 text-[10px] font-semibold">{item.riskStatus}</span></td>
-                      </tr>
-                    )) : (
-                      <tr><td colSpan={5} className="py-5 text-black/50">No recipe-linked ingredient demand is available.</td></tr>
+            <Card
+              title="Actual sales and forecast methods"
+              description="Compare each method with the same product’s recent actual sales."
+              action={
+                <label className="flex w-full flex-col gap-1 text-xs font-medium text-[#74675f] sm:w-[280px]">
+                  Product
+                  <select
+                    aria-label="Select product for forecast comparison"
+                    value={comparisonProduct?.product || ""}
+                    onChange={(event) => setComparisonProductName(event.target.value)}
+                    disabled={!comparisonProducts.length}
+                    className={FIELD_CLASS}
+                  >
+                    {comparisonProducts.length ? (
+                      comparisonProducts.map((product) => <option key={product.product} value={product.product}>{product.product}</option>)
+                    ) : (
+                      <option value="">No products with sales history</option>
                     )}
-                  </tbody>
-                </table>
-              </div>
-            </Card>
-            <Card eyebrow="Recommended Actions" title="Next operational steps">
-              <div className="flex-1 space-y-2">
-                {sortedActions.length ? paginatedActions.map((action, index) => (
-                  <div key={`${action.type}-${action.product}-${index}`} className="rounded-2xl border border-black/10 bg-[#fffdf8] p-3 text-sm text-black/70">
-                    {action.message}
-                  </div>
-                )) : (
-                  <p className="text-sm text-black/50">No action is required from the current forecast.</p>
-                )}
-              </div>
-              <ListPagination
-                page={actionsPage}
-                pageCount={actionsPageCount}
-                total={sortedActions.length}
-                onPageChange={setActionsPage}
-                label="actions"
-              />
-            </Card>
-          </div>
-
-          {/* Keep these cards in one column so the shorter drivers card does not leave a grid-sized gap. */}
-          <div className="mb-6 grid gap-4">
-            <Card eyebrow="Forecast Drivers" title="Factors used by this model" stretch={false}>
-              <div className="flex flex-wrap gap-2">
-                {(forecast.drivers || []).map((driver) => (
-                  <span key={driver} className="rounded-full bg-[#f7f2e8] px-3 py-2 text-xs text-black/70">{driver}</span>
+                  </select>
+                </label>
+              }
+            >
+              <div className="mb-4 flex flex-wrap gap-2" role="group" aria-label="Toggle forecast methods">
+                {COMPARISON_METHODS.map((method) => (
+                  <label key={method.key} className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-[#e0d6c8] bg-white px-3 py-1.5 text-xs font-medium text-[#33251e]">
+                    <input
+                      type="checkbox"
+                      checked={visibleComparisonMethods[method.key]}
+                      onChange={(event) => setVisibleComparisonMethods((current) => ({ ...current, [method.key]: event.target.checked }))}
+                      className="accent-[#8b6a12]"
+                    />
+                    <span className="h-2 w-2 rounded-full" style={{ backgroundColor: method.color }} />
+                    {method.label}
+                  </label>
                 ))}
               </div>
-              <dl className="mt-5 grid grid-cols-2 gap-3 border-t border-black/10 pt-4 text-xs">
+
+              {comparisonProduct ? (
+                anyMethodVisible ? (
+                  <div className="grid auto-rows-fr gap-4 md:grid-cols-2">
+                    {COMPARISON_METHODS.filter((method) => visibleComparisonMethods[method.key]).map((method) => (
+                      <MethodForecastChart key={`${comparisonProduct.product}-${method.key}`} product={comparisonProduct} method={method} period={period} />
+                    ))}
+                  </div>
+                ) : (
+                  <EmptyState className="min-h-[200px]">Turn on at least one forecast method to show its chart.</EmptyState>
+                )
+              ) : (
+                <EmptyState className="min-h-[200px]">Product comparison charts will appear when continuous sales history is available.</EmptyState>
+              )}
+            </Card>
+          </Section>
+
+          {/* 3. Stock & ingredients */}
+          <Section title="Stock and ingredients" description="What the forecast means for your ingredients and next steps.">
+            <div className="grid items-stretch gap-4 xl:grid-cols-2">
+              <Card title="Recipe-based consumption and risk" description="Forecast ingredient use against current stock.">
+                {forecast.model?.recipe_missing_products?.length > 0 && (
+                  <p className="mb-3 rounded-xl bg-[#fff4cd] px-3 py-2 text-xs leading-5 text-[#33251e]">
+                    No active recipe mapping for {forecast.model.recipe_missing_products.length} forecast product(s):{" "}
+                    {forecast.model.recipe_missing_products.slice(0, 5).join(", ")}
+                    {forecast.model.recipe_missing_products.length > 5 ? ", and more" : ""}. Ingredient demand for these products is not included.
+                  </p>
+                )}
+                <div className="flex flex-1 flex-col overflow-x-auto">
+                  <div className="flex min-w-[560px] flex-1 flex-col">
+                    <div className="grid grid-cols-[1.4fr_1fr_1fr_1fr_90px] gap-3 border-b border-[#e8dfd4] pb-3 text-xs text-[#74675f]">
+                      <span>Ingredient</span><span>Stock</span><span>Consumption</span><span>Remaining</span><span className="text-right">Risk</span>
+                    </div>
+                    <PagedRows
+                      items={ingredients}
+                      page={ingredientPage}
+                      emptyText="No recipe-linked ingredient demand is available."
+                      renderRow={(item) => (
+                        <div className="grid w-full grid-cols-[1.4fr_1fr_1fr_1fr_90px] items-center gap-3 text-sm">
+                          <span className="truncate font-semibold text-[#33251e]" title={item.ingredient}>{item.ingredient}</span>
+                          <span className="tabular-nums text-[#74675f]">{item.currentStock} {item.unit}</span>
+                          <span className="tabular-nums text-[#74675f]">{item.forecastConsumption} {item.unit}</span>
+                          <span className="tabular-nums text-[#74675f]">{item.projectedRemaining} {item.unit}</span>
+                          <span className="flex justify-end"><Chip tone={riskTone(item.riskStatus)}>{item.riskStatus}</Chip></span>
+                        </div>
+                      )}
+                    />
+                  </div>
+                </div>
+                <Pagination page={ingredientPage} pageCount={ingredientPageCount} total={ingredients.length} onPageChange={setIngredientPage} label="ingredients" />
+              </Card>
+
+              <Card title="Next operational steps" description="Recommended actions from the current forecast.">
+                <PagedRows
+                  items={sortedActions}
+                  page={actionsPage}
+                  emptyText="No action is required from the current forecast."
+                  renderRow={(action) => (
+                    <p className="line-clamp-2 text-sm leading-5 text-[#33251e]/80" title={action.message}>{action.message}</p>
+                  )}
+                />
+                <Pagination page={actionsPage} pageCount={actionsPageCount} total={sortedActions.length} onPageChange={setActionsPage} label="actions" />
+              </Card>
+            </div>
+
+            <div className="grid items-stretch gap-4 xl:grid-cols-2">
+              <Card
+                title="Exact ingredient quantities needed"
+                description="Reorder recommendations, highest priority first."
+                action={<Package2 size={18} className="text-[#D4AF37]" />}
+              >
+                <div className="grid grid-cols-[1.2fr_1.2fr_80px_80px] gap-3 border-b border-[#e8dfd4] pb-3 text-xs text-[#74675f]">
+                  <span>Product</span><span>Ingredient</span><span className="text-right">Qty</span><span className="text-right">Priority</span>
+                </div>
+                <PagedRows
+                  items={sortedRecommendations}
+                  page={reorderPage}
+                  emptyText="No procurement actions are required from the current snapshot."
+                  renderRow={(item) => (
+                    <div className="grid w-full grid-cols-[1.2fr_1.2fr_80px_80px] items-center gap-3 text-sm">
+                      <span className="truncate text-[#33251e]" title={item.product}>{item.product}</span>
+                      <span className="truncate text-[#74675f]" title={item.ingredient}>{item.ingredient}</span>
+                      <span className="text-right tabular-nums text-[#74675f]">{Number(item.qty || 0).toFixed(2)} kg</span>
+                      <span className="flex justify-end"><Chip tone={item.priority === "High" ? "bad" : "neutral"}>{item.priority}</Chip></span>
+                    </div>
+                  )}
+                />
+                <Pagination page={reorderPage} pageCount={reorderPageCount} total={sortedRecommendations.length} onPageChange={setReorderPage} label="recommendations" />
+              </Card>
+
+              <Card
+                title="Stock safety view"
+                description="How much of the forecast demand current stock covers."
+                action={<TrendingUp size={18} className="text-[#D4AF37]" />}
+              >
+                <PagedRows
+                  items={sortedCoverageProducts}
+                  page={coveragePage}
+                  emptyText="Coverage data will appear once forecasts are generated."
+                  renderRow={(item) => <CoverageRow item={item} />}
+                />
+                <Pagination page={coveragePage} pageCount={coveragePageCount} total={sortedCoverageProducts.length} onPageChange={setCoveragePage} label="products" />
+              </Card>
+            </div>
+          </Section>
+
+          {/* 4. Model quality */}
+          <Section title="Model quality" description="How the forecast was chosen and how accurate it has been.">
+            <Card title="Validation metrics" description="Each method tested on the last 7 days of real sales.">
+              <ValidationMetrics model={forecast.model} />
+            </Card>
+
+            <Card title="Factors used by this model" description="Inputs and data windows behind the forecast.">
+              {forecast.drivers?.length ? (
+                <div className="mb-4 flex flex-wrap gap-2">
+                  {forecast.drivers.map((driver) => (
+                    <Chip key={driver}>{driver}</Chip>
+                  ))}
+                </div>
+              ) : null}
+              <dl className="grid grid-cols-2 gap-4 border-t border-[#f0ebe1] pt-4 text-xs md:grid-cols-5">
                 <div>
-                  <dt className="text-black/50">Training window</dt>
-                  <dd className="mt-0.5 font-semibold text-black">{forecast.model?.training_start || "—"} to {forecast.model?.training_end || "—"}</dd>
+                  <dt className="text-[#74675f]">Training window</dt>
+                  <dd className="mt-1 font-semibold text-[#33251e]">{forecast.model?.training_start || "—"} to {forecast.model?.training_end || "—"}</dd>
                 </div>
                 <div>
-                  <dt className="text-black/50">Latest continuous sales coverage</dt>
-                  <dd className="mt-0.5 font-semibold text-black">
+                  <dt className="text-[#74675f]">Latest continuous sales coverage</dt>
+                  <dd className="mt-1 font-semibold text-[#33251e]">
                     {forecast.coverage?.start && forecast.coverage?.end
                       ? `${forecast.coverage.start} to ${forecast.coverage.end} (${forecast.coverage.days} days)`
                       : "Not available"}
                   </dd>
                   {forecast.coverage && (
-                    <dd className="mt-1 text-[10px] leading-4 text-black/50">Import boundaries use valid dates found in the CSV.</dd>
+                    <dd className="mt-1 text-[11px] leading-4 text-[#74675f]">Import boundaries use valid dates found in the CSV.</dd>
                   )}
                 </div>
                 <div>
-                  <dt className="text-black/50">Latest data</dt>
-                  <dd className="mt-0.5 font-semibold text-black">{forecast.dataAgeDays == null ? "—" : `${forecast.dataAgeDays} day(s) old`}</dd>
+                  <dt className="text-[#74675f]">Latest data</dt>
+                  <dd className="mt-1 font-semibold text-[#33251e]">{forecast.dataAgeDays == null ? "—" : `${forecast.dataAgeDays} day(s) old`}</dd>
                 </div>
                 <div>
-                  <dt className="text-black/50">Trend window</dt>
-                  <dd className="mt-0.5 font-semibold text-black">28 days, damped</dd>
+                  <dt className="text-[#74675f]">Trend window</dt>
+                  <dd className="mt-1 font-semibold text-[#33251e]">28 days, damped</dd>
                 </div>
                 <div>
-                  <dt className="text-black/50">Holdout</dt>
-                  <dd className="mt-0.5 font-semibold text-black">Last 7 days</dd>
+                  <dt className="text-[#74675f]">Holdout</dt>
+                  <dd className="mt-1 font-semibold text-[#33251e]">Last 7 days</dd>
                 </div>
               </dl>
             </Card>
-            <Card eyebrow="Forecast Model Performance" title="Validation metrics">
-              <ValidationMetrics model={forecast.model} />
-            </Card>
-          </div>
+          </Section>
 
-          {/* Row 5: reorder recommendations + coverage */}
-          <div className="grid items-stretch gap-4 xl:grid-cols-2">
+          {/* 5. Data cleanup */}
+          <Section title="Data cleanup" description="Fix CSV labels so imported sales match your catalog.">
             <Card
-              eyebrow="Reorder Recommendations"
-              title="Exact ingredient quantities needed"
-              action={<Package2 size={18} className="text-[#D4AF37]" />}
+              title="Product name aliases"
+              description="Map alternate CSV labels to a cake or customized cake catalog product. These mappings apply to imported sales in forecasts; they do not rename products."
             >
-              <div className="flex-1 overflow-x-auto">
-                <table className="min-w-full text-left text-sm">
-                  <thead>
-                    <tr className="border-b border-black/10 text-[11px] uppercase tracking-[0.2em] text-black/50">
-                      <th className="py-3 pr-4 font-semibold">Product</th>
-                      <th className="py-3 pr-4 font-semibold">Ingredient</th>
-                      <th className="py-3 pr-4 font-semibold">Qty</th>
-                      <th className="py-3 font-semibold">Priority</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {sortedRecommendations.length ? (
-                      paginatedRecommendations.map((item, index) => (
-                        <tr key={`${item.product}-${item.ingredient}-${index}`} className="border-b border-black/10 last:border-0 hover:bg-[#fafaf8]">
-                          <td className="py-3 pr-4 text-black">{item.product}</td>
-                          <td className="py-3 pr-4 text-black/70">{item.ingredient}</td>
-                          <td className="py-3 pr-4 text-black/70">{Number(item.qty || 0).toFixed(2)} kg</td>
-                          <td className="py-3">
-                            <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${item.priority === "High" ? "bg-amber-100 text-amber-800" : "bg-slate-100 text-slate-700"}`}>
-                              {item.priority}
-                            </span>
-                          </td>
-                        </tr>
-                      ))
-                    ) : (
-                      <tr>
-                        <td colSpan="4" className="py-4 text-sm text-black/60">
-                          No procurement actions are required from the current snapshot.
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-              <ListPagination
-                page={reorderPage}
-                pageCount={reorderPageCount}
-                total={sortedRecommendations.length}
-                onPageChange={setReorderPage}
-                label="recommendations"
-              />
-            </Card>
-
-            <Card
-              eyebrow="Inventory Coverage"
-              title="Stock safety view"
-              action={<TrendingUp size={18} className="text-[#D4AF37]" />}
-            >
-              {forecast.products?.length ? (
-                <>
-                  <div className="flex-1">
-                    <CoverageBars products={paginatedCoverageProducts} />
-                  </div>
-                  <ListPagination
-                    page={coveragePage}
-                    pageCount={coveragePageCount}
-                    total={sortedCoverageProducts.length}
-                    onPageChange={setCoveragePage}
-                    label="products"
-                  />
-                </>
+              <form onSubmit={saveProductAlias} className="grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
+                <input aria-label="Alternate CSV product name" value={aliasName} onChange={(event) => setAliasName(event.target.value)} maxLength={191} required placeholder="e.g. Choco Cake" className={FIELD_CLASS} />
+                <select aria-label="Catalog product for alias" value={aliasProductId} onChange={(event) => setAliasProductId(event.target.value)} required className={FIELD_CLASS}>
+                  {aliasProducts.map((product) => <option key={product.id} value={product.id}>{product.name}</option>)}
+                </select>
+                <button type="submit" disabled={savingAlias || !aliasProducts.length} className={BUTTON_PRIMARY}>
+                  <Plus size={14} />
+                  {savingAlias ? "Saving..." : "Add mapping"}
+                </button>
+              </form>
+              {aliasError && <p role="alert" className="mt-3 rounded-lg bg-[#fff4cd] px-3 py-2 text-xs text-[#33251e]">{aliasError}</p>}
+              {aliases.length > 0 ? (
+                <ul className="mt-4 max-h-[240px] divide-y divide-[#f0ebe1] overflow-y-auto rounded-xl border border-[#e8dfd4]">
+                  {aliases.map((alias) => (
+                    <li key={alias.id} className="flex h-12 items-center justify-between gap-3 px-4 text-sm">
+                      <span className="min-w-0 truncate text-[#33251e]">
+                        <strong>{alias.alias_name}</strong>
+                        <span className="mx-2 text-[#9a8f86]">→</span>
+                        {alias.product_name}
+                      </span>
+                      <button type="button" onClick={() => removeProductAlias(alias.id)} aria-label={`Remove alias ${alias.alias_name}`} className="rounded-md p-1.5 text-[#74675f] hover:bg-[#f4efe6] hover:text-[#33251e]">
+                        <Trash2 size={14} />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
               ) : (
-                <div className="rounded-2xl border border-dashed border-black/10 p-3 text-sm text-black/60">Coverage data will appear once forecasts are generated.</div>
+                <p className="mt-4 text-xs text-[#74675f]">No aliases yet. Add one when a CSV label doesn’t match a catalog product.</p>
               )}
             </Card>
-          </div>
+          </Section>
         </div>
       </div>
     </div>
