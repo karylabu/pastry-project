@@ -619,13 +619,7 @@ export default function Ingredients({
                     const nearestExpiry = expiryByIngredient.get(Number(item.id));
                     const thresholdInvalid = Number(item.threshold) <= 0;
                     const low = !thresholdInvalid && Number(item.usable_stock) <= Number(item.threshold || 0);
-                    const rowClass = isExpired
-                      ? 'bg-[#fff7f3]'
-                      : low
-                      ? 'bg-[#fffaf0]'
-                      : thresholdInvalid
-                      ? 'bg-[#fffdf1]'
-                      : '';
+                    const rowClass = isExpired ? 'bg-[#fff7f3]' : '';
 
                     return (
                       <tr key={item.id} className={`${rowClass} border-b border-[#f2ebe5] last:border-0`}>
