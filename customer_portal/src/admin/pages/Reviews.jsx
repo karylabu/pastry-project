@@ -144,51 +144,49 @@ export default function Reviews() {
           ) : null}
 
           {!loading && !error && reviews.length ? (
-            <>
-              <section className="overflow-hidden rounded-lg border border-[#e9e1d9] bg-white shadow-[0_3px_12px_rgba(60,42,28,0.035)]">
-                <div className="flex flex-col gap-1 border-b border-[#f0e9e2] px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+            <section>
+                <div className="mb-3 flex flex-col gap-1 rounded-xl border border-[#eee4de] bg-white px-4 py-4 shadow-[0_5px_18px_rgba(91,64,39,0.04)] sm:flex-row sm:items-center sm:justify-between sm:px-5">
                   <div>
                     <h2 className="text-[13px] font-semibold text-[#33251e]">Latest feedback</h2>
                     <p className="mt-0.5 text-[11px] text-[#8f8076]">Most recent reviews first</p>
                   </div>
                   <span className="text-[10px] font-medium text-[#8f8076]">Showing {firstReview}–{lastReview} of {total.toLocaleString()}</span>
                 </div>
-                {reviews.map((review) => (
-                  <article key={review.id} className="grid gap-3 border-b border-[#f0e9e2] px-4 py-4 transition-colors hover:bg-[#fff9e8] last:border-0 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start sm:px-5 sm:py-5">
-                    <div className="flex min-w-0 gap-3">
-                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[#f3eee7] text-[12px] font-bold text-[#806f61]">
-                        {(review.customer_name || "C").trim().split(/\s+/).slice(0, 2).map((part) => part[0]).join("").toUpperCase()}
-                      </span>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                  {reviews.map((review) => (
+                    <article key={review.id} className="flex min-w-0 flex-col justify-between rounded-xl border border-t-[3px] border-[#eee4de] border-t-[#d4af37] bg-white p-4 shadow-[0_5px_18px_rgba(91,64,39,0.04)] transition hover:-translate-y-0.5 hover:border-[#c9a94f] hover:bg-[#fffdf6] hover:ring-1 hover:ring-[#d4af37]/20 hover:shadow-[0_10px_24px_rgba(91,64,39,0.08)]">
+                      <div className="flex min-w-0 gap-3">
+                        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[#f3eee7] text-[12px] font-bold text-[#806f61]">
+                          {(review.customer_name || "C").trim().split(/\s+/).slice(0, 2).map((part) => part[0]).join("").toUpperCase()}
+                        </span>
+                        <div className="min-w-0 flex-1">
                           <h3 className="text-[13px] font-semibold text-[#33251e]">{review.customer_name || "Customer"}</h3>
-                          {review.customer_email ? <span className="break-all text-[11px] text-[#9b8c83]">{review.customer_email}</span> : null}
+                          {review.customer_email ? <p className="mt-0.5 break-all text-[11px] text-[#9b8c83]">{review.customer_email}</p> : null}
+                          <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] text-[#8f8076]">
+                            <span className="font-medium text-[#65574d]">Order #{review.order_id}</span>
+                            <span aria-hidden="true" className="text-[#d1bfae]">·</span>
+                            <time dateTime={review.created_at || undefined}>{formatReviewDate(review.created_at)}</time>
+                          </div>
                         </div>
-                        <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] text-[#8f8076]">
-                          <span className="font-medium text-[#65574d]">Order #{review.order_id}</span>
-                          <span aria-hidden="true" className="text-[#d1bfae]">·</span>
-                          <time dateTime={review.created_at || undefined}>{formatReviewDate(review.created_at)}</time>
+                      </div>
+                      <p className="mt-4 min-h-10 whitespace-pre-wrap break-words text-[13px] leading-5 text-[#5f514a]">{review.comment || "No written comment."}</p>
+                      <div className="mt-4 flex items-center justify-between border-t border-[#f0e9e2] pt-3">
+                        <div className="flex items-center gap-0.5" aria-label={`${review.rating} out of 5 stars`}>
+                          {Array.from({ length: 5 }, (_, index) => <Star key={index} size={13} className={index < Number(review.rating) ? "fill-[#d4af37] text-[#d4af37]" : "text-[#e5ddd5]"} />)}
                         </div>
-                        <p className="mt-3 whitespace-pre-wrap break-words text-[13px] leading-5 text-[#5f514a]">{review.comment || "No written comment."}</p>
+                        <span className="text-[11px] font-semibold text-[#5f514a]">{review.rating}/5</span>
                       </div>
-                    </div>
-                    <div className="flex items-center justify-between gap-3 pl-[52px] sm:flex-col sm:items-end sm:pl-0">
-                      <div className="flex items-center gap-0.5" aria-label={`${review.rating} out of 5 stars`}>
-                        {Array.from({ length: 5 }, (_, index) => <Star key={index} size={13} className={index < Number(review.rating) ? "fill-[#d4af37] text-[#d4af37]" : "text-[#e5ddd5]"} />)}
-                      </div>
-                      <span className="text-[11px] font-semibold text-[#5f514a]">{review.rating}/5</span>
-                    </div>
-                  </article>
-                ))}
-                <div className="flex items-center justify-between gap-3 border-t border-[#f0e9e2] bg-[#fcfaf7] px-4 py-3 sm:px-5">
+                    </article>
+                  ))}
+                </div>
+                <div className="mt-3 flex items-center justify-between gap-3 rounded-xl border border-[#eee4de] bg-white px-4 py-3 shadow-[0_5px_18px_rgba(91,64,39,0.04)] sm:px-5">
                   <span className="text-[11px] text-[#8f8076]">Page {page} of {lastPage}</span>
                   <div className="flex gap-2">
                     <button type="button" onClick={() => setPage((current) => Math.max(1, current - 1))} disabled={page <= 1 || loading} aria-label="Previous page" title="Previous page" className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-[#e8dfd4] bg-white text-[#5f514a] transition hover:border-[#c9a94f] hover:bg-[#fff4cd] disabled:cursor-not-allowed disabled:opacity-40"><ChevronLeft size={17} /></button>
                     <button type="button" onClick={() => setPage((current) => Math.min(lastPage, current + 1))} disabled={page >= lastPage || loading} aria-label="Next page" title="Next page" className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-[#e8dfd4] bg-white text-[#5f514a] transition hover:border-[#c9a94f] hover:bg-[#fff4cd] disabled:cursor-not-allowed disabled:opacity-40"><ChevronRight size={17} /></button>
                   </div>
                 </div>
-              </section>
-            </>
+            </section>
           ) : null}
         </div>
       </div>
