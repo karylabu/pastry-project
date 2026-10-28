@@ -20,7 +20,7 @@ const laravelStaffFetch = (url, options = {}) => {
 
 const POLL_INTERVAL = 15000;
 const DEFAULT_SORT_BY = "date";
-const DEFAULT_SORT_DIRECTION = "asc";
+const DEFAULT_SORT_DIRECTION = "desc";
 
 const isQrPayment = (payment) => ['gcash', 'qrph'].includes(
   String(payment || '').toLowerCase().replace(/[^a-z0-9]/g, '')
@@ -374,10 +374,14 @@ export default function Orders() {
         const firstOrderNumber = Number(a.order_number);
         const secondOrderNumber = Number(b.order_number);
         if (Number.isFinite(firstOrderNumber) && Number.isFinite(secondOrderNumber) && firstOrderNumber !== secondOrderNumber) {
-          return firstOrderNumber - secondOrderNumber;
+          return sortDirection === "asc"
+            ? firstOrderNumber - secondOrderNumber
+            : secondOrderNumber - firstOrderNumber;
         }
         const idComparison = Number(a.id) - Number(b.id);
-        if (Number.isFinite(idComparison) && idComparison !== 0) return idComparison;
+        if (Number.isFinite(idComparison) && idComparison !== 0) {
+          return sortDirection === "asc" ? idComparison : -idComparison;
+        }
         return 0;
       }
       return (Date.parse(b.created_at || "") || 0) - (Date.parse(a.created_at || "") || 0);

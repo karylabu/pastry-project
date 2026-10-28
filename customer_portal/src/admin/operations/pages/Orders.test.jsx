@@ -93,15 +93,15 @@ function renderOrders() {
   return render(<Orders />);
 }
 
-test("shows the oldest order first by default across all statuses", async () => {
+test("shows the newest order first by default across all statuses", async () => {
   const { container } = renderOrders();
   await screen.findAllByText("Customer 101");
 
-  expect(screen.getByRole("combobox", { name: "Sort orders" })).toHaveValue("date:asc");
-  expect(container.querySelector("article")).toHaveTextContent("#105");
+  expect(screen.getByRole("combobox", { name: "Sort orders" })).toHaveValue("date:desc");
+  expect(container.querySelector("article")).toHaveTextContent("#106");
 });
 
-test("keeps orders in sequence when their timestamps are identical", async () => {
+test("shows the newest order number first when timestamps are identical", async () => {
   const sameTimestamp = new Date().toISOString();
   global.fetch = jest.fn((url) => {
     if (String(url).includes("/inventory/ingredients")) {
@@ -123,7 +123,7 @@ test("keeps orders in sequence when their timestamps are identical", async () =>
   const { container } = renderOrders();
   await screen.findAllByText("Customer 107");
 
-  expect(container.querySelector("article")).toHaveTextContent("#107");
+  expect(container.querySelector("article")).toHaveTextContent("#108");
 });
 
 test("does not show waste actions for completed orders", async () => {
