@@ -237,46 +237,48 @@ export default function CakeRecipes() {
   return (
     <div className="min-h-screen bg-[#fbfaf5] px-4 pb-8 pt-[84px] text-[#33251e] sm:px-6 lg:pl-[284px] lg:pr-8">
       <div className="mx-auto max-w-[1440px] space-y-4">
-        <header className="flex flex-col gap-3 border-b border-[#eadfd8] pb-4 lg:flex-row lg:items-end lg:justify-between">
+        <header className="flex flex-col gap-4 border-b border-[#eadfd8] pb-5 lg:flex-row lg:items-end lg:justify-between">
           <div className="max-w-2xl">
-            <div className="mb-1.5 inline-flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-[0.18em] text-[#9b7810]">
+            <div className="mb-2 inline-flex items-center gap-1.5 rounded-full border border-[#eadfca] bg-white px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.18em] text-[#9b7810]">
               <CakeSlice size={12} /> Production setup
             </div>
-            <h1 className="font-serif text-[26px] font-semibold leading-tight text-[#33251e]">Customize Cakes Recipes</h1>
-            <p className="mt-1 text-[12px] leading-4 text-[#74675f]">Build and maintain ingredient recipes for customized cakes.</p>
+            <h1 className="font-serif text-[28px] font-semibold leading-tight text-[#33251e] sm:text-[32px]">Customize Cakes Recipes</h1>
+            <p className="mt-1.5 text-[13px] leading-5 text-[#74675f]">Build and maintain ingredient recipes for customized cakes.</p>
           </div>
-          <div className="flex items-center gap-5 rounded-lg border border-[#eadfd8] bg-white px-4 py-2.5 sm:gap-7">
-            <div><p className="text-[9px] font-bold uppercase tracking-[0.14em] text-[#9b8c83]">Active flavors</p><p className="mt-0.5 text-base font-bold leading-none text-[#33251e]">{activeFlavorCount}</p></div>
-            <div className="h-7 border-l border-[#f0e7e0]" />
-            <div><p className="text-[9px] font-bold uppercase tracking-[0.14em] text-[#9b8c83]">Recipes saved</p><p className="mt-0.5 text-base font-bold leading-none text-[#33251e]">{savedRecipeCount}</p></div>
+          <div className="grid w-full grid-cols-2 gap-2.5 sm:max-w-[440px]">
+            <div className="rounded-xl border border-t-[3px] border-[#eee4de] border-t-[#d4af37] bg-white p-3.5 shadow-[0_5px_18px_rgba(91,64,39,0.04)]">
+              <p className="text-[10px] font-semibold text-[#5d4a42]">Active flavors</p>
+              <p className="mt-1 text-[23px] font-bold leading-none text-[#33251e]">{activeFlavorCount}</p>
+              <p className="mt-1.5 text-[10px] text-[#9b8c83]">Available for custom orders</p>
             </div>
+            <div className="rounded-xl border border-t-[3px] border-[#eee4de] border-t-[#81906c] bg-white p-3.5 shadow-[0_5px_18px_rgba(91,64,39,0.04)]">
+              <p className="text-[10px] font-semibold text-[#5d4a42]">Recipes saved</p>
+              <p className="mt-1 text-[23px] font-bold leading-none text-[#33251e]">{savedRecipeCount}</p>
+              <p className="mt-1.5 text-[10px] text-[#9b8c83]">Flavor recipes with ingredients</p>
+            </div>
+          </div>
         </header>
 
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#9b7810]">Flavor catalog</p>
-            <p className="mt-1 text-[12px] text-[#8f8076]">Select a flavor to edit its saved ingredient recipe.</p>
-          </div>
-            <div className="flex w-full items-center gap-2 rounded-lg border border-[#eadfd8] bg-white px-2 py-1.5 sm:max-w-xs">
+        {status && <div role="status" className="flex items-start gap-2 rounded-xl border border-[#e7c875] bg-[#fff8e9] px-4 py-3 text-[13px] text-[#6f541d]"><CheckCircle2 size={16} className="mt-0.5 shrink-0" />{status}</div>}
+
+        <section className="overflow-hidden rounded-xl border border-[#eadfd8] bg-white shadow-[0_5px_18px_rgba(91,64,39,0.04)] transition hover:border-[#c9a94f] hover:ring-1 hover:ring-[#d4af37]/20">
+          <div className="flex flex-col gap-3 border-b border-[#f0e7e0] bg-[#fffdfa] px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#9b7810]">Saved recipes</p>
+              <h2 className="mt-0.5 text-[15px] font-semibold text-[#33251e]">Flavor recipes</h2>
+              <p className="mt-1 text-[11px] text-[#8f8076]">Select a flavor to edit its saved ingredient recipe.</p>
+            </div>
+            <div className="flex w-full items-center gap-2 rounded-lg border border-[#eadfd8] bg-white px-3 py-2 sm:max-w-xs">
               <Search size={15} aria-hidden="true" className="shrink-0 text-[#9b8c83]" />
               <input
                 value={searchQuery}
                 onChange={(event) => setSearchQuery(event.target.value)}
                 placeholder="Search cake recipes"
-                className="w-full bg-transparent text-[13px] text-[#33251e] placeholder:text-[#b7a69c] focus:outline-none"
+                aria-label="Search cake recipes"
+                className="w-full bg-transparent text-[12px] text-[#33251e] placeholder:text-[#b7a69c] outline-none"
               />
-          </div>
-        </div>
-
-        {status && <div role="status" className="flex items-start gap-2 rounded-xl border border-[#e7c875] bg-[#fff8e9] px-4 py-3 text-[13px] text-[#6f541d]"><CheckCircle2 size={16} className="mt-0.5 shrink-0" />{status}</div>}
-
-        <section className="overflow-hidden rounded-xl border border-[#eadfd8] bg-white shadow-[0_5px_18px_rgba(91,64,39,0.04)] transition hover:border-[#c9a94f] hover:ring-1 hover:ring-[#d4af37]/20">
-          <div className="flex items-center justify-between gap-3 border-b border-[#f0e7e0] bg-[#fffdfa] px-4 py-3">
-            <div>
-              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#9b7810]">Saved recipes</p>
-              <h2 className="mt-0.5 text-[15px] font-semibold text-[#33251e]">Flavor recipes</h2>
+              <span className="shrink-0 text-[10px] text-[#9b8c83]">{visibleFlavors.length}</span>
             </div>
-            <span className="rounded-full border border-[#eadfca] bg-[#fff8e9] px-2 py-0.5 text-[10px] font-semibold text-[#80600a]">{visibleFlavors.length} flavors</span>
           </div>
 
           {loading ? (
@@ -356,7 +358,7 @@ export default function CakeRecipes() {
             </div>
 
             <form onSubmit={saveRecipe} className="space-y-2.5 px-4 py-4 sm:px-5">
-              <div className="hidden gap-3 px-1 md:grid md:grid-cols-[minmax(0,1fr)_150px_110px_42px]">
+              <div className="hidden gap-3 px-3 md:grid md:grid-cols-[minmax(0,1fr)_130px_90px_38px]">
                 <div className="text-[9px] font-bold uppercase tracking-[0.18em] text-[#9b8c83]">Ingredient</div>
                 <div className="text-[9px] font-bold uppercase tracking-[0.18em] text-[#9b8c83]">Quantity</div>
                 <div className="text-[9px] font-bold uppercase tracking-[0.18em] text-[#9b8c83]">Unit</div>
@@ -364,7 +366,7 @@ export default function CakeRecipes() {
               </div>
 
               {recipeLines.length > 0 ? recipeLines.map((line, index) => (
-                <div key={`${selectedFlavorId}-${index}`} className="grid items-center gap-2 p-2.5 md:grid-cols-[minmax(0,1fr)_130px_90px_38px]">
+                <div key={`${selectedFlavorId}-${index}`} className="grid items-center gap-2 rounded-xl border border-[#f0e7e0] bg-[#fffdfa] p-3 transition-colors hover:border-[#eadfd8] md:grid-cols-[minmax(0,1fr)_130px_90px_38px]">
                   <label className="min-w-0">
                     <span className="mb-1 block text-[9px] font-bold uppercase tracking-[0.14em] text-[#9b8c83] md:hidden">Ingredient</span>
                     <select value={line.ingredient_id} onChange={(event) => selectIngredient(index, event.target.value)} className="w-full rounded-md border border-[#eadfd8] bg-white px-2.5 py-2 text-[11px] text-[#33251e] outline-none transition focus:border-[#d4af37] focus:ring-2 focus:ring-[#d4af37]/20" required>
@@ -393,8 +395,8 @@ export default function CakeRecipes() {
               )}
 
               <div className="flex flex-wrap items-center justify-between gap-2 border-t border-[#f0e7e0] pt-3">
-                <button type="button" title="Add ingredient" aria-label="Add ingredient" disabled={!selectedFlavorId} onClick={() => setRecipeLines((lines) => [...lines, { ...emptyLine }])} className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-[#eadfd8] bg-white text-[#5f514a] transition hover:border-[#d4af37] hover:bg-[#fff8e9] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d4af37] disabled:cursor-not-allowed disabled:opacity-40"><Plus size={16} aria-hidden="true" /></button>
-                <button type="submit" disabled={loading || !selectedFlavorId} className="inline-flex items-center gap-1.5 rounded-md bg-[#33251e] px-4 py-2 text-[10px] font-semibold text-white transition hover:bg-[#5b4540] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d4af37] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-40"><Save size={13} /> Save recipe</button>
+                <button type="button" title="Add ingredient" disabled={!selectedFlavorId} onClick={() => setRecipeLines((lines) => [...lines, { ...emptyLine }])} className="inline-flex items-center gap-1.5 rounded-lg border border-[#eadfd8] bg-white px-3 py-2 text-[11px] font-semibold text-[#5f514a] transition hover:border-[#c9a94f] hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d4af37] disabled:cursor-not-allowed disabled:opacity-40"><Plus size={14} aria-hidden="true" /> Add ingredient</button>
+                <button type="submit" disabled={loading || !selectedFlavorId} className="inline-flex items-center gap-1.5 rounded-lg bg-[#33251e] px-4 py-2.5 text-[11px] font-semibold text-white shadow-sm transition hover:bg-[#5b4540] hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d4af37] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-40"><Save size={14} /> Save recipe</button>
               </div>
             </form>
           </section>
