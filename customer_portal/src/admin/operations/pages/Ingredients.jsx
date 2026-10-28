@@ -525,7 +525,7 @@ export default function Ingredients({
                 aria-pressed={isActive}
                 onClick={() => stat.filter === "all" ? selectSummaryFilter("all") : selectSummaryFilter(isActive ? "all" : stat.filter)}
                 style={{ borderTopColor: stat.accent }}
-                className={`group block h-full min-w-0 rounded-xl border border-t-[3px] p-3 text-left shadow-[0_5px_18px_rgba(91,64,39,0.04)] transition hover:-translate-y-0.5 hover:border-[#c9a94f] hover:ring-1 hover:ring-[#d4af37]/20 hover:shadow-[0_10px_24px_rgba(91,64,39,0.08)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d4af37] sm:p-3.5 ${isActive ? "border-[#c9a94f] bg-[#fffaf0] ring-1 ring-[#d4af37]/20" : "border-[#eee4de] bg-white"}`}
+                className={`group block h-full min-w-0 rounded-xl border border-t-[3px] p-3 text-left shadow-[0_5px_18px_rgba(91,64,39,0.04)] transition hover:-translate-y-0.5 hover:border-[#c9a94f] hover:bg-white hover:ring-1 hover:ring-[#d4af37]/20 hover:shadow-[0_10px_24px_rgba(91,64,39,0.08)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d4af37] sm:p-3.5 ${isActive ? "border-[#c9a94f] bg-white ring-1 ring-[#d4af37]/20" : "border-[#eee4de] bg-white"}`}
               >
                 <span className="flex items-center justify-between">
                   <span className={`flex h-8 w-8 items-center justify-center rounded-full ${stat.iconTone}`}><Icon size={16} /></span>
