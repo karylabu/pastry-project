@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import Papa from "papaparse";
 import * as XLSX from "xlsx";
-import { Calculator, CakeSlice, CheckCircle2, Package, Plus, Search, Save, Trash2, Upload } from "lucide-react";
+import { Calculator, CakeSlice, CheckCircle2, ChevronRight, Package, Plus, Search, Save, Trash2, Upload } from "lucide-react";
 import { LARAVEL_BASE } from "../../services/config";
 import { safeParseJson } from "../../services/api";
 import AdminDialog from "../components/AdminDialog";
@@ -247,13 +247,19 @@ export default function CakeRecipes() {
           </div>
           <div className="grid w-full grid-cols-2 gap-2.5 sm:max-w-[440px]">
             <div className="rounded-xl border border-t-[3px] border-[#eee4de] border-t-[#d4af37] bg-white p-3.5 shadow-[0_5px_18px_rgba(91,64,39,0.04)]">
-              <p className="text-[10px] font-semibold text-[#5d4a42]">Active flavors</p>
-              <p className="mt-1 text-[23px] font-bold leading-none text-[#33251e]">{activeFlavorCount}</p>
+              <div className="flex items-center gap-2">
+                <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#fff4cd] text-[#9b7810]"><CakeSlice size={15} /></span>
+                <p className="text-[10px] font-semibold text-[#5d4a42]">Active flavors</p>
+              </div>
+              <p className="mt-2 text-[23px] font-bold leading-none text-[#33251e]">{activeFlavorCount}</p>
               <p className="mt-1.5 text-[10px] text-[#9b8c83]">Available for custom orders</p>
             </div>
             <div className="rounded-xl border border-t-[3px] border-[#eee4de] border-t-[#81906c] bg-white p-3.5 shadow-[0_5px_18px_rgba(91,64,39,0.04)]">
-              <p className="text-[10px] font-semibold text-[#5d4a42]">Recipes saved</p>
-              <p className="mt-1 text-[23px] font-bold leading-none text-[#33251e]">{savedRecipeCount}</p>
+              <div className="flex items-center gap-2">
+                <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#edf5eb] text-[#4f7654]"><Package size={15} /></span>
+                <p className="text-[10px] font-semibold text-[#5d4a42]">Recipes saved</p>
+              </div>
+              <p className="mt-2 text-[23px] font-bold leading-none text-[#33251e]">{savedRecipeCount}</p>
               <p className="mt-1.5 text-[10px] text-[#9b8c83]">Flavor recipes with ingredients</p>
             </div>
           </div>
@@ -284,7 +290,7 @@ export default function CakeRecipes() {
           {loading ? (
             <div className="px-4 py-8 text-center text-[12px] text-[#8f8076]">Loading recipe catalog...</div>
           ) : (
-            <div className="grid max-h-[52vh] gap-2 overflow-y-auto p-3" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 220px), 1fr))" }}>
+            <div className="grid max-h-[52vh] gap-2.5 overflow-y-auto p-3 sm:grid-cols-2 xl:grid-cols-3">
               {visibleFlavors.map((flavor) => {
                 const recipe = recipeMap[String(flavor.id)] || null;
                 const ingredients = recipe?.ingredients || [];
@@ -294,10 +300,14 @@ export default function CakeRecipes() {
                   <div
                     key={flavor.id}
                     style={{ borderTopColor: recipe ? "#d4af37" : "#c98f6b" }}
-                    className={`group flex min-h-[76px] min-w-0 items-center gap-2 rounded-xl border border-t-[3px] bg-white px-3 py-3 shadow-[0_5px_18px_rgba(91,64,39,0.04)] transition hover:-translate-y-0.5 hover:border-[#c9a94f] hover:bg-white hover:ring-1 hover:ring-[#d4af37]/20 hover:shadow-[0_10px_24px_rgba(91,64,39,0.08)] ${isSelected ? "border-[#c9a94f] ring-1 ring-[#d4af37]/20" : "border-[#eee4de]"}`}
+                    className={`group flex min-h-[82px] min-w-0 items-center gap-3 rounded-xl border border-t-[3px] bg-white px-3.5 py-3 shadow-[0_5px_18px_rgba(91,64,39,0.04)] transition hover:-translate-y-0.5 hover:border-[#c9a94f] hover:ring-1 hover:ring-[#d4af37]/20 hover:shadow-[0_10px_24px_rgba(91,64,39,0.08)] ${isSelected ? "border-[#c9a94f] ring-1 ring-[#d4af37]/20" : "border-[#eee4de]"}`}
                   >
+                    <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full ${recipe ? "bg-[#fff4cd] text-[#9b7810]" : "bg-[#f4ece6] text-[#8f675e]"}`}>
+                      <CakeSlice size={19} aria-hidden="true" />
+                    </span>
                     <button
                       type="button"
+                      aria-pressed={isSelected}
                       onClick={() => {
                         setSelectedFlavorId(String(flavor.id));
                         setFlavorForm({ id: flavor.id, name: flavor.name, active: flavor.active });
@@ -305,23 +315,22 @@ export default function CakeRecipes() {
                       className="min-w-0 flex-1 rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d4af37] focus-visible:ring-offset-2"
                     >
                       <div className="flex min-w-0 items-center gap-1.5">
-                        <h3 className="truncate text-[11px] font-semibold leading-tight text-[#33251e]">{flavor.name}</h3>
-                        <span className={`shrink-0 rounded-full px-1.5 py-0.5 text-[8px] font-semibold ${recipe ? "bg-[#edf5eb] text-[#4f7654]" : "bg-[#f4ece6] text-[#8f8076]"}`}>
-                          {recipe ? "Saved" : "No recipe"}
-                        </span>
-                        {isSelected ? <CheckCircle2 size={13} className="shrink-0 text-[#4f7654]" aria-label="Selected flavor" /> : null}
+                        <h3 className="truncate text-[12px] font-semibold leading-tight text-[#33251e]">{flavor.name}</h3>
                       </div>
-                      <p className="mt-0.5 text-[9px] leading-none text-[#9b8c83]">{ingredients.length} ingredients</p>
+                      <p className="mt-1 text-[10px] text-[#9b8c83]">{ingredients.length} ingredients · {recipe ? "Recipe saved" : "No recipe yet"}</p>
                     </button>
-                    <div className="shrink-0">
-                      <button
-                        type="button"
-                        onClick={() => toggle("flavors", flavor)}
-                        className={`rounded px-1.5 py-1 text-[8px] font-semibold transition ${flavor.active ? "bg-[#edf5eb] text-[#4f7654] hover:bg-[#e5f0e2]" : "bg-[#f4ece6] text-[#8f8076] hover:bg-[#f0e7e0]"}`}
-                      >
-                        {flavor.active ? "Active" : "Inactive"}
-                      </button>
-                    </div>
+                    <button
+                      type="button"
+                      onClick={() => toggle("flavors", flavor)}
+                      aria-label={`${flavor.active ? "Deactivate" : "Activate"} ${flavor.name}`}
+                      title={`${flavor.active ? "Deactivate" : "Activate"} flavor`}
+                      className={`shrink-0 rounded-full px-2 py-1 text-[9px] font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d4af37] ${flavor.active ? "bg-[#edf5eb] text-[#4f7654] hover:bg-[#e5f0e2]" : "bg-[#f4ece6] text-[#8f8076] hover:bg-[#f0e7e0]"}`}
+                    >
+                      {flavor.active ? "Active" : "Inactive"}
+                    </button>
+                    <span className="shrink-0 text-[#a57c38]" aria-label={isSelected ? "Selected flavor" : undefined} title={isSelected ? "Selected flavor" : undefined}>
+                      {isSelected ? <CheckCircle2 size={15} /> : <ChevronRight size={17} className="transition-transform group-hover:translate-x-0.5" />}
+                    </span>
                   </div>
                 );
               })}
@@ -334,12 +343,15 @@ export default function CakeRecipes() {
 
         {selectedFlavor && (
           <section className="overflow-hidden rounded-xl border border-[#eadfd8] bg-white shadow-[0_5px_18px_rgba(91,64,39,0.04)] transition hover:border-[#c9a94f] hover:ring-1 hover:ring-[#d4af37]/20">
-            <div className="flex flex-col gap-2.5 border-b border-[#f0e7e0] bg-[#fffdfa] px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5">
-              <div>
+            <div className="flex flex-col gap-3 border-b border-[#f0e7e0] bg-[#fffdfa] px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+              <div className="flex min-w-0 items-center gap-3">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#fff4cd] text-[#9b7810]"><CakeSlice size={18} /></span>
+                <div className="min-w-0">
                 <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#9b7810]">Recipe editor</p>
                 <div className="mt-0.5 flex flex-wrap items-center gap-2">
                   <h2 className="font-serif text-[18px] font-semibold text-[#33251e]">{selectedFlavor.name}</h2>
                   <span className={`rounded-full px-2 py-0.5 text-[9px] font-semibold ${selectedRecipe ? "bg-[#edf5eb] text-[#4f7654]" : "bg-[#fff4cd] text-[#80600a]"}`}>{selectedRecipe ? "Saved recipe" : "Unsaved recipe"}</span>
+                </div>
                 </div>
               </div>
               <div className="flex flex-wrap items-end gap-2">
