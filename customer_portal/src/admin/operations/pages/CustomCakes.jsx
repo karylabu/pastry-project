@@ -939,7 +939,7 @@ export default function CustomCakes() {
                     const referenceImage = getOrderReferenceImage(order);
 
                     return (
-                      <tr key={order.id} className="border-b border-black/10 bg-white transition hover:bg-[#D4AF37]/6">
+                      <tr key={order.id} className="border-b border-black/10 bg-white transition-colors hover:bg-[#fffaf0]">
                         <td className="px-4 py-4 text-[13px] font-semibold text-black">#{order.id}</td>
                         <td className="px-4 py-4 text-[13px] text-black/80">{customerLabel}</td>
                         <td className="px-4 py-4 text-[12px] text-black/60">

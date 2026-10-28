@@ -881,7 +881,7 @@ export default function Orders() {
 
                     return (
                       <React.Fragment key={order.id}>
-                        <tr className={`border-b border-[#eee8df] align-middle transition-colors last:border-b-0 hover:bg-[#fcfaf6] ${orderTiming.isRushOrder ? "bg-[#fffaf0]" : "bg-white"}`}>
+                        <tr className={`border-b border-[#eee8df] align-middle transition-colors last:border-b-0 hover:bg-[#fffaf0] ${orderTiming.isRushOrder ? "bg-[#fffaf0]" : "bg-white"}`}>
                           <td className="whitespace-nowrap px-4 py-4">
                             <span className="inline-flex rounded-md bg-[#f5f1e9] px-2.5 py-1.5 text-[12px] font-bold text-[#4c392b]">#{order.order_number ?? order.id}</span>
                           </td>
