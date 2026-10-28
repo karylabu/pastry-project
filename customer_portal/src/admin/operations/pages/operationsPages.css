@@ -6,8 +6,8 @@
 
 .admin-operations-page .admin-operations-content {
   box-sizing: border-box;
-  width: 100%;
-  max-width: 1500px;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .admin-operations-page .admin-operations-header {
