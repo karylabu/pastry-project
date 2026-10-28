@@ -906,8 +906,8 @@ export default function CustomCakes() {
 
               <div className="hidden overflow-x-auto rounded-lg border border-[#e9e1d9] bg-white shadow-[0_3px_12px_rgba(60,42,28,0.035)] xl:block">
                 <table className="w-full min-w-[1180px] table-fixed border-collapse">
-                  <thead className="bg-[#fff4cd]">
-                    <tr className="border-b border-[#e7d58f] text-[10px] uppercase tracking-[0.14em] text-[#654d10]">
+                  <thead className="bg-[#f7f4ef] text-[#74675f]">
+                    <tr className="border-b border-[#e8dfd4] text-[10px] uppercase tracking-[0.12em]">
                       {sortableHeader("Order", "order", "left", "w-[8%]")}
                       {sortableHeader("Customer", "customer", "left", "w-[14%]")}
                       {sortableHeader("Details", "details", "left", "w-[28%]")}
