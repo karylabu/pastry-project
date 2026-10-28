@@ -154,7 +154,7 @@ export default function Reviews() {
                   <span className="text-[10px] font-medium text-[#8f8076]">Showing {firstReview}–{lastReview} of {total.toLocaleString()}</span>
                 </div>
                 {reviews.map((review) => (
-                  <article key={review.id} className="grid gap-3 border-b border-[#f0e9e2] px-4 py-4 last:border-0 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start sm:px-5 sm:py-5">
+                  <article key={review.id} className="grid gap-3 border-b border-[#f0e9e2] px-4 py-4 transition-colors hover:bg-[#fff9e8] last:border-0 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start sm:px-5 sm:py-5">
                     <div className="flex min-w-0 gap-3">
                       <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[#f3eee7] text-[12px] font-bold text-[#806f61]">
                         {(review.customer_name || "C").trim().split(/\s+/).slice(0, 2).map((part) => part[0]).join("").toUpperCase()}
