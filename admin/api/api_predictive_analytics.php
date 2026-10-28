@@ -306,12 +306,16 @@ function getProducts(mysqli $conn): array {
 
 function getProductRecipes(mysqli $conn): array {
     $recipes = [];
+    $hasSizeColumn = mysqli_query($conn, "SHOW COLUMNS FROM product_recipes LIKE 'product_size_id'");
+    $hasProductSize = $hasSizeColumn && mysqli_num_rows($hasSizeColumn) > 0;
+    if ($hasSizeColumn) mysqli_free_result($hasSizeColumn);
+    $sizeSelect = $hasProductSize ? ', pr.product_size_id' : '';
     $result = mysqli_query($conn, "
-        SELECT p.name AS product_name, i.id AS ingredient_id, i.name AS ingredient_name, pr.qty AS usage
+        SELECT p.name AS product_name, i.id AS ingredient_id, i.name AS ingredient_name, pr.qty AS usage{$sizeSelect}
         FROM product_recipes pr
-        LEFT JOIN products p ON p.id = pr.product_id
-        LEFT JOIN ingredients i ON i.id = pr.ingredient_id
-        WHERE pr.active = 1
+        INNER JOIN products p ON p.id = pr.product_id
+        INNER JOIN ingredients i ON i.id = pr.ingredient_id
+        WHERE pr.active = 1 AND pr.qty > 0
         ORDER BY p.name ASC, i.name ASC
     ");
     if (!$result) {
@@ -321,12 +325,28 @@ function getProductRecipes(mysqli $conn): array {
             $productName = normalizeProductName($row['product_name'] ?? '');
             $ingredientName = trim((string) ($row['ingredient_name'] ?? ''));
             $usage = max(0, (float) ($row['usage'] ?? 0));
-            if ($productName && $ingredientName) {
-                $recipes[productMatchKey($productName)][] = [
-                    'ingredient_id' => (int) ($row['ingredient_id'] ?? 0),
-                    'name' => $ingredientName,
-                    'usage' => $usage,
-                ];
+            if ($productName && $ingredientName && $usage > 0) {
+                $productKey = productMatchKey($productName);
+                $ingredientId = (int) ($row['ingredient_id'] ?? 0);
+                $recipeIndex = [];
+                foreach ($recipes[$productKey] ?? [] as $index => $existing) {
+                    $recipeIndex[(int) $existing['ingredient_id']] = $index;
+                }
+                if (!isset($recipeIndex[$ingredientId])) {
+                    $recipes[$productKey][] = [
+                        'ingredient_id' => $ingredientId,
+                        'name' => $ingredientName,
+                        'usage' => $usage,
+                    ];
+                } else {
+                    $index = $recipeIndex[$ingredientId];
+                    // Sales history does not retain the selected product size. Use the
+                    // largest configured quantity so consumption is not understated.
+                    $recipes[$productKey][$index]['usage'] = max(
+                        (float) $recipes[$productKey][$index]['usage'],
+                        $usage
+                    );
+                }
             }
         }
         mysqli_free_result($result);
