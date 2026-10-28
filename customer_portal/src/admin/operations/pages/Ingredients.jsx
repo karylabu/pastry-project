@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useLocation } from "react-router-dom";
-import { AlertTriangle, CalendarDays, CircleAlert, History, Package, PackagePlus, Pencil, Plus, Search, X } from "lucide-react";
+import { AlertTriangle, CalendarDays, ChevronRight, CircleAlert, History, Package, PackagePlus, Pencil, Plus, Search, X } from "lucide-react";
 import { LARAVEL_BASE, STAFF_BASE } from "../../../services/config";
 
 const staffFetch = (url, options = {}) => fetch(url, { credentials: "include", ...options });
@@ -509,23 +509,34 @@ export default function Ingredients({
           <p className="text-[11px] font-medium text-[#8f8076]">{filteredIngredients.length} of {ingredients.length} ingredients shown</p>
         </header>
 
-        <div className="mb-5 grid grid-cols-2 gap-2.5 sm:grid-cols-4">
-          <button type="button" aria-pressed={stockFilter === 'all'} onClick={() => selectSummaryFilter('all')} className={`flex min-w-0 items-center gap-3 rounded-xl border p-4 text-left shadow-[0_5px_18px_rgba(91,64,39,0.04)] transition hover:-translate-y-0.5 hover:border-[#d4af37] hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d4af37] ${stockFilter === 'all' ? 'border-[#d4af37] bg-[#fffaf0]' : 'border-[#eee4de] bg-white'}`}>
-            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#fff4cd] text-[#9b7810]"><Package size={17} /></span>
-            <span className="min-w-0"><span className="block truncate text-[10px] font-semibold uppercase tracking-[0.16em] text-[#9b8c83]">Ingredients</span><span className="mt-0.5 block text-[20px] font-bold leading-none text-[#33251e]">{ingredients.length}</span></span>
-          </button>
-          <button type="button" aria-pressed={stockFilter === 'low'} onClick={() => selectSummaryFilter(stockFilter === 'low' ? 'all' : 'low')} className={`flex min-w-0 items-center gap-3 rounded-xl border p-4 text-left shadow-[0_5px_18px_rgba(91,64,39,0.04)] transition hover:-translate-y-0.5 hover:border-[#d4af37] hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d4af37] ${stockFilter === 'low' ? 'border-[#d4af37] bg-[#fffaf0]' : 'border-[#eee4de] bg-white'}`}>
-            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#fff4cd] text-[#9b7810]"><AlertTriangle size={17} /></span>
-            <span className="min-w-0"><span className="block truncate text-[10px] font-semibold uppercase tracking-[0.16em] text-[#9b8c83]">Low Stock</span><span className="mt-0.5 block text-[20px] font-bold leading-none text-[#33251e]">{lowStockCount}</span></span>
-          </button>
-          <button type="button" aria-pressed={stockFilter === 'near_expiry'} onClick={() => selectSummaryFilter(stockFilter === 'near_expiry' ? 'all' : 'near_expiry')} className={`flex min-w-0 items-center gap-3 rounded-xl border p-4 text-left shadow-[0_5px_18px_rgba(91,64,39,0.04)] transition hover:-translate-y-0.5 hover:border-[#d4af37] hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d4af37] ${stockFilter === 'near_expiry' ? 'border-[#d4af37] bg-[#fffaf0]' : 'border-[#eee4de] bg-white'}`}>
-            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#fff4cd] text-[#9b7810]"><CalendarDays size={17} /></span>
-            <span className="min-w-0"><span className="block truncate text-[10px] font-semibold uppercase tracking-[0.16em] text-[#9b8c83]">Near Expiry</span><span className="mt-0.5 block text-[20px] font-bold leading-none text-[#33251e]">{nearExpiryCount}</span></span>
-          </button>
-          <button type="button" aria-pressed={stockFilter === 'out'} onClick={() => selectSummaryFilter(stockFilter === 'out' ? 'all' : 'out')} className={`flex min-w-0 items-center gap-3 rounded-xl border p-4 text-left shadow-[0_5px_18px_rgba(91,64,39,0.04)] transition hover:-translate-y-0.5 hover:border-[#d4af37] hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d4af37] ${stockFilter === 'out' ? 'border-[#d4af37] bg-[#fffaf0]' : 'border-[#eee4de] bg-white'}`}>
-            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#fff4cd] text-[#9b7810]"><Package size={17} /></span>
-            <span className="min-w-0"><span className="block truncate text-[10px] font-semibold uppercase tracking-[0.16em] text-[#9b8c83]">Out of Stock</span><span className="mt-0.5 block text-[20px] font-bold leading-none text-[#33251e]">{outOfStockCount}</span></span>
-          </button>
+        <div className="mb-5 grid grid-cols-2 gap-2.5 sm:grid-cols-2 lg:grid-cols-4">
+          {[
+            { label: "Ingredients", value: ingredients.length, hint: "All tracked ingredients", icon: Package, accent: "#d4af37", iconTone: "bg-[#fff4cd] text-[#9b7810]", filter: "all" },
+            { label: "Low Stock", value: lowStockCount, hint: "At or below stock threshold", icon: AlertTriangle, accent: "#c98f6b", iconTone: "bg-[#fff0eb] text-[#9a5947]", filter: "low" },
+            { label: "Near Expiry", value: nearExpiryCount, hint: "Expiring within 7 days", icon: CalendarDays, accent: "#81906c", iconTone: "bg-[#edf5eb] text-[#4f7654]", filter: "near_expiry" },
+            { label: "Out of Stock", value: outOfStockCount, hint: "No usable stock remaining", icon: Package, accent: "#7f8da3", iconTone: "bg-[#edf1f7] text-[#53657d]", filter: "out" },
+          ].map((stat) => {
+            const Icon = stat.icon;
+            const isActive = stockFilter === stat.filter;
+            return (
+              <button
+                key={stat.label}
+                type="button"
+                aria-pressed={isActive}
+                onClick={() => stat.filter === "all" ? selectSummaryFilter("all") : selectSummaryFilter(isActive ? "all" : stat.filter)}
+                style={{ borderTopColor: stat.accent }}
+                className={`group block h-full min-w-0 rounded-xl border border-t-[3px] p-3 text-left shadow-[0_5px_18px_rgba(91,64,39,0.04)] transition hover:-translate-y-0.5 hover:border-[#c9a94f] hover:ring-1 hover:ring-[#d4af37]/20 hover:shadow-[0_10px_24px_rgba(91,64,39,0.08)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d4af37] sm:p-3.5 ${isActive ? "border-[#c9a94f] bg-[#fffaf0] ring-1 ring-[#d4af37]/20" : "border-[#eee4de] bg-white"}`}
+              >
+                <span className="flex items-center justify-between">
+                  <span className={`flex h-8 w-8 items-center justify-center rounded-full ${stat.iconTone}`}><Icon size={16} /></span>
+                  <ChevronRight size={15} className="text-[#d1bfae] transition group-hover:translate-x-0.5 group-hover:text-[#a57c38]" />
+                </span>
+                <span className="mt-2 block text-[11px] font-semibold text-[#5d4a42]">{stat.label}</span>
+                <span className="mt-0.5 block text-[23px] font-bold leading-none text-[#33251e]">{stat.value}</span>
+                <span className="mt-1.5 block truncate text-[10px] text-[#9b8c83]">{stat.hint}</span>
+              </button>
+            );
+          })}
         </div>
 
         <div className="mb-5 flex flex-nowrap items-center gap-3 overflow-x-auto py-1">
