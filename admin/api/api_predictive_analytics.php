@@ -396,16 +396,25 @@ function buildDetailedForecastPayload(array $history, array $products, array $in
     foreach ($products as $product) {
         $productByKey[productMatchKey($product['name'])] = $product;
     }
+    $forecastableKeys = array_fill_keys(
+        array_unique(array_merge(array_keys($productByKey), array_keys($recipes))),
+        true
+    );
 
     // Group by canonical product key so "S’mores" / "S'mores" or alias spellings are one product.
     $historyByProduct = [];
     $displayName = [];
+    $unmappedHistoryProducts = [];
     foreach ($history as $entry) {
         $name = normalizeProductName($entry['product'] ?? '');
         $date = (string) ($entry['date'] ?? '');
         $quantity = max(0, (float) ($entry['quantity'] ?? 0));
         if ($name === '' || $date === '' || $quantity <= 0) continue;
         $key = productMatchKey($name);
+        if (!isset($forecastableKeys[$key])) {
+            $unmappedHistoryProducts[$name] = true;
+            continue;
+        }
         $displayName[$key] ??= $productByKey[$key]['name'] ?? $name;
         $historyByProduct[$key][$date] = ($historyByProduct[$key][$date] ?? 0) + $quantity;
     }
@@ -661,6 +670,7 @@ function buildDetailedForecastPayload(array $history, array $products, array $in
             'previousEquivalentDemand' => round($previousTotal, 2),
             'highPriorityCount' => count(array_filter($forecastProducts, static fn ($item) => $item['priority'] === 'High')),
             'recommendationCount' => count($recommendations),
+            'unmappedProductCount' => count($unmappedHistoryProducts),
             'trendPercent' => $trendPercent,
             'peakDay' => !empty($forecastDayTotals) ? array_search(max($forecastDayTotals), $forecastDayTotals, true) : null,
         ],
@@ -688,6 +698,7 @@ function buildDetailedForecastPayload(array $history, array $products, array $in
             'validation_insufficient_history_products' => $backtest['insufficient'] + max(0, count($historyByProduct) - count($series)),
             'validation_inactive_products' => $backtest['inactive'],
             'recipe_missing_products' => $missingRecipeProducts,
+            'unmapped_history_products' => array_values(array_keys($unmappedHistoryProducts)),
         ],
         'drivers' => ['Historical product demand', 'Long-window sales average (28 days)', 'Lowest shop-total WAPE across rolling backtests'],
         'insights' => $insights,
