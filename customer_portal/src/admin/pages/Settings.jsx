@@ -212,7 +212,7 @@ export default function Settings() {
     <div className="min-h-screen bg-[#fbfaf5] font-['DM_Sans'] text-[#33251e]">
       <div className="pt-[88px] lg:pl-[260px]">
         <main className="mx-auto max-w-[1400px] px-4 py-5 sm:px-6 md:px-8 lg:px-10 lg:py-7">
-          <div className="mb-6 flex min-h-[72px] flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <div className="mb-6 flex min-h-[112px] flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.24em] text-[#92701e]">System</p>
               <h1 className="mt-1 font-serif text-[27px] leading-tight text-[#33251e]">Admin Settings</h1>
