@@ -623,7 +623,7 @@ export default function Orders() {
                 </label>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 xl:grid-cols-7" role="group" aria-label="Filter orders by status">
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 xl:grid-cols-8" role="group" aria-label="Filter orders by status">
               {statusFilterOptions.map((option) => (
                 <button
                   key={option}
@@ -639,7 +639,7 @@ export default function Orders() {
                       : "border-transparent bg-[#f7f4ef] text-[#65574d] hover:border-[#e1d4c4] hover:bg-[#fffaf0]"
                   }`}
                 >
-                  {statusLabel(option)}
+                  <span className="truncate" title={statusLabel(option)}>{statusLabel(option)}</span>
                   <span className={`min-w-5 rounded px-1 text-center text-[9px] ${statusFilter === option ? "bg-white/15 text-white" : "bg-white text-[#806f61]"}`}>{filterCounts[option]}</span>
                 </button>
               ))}
