@@ -314,6 +314,64 @@ class StaffProductCatalogTest extends TestCase
         }
     }
 
+    public function test_admin_can_create_a_cake_with_both_sizes_and_separate_prices_and_stock(): void
+    {
+        $admin = new User();
+        $admin->role = 'admin';
+        $admin->status = 'active';
+
+        $response = $this->actingAs($admin)
+            ->post('/api/staff/products', [
+                'name' => 'Two Size Vanilla Cake',
+                'category' => 'Cakes',
+                'sizes' => ['Big', 'Small'],
+                'prices' => ['Big' => '650.00', 'Small' => '320.00'],
+                'stocks' => ['Big' => '4', 'Small' => '6'],
+                'description' => 'Vanilla cake in both sizes',
+                'ingredient_id' => [1],
+                'ingredient_qty' => ['1.5'],
+                'image' => UploadedFile::fake()->image('two-size-vanilla.jpg'),
+            ], ['Accept' => 'application/json']);
+
+        $response->assertCreated()->assertJsonPath('success', true);
+        $productId = (int) $response->json('product_id');
+        $product = DB::table('products')->where('id', $productId)->first();
+        $this->assertSame(10, (int) $product->stock);
+        $this->assertDatabaseHas('product_sizes', [
+            'product_id' => $productId,
+            'size' => 'Big',
+            'price' => 650,
+            'stock_quantity' => 4,
+            'available' => true,
+        ]);
+        $this->assertDatabaseHas('product_sizes', [
+            'product_id' => $productId,
+            'size' => 'Small',
+            'price' => 320,
+            'stock_quantity' => 6,
+            'available' => true,
+        ]);
+
+        $sizeIds = DB::table('product_sizes')->where('product_id', $productId)->pluck('id');
+        $this->assertSame(2, DB::table('product_recipes')->whereIn('product_size_id', $sizeIds)->count());
+
+        $customerProducts = $this->getJson('/api/customer/products?action=list')
+            ->assertOk()
+            ->json();
+        $customerProduct = collect($customerProducts)->firstWhere('id', $productId);
+        $this->assertNotNull($customerProduct);
+        $this->assertEqualsCanonicalizing(['Big', 'Small'], collect($customerProduct['sizes'])->pluck('size')->all());
+
+        $imagePaths = [
+            base_path('../uploads/' . $product->image),
+            public_path('uploads/' . $product->image),
+        ];
+        foreach ($imagePaths as $imagePath) {
+            $this->assertFileExists($imagePath);
+            unlink($imagePath);
+        }
+    }
+
     public function test_admin_can_update_product_details_and_big_size_price_without_changing_stock(): void
     {
         $admin = new User();

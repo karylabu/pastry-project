@@ -99,10 +99,16 @@ class ProductController extends Controller
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'category' => ['required', 'string', 'max:100'],
-            'size' => ['required', 'in:Small,Big'],
+            'size' => ['required_without:sizes', 'in:Small,Big'],
+            'sizes' => ['required_without:size', 'array', 'min:1'],
+            'sizes.*' => ['required', 'distinct', 'in:Small,Big'],
             'description' => ['nullable', 'string'],
-            'price' => ['required', 'numeric', 'gt:0'],
-            'stock' => ['required', 'integer', 'min:0'],
+            'price' => ['required_without:prices', 'numeric', 'gt:0'],
+            'prices' => ['required_without:price', 'array'],
+            'prices.*' => ['required', 'numeric', 'gt:0'],
+            'stock' => ['required_without:stocks', 'integer', 'min:0'],
+            'stocks' => ['required_without:stock', 'array'],
+            'stocks.*' => ['required', 'integer', 'min:0'],
             'image' => ['required', 'image', 'mimes:jpg,jpeg,png,gif', 'max:5120'],
             'ingredient_id' => ['sometimes', 'array'],
             'ingredient_id.*' => ['required', 'integer', 'exists:ingredients,id'],
@@ -115,6 +121,20 @@ class ProductController extends Controller
                 'success' => false,
                 'message' => 'Check that every recipe ingredient has a quantity.',
             ], 422);
+        }
+
+        $sizeVariants = [];
+        foreach ($data['sizes'] ?? [$data['size']] as $size) {
+            $price = $data['prices'][$size] ?? $data['price'] ?? null;
+            $stock = $data['stocks'][$size] ?? $data['stock'] ?? null;
+            if (!is_numeric($price) || (float) $price <= 0 || filter_var($stock, FILTER_VALIDATE_INT) === false || (int) $stock < 0) {
+                return response()->json([
+                    'success' => false,
+                    'message' => "Enter a valid price and starting stock for the {$size} Cake size.",
+                ], 422);
+            }
+
+            $sizeVariants[] = ['size' => $size, 'price' => $price, 'stock' => (int) $stock];
         }
 
         $uploadDirectory = base_path('../uploads');
@@ -147,14 +167,15 @@ class ProductController extends Controller
         }
 
         try {
-            $productId = DB::transaction(function () use ($data, $imageName) {
+            $productId = DB::transaction(function () use ($data, $imageName, $sizeVariants) {
                 $now = now();
+                $baseVariant = collect($sizeVariants)->firstWhere('size', 'Big') ?? $sizeVariants[0];
                 $productAttributes = [
                     'name' => trim($data['name']),
                     'category' => trim($data['category']),
-                    'price' => $data['price'],
-                    'big_price' => $data['price'],
-                    'stock' => (int) $data['stock'],
+                    'price' => $baseVariant['price'],
+                    'big_price' => $baseVariant['price'],
+                    'stock' => array_sum(array_column($sizeVariants, 'stock')),
                     'image' => $imageName,
                     'description' => trim((string) ($data['description'] ?? '')) ?: null,
                     'available' => true,
@@ -168,39 +189,41 @@ class ProductController extends Controller
                 );
                 $productId = (int) DB::table('products')->insertGetId($productAttributes);
 
-                $sizeAttributes = [
-                    'product_id' => $productId,
-                    'size' => $data['size'],
-                    'price' => $data['price'],
-                    'stock_quantity' => (int) $data['stock'],
-                    'available' => true,
-                    'created_at' => $now,
-                    'updated_at' => $now,
-                ];
-                $sizeAttributes = array_filter(
-                    $sizeAttributes,
-                    fn ($value, $column) => Schema::hasColumn('product_sizes', $column),
-                    ARRAY_FILTER_USE_BOTH
-                );
-                $sizeId = (int) DB::table('product_sizes')->insertGetId($sizeAttributes);
+                foreach ($sizeVariants as $variant) {
+                    $sizeAttributes = [
+                        'product_id' => $productId,
+                        'size' => $variant['size'],
+                        'price' => $variant['price'],
+                        'stock_quantity' => $variant['stock'],
+                        'available' => true,
+                        'created_at' => $now,
+                        'updated_at' => $now,
+                    ];
+                    $sizeAttributes = array_filter(
+                        $sizeAttributes,
+                        fn ($value, $column) => Schema::hasColumn('product_sizes', $column),
+                        ARRAY_FILTER_USE_BOTH
+                    );
+                    $sizeId = (int) DB::table('product_sizes')->insertGetId($sizeAttributes);
 
-                if (Schema::hasTable('product_recipes')) {
-                    foreach ($data['ingredient_id'] ?? [] as $index => $ingredientId) {
-                        $recipeAttributes = [
-                            'product_id' => $productId,
-                            'product_size_id' => $sizeId,
-                            'ingredient_id' => (int) $ingredientId,
-                            'qty' => $data['ingredient_qty'][$index],
-                            'active' => true,
-                            'created_at' => $now,
-                            'updated_at' => $now,
-                        ];
-                        $recipeAttributes = array_filter(
-                            $recipeAttributes,
-                            fn ($value, $column) => Schema::hasColumn('product_recipes', $column),
-                            ARRAY_FILTER_USE_BOTH
-                        );
-                        DB::table('product_recipes')->insert($recipeAttributes);
+                    if (Schema::hasTable('product_recipes')) {
+                        foreach ($data['ingredient_id'] ?? [] as $index => $ingredientId) {
+                            $recipeAttributes = [
+                                'product_id' => $productId,
+                                'product_size_id' => $sizeId,
+                                'ingredient_id' => (int) $ingredientId,
+                                'qty' => $data['ingredient_qty'][$index],
+                                'active' => true,
+                                'created_at' => $now,
+                                'updated_at' => $now,
+                            ];
+                            $recipeAttributes = array_filter(
+                                $recipeAttributes,
+                                fn ($value, $column) => Schema::hasColumn('product_recipes', $column),
+                                ARRAY_FILTER_USE_BOTH
+                            );
+                            DB::table('product_recipes')->insert($recipeAttributes);
+                        }
                     }
                 }
 

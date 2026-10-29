@@ -118,7 +118,14 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
   const [productSaving, setProductSaving] = useState(false);
   const [productFormError, setProductFormError] = useState(null);
   const [productImageError, setProductImageError] = useState("");
-  const [newProduct, setNewProduct] = useState({ name: "", category: catalogCategory, size: "Big", price: "", stock: "0", description: "" });
+  const [newProduct, setNewProduct] = useState({
+    name: "",
+    category: catalogCategory,
+    sizes: ["Big"],
+    prices: { Big: "", Small: "" },
+    stocks: { Big: "0", Small: "0" },
+    description: "",
+  });
   const [viewMode, setViewMode] = useState("cards");
   const [newImage, setNewImage] = useState(null);
   const newImageInputRef = useRef(null);
@@ -308,10 +315,10 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
     setNewProduct({
       name: "",
       category: canManageCatalog ? "Cakes" : catalogCategory,
-      size: activeCat === "Small Cakes" ? "Small" : "Big",
-      price: "",
-      stock: "0",
-      description: ""
+      sizes: [activeCat === "Small Cakes" ? "Small" : "Big"],
+      prices: { Big: "", Small: "" },
+      stocks: { Big: "0", Small: "0" },
+      description: "",
     });
     setNewImage(null);
     setRecipeRows([{ ingredient_id: "", qty: "" }]);
@@ -353,8 +360,16 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
       setProductFormError("Product category is required.");
       return;
     }
-    if (Number(newProduct.price) <= 0) {
-      setProductFormError("Enter a valid base price.");
+    if (!newProduct.sizes.length) {
+      setProductFormError("Select at least one cake size.");
+      return;
+    }
+    if (newProduct.sizes.some((size) => !Number.isFinite(Number(newProduct.prices[size])) || Number(newProduct.prices[size]) <= 0)) {
+      setProductFormError("Enter a valid price for each selected cake size.");
+      return;
+    }
+    if (newProduct.sizes.some((size) => !Number.isInteger(Number(newProduct.stocks[size])) || Number(newProduct.stocks[size]) < 0)) {
+      setProductFormError("Enter a valid starting stock for each selected cake size.");
       return;
     }
     if (!newImage) {
@@ -365,9 +380,11 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
     const formData = new FormData();
     formData.append("name", newProduct.name.trim());
     formData.append("category", newProduct.category.trim());
-    formData.append("size", newProduct.size);
-    formData.append("price", Number(newProduct.price));
-    formData.append("stock", Number(newProduct.stock) || 0);
+    newProduct.sizes.forEach((size) => {
+      formData.append("sizes[]", size);
+      formData.append(`prices[${size}]`, Number(newProduct.prices[size]));
+      formData.append(`stocks[${size}]`, Number(newProduct.stocks[size]));
+    });
     formData.append("description", newProduct.description.trim());
     if (newImage) {
       formData.append("image", newImage);
@@ -1337,48 +1354,65 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
                     />
                   </div>
 
-                  <div className="space-y-2">
-                    <label htmlFor="new-product-size" className="block text-[10px] font-bold uppercase tracking-[0.15em] text-[#8f8076]">Cake Size</label>
-                    <select
-                      id="new-product-size"
-                      value={newProduct.size}
-                      onChange={(e) => setNewProduct((prev) => ({ ...prev, size: e.target.value }))}
-                      className="w-full rounded-xl border border-[#eadfd8] bg-white px-3.5 py-3 text-[13px] text-[#33251e] outline-none transition focus:border-[#d4af37] focus:ring-2 focus:ring-[#d4af37]/15"
-                    >
-                      <option value="Big">Big Cake</option>
-                      <option value="Small">Small Cake</option>
-                    </select>
-                  </div>
+                  <fieldset className="space-y-2 sm:col-span-2">
+                    <legend className="block text-[10px] font-bold uppercase tracking-[0.15em] text-[#8f8076]">Cake Size</legend>
+                    <div className="grid grid-cols-2 gap-3">
+                      {["Big", "Small"].map((size) => (
+                        <label key={size} className="flex items-center gap-2 rounded-xl border border-[#eadfd8] bg-white px-3.5 py-3 text-[13px] text-[#33251e]">
+                          <input
+                            type="checkbox"
+                            aria-label={`${size} Cake`}
+                            checked={newProduct.sizes.includes(size)}
+                            onChange={(event) => {
+                              setNewProduct((prev) => ({
+                                ...prev,
+                                sizes: event.target.checked
+                                  ? [...prev.sizes, size]
+                                  : prev.sizes.filter((selectedSize) => selectedSize !== size),
+                              }));
+                              setProductFormError(null);
+                            }}
+                            className="h-4 w-4 accent-[#9b7810]"
+                          />
+                          {size} Cake
+                        </label>
+                      ))}
+                    </div>
+                  </fieldset>
 
-                  <div className="space-y-2">
-                    <label htmlFor="new-product-price" className="block text-[10px] font-bold uppercase tracking-[0.15em] text-[#8f8076]">Price ({newProduct.size} Cake)</label>
-                    <input
-                      id="new-product-price"
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={newProduct.price}
-                      onChange={(e) => setNewProduct((prev) => ({ ...prev, price: e.target.value }))}
-                      className="w-full rounded-xl border border-[#eadfd8] bg-white px-3.5 py-3 text-[13px] text-[#33251e] outline-none transition focus:border-[#d4af37] focus:ring-2 focus:ring-[#d4af37]/15"
-                      placeholder="100.00"
-                      required
-                    />
-                  </div>
+                  {newProduct.sizes.map((size) => (
+                    <React.Fragment key={size}>
+                      <div className="space-y-2">
+                        <label htmlFor={`new-product-price-${size.toLowerCase()}`} className="block text-[10px] font-bold uppercase tracking-[0.15em] text-[#8f8076]">Price ({size} Cake)</label>
+                        <input
+                          id={`new-product-price-${size.toLowerCase()}`}
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={newProduct.prices[size]}
+                          onChange={(event) => setNewProduct((prev) => ({ ...prev, prices: { ...prev.prices, [size]: event.target.value } }))}
+                          className="w-full rounded-xl border border-[#eadfd8] bg-white px-3.5 py-3 text-[13px] text-[#33251e] outline-none transition focus:border-[#d4af37] focus:ring-2 focus:ring-[#d4af37]/15"
+                          placeholder="100.00"
+                          required
+                        />
+                      </div>
 
-                  <div className="space-y-2">
-                    <label htmlFor="new-product-stock" className="block text-[10px] font-bold uppercase tracking-[0.15em] text-[#8f8076]">Starting Stock</label>
-                    <input
-                      id="new-product-stock"
-                      type="number"
-                      min="0"
-                      step="1"
-                      value={newProduct.stock}
-                      onChange={(e) => setNewProduct((prev) => ({ ...prev, stock: e.target.value }))}
-                      className="w-full rounded-xl border border-[#eadfd8] bg-white px-3.5 py-3 text-[13px] text-[#33251e] outline-none transition focus:border-[#d4af37] focus:ring-2 focus:ring-[#d4af37]/15"
-                      placeholder="10"
-                      required
-                    />
-                  </div>
+                      <div className="space-y-2">
+                        <label htmlFor={`new-product-stock-${size.toLowerCase()}`} className="block text-[10px] font-bold uppercase tracking-[0.15em] text-[#8f8076]">Starting Stock ({size} Cake)</label>
+                        <input
+                          id={`new-product-stock-${size.toLowerCase()}`}
+                          type="number"
+                          min="0"
+                          step="1"
+                          value={newProduct.stocks[size]}
+                          onChange={(event) => setNewProduct((prev) => ({ ...prev, stocks: { ...prev.stocks, [size]: event.target.value } }))}
+                          className="w-full rounded-xl border border-[#eadfd8] bg-white px-3.5 py-3 text-[13px] text-[#33251e] outline-none transition focus:border-[#d4af37] focus:ring-2 focus:ring-[#d4af37]/15"
+                          placeholder="10"
+                          required
+                        />
+                      </div>
+                    </React.Fragment>
+                  ))}
 
                   <div className="space-y-2 sm:col-span-2">
                     <label className="block text-[10px] font-bold uppercase tracking-[0.15em] text-[#8f8076]">Product Image <span className="normal-case tracking-normal text-[#b07a39]">Required for the customer menu</span></label>
@@ -1428,7 +1462,7 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div>
                       <h3 className="font-serif text-[18px] text-[#33251e]">Recipe Ingredients</h3>
-                      <p className="mt-0.5 text-[11px] text-[#8f8076]">Optional · Define ingredients used for production.</p>
+                      <p className="mt-0.5 text-[11px] text-[#8f8076]">Optional · Define ingredients used for production. The same recipe is used for each selected size.</p>
                     </div>
                     <button
                       type="button"

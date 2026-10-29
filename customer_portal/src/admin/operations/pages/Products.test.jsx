@@ -153,7 +153,7 @@ describe('Products admin catalog', () => {
 
     fireEvent.change(screen.getByLabelText('Product Name'), { target: { value: 'Vanilla Cloud Cake' } });
     fireEvent.change(screen.getByLabelText('Price (Big Cake)'), { target: { value: '650' } });
-    fireEvent.change(screen.getByLabelText('Starting Stock'), { target: { value: '6' } });
+    fireEvent.change(screen.getByLabelText('Starting Stock (Big Cake)'), { target: { value: '6' } });
     const imageInput = container.querySelector('input[type="file"][accept*="image/png"]');
     const image = new File(['image-data'], 'vanilla-cake.png', { type: 'image/png' });
     fireEvent.change(imageInput, { target: { files: [image] } });
@@ -171,7 +171,9 @@ describe('Products admin catalog', () => {
     const createCall = global.fetch.mock.calls.find(([url, options]) =>
       String(url).endsWith('/api/staff/products') && options?.method === 'POST'
     );
-    expect(createCall[1].body.get('size')).toBe('Big');
+    expect(createCall[1].body.getAll('sizes[]')).toEqual(['Big']);
+    expect(createCall[1].body.get('prices[Big]')).toBe('650');
+    expect(createCall[1].body.get('stocks[Big]')).toBe('6');
     expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:product-preview');
   });
 
@@ -183,7 +185,8 @@ describe('Products admin catalog', () => {
     });
     fireEvent.click(screen.getByRole('button', { name: 'Add New' }));
     fireEvent.change(screen.getByLabelText('Product Name'), { target: { value: 'Mini Vanilla Cake' } });
-    fireEvent.change(screen.getByLabelText('Cake Size'), { target: { value: 'Small' } });
+    fireEvent.click(screen.getByLabelText('Big Cake'));
+    fireEvent.click(screen.getByLabelText('Small Cake'));
     fireEvent.change(screen.getByLabelText('Price (Small Cake)'), { target: { value: '320' } });
     const imageInput = container.querySelector('input[type="file"][accept*="image/png"]');
     fireEvent.change(imageInput, {
@@ -196,8 +199,40 @@ describe('Products admin catalog', () => {
         String(url).endsWith('/api/staff/products') && options?.method === 'POST'
       );
       expect(createCall).toBeDefined();
-      expect(createCall[1].body.get('size')).toBe('Small');
-      expect(createCall[1].body.get('price')).toBe('320');
+      expect(createCall[1].body.getAll('sizes[]')).toEqual(['Small']);
+      expect(createCall[1].body.get('prices[Small]')).toBe('320');
+    });
+  });
+
+  test('creates one product with both cake sizes and separate prices and stocks', async () => {
+    const { container } = render(<Products allowCatalogManagement />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Strawberry Cake')).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Add New' }));
+    fireEvent.change(screen.getByLabelText('Product Name'), { target: { value: 'Two Size Vanilla Cake' } });
+    fireEvent.change(screen.getByLabelText('Price (Big Cake)'), { target: { value: '650' } });
+    fireEvent.change(screen.getByLabelText('Starting Stock (Big Cake)'), { target: { value: '4' } });
+    fireEvent.click(screen.getByLabelText('Small Cake'));
+    fireEvent.change(screen.getByLabelText('Price (Small Cake)'), { target: { value: '320' } });
+    fireEvent.change(screen.getByLabelText('Starting Stock (Small Cake)'), { target: { value: '6' } });
+    const imageInput = container.querySelector('input[type="file"][accept*="image/png"]');
+    fireEvent.change(imageInput, {
+      target: { files: [new File(['image-data'], 'two-size-vanilla.png', { type: 'image/png' })] },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Create Product' }));
+
+    await waitFor(() => {
+      const createCall = global.fetch.mock.calls.find(([url, options]) =>
+        String(url).endsWith('/api/staff/products') && options?.method === 'POST'
+      );
+      expect(createCall).toBeDefined();
+      expect(createCall[1].body.getAll('sizes[]')).toEqual(['Big', 'Small']);
+      expect(createCall[1].body.get('prices[Big]')).toBe('650');
+      expect(createCall[1].body.get('prices[Small]')).toBe('320');
+      expect(createCall[1].body.get('stocks[Big]')).toBe('4');
+      expect(createCall[1].body.get('stocks[Small]')).toBe('6');
     });
   });
 
@@ -441,7 +476,7 @@ describe('Products admin catalog', () => {
     fireEvent.click(screen.getAllByRole('button', { name: /^Edit / })[0]);
 
     expect(screen.getByText('Recipe for: Small Cake')).toBeInTheDocument();
-    expect(screen.queryByLabelText('Cake Size')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Big Cake')).not.toBeInTheDocument();
     await waitFor(() => {
       expect(global.fetch).toHaveBeenCalledWith(
         expect.stringContaining('/api/staff/products/1/recipe?product_size_id=11'),
