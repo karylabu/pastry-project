@@ -49,6 +49,27 @@ export default function AdminLayout({ children }) {
           background: #fbfaf5 !important;
         }
 
+        .admin-page-surface [class*="fixed"][class*="inset-"]:has(> :not(img):not(button):not(svg)),
+        .admin-page-surface [class*="fixed"][class*="bottom-"][class*="top-"]:has(> :not(img):not(button):not(svg)) {
+          background-color: rgba(36, 24, 18, 0.55) !important;
+          backdrop-filter: blur(2px);
+        }
+
+        .admin-page-surface [class*="fixed"][class*="inset-"] > :not(img):not(button):not(svg),
+        .admin-page-surface [class*="fixed"][class*="bottom-"][class*="top-"] > :not(img):not(button):not(svg) {
+          border: 1px solid #eadfd8 !important;
+          border-radius: 8px !important;
+          background-color: #fffdfa !important;
+          box-shadow: 0 24px 70px rgba(38, 25, 16, 0.28) !important;
+          color: #33251e;
+        }
+
+        .admin-page-surface [class*="fixed"][class*="inset-"] > :not(img):not(button):not(svg):hover,
+        .admin-page-surface [class*="fixed"][class*="bottom-"][class*="top-"] > :not(img):not(button):not(svg):hover {
+          transform: none !important;
+          box-shadow: 0 24px 70px rgba(38, 25, 16, 0.28) !important;
+        }
+
         .admin-page-surface :is(div, section, article, a)[class*="rounded-"][class*="border"][class*="p-"]:not([class*="border-dashed"]):not(.admin-product-card):not(.admin-product-card *):not(.admin-static-card) {
           border-right-color: var(--admin-card-border) !important;
           border-bottom-color: var(--admin-card-border) !important;
