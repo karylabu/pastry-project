@@ -597,7 +597,7 @@ export default function Orders() {
             </div>
           )}
 
-          {dashboardFilter !== "low_stock" && <div className="admin-static-card admin-operations-controls mb-4 rounded-lg border border-[#e9e1d9] bg-white p-3 shadow-[0_3px_12px_rgba(60,42,28,0.035)] sm:p-4 xl:min-h-[132px]">
+          {dashboardFilter !== "low_stock" && <div className="admin-static-card admin-operations-controls mb-4 rounded-lg border border-[#e9e1d9] bg-white p-3 shadow-[0_3px_12px_rgba(60,42,28,0.035)] sm:p-4">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
               <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#65574d]">Filter by status</p>
               <div className="flex flex-wrap items-center gap-3">
