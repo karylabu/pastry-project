@@ -213,7 +213,7 @@ export default function WasteTracking() {
 
   const topWastedItems = useMemo(() => {
     const byItem = {};
-    periodEntries.forEach((entry) => {
+    periodEntries.filter((entry) => entry.type === "Raw Material").forEach((entry) => {
       const current = byItem[entry.item] || { item: entry.item, qty: 0, cost: 0, unit: entry.unit };
       current.qty += entry.qty;
       current.cost += entry.cost;
@@ -430,7 +430,7 @@ export default function WasteTracking() {
             </section>
 
             <section className="rounded-lg border bg-white p-4" style={{ borderColor: C.border }}>
-              <div className="mb-4 flex items-center justify-between gap-2"><div><h3 className="text-[14px] font-semibold text-black">Top Wasted Items</h3><p className="mt-0.5 text-[10px] text-black/50">Ranked by financial loss</p></div><TrendingUp size={16} className="text-[#9b7810]" /></div>
+              <div className="mb-4 flex items-center justify-between gap-2"><div><h3 className="text-[14px] font-semibold text-black">Top Wasted Ingredients</h3><p className="mt-0.5 text-[10px] text-black/50">Ranked by financial loss</p></div><TrendingUp size={16} className="text-[#9b7810]" /></div>
               {topWastedItems.length ? <div className="space-y-3">{topWastedItems.map((item, index) => <div key={item.item}><div className="mb-1 flex items-center gap-2 text-[10px]"><span className="grid h-5 w-5 shrink-0 place-items-center rounded bg-[#fff4cd] text-[9px] font-bold text-black">{index + 1}</span><span className="min-w-0 flex-1 truncate font-medium text-black" title={item.item}>{item.item}</span><span className="shrink-0 font-semibold text-black">{formatPeso(item.cost)}</span></div><div className="ml-7 h-1.5 overflow-hidden rounded-full bg-[#fff4cd]"><div className="h-full rounded-full bg-[#d4af37]" style={{ width: `${Math.max(4, item.cost / maxItemCost * 100)}%` }} /></div></div>)}</div> : <p className="py-8 text-center text-[11px] text-black/50">No waste logged for this period.</p>}
             </section>
 

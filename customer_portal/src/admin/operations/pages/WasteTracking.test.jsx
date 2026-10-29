@@ -29,7 +29,7 @@ beforeEach(() => {
     id: index + 1,
     datetime: new Date(Date.UTC(2026, 9, 23, 12, index)).toISOString(),
     item: `Waste item ${index + 1}`,
-    type: "Raw Material",
+    type: index === 0 ? "Finished Product" : "Raw Material",
     qty: 1,
     unit: "kg",
     cost: 10,
@@ -58,6 +58,8 @@ test("waste audit log shows ten table entries per page", async () => {
   render(<WasteTracking />);
 
   expect(await screen.findByRole("heading", { name: "Ingredients" })).toBeInTheDocument();
+  const topWastedIngredients = await screen.findByRole("heading", { name: "Top Wasted Ingredients" });
+  expect(within(topWastedIngredients.closest("section")).queryByText("Waste item 1")).not.toBeInTheDocument();
   expect(await screen.findAllByText("₱120.00")).toHaveLength(2);
   expect(document.body.textContent).not.toContain("$");
 
