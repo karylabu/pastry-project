@@ -709,7 +709,9 @@ export default function Ingredients({
           <div className="fixed inset-0 z-[10001] flex items-center justify-center bg-[#241812]/55 px-3 py-4 backdrop-blur-[2px]">
             <div role="dialog" aria-modal="true" aria-labelledby="ingredient-modal-title" className="w-full max-w-lg rounded-lg border border-[#eadfd8] bg-[#fffdfa] p-5 shadow-[0_24px_70px_rgba(38,25,16,0.28)] sm:p-6">
               <div className="flex items-start justify-between gap-3 border-b border-[#f0e7e0] pb-4">
-                <h3 id="ingredient-modal-title" className="text-sm font-semibold">
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-[0.24em] text-[#9b7810]">Ingredient inventory</p>
+                  <h3 id="ingredient-modal-title" className="mt-1 font-serif text-[24px] text-[#33251e]">
                   {modalType === 'history'
                     ? 'Movement History'
                     : modalType === 'create'
@@ -721,7 +723,13 @@ export default function Ingredients({
                     : modalType === 'in'
                     ? 'Stock In'
                     : 'Stock Out'}
-                </h3>
+                  </h3>
+                  {modalType === 'create' || modalType === 'batch_add' ? (
+                    <p className="mt-1 text-[12px] text-[#74675f]">
+                      {modalType === 'create' ? 'Add a new ingredient to your inventory.' : 'Record new stock for an ingredient.'}
+                    </p>
+                  ) : null}
+                </div>
                 <button type="button" onClick={closeModal} title="Close ingredient modal" aria-label="Close ingredient modal" className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-[#eadfd8] bg-white text-[#765d50] transition hover:bg-[#fff4cd]"><X size={16} aria-hidden="true" /></button>
               </div>
               <div className="mt-4">
