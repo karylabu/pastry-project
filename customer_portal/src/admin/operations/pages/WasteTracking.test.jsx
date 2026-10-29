@@ -57,7 +57,7 @@ afterEach(() => {
 test("waste audit log shows ten table entries per page", async () => {
   render(<WasteTracking />);
 
-  expect(await screen.findAllByText("₱120")).toHaveLength(2);
+  expect(await screen.findAllByText("₱120.00")).toHaveLength(2);
   expect(document.body.textContent).not.toContain("$");
 
   const table = await screen.findByRole("table");

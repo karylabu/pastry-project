@@ -63,7 +63,7 @@ const reasonMeta = (key) => REASON_CODES.find((r) => r.key === key) || REASON_CO
 const SPOILAGE_ALERT_THRESHOLD = 3; // times an item must appear to trigger a flag
 
 function formatPeso(value) {
-  return `₱${Number(value || 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
+  return `₱${Number(value || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 // Enriches an API log entry with catalogue display metadata.
