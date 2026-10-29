@@ -370,7 +370,7 @@ export default function CakeRecipes() {
                 <div key={`${selectedFlavorId}-${index}`} className="grid items-center gap-2 rounded-lg border border-[#eee4de] bg-white p-2.5 transition hover:border-[#dfd1c5] md:grid-cols-[minmax(0,1.55fr)_minmax(120px,0.55fr)_minmax(110px,0.5fr)_64px] md:gap-3 md:px-3">
                   <label className="min-w-0">
                     <span className="mb-1 block text-[9px] font-bold uppercase tracking-[0.14em] text-[#9b8c83] md:hidden">Ingredient</span>
-                    <select value={line.ingredient_id} onChange={(event) => selectIngredient(index, event.target.value)} className="h-10 w-full rounded-md border border-[#eadfd8] bg-white px-3 text-[11px] text-[#33251e] outline-none transition focus:border-[#9b8c83] focus:ring-2 focus:ring-[#9b8c83]/20" required>
+                    <select value={line.ingredient_id} onChange={(event) => selectIngredient(index, event.target.value)} className="h-10 w-full rounded-md border border-[#eadfd8] bg-white px-3 text-[11px] text-[#33251e] outline-none transition focus:border-[#9b8c83] focus:ring-2 focus:ring-[#9b8c83]/20 [&_option]:text-[#33251e] [&_option:checked]:bg-[#f1ece8] [&_option:checked]:text-[#33251e]" required>
                     <option value="">Select ingredient</option>
                     {catalog.ingredients.map((ingredient) => <option key={ingredient.id} value={ingredient.id}>{ingredient.name} ({ingredient.unit || "unit not set"})</option>)}
                     </select>
