@@ -224,7 +224,7 @@ export default function WasteTracking() {
 
   const wasteByItem = useMemo(() => {
     const byItem = {};
-    periodEntries.forEach((entry) => {
+    periodEntries.filter((entry) => entry.type === "Raw Material").forEach((entry) => {
       const current = byItem[entry.item] || { item: entry.item, qty: 0, cost: 0, unit: entry.unit };
       current.qty += entry.qty;
       current.cost += entry.cost;
@@ -425,7 +425,7 @@ export default function WasteTracking() {
 
           <div className="mb-4 grid gap-3 xl:grid-cols-3">
             <section className="rounded-lg border bg-white p-4" style={{ borderColor: C.border }}>
-              <div className="mb-4 flex items-center justify-between gap-2"><div><h3 className="text-[14px] font-semibold text-black">Waste by Item Type</h3><p className="mt-0.5 text-[10px] text-black/50">Quantity lost · {periodLabel}</p></div><Package size={16} className="text-[#9b7810]" /></div>
+              <div className="mb-4 flex items-center justify-between gap-2"><div><h3 className="text-[14px] font-semibold text-black">Ingredients</h3><p className="mt-0.5 text-[10px] text-black/50">Quantity lost · {periodLabel}</p></div><Package size={16} className="text-[#9b7810]" /></div>
               {wasteByItem.length ? <div className="space-y-3">{wasteByItem.map((item) => <div key={item.item}><div className="mb-1 flex items-center justify-between gap-2 text-[10px]"><span className="min-w-0 truncate font-medium text-black" title={item.item}>{item.item}</span><span className="shrink-0 font-semibold text-black">{item.qty.toFixed(1)} {item.unit}</span></div><div className="h-1.5 overflow-hidden rounded-full bg-[#fff4cd]"><div className="h-full rounded-full bg-[#d4af37]" style={{ width: `${Math.max(4, item.qty / maxItemQuantity * 100)}%` }} /></div></div>)}</div> : <p className="py-8 text-center text-[11px] text-black/50">No waste logged for this period.</p>}
             </section>
 
