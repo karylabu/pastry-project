@@ -542,10 +542,10 @@ export default function WasteTracking() {
 
       {/* ---------- Log New Waste Entry modal ---------- */}
       {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-          <div className="w-full max-w-md rounded-[28px] bg-white p-6 shadow-xl" style={{ border: `1px solid ${C.border}` }}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#241812]/55 px-4 py-5 backdrop-blur-[2px]">
+          <div role="dialog" aria-modal="true" aria-labelledby="waste-entry-title" className="w-full max-w-md rounded-lg border border-[#eadfd8] bg-[#fffdfa] p-6 shadow-[0_24px_70px_rgba(38,25,16,0.28)]">
             <div className="flex items-center justify-between mb-5">
-              <h3 className="text-[17px] font-bold" style={{ color: C.ink }}>Log New Waste Entry</h3>
+              <h3 id="waste-entry-title" className="text-[17px] font-bold" style={{ color: C.ink }}>Log New Waste Entry</h3>
               <button onClick={() => setShowModal(false)} style={{ color: C.sub }}>
                 <X size={18} />
               </button>

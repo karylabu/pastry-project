@@ -1113,7 +1113,7 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="fixed inset-x-0 bottom-0 top-[88px] z-50 flex items-center justify-center overflow-y-auto bg-black/40 p-4"
+              className="fixed inset-x-0 bottom-0 top-[88px] z-50 flex items-center justify-center overflow-y-auto bg-[#241812]/55 p-4 backdrop-blur-[2px]"
               role="dialog"
               aria-modal="true"
               aria-labelledby="inventory-modal-title"
@@ -1123,7 +1123,7 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
                 initial={{ scale: 0.9 }}
                 animate={{ scale: 1 }}
                 exit={{ scale: 0.9 }}
-                className="max-h-full w-full max-w-[600px] overflow-y-auto rounded-lg border border-black/10 bg-white p-6 shadow-xl"
+                className="max-h-full w-full max-w-[600px] overflow-y-auto rounded-lg border border-[#eadfd8] bg-[#fffdfa] p-6 shadow-[0_24px_70px_rgba(38,25,16,0.28)]"
               >
 
                 <div className="mb-1 flex items-start justify-between gap-4">
@@ -1553,7 +1553,7 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="fixed inset-x-0 bottom-0 top-[88px] z-[9997] flex items-start justify-center overflow-y-auto bg-black/40 px-3 py-0 sm:px-6"
+              className="fixed inset-x-0 bottom-0 top-[88px] z-[9997] flex items-start justify-center overflow-y-auto bg-[#241812]/55 px-3 py-4 backdrop-blur-[2px] sm:px-6 sm:py-6"
               role="dialog"
               aria-modal="true"
               aria-labelledby="edit-product-title"

@@ -1291,18 +1291,21 @@ export default function Orders() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+            className="fixed inset-0 z-50 flex items-center justify-center bg-[#241812]/55 p-4 backdrop-blur-[2px]"
           >
             <motion.div
               initial={{ y: 16, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
               exit={{ y: 16, opacity: 0 }}
-              className="w-full max-w-md rounded-[24px] border border-black/10 bg-white p-5 shadow-xl"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="reject-request-title"
+              className="w-full max-w-md rounded-lg border border-[#eadfd8] bg-[#fffdfa] p-5 shadow-[0_24px_70px_rgba(38,25,16,0.28)]"
             >
               <div className="mb-4 flex items-start justify-between gap-3">
                 <div>
                   <p className="text-[10px] uppercase tracking-[0.2em] text-red-700">Reject request</p>
-                  <h3 className="text-[18px] font-semibold text-black">Order #{rejectModalOrderId}</h3>
+                  <h3 id="reject-request-title" className="text-[18px] font-semibold text-black">Order #{rejectModalOrderId}</h3>
                 </div>
                 <button type="button" onClick={() => setRejectModalOrderId(null)} className="text-[12px] font-semibold text-black/60">
                   Close

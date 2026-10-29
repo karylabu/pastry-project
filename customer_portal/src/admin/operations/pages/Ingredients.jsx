@@ -706,10 +706,10 @@ export default function Ingredients({
           </nav>
         )}
         {modalOpen && (
-          <div className="fixed inset-0 z-[10001] flex items-center justify-center bg-black/40 px-3 py-4">
-            <div className="w-full max-w-lg bg-white rounded-2xl p-3 mx-2">
-              <div className="flex items-start justify-between gap-2">
-                <h3 className="text-sm font-semibold">
+          <div className="fixed inset-0 z-[10001] flex items-center justify-center bg-[#241812]/55 px-3 py-4 backdrop-blur-[2px]">
+            <div role="dialog" aria-modal="true" aria-labelledby="ingredient-modal-title" className="w-full max-w-lg rounded-lg border border-[#eadfd8] bg-[#fffdfa] p-5 shadow-[0_24px_70px_rgba(38,25,16,0.28)] sm:p-6">
+              <div className="flex items-start justify-between gap-3 border-b border-[#f0e7e0] pb-4">
+                <h3 id="ingredient-modal-title" className="text-sm font-semibold">
                   {modalType === 'history'
                     ? 'Movement History'
                     : modalType === 'create'
@@ -722,7 +722,7 @@ export default function Ingredients({
                     ? 'Stock In'
                     : 'Stock Out'}
                 </h3>
-                <button type="button" onClick={closeModal} title="Close ingredient modal" aria-label="Close ingredient modal" className="inline-flex h-8 w-8 items-center justify-center rounded-full text-gray-500 transition hover:bg-gray-100 hover:text-gray-800"><X size={16} aria-hidden="true" /></button>
+                <button type="button" onClick={closeModal} title="Close ingredient modal" aria-label="Close ingredient modal" className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-[#eadfd8] bg-white text-[#765d50] transition hover:bg-[#fff4cd]"><X size={16} aria-hidden="true" /></button>
               </div>
               <div className="mt-4">
                 {modalType === 'history' && (

@@ -534,8 +534,8 @@ export default function UserManagement() {
       </div>
 
       {viewingUser && (
-        <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/40 px-4" onClick={() => { setViewingUser(null); setViewUserError(""); }}>
-          <section className="w-full max-w-md rounded-lg border border-[#e9e1d9] bg-white p-5 shadow-xl" role="dialog" aria-modal="true" aria-labelledby="view-user-title" onClick={(event) => event.stopPropagation()}>
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-[#241812]/55 px-4 py-5 backdrop-blur-[2px]" onClick={() => { setViewingUser(null); setViewUserError(""); }}>
+          <section className="w-full max-w-md rounded-lg border border-[#eadfd8] bg-[#fffdfa] p-5 shadow-[0_24px_70px_rgba(38,25,16,0.28)]" role="dialog" aria-modal="true" aria-labelledby="view-user-title" onClick={(event) => event.stopPropagation()}>
             <div className="flex items-start justify-between gap-4">
               <div>
                 <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#92701e]">Account details</p>
@@ -556,10 +556,10 @@ export default function UserManagement() {
       )}
 
       {confirmAction && (
-        <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/40 px-4">
-          <div className="w-full max-w-md rounded-lg border border-[#e9e1d9] bg-white p-5 shadow-xl">
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-[#241812]/55 px-4 py-5 backdrop-blur-[2px]">
+          <div role="alertdialog" aria-modal="true" aria-labelledby="confirm-action-title" className="w-full max-w-md rounded-lg border border-[#eadfd8] bg-[#fffdfa] p-5 shadow-[0_24px_70px_rgba(38,25,16,0.28)]">
             <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#92701e]">Confirm action</p>
-            <h3 className="mt-2 text-[18px] font-semibold text-[#33251e]">{confirmAction.title}</h3>
+            <h3 id="confirm-action-title" className="mt-2 text-[18px] font-semibold text-[#33251e]">{confirmAction.title}</h3>
             <p className="mt-2 text-[13px] leading-5 text-[#74675f]">{confirmAction.message}</p>
             <div className="mt-6 flex justify-end gap-3">
               <button type="button" onClick={() => setConfirmAction(null)} className="rounded-md border border-[#e8dfd4] px-4 py-2 text-[12px] font-medium text-[#65574d] transition hover:bg-[#fbf7f2]">
@@ -574,12 +574,12 @@ export default function UserManagement() {
       )}
 
       {isModalOpen && (
-        <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/40 px-4">
-          <div className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-lg border border-[#e9e1d9] bg-white p-5 shadow-xl sm:p-6">
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-[#241812]/55 px-4 py-5 backdrop-blur-[2px]">
+          <div role="dialog" aria-modal="true" aria-labelledby="user-form-title" className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-lg border border-[#eadfd8] bg-[#fffdfa] p-5 shadow-[0_24px_70px_rgba(38,25,16,0.28)] sm:p-6">
             <div className="mb-5 flex items-start justify-between">
               <div>
                 <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#92701e]">Account</p>
-                <h2 className="text-[18px] font-semibold text-[#33251e]">{selectedUser ? "Edit User" : "Add New User"}</h2>
+                <h2 id="user-form-title" className="text-[18px] font-semibold text-[#33251e]">{selectedUser ? "Edit User" : "Add New User"}</h2>
               </div>
               <button type="button" onClick={() => { setIsModalOpen(false); setSelectedUser(null); }} className="rounded-md border border-[#e8dfd4] px-3 py-2 text-[11px] font-medium text-[#65574d] transition hover:bg-[#fbf7f2]">
                 Close

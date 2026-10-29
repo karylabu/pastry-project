@@ -49,14 +49,20 @@ export default function AdminLayout({ children }) {
           background: #fbfaf5 !important;
         }
 
-        .admin-page-surface [class*="fixed"][class*="inset-"]:has(> :not(img):not(button):not(svg)),
-        .admin-page-surface [class*="fixed"][class*="bottom-"][class*="top-"]:has(> :not(img):not(button):not(svg)) {
+        .admin-page-surface [class*="fixed"][class*="inset-"]:has(> [role="dialog"], > [role="alertdialog"]),
+        .admin-page-surface [class*="fixed"][class*="bottom-"][class*="top-"]:has(> [role="dialog"], > [role="alertdialog"]) {
           background-color: rgba(36, 24, 18, 0.55) !important;
           backdrop-filter: blur(2px);
         }
 
-        .admin-page-surface [class*="fixed"][class*="inset-"] > :not(img):not(button):not(svg),
-        .admin-page-surface [class*="fixed"][class*="bottom-"][class*="top-"] > :not(img):not(button):not(svg) {
+        .admin-page-surface [class*="fixed"][class*="inset-"] > [role="dialog"],
+        .admin-page-surface [class*="fixed"][class*="inset-"] > [role="alertdialog"],
+        .admin-page-surface [class*="fixed"][class*="bottom-"][class*="top-"] > [role="dialog"],
+        .admin-page-surface [class*="fixed"][class*="bottom-"][class*="top-"] > [role="alertdialog"],
+        .admin-page-surface [class*="fixed"][class*="inset-"][role="dialog"] > :not(img):not(button):not(svg),
+        .admin-page-surface [class*="fixed"][class*="inset-"][role="alertdialog"] > :not(img):not(button):not(svg),
+        .admin-page-surface [class*="fixed"][class*="bottom-"][class*="top-"][role="dialog"] > :not(img):not(button):not(svg),
+        .admin-page-surface [class*="fixed"][class*="bottom-"][class*="top-"][role="alertdialog"] > :not(img):not(button):not(svg) {
           border: 1px solid #eadfd8 !important;
           border-radius: 8px !important;
           background-color: #fffdfa !important;
@@ -64,13 +70,15 @@ export default function AdminLayout({ children }) {
           color: #33251e;
         }
 
-        .admin-page-surface [class*="fixed"][class*="inset-"] > :not(img):not(button):not(svg):hover,
-        .admin-page-surface [class*="fixed"][class*="bottom-"][class*="top-"] > :not(img):not(button):not(svg):hover {
+        .admin-page-surface [class*="fixed"][class*="inset-"] > [role="dialog"]:hover,
+        .admin-page-surface [class*="fixed"][class*="inset-"] > [role="alertdialog"]:hover,
+        .admin-page-surface [class*="fixed"][class*="bottom-"][class*="top-"] > [role="dialog"]:hover,
+        .admin-page-surface [class*="fixed"][class*="bottom-"][class*="top-"] > [role="alertdialog"]:hover {
           transform: none !important;
           box-shadow: 0 24px 70px rgba(38, 25, 16, 0.28) !important;
         }
 
-        .admin-page-surface :is(div, section, article, a)[class*="rounded-"][class*="border"][class*="p-"]:not([class*="border-dashed"]):not(.admin-product-card):not(.admin-product-card *):not(.admin-static-card) {
+        .admin-page-surface :is(div, section, article, a)[class*="rounded-"][class*="border"][class*="p-"]:not([class*="border-dashed"]):not(.admin-product-card):not(.admin-product-card *):not(.admin-static-card):not([role="dialog"]):not([role="dialog"] *):not([role="alertdialog"]):not([role="alertdialog"] *) {
           border-right-color: var(--admin-card-border) !important;
           border-bottom-color: var(--admin-card-border) !important;
           border-left-color: var(--admin-card-border) !important;
@@ -79,13 +87,13 @@ export default function AdminLayout({ children }) {
           transition: transform 180ms ease, box-shadow 180ms ease;
         }
 
-        .admin-page-surface :is(div, section, article, a)[class*="rounded-"][class*="border"][class*="p-"]:not([class*="border-dashed"]):not(.admin-product-card):not(.admin-product-card *):not(.admin-static-card):not([class*="border-t-"]) {
+        .admin-page-surface :is(div, section, article, a)[class*="rounded-"][class*="border"][class*="p-"]:not([class*="border-dashed"]):not(.admin-product-card):not(.admin-product-card *):not(.admin-static-card):not([role="dialog"]):not([role="dialog"] *):not([role="alertdialog"]):not([role="alertdialog"] *):not([class*="border-t-"]) {
           border-top-color: var(--admin-card-accent) !important;
           border-top-style: solid !important;
           border-top-width: 3px !important;
         }
 
-        .admin-page-surface :is(div, section, article, a)[class*="rounded-"][class*="border"][class*="p-"]:not([class*="border-dashed"]):not(.admin-product-card):not(.admin-product-card *):not(.admin-static-card):hover {
+        .admin-page-surface :is(div, section, article, a)[class*="rounded-"][class*="border"][class*="p-"]:not([class*="border-dashed"]):not(.admin-product-card):not(.admin-product-card *):not(.admin-static-card):not([role="dialog"]):not([role="dialog"] *):not([role="alertdialog"]):not([role="alertdialog"] *):hover {
           outline: none !important;
           box-shadow: var(--admin-card-hover-shadow) !important;
           transform: translateY(-2px);

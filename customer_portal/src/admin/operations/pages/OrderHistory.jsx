@@ -556,7 +556,7 @@ export default function OrderHistory() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/50 px-4 py-6"
+            className="fixed inset-0 z-[99999] flex items-center justify-center bg-[#241812]/55 px-4 py-6 backdrop-blur-[2px]"
             onClick={() => setSelectedOrder(null)}
           >
             <motion.div
@@ -564,12 +564,15 @@ export default function OrderHistory() {
               animate={{ y: 0, opacity: 1 }}
               exit={{ y: 24, opacity: 0 }}
               onClick={(e) => e.stopPropagation()}
-              className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-[28px] border border-black/10 bg-white p-6 shadow-2xl"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="receipt-preview-title"
+              className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-lg border border-[#eadfd8] bg-[#fffdfa] p-6 shadow-[0_24px_70px_rgba(38,25,16,0.28)]"
             >
               <div className="flex flex-wrap items-start justify-between gap-4">
                 <div>
                   <p className="text-[10px] uppercase tracking-[0.3em] text-[#D4AF37] font-bold">Receipt Preview</p>
-                  <h2 className="mt-1 text-[22px] font-semibold text-black">Pastry Project</h2>
+                  <h2 id="receipt-preview-title" className="mt-1 text-[22px] font-semibold text-black">Pastry Project</h2>
                   <p className="text-[13px] text-black/60">Order #{selectedOrder.id}</p>
                 </div>
                 <div className="flex gap-2">

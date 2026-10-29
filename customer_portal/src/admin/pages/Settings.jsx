@@ -287,8 +287,8 @@ export default function Settings() {
         </main>
       </div>
       {logoutConfirmOpen && (
-        <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/40 px-4" onClick={() => setLogoutConfirmOpen(false)}>
-          <section role="alertdialog" aria-modal="true" aria-labelledby="logout-confirm-title" aria-describedby="logout-confirm-description" className="w-full max-w-md rounded-lg border border-[#e9e1d9] bg-white p-5 shadow-xl" onClick={(event) => event.stopPropagation()}>
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-[#241812]/55 px-4 py-5 backdrop-blur-[2px]" onClick={() => setLogoutConfirmOpen(false)}>
+          <section role="alertdialog" aria-modal="true" aria-labelledby="logout-confirm-title" aria-describedby="logout-confirm-description" className="w-full max-w-md rounded-lg border border-[#eadfd8] bg-[#fffdfa] p-5 shadow-[0_24px_70px_rgba(38,25,16,0.28)]" onClick={(event) => event.stopPropagation()}>
             <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#92701e]">Confirm logout</p>
             <h2 id="logout-confirm-title" className="mt-2 text-[18px] font-semibold text-[#33251e]">Are you sure you want to log out?</h2>
             <p id="logout-confirm-description" className="mt-2 text-[13px] leading-5 text-[#74675f]">You will need to sign in again to access the admin panel.</p>
