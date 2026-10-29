@@ -926,70 +926,79 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
             {!loading && filteredProducts.map(product => (
               <motion.div
                 key={product.id}
-                whileHover={{ scale: 1.02 }}
-                className="admin-product-card group relative flex min-h-[292px] min-w-0 flex-col items-center overflow-hidden rounded-xl border border-[#eadfd8] bg-[#fffaf7] p-2 text-center shadow-[0_5px_14px_rgba(91,64,39,0.06)] transition-all duration-300 hover:-translate-y-0.5 hover:border-[#e7c875] hover:shadow-[0_10px_20px_rgba(91,64,39,0.1)]"
+                whileHover={{ y: -3 }}
+                className="admin-product-card group relative flex min-h-[370px] min-w-0 flex-col overflow-hidden rounded-2xl border border-[#eadfd8] bg-white p-3 text-left shadow-[0_5px_18px_rgba(91,64,39,0.05)] transition-all duration-300 hover:border-[#d8bd79] hover:shadow-[0_14px_30px_rgba(91,64,39,0.12)] sm:p-4"
               >
 
               {/* IMAGE */}
-              <div className="mb-2 flex h-[130px] w-full flex-shrink-0 items-center justify-center overflow-hidden rounded-lg border border-[#f1e6df] bg-[#f8eee8] p-2">
+              <div className="relative mb-4 flex h-[164px] w-full flex-shrink-0 items-center justify-center overflow-hidden rounded-xl border border-[#f1e6df] bg-gradient-to-br from-[#fffaf2] via-[#f9eee8] to-[#f4e4d8] p-3">
                 <img
                   src={`${BASE}/uploads/${product.image}`}
-                  className="h-[118px] w-auto max-w-[82%] object-contain object-center"
+                  className="h-full w-full object-contain object-center transition-transform duration-300 group-hover:scale-[1.04]"
                   alt={product.name}
                 />
+                <span className="absolute bottom-2 left-2 inline-flex items-center rounded-full border border-white/80 bg-white/90 px-2.5 py-1 text-[9px] font-semibold uppercase tracking-[0.12em] text-[#765d50] shadow-sm">
+                  {product.category}
+                </span>
+                {product.is_archived && (
+                  <span className="absolute right-2 top-2 inline-flex items-center rounded-full bg-[#8f432d] px-2.5 py-1 text-[9px] font-semibold text-white shadow-sm">Archived</span>
+                )}
               </div>
 
               {/* CONTENT */}
               <div className="flex w-full flex-grow flex-col">
 
-                <h2 className="mb-1 min-h-[1.7rem] line-clamp-2 px-1 text-[11px] font-bold leading-tight text-[#33251e]">
+                <h2 className="line-clamp-2 min-h-[2.75rem] text-[15px] font-bold leading-snug text-[#33251e]">
                   {product.name}
                 </h2>
 
-                <p className="mb-1 text-[9px] uppercase tracking-[0.12em] text-[#9b8c83]">
-                  {product.category}
-                </p>
-                {product.is_archived && (
-                  <span className="mb-1 inline-flex self-center rounded-full bg-[#f3e8e2] px-2 py-0.5 text-[9px] font-semibold text-[#8f432d]">Archived</span>
+                {product.description && (
+                  <p className="mb-3 line-clamp-2 min-h-[2rem] text-[11px] leading-relaxed text-[#8f8076]">{product.description}</p>
                 )}
 
-                <p className="mb-2 text-[11px] font-semibold text-[#33251e]">
-                  ₱{formatProductPrice(product, activeCat)}
-                </p>
-
-                <div className="mb-1 flex items-center justify-between gap-2 text-left">
+                <div className="mb-3 flex items-end justify-between gap-2">
                   <div>
-                    <p className="text-[9px] text-[#9b8c83]">Stock</p>
-                    <p className="text-sm font-bold leading-none text-[#33251e]">{getDisplayedStock(product)}</p>
+                    <p className="text-[9px] font-semibold uppercase tracking-[0.14em] text-[#9b8c83]">{activeCat === "Small Cakes" ? "Small cake" : "Price"}</p>
+                    <p className="mt-0.5 text-[20px] font-bold leading-none tracking-tight text-[#6f541d]">₱{formatProductPrice(product, activeCat)}</p>
                   </div>
                   <span className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-[9px] font-semibold ${getStockStatus(product).classes}`}>
                     {getStockStatus(product).icon} {getStockStatus(product).label}
                   </span>
                 </div>
-                <p className="mb-1 text-left text-[9px] text-[#9b8c83]">Minimum: {getProductSizeForCategory(product, activeCat)?.threshold ?? product.minimum_stock ?? "Not set"}</p>
+
+                <div className="mb-3 flex items-center justify-between gap-3 rounded-xl border border-[#f0e7e0] bg-[#fffdfa] px-3 py-2.5">
+                  <div>
+                    <p className="text-[9px] font-semibold uppercase tracking-[0.12em] text-[#9b8c83]">Available stock</p>
+                    <p className="mt-0.5 text-[17px] font-bold leading-none text-[#33251e]">{getDisplayedStock(product)}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-[9px] text-[#9b8c83]">Stock alert</p>
+                    <p className="mt-0.5 text-[11px] font-semibold text-[#5f514a]">Min. {getProductSizeForCategory(product, activeCat)?.threshold ?? product.minimum_stock ?? "Not set"}</p>
+                  </div>
+                </div>
 
                 {/* PRODUCTION AVAILABILITY */}
-                <div className="mb-1 text-left">
-                  <span className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-[9px] font-semibold ${getProductionStatus(product).is_producible ? 'bg-[#edf5eb] text-[#4f7654]' : 'bg-[#fff0eb] text-[#9a5947]'}`}>
+                <div className="mb-3 min-h-[30px]">
+                  <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1.5 text-[10px] font-semibold ${getProductionStatus(product).is_producible ? 'bg-[#edf5eb] text-[#4f7654]' : 'bg-[#fff0eb] text-[#9a5947]'}`}>
                     {getProductionStatus(product).is_producible ? <CircleCheck size={11} aria-hidden="true" /> : <CircleX size={11} aria-hidden="true" />}
                     {getProductionStatus(product).is_producible ? 'Can Produce' : 'Cannot Produce'}
                   </span>
                   {!getProductionStatus(product).is_producible && getProductionStatus(product).reason && (
-                    <p className="mt-1 line-clamp-1 text-[9px] text-[#9a5947]">{getProductionStatus(product).reason}</p>
+                    <p className="mt-1 line-clamp-1 text-[10px] text-[#9a5947]">{getProductionStatus(product).reason}</p>
                   )}
                 </div>
 
                 {/* BUTTON */}
-                <div className="mt-auto flex h-8 w-full shrink-0 items-center gap-1.5 pt-1">
-                  <button type="button" onClick={() => openInventoryModal(product, "produce")} title={`Produce ${product.name}`} aria-label={`Produce ${product.name}`} className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-[#eadfca] bg-[#fff8e9] text-[#33251e] transition hover:border-[#e7c875] hover:bg-[#fff8df] hover:text-[#8d6a2e]"><ChefHat size={14} aria-hidden="true" /></button>
-                  <button type="button" onClick={() => openInventoryModal(product, "adjust")} title={`Adjust ${product.name} stock`} aria-label={`Adjust ${product.name} stock`} className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-[#eadfd8] bg-white text-[#765d50] transition hover:border-[#e7c875] hover:bg-[#fff8df]"><SlidersHorizontal size={14} aria-hidden="true" /></button>
+                <div className="mt-auto flex w-full shrink-0 items-center gap-2 border-t border-[#f0e7e0] pt-3">
+                  <button type="button" onClick={() => openInventoryModal(product, "produce")} title={`Produce ${product.name}`} aria-label={`Produce ${product.name}`} className="inline-flex h-9 min-w-0 flex-1 items-center justify-center gap-1.5 rounded-lg border border-[#eadfca] bg-[#fff8e9] px-2 text-[10px] font-semibold text-[#5c4310] transition hover:border-[#e7c875] hover:bg-[#fff2cc]"><ChefHat size={14} aria-hidden="true" /><span>Produce</span></button>
+                  <button type="button" onClick={() => openInventoryModal(product, "adjust")} title={`Adjust ${product.name} stock`} aria-label={`Adjust ${product.name} stock`} className="inline-flex h-9 min-w-0 flex-1 items-center justify-center gap-1.5 rounded-lg border border-[#eadfd8] bg-white px-2 text-[10px] font-semibold text-[#765d50] transition hover:border-[#e7c875] hover:bg-[#fff8df]"><SlidersHorizontal size={14} aria-hidden="true" /><span>Adjust</span></button>
                   {canEditCatalog && (
                     <button
                       type="button"
                       onClick={() => openEditProductModal(product)}
                       title={`Edit ${product.name}`}
                       aria-label={`Edit ${product.name}`}
-                      className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-[#eadfd8] bg-white text-[#5f514a] transition hover:bg-[#fff8df]"
+                      className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[#eadfd8] bg-white text-[#5f514a] transition hover:bg-[#fff8df]"
                     >
                       <Pencil size={13} aria-hidden="true" />
                     </button>
@@ -1001,12 +1010,12 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
                       disabled={archivingProductId === product.id}
                       title={product.is_archived ? `Restore ${product.name}` : `Hide ${product.name} from customers`}
                       aria-label={product.is_archived ? `Restore ${product.name}` : `Hide ${product.name} from customers`}
-                      className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-[#eadfd8] bg-white text-[#765d50] transition hover:border-[#e7c875] hover:bg-[#fff8df] disabled:opacity-50"
+                      className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[#eadfd8] bg-white text-[#765d50] transition hover:border-[#e7c875] hover:bg-[#fff8df] disabled:opacity-50"
                     >
                       {product.is_archived ? <ArchiveRestore size={13} aria-hidden="true" /> : <Archive size={13} aria-hidden="true" />}
                     </button>
                   )}
-                  <button type="button" onClick={() => openInventoryModal(product, "history")} title={`View ${product.name} history`} aria-label={`View ${product.name} history`} className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-[#eadfd8] bg-white text-[#765d50] transition hover:bg-[#fff8df]"><History size={13} aria-hidden="true" /></button>
+                  <button type="button" onClick={() => openInventoryModal(product, "history")} title={`View ${product.name} history`} aria-label={`View ${product.name} history`} className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[#eadfd8] bg-white text-[#765d50] transition hover:border-[#e7c875] hover:bg-[#fff8df]"><History size={13} aria-hidden="true" /></button>
                 </div>
 
               </div>

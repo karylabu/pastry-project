@@ -136,6 +136,10 @@ describe('Products admin catalog', () => {
 
     expect(screen.getByRole('button', { name: /edit/i })).toBeInTheDocument();
     expect(screen.getByText('₱480.00')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Produce Strawberry Cake' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Adjust Strawberry Cake stock' })).toBeInTheDocument();
+    expect(screen.getByText('Available stock')).toBeInTheDocument();
+    expect(screen.getByText('Sweet and fruity')).toBeInTheDocument();
     expect(screen.queryByText('Chicken Meal')).not.toBeInTheDocument();
     expect(screen.queryByText('Mini Vanilla Cake')).not.toBeInTheDocument();
   });
