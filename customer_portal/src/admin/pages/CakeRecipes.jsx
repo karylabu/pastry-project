@@ -421,7 +421,7 @@ export default function CakeRecipes() {
                 </div>
                 <div className="flex items-center justify-end gap-2">
                   <button type="button" disabled={!selectedFlavorId || loading} onClick={discardRecipeChanges} className="inline-flex h-9 items-center justify-center rounded-md border border-[#e2d2b8] bg-white px-3.5 text-[10px] font-medium text-[#5f514a] transition hover:bg-[#fffaf3] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d4af37] disabled:cursor-not-allowed disabled:opacity-40">Discard changes</button>
-                  <button type="submit" disabled={loading || !selectedFlavorId} className="inline-flex h-9 items-center gap-1.5 rounded-md bg-[#b89646] px-4 text-[11px] font-semibold text-white shadow-sm transition hover:bg-[#a88635] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d4af37] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-40"><Save size={14} /> Save recipe</button>
+                  <button type="submit" disabled={loading || !selectedFlavorId} className="inline-flex h-9 items-center gap-1.5 rounded-md bg-[#1e1e1e] px-4 text-[11px] font-semibold text-white shadow-sm transition hover:bg-[#333333] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d4af37] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-40"><Save size={14} /> Save recipe</button>
                 </div>
               </div>
             </form>
