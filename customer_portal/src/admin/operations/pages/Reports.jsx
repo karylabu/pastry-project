@@ -200,6 +200,33 @@ export function filterImportedTransactions(sales, products, category) {
   });
 }
 
+export function getSalesTransactionPage(liveCount, importedCount, page, pageSize = 10) {
+  const totalItems = liveCount + importedCount;
+  const pageCount = Math.max(1, Math.ceil(totalItems / pageSize));
+  const currentPage = Math.min(Math.max(1, page), pageCount);
+  const start = (currentPage - 1) * pageSize;
+  const rowCount = Math.min(pageSize, totalItems - start);
+  const liveStart = Math.min(start, liveCount);
+  const liveCountOnPage = Math.max(0, Math.min(liveCount - start, pageSize));
+  const historyStart = Math.max(0, start - liveCount);
+  const historyCount = Math.max(0, rowCount - liveCountOnPage);
+  const historyOffset = historyStart % pageSize;
+
+  return {
+    totalItems,
+    pageCount,
+    currentPage,
+    start,
+    liveStart,
+    liveCountOnPage,
+    historyStart,
+    historyCount,
+    historyOffset,
+    historyPage: historyCount ? Math.floor(historyStart / pageSize) + 1 : 1,
+    historyPageCount: historyCount ? Math.ceil((historyOffset + historyCount) / pageSize) : 1,
+  };
+}
+
 export function formatOrderItemSizes(items) {
   if (!Array.isArray(items)) return '—';
 
@@ -552,7 +579,7 @@ export default function Reports() {
   const [expandedRow,   setExpandedRow]   = useState(null);
   const [productPerformanceExpanded, setProductPerformanceExpanded] = useState(false);
   const [productPerformancePage, setProductPerformancePage] = useState(1);
-  const [salesPage, setSalesPage] = useState(1);
+  const [salesPageState, setSalesPage] = useState(1);
   const [revenueDayPage, setRevenueDayPage] = useState(1);
   const [ingredientsPage, setIngredientsPage] = useState(1);
   const [checked,       setChecked]       = useState({});
@@ -752,41 +779,6 @@ export default function Reports() {
 
     return () => { isCurrentRequest = false; };
   }, [range, dateFilterStart, dateFilterEnd, analyticsCategory, orderRefreshKey]);
-
-  useEffect(() => {
-    const params = new URLSearchParams({ page: String(salesPage), per_page: String(REPORT_ROWS_PER_PAGE) });
-    if (analyticsCategory) params.set('category', analyticsCategory);
-    const dateRange = getAnalyticsDateRange(range, dateFilterStart, dateFilterEnd);
-    if (dateRange.start_date) params.set('start_date', dateRange.start_date);
-    params.set('end_date', dateRange.end_date);
-
-    let isCurrentRequest = true;
-    laravelStaffFetch(`${LARAVEL_BASE}/api/sales/import/history?${params.toString()}`)
-      .then(async (response) => {
-        let data;
-        try {
-          data = await response.json();
-        } catch {
-          throw new Error(`Sales import history returned a non-JSON response (HTTP ${response.status}).`);
-        }
-        if (!response.ok || !data.success) throw new Error(data.message || 'Unable to load imported sales history.');
-        if (!isCurrentRequest) return;
-        setHistoricalSales(Array.isArray(data.sales) ? data.sales : []);
-        setHistoricalImports(Array.isArray(data.imports) ? data.imports : []);
-        setHistoricalSalesSummary(data.summary || { total_sales: 0, total_down_payments: 0, total_remaining_balance: 0, records: 0 });
-        setHistoricalSalesError('');
-        setImportDeleteError('');
-      })
-      .catch((error) => {
-        if (!isCurrentRequest) return;
-        setHistoricalSales([]);
-        setHistoricalImports([]);
-        setHistoricalSalesSummary({ total_sales: 0, total_down_payments: 0, total_remaining_balance: 0, records: 0 });
-        setHistoricalSalesError(error.message || 'Unable to load imported sales history.');
-      });
-
-    return () => { isCurrentRequest = false; };
-  }, [range, dateFilterStart, dateFilterEnd, salesPage, analyticsCategory, analyticsRefreshKey]);
 
   useEffect(() => {
     const importId = new URLSearchParams(location.search).get('import_id');
@@ -1056,15 +1048,61 @@ export default function Reports() {
   const visibleProductPerformance = productPerformanceExpanded
     ? productPerformanceRows.slice((visibleProductPerformancePage - 1) * REPORT_ROWS_PER_PAGE, visibleProductPerformancePage * REPORT_ROWS_PER_PAGE)
     : productPerformanceRows.slice(0, 5);
-  const salesPageCount = Math.max(
-    1,
-    Math.ceil(salesTransactionOrders.length / REPORT_ROWS_PER_PAGE),
-    Math.ceil(Number(historicalSalesSummary.records || 0) / REPORT_ROWS_PER_PAGE)
+  const salesPage = getSalesTransactionPage(
+    salesTransactionOrders.length,
+    Number(historicalSalesSummary.records || 0),
+    salesPageState,
+    REPORT_ROWS_PER_PAGE
   );
-  const visibleSalesPage = Math.min(salesPage, salesPageCount);
-  const salesPageStart = (visibleSalesPage - 1) * REPORT_ROWS_PER_PAGE;
-  const salesOrdersOnPage = salesTransactionOrders.slice(salesPageStart, salesPageStart + REPORT_ROWS_PER_PAGE);
+  const visibleSalesPage = salesPage.currentPage;
+  const salesOrdersOnPage = salesTransactionOrders.slice(
+    salesPage.liveStart,
+    salesPage.liveStart + salesPage.liveCountOnPage
+  );
   const historicalSalesOnPage = historicalVisibleSales;
+  useEffect(() => {
+    const dateRange = getAnalyticsDateRange(range, dateFilterStart, dateFilterEnd);
+    const requestedPages = Array.from(
+      { length: salesPage.historyPageCount },
+      (_, index) => salesPage.historyPage + index
+    );
+
+    let isCurrentRequest = true;
+    Promise.all(requestedPages.map(async (page) => {
+      const params = new URLSearchParams({ page: String(page), per_page: String(REPORT_ROWS_PER_PAGE) });
+      if (analyticsCategory) params.set('category', analyticsCategory);
+      if (dateRange.start_date) params.set('start_date', dateRange.start_date);
+      params.set('end_date', dateRange.end_date);
+
+      const response = await laravelStaffFetch(`${LARAVEL_BASE}/api/sales/import/history?${params.toString()}`);
+      let data;
+      try {
+        data = await response.json();
+      } catch {
+        throw new Error(`Sales import history returned a non-JSON response (HTTP ${response.status}).`);
+      }
+      if (!response.ok || !data.success) throw new Error(data.message || 'Unable to load imported sales history.');
+      return data;
+    }))
+      .then((pages) => {
+        if (!isCurrentRequest) return;
+        const pageRows = pages.flatMap((data) => Array.isArray(data.sales) ? data.sales : []);
+        setHistoricalSales(pageRows.slice(salesPage.historyOffset, salesPage.historyOffset + salesPage.historyCount));
+        setHistoricalImports(Array.isArray(pages[0]?.imports) ? pages[0].imports : []);
+        setHistoricalSalesSummary(pages[0]?.summary || { total_sales: 0, total_down_payments: 0, total_remaining_balance: 0, records: 0 });
+        setHistoricalSalesError('');
+        setImportDeleteError('');
+      })
+      .catch((error) => {
+        if (!isCurrentRequest) return;
+        setHistoricalSales([]);
+        setHistoricalImports([]);
+        setHistoricalSalesSummary({ total_sales: 0, total_down_payments: 0, total_remaining_balance: 0, records: 0 });
+        setHistoricalSalesError(error.message || 'Unable to load imported sales history.');
+      });
+
+    return () => { isCurrentRequest = false; };
+  }, [range, dateFilterStart, dateFilterEnd, salesPage.currentPage, salesPage.historyPage, salesPage.historyPageCount, salesPage.historyOffset, salesPage.historyCount, analyticsCategory, analyticsRefreshKey]);
   const ingredientsPageCount = Math.max(1, Math.ceil(ingredients.length / REPORT_ROWS_PER_PAGE));
   const visibleIngredientsPage = Math.min(ingredientsPage, ingredientsPageCount);
   const ingredientsOnPage = ingredients.slice((visibleIngredientsPage - 1) * REPORT_ROWS_PER_PAGE, visibleIngredientsPage * REPORT_ROWS_PER_PAGE);
@@ -1929,7 +1967,7 @@ export default function Reports() {
                     </tbody>
                   </table>
                 </div>
-                <PaginationControls totalItems={Math.max(salesTransactionOrders.length, Number(historicalSalesSummary.records || 0))} page={visibleSalesPage} onPageChange={setSalesPage} />
+                <PaginationControls totalItems={salesPage.totalItems} page={visibleSalesPage} onPageChange={setSalesPage} />
               </div>
 
               {/* ── OPERATIONAL MATRIX (BA-02, BA-03, BA-05) ── */}

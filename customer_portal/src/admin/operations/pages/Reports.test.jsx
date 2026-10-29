@@ -1,9 +1,46 @@
-import { buildBusinessAnalyticsCsv, fetchAllReportHistory, filterImportedTransactions, filterSalesTransactions, formatOrderItemSizes, getAnalyticsDateRange, getReportPeriodLabel, getReportSellerRows, groupRevenueByInterval, normalizeReportProducts, peso, selectReportIngredients } from "./Reports";
+import { buildBusinessAnalyticsCsv, fetchAllReportHistory, filterImportedTransactions, filterSalesTransactions, formatOrderItemSizes, getAnalyticsDateRange, getReportPeriodLabel, getReportSellerRows, getSalesTransactionPage, groupRevenueByInterval, normalizeReportProducts, peso, selectReportIngredients } from "./Reports";
 
 describe("peso", () => {
   test("formats Philippine pesos with two decimal places", () => {
     expect(peso(1234.5)).toBe("₱1,234.50");
     expect(peso(0)).toBe("₱0.00");
+  });
+});
+
+describe("getSalesTransactionPage", () => {
+  test("fits live and imported sales into ten rows on the first page", () => {
+    expect(getSalesTransactionPage(9, 14247, 1)).toMatchObject({
+      totalItems: 14256,
+      currentPage: 1,
+      liveStart: 0,
+      liveCountOnPage: 9,
+      historyStart: 0,
+      historyCount: 1,
+      historyPage: 1,
+      historyPageCount: 1,
+    });
+  });
+
+  test("continues imported records without skipping the boundary between pages", () => {
+    expect(getSalesTransactionPage(9, 14247, 2)).toMatchObject({
+      currentPage: 2,
+      liveCountOnPage: 0,
+      historyStart: 1,
+      historyCount: 10,
+      historyOffset: 1,
+      historyPage: 1,
+      historyPageCount: 2,
+    });
+  });
+
+  test("caps live-only pages at ten rows", () => {
+    expect(getSalesTransactionPage(23, 0, 2)).toMatchObject({
+      totalItems: 23,
+      currentPage: 2,
+      liveStart: 10,
+      liveCountOnPage: 10,
+      historyCount: 0,
+    });
   });
 });
 
