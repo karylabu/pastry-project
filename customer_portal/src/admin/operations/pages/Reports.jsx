@@ -50,6 +50,7 @@ const C = {
   border:  '#eadfd8',
   bg:      '#fbfaf5',
 };
+const LEADER_COLORS = ['#d4af37', '#c0503c', '#a57c38', '#c87954', '#9a5947'];
 
 function fmt(n)  { return Number(n || 0).toLocaleString(undefined, { maximumFractionDigits: 0 }); }
 export function peso(n) {
@@ -449,13 +450,14 @@ function Heatmap({ matrix, loading, error }) {
 /* ─────────────────────────────────────────
    DOUGHNUT CHART
 ───────────────────────────────────────── */
-function Doughnut({ segments, size = 140 }) {
-  const total = segments.reduce((s, seg) => s + seg.value, 0) || 1;
-  const cx = size / 2, cy = size / 2, R = 48, stroke = 18;
+function Doughnut({ segments, size = 140, centerLabel = 'ORDERS' }) {
+  const total = segments.reduce((s, seg) => s + seg.value, 0);
+  const chartTotal = total || 1;
+  const cx = size / 2, cy = size / 2, R = size * 0.34, stroke = size * 0.13;
   const circumference = 2 * Math.PI * R;
   let cumulative = 0;
   const arcs = segments.map(seg => {
-    const frac = seg.value / total;
+    const frac = seg.value / chartTotal;
     const dash = frac * circumference;
     const offset = circumference * (0.25 - cumulative);
     cumulative += frac;
@@ -468,35 +470,9 @@ function Doughnut({ segments, size = 140 }) {
         <circle key={i} cx={cx} cy={cy} r={R} fill="none" stroke={a.color} strokeWidth={stroke}
           strokeDasharray={`${a.dash} ${a.gap}`} strokeDashoffset={a.offset} strokeLinecap="round" />
       ))}
-      <text x={cx} y={cy - 3} textAnchor="middle" fontSize="18" fontWeight="700" fill={C.ink}>{total}</text>
-      <text x={cx} y={cy + 14} textAnchor="middle" fontSize="8" fill={C.sub} letterSpacing="1.5">ORDERS</text>
+      <text x={cx} y={cy - size * 0.02} textAnchor="middle" fontSize={size * 0.13} fontWeight="700" fill={C.ink}>{total}</text>
+      <text x={cx} y={cy + size * 0.1} textAnchor="middle" fontSize={size * 0.057} fill={C.sub} letterSpacing={size * 0.01}>{centerLabel}</text>
     </svg>
-  );
-}
-
-/* ─────────────────────────────────────────
-   LEADERBOARD BAR
-───────────────────────────────────────── */
-function RankBar({ rank, label, qty, revenue, max, color }) {
-  const pct = max > 0 ? (qty / max) * 100 : 0;
-  return (
-    <div className="flex flex-col gap-2">
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <span className="w-4 text-xs font-bold text-black/45">{rank}</span>
-          <div className="min-w-0">
-            <p className="text-sm font-semibold truncate" style={{ color: C.ink }}>{label}</p>
-            <p className="text-[11px] text-black/55">{qty} units · {peso(revenue)}</p>
-          </div>
-        </div>
-        <span className="text-[11px] font-semibold text-black/55">{qty}</span>
-      </div>
-      <div className="h-1.5 overflow-hidden rounded-full bg-[#fff4cd]">
-        <motion.div initial={{ width: 0 }} animate={{ width: `${Math.max(5, pct)}%` }}
-          transition={{ duration: 0.6, delay: rank * 0.05 }}
-          className="h-full rounded-full" style={{ background: color }} />
-      </div>
-    </div>
   );
 }
 
@@ -1143,7 +1119,12 @@ export default function Reports() {
     ? [...(analytics.product_performance || [])].sort((a, b) => Number(a.sold) - Number(b.sold)).slice(0, 5).map((item) => ({ name: item.product, qty: Number(item.sold), revenue: 0 }))
     : [], [analytics]);
   const leaderList = leaderTab === 'top' ? topSellers : bottomSellers;
-  const leaderMax = Math.max(...topSellers.map(p => p.qty), 1);
+  const leaderSegments = useMemo(() => leaderList.map((product, index) => ({
+    label: product.name,
+    value: Math.max(0, Number(product.qty) || 0),
+    color: LEADER_COLORS[index % LEADER_COLORS.length],
+  })), [leaderList]);
+  const leaderTotalUnits = leaderSegments.reduce((sum, segment) => sum + segment.value, 0);
   const revenueByDay = useMemo(
     () => groupRevenueByInterval(analytics?.sales?.daily || [], interval),
     [analytics, interval]
@@ -1706,9 +1687,52 @@ export default function Reports() {
                   {!analytics?.has_data?.ingredient_consumption ? <p className="text-sm text-black/50">No ingredient consumption recorded for this period.</p> : <div className="space-y-2">{analytics.ingredient_consumption.slice(0, 8).map((row) => <div key={row.ingredient_id} className="flex justify-between border-b border-black/10 py-2 text-sm"><span>{row.ingredient}</span><strong>{Number(row.quantity_consumed).toLocaleString()} {row.unit}</strong></div>)}</div>}
                 </div>
                 <div className="rounded-2xl border bg-white p-4" style={{ borderColor: C.border }}>
-                  <h3 className="mb-4 text-base font-bold" style={{ color: C.ink }}>Waste Analytics</h3>
-                  <p className="mb-3 text-[11px] text-black/50">Waste value uses the recorded cost per inventory unit. Reference prices are estimates until replaced with supplier costs.</p>
-                  {!analytics?.has_data?.waste ? <><p className="text-sm text-black/50">No waste recorded for this period.</p>{analytics?.waste?.recent_outside_period?.length > 0 && <div className="mt-4 border-t border-black/10 pt-3"><p className="mb-2 text-xs font-semibold text-black/60">Recent saved records outside this date range</p><div className="space-y-2">{analytics.waste.recent_outside_period.map((row) => <div key={row.id} className="flex items-start justify-between gap-3 border-b border-black/10 py-2 text-sm last:border-0"><div><p className="font-medium text-black/80">{row.item_name}</p><p className="text-xs text-black/50">{row.datetime} · {row.reason || "Unspecified"}</p></div><div className="shrink-0 text-right"><p className="font-semibold">{fmt(row.qty)} · {peso(Number(row.qty) * Number(row.unit_cost))}</p><p className="text-xs text-black/50">{row.item_type || "Waste"}</p></div></div>)}</div><p className="mt-2 text-[11px] text-black/50">These records are not included in the totals above. Choose All in the date range to include them.</p></div>}</> : <><div className="mb-3 grid grid-cols-3 gap-2 text-sm"><span>Qty <strong>{fmt(analytics.summary.waste_quantity)}</strong></span><span>Cost <strong>{peso(analytics.summary.waste_cost)}</strong></span><span>Cost Rate <strong>{analytics.summary.waste_rate == null ? "Not available" : `${analytics.summary.waste_rate.toFixed(2)}%`}</strong></span></div><div className="space-y-2">{analytics.waste.by_reason.map((row) => <div key={row.reason} className="flex justify-between border-b border-black/10 py-2 text-sm"><span>{row.reason}</span><strong>{peso(row.cost)}</strong></div>)}</div></>}
+                  <div className="mb-4 flex items-center justify-between gap-3">
+                    <h3 className="text-base font-bold" style={{ color: C.ink }}>Product Performance Ranking</h3>
+                    <div className="flex shrink-0 items-center gap-1 rounded-md border border-black/10 bg-white p-1">
+                      {[['top', 'Top 5'], ['bottom', 'Bottom 5']].map(([val, label]) => (
+                        <button key={val} type="button" onClick={() => setLeaderTab(val)}
+                          className="rounded-md px-3 py-1.5 text-xs font-bold transition-colors"
+                          style={{ background: leaderTab === val ? '#fff4cd' : 'transparent', color: leaderTab === val ? C.ink : C.sub }}>
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  {leaderList.length === 0 ? (
+                    <p className="text-sm text-black/50">No product sales data yet.</p>
+                  ) : (
+                    <div className="grid items-center gap-5 p-5 sm:grid-cols-[170px_minmax(0,1fr)]">
+                      <div className="mx-auto h-[170px] w-[170px]">
+                        <Doughnut segments={leaderSegments} size={170} centerLabel="UNITS" />
+                      </div>
+                      <ul className="space-y-2">
+                        {leaderList.map((product, index) => (
+                          <li key={product.name} className="rounded-lg border border-[#f1e9e3] px-3 py-2 transition hover:border-[#c9a94f] hover:ring-1 hover:ring-[#d4af37]/20">
+                            <div className="flex items-center justify-between gap-3 text-[12px]">
+                              <span className="flex min-w-0 items-center gap-2 text-[#6a5a50]">
+                                <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: leaderSegments[index].color }} />
+                                <span className="truncate" title={product.name}>{product.name}</span>
+                              </span>
+                              <span className="shrink-0 font-semibold text-[#33251e]">
+                                {fmt(product.qty)} <span className="font-normal text-[#9b8c83]">· {leaderTotalUnits ? Math.round((leaderSegments[index].value / leaderTotalUnits) * 100) : 0}%</span>
+                              </span>
+                            </div>
+                            <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-[#f4ece6]">
+                              <div
+                                className="h-full rounded-full"
+                                style={{
+                                  width: `${leaderTotalUnits ? (leaderSegments[index].value / leaderTotalUnits) * 100 : 0}%`,
+                                  backgroundColor: leaderSegments[index].color,
+                                }}
+                              />
+                            </div>
+                            <p className="mt-1 text-[10px] text-[#9b8c83]">{peso(product.revenue)} revenue</p>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
                 </div>
                 <div className="rounded-2xl border bg-white p-4" style={{ borderColor: C.border }}>
                   <h3 className="mb-1 text-base font-bold" style={{ color: C.ink }}>Seasonal Waste</h3>
@@ -1785,32 +1809,6 @@ export default function Reports() {
                     <span className="text-lg font-bold" style={{ color: C.ink }}>{cancellationRate}%</span>
                   </div>
                 </div>
-              </div>
-
-              {/* ── WIDGET B: LEADERBOARD ── */}
-              <div className="bg-white rounded-2xl border p-6 mb-8" style={{ borderColor: C.border }}>
-                <div className="flex items-center justify-between mb-6">
-                  <h3 className="text-base font-bold" style={{ color: C.ink }}>Product Performance Ranking</h3>
-                  <div className="flex items-center gap-1 rounded-md border border-black/10 bg-white p-1">
-                    {[['top', 'Top 5'], ['bottom', 'Bottom 5']].map(([val, label]) => (
-                      <button key={val} onClick={() => setLeaderTab(val)}
-                        className="px-3 py-1.5 rounded-md text-xs font-bold transition-colors"
-                        style={{ background: leaderTab === val ? '#fff' : 'transparent', color: leaderTab === val ? C.ink : C.sub, boxShadow: leaderTab === val ? '0 1px 2px rgba(0,0,0,0.06)' : 'none' }}>
-                        {label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                {leaderList.length === 0 ? (
-                  <p className="text-sm text-black/50">No product sales data yet.</p>
-                ) : (
-                  <div className="grid sm:grid-cols-2 gap-x-10 gap-y-4">
-                    {leaderList.map((p, i) => (
-                      <RankBar key={p.name} rank={i + 1} label={p.name} qty={p.qty} revenue={p.revenue} max={leaderMax}
-                        color={leaderTab === 'top' ? C.emerald : C.red} />
-                    ))}
-                  </div>
-                )}
               </div>
 
               <div className="bg-white rounded-2xl border p-6 mb-8" style={{ borderColor: C.border }}>
