@@ -8,6 +8,7 @@ use App\Models\Promotion;
 use App\Models\PromotionEmailLog;
 use App\Models\Subscriber;
 use App\Models\User;
+use App\Services\AdminRecycleBinService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Mail;
@@ -320,7 +321,7 @@ class PromotionController extends Controller
         ]);
     }
 
-    public function destroy(Request $request, Promotion $promotion): JsonResponse
+    public function destroy(Request $request, Promotion $promotion, AdminRecycleBinService $recycleBin): JsonResponse
     {
         $user = $this->resolveAdminUser($request);
 
@@ -331,11 +332,11 @@ class PromotionController extends Controller
             ], 403);
         }
 
-        $promotion->delete();
+        $recycleBin->trashPromotion((int) $promotion->id);
 
         return response()->json([
             'success' => true,
-            'message' => 'Promotion and delivery history deleted.',
+            'message' => 'Promotion moved to the Recycle Bin. It can be restored for 30 days.',
         ]);
     }
 }

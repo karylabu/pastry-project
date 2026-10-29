@@ -4,6 +4,7 @@ namespace App\Jobs;
 
 use App\Support\SalesItemSize;
 use App\Support\SalesImportCleaner;
+use App\Services\AdminRecycleBinService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -58,25 +59,25 @@ class ProcessSalesCsvImport implements ShouldQueue
 
             DB::table('analytics_sales_history')->where('import_id', $this->importId)->delete();
 
+            $claimFields = [
+                'status' => 'processing',
+                'rows_received' => 0,
+                'rows_processed' => 0,
+                'error_message' => null,
+                'queue_job_id' => null,
+            ];
+            if (Schema::hasColumn('analytics_imports', 'cleaning_report')) {
+                $claimFields['cleaning_report'] = null;
+            }
             $claimed = DB::table('analytics_imports')
                 ->where('id', $this->importId)
                 ->where('status', 'queued')
-                ->update([
-                    'status' => 'processing',
-                    'rows_received' => 0,
-                    'rows_processed' => 0,
-                    'error_message' => null,
-                    ...(Schema::hasColumn('analytics_imports', 'cleaning_report') ? ['cleaning_report' => null] : []),
-                    'queue_job_id' => null,
-                ]) === 1;
+                ->update($claimFields) === 1;
 
             return $claimed ? 'claimed' : 'ignored';
         });
 
         if ($claim !== 'claimed') {
-            if ($claim === 'missing' || $claim === 'cancelled') {
-                Storage::disk('local')->delete($this->storedPath);
-            }
             return;
         }
 
@@ -228,24 +229,27 @@ class ProcessSalesCsvImport implements ShouldQueue
             fclose($handle);
         }
 
-        Storage::disk('local')->delete($this->storedPath);
+        $status = DB::table('analytics_imports')->where('id', $this->importId)->value('status');
+        if ($status === 'completed') {
+            Storage::disk('local')->delete($this->storedPath);
+        }
     }
 
     public function failed(Throwable $exception): void
     {
-        DB::transaction(function () {
+        $cancelled = DB::transaction(function (): bool {
             $import = DB::table('analytics_imports')
                 ->where('id', $this->importId)
                 ->lockForUpdate()
                 ->first(['status']);
             if (!$import) {
-                return;
+                return false;
             }
 
             if ($import->status === 'cancellation_requested') {
                 $this->deleteImportDataAndRecord();
 
-                return;
+                return true;
             }
 
             DB::table('analytics_sales_history')->where('import_id', $this->importId)->delete();
@@ -255,8 +259,11 @@ class ProcessSalesCsvImport implements ShouldQueue
                 'stored_path' => null,
                 'queue_job_id' => null,
             ]);
+            return false;
         });
-        Storage::disk('local')->delete($this->storedPath);
+        if (! $cancelled) {
+            Storage::disk('local')->delete($this->storedPath);
+        }
         Log::error('Sales CSV import job failed.', [
             'import_id' => $this->importId,
             'exception' => $exception->getMessage(),
@@ -351,23 +358,24 @@ class ProcessSalesCsvImport implements ShouldQueue
                 DB::table('analytics_sales_history')->insert($batch);
             }
 
-            DB::table('analytics_imports')->where('id', $this->importId)->update([
+            $completionFields = [
                 'status' => 'completed',
                 'rows_received' => $rowsReceived,
                 'rows_processed' => $rowsProcessed,
                 'error_message' => null,
-                ...(Schema::hasColumn('analytics_imports', 'cleaning_report')
-                    ? ['cleaning_report' => json_encode($cleaningReport, JSON_THROW_ON_ERROR)]
-                    : []),
                 'stored_path' => null,
                 'queue_job_id' => null,
-                ...(Schema::hasColumn('analytics_imports', 'coverage_start_date')
-                    ? ['coverage_start_date' => $coverageStartDate]
-                    : []),
-                ...(Schema::hasColumn('analytics_imports', 'coverage_end_date')
-                    ? ['coverage_end_date' => $coverageEndDate]
-                    : []),
-            ]);
+            ];
+            if (Schema::hasColumn('analytics_imports', 'cleaning_report')) {
+                $completionFields['cleaning_report'] = json_encode($cleaningReport, JSON_THROW_ON_ERROR);
+            }
+            if (Schema::hasColumn('analytics_imports', 'coverage_start_date')) {
+                $completionFields['coverage_start_date'] = $coverageStartDate;
+            }
+            if (Schema::hasColumn('analytics_imports', 'coverage_end_date')) {
+                $completionFields['coverage_end_date'] = $coverageEndDate;
+            }
+            DB::table('analytics_imports')->where('id', $this->importId)->update($completionFields);
 
             return 'completed';
         });
@@ -375,8 +383,12 @@ class ProcessSalesCsvImport implements ShouldQueue
 
     private function deleteImportDataAndRecord(): void
     {
-        DB::table('analytics_sales_history')->where('import_id', $this->importId)->delete();
-        DB::table('analytics_imports')->where('id', $this->importId)->delete();
+        DB::table('analytics_imports')->where('id', $this->importId)->update([
+            'status' => 'failed',
+            'error_message' => 'Import cancelled and moved to the Recycle Bin.',
+            'stored_path' => $this->storedPath,
+        ]);
+        app(AdminRecycleBinService::class)->trashImport($this->importId);
     }
 
     private function mapHeaders(array $headers): array

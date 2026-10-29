@@ -852,12 +852,12 @@ export default function Reports() {
   const deleteCsvImport = (importFile) => {
     const confirmation = importFile.status === 'processing'
       ? `Cancel "${importFile.file_name}" and remove any rows imported from this file? The worker will stop at its next safe checkpoint.`
-      : `Delete "${importFile.file_name}" and its associated imported sales records? This cannot be undone.`;
+      : `Move "${importFile.file_name}" and its associated imported sales records to the Recycle Bin? They can be restored for 30 days.`;
     setAdminDialog({
       kind: "confirm",
-      title: importFile.status === 'processing' ? "Cancel this import?" : "Delete this import?",
+      title: importFile.status === 'processing' ? "Cancel this import?" : "Move import to Recycle Bin?",
       message: confirmation,
-      confirmLabel: importFile.status === 'processing' ? "Cancel import" : "Delete import",
+      confirmLabel: importFile.status === 'processing' ? "Cancel import" : "Move to bin",
       onConfirm: () => executeDeleteCsvImport(importFile),
     });
   };

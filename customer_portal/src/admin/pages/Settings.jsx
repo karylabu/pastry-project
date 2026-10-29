@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Archive, Bell, Building2, Check, Clock3, Eye, EyeOff, KeyRound, LogOut, Save, Trash2, UserCircle2 } from "lucide-react";
+import { Bell, Building2, Check, Clock3, Download, Eye, EyeOff, KeyRound, LogOut, RotateCcw, Save, Trash2, UserCircle2, X } from "lucide-react";
 import { LARAVEL_BASE } from "../../services/config";
 import { getAuthHeaders } from "../../services/api";
 
@@ -85,6 +85,12 @@ export default function Settings() {
   const [settingsLoaded, setSettingsLoaded] = useState(false);
   const [savingPreferences, setSavingPreferences] = useState(false);
   const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
+  const [backupDownloading, setBackupDownloading] = useState(false);
+  const [recycleBinOpen, setRecycleBinOpen] = useState(false);
+  const [recycleItems, setRecycleItems] = useState([]);
+  const [recycleLoading, setRecycleLoading] = useState(false);
+  const [recycleError, setRecycleError] = useState("");
+  const [recycleActionId, setRecycleActionId] = useState(null);
 
   useEffect(() => {
     if (user) setProfile({ full_name: user.name || "", email: user.email || "", phone: user.phone || "" });
@@ -196,6 +202,100 @@ export default function Settings() {
     finally { setSavingPassword(false); }
   };
 
+  const downloadBackup = async () => {
+    setBackupDownloading(true);
+    setError("");
+    setNotice("");
+    try {
+      const response = await fetch(`${LARAVEL_BASE}/api/admin/backup`, {
+        credentials: "include",
+        headers: { Accept: "application/json", ...getAuthHeaders() },
+      });
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.message || "Unable to download the business backup.");
+      }
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `pastry-business-backup-${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+      setNotice("Business data backup downloaded. Passwords and account secrets are excluded.");
+    } catch (backupError) {
+      setError(backupError.message);
+    } finally {
+      setBackupDownloading(false);
+    }
+  };
+
+  const loadRecycleBin = async () => {
+    setRecycleLoading(true);
+    setRecycleError("");
+    try {
+      const response = await fetch(`${LARAVEL_BASE}/api/admin/recycle-bin`, {
+        credentials: "include",
+        headers: { Accept: "application/json", ...getAuthHeaders() },
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !data.success) throw new Error(data.message || "Unable to load the Recycle Bin.");
+      setRecycleItems(data.items || []);
+    } catch (loadError) {
+      setRecycleError(loadError.message);
+    } finally {
+      setRecycleLoading(false);
+    }
+  };
+
+  const openRecycleBin = () => {
+    setRecycleBinOpen(true);
+    loadRecycleBin();
+  };
+
+  const restoreRecycleItem = async (item) => {
+    setRecycleActionId(item.id);
+    setRecycleError("");
+    try {
+      const response = await fetch(`${LARAVEL_BASE}/api/admin/recycle-bin/${item.id}/restore`, {
+        method: "POST",
+        credentials: "include",
+        headers: { Accept: "application/json", ...getAuthHeaders() },
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !data.success) throw new Error(data.message || "Unable to restore this item.");
+      setNotice(`${item.label} restored successfully.`);
+      await loadRecycleBin();
+    } catch (restoreError) {
+      setRecycleError(restoreError.message);
+    } finally {
+      setRecycleActionId(null);
+    }
+  };
+
+  const permanentlyDeleteRecycleItem = async (item) => {
+    if (!window.confirm(`Permanently delete "${item.label}"? This cannot be undone.`)) return;
+    setRecycleActionId(item.id);
+    setRecycleError("");
+    try {
+      const response = await fetch(`${LARAVEL_BASE}/api/admin/recycle-bin/${item.id}`, {
+        method: "DELETE",
+        credentials: "include",
+        headers: { Accept: "application/json", ...getAuthHeaders() },
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !data.success) throw new Error(data.message || "Unable to permanently delete this item.");
+      setNotice(`${item.label} permanently deleted.`);
+      await loadRecycleBin();
+    } catch (deleteError) {
+      setRecycleError(deleteError.message);
+    } finally {
+      setRecycleActionId(null);
+    }
+  };
+
   const confirmLogout = () => {
     const token = getUser()?.token || "";
     fetch(`${LARAVEL_BASE}/staff/logout.php`, {
@@ -226,14 +326,45 @@ export default function Settings() {
               </div>
               <button type="button" onClick={() => setLogoutConfirmOpen(true)} className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-[#efd8d4] px-3 text-[11px] font-semibold text-[#8d5357] transition hover:bg-[#fff0f0]"><LogOut size={14} /> Log out</button>
               <div className="flex flex-wrap gap-2">
-                <button type="button" className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-[#e8dfd4] bg-white px-3 text-[11px] font-semibold text-[#65574d] transition hover:border-[#c9a94f] hover:bg-[#fffaf0]"><Archive size={14} /> Backup</button>
-                <button type="button" className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-[#efd8d4] bg-white px-3 text-[11px] font-semibold text-[#8d5357] transition hover:bg-[#fff0f0]"><Trash2 size={14} /> Recycle Bin</button>
+                <button type="button" onClick={downloadBackup} disabled={backupDownloading} className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-[#e8dfd4] bg-white px-3 text-[11px] font-semibold text-[#65574d] transition hover:border-[#c9a94f] hover:bg-[#fffaf0] disabled:opacity-60"><Download size={14} /> {backupDownloading ? "Preparing..." : "Backup"}</button>
+                <button type="button" onClick={openRecycleBin} className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-[#efd8d4] bg-white px-3 text-[11px] font-semibold text-[#8d5357] transition hover:bg-[#fff0f0]"><Trash2 size={14} /> Recycle Bin</button>
                 <button type="button" onClick={savePreferences} disabled={settingsLoading || !settingsLoaded || savingPreferences} className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-[#33251e] px-4 text-[12px] font-semibold text-white transition hover:bg-[#5b4540] disabled:cursor-not-allowed disabled:opacity-60"><Save size={15} /> {settingsLoading ? "Loading settings..." : savingPreferences ? "Saving..." : settingsLoaded ? "Save settings" : "Settings unavailable"}</button>
               </div>
             </div>
           </div>
 
           {(notice || error) && <div role="status" className={`mb-4 flex items-center gap-2 rounded-lg border px-4 py-3 text-[12px] ${error ? "border-[#efd8d4] bg-[#fff0f0] text-[#8d5357]" : "border-[#d8e7d5] bg-[#edf5eb] text-[#4f7654]"}`}><Check size={15} />{error || notice}</div>}
+
+          {recycleBinOpen && (
+            <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[#211812]/50 p-4" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setRecycleBinOpen(false); }}>
+              <section role="dialog" aria-modal="true" aria-labelledby="recycle-bin-title" className="max-h-[85vh] w-full max-w-2xl overflow-hidden rounded-xl border border-[#eadfd8] bg-white shadow-2xl">
+                <header className="flex items-center justify-between border-b border-[#f0e9e2] px-5 py-4">
+                  <div>
+                    <h2 id="recycle-bin-title" className="font-serif text-lg text-[#33251e]">Recycle Bin</h2>
+                    <p className="mt-1 text-[11px] text-[#74675f]">Items are automatically removed after 30 days.</p>
+                  </div>
+                  <button type="button" onClick={() => setRecycleBinOpen(false)} aria-label="Close Recycle Bin" className="grid h-9 w-9 place-items-center rounded-full text-[#74675f] hover:bg-[#f8f3ee]"><X size={17} /></button>
+                </header>
+                <div className="max-h-[65vh] overflow-y-auto p-4 sm:p-5">
+                  {recycleError && <p role="alert" className="mb-3 rounded-lg border border-[#efd8d4] bg-[#fff0f0] px-3 py-2 text-[12px] text-[#8d5357]">{recycleError}</p>}
+                  {recycleLoading ? <p className="py-10 text-center text-sm text-[#74675f]">Loading deleted items...</p>
+                    : recycleItems.length === 0 ? <p className="py-10 text-center text-sm text-[#74675f]">Recycle Bin is empty.</p>
+                      : <ul className="space-y-2">{recycleItems.map((item) => (
+                        <li key={item.id} className="flex flex-col gap-3 rounded-lg border border-[#eee5dd] p-3 sm:flex-row sm:items-center sm:justify-between">
+                          <div className="min-w-0">
+                            <p className="truncate text-[12px] font-semibold text-[#33251e]">{item.label}</p>
+                            <p className="mt-1 text-[10px] capitalize text-[#8f8076]">{item.type.replaceAll("_", " ")} · expires {new Date(item.expires_at).toLocaleDateString()}</p>
+                          </div>
+                          <div className="flex shrink-0 gap-2">
+                            <button type="button" disabled={recycleActionId !== null} onClick={() => restoreRecycleItem(item)} className="inline-flex h-9 items-center gap-1.5 rounded-md bg-[#edf5eb] px-3 text-[11px] font-semibold text-[#4f7654] disabled:opacity-50"><RotateCcw size={13} /> Restore</button>
+                            <button type="button" disabled={recycleActionId !== null} onClick={() => permanentlyDeleteRecycleItem(item)} className="inline-flex h-9 items-center gap-1.5 rounded-md border border-[#efd8d4] px-3 text-[11px] font-semibold text-[#8d5357] disabled:opacity-50"><Trash2 size={13} /> Delete</button>
+                          </div>
+                        </li>
+                      ))}</ul>}
+                </div>
+              </section>
+            </div>
+          )}
 
           <div className="grid items-stretch gap-4 xl:grid-cols-2">
             <Section icon={UserCircle2} eyebrow="Account" title="Admin profile" className="h-full">

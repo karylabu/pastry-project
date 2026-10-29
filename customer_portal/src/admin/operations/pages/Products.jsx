@@ -93,6 +93,7 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
   const [editImage, setEditImage] = useState(null);
   const [editImagePreview, setEditImagePreview] = useState("");
   const [editSaving, setEditSaving] = useState(false);
+  const [recipeDeleting, setRecipeDeleting] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [recipeLines, setRecipeLines] = useState([]);
   const [productionSizeId, setProductionSizeId] = useState("");
@@ -1671,15 +1672,44 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
                 <div className="mt-5 space-y-3 rounded-xl border border-[#eadfd8] bg-[#fbf7f2] p-4">
                   <div className="flex items-center justify-between gap-3">
                     <h3 className="font-serif text-[17px] text-[#33251e]">Recipe Ingredients</h3>
-                    <button
-                      type="button"
-                      onClick={addRecipeRow}
-                      title="Add ingredient"
-                      aria-label="Add ingredient"
-                      className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-[#33251e] text-white transition hover:bg-[#5b4540]"
-                    >
-                      <Plus size={16} aria-hidden="true" />
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        disabled={!editRecipeSizeId || recipeDeleting || !recipeRows.some((row) => row.ingredient_id && Number(row.qty) > 0)}
+                        onClick={async () => {
+                          if (!window.confirm("Move this product-size recipe to the Recycle Bin?")) return;
+                          setRecipeDeleting(true);
+                          try {
+                            const response = await laravelStaffFetch(`${LARAVEL_BASE}/api/staff/products/${editProduct.id}/recipe`, {
+                              method: "DELETE",
+                              headers: { "Content-Type": "application/json", Accept: "application/json" },
+                              body: JSON.stringify({ product_size_id: Number(editRecipeSizeId) }),
+                            });
+                            const data = await response.json().catch(() => ({}));
+                            if (!response.ok || !data.success) throw new Error(data.message || "Unable to move this recipe to the Recycle Bin.");
+                            setRecipeRows([{ ingredient_id: "", qty: "" }]);
+                            setFeedback({ type: "success", text: "Product recipe moved to the Recycle Bin for 30 days." });
+                          } catch (recipeError) {
+                            setFeedback({ type: "error", text: recipeError.message || "Unable to move this recipe to the Recycle Bin." });
+                          } finally {
+                            setRecipeDeleting(false);
+                          }
+                        }}
+                        title="Move saved recipe to Recycle Bin"
+                        className="h-9 rounded-lg border border-[#efd8d4] px-3 text-[11px] font-semibold text-[#8d5357] transition hover:bg-[#fff0f0] disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        {recipeDeleting ? "Moving..." : "Move saved recipe to bin"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={addRecipeRow}
+                        title="Add ingredient"
+                        aria-label="Add ingredient"
+                        className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-[#33251e] text-white transition hover:bg-[#5b4540]"
+                      >
+                        <Plus size={16} aria-hidden="true" />
+                      </button>
+                    </div>
                   </div>
                   <div>
                     <p className="text-[11px] font-semibold text-black/70">

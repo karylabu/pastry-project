@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\User;
 use App\Http\Controllers\SalesImportController;
 use App\Jobs\ProcessSalesCsvImport;
+use App\Services\AdminRecycleBinService;
 use Illuminate\Http\UploadedFile;
 use App\Support\SalesImportCleaner;
 use Illuminate\Database\Schema\Blueprint;
@@ -12,6 +13,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\URL;
 use Illuminate\Http\Request;
 use Tests\TestCase;
 
@@ -20,10 +22,13 @@ class SalesImportControllerTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        config()->set('app.url', 'http://localhost');
+        URL::forceRootUrl('http://localhost');
 
         Schema::dropIfExists('analytics_sales_history');
         Schema::dropIfExists('analytics_product_aliases');
         Schema::dropIfExists('analytics_imports');
+        Schema::dropIfExists('admin_recycle_bin');
         Schema::dropIfExists('jobs');
         Schema::dropIfExists('failed_jobs');
         Schema::dropIfExists('sales');
@@ -112,6 +117,15 @@ class SalesImportControllerTest extends TestCase
             $table->unsignedBigInteger('product_id');
             $table->timestamps();
         });
+        Schema::create('admin_recycle_bin', function (Blueprint $table) {
+            $table->id();
+            $table->string('item_type', 40);
+            $table->string('label', 255);
+            $table->longText('payload');
+            $table->timestamp('deleted_at');
+            $table->timestamp('expires_at')->index();
+            $table->timestamps();
+        });
     }
 
     public function test_sales_coverage_migration_backfills_completed_import_dates(): void
@@ -126,10 +140,6 @@ class SalesImportControllerTest extends TestCase
             ['import_id' => $importId, 'product_name' => 'Croissant', 'sale_date' => '2025-03-02', 'units_sold' => 2, 'revenue' => 20],
             ['import_id' => $importId, 'product_name' => 'Bread', 'sale_date' => '2025-03-05', 'units_sold' => 1, 'revenue' => 15],
         ]);
-        Schema::table('analytics_imports', function (Blueprint $table) {
-            $table->dropColumn(['coverage_start_date', 'coverage_end_date']);
-        });
-
         $migration = require database_path('migrations/2026_10_27_000001_add_sales_coverage_to_analytics_imports.php');
         $migration->up();
 
@@ -154,7 +164,6 @@ class SalesImportControllerTest extends TestCase
                 ['name' => 'Sourdough Loaf', 'quantity' => 2, 'total' => 360, 'sale_date' => '2026-09-30'],
             ],
         ]);
-
         $response->assertCreated()
             ->assertJsonPath('success', true)
             ->assertJsonPath('items_sold', 5)
@@ -432,9 +441,6 @@ class SalesImportControllerTest extends TestCase
     public function test_predictive_import_options_migration_adds_defaults_and_aliases(): void
     {
         Schema::dropIfExists('analytics_product_aliases');
-        Schema::table('analytics_imports', function (Blueprint $table) {
-            $table->dropColumn('overlap_mode');
-        });
 
         $migration = require database_path('migrations/2026_10_20_000002_add_predictive_import_options.php');
         $migration->up();
@@ -779,7 +785,7 @@ class SalesImportControllerTest extends TestCase
         $this->assertSame('Other', $sizesByName['Dog Cake']);
     }
 
-    public function test_admin_can_delete_a_completed_csv_import_and_its_sales_rows(): void
+    public function test_admin_can_move_a_completed_csv_import_and_its_sales_rows_to_the_recycle_bin(): void
     {
         $admin = User::factory()->createOne(['role' => 'admin']);
         $importId = DB::table('analytics_imports')->insertGetId([
@@ -830,16 +836,70 @@ class SalesImportControllerTest extends TestCase
 
         $this->assertDatabaseMissing('analytics_imports', ['id' => $importId]);
         $this->assertDatabaseMissing('analytics_sales_history', ['import_id' => $importId]);
+        $this->assertDatabaseHas('admin_recycle_bin', ['item_type' => 'csv_import', 'label' => 'cakes.csv']);
         $this->assertDatabaseHas('analytics_sales_history', ['import_id' => $otherImportId, 'product_name' => 'Retained Cake']);
         $this->assertDatabaseHas('sales', ['cake_name' => 'Customer Order']);
     }
 
-    public function test_admin_can_delete_a_queued_csv_import_and_its_stored_file(): void
+    public function test_csv_import_can_be_restored_without_changing_order_sales(): void
+    {
+        $importId = DB::table('analytics_imports')->insertGetId([
+            'file_name' => 'restore.csv',
+            'source_name' => 'POS CSV',
+            'uploaded_at' => now(),
+            'status' => 'completed',
+        ]);
+        DB::table('analytics_sales_history')->insert([
+            'import_id' => $importId,
+            'product_name' => 'Restore Cake',
+            'sale_date' => '2026-10-01',
+            'units_sold' => 1,
+            'revenue' => 250,
+        ]);
+        DB::table('sales')->insert([
+            'cake_name' => 'Unchanged Customer Order',
+            'price' => 100,
+            'down_payment' => 50,
+            'remaining_balance' => 50,
+            'sale_date' => '2026-10-01',
+        ]);
+
+        $recycleBin = app(AdminRecycleBinService::class);
+        $recycleBin->trashImport($importId);
+        $entryId = (int) DB::table('admin_recycle_bin')->where('item_type', 'csv_import')->value('id');
+        $recycleBin->restore($entryId);
+
+        $this->assertDatabaseHas('analytics_imports', ['id' => $importId, 'file_name' => 'restore.csv']);
+        $this->assertDatabaseHas('analytics_sales_history', ['import_id' => $importId, 'product_name' => 'Restore Cake']);
+        $this->assertDatabaseHas('sales', ['cake_name' => 'Unchanged Customer Order']);
+        $this->assertDatabaseMissing('admin_recycle_bin', ['id' => $entryId]);
+    }
+
+    public function test_expired_csv_bin_entry_is_removed_even_when_its_source_file_is_already_missing(): void
+    {
+        DB::table('admin_recycle_bin')->insert([
+            'item_type' => 'csv_import',
+            'label' => 'expired.csv',
+            'payload' => json_encode([
+                'import' => ['stored_path' => 'sales-imports/already-missing.csv'],
+                'sales_history' => [],
+            ], JSON_THROW_ON_ERROR),
+            'deleted_at' => now()->subDays(31),
+            'expires_at' => now()->subDay(),
+            'created_at' => now()->subDays(31),
+            'updated_at' => now()->subDays(31),
+        ]);
+
+        $this->assertSame([], app(AdminRecycleBinService::class)->entries());
+        $this->assertDatabaseCount('admin_recycle_bin', 0);
+    }
+
+    public function test_admin_can_move_a_queued_csv_import_to_the_recycle_bin_without_losing_its_file(): void
     {
         Storage::fake('local');
         $admin = User::factory()->createOne(['role' => 'admin']);
         $storedPath = 'sales-imports/queued.csv';
-        Storage::disk('local')->put($storedPath, 'queued,csv');
+        Storage::disk('local')->put($storedPath, "product,quantity,total\nTest Cake,1,100\n");
         $payload = json_encode(['data' => ['command' => serialize(new ProcessSalesCsvImport(1, $storedPath))]]);
         $queueJobId = DB::table('jobs')->insertGetId([
             'queue' => 'default',
@@ -868,13 +928,22 @@ class SalesImportControllerTest extends TestCase
 
         $this->assertDatabaseMissing('analytics_imports', ['id' => $importId]);
         $this->assertDatabaseMissing('jobs', ['id' => $queueJobId]);
-        Storage::disk('local')->assertMissing($storedPath);
+        $this->assertDatabaseHas('admin_recycle_bin', ['item_type' => 'csv_import', 'label' => 'queued.csv']);
+        Storage::disk('local')->assertExists($storedPath);
+        $binEntry = DB::table('admin_recycle_bin')->where('item_type', 'csv_import')->first();
+        $this->assertSame('queued', json_decode($binEntry->payload, true)['import']['status']);
 
         (new ProcessSalesCsvImport($importId, $storedPath))->handle();
         $this->assertDatabaseMissing('analytics_sales_history', ['import_id' => $importId]);
+        Storage::disk('local')->assertExists($storedPath);
+
+        app(AdminRecycleBinService::class)->restore((int) $binEntry->id);
+        $this->assertDatabaseHas('analytics_imports', ['id' => $importId, 'status' => 'queued']);
+        $this->assertDatabaseHas('jobs', ['id' => DB::table('analytics_imports')->where('id', $importId)->value('queue_job_id')]);
+        Storage::disk('local')->assertExists($storedPath);
     }
 
-    public function test_legacy_queued_import_without_stored_path_cleans_its_matching_job_and_file(): void
+    public function test_legacy_queued_import_without_stored_path_moves_its_file_to_the_recycle_bin(): void
     {
         Storage::fake('local');
         $admin = User::factory()->createOne(['role' => 'admin']);
@@ -902,7 +971,8 @@ class SalesImportControllerTest extends TestCase
         $this->assertSame(200, $response->getStatusCode());
         $this->assertDatabaseMissing('jobs', ['id' => $queueJobId]);
         $this->assertDatabaseMissing('analytics_imports', ['id' => $importId]);
-        Storage::disk('local')->assertMissing($storedPath);
+        $this->assertDatabaseHas('admin_recycle_bin', ['item_type' => 'csv_import', 'label' => 'legacy-queued.csv']);
+        Storage::disk('local')->assertExists($storedPath);
     }
 
     public function test_admin_can_filter_imported_history_to_one_csv_file(): void
@@ -1008,9 +1078,10 @@ class SalesImportControllerTest extends TestCase
 
         $this->assertDatabaseMissing('analytics_imports', ['id' => $importId]);
         $this->assertDatabaseMissing('analytics_sales_history', ['import_id' => $importId]);
+        $this->assertDatabaseHas('admin_recycle_bin', ['item_type' => 'csv_import', 'label' => 'processing.csv']);
         $this->assertDatabaseHas('analytics_sales_history', ['import_id' => $otherImportId, 'product_name' => 'Other Cake']);
         $this->assertDatabaseHas('sales', ['cake_name' => 'Customer Order']);
-        Storage::disk('local')->assertMissing($storedPath);
+        Storage::disk('local')->assertExists($storedPath);
     }
 
     public function test_failed_csv_import_can_be_deleted_without_deleting_another_imports_sales(): void
@@ -1079,7 +1150,8 @@ class SalesImportControllerTest extends TestCase
 
         $this->assertDatabaseMissing('analytics_imports', ['id' => $cancelledImportId]);
         $this->assertDatabaseMissing('analytics_sales_history', ['import_id' => $cancelledImportId]);
-        Storage::disk('local')->assertMissing($storedPath);
+        $this->assertDatabaseHas('admin_recycle_bin', ['item_type' => 'csv_import', 'label' => 'cancelled.csv']);
+        Storage::disk('local')->assertExists($storedPath);
     }
 
     public function test_worker_stops_at_a_batch_checkpoint_if_cancellation_races_with_processing(): void
@@ -1117,7 +1189,8 @@ class SalesImportControllerTest extends TestCase
         $this->assertTrue($cancellationRequested);
         $this->assertDatabaseMissing('analytics_imports', ['id' => $importId]);
         $this->assertDatabaseMissing('analytics_sales_history', ['import_id' => $importId]);
-        Storage::disk('local')->assertMissing($storedPath);
+        $this->assertDatabaseHas('admin_recycle_bin', ['item_type' => 'csv_import', 'label' => 'race.csv']);
+        Storage::disk('local')->assertExists($storedPath);
     }
 
     public function test_delete_rejects_unauthorized_and_invalid_import_ids(): void

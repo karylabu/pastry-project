@@ -33,6 +33,7 @@ export default function CakeRecipes() {
   ]);
   const [preview, setPreview] = useState(null);
   const [adminDialog, setAdminDialog] = useState(null);
+  const [deletingRecipe, setDeletingRecipe] = useState(false);
 
   const request = async (path, options = {}) => {
     let storedUser = null;
@@ -123,6 +124,20 @@ export default function CakeRecipes() {
       setStatus("Base recipe saved.");
       await loadCatalog();
     } catch (error) { setStatus(error.message); }
+  };
+
+  const deleteRecipe = async () => {
+    if (!selectedRecipe?.id || !window.confirm(`Move the saved recipe for ${selectedFlavor?.name || "this flavor"} to the Recycle Bin?`)) return;
+    setDeletingRecipe(true);
+    try {
+      await request(`/api/staff/customized-cakes/recipes/${selectedRecipe.id}`, { method: "DELETE" });
+      setStatus("Recipe moved to the Recycle Bin. It can be restored for 30 days.");
+      await loadCatalog();
+    } catch (error) {
+      setStatus(error.message);
+    } finally {
+      setDeletingRecipe(false);
+    }
   };
 
   const importRecipeFile = async (event) => {
@@ -347,6 +362,7 @@ export default function CakeRecipes() {
                   <Upload size={14} /> Import recipe
                   <input type="file" accept=".csv,.xlsx,.xls" onChange={importRecipeFile} disabled={!selectedFlavor} className="sr-only" />
                 </label>
+                {selectedRecipe && <button type="button" onClick={deleteRecipe} disabled={deletingRecipe} className="inline-flex h-9 items-center gap-1.5 rounded-md border border-[#efd8d4] px-3 text-[11px] font-semibold text-[#8d5357] transition hover:bg-[#fff0f0] disabled:opacity-50"><Trash2 size={14} /> {deletingRecipe ? "Moving..." : "Move to bin"}</button>}
                 <label className="text-[9px] font-bold uppercase tracking-[0.14em] text-[#8f8076]">
                   <span className="sr-only">Change flavor</span>
                   <select aria-label="Change flavor" value={selectedFlavorId} onChange={(event) => setSelectedFlavorId(event.target.value)} className="block h-9 min-w-40 rounded-md border border-[#eadfd8] bg-white px-3 text-[11px] font-medium normal-case tracking-normal text-[#33251e] outline-none transition focus:border-[#d4af37] focus:ring-2 focus:ring-[#d4af37]/20">

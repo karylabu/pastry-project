@@ -10,6 +10,7 @@ use App\Models\CakeRecipe;
 use App\Models\CakeRecipeIngredient;
 use App\Services\CustomizedCakeService;
 use App\Services\CustomCakeRequestSetting;
+use App\Services\AdminRecycleBinService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -165,6 +166,18 @@ class CustomizedCakeController extends Controller
         });
 
         return response()->json(['success' => true, 'recipes' => $this->service->getRecipes()]);
+    }
+
+    public function deleteRecipe(Request $request, int $recipeId, AdminRecycleBinService $recycleBin): JsonResponse
+    {
+        if ($response = $this->authorizeAdmin($request)) return $response;
+
+        try {
+            $recycleBin->trashCustomizedRecipe($recipeId);
+            return response()->json(['success' => true, 'message' => 'Recipe moved to the Recycle Bin for 30 days.']);
+        } catch (RuntimeException $exception) {
+            return response()->json(['success' => false, 'message' => $exception->getMessage()], 409);
+        }
     }
 
     private function authorizeAdmin(Request $request): ?JsonResponse

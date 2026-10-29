@@ -490,6 +490,7 @@ describe('Products admin catalog', () => {
     await waitFor(() => {
       expect(screen.getByDisplayValue('1')).toBeInTheDocument();
     });
+    expect(screen.getByRole('button', { name: 'Move saved recipe to bin' })).toBeEnabled();
 
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
 
@@ -502,6 +503,24 @@ describe('Products admin catalog', () => {
         product_size_id: 11,
         recipes: [{ ingredient_id: 4, qty: 1 }],
       });
+    });
+  });
+
+  test('does not allow moving an unsaved product recipe to the Recycle Bin', async () => {
+    const existingFetch = global.fetch.getMockImplementation();
+    global.fetch.mockImplementation((url, options) => {
+      if (String(url).includes('/api/staff/products/1/recipe')) {
+        return Promise.resolve({ ok: true, json: async () => ({ success: true, recipe: [] }) });
+      }
+      return existingFetch(url, options);
+    });
+
+    render(<Products allowCatalogManagement />);
+    await waitFor(() => expect(screen.getByText('Strawberry Cake')).toBeInTheDocument());
+    fireEvent.click(screen.getAllByRole('button', { name: /^Edit / })[0]);
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Move saved recipe to bin' })).toBeDisabled();
     });
   });
 

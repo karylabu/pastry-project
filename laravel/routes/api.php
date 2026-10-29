@@ -3,6 +3,8 @@
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\AdminAlertController;
 use App\Http\Controllers\Api\AdminSettingsController;
+use App\Http\Controllers\Api\AdminBackupController;
+use App\Http\Controllers\Api\AdminRecycleBinController;
 use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\PromotionController;
@@ -148,6 +150,7 @@ Route::post('staff/inventory/waste', [WasteLogController::class, 'store']);
 // Staff production routes
 Route::get('staff/products/{product}/recipe', [RecipeController::class, 'show']);
 Route::put('staff/products/{product}/recipe', [RecipeController::class, 'update']);
+Route::delete('staff/products/{product}/recipe', [RecipeController::class, 'destroy']);
 Route::get('staff/production/availability/{product}', [ProductionController::class, 'availability']);
 Route::post('staff/production', [ProductionController::class, 'store']);
 
@@ -162,6 +165,7 @@ Route::patch('staff/customized-cakes/flavors/{flavor}/toggle', [CustomizedCakeCo
 Route::post('staff/customized-cakes/sizes', [CustomizedCakeController::class, 'saveSize']);
 Route::patch('staff/customized-cakes/sizes/{size}/toggle', [CustomizedCakeController::class, 'toggleSize']);
 Route::put('staff/customized-cakes/recipes', [CustomizedCakeController::class, 'saveRecipe']);
+Route::delete('staff/customized-cakes/recipes/{recipeId}', [CustomizedCakeController::class, 'deleteRecipe'])->whereNumber('recipeId');
 Route::post('customized-cakes/preview', [CustomizedCakeController::class, 'preview']);
 Route::post('customized-cakes/order', [CustomizedCakeController::class, 'storeOrder']);
 Route::post('customized-cakes/consume-inventory', [CustomizedCakeController::class, 'consume']);
@@ -174,6 +178,10 @@ Route::middleware(['api'])->group(function () {
     Route::apiResource('users', UserController::class);
 
     Route::prefix('admin')->group(function () {
+        Route::get('backup', [AdminBackupController::class, 'download']);
+        Route::get('recycle-bin', [AdminRecycleBinController::class, 'index']);
+        Route::post('recycle-bin/{entryId}/restore', [AdminRecycleBinController::class, 'restore'])->whereNumber('entryId');
+        Route::delete('recycle-bin/{entryId}', [AdminRecycleBinController::class, 'destroy'])->whereNumber('entryId');
         Route::get('settings', [AdminSettingsController::class, 'show']);
         Route::put('settings', [AdminSettingsController::class, 'update']);
         Route::get('notifications', [NotificationController::class, 'index']);

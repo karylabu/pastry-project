@@ -55,6 +55,15 @@ class PromotionDraftEditingTest extends TestCase
             $table->text('error_message')->nullable();
             $table->timestamp('attempted_at')->useCurrent();
         });
+        Schema::create('admin_recycle_bin', function ($table) {
+            $table->id();
+            $table->string('item_type', 40);
+            $table->string('label', 255);
+            $table->longText('payload');
+            $table->timestamp('deleted_at');
+            $table->timestamp('expires_at')->index();
+            $table->timestamps();
+        });
         Schema::create('subscribers', function ($table) {
             $table->id();
             $table->string('email')->unique();
@@ -79,6 +88,7 @@ class PromotionDraftEditingTest extends TestCase
     protected function tearDown(): void
     {
         Schema::dropIfExists('promotion_email_logs');
+        Schema::dropIfExists('admin_recycle_bin');
         Schema::dropIfExists('promotions');
         Schema::dropIfExists('subscribers');
         Schema::dropIfExists('user_sessions');
@@ -136,7 +146,7 @@ class PromotionDraftEditingTest extends TestCase
         ]);
     }
 
-    public function test_admin_can_delete_a_promotion_and_its_delivery_history(): void
+    public function test_admin_can_move_a_promotion_and_its_delivery_history_to_the_recycle_bin(): void
     {
         $promotionId = $this->createPromotion('sent');
         $logId = DB::table('promotion_email_logs')->insertGetId([
@@ -153,6 +163,13 @@ class PromotionDraftEditingTest extends TestCase
 
         $this->assertDatabaseMissing('promotions', ['id' => $promotionId]);
         $this->assertDatabaseMissing('promotion_email_logs', ['id' => $logId]);
+        $this->assertDatabaseHas('admin_recycle_bin', ['item_type' => 'promotion', 'label' => 'Original campaign']);
+
+        $entryId = (int) DB::table('admin_recycle_bin')->value('id');
+        app(\App\Services\AdminRecycleBinService::class)->restore($entryId);
+
+        $this->assertDatabaseHas('promotions', ['id' => $promotionId, 'title' => 'Original campaign']);
+        $this->assertDatabaseHas('promotion_email_logs', ['id' => $logId, 'promotion_id' => $promotionId]);
     }
 
     public function test_draft_coupon_requires_a_discount_percent(): void

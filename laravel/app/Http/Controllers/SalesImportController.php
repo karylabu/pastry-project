@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Controllers\Controller;
 use App\Jobs\ProcessSalesCsvImport;
 use App\Models\User;
+use App\Services\AdminRecycleBinService;
 use App\Support\SalesImportCleaner;
 use App\Support\SalesItemSize;
 use Illuminate\Http\Request;
@@ -84,12 +85,19 @@ class SalesImportController extends Controller
 
         return response()->json([
             'success' => true,
-            'products' => $this->cakeAliasProducts()->orderBy('name')->get(['id', 'name']),
+            'products' => $this->cakeAliasProducts()->orderBy('name')->get(['id', 'name'])
+                ->map(static fn ($product) => ['id' => (int) $product->id, 'name' => $product->name]),
             'aliases' => DB::table('analytics_product_aliases as aliases')
                 ->join('products', 'products.id', '=', 'aliases.product_id')
                 ->whereIn('aliases.product_id', $this->cakeAliasProducts()->select('id'))
                 ->orderBy('aliases.alias_name')
-                ->get(['aliases.id', 'aliases.alias_name', 'aliases.product_id', 'products.name as product_name']),
+                ->get(['aliases.id', 'aliases.alias_name', 'aliases.product_id', 'products.name as product_name'])
+                ->map(static fn ($alias) => [
+                    'id' => (int) $alias->id,
+                    'alias_name' => $alias->alias_name,
+                    'product_id' => (int) $alias->product_id,
+                    'product_name' => $alias->product_name,
+                ]),
         ]);
     }
 
@@ -136,11 +144,25 @@ class SalesImportController extends Controller
 
         return response()->json([
             'success' => true,
-            'alias' => DB::table('analytics_product_aliases as aliases')
+            'alias' => $this->serializeProductAlias(DB::table('analytics_product_aliases as aliases')
                 ->join('products', 'products.id', '=', 'aliases.product_id')
                 ->where('aliases.id', $aliasId)
-                ->first(['aliases.id', 'aliases.alias_name', 'aliases.product_id', 'products.name as product_name']),
+                ->first(['aliases.id', 'aliases.alias_name', 'aliases.product_id', 'products.name as product_name'])),
         ], 201);
+    }
+
+    private function serializeProductAlias(?object $alias): ?array
+    {
+        if ($alias === null) {
+            return null;
+        }
+
+        return [
+            'id' => (int) $alias->id,
+            'alias_name' => $alias->alias_name,
+            'product_id' => (int) $alias->product_id,
+            'product_name' => $alias->product_name,
+        ];
     }
 
     public function deleteProductAlias(Request $request, int $aliasId)
@@ -227,35 +249,43 @@ class SalesImportController extends Controller
                         return null;
                     }
 
-                    DB::table('analytics_imports')
-                        ->where('id', $retryImportId)
-                        ->update([
+                    $retryFields = [
                             'file_name' => basename($file->getClientOriginalName()),
                             'status' => 'queued',
                             'rows_received' => 0,
                             'rows_processed' => 0,
                             'error_message' => null,
-                            ...(Schema::hasColumn('analytics_imports', 'cleaning_report') ? ['cleaning_report' => null] : []),
                             'uploaded_at' => now(),
                             'sales_type' => $salesType,
-                            ...(Schema::hasColumn('analytics_imports', 'overlap_mode') ? ['overlap_mode' => $overlapMode] : []),
                             'stored_path' => $storedPath,
                             'queue_job_id' => null,
-                        ]);
+                        ];
+                    if (Schema::hasColumn('analytics_imports', 'cleaning_report')) {
+                        $retryFields['cleaning_report'] = null;
+                    }
+                    if (Schema::hasColumn('analytics_imports', 'overlap_mode')) {
+                        $retryFields['overlap_mode'] = $overlapMode;
+                    }
+                    DB::table('analytics_imports')
+                        ->where('id', $retryImportId)
+                        ->update($retryFields);
                     $importId = $retryImportId;
                 } else {
-                    $importId = (int) DB::table('analytics_imports')->insertGetId([
+                    $importFields = [
                         'file_name' => basename($file->getClientOriginalName()),
                         'source_name' => 'POS CSV',
                         'sales_type' => $salesType,
-                        ...(Schema::hasColumn('analytics_imports', 'overlap_mode') ? ['overlap_mode' => $overlapMode] : []),
                         'uploaded_at' => now(),
                         'status' => 'queued',
                         'rows_received' => 0,
                         'rows_processed' => 0,
                         'source_hash' => $sourceHash,
                         'stored_path' => $storedPath,
-                    ]);
+                    ];
+                    if (Schema::hasColumn('analytics_imports', 'overlap_mode')) {
+                        $importFields['overlap_mode'] = $overlapMode;
+                    }
+                    $importId = (int) DB::table('analytics_imports')->insertGetId($importFields);
                 }
 
                 $queueJobId = Queue::connection('database')->pushOn(
@@ -356,14 +386,18 @@ class SalesImportController extends Controller
         ]);
     }
 
-    public function deleteImport(Request $request, int $importId)
+    public function deleteImport(Request $request, int $importId, ?AdminRecycleBinService $recycleBin = null)
     {
         $user = $this->requireRole($request, 'admin');
         if (!$user instanceof User) {
             return $user;
         }
 
-        $result = DB::transaction(function () use ($importId) {
+        if ($recycleBin === null) {
+            $recycleBin = app(AdminRecycleBinService::class);
+        }
+
+        $result = DB::transaction(function () use ($importId, $recycleBin) {
             $import = DB::table('analytics_imports')
                 ->where('id', $importId)
                 ->lockForUpdate()
@@ -398,28 +432,22 @@ class SalesImportController extends Controller
                 $storedPath = $storedPath ?: ($queuedJob['stored_path'] ?? null);
             }
 
-            if ($storedPath && !Storage::disk('local')->delete($storedPath)) {
-                Log::warning('Unable to delete stored sales CSV during import deletion.', [
-                    'import_id' => $importId,
-                    'stored_path' => $storedPath,
-                ]);
-
-                return ['response' => response()->json(['success' => false, 'message' => 'Unable to delete the stored CSV file. Please try again.'], 500)];
-            }
             if ($import->status === 'queued') {
                 $this->removeQueuedImportJob($queuedJob, $import->queue_job_id);
             } elseif ($import->status === 'failed') {
                 $this->removeFailedImportJobs($importId);
             }
 
-            DB::table('analytics_sales_history')->where('import_id', $importId)->delete();
-            DB::table('analytics_imports')->where('id', $importId)->delete();
+            if ($storedPath && ! $import->stored_path) {
+                DB::table('analytics_imports')->where('id', $importId)->update(['stored_path' => $storedPath]);
+            }
+            $recycleBin->trashImport($importId);
 
             return [
                 'response' => response()->json([
                     'success' => true,
-                    'status' => 'deleted',
-                    'message' => 'CSV import and its associated sales records were deleted.',
+                    'status' => 'recycled',
+                    'message' => 'CSV import and associated sales records moved to the Recycle Bin for 30 days.',
                 ]),
             ];
         });
@@ -823,7 +851,7 @@ class SalesImportController extends Controller
             )));
             $coverageStartDate = $saleDates ? min($saleDates) : null;
             $coverageEndDate = $saleDates ? max($saleDates) : null;
-            $importId = (int) DB::table('analytics_imports')->insertGetId([
+            $importFields = [
                 'file_name' => basename($fileName),
                 'source_name' => $sourceName,
                 'sales_type' => $salesType,
@@ -832,16 +860,17 @@ class SalesImportController extends Controller
                 'rows_received' => $rowsReceived,
                 'rows_processed' => count($rows),
                 'source_hash' => $sourceHash,
-                ...(Schema::hasColumn('analytics_imports', 'cleaning_report') && $cleaningReport !== null
-                    ? ['cleaning_report' => json_encode($cleaningReport, JSON_THROW_ON_ERROR)]
-                    : []),
-                ...(Schema::hasColumn('analytics_imports', 'coverage_start_date')
-                    ? ['coverage_start_date' => $coverageStartDate]
-                    : []),
-                ...(Schema::hasColumn('analytics_imports', 'coverage_end_date')
-                    ? ['coverage_end_date' => $coverageEndDate]
-                    : []),
-            ]);
+            ];
+            if (Schema::hasColumn('analytics_imports', 'cleaning_report') && $cleaningReport !== null) {
+                $importFields['cleaning_report'] = json_encode($cleaningReport, JSON_THROW_ON_ERROR);
+            }
+            if (Schema::hasColumn('analytics_imports', 'coverage_start_date')) {
+                $importFields['coverage_start_date'] = $coverageStartDate;
+            }
+            if (Schema::hasColumn('analytics_imports', 'coverage_end_date')) {
+                $importFields['coverage_end_date'] = $coverageEndDate;
+            }
+            $importId = (int) DB::table('analytics_imports')->insertGetId($importFields);
 
             $historyRows = array_map(static fn (array $row) => [
                 'import_id' => $importId,
