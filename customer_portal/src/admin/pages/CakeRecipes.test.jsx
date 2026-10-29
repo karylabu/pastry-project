@@ -38,7 +38,7 @@ describe("CakeRecipes ingredient pagination", () => {
 
     expect(await screen.findByRole("button", { name: "Remove ingredient 10" })).toBeInTheDocument();
     expect(screen.getByText("Recipe editor")).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Carrot" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 1, name: "Carrot" })).toBeInTheDocument();
     expect(screen.getByLabelText("Change flavor")).toBeInTheDocument();
     expect(screen.getByText("Import recipe")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Discard changes" })).toBeInTheDocument();

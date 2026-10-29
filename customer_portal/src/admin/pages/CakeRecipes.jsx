@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import Papa from "papaparse";
 import * as XLSX from "xlsx";
-import { Calculator, CakeSlice, CheckCircle2, ChevronLeft, ChevronRight, Package, Plus, Save, Trash2, Upload } from "lucide-react";
+import { Calculator, CakeSlice, CheckCircle2, ChevronLeft, ChevronRight, Package, Plus, Search, Save, Trash2, Upload } from "lucide-react";
 import { LARAVEL_BASE } from "../../services/config";
 import { safeParseJson } from "../../services/api";
 import AdminDialog from "../components/AdminDialog";
@@ -20,6 +20,7 @@ const getFlavorThumbnail = (name) => {
 export default function CakeRecipes() {
   const [catalog, setCatalog] = useState({ flavors: [], sizes: [], recipes: [], ingredients: [] });
   const [selectedFlavorId, setSelectedFlavorId] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
   const [recipeLines, setRecipeLines] = useState([emptyLine]);
   const [ingredientPage, setIngredientPage] = useState(1);
   const [flavorForm, setFlavorForm] = useState({ id: "", name: "", active: true });
@@ -220,6 +221,13 @@ export default function CakeRecipes() {
     } catch (error) { setStatus(error.message); }
   };
 
+  const toggle = async (type, item) => {
+    try {
+      await request(`/api/staff/customized-cakes/${type}/${item.id}/toggle`, { method: "PATCH" });
+      await loadCatalog();
+    } catch (error) { setStatus(error.message); }
+  };
+
   const updateLine = (index, field, value) => setRecipeLines((lines) => lines.map((line, lineIndex) => lineIndex === index ? { ...line, [field]: value } : line));
   const selectIngredient = (index, ingredientId) => {
     const ingredient = catalog.ingredients.find((item) => String(item.id) === String(ingredientId));
@@ -228,6 +236,10 @@ export default function CakeRecipes() {
       : line));
   };
 
+  const recipeMap = Object.fromEntries((catalog.recipes || []).map((recipe) => [String(recipe.flavor_id), recipe]));
+  const visibleFlavors = (catalog.flavors || []).filter((flavor) => (
+    String(flavor.name || "").toLowerCase().includes(searchQuery.trim().toLowerCase())
+  ));
   const selectedFlavor = catalog.flavors.find((flavor) => String(flavor.id) === String(selectedFlavorId));
   const selectedRecipe = catalog.recipes.find((recipe) => String(recipe.flavor_id) === String(selectedFlavorId));
   const ingredientPageCount = Math.max(1, Math.ceil(recipeLines.length / INGREDIENTS_PER_PAGE));
@@ -250,7 +262,62 @@ export default function CakeRecipes() {
   return (
     <div className="min-h-screen bg-[#fbfaf5] px-4 pb-8 pt-[108px] text-[#33251e] sm:px-6 lg:pl-[284px] lg:pr-8">
       <div className="mx-auto max-w-[1440px] space-y-4">
+        <header className="mb-2">
+          <div className="max-w-2xl">
+            <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.24em] text-[#92701e]">Production setup</p>
+            <h1 className="font-serif text-[27px] leading-tight text-[#33251e]">Customize Cakes Recipes</h1>
+            <p className="mt-1 text-[12px] leading-5 text-[#74675f]">Build and maintain ingredient recipes for customized cakes.</p>
+          </div>
+        </header>
+
         {status && <div role="status" className="flex items-start gap-2 rounded-xl border border-[#e7c875] bg-[#fff8e9] px-4 py-3 text-[13px] text-[#6f541d]"><CheckCircle2 size={16} className="mt-0.5 shrink-0" />{status}</div>}
+
+        <section className="overflow-hidden rounded-xl border border-[#eadfd8] bg-white shadow-[0_5px_18px_rgba(91,64,39,0.04)]">
+          <div className="flex flex-col gap-3 border-b border-[#f0e7e0] bg-[#fffdfa] px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#9b7810]">Saved recipes</p>
+              <h2 className="mt-0.5 text-[15px] font-semibold text-[#33251e]">Flavor recipes</h2>
+              <p className="mt-1 text-[11px] text-[#8f8076]">Select a flavor to edit its saved ingredient recipe.</p>
+            </div>
+            <div className="flex w-full items-center gap-2 rounded-lg border border-[#eadfd8] bg-white px-3 py-2 sm:max-w-xs">
+              <Search size={15} aria-hidden="true" className="shrink-0 text-[#9b8c83]" />
+              <input value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} placeholder="Search cake recipes" aria-label="Search cake recipes" className="w-full bg-transparent text-[12px] text-[#33251e] placeholder:text-[#b7a69c] outline-none" />
+              <span className="shrink-0 text-[10px] text-[#9b8c83]">{visibleFlavors.length}</span>
+            </div>
+          </div>
+          {loading ? (
+            <div className="px-4 py-8 text-center text-[12px] text-[#8f8076]">Loading recipe catalog...</div>
+          ) : (
+            <div className="grid max-h-[52vh] gap-3 overflow-y-auto p-3 sm:grid-cols-2 xl:grid-cols-3">
+              {visibleFlavors.map((flavor) => {
+                const recipe = recipeMap[String(flavor.id)] || null;
+                const isSelected = String(selectedFlavorId) === String(flavor.id);
+                const thumbnail = getFlavorThumbnail(flavor.name);
+                return (
+                  <div key={flavor.id} className={`group flex min-h-[92px] min-w-0 items-center gap-3 rounded-xl border px-3.5 py-3 transition hover:shadow-[0_8px_20px_rgba(91,64,39,0.07)] ${isSelected ? "border-[#b7a69c] bg-[#fbfaf6] shadow-[0_5px_18px_rgba(91,64,39,0.06)]" : "border-[#eee4de] bg-white hover:border-[#dfd1c5]"}`}>
+                    <span className="relative flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[#f4ece6] text-[#8f675e]">
+                      <CakeSlice size={19} aria-hidden="true" />
+                      {thumbnail && <img src={thumbnail} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover" onError={(event) => { event.currentTarget.style.display = "none"; }} />}
+                    </span>
+                    <button type="button" aria-pressed={isSelected} onClick={() => {
+                      setSelectedFlavorId(String(flavor.id));
+                      setFlavorForm({ id: flavor.id, name: flavor.name, active: flavor.active });
+                    }} className="min-w-0 flex-1 rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#9b8c83] focus-visible:ring-offset-2">
+                      <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+                        <h3 className="truncate text-[12px] font-semibold leading-tight text-[#33251e]">{flavor.name}</h3>
+                        <span className={`rounded-full px-1.5 py-0.5 text-[8px] font-semibold ${recipe ? "bg-[#edf5eb] text-[#4f7654]" : "bg-[#f4ece6] text-[#8f8076]"}`}>{recipe ? "Recipe saved" : "No recipe"}</span>
+                      </div>
+                      <p className="mt-1 text-[10px] text-[#9b8c83]">{recipe?.ingredients?.length || 0} ingredients</p>
+                    </button>
+                    <button type="button" onClick={() => toggle("flavors", flavor)} aria-label={`${flavor.active ? "Deactivate" : "Activate"} ${flavor.name}`} title={`${flavor.active ? "Deactivate" : "Activate"} flavor`} className={`shrink-0 rounded-full px-2 py-1 text-[9px] font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#9b8c83] ${flavor.active ? "bg-[#edf5eb] text-[#4f7654] hover:bg-[#e5f0e2]" : "bg-[#f4ece6] text-[#8f8076] hover:bg-[#f0e7e0]"}`}>{flavor.active ? "Active" : "Inactive"}</button>
+                    <span className={`shrink-0 ${isSelected ? "text-[#9b7810]" : "text-[#a99687]"}`} aria-label={isSelected ? "Selected flavor" : undefined} title={isSelected ? "Selected flavor" : undefined}>{isSelected ? <CheckCircle2 size={15} /> : <ChevronRight size={17} className="transition-transform group-hover:translate-x-0.5" />}</span>
+                  </div>
+                );
+              })}
+              {!visibleFlavors.length && <p className="px-4 py-8 text-center text-sm text-black/50">No cake flavors match your search.</p>}
+            </div>
+          )}
+        </section>
 
         <section className="overflow-hidden rounded-xl border border-[#eadfd8] bg-white shadow-[0_5px_18px_rgba(91,64,39,0.06)]">
           <div className="flex flex-col gap-4 border-b border-[#f0e7e0] bg-[#fffdfa] px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
@@ -303,18 +370,18 @@ export default function CakeRecipes() {
                 <div key={`${selectedFlavorId}-${index}`} className="grid items-center gap-2 rounded-lg border border-[#eee4de] bg-white p-2.5 transition hover:border-[#dfd1c5] md:grid-cols-[minmax(0,1.55fr)_minmax(120px,0.55fr)_minmax(110px,0.5fr)_64px] md:gap-3 md:px-3">
                   <label className="min-w-0">
                     <span className="mb-1 block text-[9px] font-bold uppercase tracking-[0.14em] text-[#9b8c83] md:hidden">Ingredient</span>
-                    <select value={line.ingredient_id} onChange={(event) => selectIngredient(index, event.target.value)} className="h-10 w-full rounded-md border border-[#eadfd8] bg-white px-3 text-[11px] text-[#33251e] outline-none transition focus:border-[#c9a94f] focus:ring-2 focus:ring-[#d4af37]/15" required>
+                    <select value={line.ingredient_id} onChange={(event) => selectIngredient(index, event.target.value)} className="h-10 w-full rounded-md border border-[#eadfd8] bg-white px-3 text-[11px] text-[#33251e] outline-none transition focus:border-[#9b8c83] focus:ring-2 focus:ring-[#9b8c83]/20" required>
                     <option value="">Select ingredient</option>
                     {catalog.ingredients.map((ingredient) => <option key={ingredient.id} value={ingredient.id}>{ingredient.name} ({ingredient.unit || "unit not set"})</option>)}
                     </select>
                   </label>
                   <label>
                     <span className="mb-1 block text-[9px] font-bold uppercase tracking-[0.14em] text-[#9b8c83] md:hidden">Quantity</span>
-                    <input value={line.quantity} onChange={(event) => updateLine(index, "quantity", event.target.value)} type="number" step="0.001" min="0" placeholder="0.000" className="h-10 w-full rounded-md border border-[#eadfd8] bg-white px-3 text-[11px] text-[#33251e] outline-none transition focus:border-[#c9a94f] focus:ring-2 focus:ring-[#d4af37]/15" required />
+                    <input value={line.quantity} onChange={(event) => updateLine(index, "quantity", event.target.value)} type="number" step="0.001" min="0" placeholder="0.000" className="h-10 w-full rounded-md border border-[#eadfd8] bg-white px-3 text-[11px] text-[#33251e] outline-none transition focus:border-[#9b8c83] focus:ring-2 focus:ring-[#9b8c83]/20" required />
                   </label>
                   <label>
                     <span className="mb-1 block text-[9px] font-bold uppercase tracking-[0.14em] text-[#9b8c83] md:hidden">Unit</span>
-                    <select value={line.unit} onChange={(event) => updateLine(index, "unit", event.target.value)} className="h-10 w-full rounded-md border border-[#eadfd8] bg-white px-3 text-[11px] text-[#33251e] outline-none transition focus:border-[#c9a94f] focus:ring-2 focus:ring-[#d4af37]/15" required>
+                    <select value={line.unit} onChange={(event) => updateLine(index, "unit", event.target.value)} className="h-10 w-full rounded-md border border-[#eadfd8] bg-white px-3 text-[11px] text-[#33251e] outline-none transition focus:border-[#9b8c83] focus:ring-2 focus:ring-[#9b8c83]/20" required>
                       {!line.unit && <option value="">Select unit</option>}
                       {!recipeUnits.includes(line.unit) && <option value={line.unit}>{line.unit}</option>}
                       {recipeUnits.map((unit) => <option key={unit} value={unit}>{unit}</option>)}
