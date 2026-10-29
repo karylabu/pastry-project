@@ -40,15 +40,15 @@ const laravelStaffFetch = (url, options = {}) => {
 };
 
 const C = {
-  emerald: '#d4af37', emeraldSoft: '#fff4cd',
-  violet:  '#d4af37', violetSoft:  '#fff4cd',
-  amber:   '#d4af37', amberSoft:   '#fff4cd',
-  sky:     '#d4af37', skySoft:     '#fff4cd',
-  red:     '#000000', redSoft:     '#fff4cd',
-  ink:     '#000000',
-  sub:     'rgba(0,0,0,0.56)',
-  border:  'rgba(0,0,0,0.12)',
-  bg:      '#ffffff',
+  emerald: '#68815d', emeraldSoft: '#eef5e9',
+  violet:  '#a57c38', violetSoft:  '#fff4cd',
+  amber:   '#c9a94f', amberSoft:   '#fff8e9',
+  sky:     '#81906c', skySoft:     '#eef5e9',
+  red:     '#9a5947', redSoft:     '#fff0eb',
+  ink:     '#33251e',
+  sub:     '#8f8076',
+  border:  '#eadfd8',
+  bg:      '#fbfaf5',
 };
 
 function fmt(n)  { return Number(n || 0).toLocaleString(undefined, { maximumFractionDigits: 0 }); }
@@ -367,7 +367,7 @@ function StatCard({ title, value, sub, icon: Icon, color, soft, trend, isMock })
   return (
     <motion.div
       whileHover={{ y: -3 }}
-      className="relative flex min-h-[142px] flex-col justify-between overflow-hidden rounded-lg border border-t-[3px] bg-white p-4 shadow-[0_3px_12px_rgba(60,42,28,0.035)] transition-shadow"
+      className="relative flex min-h-[124px] flex-col justify-between overflow-hidden rounded-lg border border-t-[3px] bg-white p-4 shadow-[0_3px_12px_rgba(60,42,28,0.035)] transition-shadow"
       style={{ borderColor: C.border, borderTopColor: color }}
     >
       {isMock && (
@@ -376,7 +376,7 @@ function StatCard({ title, value, sub, icon: Icon, color, soft, trend, isMock })
         </span>
       )}
       <div className="flex items-center gap-2.5">
-        <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: soft }}>
+        <div className="flex h-8 w-8 items-center justify-center rounded-lg" style={{ background: soft }}>
           <Icon size={16} style={{ color }} />
         </div>
         <span className="text-sm font-semibold" style={{ color: C.ink }}>{title}</span>
@@ -1577,8 +1577,8 @@ export default function Reports() {
           <div className="mb-5 rounded-lg border border-[#e9e1d9] bg-white p-3 shadow-[0_3px_12px_rgba(60,42,28,0.035)] sm:p-4">
             <div className="grid gap-4 lg:grid-cols-2">
             <div className="min-w-0">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-black/60">Interval</p>
-              <div className="mt-[27px] grid h-10 grid-cols-4 gap-1 rounded-md bg-[#f7f4ef] p-1">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#9b8c83]">Interval</p>
+              <div className="mt-2 grid h-10 grid-cols-4 gap-1 rounded-md bg-[#f7f4ef] p-1 lg:mt-[27px]">
                 {['daily', 'weekly', 'monthly', 'all'].map((key) => (
                   <button
                     key={key}
@@ -1602,48 +1602,48 @@ export default function Reports() {
               </div>
             </div>
             <div className="min-w-0">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-black/60">Date range</p>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#9b8c83]">Date range</p>
               <div className="mt-2 grid gap-2 sm:grid-cols-2">
-                <label className="block text-[10px] font-medium text-black/60">From
+                <label className="block text-[10px] font-medium text-[#8f8076]">From
                 <input
                   type="date"
                   value={dateFilterStart}
                   onChange={(e) => setDateFilterStart(e.target.value)}
-                  className="mt-1 h-10 w-full rounded-md border border-black/15 bg-white px-3 text-[12px] text-black outline-none focus:border-[#d4af37] focus:ring-2 focus:ring-[#d4af37]/15"
+                  className="mt-1 h-10 w-full rounded-md border border-[#eadfd8] bg-white px-3 text-[12px] text-[#33251e] outline-none focus:border-[#d4af37] focus:ring-2 focus:ring-[#d4af37]/15"
                 />
                 </label>
-                <label className="block text-[10px] font-medium text-black/60">To
+                <label className="block text-[10px] font-medium text-[#8f8076]">To
                   <input
                   type="date"
                   value={dateFilterEnd}
                   onChange={(e) => setDateFilterEnd(e.target.value)}
-                  className="mt-1 h-10 w-full rounded-md border border-black/15 bg-white px-3 text-[12px] text-black outline-none focus:border-[#d4af37] focus:ring-2 focus:ring-[#d4af37]/15"
+                  className="mt-1 h-10 w-full rounded-md border border-[#eadfd8] bg-white px-3 text-[12px] text-[#33251e] outline-none focus:border-[#d4af37] focus:ring-2 focus:ring-[#d4af37]/15"
                   />
                 </label>
               </div>
             </div>
             </div>
             <div className="mt-4 grid gap-2 border-t border-[#f0e9e2] pt-4 sm:grid-cols-2 lg:grid-cols-[repeat(4,minmax(0,1fr))_auto]">
-            <label className="text-[10px] font-bold uppercase tracking-[0.16em] text-black/60">Product
-              <select value={analyticsProductId} onChange={(e) => setAnalyticsProductId(e.target.value)} className="mt-1.5 h-10 w-full rounded-md border border-black/15 bg-white px-3 py-2 text-[12px] font-normal normal-case tracking-normal text-black outline-none focus:border-[#d4af37] focus:ring-2 focus:ring-[#d4af37]/15">
+            <label className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#9b8c83]">Product
+              <select value={analyticsProductId} onChange={(e) => setAnalyticsProductId(e.target.value)} className="mt-1.5 h-10 w-full rounded-md border border-[#eadfd8] bg-white px-3 py-2 text-[12px] font-normal normal-case tracking-normal text-[#33251e] outline-none focus:border-[#d4af37] focus:ring-2 focus:ring-[#d4af37]/15">
                 <option value="">All products</option>
                 {cakeProducts.map((product) => <option key={product.id} value={product.id}>{product.name}</option>)}
               </select>
             </label>
-            <label className="text-[10px] font-bold uppercase tracking-[0.16em] text-black/60">Category
-              <select value={analyticsCategory} onChange={(e) => setAnalyticsCategory(e.target.value)} className="mt-1.5 h-10 w-full rounded-md border border-black/15 bg-white px-3 py-2 text-[12px] font-normal normal-case tracking-normal text-black outline-none focus:border-[#d4af37] focus:ring-2 focus:ring-[#d4af37]/15">
+            <label className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#9b8c83]">Category
+              <select value={analyticsCategory} onChange={(e) => setAnalyticsCategory(e.target.value)} className="mt-1.5 h-10 w-full rounded-md border border-[#eadfd8] bg-white px-3 py-2 text-[12px] font-normal normal-case tracking-normal text-[#33251e] outline-none focus:border-[#d4af37] focus:ring-2 focus:ring-[#d4af37]/15">
                 <option value="">All categories</option>
                 {cakeCategories.map((category) => <option key={category} value={category}>{category}</option>)}
               </select>
             </label>
-            <label className="text-[10px] font-bold uppercase tracking-[0.16em] text-black/60">Ingredient
-              <select value={analyticsIngredientId} onChange={(e) => setAnalyticsIngredientId(e.target.value)} className="mt-1.5 h-10 w-full rounded-md border border-black/15 bg-white px-3 py-2 text-[12px] font-normal normal-case tracking-normal text-black outline-none focus:border-[#d4af37] focus:ring-2 focus:ring-[#d4af37]/15">
+            <label className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#9b8c83]">Ingredient
+              <select value={analyticsIngredientId} onChange={(e) => setAnalyticsIngredientId(e.target.value)} className="mt-1.5 h-10 w-full rounded-md border border-[#eadfd8] bg-white px-3 py-2 text-[12px] font-normal normal-case tracking-normal text-[#33251e] outline-none focus:border-[#d4af37] focus:ring-2 focus:ring-[#d4af37]/15">
                 <option value="">All ingredients</option>
                 {ingredientsRaw.map((ingredient) => <option key={ingredient.id} value={ingredient.id}>{ingredient.name}</option>)}
               </select>
             </label>
-            <label className="text-[10px] font-bold uppercase tracking-[0.16em] text-black/60">Movement
-              <select value={analyticsMovementType} onChange={(e) => setAnalyticsMovementType(e.target.value)} className="mt-1.5 h-10 w-full rounded-md border border-black/15 bg-white px-3 py-2 text-[12px] font-normal normal-case tracking-normal text-black outline-none focus:border-[#d4af37] focus:ring-2 focus:ring-[#d4af37]/15">
+            <label className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#9b8c83]">Movement
+              <select value={analyticsMovementType} onChange={(e) => setAnalyticsMovementType(e.target.value)} className="mt-1.5 h-10 w-full rounded-md border border-[#eadfd8] bg-white px-3 py-2 text-[12px] font-normal normal-case tracking-normal text-[#33251e] outline-none focus:border-[#d4af37] focus:ring-2 focus:ring-[#d4af37]/15">
                 <option value="">All movement types</option>
                 {['Production', 'Order', 'Cancellation', 'Reservation Release', 'Waste', 'Return', 'Stock Adjustment', 'Inventory Correction'].map((type) => <option key={type} value={type}>{type}</option>)}
               </select>
@@ -1656,7 +1656,7 @@ export default function Reports() {
                 setAnalyticsIngredientId('');
                 setAnalyticsMovementType('');
               }}
-              className="self-end h-10 rounded-md border border-black/15 bg-white px-3 text-[11px] font-semibold text-black/70 transition hover:bg-[#fff4cd] hover:text-black"
+              className="self-end h-10 rounded-md border border-[#eadfd8] bg-white px-3 text-[11px] font-semibold text-[#765d50] transition hover:bg-[#fff8df] hover:text-[#33251e]"
             >
               Reset filters
             </button>
