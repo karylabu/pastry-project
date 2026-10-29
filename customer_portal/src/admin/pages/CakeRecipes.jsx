@@ -1,12 +1,13 @@
 import React, { useCallback, useEffect, useState } from "react";
 import Papa from "papaparse";
 import * as XLSX from "xlsx";
-import { Calculator, CakeSlice, CheckCircle2, ChevronRight, Package, Plus, Search, Save, Trash2, Upload } from "lucide-react";
+import { Calculator, CakeSlice, CheckCircle2, ChevronLeft, ChevronRight, Package, Plus, Search, Save, Trash2, Upload } from "lucide-react";
 import { LARAVEL_BASE } from "../../services/config";
 import { safeParseJson } from "../../services/api";
 import AdminDialog from "../components/AdminDialog";
 
 const emptyLine = { ingredient_id: "", quantity: "", unit: "g" };
+const INGREDIENTS_PER_PAGE = 10;
 
 const getFlavorThumbnail = (name) => {
   const flavorName = String(name || "").toLowerCase();
@@ -21,6 +22,7 @@ export default function CakeRecipes() {
   const [selectedFlavorId, setSelectedFlavorId] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [recipeLines, setRecipeLines] = useState([emptyLine]);
+  const [ingredientPage, setIngredientPage] = useState(1);
   const [flavorForm, setFlavorForm] = useState({ id: "", name: "", active: true });
   const [sizeForm, setSizeForm] = useState({ id: "", code: "", label: "", multiplier: "", active: true });
   const [status, setStatus] = useState("");
@@ -81,6 +83,7 @@ export default function CakeRecipes() {
   }, [catalog.flavors, selectedFlavorId]);
 
   useEffect(() => {
+    setIngredientPage(1);
     const selectedRecipe = catalog.recipes.find((recipe) => String(recipe.flavor_id) === String(selectedFlavorId));
     if (selectedRecipe) {
       setRecipeLines(selectedRecipe.ingredients.map((line) => ({
@@ -188,6 +191,7 @@ export default function CakeRecipes() {
           confirmLabel: "Replace draft",
           onConfirm: () => {
             setRecipeLines(importedLines);
+            setIngredientPage(1);
             setStatus(`Imported ${importedLines.length} ingredients for ${selectedFlavor?.name || "this flavor"}. Review the recipe, then save it.`);
           },
         });
@@ -195,6 +199,7 @@ export default function CakeRecipes() {
       }
 
       setRecipeLines(importedLines);
+      setIngredientPage(1);
       setStatus(`Imported ${importedLines.length} ingredients for ${selectedFlavor?.name || "this flavor"}. Review the recipe, then save it.`);
     } catch (error) {
       setStatus(error.message);
@@ -239,6 +244,12 @@ export default function CakeRecipes() {
 
   const selectedFlavor = catalog.flavors.find((flavor) => String(flavor.id) === String(selectedFlavorId));
   const selectedRecipe = catalog.recipes.find((recipe) => String(recipe.flavor_id) === String(selectedFlavorId));
+  const ingredientPageCount = Math.max(1, Math.ceil(recipeLines.length / INGREDIENTS_PER_PAGE));
+  const currentIngredientPage = Math.min(ingredientPage, ingredientPageCount);
+  const firstIngredientIndex = (currentIngredientPage - 1) * INGREDIENTS_PER_PAGE;
+  const visibleRecipeLines = recipeLines
+    .slice(firstIngredientIndex, firstIngredientIndex + INGREDIENTS_PER_PAGE)
+    .map((line, index) => ({ line, index: firstIngredientIndex + index }));
 
   return (
     <div className="min-h-screen bg-[#fbfaf5] px-4 pb-8 pt-[108px] text-[#33251e] sm:px-6 lg:pl-[284px] lg:pr-8">
@@ -385,7 +396,7 @@ export default function CakeRecipes() {
                 <div />
               </div>
 
-              {recipeLines.length > 0 ? recipeLines.map((line, index) => (
+              {recipeLines.length > 0 ? visibleRecipeLines.map(({ line, index }) => (
                 <div key={`${selectedFlavorId}-${index}`} className="grid items-center gap-2 rounded-xl border border-t-0 border-[#e5d9d0] bg-white p-3 md:grid-cols-[minmax(0,1fr)_130px_90px_38px]">
                   <label className="min-w-0">
                     <span className="mb-1 block text-[9px] font-bold uppercase tracking-[0.14em] text-[#9b8c83] md:hidden">Ingredient</span>
@@ -415,7 +426,20 @@ export default function CakeRecipes() {
               )}
 
               <div className="flex flex-wrap items-center justify-between gap-2 border-t border-[#f0e7e0] pt-3">
-                <button type="button" title="Add ingredient" disabled={!selectedFlavorId} onClick={() => setRecipeLines((lines) => [...lines, { ...emptyLine }])} className="inline-flex items-center gap-1.5 rounded-lg border border-[#eadfd8] bg-white px-3 py-2 text-[11px] font-semibold text-[#5f514a] transition hover:border-[#c9a94f] hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d4af37] disabled:cursor-not-allowed disabled:opacity-40"><Plus size={14} aria-hidden="true" /> Add ingredient</button>
+                <div className="flex flex-wrap items-center gap-3">
+                  <button type="button" title="Add ingredient" disabled={!selectedFlavorId} onClick={() => {
+                    setRecipeLines((lines) => [...lines, { ...emptyLine }]);
+                    setIngredientPage(Math.ceil((recipeLines.length + 1) / INGREDIENTS_PER_PAGE));
+                  }} className="inline-flex items-center gap-1.5 rounded-lg border border-[#eadfd8] bg-white px-3 py-2 text-[11px] font-semibold text-[#5f514a] transition hover:border-[#c9a94f] hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d4af37] disabled:cursor-not-allowed disabled:opacity-40"><Plus size={14} aria-hidden="true" /> Add ingredient</button>
+                  {ingredientPageCount > 1 && (
+                    <nav aria-label="Recipe ingredient pages" className="flex flex-wrap items-center gap-2 text-[10px] text-[#74675f]">
+                      <span>Showing {firstIngredientIndex + 1}-{Math.min(firstIngredientIndex + INGREDIENTS_PER_PAGE, recipeLines.length)} of {recipeLines.length} ingredients</span>
+                      <span>Page {currentIngredientPage} of {ingredientPageCount}</span>
+                      <button type="button" onClick={() => setIngredientPage(Math.max(1, currentIngredientPage - 1))} disabled={currentIngredientPage <= 1} aria-label="Previous ingredient page" className="inline-flex items-center gap-1 rounded-md border border-[#eadfd8] px-2 py-1.5 font-semibold text-[#5f514a] transition hover:bg-[#fff8e9] disabled:cursor-not-allowed disabled:opacity-40"><ChevronLeft size={13} /> Previous</button>
+                      <button type="button" onClick={() => setIngredientPage(Math.min(ingredientPageCount, currentIngredientPage + 1))} disabled={currentIngredientPage >= ingredientPageCount} aria-label="Next ingredient page" className="inline-flex items-center gap-1 rounded-md border border-[#eadfd8] px-2 py-1.5 font-semibold text-[#5f514a] transition hover:bg-[#fff8e9] disabled:cursor-not-allowed disabled:opacity-40">Next <ChevronRight size={13} /></button>
+                    </nav>
+                  )}
+                </div>
                 <button type="submit" disabled={loading || !selectedFlavorId} className="inline-flex items-center gap-1.5 rounded-lg bg-[#33251e] px-4 py-2.5 text-[11px] font-semibold text-white shadow-sm transition hover:bg-[#5b4540] hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d4af37] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-40"><Save size={14} /> Save recipe</button>
               </div>
             </form>
