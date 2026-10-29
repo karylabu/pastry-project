@@ -29,6 +29,7 @@ class RecordUnclaimedOrderWasteTest extends TestCase
             $table->unsignedBigInteger('order_id');
             $table->string('product')->nullable();
             $table->integer('qty')->default(1);
+            $table->decimal('price', 10, 2)->nullable();
         });
         Schema::create('waste_log', function ($table) {
             $table->id();
@@ -69,6 +70,7 @@ class RecordUnclaimedOrderWasteTest extends TestCase
             'order_id' => 1,
             'product' => 'Customized Chocolate Cake',
             'qty' => 1,
+            'price' => 1250.75,
         ]);
         DB::table('orders')->insert([
             'id' => 2,
@@ -88,8 +90,42 @@ class RecordUnclaimedOrderWasteTest extends TestCase
             'reason' => 'Unclaimed after 3 days',
             'reference_type' => 'order_waste',
             'reference_id' => 1,
-            'unit' => 'order',
+            'unit' => 'pcs',
         ]);
+    }
+
+    public function test_it_records_each_order_product_separately_at_its_order_price(): void
+    {
+        DB::table('orders')->insert([
+            'id' => 1,
+            'status' => 'Ready for Pickup',
+            'total' => 3000,
+            'items' => '[]',
+            'ready_for_pickup_at' => now()->subDays(3),
+        ]);
+        DB::table('order_items')->insert([
+            ['order_id' => 1, 'product' => 'Choco Pistachio Dream', 'qty' => 2, 'price' => 800],
+            ['order_id' => 1, 'product' => 'Carrot Cake', 'qty' => 1, 'price' => 900],
+            ['order_id' => 1, 'product' => 'Chocolate Ganache Cake', 'qty' => 1, 'price' => 700],
+        ]);
+
+        $this->artisan('orders:record-unclaimed-waste')->assertExitCode(0);
+
+        $entries = DB::table('waste_log')->where('reference_id', 1)->orderBy('id')->get();
+        $this->assertCount(3, $entries);
+        $this->assertSame(
+            ['Choco Pistachio Dream', 'Carrot Cake', 'Chocolate Ganache Cake'],
+            $entries->pluck('item')->all()
+        );
+        $this->assertSame([2.0, 1.0, 1.0], $entries->map(fn ($entry) => (float) $entry->qty)->all());
+        $this->assertSame([1600.0, 900.0, 700.0], $entries->map(
+            fn ($entry) => round((float) $entry->qty * (float) $entry->unit_cost, 2)
+        )->all());
+        $this->assertSame(1, $entries->pluck('datetime')->unique()->count());
+        $this->assertSame(3, $entries->pluck('idempotency_key')->unique()->count());
+
+        $this->artisan('orders:record-unclaimed-waste')->assertExitCode(0);
+        $this->assertSame(3, DB::table('waste_log')->where('reference_id', 1)->count());
     }
 
     public function test_it_does_not_record_a_ready_order_before_the_three_day_deadline(): void

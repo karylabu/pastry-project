@@ -198,7 +198,9 @@ export default function WasteTracking() {
     return totals;
   }, { 'Raw Material': 0, 'Finished Product': 0 }), [periodEntries]);
   const wastedOrderCount = useMemo(
-    () => periodEntries.filter((entry) => entry.reference_type === 'order_waste').length,
+    () => new Set(periodEntries
+      .filter((entry) => entry.reference_type === 'order_waste')
+      .map((entry) => entry.reference_id)).size,
     [periodEntries]
   );
 
@@ -485,7 +487,7 @@ export default function WasteTracking() {
                             })}
                           </td>
                           <td className="px-5 py-4">
-                            <div className="flex items-center gap-2 text-[9px] font-semibold" style={{ color: C.ink, fontSize: "9px" }}>
+                            <div className="flex items-center gap-2 text-sm font-semibold leading-snug sm:text-[15px]" style={{ color: C.ink }}>
                               {e.item}
                               {flagged && (
                                 <span title="Frequent waste item — review safety stock">

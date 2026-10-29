@@ -16,36 +16,66 @@ use Throwable;
 
 class WasteLogController extends Controller
 {
-    public function index(Request $request, \App\Services\OrderWasteService $orderWaste): JsonResponse
+    public function index(Request $request): JsonResponse
     {
         if ($response = $this->authorizeOperationalStaff($request)) return $response;
 
         $wastes = WasteLog::query()->with(['ingredient:id,name,unit', 'batch:id,batch_number'])
             ->orderByDesc('datetime')->get();
-        $orderWasteIds = $wastes
-            ->where('reference_type', 'order_waste')
-            ->pluck('reference_id')
-            ->map(fn ($id) => (int) $id)
-            ->unique()
-            ->values()
-            ->all();
-        $orderItemNames = $orderWaste->itemNames($orderWasteIds);
 
-        $entries = $wastes->map(fn (WasteLog $waste) => [
+        $singleOrderWasteIds = $wastes
+            ->where('reference_type', 'order_waste')
+            ->groupBy('reference_id')
+            ->filter(fn ($rows) => $rows->count() === 1)
+            ->keys()
+            ->all();
+        $legacyOrderLines = collect();
+        if ($singleOrderWasteIds !== []
+            && Schema::hasTable('order_items')
+            && Schema::hasColumn('order_items', 'order_id')
+            && Schema::hasColumn('order_items', 'product')
+            && Schema::hasColumn('order_items', 'qty')
+            && Schema::hasColumn('order_items', 'price')) {
+            $legacyOrderLines = DB::table('order_items')
+                ->whereIn('order_id', $singleOrderWasteIds)
+                ->get(['order_id', 'product', 'qty', 'price'])
+                ->groupBy('order_id');
+        }
+
+        $entries = $wastes->flatMap(function (WasteLog $waste) use ($legacyOrderLines) {
+            $lines = $waste->reference_type === 'order_waste'
+                ? $legacyOrderLines->get($waste->reference_id, collect())
+                : collect();
+            $canExpandLegacyOrder = $lines->count() > 1
+                && $lines->every(fn ($line) => trim((string) $line->product) !== '' && $line->price !== null);
+            $entry = [
                 'id' => (int) $waste->id, 'datetime' => $waste->datetime,
-                'item' => $waste->reference_type === 'order_waste'
-                    ? ($orderItemNames[$waste->reference_id] ?? $waste->item)
-                    : $waste->item,
+                'item' => $waste->item,
                 'qty' => (float) $waste->qty,
                 'unit_cost' => (float) $waste->unit_cost,
                 'cost' => round((float) $waste->qty * (float) $waste->unit_cost, 2),
                 'type' => $waste->item_type, 'reason' => $waste->reason,
-                'unit' => $waste->reference_type === 'order_waste'
-                    ? 'order'
-                    : ($waste->ingredient?->unit ?? ($waste->item_type === 'Finished Product' ? 'pcs' : 'kg')),
+                'unit' => $waste->unit
+                    ?? ($waste->reference_type === 'order_waste'
+                        ? 'order'
+                        : ($waste->ingredient?->unit ?? ($waste->item_type === 'Finished Product' ? 'pcs' : 'kg'))),
                 'ingredient_id' => $waste->ingredient_id, 'ingredient_batch_id' => $waste->ingredient_batch_id,
                 'reference_type' => $waste->reference_type, 'reference_id' => $waste->reference_id,
-            ]);
+            ];
+
+            if (!$canExpandLegacyOrder) {
+                return [$entry];
+            }
+
+            return $lines->values()->map(fn ($line, $index) => array_replace($entry, [
+                'id' => "legacy-{$waste->id}-{$index}",
+                'item' => trim((string) $line->product),
+                'qty' => (float) max(1, (int) $line->qty),
+                'unit_cost' => (float) $line->price,
+                'cost' => round(max(1, (int) $line->qty) * (float) $line->price, 2),
+                'unit' => 'pcs',
+            ]));
+        })->values();
 
         return response()->json(['success' => true, 'entries' => $entries]);
     }
@@ -104,13 +134,14 @@ class WasteLogController extends Controller
                 'already_recorded' => $waste['already_recorded'],
                 'entry' => [
                     'id' => (int) $record->id,
+                    'datetime' => $record->datetime,
                     'item' => $record->item,
                     'qty' => (float) $record->qty,
                     'unit_cost' => (float) $record->unit_cost,
                     'cost' => round((float) $record->qty * (float) $record->unit_cost, 2),
                     'type' => $record->item_type,
                     'reason' => $record->reason,
-                    'unit' => 'order',
+                    'unit' => $record->unit ?? 'order',
                     'reference_type' => $record->reference_type,
                     'reference_id' => (int) $record->reference_id,
                 ],

@@ -64,7 +64,9 @@ test("waste audit log shows ten table entries per page", async () => {
   await within(table).findByText("Waste item 12");
   const auditLog = within(table);
   expect(auditLog.getAllByRole("row")).toHaveLength(11);
-  expect(auditLog.getByText("Waste item 12")).toBeInTheDocument();
+  const productName = auditLog.getByText("Waste item 12");
+  expect(productName).toBeInTheDocument();
+  expect(productName.closest("div")).toHaveClass("text-sm", "font-semibold");
   expect(auditLog.queryByText("Waste item 2")).not.toBeInTheDocument();
   expect(screen.getByText("Showing 1–10 of 12 entries")).toBeInTheDocument();
   expect(screen.getByText("Page 1 of 2")).toBeInTheDocument();
