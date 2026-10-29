@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import {
   Trash2,
-  DollarSign,
   TrendingUp,
   AlertTriangle,
   Package,
@@ -386,7 +385,7 @@ export default function WasteTracking() {
               <p className="mt-2 text-[10px] text-black/55">{wasteByType['Finished Product'].toFixed(1)} finished product units · {wastedOrderCount} orders · {periodLabel}</p>
             </div>
             <div className="rounded-lg border border-t-[3px] bg-white p-4" style={{ borderColor: C.border, borderTopColor: C.red }}>
-              <div className="flex items-center justify-between gap-2"><p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-black/55">Total financial loss</p><DollarSign size={16} className="text-[#b55f52]" /></div>
+              <div className="flex items-center justify-between gap-2"><p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-black/55">Total financial loss</p><span aria-hidden="true" className="text-[16px] font-semibold leading-none text-[#b55f52]">₱</span></div>
               <p className="mt-3 text-[24px] font-bold leading-none text-black">{formatPeso(totalFinancialLoss)}</p>
               <p className="mt-2 text-[10px] text-black/55">Quantity lost × estimated / recorded unit cost · {periodLabel}</p>
               <p className="mt-1 text-[10px] text-[#8a6208]">Reference prices are estimates; use supplier purchase costs for exact loss values.</p>
@@ -396,7 +395,7 @@ export default function WasteTracking() {
               {highestContributor ? <><p className="mt-3 truncate text-[20px] font-bold leading-tight text-black" title={highestContributor.name}>{highestContributor.name}</p><p className="mt-2 text-[10px] text-black/55">{highestContributor.qty.toFixed(1)} {highestContributor.unit} lost · {formatPeso(highestContributor.cost)} impact</p></> : <p className="mt-3 text-[12px] text-black/55">No waste logged yet.</p>}
             </div>
             <div className="rounded-lg border border-t-[3px] bg-white p-4" style={{ borderColor: C.border, borderTopColor: C.emerald }}>
-              <div className="flex items-center justify-between gap-2"><p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-black/55">Average waste cost</p><DollarSign size={16} className="text-[#81906c]" /></div>
+              <div className="flex items-center justify-between gap-2"><p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-black/55">Average waste cost</p><span aria-hidden="true" className="text-[16px] font-semibold leading-none text-[#81906c]">₱</span></div>
               <p className="mt-3 text-[24px] font-bold leading-none text-black">{averageWasteCost === null ? "Not available" : formatPeso(averageWasteCost)}</p>
               <p className="mt-2 text-[10px] text-black/55">Per completed order · {periodCompletedOrderCount} orders</p>
             </div>
