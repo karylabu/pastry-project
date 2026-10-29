@@ -833,7 +833,7 @@ export default function CustomCakes() {
             ))}
           </div>
 
-          <div className="admin-static-card admin-operations-controls mb-4 rounded-lg border border-[#e9e1d9] bg-white p-3 shadow-[0_3px_12px_rgba(60,42,28,0.035)] sm:p-4">
+          <div className="admin-static-card admin-operations-controls mb-4 rounded-lg border border-[#e9e1d9] bg-white p-3 shadow-[0_3px_12px_rgba(60,42,28,0.035)] sm:p-4 xl:min-h-[132px]">
             <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#65574d]">Request status</p>
               <label className="relative block w-full sm:max-w-[340px]">

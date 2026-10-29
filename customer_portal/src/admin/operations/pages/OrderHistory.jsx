@@ -386,7 +386,7 @@ export default function OrderHistory() {
           ))}
         </div>
 
-        <div className="admin-static-card admin-operations-controls mb-4 rounded-lg border border-[#e9e1d9] bg-white p-3 shadow-[0_3px_12px_rgba(60,42,28,0.035)] sm:p-4">
+        <div className="admin-static-card admin-operations-controls mb-4 rounded-lg border border-[#e9e1d9] bg-white p-3 shadow-[0_3px_12px_rgba(60,42,28,0.035)] sm:p-4 xl:min-h-[132px]">
           <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-[minmax(240px,1.4fr)_minmax(170px,1fr)_minmax(170px,1fr)]">
             <label className="relative block">
               <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#9b8c83]" aria-hidden="true" />
