@@ -213,7 +213,7 @@ export default function WasteTracking() {
 
   const topWastedItems = useMemo(() => {
     const byItem = {};
-    periodEntries.forEach((entry) => {
+    periodEntries.filter((entry) => entry.type === "Finished Product").forEach((entry) => {
       const current = byItem[entry.item] || { item: entry.item, qty: 0, cost: 0, unit: entry.unit };
       current.qty += entry.qty;
       current.cost += entry.cost;

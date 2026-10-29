@@ -59,8 +59,10 @@ test("waste audit log shows ten table entries per page", async () => {
 
   const topWastedIngredients = await screen.findByRole("heading", { name: "Top Wasted Ingredients" });
   const topWastedItems = await screen.findByRole("heading", { name: "Top Wasted Items" });
+  expect(within(topWastedIngredients.closest("section")).getByText("Waste item 11")).toBeInTheDocument();
   expect(within(topWastedIngredients.closest("section")).queryByText("Waste item 12")).not.toBeInTheDocument();
   expect(within(topWastedItems.closest("section")).getByText("Waste item 12")).toBeInTheDocument();
+  expect(within(topWastedItems.closest("section")).queryByText("Waste item 11")).not.toBeInTheDocument();
   expect(await screen.findAllByText("₱120.00")).toHaveLength(2);
   expect(document.body.textContent).not.toContain("$");
 
