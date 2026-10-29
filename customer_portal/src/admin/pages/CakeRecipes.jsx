@@ -239,35 +239,15 @@ export default function CakeRecipes() {
 
   const selectedFlavor = catalog.flavors.find((flavor) => String(flavor.id) === String(selectedFlavorId));
   const selectedRecipe = catalog.recipes.find((recipe) => String(recipe.flavor_id) === String(selectedFlavorId));
-  const savedRecipeCount = catalog.recipes.length;
-  const activeFlavorCount = catalog.flavors.filter((flavor) => flavor.active).length;
 
   return (
     <div className="min-h-screen bg-[#fbfaf5] px-4 pb-8 pt-[84px] text-[#33251e] sm:px-6 lg:pl-[284px] lg:pr-8">
       <div className="mx-auto max-w-[1440px] space-y-4">
-        <header className="mb-2 flex min-h-[72px] flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <header className="mb-2">
           <div className="max-w-2xl">
             <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.24em] text-[#92701e]">Production setup</p>
             <h1 className="font-serif text-[27px] leading-tight text-[#33251e]">Customize Cakes Recipes</h1>
             <p className="mt-1 text-[12px] leading-5 text-[#74675f]">Build and maintain ingredient recipes for customized cakes.</p>
-          </div>
-          <div className="grid w-full grid-cols-2 gap-2.5 sm:max-w-[440px]">
-            <div className="rounded-xl border border-t-[3px] border-[#eee4de] border-t-[#d4af37] bg-white p-3.5 shadow-[0_5px_18px_rgba(91,64,39,0.04)]">
-              <div className="flex items-center gap-2">
-                <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#fff4cd] text-[#9b7810]"><CakeSlice size={15} /></span>
-                <p className="text-[10px] font-semibold text-[#5d4a42]">Active flavors</p>
-              </div>
-              <p className="mt-2 text-[23px] font-bold leading-none text-[#33251e]">{activeFlavorCount}</p>
-              <p className="mt-1.5 text-[10px] text-[#9b8c83]">Available for custom orders</p>
-            </div>
-            <div className="rounded-xl border border-t-[3px] border-[#eee4de] border-t-[#81906c] bg-white p-3.5 shadow-[0_5px_18px_rgba(91,64,39,0.04)]">
-              <div className="flex items-center gap-2">
-                <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#edf5eb] text-[#4f7654]"><Package size={15} /></span>
-                <p className="text-[10px] font-semibold text-[#5d4a42]">Recipes saved</p>
-              </div>
-              <p className="mt-2 text-[23px] font-bold leading-none text-[#33251e]">{savedRecipeCount}</p>
-              <p className="mt-1.5 text-[10px] text-[#9b8c83]">Flavor recipes with ingredients</p>
-            </div>
           </div>
         </header>
 
