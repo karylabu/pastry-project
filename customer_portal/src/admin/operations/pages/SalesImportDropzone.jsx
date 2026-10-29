@@ -292,27 +292,27 @@ export default function SalesImportDropzone({
 
   if (compact) {
     return (
-      <div className="admin-sales-import-buttons grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="admin-sales-import-buttons grid grid-cols-1 gap-2 min-[400px]:grid-cols-2 min-[1024px]:grid-cols-4">
         <input ref={inputRef} type="file" accept=".csv,.pdf" className="hidden" onChange={onInputChange} />
-        <label className="col-span-full flex h-10 min-w-0 items-center gap-2 rounded-md border border-black/15 bg-white px-3 text-[10px] font-semibold text-black/70">
+        <label className="col-span-full flex min-h-10 min-w-0 flex-col items-stretch justify-center gap-1 rounded-md border border-black/15 bg-white px-3 py-2 text-[10px] font-semibold leading-tight text-black/70 sm:flex-row sm:items-center sm:gap-2">
           CSV overlap handling
           <select aria-label="CSV overlap handling" value={overlapMode} onChange={(event) => setOverlapMode(event.target.value)} className="min-w-0 flex-1 bg-transparent text-[10px] outline-none">
             <option value="deduplicate_live">Skip rows overlapping live orders</option>
             <option value="supplement">Add as additional sales (e.g. walk-ins)</option>
           </select>
         </label>
-        <button type="button" onClick={() => { chooseSalesType('customized_cake'); inputRef.current?.click(); }} disabled={isProcessing} className="inline-flex h-10 min-w-0 items-center justify-center gap-2 rounded-md bg-black px-3 text-[11px] font-semibold text-white transition hover:bg-black/85 disabled:cursor-wait disabled:opacity-60">
+        <button type="button" onClick={() => { chooseSalesType('customized_cake'); inputRef.current?.click(); }} disabled={isProcessing} className="inline-flex h-auto min-h-10 min-w-0 items-center justify-center gap-2 rounded-md bg-black px-3 py-2 text-center text-[10px] font-semibold leading-tight text-white transition hover:bg-black/85 disabled:cursor-wait disabled:opacity-60 sm:text-[11px]">
           {isProcessing ? <Loader2 size={14} className="animate-spin" /> : <UploadCloud size={14} />}
           {isProcessing ? 'Importing report...' : 'Import Customized Cake Sales'}
         </button>
-        <button type="button" onClick={() => { chooseSalesType('finished_product'); inputRef.current?.click(); }} disabled={isProcessing} className="inline-flex h-10 min-w-0 items-center justify-center gap-2 rounded-md bg-black px-3 text-[11px] font-semibold text-white transition hover:bg-black/85 disabled:cursor-wait disabled:opacity-60">
+        <button type="button" onClick={() => { chooseSalesType('finished_product'); inputRef.current?.click(); }} disabled={isProcessing} className="inline-flex h-auto min-h-10 min-w-0 items-center justify-center gap-2 rounded-md bg-black px-3 py-2 text-center text-[10px] font-semibold leading-tight text-white transition hover:bg-black/85 disabled:cursor-wait disabled:opacity-60 sm:text-[11px]">
           {isProcessing ? <Loader2 size={14} className="animate-spin" /> : <UploadCloud size={14} />}
           {isProcessing ? 'Importing report...' : 'Import Finished Product Sales'}
         </button>
         <button
           type="button"
           onClick={onDownloadCsvReport || (() => downloadCsvTemplate(range, dateFilterStart, dateFilterEnd))}
-          className="inline-flex h-10 min-w-0 items-center justify-center gap-2 rounded-md bg-black px-3 text-[11px] font-semibold text-white transition hover:bg-black/85"
+          className="inline-flex h-auto min-h-10 min-w-0 items-center justify-center gap-2 rounded-md bg-black px-3 py-2 text-center text-[10px] font-semibold leading-tight text-white transition hover:bg-black/85 sm:text-[11px]"
         >
           <Download size={14} />
           {onDownloadCsvReport ? 'Download CSV Report' : 'Download CSV template'}
@@ -321,7 +321,7 @@ export default function SalesImportDropzone({
           <button
             type="button"
             onClick={onDownloadPdfReport}
-            className="admin-sales-report-pdf-button inline-flex h-10 min-w-0 items-center justify-center gap-2 rounded-md bg-black px-3 text-[11px] font-semibold text-white transition hover:bg-black/85"
+            className="admin-sales-report-pdf-button inline-flex h-auto min-h-10 min-w-0 items-center justify-center gap-2 rounded-md bg-black px-3 py-2 text-center text-[10px] font-semibold leading-tight text-white transition hover:bg-black/85 sm:text-[11px]"
           >
             <Download size={15} />
             Download PDF Report
