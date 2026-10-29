@@ -327,6 +327,60 @@ function sendOrderStatusSms(?string $phone, int $orderId, string $status, bool $
     return ['sent' => true, 'error' => null];
 }
 
+function getOrderSmsPhone(mysqli $conn, array $orderRow, int $orderId): ?string {
+    $phone = trim((string) ($orderRow['phone'] ?? ''));
+    if ($phone !== '') {
+        return $phone;
+    }
+
+    foreach (['customized_cake_orders', 'custom_cake_orders'] as $table) {
+        $tableResult = $conn->query("SHOW TABLES LIKE '{$table}'");
+        if (!$tableResult || $tableResult->num_rows === 0) {
+            continue;
+        }
+        $tableResult->free();
+
+        $stmt = $conn->prepare("SELECT notes FROM {$table} WHERE order_id = ? ORDER BY id DESC LIMIT 1");
+        if (!$stmt) {
+            continue;
+        }
+        $stmt->bind_param('i', $orderId);
+        if (!$stmt->execute()) {
+            $stmt->close();
+            continue;
+        }
+        $row = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+        $details = json_decode((string) ($row['notes'] ?? ''), true);
+        if (!is_array($details)) {
+            continue;
+        }
+        foreach (['phone', 'phone_number', 'contact_number'] as $key) {
+            $phone = trim((string) ($details[$key] ?? ''));
+            if ($phone !== '') {
+                return $phone;
+            }
+        }
+    }
+
+    $userId = (int) ($orderRow['user_id'] ?? 0);
+    if ($userId > 0) {
+        $stmt = $conn->prepare('SELECT phone FROM users WHERE id = ? LIMIT 1');
+        if ($stmt) {
+            $stmt->bind_param('i', $userId);
+            if ($stmt->execute()) {
+                $row = $stmt->get_result()->fetch_assoc();
+                $phone = trim((string) ($row['phone'] ?? ''));
+                $stmt->close();
+                return $phone !== '' ? $phone : null;
+            }
+            $stmt->close();
+        }
+    }
+
+    return null;
+}
+
 /* =========================
     DATABASE
  ========================= */
@@ -1668,7 +1722,7 @@ try {
         default => null,
     };
     $smsResult = $oldStatus !== $status
-        ? sendOrderStatusSms($orderRow['phone'] ?? null, $id, $status, $isCustomCakeOrder, $notificationPaymentAmount, $refundSmsMessage)
+        ? sendOrderStatusSms(getOrderSmsPhone($conn, $orderRow, $id), $id, $status, $isCustomCakeOrder, $notificationPaymentAmount, $refundSmsMessage)
         : ['sent' => false, 'error' => 'Status did not change'];
 
     $conn->close();

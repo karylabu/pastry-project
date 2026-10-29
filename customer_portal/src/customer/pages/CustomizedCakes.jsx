@@ -616,6 +616,7 @@ export default function CustomizedCakes() {
       const laravelForm = new FormData();
       laravelForm.append('cake_type', payload.cake_type);
       laravelForm.append('user_id', String(payload.user_id || userId || 0));
+      laravelForm.append('phone', contactNumber);
       laravelForm.append('tiers', JSON.stringify(payload.tiers));
       laravelForm.append('order_id', '');
       laravelForm.append('notes', orderNotes);

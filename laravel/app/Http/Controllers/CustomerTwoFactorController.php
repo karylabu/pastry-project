@@ -42,8 +42,8 @@ class CustomerTwoFactorController extends Controller
             return response()->json(['success' => false, 'message' => 'Two-factor authentication is already enabled.'], 409);
         }
 
-        $method = (string) $request->input('method', 'authenticator');
-        if ($method !== 'authenticator') {
+        $method = strtolower((string) $request->input('method', 'authenticator'));
+        if (!in_array($method, ['authenticator', 'email', 'sms'], true)) {
             return response()->json(['success' => false, 'message' => 'Choose a valid verification method.'], 422);
         }
         if (!$delivery->isConfigured($method)) {

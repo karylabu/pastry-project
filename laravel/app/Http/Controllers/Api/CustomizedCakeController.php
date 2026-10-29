@@ -264,6 +264,10 @@ class CustomizedCakeController extends Controller
         }
 
         $payload = $request->all();
+        $validatedContact = $request->validate([
+            'phone' => 'sometimes|nullable|string|max:30',
+        ]);
+        $contactPhone = trim((string) ($validatedContact['phone'] ?? ''));
         $payload['user_id'] = (int) $user->id;
         $paymentMethod = trim((string) ($payload['payment_method'] ?? 'QR Ph'));
         $allowedPaymentMethods = ['QR Ph'];
@@ -278,6 +282,14 @@ class CustomizedCakeController extends Controller
         if (is_array($notes)) {
             $notes['payment_method'] = $paymentMethod;
             $payload['notes'] = json_encode($notes);
+        }
+        if ($contactPhone === '') {
+            $contactPhone = trim((string) (
+                $notes['phone'] ?? $notes['phone_number'] ?? $notes['contact_number'] ?? ''
+            ));
+        }
+        if ($contactPhone === '') {
+            $contactPhone = trim((string) ($user->phone ?? ''));
         }
         $deliveryMethod = strtolower(trim((string) ($notes['delivery_method'] ?? 'pickup')));
         $isDeliveryOrder = in_array($deliveryMethod, ['delivery', 'deliver'], true);
@@ -423,7 +435,7 @@ class CustomizedCakeController extends Controller
                 $uploadedImages[] = $referenceImage;
             }
 
-            $customizedCakeOrderId = DB::transaction(function () use ($cakeType, $tiers, $payload, $uploadedImages, $user, $paymentMethod, $notes, $isDeliveryOrder, $deliveryService) {
+            $customizedCakeOrderId = DB::transaction(function () use ($cakeType, $tiers, $payload, $uploadedImages, $user, $paymentMethod, $notes, $isDeliveryOrder, $deliveryService, $contactPhone) {
                 if (!$this->requestSetting->enabled(true)) {
                     return null;
                 }
@@ -446,7 +458,7 @@ class CustomizedCakeController extends Controller
                         'delivery_time' => $notes['pickup_time'] ?? null,
                         'payment' => $paymentMethod,
                         'address' => $isDeliveryOrder ? ($notes['delivery_address'] ?? '') : '',
-                        'phone' => $user->phone ?? '',
+                        'phone' => $contactPhone,
                         'customer' => $user->name,
                         'email' => $user->email,
                         'user_id' => $user->id,

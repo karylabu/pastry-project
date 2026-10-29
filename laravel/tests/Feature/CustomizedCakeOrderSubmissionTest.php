@@ -182,6 +182,31 @@ class CustomizedCakeOrderSubmissionTest extends TestCase
             ->assertJsonPath('orders.0.is_customized', true);
     }
 
+    public function test_customer_custom_cake_request_saves_submitted_phone_for_status_sms(): void
+    {
+        $customer = new User();
+        $customer->id = 1;
+        $customer->name = 'Customer';
+        $customer->email = 'customer@example.test';
+        $customer->role = 'customer';
+        $customer->status = 'active';
+
+        $this->actingAs($customer)
+            ->postJson('http://localhost/api/customized-cakes/order', [
+                'cake_type' => 'single',
+                'tiers' => [['flavor_id' => 1, 'size_id' => 1]],
+                'payment_method' => 'QR Ph',
+                'notes' => json_encode(['phone' => '09123456789']),
+            ])
+            ->assertOk()
+            ->assertJsonPath('success', true);
+
+        $this->assertDatabaseHas('orders', [
+            'id' => 1,
+            'phone' => '09123456789',
+        ]);
+    }
+
     public function test_custom_cake_delivery_service_and_method_are_saved_to_order(): void
     {
         $customer = new User();

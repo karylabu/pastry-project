@@ -493,19 +493,59 @@ class CustomerAuthApiTest extends TestCase
         $this->assertCount(2, $sentCodes);
     }
 
-    public function test_customer_two_factor_setup_only_accepts_authenticator_method(): void
+    public function test_customer_two_factor_setup_accepts_supported_methods_when_configured(): void
     {
         $this->withoutMiddleware(\Illuminate\Routing\Middleware\ThrottleRequests::class);
         $this->seedCustomer();
         $this->withHeader('X-Auth-Token', 'test-customer-token');
 
-        foreach (['email', 'sms'] as $method) {
-            $this->postJson('http://localhost/api/customer/two-factor/setup', ['method' => $method])
-                ->assertUnprocessable()
-                ->assertJsonPath('success', false);
-        }
+        $emailDelivery = \Mockery::mock(\App\Services\CustomerTwoFactorDelivery::class);
+        $emailDelivery->shouldReceive('isConfigured')->with('email')->once()->andReturn(true);
+        $emailDelivery->shouldReceive('send')->once()->with(
+            'email',
+            'customer@example.com',
+            null,
+            \Mockery::type('string'),
+            'setup'
+        );
+        $emailDelivery->shouldReceive('destination')->once()->with(
+            'email',
+            'customer@example.com',
+            null
+        )->andReturn('c***@example.com');
+        $this->app->instance(\App\Services\CustomerTwoFactorDelivery::class, $emailDelivery);
+        $this->postJson('http://localhost/api/customer/two-factor/setup', ['method' => 'email'])
+            ->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('method', 'email');
 
-        $this->assertDatabaseMissing('customer_two_factor', ['user_id' => 7]);
+        $this->assertDatabaseHas('customer_two_factor', ['user_id' => 7, 'pending_method' => 'email']);
+
+        DB::table('customer_two_factor')->where('user_id', 7)->delete();
+        RateLimiter::clear('customer-two-factor:7:setup');
+        DB::table('users')->where('id', 7)->update(['phone' => '09123456789']);
+
+        config(['services.iprogsms.api_token' => 'test-provider-token']);
+        Http::fake(fn () => Http::response([], 200));
+        $this->app->instance(
+            \App\Services\CustomerTwoFactorDelivery::class,
+            new \App\Services\CustomerTwoFactorDelivery()
+        );
+
+        $this->postJson('http://localhost/api/customer/two-factor/setup', ['method' => 'sms'])
+            ->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('method', 'sms')
+            ->assertJsonPath('destination', '••••6789');
+        Http::assertSent(function (\Illuminate\Http\Client\Request $request) {
+            return $request->url() === 'https://www.iprogsms.com/api/v1/sms_messages'
+                && $request['api_token'] === 'test-provider-token'
+                && $request['phone_number'] === '639123456789';
+        });
+
+        $this->postJson('http://localhost/api/customer/two-factor/setup', ['method' => 'totp'])
+            ->assertUnprocessable()
+            ->assertJsonPath('success', false);
     }
 
     public function test_totp_code_matches_the_rfc_6238_sha1_vector(): void
