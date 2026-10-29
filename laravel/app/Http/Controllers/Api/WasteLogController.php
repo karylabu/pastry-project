@@ -34,20 +34,64 @@ class WasteLogController extends Controller
             && Schema::hasTable('order_items')
             && Schema::hasColumn('order_items', 'order_id')
             && Schema::hasColumn('order_items', 'product')
-            && Schema::hasColumn('order_items', 'qty')
-            && Schema::hasColumn('order_items', 'price')) {
+            && Schema::hasColumn('order_items', 'qty')) {
+            $columns = ['order_id', 'product', 'qty'];
+            $hasItemPrice = Schema::hasColumn('order_items', 'price');
+            if ($hasItemPrice) {
+                $columns[] = 'price';
+            }
             $legacyOrderLines = DB::table('order_items')
                 ->whereIn('order_id', $singleOrderWasteIds)
-                ->get(['order_id', 'product', 'qty', 'price'])
+                ->get($columns)
                 ->groupBy('order_id');
+        }
+        if ($singleOrderWasteIds !== []
+            && Schema::hasTable('orders')
+            && Schema::hasColumn('orders', 'items')) {
+            $legacyOrders = DB::table('orders')
+                ->whereIn('id', $singleOrderWasteIds)
+                ->get(['id', 'items']);
+            foreach ($legacyOrders as $order) {
+                if ($legacyOrderLines->has($order->id)) {
+                    continue;
+                }
+                $decodedItems = json_decode((string) $order->items, true);
+                if (!is_array($decodedItems)) {
+                    continue;
+                }
+                $lines = collect($decodedItems)->map(function ($item) {
+                    if (!is_array($item)) {
+                        return null;
+                    }
+                    $name = trim((string) ($item['name'] ?? $item['product'] ?? ''));
+                    if ($name === '') {
+                        return null;
+                    }
+
+                    $line = [
+                        'product' => $name,
+                        'qty' => max(1, (int) ($item['qty'] ?? $item['quantity'] ?? 1)),
+                    ];
+                    $price = $item['price'] ?? $item['unit_price'] ?? null;
+                    if (is_numeric($price)) {
+                        $line['price'] = (float) $price;
+                    }
+                    return (object) $line;
+                })->filter()->values();
+                if ($lines->isNotEmpty()) {
+                    $legacyOrderLines->put($order->id, $lines);
+                }
+            }
         }
 
         $entries = $wastes->flatMap(function (WasteLog $waste) use ($legacyOrderLines) {
             $lines = $waste->reference_type === 'order_waste'
                 ? $legacyOrderLines->get($waste->reference_id, collect())
                 : collect();
-            $canExpandLegacyOrder = $lines->count() > 1
-                && $lines->every(fn ($line) => trim((string) $line->product) !== '' && $line->price !== null);
+            $canExpandLegacyOrder = $lines->isNotEmpty()
+                && $lines->every(fn ($line) => trim((string) $line->product) !== ''
+                    && isset($line->price)
+                    && $line->price !== null);
             $entry = [
                 'id' => (int) $waste->id, 'datetime' => $waste->datetime,
                 'item' => $waste->item,
@@ -64,6 +108,17 @@ class WasteLogController extends Controller
             ];
 
             if (!$canExpandLegacyOrder) {
+                if ($lines->isNotEmpty()
+                    && preg_match('/^Order ID\s*#?\s*\d+$/i', trim((string) $entry['item']))) {
+                    $names = $lines
+                        ->map(fn ($line) => trim((string) $line->product))
+                        ->filter()
+                        ->unique()
+                        ->values();
+                    if ($names->isNotEmpty()) {
+                        $entry['item'] = $names->implode(', ');
+                    }
+                }
                 return [$entry];
             }
 

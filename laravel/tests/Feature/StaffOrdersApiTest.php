@@ -473,7 +473,15 @@ class StaffOrdersApiTest extends TestCase
 
         DB::table('waste_log')->where('reference_type', 'order_waste')
             ->where('reference_id', 51)
-            ->update(['item' => 'Chocolate Cake']);
+            ->update(['item' => 'Order ID #51']);
+        DB::table('order_items')->where('order_id', 51)->delete();
+        DB::table('orders')->where('id', 51)->update([
+            'items' => json_encode([[
+                'name' => 'Chocolate Cake',
+                'qty' => 2,
+                'price' => 437.75,
+            ]]),
+        ]);
 
         $this->withHeader('Authorization', 'Bearer test-admin-token')
             ->getJson('/api/staff/inventory/waste')
