@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Bell, Building2, Check, Clock3, Eye, EyeOff, KeyRound, LogOut, Save, UserCircle2 } from "lucide-react";
+import { Archive, Bell, Building2, Check, Clock3, Eye, EyeOff, KeyRound, LogOut, Save, Trash2, UserCircle2 } from "lucide-react";
 import { LARAVEL_BASE } from "../../services/config";
 import { getAuthHeaders } from "../../services/api";
 
@@ -225,7 +225,11 @@ export default function Settings() {
                 <span className="text-[#8f8076]">· {user?.role || "admin"}</span>
               </div>
               <button type="button" onClick={() => setLogoutConfirmOpen(true)} className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-[#efd8d4] px-3 text-[11px] font-semibold text-[#8d5357] transition hover:bg-[#fff0f0]"><LogOut size={14} /> Log out</button>
-              <button type="button" onClick={savePreferences} disabled={settingsLoading || !settingsLoaded || savingPreferences} className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-[#33251e] px-4 text-[12px] font-semibold text-white transition hover:bg-[#5b4540] disabled:cursor-not-allowed disabled:opacity-60"><Save size={15} /> {settingsLoading ? "Loading settings..." : savingPreferences ? "Saving..." : settingsLoaded ? "Save settings" : "Settings unavailable"}</button>
+              <div className="flex flex-wrap gap-2">
+                <button type="button" className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-[#e8dfd4] bg-white px-3 text-[11px] font-semibold text-[#65574d] transition hover:border-[#c9a94f] hover:bg-[#fffaf0]"><Archive size={14} /> Backup</button>
+                <button type="button" className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-[#efd8d4] bg-white px-3 text-[11px] font-semibold text-[#8d5357] transition hover:bg-[#fff0f0]"><Trash2 size={14} /> Recycle Bin</button>
+                <button type="button" onClick={savePreferences} disabled={settingsLoading || !settingsLoaded || savingPreferences} className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-[#33251e] px-4 text-[12px] font-semibold text-white transition hover:bg-[#5b4540] disabled:cursor-not-allowed disabled:opacity-60"><Save size={15} /> {settingsLoading ? "Loading settings..." : savingPreferences ? "Saving..." : settingsLoaded ? "Save settings" : "Settings unavailable"}</button>
+              </div>
             </div>
           </div>
 
