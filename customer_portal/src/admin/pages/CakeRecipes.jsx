@@ -241,7 +241,7 @@ export default function CakeRecipes() {
   const selectedRecipe = catalog.recipes.find((recipe) => String(recipe.flavor_id) === String(selectedFlavorId));
 
   return (
-    <div className="min-h-screen bg-[#fbfaf5] px-4 pb-8 pt-[96px] text-[#33251e] sm:px-6 lg:pl-[284px] lg:pr-8">
+    <div className="min-h-screen bg-[#fbfaf5] px-4 pb-8 pt-[108px] text-[#33251e] sm:px-6 lg:pl-[284px] lg:pr-8">
       <div className="mx-auto max-w-[1440px] space-y-4">
         <header className="mb-2">
           <div className="max-w-2xl">
