@@ -361,7 +361,7 @@ export default function Promotions() {
 
                   <label className="block">
                     <span className="mb-1.5 block text-[10px] font-semibold uppercase tracking-[0.16em] text-black/55">Coupon code</span>
-                    <div className="flex h-10 items-center gap-2 rounded-md border border-[#e8dfd4] bg-white px-3 focus-within:border-[#b89646] focus-within:bg-[#fffaf0] focus-within:ring-2 focus-within:ring-[#d4af37]/15">
+                    <div className="flex h-10 items-center gap-2 rounded-md border border-[#e8dfd4] bg-white px-3">
                       <Tag size={15} className="text-black/40" />
                       <input
                         type="text"
