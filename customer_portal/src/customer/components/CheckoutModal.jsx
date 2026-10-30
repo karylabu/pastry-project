@@ -103,6 +103,7 @@ export default function CheckoutModal({
 }) {
   const [loading, setLoading] = useState(false);
   const [fieldErrors, setFieldErrors] = useState({});
+  const [orderError, setOrderError] = useState('');
   const [shopOpen, setShopOpen] = useState(null);
   const [shopStatusError, setShopStatusError] = useState(false);
   const [shopSettings, setShopSettings] = useState(DEFAULT_SHOP_SETTINGS);
@@ -615,6 +616,7 @@ export default function CheckoutModal({
      PLACE ORDER
   ========================= */
   const handlePlaceOrder = async () => {
+    setOrderError('');
 
     if (shopOpen !== true) {
       if (shopOpen === null && shopStatusError) {
@@ -782,7 +784,7 @@ export default function CheckoutModal({
         try {
           const errorResult = JSON.parse(text);
           if (errorResult.message?.includes('stock available')) {
-            alert(errorResult.message);
+            setOrderError(errorResult.message);
             return;
           }
         } catch {
@@ -1670,6 +1672,12 @@ export default function CheckoutModal({
                   <span>{checkoutData.pickupPaymentType === "downpayment" ? "Pay now (50% downpayment)" : "Pay now (full payment)"}</span>
                   <span>₱{(checkoutData.pickupPaymentType === "downpayment" ? total * 0.5 : total).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                 </div>
+              )}
+
+              {orderError && (
+                <p role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-xs font-medium leading-5 text-red-700">
+                  {orderError}
+                </p>
               )}
 
               <button
