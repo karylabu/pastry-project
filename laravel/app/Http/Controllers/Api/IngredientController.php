@@ -76,6 +76,7 @@ class IngredientController extends Controller
 
                 return $ingredient->fresh();
             });
+            app(\App\Services\RealtimeEventPublisher::class)->inventoryUpdated();
 
             return response()->json([
                 'success' => true,
@@ -133,6 +134,7 @@ class IngredientController extends Controller
                 $updates['unit_cost'] = (float) $validated['unit_cost'];
             }
             $ingredient->update($updates);
+            app(\App\Services\RealtimeEventPublisher::class)->inventoryUpdated();
 
             return response()->json([
                 'success' => true,
@@ -170,6 +172,7 @@ class IngredientController extends Controller
 
         try {
             $entryId = $recycleBin->trashIngredient((int) $ingredient->id);
+            app(\App\Services\RealtimeEventPublisher::class)->inventoryUpdated();
 
             return response()->json([
                 'success' => true,
@@ -222,7 +225,7 @@ class IngredientController extends Controller
         ]);
 
         try {
-            return DB::transaction(function () use ($ingredient, $validated, $user) {
+            $response = DB::transaction(function () use ($ingredient, $validated, $user) {
                 $action = $validated['action'];
                 $qty = (float) $validated['qty'];
                 $note = trim((string) ($validated['note'] ?? ''));
@@ -242,6 +245,10 @@ class IngredientController extends Controller
                     return $this->handleManualStockOut($lockedIngredient, $qty, $note, $user);
                 }
             });
+            if ($response->getStatusCode() < 400 && (($response->getData()->success ?? false) === true)) {
+                app(\App\Services\RealtimeEventPublisher::class)->inventoryUpdated();
+            }
+            return $response;
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,

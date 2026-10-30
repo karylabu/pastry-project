@@ -17,6 +17,11 @@ class RealtimeEventPublisher
         $this->publish('chat.updated', $userId, $orderId, $conversationId);
     }
 
+    public function inventoryUpdated(): void
+    {
+        $this->publish('inventory.updated', 0, 0);
+    }
+
     private function publish(string $eventName, int $userId, int $orderId, string $conversationId = ''): void
     {
         $events = [['audience' => 'admins', 'user_id' => null]];
