@@ -349,7 +349,6 @@ export default function Dashboard() {
     (max, ingredient) => Math.max(max, Number(ingredient.quantity || 0)),
     0,
   );
-  const wasteAnalytics = analytics?.wasteAnalytics || {};
   const businessInsights = analytics?.businessInsights || [];
   const now = new Date();
   const greeting = now.getHours() < 12 ? "morning" : now.getHours() < 18 ? "afternoon" : "evening";
@@ -546,7 +545,7 @@ export default function Dashboard() {
                   </Panel>
                 </div>
 
-                <div className="grid items-stretch gap-3 lg:grid-cols-2">
+                <div className="grid items-stretch gap-3">
                   <Panel eyebrow="Business Insights" title="What the data suggests" className="flex h-full flex-col">
                     <div className="space-y-2 p-4">
                       {businessInsights.map((insight, index) => (
@@ -558,108 +557,6 @@ export default function Dashboard() {
                         </div>
                       ))}
                     </div>
-                  </Panel>
-
-                  <Panel eyebrow="Ingredient & Waste Analytics" title="Waste and ingredient loss insights" className="flex h-full flex-col">
-                    {Number(wasteAnalytics.records || 0) === 0 ? (
-                      <div className="flex flex-1 flex-col justify-center p-4">
-                        <div className="rounded-xl border border-dashed border-[#eadfd8] bg-[#fcfaf7] px-4 py-7 text-center">
-                          <span className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-[#fff4cd] text-[#9b7810]">
-                            <AlertTriangle size={18} aria-hidden="true" />
-                          </span>
-                          <p className="mt-3 text-[13px] font-semibold text-[#5f514a]">No waste recorded</p>
-                          <p className="mx-auto mt-1 max-w-xs text-[11px] leading-5 text-[#9b8c83]">
-                            Nothing was logged as wasted in this period. Waste insights will appear here when records are added.
-                          </p>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="flex flex-1 flex-col gap-3 p-4">
-                        <div className="grid gap-3 sm:grid-cols-2">
-                          <div className="rounded-xl border border-[#eadfd8] bg-[#fcfaf7] p-4">
-                            <div className="flex items-center justify-between gap-3">
-                              <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#9b8c83]">Waste records</p>
-                              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#fff4cd] text-[#9b7810]">
-                                <AlertTriangle size={15} aria-hidden="true" />
-                              </span>
-                            </div>
-                            <p className="mt-3 text-[24px] font-bold leading-none text-[#33251e]">{Number(wasteAnalytics.records).toLocaleString()}</p>
-                            <p className="mt-1.5 text-[10px] text-[#9b8c83]">logged in this period</p>
-                          </div>
-                          <div className="rounded-xl border border-[#eadfd8] bg-[#fcfaf7] p-4">
-                            <div className="flex items-center justify-between gap-3">
-                              <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#9b8c83]">Waste value</p>
-                              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#f7ebe5] text-[#a65f44]">
-                                <Package size={15} aria-hidden="true" />
-                              </span>
-                            </div>
-                            <p className="mt-3 break-words text-[24px] font-bold leading-none text-[#33251e]">₱{Number(wasteAnalytics.waste_value || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
-                            <p className="mt-1.5 text-[10px] text-[#9b8c83]">estimated ingredient loss</p>
-                          </div>
-                        </div>
-
-                        {(wasteAnalytics.total_by_unit || []).length > 0 && (
-                          <div className="rounded-xl border border-[#eadfd8] p-4">
-                            <div className="flex items-center justify-between gap-3">
-                              <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#9b8c83]">Waste quantity</p>
-                              <span className="text-[10px] text-[#9b8c83]">by unit</span>
-                            </div>
-                            <div className="mt-3 flex flex-wrap gap-2">
-                              {wasteAnalytics.total_by_unit.map((item) => (
-                                <span key={item.unit} className="inline-flex items-baseline gap-1.5 rounded-lg bg-[#fff8e9] px-3 py-2 text-[11px] text-[#80600a]">
-                                  <span className="text-[13px] font-bold">{Number(item.quantity).toLocaleString()}</span>
-                                  <span className="font-medium">{item.unit}</span>
-                                </span>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-
-                        {(() => {
-                          const reasons = wasteAnalytics.by_reason || [];
-                          const maxQty = Math.max(1, ...reasons.map((r) => Number(r.quantity || 0)));
-                          return (
-                            <div className="rounded-xl border border-[#eadfd8] p-4">
-                              <div className="flex items-center justify-between gap-3">
-                                <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#9b8c83]">Waste reasons</p>
-                                <span className="text-[10px] text-[#9b8c83]">{reasons.length} {reasons.length === 1 ? "reason" : "reasons"}</span>
-                              </div>
-                              <div className="mt-3 space-y-3">
-                                {reasons.map((reason) => (
-                                  <div key={reason.reason || "unspecified"}>
-                                    <div className="mb-1 flex items-center justify-between gap-3 text-[11px]">
-                                      <span className="min-w-0 truncate text-[#5f514a]">{reason.reason || "Unspecified"}</span>
-                                      <span className="shrink-0 font-semibold text-[#33251e]">{Number(reason.quantity).toLocaleString()}</span>
-                                    </div>
-                                    <div className="h-2 overflow-hidden rounded-full bg-[#f4ece6]">
-                                      <div className="h-full rounded-full bg-[#c87954]" style={{ width: `${(Number(reason.quantity || 0) / maxQty) * 100}%` }} />
-                                    </div>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          );
-                        })()}
-
-                        {(wasteAnalytics.high_waste_low_stock || []).length > 0 && (
-                          <div>
-                            <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#9b8c83]">High waste + low stock</p>
-                            <div className="grid gap-2 sm:grid-cols-2">
-                              {wasteAnalytics.high_waste_low_stock.slice(0, 4).map((item) => (
-                                <div key={item.name} className="rounded-xl border border-[#eadfca] bg-[#fff8e9] p-3">
-                                  <p className="truncate text-[12px] font-semibold text-[#5f514a]" title={item.name}>{item.name}</p>
-                                  <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px]">
-                                    <span className="font-semibold text-[#a65f44]">{Number(item.quantity).toLocaleString()} {item.unit} wasted</span>
-                                    <span className="text-[#c7b5a8]" aria-hidden="true">·</span>
-                                    <span className="text-[#8d6a2e]">{Number(item.current_stock).toLocaleString()} {item.unit} left</span>
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    )}
                   </Panel>
                 </div>
 
