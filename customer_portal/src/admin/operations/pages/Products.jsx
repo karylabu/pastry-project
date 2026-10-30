@@ -48,8 +48,12 @@ const getDefaultProductionSize = (product) => {
 
 const getProductSizeForCategory = (product, category) => {
   const sizeName = category === "Small Cakes" ? "small" : "big";
+  return getProductSizeByName(product, sizeName);
+};
+
+const getProductSizeByName = (product, sizeName) => {
   return getProductSizeOptions(product).find((size) =>
-    String(size?.size || size?.variant_size || '').trim().toLowerCase() === sizeName
+    String(size?.size || size?.variant_size || '').trim().toLowerCase() === String(sizeName).toLowerCase()
   ) || null;
 };
 
@@ -64,9 +68,7 @@ const getProductBasePrice = (product) => {
 
 const getProductPriceForSize = (product, category) => {
   const sizeName = category === "Small Cakes" ? "small" : "big";
-  const sizeOption = getProductSizeOptions(product).find((size) =>
-    String(size?.size || size?.variant_size || '').trim().toLowerCase() === sizeName
-  );
+  const sizeOption = getProductSizeByName(product, sizeName);
   const sizePrice = [sizeOption?.price, product?.[`${sizeName}_price`]]
     .map(Number)
     .find((value) => Number.isFinite(value) && value > 0);
@@ -85,6 +87,8 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
   const [adminDialog, setAdminDialog] = useState(null);
 
   const [selectedProduct, setSelectedProduct] = useState(null);
+  const [cardSizeSelections, setCardSizeSelections] = useState({});
+  const [inventorySizeName, setInventorySizeName] = useState("");
   const [qty, setQty] = useState("");
   const [updateError, setUpdateError] = useState(null);
   const [feedback, setFeedback] = useState(null);
@@ -160,6 +164,8 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
   const navigate = useNavigate();
   const [activeCat, setActiveCat] = useState(allowCatalogManagement ? catalogCategory : "All");
   const canManageCatalog = Boolean(allowCatalogManagement);
+  const getCardSizeName = (product) => cardSizeSelections[product.id]
+    || (getProductSizeByName(product, "small") ? "small" : "big");
   const canEditCatalog = Boolean(allowCatalogManagement);
   const editRecipeSize = editProduct ? getProductSizeForCategory(editProduct, activeCat) : null;
   const editRecipeSizeId = editRecipeSize?.id ? String(editRecipeSize.id) : "";
@@ -523,7 +529,7 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
         throw new Error("Stock history returned an invalid response. Please refresh and try again.");
       }
       if (!res.ok || !data?.success) throw new Error(data?.message || "Unable to load stock history.");
-      setHistoryEntries(Array.isArray(data.history) ? data.history : []);
+      setHistoryEntries(Array.isArray(data.history) ? data.history.filter((entry) => entry?.admin) : []);
     } catch (error) {
       setHistoryEntries([]);
       setHistoryError(error.message || "Unable to load stock history.");
@@ -532,8 +538,9 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
     }
   };
 
-  const openInventoryModal = (product, action) => {
+  const openInventoryModal = (product, action, sizeName = activeCat === "Small Cakes" ? "small" : "big") => {
     setSelectedProduct(product);
+    setInventorySizeName(sizeName);
     setActiveModal(action);
     setQty("");
     setBomQty(1);
@@ -546,7 +553,7 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
     if (action === "produce") {
       setRecipeLines([]);
       const defaultSize = canManageCatalog
-        ? getProductSizeForCategory(product, activeCat)
+        ? getProductSizeByName(product, sizeName)
         : product.production_size_id
         ? getProductSizeOptions(product).find((size) => Number(size.id) === Number(product.production_size_id))
         : getDefaultProductionSize(product);
@@ -656,9 +663,9 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
       return;
     }
 
-    const selectedSize = canManageCatalog ? getProductSizeForCategory(selectedProduct, activeCat) : null;
+    const selectedSize = canManageCatalog ? getProductSizeByName(selectedProduct, inventorySizeName) : null;
     if (canManageCatalog && !selectedSize?.id) {
-      setUpdateError(`No ${activeCat === "Small Cakes" ? "small" : "big"} cake size is configured for this product.`);
+      setUpdateError(`No ${inventorySizeName} cake size is configured for this product.`);
       return;
     }
 
@@ -711,8 +718,8 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
   /* =========================
      STOCK COLORS
   ========================= */
-  const getStockStatus = (product) => {
-    const size = canManageCatalog ? getProductSizeForCategory(product, activeCat) : null;
+  const getStockStatus = (product, sizeName) => {
+    const size = canManageCatalog ? getProductSizeByName(product, sizeName || (activeCat === "Small Cakes" ? "small" : "big")) : null;
     const stock = canManageCatalog ? Number(size?.stock_quantity ?? 0) : Number(product.stock || 0);
     const minimum = Number(size?.threshold ?? product.minimum_stock ?? 0);
     if (stock <= 0) return { label: "Out of Stock", icon: <CircleX size={12} aria-hidden="true" />, classes: "bg-[#FEE2E2] text-[#991B1B]" };
@@ -720,17 +727,18 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
     return { label: "In Stock", icon: <CircleCheck size={12} aria-hidden="true" />, classes: "bg-[#DCFCE7] text-[#166534]" };
   };
 
-  const getDisplayedStock = (product) => {
-    const size = canManageCatalog ? getProductSizeForCategory(product, activeCat) : null;
+  const getDisplayedStock = (product, sizeName) => {
+    const size = canManageCatalog ? getProductSizeByName(product, sizeName || (activeCat === "Small Cakes" ? "small" : "big")) : null;
     return canManageCatalog ? Number(size?.stock_quantity ?? 0) : Number(product.stock ?? 0);
   };
 
-  const getProductionStatus = (product) => {
+  const getProductionStatus = (product, sizeName) => {
     if (canManageCatalog) {
-      const size = getProductSizeForCategory(product, activeCat);
+      const selectedSizeName = sizeName || (activeCat === "Small Cakes" ? "small" : "big");
+      const size = getProductSizeByName(product, selectedSizeName);
       return size
         ? { is_producible: Boolean(size.is_producible), reason: size.availability_reason }
-        : { is_producible: false, reason: `No ${activeCat === "Small Cakes" ? "small" : "big"} cake size is configured.` };
+        : { is_producible: false, reason: `No ${selectedSizeName} cake size is configured.` };
     }
 
     const size = getProductSizeOptions(product).find((option) => Number(option.id) === Number(product.production_size_id))
@@ -744,9 +752,9 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
     };
   };
 
-  const getSelectedInventoryStock = (product) => {
+  const getSelectedInventoryStock = (product, sizeName = inventorySizeName) => {
     if (canManageCatalog) {
-      return Number(getProductSizeForCategory(product, activeCat)?.stock_quantity ?? 0);
+      return Number(getProductSizeByName(product, sizeName)?.stock_quantity ?? 0);
     }
     return Number(product.stock ?? 0);
   };
@@ -814,28 +822,27 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
         {/* =========================
             CATEGORY FILTER + SEARCH + ACTIONS
         ========================= */}
-        <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
+        <div className={`mb-6 flex flex-wrap items-center gap-4 ${canManageCatalog ? "justify-end" : "justify-between"}`}>
 
-          <div className="flex flex-wrap gap-2 overflow-x-auto pb-1 -mx-1 px-1">
-            {categories.map((cat) => (
-              <button
-                key={cat}
-                onClick={() => {
-                  setActiveCat(cat);
-                  if (canManageCatalog) setNewProduct((current) => ({ ...current, category: "Cakes" }));
-                }}
-                className={`flex-none px-4 py-1.5 rounded-full text-[11px] tracking-[0.22em] border transition ${
-                  activeCat === cat
-                    ? "border-[#33251e] bg-[#33251e] text-white"
-                    : "border-[#eadfd8] bg-white text-[#765d50] hover:border-[#e7c875] hover:bg-[#fff8df]"
-                }`}
-              >
-                {canManageCatalog && cat === "Cakes" ? "Big Cakes" : cat}
-              </button>
-            ))}
-          </div>
+          {!canManageCatalog && (
+            <div className="flex flex-wrap gap-2 overflow-x-auto pb-1 -mx-1 px-1">
+              {categories.map((cat) => (
+                <button
+                  key={cat}
+                  onClick={() => setActiveCat(cat)}
+                  className={`flex-none px-4 py-1.5 rounded-full text-[11px] tracking-[0.22em] border transition ${
+                    activeCat === cat
+                      ? "border-[#33251e] bg-[#33251e] text-white"
+                      : "border-[#eadfd8] bg-white text-[#765d50] hover:border-[#e7c875] hover:bg-[#fff8df]"
+                  }`}
+                >
+                  {cat}
+                </button>
+              ))}
+            </div>
+          )}
 
-          <div className="flex min-w-[280px] flex-wrap items-center justify-end gap-3">
+          <div className={`flex min-w-[280px] flex-wrap items-center justify-end gap-3`}>
             <form onSubmit={handleSearchSubmit} className="min-w-[220px] w-full sm:w-[340px]">
               <label className="sr-only" htmlFor="staff-product-search">
                 Search products
@@ -876,16 +883,20 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
               <button
                 type="button"
                 onClick={() => setViewMode("cards")}
-                className={`rounded-lg px-3 py-2 text-[11px] font-semibold transition ${viewMode === "cards" ? "bg-[#33251e] text-white" : "border border-[#eadfd8] bg-white text-[#765d50] hover:bg-[#fff8df]"}`}
+                aria-label="Cards view"
+                title="Cards view"
+                className={`inline-flex h-9 w-9 items-center justify-center rounded-lg transition ${viewMode === "cards" ? "bg-[#33251e] text-white" : "border border-[#eadfd8] bg-white text-[#765d50] hover:bg-[#fff8df]"}`}
               >
-                <LayoutGrid size={14} aria-hidden="true" /> Cards
+                <LayoutGrid size={16} aria-hidden="true" />
               </button>
               <button
                 type="button"
                 onClick={() => setViewMode("table")}
-                className={`rounded-lg px-3 py-2 text-[11px] font-semibold transition ${viewMode === "table" ? "bg-[#33251e] text-white" : "border border-[#eadfd8] bg-white text-[#765d50] hover:bg-[#fff8df]"}`}
+                aria-label="Table view"
+                title="Table view"
+                className={`inline-flex h-9 w-9 items-center justify-center rounded-lg transition ${viewMode === "table" ? "bg-[#33251e] text-white" : "border border-[#eadfd8] bg-white text-[#765d50] hover:bg-[#fff8df]"}`}
               >
-                <Table2 size={14} aria-hidden="true" /> Table
+                <Table2 size={16} aria-hidden="true" />
               </button>
               {canManageCatalog && <button
                 onClick={openAddProductModal}
@@ -925,6 +936,16 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
         {viewMode === "cards" ? (
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {!loading && filteredProducts.map(product => (
+              (() => {
+                const cardSizeName = getCardSizeName(product);
+                const cardSize = getProductSizeByName(product, cardSizeName);
+                const cardCategory = cardSizeName === "small" ? "Small Cakes" : "Cakes";
+                const stockStatus = getStockStatus(product, cardSizeName);
+                const productionStatus = getProductionStatus(product, cardSizeName);
+                const productNameLength = String(product.name || "").trim().length;
+                const productNameFontSize = productNameLength > 30 ? "text-[10px]" : productNameLength > 20 ? "text-[12px]" : "text-[14px]";
+
+                return (
               <motion.div
                 key={product.id}
                 whileHover={{ y: -3 }}
@@ -949,50 +970,77 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
               {/* CONTENT */}
               <div className="flex w-full flex-grow flex-col">
 
-                <h2 className="line-clamp-2 min-h-[2.75rem] text-[15px] font-bold leading-snug text-[#33251e]">
-                  {product.name}
-                </h2>
+                <div className="admin-product-heading mb-1 flex min-w-0 items-start justify-between gap-2">
+                  <h2 className={`min-w-0 flex-1 truncate whitespace-nowrap font-bold leading-tight text-[#33251e] ${productNameFontSize}`}>
+                    {product.name}
+                  </h2>
+                  <div className="admin-product-stock-details -mt-1 w-[104px] shrink-0 text-right">
+                    <p className="truncate text-[8px] font-medium leading-tight text-[#766a62]">Stock alert · Min. {cardSize?.threshold ?? product.minimum_stock ?? "Not set"}</p>
+                  </div>
+                </div>
 
                 {product.description && (
-                  <p className="mb-3 line-clamp-2 min-h-[2rem] text-[11px] leading-relaxed text-[#8f8076]">{product.description}</p>
+                  <p className="mb-2 line-clamp-2 min-h-[1.75rem] text-[11px] leading-relaxed text-[#8f8076]">{product.description}</p>
                 )}
 
-                <div className="mb-3 flex items-end justify-between gap-2">
-                  <div>
-                    <p className="text-[9px] font-semibold uppercase tracking-[0.14em] text-[#9b8c83]">{activeCat === "Small Cakes" ? "Small cake" : "Price"}</p>
-                    <p className="mt-0.5 text-[20px] font-bold leading-none tracking-tight text-[#6f541d]">₱{formatProductPrice(product, activeCat)}</p>
-                  </div>
-                  <span className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-[9px] font-semibold ${getStockStatus(product).classes}`}>
-                    {getStockStatus(product).icon} {getStockStatus(product).label}
-                  </span>
+                <div className="-mt-1 mb-1 flex justify-center text-center">
+                  <p className="text-[20px] font-bold leading-none tracking-tight text-[#6f541d]">₱{formatProductPrice(product, canManageCatalog ? cardCategory : activeCat)}</p>
                 </div>
 
-                <div className="mb-3 flex items-center justify-between gap-3 rounded-xl border border-[#f0e7e0] bg-[#fffdfa] px-3 py-2.5">
-                  <div>
-                    <p className="text-[9px] font-semibold uppercase tracking-[0.12em] text-[#9b8c83]">Available stock</p>
-                    <p className="mt-0.5 text-[17px] font-bold leading-none text-[#33251e]">{getDisplayedStock(product)}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-[9px] text-[#9b8c83]">Stock alert</p>
-                    <p className="mt-0.5 text-[11px] font-semibold text-[#5f514a]">Min. {getProductSizeForCategory(product, activeCat)?.threshold ?? product.minimum_stock ?? "Not set"}</p>
-                  </div>
-                </div>
+                {canManageCatalog && (
+                  <div className="mb-1 flex min-h-[25px] w-full items-center justify-center gap-1 rounded-full border border-[#f1e6df] bg-[#f8f3ee] p-1">
+                    {['small', 'big'].map((sizeName) => {
+                      const sizeOption = getProductSizeByName(product, sizeName);
+                      const selected = cardSizeName === sizeName;
 
-                {/* PRODUCTION AVAILABILITY */}
-                <div className="mb-3 min-h-[30px]">
-                  <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1.5 text-[10px] font-semibold ${getProductionStatus(product).is_producible ? 'bg-[#edf5eb] text-[#4f7654]' : 'bg-[#fff0eb] text-[#9a5947]'}`}>
-                    {getProductionStatus(product).is_producible ? <CircleCheck size={11} aria-hidden="true" /> : <CircleX size={11} aria-hidden="true" />}
-                    {getProductionStatus(product).is_producible ? 'Can Produce' : 'Cannot Produce'}
+                      return (
+                        <button
+                          key={sizeName}
+                          type="button"
+                          disabled={!sizeOption}
+                          onClick={() => setCardSizeSelections((current) => ({ ...current, [product.id]: sizeName }))}
+                          aria-label={`${sizeName === 'small' ? 'Small' : 'Big'} size for ${product.name}`}
+                          className={`flex min-w-0 flex-1 items-center justify-center rounded-xl border px-1.5 py-1 text-[8px] font-semibold uppercase tracking-[0.08em] whitespace-nowrap transition-all ${
+                            !sizeOption
+                              ? 'cursor-not-allowed border-stone-200 bg-stone-100 text-stone-400'
+                              : selected
+                              ? 'border-[#e7c875] bg-[#fff8df] text-[#8d6a2e] shadow-sm'
+                              : 'border-[#eadfd8] bg-white text-[#765d50] hover:border-[#e7c875] hover:bg-[#fff8df] hover:text-[#8d6a2e]'
+                          }`}
+                        >
+                          {sizeName}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+
+                <div className="admin-stock-production-summary mb-3 mt-1 flex min-w-0 items-start justify-between gap-3 py-1">
+                  <div className="flex min-w-0 flex-col items-start gap-1">
+                    <div className="flex min-w-0 flex-wrap items-center gap-2">
+                      <span className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2 py-1 text-[9px] font-semibold ${productionStatus.is_producible ? 'bg-[#edf5eb] text-[#4f7654]' : 'bg-[#fff0eb] text-[#9a5947]'}`}>
+                        {productionStatus.is_producible ? <CircleCheck size={10} aria-hidden="true" /> : <CircleX size={10} aria-hidden="true" />}
+                        {productionStatus.is_producible ? 'Can Produce' : 'Cannot Produce'}
+                      </span>
+                      {stockStatus.label !== "In Stock" && (
+                        <span className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2 py-1 text-[9px] font-semibold ${stockStatus.classes}`}>
+                          {stockStatus.icon} {stockStatus.label}
+                        </span>
+                      )}
+                    </div>
+                    {!productionStatus.is_producible && productionStatus.reason && (
+                      <p className="max-w-[150px] text-[9px] leading-tight text-[#9a5947]">{productionStatus.reason}</p>
+                    )}
+                  </div>
+                  <span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full bg-[#f8f3ee] px-2 py-1 text-[9px] font-semibold text-[#765d50]">
+                    Available stock <span className="font-semibold text-[#33251e]">{getDisplayedStock(product, cardSizeName)}</span>
                   </span>
-                  {!getProductionStatus(product).is_producible && getProductionStatus(product).reason && (
-                    <p className="mt-1 line-clamp-1 text-[10px] text-[#9a5947]">{getProductionStatus(product).reason}</p>
-                  )}
                 </div>
 
                 {/* BUTTON */}
                 <div className="mt-auto flex w-full shrink-0 items-center gap-2 border-t border-[#f0e7e0] pt-3">
-                  <button type="button" onClick={() => openInventoryModal(product, "produce")} title={`Produce ${product.name}`} aria-label={`Produce ${product.name}`} className="inline-flex h-9 min-w-0 flex-1 items-center justify-center gap-1.5 rounded-lg border border-[#eadfca] bg-[#fff8e9] px-2 text-[10px] font-semibold text-[#5c4310] transition hover:border-[#e7c875] hover:bg-[#fff2cc]"><ChefHat size={14} aria-hidden="true" /><span>Produce</span></button>
-                  <button type="button" onClick={() => openInventoryModal(product, "adjust")} title={`Adjust ${product.name} stock`} aria-label={`Adjust ${product.name} stock`} className="inline-flex h-9 min-w-0 flex-1 items-center justify-center gap-1.5 rounded-lg border border-[#eadfd8] bg-white px-2 text-[10px] font-semibold text-[#765d50] transition hover:border-[#e7c875] hover:bg-[#fff8df]"><SlidersHorizontal size={14} aria-hidden="true" /><span>Adjust</span></button>
+                  <button type="button" onClick={() => openInventoryModal(product, "produce", cardSizeName)} title={`Produce ${product.name}`} aria-label={`Produce ${product.name}`} className="inline-flex h-9 min-w-0 flex-1 items-center justify-center gap-1.5 rounded-lg border border-[#eadfca] bg-[#fff8e9] px-2 text-[10px] font-semibold text-[#5c4310] transition hover:border-[#e7c875] hover:bg-[#fff2cc]"><ChefHat size={14} aria-hidden="true" /><span>Produce</span></button>
+                  <button type="button" onClick={() => openInventoryModal(product, "adjust", cardSizeName)} title={`Adjust ${product.name} stock`} aria-label={`Adjust ${product.name} stock`} className="inline-flex h-9 min-w-0 flex-1 items-center justify-center gap-1.5 rounded-lg border border-[#eadfd8] bg-white px-2 text-[10px] font-semibold text-[#765d50] transition hover:border-[#e7c875] hover:bg-[#fff8df]"><SlidersHorizontal size={14} aria-hidden="true" /><span>Adjust</span></button>
                   {canEditCatalog && (
                     <button
                       type="button"
@@ -1022,7 +1070,8 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
               </div>
 
             </motion.div>
-
+                );
+              })()
           ))}
 
             {!loading && filteredProducts.length === 0 && (
@@ -1123,7 +1172,7 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="fixed inset-x-0 bottom-0 top-[88px] z-50 flex items-center justify-center overflow-y-auto bg-[#241812]/55 p-4 backdrop-blur-[2px]"
+              className="fixed inset-x-0 bottom-0 top-[88px] z-[9997] flex items-start justify-center overflow-y-auto bg-[#241812]/55 px-3 py-4 backdrop-blur-[2px] sm:px-6 sm:py-6"
               role="dialog"
               aria-modal="true"
               aria-labelledby="inventory-modal-title"
@@ -1133,23 +1182,31 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
                 initial={{ scale: 0.9 }}
                 animate={{ scale: 1 }}
                 exit={{ scale: 0.9 }}
-                className="max-h-full w-full max-w-[600px] overflow-y-auto rounded-lg border border-[#eadfd8] bg-[#fffdfa] p-6 shadow-[0_24px_70px_rgba(38,25,16,0.28)]"
+                className="max-h-full w-full max-w-[680px] overflow-y-auto rounded-lg border border-[#eadfd8] bg-[#fffdfa] shadow-[0_24px_70px_rgba(38,25,16,0.28)]"
               >
-
-                <div className="mb-1 flex items-start justify-between gap-4">
-                  <h2 id="inventory-modal-title" className="text-lg font-semibold">
-                    {selectedProduct.name}
-                  </h2>
+                <div className="sticky top-0 z-20 flex items-start justify-between gap-4 border-b border-[#f0e7e0] bg-[#fffdfa]/95 px-5 py-4 backdrop-blur sm:px-7">
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-[0.24em] text-[#9b7810]">Inventory control</p>
+                    <h2 id="inventory-modal-title" className="mt-1 font-serif text-[24px] text-[#33251e]">
+                      {activeModal === "produce" ? "Produce" : activeModal === "adjust" ? "Adjust stock" : "Stock history"}
+                    </h2>
+                    <p className="mt-1 text-[12px] text-[#74675f]">
+                      {selectedProduct.name}{canManageCatalog ? ` · ${inventorySizeName === "small" ? "Small" : "Big"} Cake` : ""}
+                    </p>
+                  </div>
                   <button
                     type="button"
                     onClick={closeInventoryModal}
-                    className="shrink-0 rounded-lg border border-black/10 bg-white px-3 py-1.5 text-xs font-medium text-black hover:bg-black/5"
+                    title="Close"
+                    aria-label="Close"
+                    className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[#eadfd8] bg-white text-[#765d50] transition hover:bg-[#fff4cd] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d4af37]"
                   >
-                    Close
+                    <X size={16} aria-hidden="true" />
                   </button>
                 </div>
 
-                <p className="text-xs text-black/60 mb-4">
+                <div className="px-5 py-5 sm:px-7 sm:py-6">
+                <p className="mb-4 text-[12px] text-[#74675f]">
                   Current Stock: {activeModal === "produce"
                     ? canManageCatalog
                       ? Number(getProductSizeOptions(selectedProduct).find((size) => Number(size.id) === Number(productionSizeId))?.stock_quantity ?? 0)
@@ -1161,7 +1218,7 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
                   <div>
                     {canManageCatalog ? (
                       <p className="text-[11px] font-semibold text-black/70">
-                        Cake size: {activeCat === "Small Cakes" ? "Small" : "Big"}
+                        Cake size: {inventorySizeName === "small" ? "Small" : "Big"}
                       </p>
                     ) : (
                       <>
@@ -1175,7 +1232,7 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
                             loadProductRecipe(selectedProduct.id, sizeId);
                             loadProductionAvailability(selectedProduct.id, sizeId);
                           }}
-                          className="w-full rounded-xl border border-black/10 bg-white px-3 py-2 text-xs text-black outline-none focus:ring-2 focus:ring-[#D4AF37]"
+                          className="w-full rounded-xl border border-[#eadfd8] bg-white px-3 py-2.5 text-[12px] text-[#33251e] outline-none transition focus:border-[#d4af37] focus:ring-2 focus:ring-[#d4af37]/15"
                         >
                           <option value="">Select cake size</option>
                           {getProductSizeOptions(selectedProduct).map((size) => (
@@ -1201,18 +1258,18 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
                     )}
                   </div>
 
-                  <label className="block text-[11px] font-semibold text-black/70">Produce finished goods</label>
+                    <label className="block text-[10px] font-bold uppercase tracking-[0.16em] text-[#8f8076]">Produce finished goods</label>
                   <input
                     type="number"
                     min="1"
                     value={bomQty}
                     onChange={(e) => setBomQty(e.target.value)}
                     placeholder="Production quantity"
-                    className="w-full border border-black/10 rounded-xl px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-[#D4AF37]"
+                    className="w-full rounded-xl border border-[#eadfd8] bg-white px-3 py-2.5 text-[12px] text-[#33251e] outline-none transition focus:border-[#d4af37] focus:ring-2 focus:ring-[#d4af37]/15"
                   />
 
                   <div>
-                    <label htmlFor="production-expiry-date" className="mb-1 block text-[11px] font-semibold text-black/70">Expiry date</label>
+                      <label htmlFor="production-expiry-date" className="mb-1 block text-[10px] font-bold uppercase tracking-[0.16em] text-[#8f8076]">Expiry date</label>
                     <input
                       id="production-expiry-date"
                       type="date"
@@ -1220,14 +1277,14 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
                       value={productionExpiryDate}
                       onChange={(event) => setProductionExpiryDate(event.target.value)}
                       required
-                      className="w-full rounded-xl border border-black/10 px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-[#D4AF37]"
+                      className="w-full rounded-xl border border-[#eadfd8] bg-white px-3 py-2.5 text-[12px] text-[#33251e] outline-none transition focus:border-[#d4af37] focus:ring-2 focus:ring-[#d4af37]/15"
                     />
                   </div>
 
                   {bomLoading ? (
                     <p className="text-[12px] text-black/60">Loading recipe...</p>
                   ) : recipeLines.length > 0 ? (
-                    <div className="space-y-2 rounded-xl border border-black/10 bg-black/5 p-2 text-xs">
+                    <div className="space-y-2 rounded-xl border border-[#eadfd8] bg-[#fbf7f2] p-3 text-xs">
                       {recipeLines.map((line) => {
                         const required = Number(line.qty) * Number(bomQty || 1);
                         const enough = Number(line.stock) >= required;
@@ -1263,18 +1320,18 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
                   </button>
                 </div>}
 
-                {activeModal === "adjust" && <div className="space-y-3 border-t border-black/10 pt-4">
-                  <label className="block text-[11px] font-semibold text-black/70 mb-2">Manual stock adjust</label>
+                {activeModal === "adjust" && <div className="space-y-3 border-t border-[#f0e7e0] pt-4">
+                  <label className="mb-2 block text-[10px] font-bold uppercase tracking-[0.16em] text-[#8f8076]">Manual stock adjust</label>
                   {canManageCatalog && (
                     <p className="text-[11px] font-medium text-black/60">
-                      Adjusting {activeCat === "Small Cakes" ? "Small" : "Big"} Cake stock
+                      Adjusting {inventorySizeName === "small" ? "Small" : "Big"} Cake stock
                     </p>
                   )}
                   <div className="grid gap-2 sm:grid-cols-2 mb-3">
-                    <select value={adjustType} onChange={(e) => setAdjustType(e.target.value)} className="rounded-xl border px-2 py-2 text-xs">
+                    <select value={adjustType} onChange={(e) => setAdjustType(e.target.value)} className="rounded-xl border border-[#eadfd8] bg-white px-3 py-2.5 text-[12px] text-[#33251e]">
                       <option value="in">Stock In</option><option value="out">Stock Out</option>
                     </select>
-                    <select value={adjustReason} onChange={(e) => setAdjustReason(e.target.value)} className="rounded-xl border px-2 py-2 text-xs">
+                    <select value={adjustReason} onChange={(e) => setAdjustReason(e.target.value)} className="rounded-xl border border-[#eadfd8] bg-white px-3 py-2.5 text-[12px] text-[#33251e]">
                       <option>Damaged</option><option>Expired</option><option>Returned</option><option>Inventory Correction</option><option>Other</option>
                     </select>
                     <input
@@ -1283,10 +1340,10 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
                       value={qty}
                       onChange={(e) => setQty(e.target.value)}
                       placeholder="Quantity"
-                      className="w-full border border-black/10 rounded-xl px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-[#D4AF37]"
+                      className="w-full rounded-xl border border-[#eadfd8] bg-white px-3 py-2.5 text-[12px] text-[#33251e] outline-none transition focus:border-[#d4af37] focus:ring-2 focus:ring-[#d4af37]/15"
                     />
                   </div>
-                  <textarea value={adjustNotes} onChange={(e) => setAdjustNotes(e.target.value)} placeholder="Optional notes" className="w-full rounded-xl border border-black/10 px-3 py-2 text-xs" />
+                  <textarea value={adjustNotes} onChange={(e) => setAdjustNotes(e.target.value)} placeholder="Optional notes" className="w-full rounded-xl border border-[#eadfd8] bg-white px-3 py-2.5 text-[12px] text-[#33251e] outline-none transition focus:border-[#d4af37] focus:ring-2 focus:ring-[#d4af37]/15" />
                   <p className="text-xs text-black/70">Current Stock: <strong>{adjustmentStock}</strong> <span className="mx-1">→</span> Adjustment: <strong>{adjustType === "in" ? "+" : "-"}{Number(qty || 0)}</strong> <span className="mx-1">→</span> New Stock: <strong>{Math.max(0, adjustmentStock + (adjustType === "in" ? Number(qty || 0) : -Number(qty || 0)))}</strong></p>
 
                   {updateError && (
@@ -1298,17 +1355,21 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
                   <button onClick={() => updateStock(adjustType)} disabled={operationLoading || !qty || Number(qty) <= 0 || (adjustType === "out" && Number(qty) > adjustmentStock)} className="w-full bg-black text-white px-4 py-2 rounded-xl text-xs font-semibold hover:bg-black/90 disabled:opacity-50">{operationLoading ? "Updating..." : "Confirm Adjustment"}</button>
                 </div>}
 
-                {activeModal === "history" && <div className="border-t border-black/10 pt-4">
-                  <div className="mb-3 flex items-center justify-between"><label className="text-[11px] font-semibold text-black/70">Stock history</label><RefreshCw size={14} className={historyLoading ? "animate-spin" : ""} /></div>
-                  {historyLoading ? <p className="text-xs text-black/60">Loading history...</p> : historyError ? <p className="text-xs text-red-600">{historyError}</p> : historyEntries.length === 0 ? <p className="text-xs text-black/60">No movement history.</p> : <div className="max-h-64 overflow-auto rounded-xl border border-black/10"><table className="w-full text-left text-[10px]"><thead className="sticky top-0 bg-black/5"><tr><th className="p-2">Date</th><th className="p-2">Action</th><th className="p-2">Qty</th><th className="p-2">Stock</th><th className="p-2">Staff</th></tr></thead><tbody>{historyEntries.map((entry) => <tr key={entry.movement_id} className="border-t border-black/5"><td className="p-2">{entry.created_at}</td><td className="p-2">{entry.movement_type}</td><td className="p-2">{entry.quantity > 0 ? "+" : ""}{entry.quantity}</td><td className="p-2">{entry.previous_stock} → {entry.new_stock}</td><td className="p-2">{entry.staff}</td></tr>)}</tbody></table></div>}
+                {activeModal === "history" && <div className="border-t border-[#f0e7e0] pt-4">
+                  <div className="mb-3 flex items-center justify-between"><label className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#8f8076]">Stock history</label><RefreshCw size={14} className={`text-[#9b8c83] ${historyLoading ? "animate-spin" : ""}`} /></div>
+                  {historyLoading ? <p className="text-[12px] text-[#74675f]">Loading history...</p> : historyError ? <p className="text-[12px] text-red-600">{historyError}</p> : historyEntries.length === 0 ? <p className="text-[12px] text-[#74675f]">No movement history.</p> : <div className="max-h-64 overflow-auto rounded-xl border border-[#eadfd8]"><table className="w-full text-left text-[10px]"><thead className="sticky top-0 bg-[#fbf7f2] text-[#765d50]"><tr><th className="p-2">Date</th><th className="p-2">Action</th><th className="p-2">Qty</th><th className="p-2">Stock</th><th className="p-2">Admin</th></tr></thead><tbody>{historyEntries.map((entry) => <tr key={entry.movement_id} className="border-t border-[#f0e7e0]"><td className="p-2">{entry.created_at}</td><td className="p-2">{entry.movement_type}</td><td className="p-2">{entry.quantity > 0 ? "+" : ""}{entry.quantity}</td><td className="p-2">{entry.previous_stock} → {entry.new_stock}</td><td className="p-2">{entry.admin}</td></tr>)}</tbody></table></div>}
                 </div>}
 
-                <button
-                  onClick={() => setSelectedProduct(null)}
-                  className="mt-4 rounded-xl border border-black/10 bg-white px-4 py-2 text-xs font-medium text-black w-full hover:bg-black/5"
-                >
-                  Cancel
-                </button>
+                <div className="mt-5 flex justify-end">
+                  <button
+                    type="button"
+                    onClick={closeInventoryModal}
+                    className="rounded-xl border border-[#eadfd8] bg-white px-4 py-2 text-[12px] font-medium text-[#765d50] transition hover:bg-[#fff4cd]"
+                  >
+                    Cancel
+                  </button>
+                </div>
+                </div>
 
               </motion.div>
 

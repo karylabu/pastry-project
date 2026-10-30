@@ -1,8 +1,10 @@
 import React from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 
+let mockLocationSearch = '';
+
 jest.mock('react-router-dom', () => ({
-  useLocation: () => ({ search: '' }),
+  useLocation: () => ({ search: mockLocationSearch }),
   useNavigate: () => jest.fn(),
 }));
 
@@ -10,6 +12,7 @@ import Products from './Products';
 
 describe('Products admin catalog', () => {
   beforeEach(() => {
+    mockLocationSearch = '';
     localStorage.setItem('user', JSON.stringify({ role: 'admin', token: 'test-admin-token' }));
     const archivedProductIds = new Set();
 
@@ -134,11 +137,30 @@ describe('Products admin catalog', () => {
       expect(screen.getByText('Strawberry Cake')).toBeInTheDocument();
     });
 
+    fireEvent.click(screen.getByRole('button', { name: 'Big size for Strawberry Cake' }));
     expect(screen.getByRole('button', { name: /edit/i })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Big Cakes', exact: true })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Small Cakes', exact: true })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Cards view' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Table view' })).toBeInTheDocument();
+    expect(screen.queryByText('Cards', { exact: true })).not.toBeInTheDocument();
+    expect(screen.queryByText('Table', { exact: true })).not.toBeInTheDocument();
+    expect(screen.getByText('Strawberry Cake')).toHaveClass('truncate', 'whitespace-nowrap');
     expect(screen.getByText('₱480.00')).toBeInTheDocument();
+    expect(screen.getByText('₱480.00').compareDocumentPosition(screen.getByRole('button', { name: 'Small size for Strawberry Cake' })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.queryByText(/^big cake$/i)).not.toBeInTheDocument();
+    expect(screen.getByText('Sweet and fruity').compareDocumentPosition(screen.getByText('₱480.00')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Produce Strawberry Cake' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Adjust Strawberry Cake stock' })).toBeInTheDocument();
-    expect(screen.getByText('Available stock')).toBeInTheDocument();
+    const availableStock = screen.getByText(/Available stock/);
+    const stockDetails = screen.getByText(/Stock alert.*Min\. 5/).closest('.admin-product-stock-details');
+    expect(screen.getByText('Strawberry Cake').closest('.admin-product-heading')).toContainElement(stockDetails);
+    expect(availableStock.textContent).toBe('Available stock 7');
+    expect(availableStock).toHaveClass('text-[9px]', 'font-semibold');
+    expect(availableStock).not.toHaveClass('font-bold');
+    expect(availableStock.closest('.admin-stock-production-summary')).toHaveClass('items-start');
+    expect(availableStock.closest('.admin-stock-production-summary')).toContainElement(screen.getByText('Can Produce'));
+    expect(screen.queryByText('In Stock')).not.toBeInTheDocument();
     expect(screen.getByText('Sweet and fruity')).toBeInTheDocument();
     expect(screen.queryByText('Chicken Meal')).not.toBeInTheDocument();
     expect(screen.queryByText('Mini Vanilla Cake')).not.toBeInTheDocument();
@@ -241,17 +263,42 @@ describe('Products admin catalog', () => {
   });
 
   test('keeps the same cakes and changes to their small-size price', async () => {
+    mockLocationSearch = '?category=Small%20Cakes';
     render(<Products allowCatalogManagement />);
 
     await waitFor(() => {
       expect(screen.getByText('Strawberry Cake')).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByRole('button', { name: 'Small Cakes' }));
     expect(screen.getByText('Strawberry Cake')).toBeInTheDocument();
     expect(screen.getByText('Mini Vanilla Cake')).toBeInTheDocument();
     expect(screen.getAllByText('₱320.00')).toHaveLength(2);
     expect(screen.queryByText('Mini Chocolate Cake')).not.toBeInTheDocument();
+  });
+
+  test('selects Small and Big sizes from the product card for price and inventory actions', async () => {
+    render(<Products allowCatalogManagement />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Strawberry Cake')).toBeInTheDocument();
+    });
+
+    expect(screen.getByText('₱320.00')).toBeInTheDocument();
+    expect(screen.getByText(/Available stock/).textContent).toBe('Available stock 2');
+    expect(screen.getByText('₱320.00').parentElement).toHaveClass('-mt-1');
+    fireEvent.click(screen.getByRole('button', { name: 'Big size for Strawberry Cake' }));
+    expect(screen.getByText('₱480.00')).toBeInTheDocument();
+    expect(screen.getByText(/Available stock/).textContent).toBe('Available stock 7');
+    fireEvent.click(screen.getByRole('button', { name: 'Small size for Strawberry Cake' }));
+
+    fireEvent.click(screen.getByRole('button', { name: 'Produce Strawberry Cake' }));
+    await waitFor(() => {
+      expect(screen.getByText('Cake size: Small')).toBeInTheDocument();
+    });
+    expect(global.fetch).toHaveBeenCalledWith(
+      expect.stringContaining('production/availability/1?product_size_id=11'),
+      expect.any(Object),
+    );
   });
 
   test('keeps table action buttons in a fixed five-button row', async () => {
@@ -312,11 +359,14 @@ describe('Products admin catalog', () => {
       expect(screen.getByText('Strawberry Cake')).toBeInTheDocument();
     });
 
+    fireEvent.click(screen.getByRole('button', { name: 'Big size for Strawberry Cake' }));
     fireEvent.click(screen.getAllByRole('button', { name: /^Produce / })[0]);
 
     const dialog = await screen.findByRole('dialog');
     expect(dialog).toHaveClass('top-[88px]');
-    expect(dialog.firstElementChild).toHaveClass('max-w-[600px]', 'max-h-full', 'overflow-y-auto');
+    expect(dialog.firstElementChild).toHaveClass('max-w-[680px]', 'max-h-full', 'overflow-y-auto');
+    expect(screen.getByRole('heading', { name: 'Produce' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Close' })).toBeInTheDocument();
 
     await waitFor(() => {
       expect(screen.getByText('Cake size: Big')).toBeInTheDocument();
@@ -346,14 +396,13 @@ describe('Products admin catalog', () => {
   });
 
   test('uses the small tab size and displays stock for that size only', async () => {
+    mockLocationSearch = '?category=Small%20Cakes';
     render(<Products allowCatalogManagement />);
 
     await waitFor(() => {
       expect(screen.getByText('Strawberry Cake')).toBeInTheDocument();
     });
 
-    expect(screen.getByText('7', { exact: true })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Small Cakes' }));
     expect(screen.getByText('2', { exact: true })).toBeInTheDocument();
     expect(screen.queryByText('7', { exact: true })).not.toBeInTheDocument();
 
@@ -375,6 +424,7 @@ describe('Products admin catalog', () => {
       expect(screen.getByText('Strawberry Cake')).toBeInTheDocument();
     });
 
+    fireEvent.click(screen.getByRole('button', { name: 'Big size for Strawberry Cake' }));
     fireEvent.click(screen.getAllByRole('button', { name: /^Adjust / })[0]);
     expect(screen.getByText('Current Stock: 7')).toBeInTheDocument();
     expect(screen.getByText('Adjusting Big Cake stock')).toBeInTheDocument();
@@ -470,13 +520,13 @@ describe('Products admin catalog', () => {
   });
 
   test('loads and saves the recipe for the selected cake tab without a size picker', async () => {
+    mockLocationSearch = '?category=Small%20Cakes';
     render(<Products allowCatalogManagement />);
 
     await waitFor(() => {
       expect(screen.getByText('Strawberry Cake')).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByRole('button', { name: 'Small Cakes' }));
     fireEvent.click(screen.getAllByRole('button', { name: /^Edit / })[0]);
 
     expect(screen.getByText('Recipe for: Small Cake')).toBeInTheDocument();
@@ -542,6 +592,58 @@ describe('Products admin catalog', () => {
     expect(await screen.findByText('No movement history.')).toBeInTheDocument();
   });
 
+  test('shows only admin actors in stock history', async () => {
+    const existingFetch = global.fetch.getMockImplementation();
+    global.fetch.mockImplementation((url, options) => {
+      if (String(url).includes('/api/admin/stock/history')) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            success: true,
+            history: [{
+              movement_id: 1,
+              created_at: '2026-10-29 10:00:00',
+              movement_type: 'Stock In',
+              quantity: 2,
+              previous_stock: 4,
+              new_stock: 6,
+              admin: 'Shop Owner',
+            }],
+          }),
+        });
+      }
+      return existingFetch(url, options);
+    });
+
+    render(<Products allowCatalogManagement />);
+    await waitFor(() => expect(screen.getByText('Strawberry Cake')).toBeInTheDocument());
+    fireEvent.click(screen.getByRole('button', { name: 'View Strawberry Cake history' }));
+
+    expect(await screen.findByText('Shop Owner')).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: 'Admin' })).toBeInTheDocument();
+    expect(screen.queryByRole('columnheader', { name: 'Staff' })).not.toBeInTheDocument();
+  });
+
+  test('hides legacy stock history entries without an admin actor', async () => {
+    const existingFetch = global.fetch.getMockImplementation();
+    global.fetch.mockImplementation((url, options) => {
+      if (String(url).includes('/api/admin/stock/history')) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({ success: true, history: [{ movement_id: 2, staff: 'Floor Staff' }] }),
+        });
+      }
+      return existingFetch(url, options);
+    });
+
+    render(<Products allowCatalogManagement />);
+    await waitFor(() => expect(screen.getByText('Strawberry Cake')).toBeInTheDocument());
+    fireEvent.click(screen.getByRole('button', { name: 'View Strawberry Cake history' }));
+
+    expect(await screen.findByText('No movement history.')).toBeInTheDocument();
+    expect(screen.queryByText('Floor Staff')).not.toBeInTheDocument();
+  });
+
   test('shows a readable error when stock history responds with non-JSON', async () => {
     const existingFetch = global.fetch.getMockImplementation();
     global.fetch.mockImplementation((url) => {
@@ -567,7 +669,7 @@ describe('Products admin catalog', () => {
     await waitFor(() => {
       expect(screen.getByText('Strawberry Cake')).toBeInTheDocument();
     });
-    const lowStockCard = screen.getByText('Low Stock').parentElement;
+    const lowStockCard = screen.getAllByText('Low Stock', { exact: true })[0].parentElement;
     await waitFor(() => expect(lowStockCard).toHaveTextContent('0'));
     expect(screen.getByText('Out of Stock').parentElement).toHaveTextContent('0');
     expect(screen.getByText("Today's Production").parentElement).toHaveTextContent('0');
