@@ -25,6 +25,9 @@ export default function AdminChatBubble() {
   const [messageAlertsEnabled, setMessageAlertsEnabled] = useState(true);
   const [adminDialog, setAdminDialog] = useState(null);
   const conversationFetchId = useRef(0);
+  const messageListRef = useRef(null);
+  const keepMessagesAtBottom = useRef(true);
+  const activeChatKey = useRef(null);
 
   const selectedConversation = useMemo(
     () => conversations.find((item) => String(item.conversation_key) === String(selectedConversationKey)),
@@ -126,6 +129,12 @@ export default function AdminChatBubble() {
 
   useEffect(() => {
     if (!open || !selectedConversation) return undefined;
+    const conversationKey = String(selectedConversation.conversation_key);
+    if (activeChatKey.current !== conversationKey) {
+      activeChatKey.current = conversationKey;
+      keepMessagesAtBottom.current = true;
+      setMessages([]);
+    }
     fetchMessages(selectedConversation);
     return subscribeRealtime((event) => {
       if (event.type === "chat.updated" && Number(event.order_id || 0) === Number(selectedConversation.order_id || 0)) {
@@ -133,6 +142,26 @@ export default function AdminChatBubble() {
       }
     });
   }, [open, selectedConversation]);
+
+  useEffect(() => {
+    if (!open) {
+      activeChatKey.current = null;
+      keepMessagesAtBottom.current = true;
+      return;
+    }
+
+    const messageList = messageListRef.current;
+    if (messageList && keepMessagesAtBottom.current) {
+      messageList.scrollTop = messageList.scrollHeight;
+    }
+  }, [open, messages]);
+
+  const handleMessageListScroll = () => {
+    const messageList = messageListRef.current;
+    if (!messageList) return;
+    keepMessagesAtBottom.current =
+      messageList.scrollHeight - messageList.scrollTop - messageList.clientHeight < 80;
+  };
 
   const sendReply = async (event) => {
     event.preventDefault();
@@ -214,7 +243,7 @@ export default function AdminChatBubble() {
                     <div className="flex items-center gap-3"><button type="button" onClick={() => setMobilePanel("list")} className="grid h-9 w-9 place-items-center rounded-full text-[#80600a] transition hover:bg-[#fff4cd] hover:text-black md:hidden" aria-label="Back to conversations"><Menu size={18} /></button><div className="grid h-10 w-10 place-items-center rounded-2xl bg-[#fff4cd] font-bold text-[#80600a]">{customerName.charAt(0).toUpperCase()}</div><div><p className="font-semibold">{customerName}</p><p className="text-xs text-gray-500">{selectedConversation?.order_label || "Select a conversation"}</p></div></div>
                     <span className="rounded-full bg-[#fff4cd] px-3 py-1.5 text-[10px] font-semibold text-[#80600a]">{selectedConversation?.order_status || "Customer"}</span>
                   </div>
-                  <div className="min-h-0 flex-1 space-y-2.5 overflow-y-auto bg-[#fffaf3] px-3 py-4 sm:px-6 sm:py-5">
+                  <div ref={messageListRef} onScroll={handleMessageListScroll} aria-label="Chat messages" className="min-h-0 flex-1 space-y-2.5 overflow-y-auto bg-[#fffaf3] px-3 py-4 sm:px-6 sm:py-5">
                     {messages.length === 0 ? <div className="grid h-full place-items-center text-center text-xs text-gray-400">Select a conversation to begin.</div> : messages.map((item, index) => {
                       const isAdmin = item.sender === "admin";
                       const isAi = item.sender === "ai";

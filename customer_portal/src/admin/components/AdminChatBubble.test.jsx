@@ -3,6 +3,8 @@ import { act, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import AdminChatBubble from "./AdminChatBubble";
 
 let mockRealtimeListener;
+let originalScrollHeightDescriptor;
+let originalClientHeightDescriptor;
 
 jest.mock("../../services/config", () => ({
   CUSTOMER_BASE: "https://example.test/customer",
@@ -26,6 +28,8 @@ jest.mock("./AdminDialog", () => () => null);
 describe("AdminChatBubble", () => {
   beforeEach(() => {
     mockRealtimeListener = null;
+    originalScrollHeightDescriptor = Object.getOwnPropertyDescriptor(HTMLElement.prototype, "scrollHeight");
+    originalClientHeightDescriptor = Object.getOwnPropertyDescriptor(HTMLElement.prototype, "clientHeight");
     global.fetch = jest.fn((url) => {
       if (String(url).includes("/api/admin/settings")) {
         return Promise.resolve({
@@ -52,6 +56,16 @@ describe("AdminChatBubble", () => {
 
   afterEach(() => {
     jest.restoreAllMocks();
+    if (originalScrollHeightDescriptor) {
+      Object.defineProperty(HTMLElement.prototype, "scrollHeight", originalScrollHeightDescriptor);
+    } else {
+      delete HTMLElement.prototype.scrollHeight;
+    }
+    if (originalClientHeightDescriptor) {
+      Object.defineProperty(HTMLElement.prototype, "clientHeight", originalClientHeightDescriptor);
+    } else {
+      delete HTMLElement.prototype.clientHeight;
+    }
   });
 
   test("loads unread messages and shows the count before the inbox is opened", async () => {
@@ -143,5 +157,23 @@ describe("AdminChatBubble", () => {
     const newest = await screen.findByRole("button", { name: /Newest Customer/ });
     const earlier = screen.getByRole("button", { name: /Earlier Customer/ });
     expect(newest.compareDocumentPosition(earlier) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  test("opens the selected chat at its newest message", async () => {
+    Object.defineProperty(HTMLElement.prototype, "scrollHeight", {
+      configurable: true,
+      get: () => 640,
+    });
+    Object.defineProperty(HTMLElement.prototype, "clientHeight", {
+      configurable: true,
+      get: () => 240,
+    });
+    render(<AdminChatBubble />);
+    fireEvent.click(await screen.findByRole("button", { name: /Customer Chat/ }));
+
+    const messageList = await screen.findByLabelText("Chat messages");
+    await waitFor(() => {
+      expect(messageList.scrollTop).toBe(640);
+    });
   });
 });
