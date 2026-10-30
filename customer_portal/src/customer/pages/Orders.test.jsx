@@ -199,6 +199,73 @@ test('shows Awaiting Payment only for customized orders in the customer status f
   expect(screen.queryByText('Blueberry Cheesecake')).not.toBeInTheDocument();
 });
 
+test('shows the bakery logo for custom cake orders without a reference image', async () => {
+  global.fetch = jest.fn((url) => {
+    if (String(url).includes('/api/customer/products')) {
+      return Promise.resolve({ ok: true, json: async () => [] });
+    }
+
+    return Promise.resolve({
+      ok: true,
+      json: async () => ({
+        success: true,
+        orders: [{
+          id: 604,
+          user_id: 7,
+          customer: 'Customer',
+          status: 'Pending',
+          payment: 'QRPh',
+          payment_status: 'paid',
+          is_customized: true,
+          items: [{ name: 'Customized Cake', qty: 1, price: 1800 }],
+        }],
+      }),
+    });
+  });
+
+  render(<Orders />);
+
+  expect(await screen.findByRole('img', { name: 'Customized Cake thumbnail' })).toHaveAttribute(
+    'src',
+    'https://example.test/uploads/logo.png?v=logo-v2',
+  );
+});
+
+test('replaces a broken custom cake image with the bakery logo', async () => {
+  global.fetch = jest.fn((url) => {
+    if (String(url).includes('/api/customer/products')) {
+      return Promise.resolve({ ok: true, json: async () => [] });
+    }
+
+    return Promise.resolve({
+      ok: true,
+      json: async () => ({
+        success: true,
+        orders: [{
+          id: 605,
+          user_id: 7,
+          customer: 'Customer',
+          status: 'Pending',
+          payment: 'QRPh',
+          payment_status: 'paid',
+          is_customized: true,
+          custom_inspo_images: ['/uploads/missing-cake-reference.jpg'],
+          items: [{ name: 'Customized Cake', qty: 1, price: 1800 }],
+        }],
+      }),
+    });
+  });
+
+  render(<Orders />);
+
+  const image = await screen.findByRole('img', { name: 'Customized Cake thumbnail' });
+  expect(image).toHaveAttribute('src', 'https://example.test/uploads/missing-cake-reference.jpg');
+
+  fireEvent.error(image);
+
+  expect(image).toHaveAttribute('src', 'https://example.test/uploads/logo.png?v=logo-v2');
+});
+
 test('shows the full QR Ph charge as the custom cake downpayment', async () => {
   global.fetch = jest.fn((url) => {
     if (String(url).includes('/api/customer/products')) {

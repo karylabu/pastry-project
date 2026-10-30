@@ -15,6 +15,28 @@ import {
 import { getCustomCakePaymentBreakdown } from '../utils/customCakePayment';
 import { getReceiptItemTotal, getReceiptTotal } from '../utils/orderReceipt';
 
+const ORDER_IMAGE_FALLBACK = `${ROOT_BASE}/uploads/logo.png?v=logo-v2`;
+
+function OrderProductImage({ src, alt, className }) {
+  const [failed, setFailed] = useState(false);
+  const imageSrc = src && !failed ? src : ORDER_IMAGE_FALLBACK;
+
+  useEffect(() => {
+    setFailed(false);
+  }, [src]);
+
+  return (
+    <img
+      src={imageSrc}
+      alt={alt}
+      className={`${className} ${imageSrc === ORDER_IMAGE_FALLBACK ? 'object-contain p-1' : 'object-cover'}`}
+      onError={() => {
+        if (imageSrc !== ORDER_IMAGE_FALLBACK) setFailed(true);
+      }}
+    />
+  );
+}
+
 const formatOrderTimestamp = (value) => {
   if (!value) return 'Not available';
   const date = new Date(value);
@@ -1227,7 +1249,7 @@ export default function Orders() {
         ? reference
         : reference?.url || reference?.src || reference?.path || reference?.image;
       if (source) return resolveCustomCakeImageUrl(source, LARAVEL_BASE, ROOT_BASE);
-      return '/assets/customize/customized_2.jpg';
+      return ORDER_IMAGE_FALLBACK;
     }
 
     const itemName = String(item?.name || item?.product || item?.title || '').trim().toLowerCase();
@@ -1498,7 +1520,7 @@ export default function Orders() {
                       <div className={`grid h-11 w-11 shrink-0 place-items-center overflow-hidden rounded-xl bg-slate-100 text-slate-900 ring-1 ring-slate-200 ${isExpanded ? 'hidden' : ''}`}>
                         {primaryItem ? (
                           primaryProductImage ? (
-                            <img
+                            <OrderProductImage
                               src={primaryProductImage}
                               alt={`${primaryItem.name} thumbnail`}
                               className="h-full w-full object-cover"
@@ -1549,7 +1571,7 @@ export default function Orders() {
                                     <div key={`${item.id ?? item.name}-${itemIndex}`} className="flex items-start gap-2">
                                       <div className="grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-lg bg-slate-100 text-slate-900 ring-1 ring-slate-200">
                                         {image ? (
-                                          <img
+                                          <OrderProductImage
                                             src={image}
                                             alt={`${item.name} thumbnail`}
                                             className="h-full w-full object-cover"
