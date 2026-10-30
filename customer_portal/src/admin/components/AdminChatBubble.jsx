@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Bot, Menu, MessageCircle, Paperclip, RefreshCw, Search, Send, UserRound, X } from "lucide-react";
 import { CUSTOMER_BASE, LARAVEL_BASE } from "../../services/config";
 import { getAuthHeaders, safeParseJson } from "../../services/api";
@@ -24,6 +24,7 @@ export default function AdminChatBubble() {
   const [mobilePanel, setMobilePanel] = useState("conversation");
   const [messageAlertsEnabled, setMessageAlertsEnabled] = useState(true);
   const [adminDialog, setAdminDialog] = useState(null);
+  const conversationFetchId = useRef(0);
 
   const selectedConversation = useMemo(
     () => conversations.find((item) => String(item.conversation_key) === String(selectedConversationKey)),
@@ -65,14 +66,16 @@ export default function AdminChatBubble() {
   }, []);
 
   const fetchConversations = useCallback(async () => {
+    const fetchId = ++conversationFetchId.current;
     try {
       const response = await fetch(`${LARAVEL_BASE}/api/staff/chat/conversations`, {
         credentials: "include",
         headers: getAuthHeaders(),
       });
       const data = await safeParseJson(response);
-      if (!response.ok || data?.success === false) return;
-      const next = Array.isArray(data.conversations) ? data.conversations : [];
+      if (!response.ok || data?.success === false || fetchId !== conversationFetchId.current) return;
+      const next = (Array.isArray(data.conversations) ? data.conversations : [])
+        .sort((a, b) => (Date.parse(b.last_message_at || "") || 0) - (Date.parse(a.last_message_at || "") || 0));
       setConversations(next);
       setSelectedConversationKey((currentKey) => (
         next.some((item) => String(item.conversation_key) === String(currentKey))

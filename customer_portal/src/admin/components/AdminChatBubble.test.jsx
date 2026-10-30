@@ -1,5 +1,5 @@
 import React from "react";
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import AdminChatBubble from "./AdminChatBubble";
 
 let mockRealtimeListener;
@@ -101,5 +101,47 @@ describe("AdminChatBubble", () => {
     await waitFor(() => {
       expect(screen.getByRole("button", { name: "Customer Chat, 5 unread messages" })).toBeInTheDocument();
     });
+  });
+
+  test("shows the most recently active chats first", async () => {
+    global.fetch.mockImplementation((url) => {
+      if (String(url).includes("/api/admin/settings")) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({ success: true, notification_preferences: { messageAlerts: true } }),
+        });
+      }
+
+      return Promise.resolve({
+        ok: true,
+        json: async () => ({
+          success: true,
+          conversations: [
+            {
+              conversation_key: "order:41",
+              order_id: 41,
+              customer_name: "Earlier Customer",
+              last_message_at: "2026-10-29T10:00:00+08:00",
+              unread_count: 0,
+            },
+            {
+              conversation_key: "order:42",
+              order_id: 42,
+              customer_name: "Newest Customer",
+              last_message_at: "2026-10-30T10:00:00+08:00",
+              unread_count: 0,
+            },
+          ],
+        }),
+      });
+    });
+
+    render(<AdminChatBubble />);
+    await screen.findByRole("button", { name: "Customer Chat" });
+    fireEvent.click(screen.getByRole("button", { name: /Customer Chat/ }));
+
+    const newest = await screen.findByRole("button", { name: /Newest Customer/ });
+    const earlier = screen.getByRole("button", { name: /Earlier Customer/ });
+    expect(newest.compareDocumentPosition(earlier) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 });

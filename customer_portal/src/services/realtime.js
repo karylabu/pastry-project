@@ -1,4 +1,4 @@
-import { CUSTOMER_BASE } from "./config";
+import { ROOT_BASE } from "./config";
 
 let eventSource = null;
 const listeners = new Set();
@@ -6,7 +6,7 @@ const listeners = new Set();
 function getEventSource() {
   if (eventSource || typeof EventSource === "undefined") return eventSource;
 
-  eventSource = new EventSource(`${CUSTOMER_BASE}/api_realtime_events.php`, { withCredentials: true });
+  eventSource = new EventSource(`${ROOT_BASE}/customer/api_realtime_events.php`, { withCredentials: true });
   eventSource.addEventListener("sync", (event) => {
     let payload;
     try {
