@@ -577,10 +577,10 @@ function ValidationMetrics({ model }) {
 
       <div className="rounded-xl bg-[#f7f2e8] px-4 py-3 text-xs leading-5 text-[#33251e]">
         <p>
-          Forecast uses <span className="font-semibold">{forecastMethodLabel}</span>, selected by shop-total WAPE
+          Forecast uses the fixed <span className="font-semibold">{forecastMethodLabel}</span> method
           {model?.selected_forecast_method_wape != null
-            ? ` (${formatMetric(model.selected_forecast_method_wape, "%")} across ${model.validation_folds ?? 0} rolling tests of ${model.validation_horizon_days ?? 7} days).`
-            : " when backtest data is available; the 28-day average is the fallback."}
+            ? `. Its shop-total WAPE is ${formatMetric(model.selected_forecast_method_wape, "%")} across ${model.validation_folds ?? 0} rolling tests of ${model.validation_horizon_days ?? 7} days.`
+            : "; backtest metrics are unavailable."}
         </p>
         {forecastMethodNote && <p className="mt-1 text-[#74675f]">{forecastMethodNote}</p>}
       </div>

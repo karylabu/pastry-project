@@ -21,9 +21,7 @@
 if (!defined('FE_VALIDATION_METHODS')) {
     // 'zero' is a comparison-only baseline and is never selected for production.
     define('FE_VALIDATION_METHODS', ['linear', 'zero', 'yesterday', 'same_weekday_last_week', 'moving_average_7', 'moving_average_28']);
-    define('FE_CANDIDATE_METHODS', ['moving_average_28', 'moving_average_7', 'linear', 'same_weekday_last_week', 'yesterday']);
     define('FE_PREFERRED_METHOD', 'moving_average_28');
-    define('FE_SWITCH_MARGIN', 0.02);   // a challenger must beat the preferred method by 2% (relative) to win
     define('FE_BACKTEST_MAX_FOLDS', 12);
     define('FE_BACKTEST_STEP_DAYS', 7);
     define('FE_BACKTEST_MIN_TRAIN_DAYS', 28);
@@ -149,33 +147,11 @@ function fe_metrics_summarize(array $m): array
 }
 
 /**
- * Picks the production method from shop-total WAPE. The preferred (long-window) method
- * keeps the job unless another method is clearly better, so one lucky week cannot flip it.
+ * Keeps the production forecast on the configured method; backtest metrics remain for comparison.
  */
 function fe_select_method(array $aggregateMetrics): string
 {
-    $valid = [];
-    foreach (FE_CANDIDATE_METHODS as $method) {
-        $wape = $aggregateMetrics[$method]['wape'] ?? null;
-        if ($wape !== null && ($aggregateMetrics[$method]['records'] ?? 0) > 0) {
-            $valid[$method] = (float) $wape;
-        }
-    }
-    if (!$valid) return FE_PREFERRED_METHOD;
-
-    if (!isset($valid[FE_PREFERRED_METHOD])) {
-        asort($valid);
-        return (string) array_key_first($valid);
-    }
-
-    $challengers = $valid;
-    unset($challengers[FE_PREFERRED_METHOD]);
-    if (!$challengers) return FE_PREFERRED_METHOD;
-    asort($challengers);
-    $bestChallenger = (string) array_key_first($challengers);
-    return $challengers[$bestChallenger] < $valid[FE_PREFERRED_METHOD] * (1 - FE_SWITCH_MARGIN)
-        ? $bestChallenger
-        : FE_PREFERRED_METHOD;
+    return FE_PREFERRED_METHOD;
 }
 
 // ---------------------------------------------------------------------------
