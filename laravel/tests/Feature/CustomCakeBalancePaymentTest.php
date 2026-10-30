@@ -20,11 +20,14 @@ class CustomCakeBalancePaymentTest extends TestCase
             $table->string('status');
             $table->decimal('total', 10, 2);
             $table->decimal('downpayment_amount', 10, 2)->nullable();
+            $table->decimal('downpayment_base_amount', 10, 2)->nullable();
             $table->string('method')->nullable();
             $table->string('payment');
             $table->string('payment_status')->default('pending');
             $table->string('payment_reference')->nullable();
             $table->string('payment_link')->nullable();
+            $table->string('payment_proof_path')->nullable();
+            $table->string('customer_payment_reference')->nullable();
             $table->boolean('is_customized')->default(true);
             $table->string('order_type')->default('Customized');
             $table->timestamps();
@@ -169,6 +172,56 @@ class CustomCakeBalancePaymentTest extends TestCase
             && $request['amount'] === 50000
             && $request['remarks'] === 'Pickup order remaining balance'
             && str_contains($request['description'], 'Remaining Balance')
+        );
+    }
+
+    public function test_custom_downpayment_credit_matches_the_qrph_charge_after_proof_submission(): void
+    {
+        \Illuminate\Support\Facades\DB::table('orders')->insert([
+            'id' => 43,
+            'user_id' => 9,
+            'status' => 'Awaiting Payment',
+            'total' => 10,
+            'downpayment_amount' => 5,
+            'payment' => 'QRPh',
+            'payment_status' => 'pending',
+            'is_customized' => true,
+            'order_type' => 'Customized',
+        ]);
+        \Illuminate\Support\Facades\DB::table('custom_cake_orders')->insert([
+            'order_id' => 43,
+            'notes' => json_encode(['downpayment_amount' => 5]),
+        ]);
+
+        $customer = new User();
+        $customer->id = 9;
+        $customer->role = 'customer';
+
+        $this->actingAs($customer)
+            ->postJson('/api/orders/43/payment-proof', [
+                'customer_payment_reference' => 'QRPH_DOWNPAYMENT_103',
+            ])
+            ->assertOk()
+            ->assertJsonPath('payment_status', 'proof_submitted');
+
+        $this->assertDatabaseHas('orders', [
+            'id' => 43,
+            'downpayment_base_amount' => 5,
+            'downpayment_amount' => 5.12,
+            'payment_status' => 'proof_submitted',
+        ]);
+
+        \Illuminate\Support\Facades\DB::table('orders')->where('id', 43)->update([
+            'status' => 'Awaiting Balance Payment',
+            'payment_status' => 'paid',
+        ]);
+        $this->actingAs($customer)
+            ->postJson('/create_payment.php', ['order_id' => 43, 'payment_type' => 'balance'])
+            ->assertOk();
+
+        Http::assertSent(fn (ClientRequest $request) =>
+            $request->url() === 'https://api.paymongo.com/v2/checkout_sessions'
+            && $request['data']['attributes']['line_items'][0]['amount'] === 50000
         );
     }
 

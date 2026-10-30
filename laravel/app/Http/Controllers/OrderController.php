@@ -706,6 +706,49 @@ class OrderController extends Controller
             return response()->json(['success' => false, 'message' => 'This order is not awaiting a QR payment.'], 409);
         }
 
+        $downpaymentUpdates = [];
+        if ($isCustomCake && $order->status === 'Awaiting Payment') {
+            $customCakeNotes = [];
+            foreach (['custom_cake_orders', 'customized_cake_orders'] as $table) {
+                if (!Schema::hasTable($table)) {
+                    continue;
+                }
+
+                $notes = DB::table($table)->where('order_id', $orderId)->value('notes');
+                if (!is_string($notes) || trim($notes) === '') {
+                    continue;
+                }
+
+                $decodedNotes = json_decode($notes, true);
+                if (is_array($decodedNotes)) {
+                    $customCakeNotes = $decodedNotes;
+                    break;
+                }
+            }
+
+            $baseAmount = (float) ($order->downpayment_base_amount ?? 0);
+            if ($baseAmount <= 0) {
+                $baseAmount = (float) ($customCakeNotes['downpayment_base_amount']
+                    ?? $customCakeNotes['downpayment_amount']
+                    ?? $order->downpayment_amount
+                    ?? 0);
+            }
+            if ($baseAmount <= 0 && (float) ($customCakeNotes['downpayment_percent'] ?? 0) > 0) {
+                $baseAmount = round(
+                    (float) $order->total * (float) $customCakeNotes['downpayment_percent'] / 100,
+                    2
+                );
+            }
+            if ($baseAmount > 0) {
+                $baseAmount = round($baseAmount, 2);
+                $grossAmount = ceil(($baseAmount / (1 - 0.0223) * 100) - 1e-8) / 100;
+                $downpaymentUpdates = [
+                    'downpayment_base_amount' => $baseAmount,
+                    'downpayment_amount' => $grossAmount,
+                ];
+            }
+        }
+
         $newPath = null;
         if ($hasPaymentProof) {
             $newPath = $request->file('payment_proof')->store('payment-proofs', 'local');
@@ -717,6 +760,7 @@ class OrderController extends Controller
         $oldPath = $order->payment_proof_path;
         try {
             $order->update([
+                ...$downpaymentUpdates,
                 'payment_proof_path' => $newPath,
                 'customer_payment_reference' => $paymentReference !== '' ? $paymentReference : null,
                 'payment_status' => 'proof_submitted',

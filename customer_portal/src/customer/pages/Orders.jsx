@@ -9,6 +9,7 @@ import {
   getCustomCakeDetails,
   getCustomCakeReferenceSources,
   isCustomCakeOrder,
+  parseCustomCakeDetails,
   resolveCustomCakeImageUrl,
 } from './customCakeImages';
 import { getCustomCakePaymentBreakdown } from '../utils/customCakePayment';
@@ -1407,9 +1408,8 @@ export default function Orders() {
                   : cakeSize && typeof cakeSize === 'object'
                     ? Object.values(cakeSize).filter(Boolean).join(', ')
                     : String(cakeSize || '').trim();
-                const customPaymentDetails = order.custom_details && typeof order.custom_details === 'string'
-                  ? (() => { try { return JSON.parse(order.custom_details); } catch { return {}; } })()
-                  : (order.custom_details || order.custom_cake_details || {});
+                const customPaymentDetails = getCustomCakeDetails(order);
+                const customCakeNotes = parseCustomCakeDetails(customPaymentDetails.notes);
                 const isDeliveryOrder = [order.method, order.delivery_method, customPaymentDetails.delivery_method]
                   .some((method) => String(method || '').trim().toLowerCase().includes('deliver'));
                 const riderInformation = {
@@ -1427,15 +1427,28 @@ export default function Orders() {
                   }
                   setSelectedOrder(order);
                 };
-                const quotedDownpayment = Number(order.downpayment_amount ?? customPaymentDetails.downpayment_amount);
-                const downpaymentPercent = Number(customPaymentDetails.downpayment_percent ?? 50);
-                const customDownpaymentAmount = Number.isFinite(quotedDownpayment)
+                const quotedDownpayment = Number(
+                  order.downpayment_base_amount
+                  ?? customPaymentDetails.downpayment_base_amount
+                  ?? customCakeNotes.downpayment_base_amount
+                  ?? customCakeNotes.downpayment_amount
+                  ?? customPaymentDetails.downpayment_amount
+                  ?? order.downpayment_amount,
+                );
+                const downpaymentPercent = Number(customCakeNotes.downpayment_percent ?? customPaymentDetails.downpayment_percent ?? 50);
+                const customDownpaymentBaseAmount = Number.isFinite(quotedDownpayment)
                   ? quotedDownpayment
                   : Number((Number(order.total || 0) * downpaymentPercent / 100).toFixed(2));
+                const customDownpaymentAmount = Number(
+                  order.downpayment_amount
+                  ?? customPaymentDetails.downpayment_amount
+                  ?? customCakeNotes.downpayment_amount
+                  ?? customDownpaymentBaseAmount,
+                );
                 const customBalanceAmount = Math.max(0, Number((Number(order.total || 0) - customDownpaymentAmount).toFixed(2)));
                 const remainingBalanceAmount = Math.max(0, Number((Number(order.total || 0) - Number(order.downpayment_amount || 0)).toFixed(2)));
                 const customPaymentMethod = isCustomized ? 'QR Ph' : (order.payment || customPaymentDetails.payment_method || '—');
-                const downpaymentBreakdown = getCustomCakePaymentBreakdown(customDownpaymentAmount);
+                const downpaymentBreakdown = getCustomCakePaymentBreakdown(customDownpaymentBaseAmount);
                 const balanceBreakdown = getCustomCakePaymentBreakdown(customBalanceAmount);
                 const canPayPickupBalance = !isCustomized
                   && paymentMethodKey === 'qrph'
@@ -1595,7 +1608,7 @@ export default function Orders() {
                       )}
                       {isCustomized && isAwaitingPayment && customDownpaymentAmount > 0 && (
                         <p className="mt-1 text-[10px] leading-4 text-gray-500">
-                          Downpayment fee: ₱{downpaymentBreakdown.fee.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          Downpayment: ₱{downpaymentBreakdown.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </p>
                       )}
                       {isCustomized && isAwaitingBalancePayment && customBalanceAmount > 0 && (
@@ -1614,7 +1627,7 @@ export default function Orders() {
                               type="button"
                               onClick={() => handleCreatePaymentLink(order)}
                               disabled={payingOrderId === order.id || customDownpaymentAmount <= 0}
-                              title={customDownpaymentAmount <= 0 ? 'Ask Admin to enter a downpayment amount.' : `Pay the ₱${customDownpaymentAmount.toFixed(2)} downpayment plus ₱${downpaymentBreakdown.fee.toFixed(2)} ${customPaymentMethod} fee`}
+                              title={customDownpaymentAmount <= 0 ? 'Ask Admin to enter a downpayment amount.' : `Pay the ₱${downpaymentBreakdown.total.toFixed(2)} ${customPaymentMethod} downpayment`}
                               className="inline-flex h-9 w-[126px] shrink-0 items-center justify-center gap-1.5 rounded-lg bg-[#fff1bd] px-3 py-2 text-center text-[11px] font-semibold leading-4 text-[#6b4f1d] transition-colors hover:bg-[#ffe79a] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#b89646] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                             >
                               <CreditCard size={14} />

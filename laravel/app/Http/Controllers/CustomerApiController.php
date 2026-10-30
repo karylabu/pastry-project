@@ -679,6 +679,9 @@ class CustomerApiController extends Controller
                 'lat' => floatval($row->lat ?? 0),
                 'lng' => floatval($row->lng ?? 0),
                 'is_customized' => $row->is_customized,
+                'downpayment_base_amount' => isset($row->downpayment_base_amount)
+                    ? floatval($row->downpayment_base_amount)
+                    : null,
                 'custom_details' => $customDetails,
             ];
         });

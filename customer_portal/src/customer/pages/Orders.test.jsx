@@ -198,3 +198,71 @@ test('shows Awaiting Payment only for customized orders in the customer status f
   expect(screen.getByText('Customized Cake')).toBeInTheDocument();
   expect(screen.queryByText('Blueberry Cheesecake')).not.toBeInTheDocument();
 });
+
+test('shows the full QR Ph charge as the custom cake downpayment', async () => {
+  global.fetch = jest.fn((url) => {
+    if (String(url).includes('/api/customer/products')) {
+      return Promise.resolve({ ok: true, json: async () => [] });
+    }
+
+    return Promise.resolve({
+      ok: true,
+      json: async () => ({
+        success: true,
+        orders: [{
+          id: 603,
+          user_id: 7,
+          customer: 'Customer',
+          status: 'Awaiting Payment',
+          payment: 'QRPh',
+          payment_status: 'pending',
+          total: 2,
+          downpayment_amount: 1,
+          is_customized: true,
+          custom_details: { notes: JSON.stringify({ downpayment_amount: 1 }) },
+          items: [{ name: 'Customized Cake', qty: 1, price: 2 }],
+        }],
+      }),
+    });
+  });
+
+  render(<Orders />);
+
+  expect(await screen.findByRole('button', { name: 'Pay ₱1.03' })).toBeInTheDocument();
+  expect(screen.getByText('Downpayment: ₱1.03')).toBeInTheDocument();
+  expect(screen.queryByText('Downpayment fee: ₱0.03')).not.toBeInTheDocument();
+});
+
+test('uses the full QR Ph downpayment credit when showing the custom cake balance', async () => {
+  global.fetch = jest.fn((url) => {
+    if (String(url).includes('/api/customer/products')) {
+      return Promise.resolve({ ok: true, json: async () => [] });
+    }
+
+    return Promise.resolve({
+      ok: true,
+      json: async () => ({
+        success: true,
+        orders: [{
+          id: 604,
+          user_id: 7,
+          customer: 'Customer',
+          status: 'Awaiting Balance Payment',
+          payment: 'QRPh',
+          payment_status: 'downpayment_paid',
+          total: 10,
+          downpayment_base_amount: 5,
+          downpayment_amount: 5.12,
+          is_customized: true,
+          custom_details: { notes: JSON.stringify({ downpayment_amount: 5 }) },
+          items: [{ name: 'Customized Cake', qty: 1, price: 10 }],
+        }],
+      }),
+    });
+  });
+
+  render(<Orders />);
+
+  expect(await screen.findByRole('button', { name: 'Pay ₱5.00' })).toBeInTheDocument();
+  expect(screen.getByText('Deposit paid: ₱5.12 · Balance due: ₱4.88')).toBeInTheDocument();
+});
