@@ -76,6 +76,10 @@ describe("CustomCakes", () => {
     expect(orderRow).toHaveTextContent("Blue ocean theme");
     expect(orderRow).toHaveTextContent("8 inches");
     expect(orderRow).toHaveTextContent("Vanilla");
+    expect(within(orderRow).getByRole("img", { name: "Customer cake reference" })).toHaveAttribute(
+      "src",
+      "/assets/logo.png",
+    );
     await waitFor(() => {
       expect(global.fetch).toHaveBeenCalledWith(
         "https://example.test/laravel/public/api/staff/orders?custom=1",
@@ -87,6 +91,39 @@ describe("CustomCakes", () => {
         }),
       );
     });
+  });
+
+  test("replaces a broken custom cake reference image with the bakery logo", async () => {
+    global.fetch.mockImplementation((url, options = {}) => {
+      if (url.includes("/customized-cakes/request-status")) {
+        const enabled = options.method === "PATCH" ? JSON.parse(options.body).enabled : true;
+        return Promise.resolve({ ok: true, json: async () => ({ success: true, enabled }) });
+      }
+
+      return Promise.resolve({
+        ok: true,
+        json: async () => ({
+          success: true,
+          orders: [{
+            id: 31,
+            status: "Pending",
+            payment_status: "paid",
+            customer: "Mila Customer",
+            total: 1200,
+            custom_inspo_images: ["/missing-reference.jpg"],
+          }],
+        }),
+      });
+    });
+
+    render(<CustomCakes />);
+
+    const referenceImage = await screen.findByRole("img", { name: "Customer cake reference" });
+    expect(referenceImage).toHaveAttribute("src", "http://localhost/pastry-project/missing-reference.jpg");
+
+    fireEvent.error(referenceImage);
+
+    expect(referenceImage).toHaveAttribute("src", "/assets/logo.png");
   });
 
   test("keeps all request status filters in one row and fits them on desktop", async () => {

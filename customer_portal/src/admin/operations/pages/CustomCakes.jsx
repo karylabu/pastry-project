@@ -31,6 +31,25 @@ const ACTION_BUTTON_BASE = "inline-flex h-8 w-full min-w-0 items-center justify-
 const ACTION_BUTTON_PRIMARY = `${ACTION_BUTTON_BASE} bg-[#33251e] text-white hover:bg-[#5b4540]`;
 const ACTION_BUTTON_SECONDARY = `${ACTION_BUTTON_BASE} bg-[#33251e] text-white hover:bg-[#5b4540]`;
 const ACTION_BUTTON_DANGER = `${ACTION_BUTTON_BASE} border border-red-200 bg-red-50 text-red-700 hover:bg-red-100`;
+const CAKE_REFERENCE_FALLBACK = "/assets/logo.png";
+
+function CakeReferenceImage({ src, alt, className }) {
+  const [failed, setFailed] = useState(false);
+  const imageSrc = src && !failed ? src : CAKE_REFERENCE_FALLBACK;
+
+  useEffect(() => {
+    setFailed(false);
+  }, [src]);
+
+  return (
+    <img
+      src={imageSrc}
+      alt={alt}
+      className={className}
+      onError={() => setFailed(true)}
+    />
+  );
+}
 
 function Toast({ toasts }) {
   return (
@@ -888,7 +907,7 @@ export default function CustomCakes() {
                         <p className="shrink-0 text-[14px] font-bold text-[#33251e]">₱{Number(order.total || 0).toLocaleString()}</p>
                       </div>
                       <div className="mt-3 flex items-start gap-3 border-t border-[#f0e9e2] pt-3">
-                        <div className="h-14 w-14 shrink-0 overflow-hidden rounded-md border border-[#eee4de] bg-[#f7f4ef]">{referenceImage ? <img src={referenceImage} alt="Cake reference" className="h-full w-full object-cover" /> : <div className="grid h-full place-items-center text-[8px] font-semibold uppercase text-[#a99a8e]">Cake</div>}</div>
+                        <div className="h-14 w-14 shrink-0 overflow-hidden rounded-md border border-[#eee4de] bg-[#f7f4ef]"><CakeReferenceImage src={referenceImage} alt="Cake reference" className="h-full w-full object-contain p-1" /></div>
                         <div className="min-w-0 flex-1"><p className="text-[11px] font-medium text-[#65574d]">{itemLabel}</p><p className="mt-1 line-clamp-2 text-[10px] leading-4 text-[#8f8076]">{getRequestDetailsSummary(order)}</p><p className="mt-1 text-[9px] text-[#a99a8e]">{order.created_at ? new Date(order.created_at).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "No date"}</p></div>
                       </div>
                       <div className="mt-3 flex flex-wrap gap-1.5">
@@ -945,11 +964,7 @@ export default function CustomCakes() {
                         <td className="px-4 py-4 text-[12px] text-black/60">
                           <div className="flex min-w-0 items-start gap-3">
                             <div className="h-12 w-12 shrink-0 overflow-hidden rounded-lg border border-[#ddd4c2] bg-[#f4efe4]">
-                              {referenceImage ? (
-                                <img src={referenceImage} alt="Customer cake reference" className="h-full w-full object-cover" />
-                              ) : (
-                                <div className="grid h-full w-full place-items-center text-[9px] font-semibold uppercase tracking-[0.12em] text-black/35">Cake</div>
-                              )}
+                              <CakeReferenceImage src={referenceImage} alt="Customer cake reference" className="h-full w-full object-contain p-1" />
                             </div>
                             <div className="min-w-0 space-y-2">
                               <div className="leading-5 text-black/75">
@@ -1258,14 +1273,15 @@ export default function CustomCakes() {
                   <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
                     {selectedReferenceImages.map((image) => (
                       <a key={`${image.url}-${image.name}`} href={image.url} target="_blank" rel="noreferrer" className="group overflow-hidden rounded-2xl border border-black/10 bg-[#FAFAFA]">
-                        <img src={image.url} alt={image.name} className="h-36 w-full object-cover transition group-hover:scale-[1.03]" />
+                        <CakeReferenceImage src={image.url} alt={image.name} className="h-36 w-full object-cover transition group-hover:scale-[1.03]" />
                         <p className="truncate px-3 py-2 text-[11px] text-black/65">{image.name}</p>
                       </a>
                     ))}
                   </div>
                 ) : (
-                  <div className="mt-4 flex min-h-36 items-center justify-center rounded-2xl border border-dashed border-black/15 bg-[#FAFAFA] px-4 text-center text-sm text-black/45">
-                    No reference image was provided.
+                  <div className="mt-4 flex min-h-36 flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-black/15 bg-[#FAFAFA] px-4 text-center text-sm text-black/45">
+                    <img src={CAKE_REFERENCE_FALLBACK} alt="Pastry Project logo" className="h-20 w-20 object-contain" />
+                    <span>No reference image was provided.</span>
                   </div>
                 )}
               </div>
