@@ -35,6 +35,7 @@ export default function CakeRecipes() {
   const [preview, setPreview] = useState(null);
   const [adminDialog, setAdminDialog] = useState(null);
   const [deletingRecipe, setDeletingRecipe] = useState(false);
+  const [removingRecipeIngredient, setRemovingRecipeIngredient] = useState(false);
   const showStatus = (message, type = "success") => {
     setStatus(message);
     setStatusType(type);
@@ -154,6 +155,42 @@ export default function CakeRecipes() {
       message: `The saved recipe for ${flavorName} will be moved to the Recycle Bin and can be restored from Settings within 30 days.`,
       confirmLabel: "Move to Recycle Bin",
       onConfirm: () => deleteRecipe(selectedRecipe, flavorName),
+    });
+  };
+
+  const confirmRemoveRecipeIngredient = (index) => {
+    const line = recipeLines[index];
+    if (!line || !selectedFlavorId || removingRecipeIngredient) return;
+    const ingredientName = catalog.ingredients.find(
+      (ingredient) => String(ingredient.id) === String(line.ingredient_id)
+    )?.name || "This ingredient";
+    const flavorName = selectedFlavor?.name || "this flavor";
+
+    setAdminDialog({
+      kind: "confirm",
+      title: "Remove ingredient from recipe?",
+      message: `${ingredientName} will be removed from the ${flavorName} recipe. This also saves the current recipe draft.`,
+      confirmLabel: "Remove ingredient",
+      onConfirm: async () => {
+        setRemovingRecipeIngredient(true);
+        const ingredients = recipeLines
+          .filter((_, lineIndex) => lineIndex !== index)
+          .filter((recipeLine) => recipeLine.ingredient_id && Number(recipeLine.quantity) > 0);
+
+        try {
+          await request("/api/staff/customized-cakes/recipes", {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ flavor_id: selectedFlavorId, ingredients }),
+          });
+          showStatus(`${ingredientName} removed from the ${flavorName} recipe.`);
+          await loadCatalog();
+        } catch (error) {
+          showStatus(error.message, "error");
+        } finally {
+          setRemovingRecipeIngredient(false);
+        }
+      },
     });
   };
 
@@ -420,7 +457,7 @@ export default function CakeRecipes() {
                       {recipeUnits.map((unit) => <option key={unit} value={unit}>{unit}</option>)}
                     </select>
                   </label>
-                  <button type="button" title={`Remove ingredient ${index + 1}`} aria-label={`Remove ingredient ${index + 1}`} onClick={() => setRecipeLines((lines) => lines.filter((_, lineIndex) => lineIndex !== index))} className="inline-flex h-9 w-9 items-center justify-center justify-self-end rounded-md border border-[#eadfd8] bg-white text-[#8f675e] transition hover:border-[#d9aaa0] hover:bg-[#fff0eb] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#9b8c83] md:justify-self-center">
+                  <button type="button" title={`Remove ingredient ${index + 1}`} aria-label={`Remove ingredient ${index + 1}`} onClick={() => confirmRemoveRecipeIngredient(index)} disabled={removingRecipeIngredient} className="inline-flex h-9 w-9 items-center justify-center justify-self-end rounded-md border border-[#eadfd8] bg-white text-[#8f675e] transition hover:border-[#d9aaa0] hover:bg-[#fff0eb] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#9b8c83] disabled:cursor-not-allowed disabled:opacity-50 md:justify-self-center">
                     <Trash2 size={14} />
                   </button>
                 </div>

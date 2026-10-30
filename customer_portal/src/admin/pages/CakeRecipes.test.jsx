@@ -75,6 +75,101 @@ describe("CakeRecipes ingredient pagination", () => {
     expect(screen.getByRole("button", { name: "Save recipe" })).toBeDisabled();
   });
 
+  test("confirms and saves removing an ingredient from the recipe", async () => {
+    let savedIngredients = [
+      { ingredient_id: 1, quantity: 240, unit: "g" },
+      { ingredient_id: 2, quantity: 113, unit: "g" },
+    ];
+    global.fetch.mockImplementation((url, options = {}) => {
+      if (String(url).includes("/catalog")) {
+        return Promise.resolve({
+          ok: true,
+          text: async () => JSON.stringify({
+            success: true,
+            flavors: [{ id: 1, name: "Carrot", active: true }],
+            sizes: [],
+            ingredients: [
+              { id: 1, name: "All-purpose Flour", unit: "g" },
+              { id: 2, name: "Butter", unit: "g" },
+            ],
+            recipes: [{ id: 21, flavor_id: 1, ingredients: savedIngredients }],
+          }),
+        });
+      }
+      if (options.method === "PUT") {
+        savedIngredients = JSON.parse(options.body).ingredients;
+        return Promise.resolve({ ok: true, text: async () => JSON.stringify({ success: true }) });
+      }
+      return Promise.resolve({ ok: true, text: async () => JSON.stringify({ success: true }) });
+    });
+
+    render(<CakeRecipes />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Remove ingredient 1" }));
+
+    const confirmation = await screen.findByRole("alertdialog");
+    expect(confirmation).toHaveTextContent("Remove ingredient from recipe?");
+    expect(confirmation).toHaveTextContent(
+      "All-purpose Flour will be removed from the Carrot recipe. This also saves the current recipe draft."
+    );
+    expect(screen.getAllByRole("spinbutton")).toHaveLength(2);
+    expect(global.fetch).not.toHaveBeenCalledWith(
+      "https://example.test/laravel/public/api/staff/customized-cakes/recipes",
+      expect.objectContaining({ method: "PUT" })
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Remove ingredient" }));
+
+    await waitFor(() => {
+      const saveCall = global.fetch.mock.calls.find(
+        ([url, options]) => String(url).endsWith("/api/staff/customized-cakes/recipes") && options.method === "PUT"
+      );
+      expect(saveCall).toBeDefined();
+      expect(JSON.parse(saveCall[1].body).ingredients).toEqual([
+        { ingredient_id: "2", quantity: "113", unit: "g" },
+      ]);
+    });
+    expect(await screen.findByRole("status")).toHaveTextContent("All-purpose Flour removed from the Carrot recipe.");
+    await waitFor(() => expect(screen.getAllByRole("spinbutton")).toHaveLength(1));
+    expect(global.fetch).not.toHaveBeenCalledWith(
+      expect.stringContaining("/api/staff/customized-cakes/recipes/21"),
+      expect.objectContaining({ method: "DELETE" })
+    );
+  });
+
+  test("shows an error and keeps the ingredient if saving its removal fails", async () => {
+    global.fetch.mockImplementation((url, options = {}) => {
+      if (String(url).includes("/catalog")) {
+        return Promise.resolve({
+          ok: true,
+          text: async () => JSON.stringify({
+            success: true,
+            flavors: [{ id: 1, name: "Carrot", active: true }],
+            sizes: [],
+            ingredients: [{ id: 1, name: "All-purpose Flour", unit: "g" }],
+            recipes: [{ id: 21, flavor_id: 1, ingredients: [{ ingredient_id: 1, quantity: 240, unit: "g" }] }],
+          }),
+        });
+      }
+      if (options.method === "PUT") {
+        return Promise.resolve({
+          ok: false,
+          status: 500,
+          text: async () => JSON.stringify({ success: false, message: "Unable to save recipe." }),
+        });
+      }
+      return Promise.resolve({ ok: true, text: async () => JSON.stringify({ success: true }) });
+    });
+
+    render(<CakeRecipes />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Remove ingredient 1" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Remove ingredient" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Unable to save recipe.");
+    expect(screen.getByRole("button", { name: "Remove ingredient 1" })).toBeInTheDocument();
+  });
+
   test("moves the saved recipe to the Recycle Bin and shows a success notice", async () => {
     const catalog = {
       success: true,
