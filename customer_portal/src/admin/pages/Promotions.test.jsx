@@ -71,6 +71,16 @@ describe("Promotions campaign history", () => {
     });
   });
 
+  test("keeps the coupon discount editable before entering a coupon code", async () => {
+    render(<Promotions />);
+
+    const discountInput = await screen.findByLabelText("Coupon discount (%)");
+    expect(discountInput).toBeEnabled();
+
+    fireEvent.change(discountInput, { target: { value: "25" } });
+    expect(discountInput).toHaveValue(25);
+  });
+
   test("deletes the selected campaign after confirmation", async () => {
     render(<Promotions />);
 

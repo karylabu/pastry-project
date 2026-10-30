@@ -270,7 +270,15 @@ export default function Promotions() {
       setError("Title, message, start date, and end date are required.");
       return;
     }
-    if (form.coupon_code.trim() && (!form.discount_percent || Number(form.discount_percent) < 1 || Number(form.discount_percent) > 100)) {
+    if (form.discount_percent && !form.coupon_code.trim()) {
+      setError("Enter a coupon code to use this discount.");
+      return;
+    }
+    if (form.coupon_code.trim() && !form.discount_percent) {
+      setError("Enter a coupon discount between 1% and 100%.");
+      return;
+    }
+    if (form.discount_percent && (Number(form.discount_percent) < 1 || Number(form.discount_percent) > 100)) {
       setError("Enter a coupon discount between 1% and 100%.");
       return;
     }
@@ -376,9 +384,8 @@ export default function Promotions() {
                       min="1"
                       max="100"
                       step="1"
-                      disabled={!form.coupon_code.trim()}
                       placeholder="10"
-                      className="h-10 w-full rounded-md border border-[#e8dfd4] bg-white px-3 text-[12px] text-black placeholder:text-black/35 focus:border-[#b89646] focus:outline-none focus:ring-2 focus:ring-[#d4af37]/15 disabled:cursor-not-allowed disabled:bg-[#f5f2ed]"
+                      className="h-10 w-full rounded-md border border-[#e8dfd4] bg-white px-3 text-[12px] text-black placeholder:text-black/35 focus:border-[#b89646] focus:outline-none focus:ring-2 focus:ring-[#d4af37]/15"
                     />
                   </label>
 
