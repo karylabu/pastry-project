@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import Papa from "papaparse";
 import * as XLSX from "xlsx";
-import { Calculator, CakeSlice, CheckCircle2, ChevronLeft, ChevronRight, Package, Plus, Search, Save, Trash2, Upload } from "lucide-react";
+import { Calculator, CakeSlice, CheckCircle2, ChevronLeft, ChevronRight, CircleX, Package, Plus, Search, Save, Trash2, Upload } from "lucide-react";
 import { LARAVEL_BASE } from "../../services/config";
 import { safeParseJson } from "../../services/api";
 import AdminDialog from "../components/AdminDialog";
@@ -26,6 +26,7 @@ export default function CakeRecipes() {
   const [flavorForm, setFlavorForm] = useState({ id: "", name: "", active: true });
   const [sizeForm, setSizeForm] = useState({ id: "", code: "", label: "", multiplier: "", active: true });
   const [status, setStatus] = useState("");
+  const [statusType, setStatusType] = useState("success");
   const [loading, setLoading] = useState(true);
   const [previewTiers, setPreviewTiers] = useState([
     { flavor_id: "", size_id: "" },
@@ -34,6 +35,10 @@ export default function CakeRecipes() {
   const [preview, setPreview] = useState(null);
   const [adminDialog, setAdminDialog] = useState(null);
   const [deletingRecipe, setDeletingRecipe] = useState(false);
+  const showStatus = (message, type = "success") => {
+    setStatus(message);
+    setStatusType(type);
+  };
 
   const request = async (path, options = {}) => {
     let storedUser = null;
@@ -62,7 +67,7 @@ export default function CakeRecipes() {
       const data = await request("/api/staff/customized-cakes/catalog");
       setCatalog(data);
     } catch (error) {
-      setStatus(error.message);
+      showStatus(error.message, "error");
     } finally {
       setLoading(false);
     }
@@ -101,43 +106,55 @@ export default function CakeRecipes() {
     event.preventDefault();
     try {
       await request("/api/staff/customized-cakes/flavors", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(flavorForm) });
-      setStatus("Flavor saved.");
+      showStatus("Flavor saved.");
       setFlavorForm({ id: "", name: "", active: true });
       await loadCatalog();
-    } catch (error) { setStatus(error.message); }
+    } catch (error) { showStatus(error.message, "error"); }
   };
 
   const saveSize = async (event) => {
     event.preventDefault();
     try {
       await request("/api/staff/customized-cakes/sizes", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(sizeForm) });
-      setStatus("Size saved.");
+      showStatus("Size saved.");
       setSizeForm({ id: "", code: "", label: "", multiplier: "", active: true });
       await loadCatalog();
-    } catch (error) { setStatus(error.message); }
+    } catch (error) { showStatus(error.message, "error"); }
   };
 
   const saveRecipe = async (event) => {
     event.preventDefault();
     try {
       await request("/api/staff/customized-cakes/recipes", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ flavor_id: selectedFlavorId, ingredients: recipeLines.filter((line) => line.ingredient_id && Number(line.quantity) > 0) }) });
-      setStatus("Base recipe saved.");
+      showStatus("Base recipe saved.");
       await loadCatalog();
-    } catch (error) { setStatus(error.message); }
+    } catch (error) { showStatus(error.message, "error"); }
   };
 
-  const deleteRecipe = async () => {
-    if (!selectedRecipe?.id || !window.confirm(`Move the saved recipe for ${selectedFlavor?.name || "this flavor"} to the Recycle Bin?`)) return;
+  const deleteRecipe = async (recipe, flavorName) => {
+    if (!recipe?.id) return;
     setDeletingRecipe(true);
     try {
-      await request(`/api/staff/customized-cakes/recipes/${selectedRecipe.id}`, { method: "DELETE" });
-      setStatus("Recipe moved to the Recycle Bin. It can be restored for 30 days.");
+      await request(`/api/staff/customized-cakes/recipes/${recipe.id}`, { method: "DELETE" });
+      showStatus(`${flavorName} recipe moved to the Recycle Bin. It can be restored from Settings within 30 days.`);
       await loadCatalog();
     } catch (error) {
-      setStatus(error.message);
+      showStatus(error.message, "error");
     } finally {
       setDeletingRecipe(false);
     }
+  };
+
+  const confirmDeleteRecipe = () => {
+    if (!selectedRecipe?.id) return;
+    const flavorName = selectedFlavor?.name || "This flavor";
+    setAdminDialog({
+      kind: "confirm",
+      title: "Move recipe to Recycle Bin?",
+      message: `The saved recipe for ${flavorName} will be moved to the Recycle Bin and can be restored from Settings within 30 days.`,
+      confirmLabel: "Move to Recycle Bin",
+      onConfirm: () => deleteRecipe(selectedRecipe, flavorName),
+    });
   };
 
   const importRecipeFile = async (event) => {
@@ -207,7 +224,7 @@ export default function CakeRecipes() {
           onConfirm: () => {
             setRecipeLines(importedLines);
             setIngredientPage(1);
-            setStatus(`Imported ${importedLines.length} ingredients for ${selectedFlavor?.name || "this flavor"}. Review the recipe, then save it.`);
+            showStatus(`Imported ${importedLines.length} ingredients for ${selectedFlavor?.name || "this flavor"}. Review the recipe, then save it.`);
           },
         });
         return;
@@ -215,9 +232,9 @@ export default function CakeRecipes() {
 
       setRecipeLines(importedLines);
       setIngredientPage(1);
-      setStatus(`Imported ${importedLines.length} ingredients for ${selectedFlavor?.name || "this flavor"}. Review the recipe, then save it.`);
+      showStatus(`Imported ${importedLines.length} ingredients for ${selectedFlavor?.name || "this flavor"}. Review the recipe, then save it.`);
     } catch (error) {
-      setStatus(error.message);
+      showStatus(error.message, "error");
     } finally {
       input.value = "";
     }
@@ -233,14 +250,14 @@ export default function CakeRecipes() {
         body: JSON.stringify({ tiers }),
       });
       setPreview(data.preview);
-    } catch (error) { setStatus(error.message); }
+    } catch (error) { showStatus(error.message, "error"); }
   };
 
   const toggle = async (type, item) => {
     try {
       await request(`/api/staff/customized-cakes/${type}/${item.id}/toggle`, { method: "PATCH" });
       await loadCatalog();
-    } catch (error) { setStatus(error.message); }
+    } catch (error) { showStatus(error.message, "error"); }
   };
 
   const updateLine = (index, field, value) => setRecipeLines((lines) => lines.map((line, lineIndex) => lineIndex === index ? { ...line, [field]: value } : line));
@@ -270,7 +287,7 @@ export default function CakeRecipes() {
       unit: line.unit || "g",
     })));
     setIngredientPage(1);
-    setStatus("Unsaved recipe changes discarded.");
+    showStatus("Unsaved recipe changes discarded.");
   };
   const recipeUnits = ["g", "kg", "ml", "L", "pcs", "tsp", "tbsp", "cup"];
 
@@ -285,7 +302,7 @@ export default function CakeRecipes() {
           </div>
         </header>
 
-        {status && <div role="status" className="flex items-start gap-2 rounded-xl border border-[#e7c875] bg-[#fff8e9] px-4 py-3 text-[13px] text-[#6f541d]"><CheckCircle2 size={16} className="mt-0.5 shrink-0" />{status}</div>}
+        {status && <div role={statusType === "error" ? "alert" : "status"} className={`flex items-start gap-2 rounded-xl border px-4 py-3 text-[13px] ${statusType === "error" ? "border-[#efd8d4] bg-[#fff1e9] text-[#8d4a37]" : "border-[#e7c875] bg-[#fff8e9] text-[#6f541d]"}`}>{statusType === "error" ? <CircleX size={16} className="mt-0.5 shrink-0" /> : <CheckCircle2 size={16} className="mt-0.5 shrink-0" />}{status}</div>}
 
         <section className="overflow-hidden rounded-xl border border-[#eadfd8] bg-white shadow-[0_5px_18px_rgba(91,64,39,0.04)]">
           <div className="flex flex-col gap-3 border-b border-[#f0e7e0] bg-[#fffdfa] px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
@@ -362,7 +379,7 @@ export default function CakeRecipes() {
                   <Upload size={14} /> Import recipe
                   <input type="file" accept=".csv,.xlsx,.xls" onChange={importRecipeFile} disabled={!selectedFlavor} className="sr-only" />
                 </label>
-                {selectedRecipe && <button type="button" onClick={deleteRecipe} disabled={deletingRecipe} className="inline-flex h-9 items-center gap-1.5 rounded-md border border-[#efd8d4] px-3 text-[11px] font-semibold text-[#8d5357] transition hover:bg-[#fff0f0] disabled:opacity-50"><Trash2 size={14} /> {deletingRecipe ? "Moving..." : "Move to bin"}</button>}
+                {selectedRecipe && <button type="button" aria-label={`Move ${selectedFlavor?.name || "saved"} recipe to Recycle Bin`} onClick={confirmDeleteRecipe} disabled={deletingRecipe} className="inline-flex h-9 items-center gap-1.5 rounded-md border border-[#efd8d4] px-3 text-[11px] font-semibold text-[#8d5357] transition hover:bg-[#fff0f0] disabled:opacity-50"><Trash2 size={14} /> {deletingRecipe ? "Moving..." : "Move to bin"}</button>}
                 <label className="text-[9px] font-bold uppercase tracking-[0.14em] text-[#8f8076]">
                   <span className="sr-only">Change flavor</span>
                   <select aria-label="Change flavor" value={selectedFlavorId} onChange={(event) => setSelectedFlavorId(event.target.value)} className="block h-9 min-w-40 rounded-md border border-[#eadfd8] bg-white px-3 text-[11px] font-medium normal-case tracking-normal text-[#33251e] outline-none transition focus:border-[#d4af37] focus:ring-2 focus:ring-[#d4af37]/20">

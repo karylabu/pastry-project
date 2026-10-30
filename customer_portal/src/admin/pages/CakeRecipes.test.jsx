@@ -1,5 +1,5 @@
 import React from "react";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import CakeRecipes from "./CakeRecipes";
 
 jest.mock("../../services/config", () => ({
@@ -17,6 +17,7 @@ describe("CakeRecipes ingredient pagination", () => {
         sizes: [],
         ingredients: [],
         recipes: [{
+          id: 21,
           flavor_id: 1,
           ingredients: Array.from({ length: 12 }, (_, index) => ({
             ingredient_id: index + 1,
@@ -72,5 +73,83 @@ describe("CakeRecipes ingredient pagination", () => {
 
     expect(await screen.findByText("No cake flavors available to edit.")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Save recipe" })).toBeDisabled();
+  });
+
+  test("moves the saved recipe to the Recycle Bin and shows a success notice", async () => {
+    const catalog = {
+      success: true,
+      flavors: [{ id: 1, name: "Carrot", active: true }],
+      sizes: [],
+      ingredients: [],
+      recipes: [{ id: 21, flavor_id: 1, ingredients: [] }],
+    };
+    global.fetch.mockImplementation((url, options = {}) => {
+      if (String(url).includes("/catalog")) {
+        return Promise.resolve({ ok: true, text: async () => JSON.stringify(catalog) });
+      }
+      if (options.method === "DELETE") {
+        return Promise.resolve({
+          ok: true,
+          text: async () => JSON.stringify({ success: true, message: "Recipe moved to the Recycle Bin for 30 days." }),
+        });
+      }
+      return Promise.resolve({ ok: true, text: async () => JSON.stringify({ success: true }) });
+    });
+
+    render(<CakeRecipes />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Move Carrot recipe to Recycle Bin" }));
+
+    const confirmation = await screen.findByRole("alertdialog");
+    expect(confirmation).toHaveTextContent("Move recipe to Recycle Bin?");
+    expect(confirmation).toHaveTextContent("The saved recipe for Carrot will be moved to the Recycle Bin");
+    expect(global.fetch).not.toHaveBeenCalledWith(
+      expect.stringContaining("/api/staff/customized-cakes/recipes/21"),
+      expect.objectContaining({ method: "DELETE" })
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Move to Recycle Bin" }));
+
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith(
+        "https://example.test/laravel/public/api/staff/customized-cakes/recipes/21",
+        expect.objectContaining({ method: "DELETE" })
+      );
+    });
+    expect(await screen.findByRole("status")).toHaveTextContent(
+      "Carrot recipe moved to the Recycle Bin. It can be restored from Settings within 30 days."
+    );
+  });
+
+  test("shows an error notice when moving a saved recipe to the Recycle Bin fails", async () => {
+    global.fetch.mockImplementation((url, options = {}) => {
+      if (String(url).includes("/catalog")) {
+        return Promise.resolve({
+          ok: true,
+          text: async () => JSON.stringify({
+            success: true,
+            flavors: [{ id: 1, name: "Carrot", active: true }],
+            sizes: [],
+            ingredients: [],
+            recipes: [{ id: 21, flavor_id: 1, ingredients: [] }],
+          }),
+        });
+      }
+      if (options.method === "DELETE") {
+        return Promise.resolve({
+          ok: false,
+          status: 409,
+          text: async () => JSON.stringify({ success: false, message: "Recipe not found." }),
+        });
+      }
+      return Promise.resolve({ ok: true, text: async () => JSON.stringify({ success: true }) });
+    });
+
+    render(<CakeRecipes />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Move Carrot recipe to Recycle Bin" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Move to Recycle Bin" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Recipe not found.");
   });
 });
