@@ -1608,16 +1608,12 @@ export default function Orders() {
                       {(isPickupDownpaymentPaid || (isCustomized && isAwaitingBalancePayment)) && (
                         <p className="mt-1 text-[10px] leading-4 text-gray-500">
                           Deposit paid: ₱{customDownpaymentAmount.toLocaleString()} · Balance due: ₱{remainingBalanceAmount.toLocaleString()}
+                          {hasQrPhBalanceFee && ` + ₱${balanceBreakdown.fee.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} QR Ph fee`}
                         </p>
                       )}
                       {isCustomized && isAwaitingPayment && customDownpaymentAmount > 0 && (
                         <p className="mt-1 text-[10px] leading-4 text-gray-500">
                           Downpayment: ₱{downpaymentBreakdown.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                        </p>
-                      )}
-                      {hasQrPhBalanceFee && (
-                        <p className="mt-1 text-[10px] leading-4 text-gray-500">
-                          QR Ph balance fee (2.23%): ₱{balanceBreakdown.fee.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </p>
                       )}
                     </div>

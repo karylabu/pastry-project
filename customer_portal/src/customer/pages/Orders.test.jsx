@@ -65,8 +65,7 @@ test('shows the remaining pickup balance and starts balance payment', async () =
 
   const payBalanceButton = await screen.findByRole('button', { name: 'Pay ₱511.41' });
   expect(payBalanceButton).toHaveClass('h-9', 'w-[126px]', 'bg-[#fff1bd]', 'focus-visible:ring-2');
-  expect(screen.getByText('Deposit paid: ₱500 · Balance due: ₱500')).toBeInTheDocument();
-  expect(screen.getByText('QR Ph balance fee (2.23%): ₱11.41')).toBeInTheDocument();
+  expect(screen.getByText('Deposit paid: ₱500 · Balance due: ₱500 + ₱11.41 QR Ph fee')).toBeInTheDocument();
   expect(screen.getByText('Pay the remaining balance or submit proof for review')).toBeInTheDocument();
   const submitProofButton = screen.getByRole('button', { name: 'Send proof' });
   expect(submitProofButton).toHaveClass('h-9', 'w-[126px]', 'focus-visible:ring-2');
@@ -265,6 +264,5 @@ test('uses the full QR Ph downpayment credit when showing the custom cake balanc
   render(<Orders />);
 
   expect(await screen.findByRole('button', { name: 'Pay ₱5.00' })).toBeInTheDocument();
-  expect(screen.getByText('Deposit paid: ₱5.12 · Balance due: ₱4.88')).toBeInTheDocument();
-  expect(screen.getByText('QR Ph balance fee (2.23%): ₱0.12')).toBeInTheDocument();
+  expect(screen.getByText('Deposit paid: ₱5.12 · Balance due: ₱4.88 + ₱0.12 QR Ph fee')).toBeInTheDocument();
 });
