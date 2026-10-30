@@ -1449,7 +1449,11 @@ export default function Orders() {
                 const remainingBalanceAmount = Math.max(0, Number((Number(order.total || 0) - Number(order.downpayment_amount || 0)).toFixed(2)));
                 const customPaymentMethod = isCustomized ? 'QR Ph' : (order.payment || customPaymentDetails.payment_method || '—');
                 const downpaymentBreakdown = getCustomCakePaymentBreakdown(customDownpaymentBaseAmount);
-                const balanceBreakdown = getCustomCakePaymentBreakdown(customBalanceAmount);
+                const balanceFeeBaseAmount = isCustomized ? customBalanceAmount : remainingBalanceAmount;
+                const balanceBreakdown = getCustomCakePaymentBreakdown(balanceFeeBaseAmount);
+                const hasQrPhBalanceFee = (isCustomized || paymentMethodKey === 'qrph')
+                  && isAwaitingBalancePayment
+                  && balanceFeeBaseAmount > 0;
                 const canPayPickupBalance = !isCustomized
                   && paymentMethodKey === 'qrph'
                   && isPickupDownpaymentPaid
@@ -1611,7 +1615,7 @@ export default function Orders() {
                           Downpayment: ₱{downpaymentBreakdown.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </p>
                       )}
-                      {isCustomized && isAwaitingBalancePayment && customBalanceAmount > 0 && (
+                      {hasQrPhBalanceFee && (
                         <p className="mt-1 text-[10px] leading-4 text-gray-500">
                           QR Ph balance fee (2.23%): ₱{balanceBreakdown.fee.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </p>
@@ -1650,18 +1654,18 @@ export default function Orders() {
                             <button
                               type="button"
                               onClick={() => handleCreatePaymentLink(order, 'balance')}
-                              disabled={payingOrderId === order.id || (isCustomized ? customBalanceAmount : remainingBalanceAmount) <= 0}
-                              title={isCustomized
-                                ? customBalanceAmount <= 0
+                              disabled={payingOrderId === order.id || balanceFeeBaseAmount <= 0}
+                              title={isCustomized || paymentMethodKey === 'qrph'
+                                ? balanceFeeBaseAmount <= 0
                                   ? 'The order has no remaining balance.'
-                                  : `Pay the ₱${customBalanceAmount.toFixed(2)} balance plus ₱${balanceBreakdown.fee.toFixed(2)} ${customPaymentMethod} fee`
+                                  : `Pay the ₱${balanceFeeBaseAmount.toFixed(2)} balance plus ₱${balanceBreakdown.fee.toFixed(2)} ${customPaymentMethod} fee`
                                 : `Pay the remaining balance of ₱${remainingBalanceAmount.toFixed(2)}`}
                               className="inline-flex h-9 w-[126px] shrink-0 items-center justify-center gap-1.5 rounded-lg bg-[#fff1bd] px-3 py-2 text-center text-[11px] font-semibold leading-4 text-[#6b4f1d] transition-colors hover:bg-[#ffe79a] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#b89646] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                             >
                               <CreditCard size={14} />
                               {payingOrderId === order.id
                                 ? 'Opening…'
-                                : `Pay ₱${(isCustomized ? balanceBreakdown.total : remainingBalanceAmount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                                : `Pay ₱${((isCustomized || paymentMethodKey === 'qrph') ? balanceBreakdown.total : remainingBalanceAmount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
                             </button>
                           )}
                           <button

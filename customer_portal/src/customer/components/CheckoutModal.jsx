@@ -6,6 +6,7 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { CUSTOMER_BASE, LARAVEL_BASE } from '../../services/config';
 import { getAuthHeaders } from '../../services/api';
+import { getCustomCakePaymentBreakdown } from '../utils/customCakePayment';
 import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
 import markerIcon from "leaflet/dist/images/marker-icon.png";
 import markerShadow from "leaflet/dist/images/marker-shadow.png";
@@ -600,6 +601,11 @@ export default function CheckoutModal({
   const taxAmount = 0;
 
   const total = subtotal + rushFee + taxAmount - discountAmount;
+  const initialPaymentBaseAmount = checkoutData.method === "Pickup"
+    && checkoutData.pickupPaymentType === "downpayment"
+    ? total * 0.5
+    : total;
+  const initialPaymentBreakdown = getCustomCakePaymentBreakdown(initialPaymentBaseAmount);
   const fulfillmentTimeSlots = useMemo(
     () => createFulfillmentTimeSlots(shopSettings.openingHours),
     [shopSettings.openingHours]
@@ -1682,10 +1688,22 @@ export default function CheckoutModal({
                 <span>Total</span>
                 <span>₱{total.toLocaleString()}</span>
               </div>
+              {checkoutData.payment === "QRPh" && (
+                <>
+                  <div className="flex justify-between px-1 text-sm text-gray-500">
+                    <span>QR Ph fee (2.23%)</span>
+                    <span>₱{initialPaymentBreakdown.fee.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                  </div>
+                  <div className="flex justify-between rounded-xl border border-[#eadfca] bg-[#fffaf0] px-4 py-3 text-sm font-bold text-[#6b4f1d]">
+                    <span>Total to pay now with QR Ph</span>
+                    <span>₱{initialPaymentBreakdown.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                  </div>
+                </>
+              )}
               {checkoutData.method === "Pickup" && (
                 <div className="flex justify-between px-1 text-sm font-semibold text-[#6b4f1d]">
-                  <span>{checkoutData.pickupPaymentType === "downpayment" ? "Pay now (50% downpayment)" : "Pay now (full payment)"}</span>
-                  <span>₱{(checkoutData.pickupPaymentType === "downpayment" ? total * 0.5 : total).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                  <span>{checkoutData.pickupPaymentType === "downpayment" ? "50% downpayment before fee" : "Full payment before fee"}</span>
+                  <span>₱{initialPaymentBaseAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                 </div>
               )}
 

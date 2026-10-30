@@ -169,7 +169,7 @@ class CustomCakeBalancePaymentTest extends TestCase
 
         Http::assertSent(fn (ClientRequest $request) =>
             $request->url() === 'https://api.paymongo.com/v1/payment_links'
-            && $request['amount'] === 50000
+            && $request['amount'] === 51141
             && $request['remarks'] === 'Pickup order remaining balance'
             && str_contains($request['description'], 'Remaining Balance')
         );
@@ -221,7 +221,7 @@ class CustomCakeBalancePaymentTest extends TestCase
 
         Http::assertSent(fn (ClientRequest $request) =>
             $request->url() === 'https://api.paymongo.com/v2/checkout_sessions'
-            && $request['data']['attributes']['line_items'][0]['amount'] === 50000
+            && $request['data']['attributes']['line_items'][0]['amount'] === 49900
         );
     }
 
@@ -255,8 +255,39 @@ class CustomCakeBalancePaymentTest extends TestCase
 
         Http::assertSent(fn (ClientRequest $request) =>
             $request->url() === 'https://api.paymongo.com/v1/payment_links'
-            && $request['amount'] === 50000
+            && $request['amount'] === 51141
             && str_contains($request['description'], 'Downpayment')
+        );
+    }
+
+    public function test_standard_gcash_payment_does_not_add_the_qrph_fee(): void
+    {
+        \Illuminate\Support\Facades\DB::table('orders')->insert([
+            'id' => 47,
+            'user_id' => 9,
+            'status' => 'Awaiting Payment',
+            'total' => 1000,
+            'payment' => 'GCash',
+            'payment_status' => 'pending',
+            'is_customized' => false,
+            'order_type' => 'Standard',
+        ]);
+
+        $customer = new User();
+        $customer->id = 9;
+        $customer->role = 'customer';
+
+        $this->actingAs($customer)
+            ->postJson('/create_payment.php', [
+                'order_id' => 47,
+                'amount' => 1000,
+                'payment_type' => 'full',
+            ])
+            ->assertOk();
+
+        Http::assertSent(fn (ClientRequest $request) =>
+            $request->url() === 'https://api.paymongo.com/v1/payment_links'
+            && $request['amount'] === 100000
         );
     }
 

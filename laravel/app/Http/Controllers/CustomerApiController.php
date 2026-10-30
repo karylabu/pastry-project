@@ -1625,6 +1625,7 @@ PROMPT;
         }
         $customCheckoutPaymentType = 'qrph';
         $customPaymentFeeRate = 0.0223;
+        $qrPhFeeApplies = $customOrder || strtolower((string) $order->payment) === 'qrph';
         $paymentStatus = strtolower((string) ($order->payment_status ?? 'pending'));
         $supportedOrderPayment = $customOrder
             || in_array(strtolower((string) $order->payment), ['qrph', 'gcash'], true);
@@ -1680,7 +1681,7 @@ PROMPT;
         }
 
         $checkoutAmountCents = $amountCents;
-        if ($customOrder) {
+        if ($qrPhFeeApplies) {
             $baseAmount = $amountCents / 100;
             $checkoutAmount = $baseAmount / (1 - $customPaymentFeeRate);
             $checkoutAmountCents = (int) ceil(($checkoutAmount * 100) - 1e-8);
@@ -1723,7 +1724,7 @@ PROMPT;
             $paymentEndpoint = 'https://api.paymongo.com/v2/checkout_sessions';
         } else {
             $payload = [
-                'amount' => $amountCents,
+                'amount' => $checkoutAmountCents,
                 'currency' => 'PHP',
                 'description' => $description,
                 'remarks' => match ($paymentType) {
