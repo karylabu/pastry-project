@@ -124,7 +124,7 @@ class UserController extends Controller
             'email' => ['required', 'email', 'max:255'],
             'phone_number' => ['nullable', 'string', 'max:20'],
             'phone' => ['nullable', 'string', 'max:20'],
-            'role' => ['required', Rule::in(['admin', 'customer'])],
+            'role' => ['required', Rule::in(['admin'])],
             'status' => ['sometimes', Rule::in(['active', 'inactive', 'banned'])],
             'password' => ['required', 'string', 'min:8', 'confirmed'],
         ]);

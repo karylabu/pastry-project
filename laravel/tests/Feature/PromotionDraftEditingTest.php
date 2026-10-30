@@ -124,6 +124,34 @@ class PromotionDraftEditingTest extends TestCase
         ]);
     }
 
+    public function test_admin_can_change_and_save_a_coupon_discount(): void
+    {
+        $promotionId = $this->createPromotion('sent');
+        DB::table('promotions')->where('id', $promotionId)->update([
+            'coupon_code' => 'SAVE20',
+            'discount_percent' => 20,
+        ]);
+
+        $this->withHeader('X-Auth-Token', 'admin-token')
+            ->postJson("http://localhost/api/admin/promotions/{$promotionId}", [
+                'title' => 'Original campaign',
+                'message' => 'Original copy',
+                'coupon_code' => 'SAVE20',
+                'discount_percent' => 35,
+                'starts_at' => '2026-10-10 09:00:00',
+                'ends_at' => '2026-10-12 18:00:00',
+            ])
+            ->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.discount_percent', '35.00');
+
+        $this->assertDatabaseHas('promotions', [
+            'id' => $promotionId,
+            'coupon_code' => 'SAVE20',
+            'discount_percent' => 35,
+        ]);
+    }
+
     public function test_admin_can_edit_a_sent_promotion(): void
     {
         $promotionId = $this->createPromotion('sent');

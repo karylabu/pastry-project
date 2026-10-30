@@ -54,7 +54,7 @@ const initialForm = {
   name: "",
   email: "",
   phone_number: "",
-  role: "customer",
+  role: "admin",
   status: "active",
   password: "",
   password_confirmation: "",
@@ -162,8 +162,8 @@ export default function UserManagement() {
       nextErrors.phone_number = "Please enter a valid phone number.";
     }
 
-    if (!["admin", "customer"].includes(payload.role)) {
-      nextErrors.role = "Please choose a valid role.";
+    if (selectedUser ? !["admin", "customer"].includes(payload.role) : payload.role !== "admin") {
+      nextErrors.role = selectedUser ? "Please choose a valid role." : "New managed accounts must be admins.";
     }
 
     if (!["active", "inactive", "banned"].includes(payload.status)) {
@@ -378,7 +378,7 @@ export default function UserManagement() {
               className="inline-flex h-10 items-center justify-center gap-2 self-start rounded-lg bg-[#33251e] px-4 text-[12px] font-semibold text-white transition hover:bg-[#5b4540] sm:self-auto"
             >
               <Plus size={15} />
-              Add user
+              Add Admin
             </button>
           </div>
 
@@ -579,7 +579,7 @@ export default function UserManagement() {
             <div className="mb-5 flex items-start justify-between">
               <div>
                 <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#92701e]">Account</p>
-                <h2 id="user-form-title" className="text-[18px] font-semibold text-[#33251e]">{selectedUser ? "Edit User" : "Add New User"}</h2>
+                <h2 id="user-form-title" className="text-[18px] font-semibold text-[#33251e]">{selectedUser ? "Edit User" : "Add Admin"}</h2>
               </div>
               <button type="button" onClick={() => { setIsModalOpen(false); setSelectedUser(null); }} className="rounded-md border border-[#e8dfd4] px-3 py-2 text-[11px] font-medium text-[#65574d] transition hover:bg-[#fbf7f2]">
                 Close
@@ -608,9 +608,9 @@ export default function UserManagement() {
                 </div>
                 <div>
                   <label className="mb-1.5 block text-[11px] font-medium text-[#65574d]">Role</label>
-                  <select value={form.role} onChange={(event) => setForm({ ...form, role: event.target.value })} className="h-10 w-full rounded-md border border-[#e8dfd4] bg-white px-3 text-[12px] text-[#33251e] outline-none transition focus:border-[#b89646] focus:ring-2 focus:ring-[#d4af37]/15">
+                  <select aria-label="Role" value={form.role} onChange={(event) => setForm({ ...form, role: event.target.value })} className="h-10 w-full rounded-md border border-[#e8dfd4] bg-white px-3 text-[12px] text-[#33251e] outline-none transition focus:border-[#b89646] focus:ring-2 focus:ring-[#d4af37]/15">
                     <option value="admin">Admin</option>
-                    <option value="customer">Customer</option>
+                    {selectedUser && <option value="customer">Customer</option>}
                   </select>
                   {formErrors.role ? <p className="mt-1 text-[11px] text-[#8b2e2e]">{formErrors.role}</p> : null}
                 </div>
@@ -655,7 +655,7 @@ export default function UserManagement() {
                 </button>
                 <button type="submit" disabled={savingUser} className="inline-flex items-center gap-2 rounded-md bg-[#33251e] px-4 py-2 text-[12px] font-semibold text-white transition hover:bg-[#5b4540] disabled:cursor-not-allowed disabled:opacity-60">
                   {savingUser ? <Loader2 size={16} className="animate-spin" /> : <UserPlus size={16} />}
-                  {selectedUser ? "Save Changes" : "Create User"}
+                  {selectedUser ? "Save Changes" : "Create Admin"}
                 </button>
               </div>
             </form>

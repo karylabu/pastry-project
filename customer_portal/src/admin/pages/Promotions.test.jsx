@@ -22,6 +22,10 @@ describe("Promotions campaign history", () => {
         return Promise.resolve({ ok: true, json: async () => ({ success: true }) });
       }
 
+      if (String(url).includes("/api/admin/promotions/17") && options.method === "POST") {
+        return Promise.resolve({ ok: true, json: async () => ({ success: true, data: campaign }) });
+      }
+
       if (String(url).includes("/api/admin/promotions")) {
         return Promise.resolve({
           ok: true,
@@ -46,6 +50,25 @@ describe("Promotions campaign history", () => {
     expect(screen.getByRole("heading", { name: "Edit promotion" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Save changes" })).toBeInTheDocument();
     expect(screen.getByLabelText("Title")).toHaveValue("Weekend Special");
+  });
+
+  test("saves a changed coupon discount when editing a campaign", async () => {
+    render(<Promotions />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Edit Weekend Special" }));
+
+    const discountInput = screen.getByLabelText("Coupon discount (%)");
+    expect(discountInput).toHaveValue(10);
+    fireEvent.change(discountInput, { target: { value: "35" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+
+    await waitFor(() => {
+      const updateRequest = global.fetch.mock.calls.find(
+        ([url, options]) => String(url).includes("/api/admin/promotions/17") && options.method === "POST",
+      );
+      expect(updateRequest).toBeDefined();
+      expect(updateRequest[1].body.get("discount_percent")).toBe("35");
+    });
   });
 
   test("deletes the selected campaign after confirmation", async () => {

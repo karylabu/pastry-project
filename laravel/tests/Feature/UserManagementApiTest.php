@@ -133,20 +133,43 @@ class UserManagementApiTest extends TestCase
         ]);
     }
 
-    public function test_new_managed_users_default_to_active(): void
+    public function test_admin_can_create_another_admin_account(): void
     {
         $this->withHeader('Authorization', 'Bearer admin-token')
-            ->postJson('/api/users', [
+            ->withHeader('X-Auth-Token', 'admin-token')
+            ->postJson('http://localhost/api/users', [
                 'name' => 'New Managed User',
                 'email' => 'new-managed@example.com',
-                'role' => 'customer',
+                'role' => 'admin',
                 'password' => 'new-password',
                 'password_confirmation' => 'new-password',
             ])
             ->assertCreated()
+            ->assertJsonPath('data.role', 'admin')
             ->assertJsonPath('data.status', 'active');
 
-        $this->assertDatabaseHas('users', ['email' => 'new-managed@example.com', 'status' => 'active']);
+        $this->assertDatabaseHas('users', [
+            'email' => 'new-managed@example.com',
+            'role' => 'admin',
+            'status' => 'active',
+        ]);
+    }
+
+    public function test_admin_cannot_create_a_customer_through_user_management(): void
+    {
+        $this->withHeader('Authorization', '******')
+            ->withHeader('X-Auth-Token', 'admin-token')
+            ->postJson('http://localhost/api/users', [
+                'name' => 'New Customer',
+                'email' => 'new-customer@example.com',
+                'role' => 'customer',
+                'password' => 'new-password',
+                'password_confirmation' => 'new-password',
+            ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('role');
+
+        $this->assertDatabaseMissing('users', ['email' => 'new-customer@example.com']);
     }
 
     public function test_admin_cannot_create_an_account_with_a_case_variant_of_an_existing_email(): void
@@ -164,7 +187,7 @@ class UserManagementApiTest extends TestCase
             ->postJson('/api/users', [
                 'name' => 'Duplicate User',
                 'email' => 'legacyuser@EXAMPLE.com',
-                'role' => 'customer',
+                'role' => 'admin',
                 'password' => 'new-password',
                 'password_confirmation' => 'new-password',
             ])
