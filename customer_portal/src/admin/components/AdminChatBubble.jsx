@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Bot, Menu, MessageCircle, Paperclip, RefreshCw, Search, Send, UserRound, X } from "lucide-react";
 import { CUSTOMER_BASE, LARAVEL_BASE } from "../../services/config";
 import { getAuthHeaders, safeParseJson } from "../../services/api";
@@ -64,7 +64,7 @@ export default function AdminChatBubble() {
     };
   }, []);
 
-  const fetchConversations = async () => {
+  const fetchConversations = useCallback(async () => {
     try {
       const response = await fetch(`${LARAVEL_BASE}/api/staff/chat/conversations`, {
         credentials: "include",
@@ -74,13 +74,15 @@ export default function AdminChatBubble() {
       if (!response.ok || data?.success === false) return;
       const next = Array.isArray(data.conversations) ? data.conversations : [];
       setConversations(next);
-      if (!next.some((item) => String(item.conversation_key) === String(selectedConversationKey))) {
-        setSelectedConversationKey(next[0]?.conversation_key ?? null);
-      }
+      setSelectedConversationKey((currentKey) => (
+        next.some((item) => String(item.conversation_key) === String(currentKey))
+          ? currentKey
+          : next[0]?.conversation_key ?? null
+      ));
     } catch {
       // The inbox continues showing its last successful state.
     }
-  };
+  }, []);
 
   const fetchMessages = async (conversation = selectedConversation) => {
     if (!conversation) return;
@@ -109,12 +111,15 @@ export default function AdminChatBubble() {
   };
 
   useEffect(() => {
-    if (!open) return undefined;
     fetchConversations();
     return subscribeRealtime((event) => {
       if (event.type === "chat.updated") fetchConversations();
     });
-  }, [open]);
+  }, [fetchConversations]);
+
+  useEffect(() => {
+    if (open) fetchConversations();
+  }, [open, fetchConversations]);
 
   useEffect(() => {
     if (!open || !selectedConversation) return undefined;
@@ -248,7 +253,7 @@ export default function AdminChatBubble() {
         </div>
       )}
 
-      <button type="button" onClick={() => setOpen((value) => !value)} className="fixed bottom-5 right-5 z-[10001] grid h-12 w-12 place-items-center rounded-full bg-[#f0b94d] text-black shadow-xl transition hover:scale-105 hover:bg-[#e5ae3d]" title="Customer Chat" aria-label="Customer Chat"><MessageCircle size={21} />{unreadCount > 0 && <span className="absolute -right-1 -top-1 grid h-5 min-w-5 place-items-center rounded-full bg-black px-1 text-[10px] font-bold text-white">{unreadCount > 99 ? "99+" : unreadCount}</span>}</button>
+      <button type="button" onClick={() => setOpen((value) => !value)} className="fixed bottom-5 right-5 z-[10001] grid h-12 w-12 place-items-center rounded-full bg-[#f0b94d] text-black shadow-xl transition hover:scale-105 hover:bg-[#e5ae3d]" title="Customer Chat" aria-label={unreadCount > 0 ? `Customer Chat, ${unreadCount} unread messages` : "Customer Chat"}><MessageCircle size={21} />{unreadCount > 0 && <span aria-hidden="true" className="absolute -right-1 -top-1 grid h-5 min-w-5 place-items-center rounded-full bg-black px-1 text-[10px] font-bold text-white">{unreadCount > 99 ? "99+" : unreadCount}</span>}</button>
       <AdminDialog dialog={adminDialog} onClose={() => setAdminDialog(null)} />
     </>
   );
