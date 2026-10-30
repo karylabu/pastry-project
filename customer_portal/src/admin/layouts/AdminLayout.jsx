@@ -78,7 +78,7 @@ export default function AdminLayout({ children }) {
           box-shadow: 0 24px 70px rgba(38, 25, 16, 0.28) !important;
         }
 
-        .admin-page-surface :is(div, section, article, a)[class*="rounded-"][class*="border"][class*="p-"]:not([class*="border-dashed"]):not(.admin-product-card):not(.admin-product-card *):not(.admin-static-card):not([role="dialog"]):not([role="dialog"] *):not([role="alertdialog"]):not([role="alertdialog"] *) {
+        .admin-page-surface :is(div, section, article, a)[class*="rounded-"][class*="border"][class*="p-"]:not([class*="border-dashed"]):not(.coupon-code-field):not(.admin-product-card):not(.admin-product-card *):not(.admin-static-card):not([role="dialog"]):not([role="dialog"] *):not([role="alertdialog"]):not([role="alertdialog"] *) {
           border-right-color: var(--admin-card-border) !important;
           border-bottom-color: var(--admin-card-border) !important;
           border-left-color: var(--admin-card-border) !important;
@@ -87,13 +87,13 @@ export default function AdminLayout({ children }) {
           transition: transform 180ms ease, box-shadow 180ms ease;
         }
 
-        .admin-page-surface :is(div, section, article, a)[class*="rounded-"][class*="border"][class*="p-"]:not([class*="border-dashed"]):not(.admin-product-card):not(.admin-product-card *):not(.admin-static-card):not([role="dialog"]):not([role="dialog"] *):not([role="alertdialog"]):not([role="alertdialog"] *):not([class*="border-t-"]) {
+        .admin-page-surface :is(div, section, article, a)[class*="rounded-"][class*="border"][class*="p-"]:not([class*="border-dashed"]):not(.coupon-code-field):not(.admin-product-card):not(.admin-product-card *):not(.admin-static-card):not([role="dialog"]):not([role="dialog"] *):not([role="alertdialog"]):not([role="alertdialog"] *):not([class*="border-t-"]) {
           border-top-color: var(--admin-card-accent) !important;
           border-top-style: solid !important;
           border-top-width: 3px !important;
         }
 
-        .admin-page-surface :is(div, section, article, a)[class*="rounded-"][class*="border"][class*="p-"]:not([class*="border-dashed"]):not(.admin-product-card):not(.admin-product-card *):not(.admin-static-card):not([role="dialog"]):not([role="dialog"] *):not([role="alertdialog"]):not([role="alertdialog"] *):hover {
+        .admin-page-surface :is(div, section, article, a)[class*="rounded-"][class*="border"][class*="p-"]:not([class*="border-dashed"]):not(.coupon-code-field):not(.admin-product-card):not(.admin-product-card *):not(.admin-static-card):not([role="dialog"]):not([role="dialog"] *):not([role="alertdialog"]):not([role="alertdialog"] *):hover {
           outline: none !important;
           box-shadow: var(--admin-card-hover-shadow) !important;
           transform: translateY(-2px);

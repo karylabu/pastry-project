@@ -89,6 +89,7 @@ describe("Promotions campaign history", () => {
 
     fireEvent.focus(couponCodeInput);
 
+    expect(couponCodeField).toHaveClass("coupon-code-field");
     expect(couponCodeField.style.borderColor).toBe("#e8dfd4");
     expect(couponCodeField.style.backgroundColor).toBe("rgb(255, 255, 255)");
   });
