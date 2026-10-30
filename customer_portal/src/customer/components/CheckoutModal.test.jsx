@@ -97,4 +97,74 @@ describe("CheckoutModal", () => {
     );
     expect(window.alert).not.toHaveBeenCalled();
   });
+
+  test("shows stock errors returned during payment setup inline", async () => {
+    global.fetch.mockImplementation((url) => {
+      if (String(url).includes("/api/shop/status")) {
+        return Promise.resolve({
+          ok: true,
+          text: async () => JSON.stringify({
+            is_open: true,
+            settings: { openingHours: "08:00 - 00:00" },
+          }),
+        });
+      }
+
+      if (String(url).endsWith("/api/orders")) {
+        return Promise.resolve({
+          ok: true,
+          text: async () => JSON.stringify({
+            success: true,
+            status: "success",
+            order_id: 51,
+            total: 480,
+          }),
+        });
+      }
+
+      if (String(url).includes("/api/customer/payments")) {
+        return Promise.resolve({
+          ok: false,
+          status: 422,
+          text: async () => JSON.stringify({
+            error: "You ordered more than the stock available.",
+          }),
+        });
+      }
+
+      if (String(url).includes("/api/orders/51/payment-failure")) {
+        return Promise.resolve({ ok: true, text: async () => "" });
+      }
+
+      return Promise.reject(new Error(`Unexpected request: ${url}`));
+    });
+
+    render(
+      <CheckoutModal
+        isOpen
+        onClose={jest.fn()}
+        cartItems={[{ product_id: 7, name: "Strawberry Cake", price: 480 }]}
+        fullCartItems={[{ product_id: 7, name: "Strawberry Cake", price: 480 }]}
+        onOrderPlaced={jest.fn()}
+      />,
+    );
+
+    await screen.findByRole("button", { name: "PLACE ORDER" });
+    fireEvent.change(screen.getByLabelText("Phone Number"), {
+      target: { value: "09123456789" },
+    });
+    fireEvent.change(screen.getByLabelText("Delivery address"), {
+      target: { value: "30 Bagumbayan Road, Tanauan" },
+    });
+    fireEvent.change(screen.getByLabelText(/Delivery time/), {
+      target: { value: "09:00" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Lalamove" }));
+    fireEvent.click(await screen.findByRole("button", { name: "PLACE ORDER" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "You ordered more than the stock available.",
+    );
+    expect(window.alert).not.toHaveBeenCalled();
+  });
 });

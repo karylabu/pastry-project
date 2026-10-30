@@ -55,6 +55,8 @@ const PICKUP_LOCATION = {
   address: '30 Bagumbayan Road, Tanauan, Calabarzon 4232',
 };
 const PENDING_PAYMONGO_CHECKOUT_KEY = 'pendingPaymongoCheckout';
+const isStockAvailabilityError = (message) =>
+  typeof message === 'string' && message.toLowerCase().includes('stock available');
 
 const isBerMonth = () => {
   const manilaDate = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Manila' }));
@@ -783,8 +785,9 @@ export default function CheckoutModal({
         console.error('Order API returned non-OK:', response.status, text);
         try {
           const errorResult = JSON.parse(text);
-          if (errorResult.message?.includes('stock available')) {
-            setOrderError(errorResult.message);
+          const stockError = errorResult.message || errorResult.errors?.items?.[0] || errorResult.error;
+          if (isStockAvailabilityError(stockError)) {
+            setOrderError(stockError);
             return;
           }
         } catch {
@@ -805,7 +808,11 @@ export default function CheckoutModal({
       console.log('Order API result:', result);
 
       if (result.status !== "success" && result.success !== true) {
-        alert(result.message || "Order failed.");
+        if (isStockAvailabilityError(result.message)) {
+          setOrderError(result.message);
+        } else {
+          alert(result.message || "Order failed.");
+        }
         return;
       }
       paymentOrderId = result.order_id;
@@ -852,7 +859,11 @@ export default function CheckoutModal({
             errMsg = e.message || errMsg;
           }
           await markPaymentSetupFailed();
-          alert(errMsg);
+          if (isStockAvailabilityError(errMsg)) {
+            setOrderError(errMsg);
+          } else {
+            alert(errMsg);
+          }
           return;
         }
 
@@ -910,7 +921,11 @@ export default function CheckoutModal({
 
       console.error('Place order error:', err);
       const msg = (err && err.message) ? err.message : String(err);
-      alert(`Server error: ${msg}`);
+      if (isStockAvailabilityError(msg)) {
+        setOrderError(msg);
+      } else {
+        alert(`Server error: ${msg}`);
+      }
 
     } finally {
 
