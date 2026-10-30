@@ -81,6 +81,18 @@ describe("Promotions campaign history", () => {
     expect(discountInput).toHaveValue(25);
   });
 
+  test("keeps the coupon code border neutral while focused", async () => {
+    render(<Promotions />);
+
+    const couponCodeInput = await screen.findByLabelText("Coupon code");
+    const couponCodeField = couponCodeInput.parentElement;
+
+    fireEvent.focus(couponCodeInput);
+
+    expect(couponCodeField.style.borderColor).toBe("#e8dfd4");
+    expect(couponCodeField.style.backgroundColor).toBe("rgb(255, 255, 255)");
+  });
+
   test("deletes the selected campaign after confirmation", async () => {
     render(<Promotions />);
 
