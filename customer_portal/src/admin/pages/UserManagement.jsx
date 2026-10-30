@@ -3,6 +3,7 @@ import { ChevronLeft, ChevronRight, Eye, EyeOff, Loader2, Pencil, Plus, Search, 
 import { LARAVEL_BASE } from "../../services/config";
 import { getAuthHeaders } from "../../services/api";
 import { useAdminUsers } from "../hooks/useAdminUsers";
+import AdminDialog from "../components/AdminDialog";
 import UndoToast from "../components/UndoToast";
 
 const roleStyles = {
@@ -76,6 +77,7 @@ export default function UserManagement() {
   const [showPasswordConfirmation, setShowPasswordConfirmation] = useState(false);
   const [deletingUserId, setDeletingUserId] = useState(null);
   const [confirmAction, setConfirmAction] = useState(null);
+  const [adminDialog, setAdminDialog] = useState(null);
   const [undoEntry, setUndoEntry] = useState(null);
   const [notice, setNotice] = useState({ type: "", message: "" });
   const [formErrors, setFormErrors] = useState({});
@@ -294,12 +296,40 @@ export default function UserManagement() {
   };
 
   const confirmDeleteUser = (user) => {
-    setConfirmAction({
-      type: "delete",
-      user,
+    setAdminDialog({
+      kind: "confirm",
       title: "Move account to Recycle Bin?",
       message: `${user.name || "This account"} will be hidden and moved to the Recycle Bin. You can Undo for 5 seconds or restore it from Settings within 30 days.`,
+      confirmLabel: "Move to Recycle Bin",
+      onConfirm: () => deleteUser(user),
     });
+  };
+
+  const deleteUser = async (user) => {
+    setDeletingUserId(user.id);
+    try {
+      const response = await fetch(`${LARAVEL_BASE}/api/users/${user.id}`, {
+        method: "DELETE",
+        credentials: "include",
+        headers: { Accept: "application/json", ...getAuthHeaders() },
+      });
+
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok || data.success === false) {
+        showNotice("error", data.message || "Unable to delete user right now.");
+        return;
+      }
+
+      setUndoEntry({ id: data.recycle_bin_entry_id, label: user.name || "Account" });
+      showNotice("success", "User moved to the Recycle Bin.");
+      refetch();
+    } catch (error) {
+      console.error(error);
+      showNotice("error", "Unable to delete user right now.");
+    } finally {
+      setDeletingUserId(null);
+    }
   };
 
   const confirmStatusChange = (user) => {
@@ -314,35 +344,6 @@ export default function UserManagement() {
 
   const executeConfirmAction = async () => {
     if (!confirmAction) return;
-
-    if (confirmAction.type === "delete") {
-      setDeletingUserId(confirmAction.user.id);
-      try {
-        const response = await fetch(`${LARAVEL_BASE}/api/users/${confirmAction.user.id}`, {
-          method: "DELETE",
-          credentials: "include",
-          headers: { Accept: "application/json", ...getAuthHeaders() },
-        });
-
-        const data = await response.json().catch(() => ({}));
-
-        if (!response.ok || data.success === false) {
-          showNotice("error", data.message || "Unable to delete user right now.");
-          return;
-        }
-
-        setUndoEntry({ id: data.recycle_bin_entry_id, label: confirmAction.user.name || "Account" });
-        showNotice("success", "User moved to the Recycle Bin.");
-        refetch();
-      } catch (error) {
-        console.error(error);
-        showNotice("error", "Unable to delete user right now.");
-      } finally {
-        setDeletingUserId(null);
-        setConfirmAction(null);
-      }
-      return;
-    }
 
     setUpdatingStatusId(confirmAction.user.id);
     try {
@@ -593,6 +594,15 @@ export default function UserManagement() {
           </div>
         </div>
       )}
+      <AdminDialog
+        dialog={adminDialog}
+        onClose={() => setAdminDialog(null)}
+        onConfirm={() => {
+          const action = adminDialog?.onConfirm;
+          setAdminDialog(null);
+          action?.();
+        }}
+      />
       <UndoToast
         message={undoEntry ? `${undoEntry.label} moved to the Recycle Bin.` : ""}
         onUndo={undoUserDelete}
