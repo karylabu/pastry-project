@@ -1258,6 +1258,7 @@ class CustomerApiController extends Controller
             $conversationContext = json_encode($conversation, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
             $productCatalog = DB::table('products')
                 ->where('available', 1)
+                ->when(Schema::hasColumn('products', 'deleted_at'), fn ($query) => $query->whereNull('deleted_at'))
                 ->limit(50)
                 ->get(['name', 'category', 'price', 'meal_price', 'combo_price', 'stock'])
                 ->map(function ($product) {

@@ -4,10 +4,11 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use App\Models\Concerns\ExcludesTrashedRecords;
 
 class Product extends Model
 {
-    use HasFactory;
+    use ExcludesTrashedRecords, HasFactory;
 
     protected $fillable = [
         'name',

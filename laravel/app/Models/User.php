@@ -6,11 +6,12 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use App\Models\Concerns\ExcludesTrashedRecords;
 
 class User extends Authenticatable
 {
     /** @use HasFactory<\Illuminate\Database\Eloquent\Factories\Factory> */
-    use HasFactory, Notifiable;
+    use ExcludesTrashedRecords, HasFactory, Notifiable;
 
     public $timestamps = false;
 

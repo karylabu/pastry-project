@@ -7,6 +7,7 @@ use App\Models\IngredientBatch;
 use App\Models\Ingredient;
 use App\Models\User;
 use App\Services\InventoryService;
+use App\Services\AdminRecycleBinService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -158,20 +159,22 @@ class IngredientController extends Controller
     /**
      * Delete an ingredient.
      */
-    public function destroy(Request $request, Ingredient $ingredient): JsonResponse
+    public function destroy(Request $request, Ingredient $ingredient, AdminRecycleBinService $recycleBin): JsonResponse
     {
         if ($response = $this->authorizeOperationalStaff($request)) {
             return $response;
         }
+        if (strtolower((string) $this->getAuthenticatedUser($request)?->role) !== 'admin') {
+            return response()->json(['success' => false, 'message' => 'Admin authorization required.'], 403);
+        }
 
         try {
-            $name = $ingredient->name;
-
-            $ingredient->delete();
+            $entryId = $recycleBin->trashIngredient((int) $ingredient->id);
 
             return response()->json([
                 'success' => true,
-                'message' => "Ingredient '$name' deleted successfully",
+                'message' => 'Ingredient moved to the Recycle Bin for 30 days.',
+                'recycle_bin_entry_id' => $entryId,
             ]);
         } catch (\Exception $e) {
             return response()->json([

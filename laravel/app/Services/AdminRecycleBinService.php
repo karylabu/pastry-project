@@ -14,6 +14,21 @@ class AdminRecycleBinService
 {
     private const RETENTION_DAYS = 30;
 
+    public function trashProduct(int $productId): int
+    {
+        return $this->trashRecord('products', 'product', $productId);
+    }
+
+    public function trashIngredient(int $ingredientId): int
+    {
+        return $this->trashRecord('ingredients', 'ingredient', $ingredientId);
+    }
+
+    public function trashUser(int $userId): int
+    {
+        return $this->trashRecord('users', 'user', $userId);
+    }
+
     public function trashPromotion(int $promotionId): void
     {
         DB::transaction(function () use ($promotionId): void {
@@ -163,6 +178,15 @@ class AdminRecycleBinService
                         $this->insertSnapshot('product_recipes', $row);
                     }
                     break;
+                case 'product':
+                    $this->restoreRecord('products', (int) ($payload['id'] ?? 0));
+                    break;
+                case 'ingredient':
+                    $this->restoreRecord('ingredients', (int) ($payload['id'] ?? 0));
+                    break;
+                case 'user':
+                    $this->restoreRecord('users', (int) ($payload['id'] ?? 0));
+                    break;
                 default:
                     throw new RuntimeException('This Recycle Bin item type cannot be restored.');
             }
@@ -179,23 +203,55 @@ class AdminRecycleBinService
             throw new RuntimeException('Recycle Bin entry not found or expired.');
         }
 
-        $payload = json_decode((string) $entry->payload, true, 512, JSON_THROW_ON_ERROR);
-        if ($entry->item_type === 'csv_import') {
-            $path = $payload['import']['stored_path'] ?? null;
-            if ($path && Storage::disk('local')->exists($path) && ! Storage::disk('local')->delete($path)) {
-                throw new RuntimeException('Unable to permanently remove the stored CSV file.');
-            }
-        } elseif ($entry->item_type === 'promotion') {
-            $this->deletePromotionImage($payload['promotion']['image_url'] ?? null);
-        }
+        $this->permanentlyDeleteEntry($entry);
         DB::table('admin_recycle_bin')->where('id', $entryId)->delete();
     }
 
-    private function createEntry(string $type, string $label, array $payload): void
+    private function trashRecord(string $table, string $type, int $recordId): int
+    {
+        if (! Schema::hasTable($table) || ! Schema::hasColumn($table, 'deleted_at')) {
+            throw new RuntimeException('Soft deletion is unavailable for this record type.');
+        }
+
+        return DB::transaction(function () use ($table, $type, $recordId): int {
+            $record = DB::table($table)->where('id', $recordId)->lockForUpdate()->first();
+            if (! $record || $record->deleted_at !== null) {
+                throw new RuntimeException('Record not found or already in the Recycle Bin.');
+            }
+
+            $label = match ($type) {
+                'product' => (string) ($record->name ?: "Product #{$recordId}"),
+                'ingredient' => (string) ($record->name ?: "Ingredient #{$recordId}"),
+                'user' => (string) ($record->name ?: "User #{$recordId}"),
+                default => throw new RuntimeException('Unsupported record type.'),
+            };
+            $entryId = $this->createEntry($type, $label, ['id' => $recordId]);
+            DB::table($table)->where('id', $recordId)->update(['deleted_at' => now()]);
+
+            return $entryId;
+        });
+    }
+
+    private function restoreRecord(string $table, int $recordId): void
+    {
+        if ($recordId < 1 || ! Schema::hasTable($table) || ! Schema::hasColumn($table, 'deleted_at')) {
+            throw new RuntimeException('This Recycle Bin item cannot be restored.');
+        }
+
+        $restored = DB::table($table)
+            ->where('id', $recordId)
+            ->whereNotNull('deleted_at')
+            ->update(['deleted_at' => null]);
+        if ($restored !== 1) {
+            throw new RuntimeException('This record no longer exists or has already been restored.');
+        }
+    }
+
+    private function createEntry(string $type, string $label, array $payload): int
     {
         $this->purgeExpired();
         $now = now();
-        DB::table('admin_recycle_bin')->insert([
+        return (int) DB::table('admin_recycle_bin')->insertGetId([
             'item_type' => $type,
             'label' => $label,
             'payload' => json_encode($payload, JSON_THROW_ON_ERROR),
@@ -228,17 +284,108 @@ class AdminRecycleBinService
 
         $expired = DB::table('admin_recycle_bin')->where('expires_at', '<=', now())->get();
         foreach ($expired as $entry) {
-            if ($entry->item_type === 'csv_import') {
-                $payload = json_decode((string) $entry->payload, true);
-                $path = is_array($payload) ? ($payload['import']['stored_path'] ?? null) : null;
-                if ($path && Storage::disk('local')->exists($path) && ! Storage::disk('local')->delete($path)) {
-                    throw new RuntimeException('Unable to purge an expired CSV import file.');
-                }
-            } elseif ($entry->item_type === 'promotion') {
-                $payload = json_decode((string) $entry->payload, true);
-                $this->deletePromotionImage(is_array($payload) ? ($payload['promotion']['image_url'] ?? null) : null);
-            }
+            $this->permanentlyDeleteEntry($entry);
             DB::table('admin_recycle_bin')->where('id', $entry->id)->delete();
+        }
+    }
+
+    private function permanentlyDeleteEntry(object $entry): void
+    {
+        $payload = json_decode((string) $entry->payload, true, 512, JSON_THROW_ON_ERROR);
+        switch ($entry->item_type) {
+            case 'csv_import':
+                $path = $payload['import']['stored_path'] ?? null;
+                if ($path && Storage::disk('local')->exists($path) && ! Storage::disk('local')->delete($path)) {
+                    throw new RuntimeException('Unable to permanently remove the stored CSV file.');
+                }
+                break;
+            case 'promotion':
+                $this->deletePromotionImage($payload['promotion']['image_url'] ?? null);
+                break;
+            case 'product':
+                $this->deleteRelatedRows('product_id', (int) ($payload['id'] ?? 0));
+                $this->deleteProductImages((int) ($payload['id'] ?? 0));
+                break;
+            case 'ingredient':
+                $this->deleteRelatedRows('ingredient_id', (int) ($payload['id'] ?? 0));
+                break;
+            case 'user':
+                $this->detachUserHistory((int) ($payload['id'] ?? 0));
+                break;
+        }
+
+        if (in_array($entry->item_type, ['product', 'ingredient', 'user'], true)) {
+            $table = match ($entry->item_type) {
+                'product' => 'products',
+                'ingredient' => 'ingredients',
+                'user' => 'users',
+            };
+            if (Schema::hasTable($table)) {
+                DB::table($table)->where('id', (int) ($payload['id'] ?? 0))->delete();
+            }
+        }
+    }
+
+    private function deleteRelatedRows(string $foreignKey, int $recordId): void
+    {
+        if ($recordId < 1) {
+            return;
+        }
+
+        $tables = match ($foreignKey) {
+            'product_id' => ['analytics_product_aliases', 'product_sizes', 'product_recipes', 'production_transactions', 'product_inventory_movements', 'production_batch_allocations'],
+            'ingredient_id' => ['ingredient_batches', 'ingredient_movements', 'product_recipes', 'cake_recipe_ingredients', 'production_batch_allocations', 'waste_logs', 'discard_requests'],
+            default => [],
+        };
+        foreach ($tables as $table) {
+            if (Schema::hasTable($table) && Schema::hasColumn($table, $foreignKey)) {
+                DB::table($table)->where($foreignKey, $recordId)->delete();
+            }
+        }
+    }
+
+    private function deleteProductImages(int $productId): void
+    {
+        $imageName = DB::table('products')->where('id', $productId)->value('image');
+        if (! is_string($imageName) || ! preg_match('/^[A-Za-z0-9._-]+$/D', $imageName)) {
+            return;
+        }
+
+        foreach ([base_path('../uploads/' . $imageName), public_path('uploads/' . $imageName)] as $path) {
+            if (File::exists($path) && ! File::delete($path)) {
+                throw new RuntimeException('Unable to permanently remove the product image.');
+            }
+        }
+    }
+
+    private function detachUserHistory(int $userId): void
+    {
+        if ($userId < 1) {
+            return;
+        }
+
+        if (Schema::hasTable('addresses') && Schema::hasColumn('addresses', 'customer_id')) {
+            DB::table('addresses')->where('customer_id', $userId)->delete();
+        }
+        if (Schema::hasTable('favorites') && Schema::hasColumn('favorites', 'customer_id')) {
+            DB::table('favorites')->where('customer_id', $userId)->delete();
+        }
+        if (Schema::hasTable('orders') && Schema::hasColumn('orders', 'user_id')) {
+            DB::table('orders')->where('user_id', $userId)->update(['user_id' => null]);
+        }
+        if (Schema::hasTable('variance') && Schema::hasColumn('variance', 'recorded_by')) {
+            DB::table('variance')->where('recorded_by', $userId)->update(['recorded_by' => null]);
+        }
+        if (Schema::hasTable('messages') && Schema::hasColumn('messages', 'user_id')) {
+            $updates = ['user_id' => null];
+            if (Schema::hasColumn('messages', 'customer_name')) $updates['customer_name'] = null;
+            if (Schema::hasColumn('messages', 'customer_email')) $updates['customer_email'] = null;
+            DB::table('messages')->where('user_id', $userId)->update($updates);
+        }
+        foreach (['user_sessions', 'customer_two_factor_login_challenges'] as $table) {
+            if (Schema::hasTable($table) && Schema::hasColumn($table, 'user_id')) {
+                DB::table($table)->where('user_id', $userId)->delete();
+            }
         }
     }
 

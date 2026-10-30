@@ -3,6 +3,7 @@ import { ChevronLeft, ChevronRight, Eye, EyeOff, Loader2, Pencil, Plus, Search, 
 import { LARAVEL_BASE } from "../../services/config";
 import { getAuthHeaders } from "../../services/api";
 import { useAdminUsers } from "../hooks/useAdminUsers";
+import UndoToast from "../components/UndoToast";
 
 const roleStyles = {
   admin: "border border-[#f0dfa4] bg-[#fff4cd] text-[#80600a]",
@@ -75,6 +76,7 @@ export default function UserManagement() {
   const [showPasswordConfirmation, setShowPasswordConfirmation] = useState(false);
   const [deletingUserId, setDeletingUserId] = useState(null);
   const [confirmAction, setConfirmAction] = useState(null);
+  const [undoEntry, setUndoEntry] = useState(null);
   const [notice, setNotice] = useState({ type: "", message: "" });
   const [formErrors, setFormErrors] = useState({});
   const [form, setForm] = useState(initialForm);
@@ -295,8 +297,8 @@ export default function UserManagement() {
     setConfirmAction({
       type: "delete",
       user,
-      title: "Permanently delete account",
-      message: `Permanently delete ${user.name || "this account"}? Saved addresses and favorites will be removed. Order history will be retained without a linked account.`,
+      title: "Move account to Recycle Bin?",
+      message: `${user.name || "This account"} will be hidden and moved to the Recycle Bin. You can Undo for 5 seconds or restore it from Settings within 30 days.`,
     });
   };
 
@@ -329,7 +331,8 @@ export default function UserManagement() {
           return;
         }
 
-        showNotice("success", "User deleted successfully.");
+        setUndoEntry({ id: data.recycle_bin_entry_id, label: confirmAction.user.name || "Account" });
+        showNotice("success", "User moved to the Recycle Bin.");
         refetch();
       } catch (error) {
         console.error(error);
@@ -351,6 +354,24 @@ export default function UserManagement() {
     } finally {
       setUpdatingStatusId(null);
       setConfirmAction(null);
+    }
+  };
+
+  const undoUserDelete = async () => {
+    if (!undoEntry?.id) return;
+    try {
+      const response = await fetch(`${LARAVEL_BASE}/api/admin/recycle-bin/${undoEntry.id}/restore`, {
+        method: "POST",
+        credentials: "include",
+        headers: { Accept: "application/json", ...getAuthHeaders() },
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !data.success) throw new Error(data.message || "Unable to restore this account.");
+      setUndoEntry(null);
+      showNotice("success", `${undoEntry.label} restored.`);
+      refetch();
+    } catch (restoreError) {
+      showNotice("error", restoreError.message || "Unable to restore this account.");
     }
   };
 
@@ -572,6 +593,11 @@ export default function UserManagement() {
           </div>
         </div>
       )}
+      <UndoToast
+        message={undoEntry ? `${undoEntry.label} moved to the Recycle Bin.` : ""}
+        onUndo={undoUserDelete}
+        onDismiss={() => setUndoEntry(null)}
+      />
 
       {isModalOpen && (
         <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-[#241812]/55 px-4 py-5 backdrop-blur-[2px]">

@@ -301,7 +301,7 @@ describe('Products admin catalog', () => {
     );
   });
 
-  test('keeps table action buttons in a fixed five-button row', async () => {
+  test('keeps table action buttons in a fixed six-button row', async () => {
     render(<Products allowCatalogManagement />);
 
     await waitFor(() => {
@@ -311,9 +311,41 @@ describe('Products admin catalog', () => {
     fireEvent.click(screen.getByRole('button', { name: /table/i }));
     const actions = screen.getByLabelText('Actions for Strawberry Cake');
     expect(actions).toHaveClass('flex', 'items-center', 'justify-center');
-    expect(Array.from(actions.children)).toHaveLength(5);
+    expect(Array.from(actions.children)).toHaveLength(6);
     Array.from(actions.children).forEach((button) => {
       expect(button).toHaveClass('h-9', 'w-9');
+    });
+  });
+
+  test('moves a product to the Recycle Bin and restores it through Undo', async () => {
+    const defaultFetch = global.fetch.getMockImplementation();
+    global.fetch.mockImplementation((url, options = {}) => {
+      if (String(url).endsWith('/api/staff/products/1') && options.method === 'DELETE') {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({ success: true, recycle_bin_entry_id: 23 }),
+        });
+      }
+      if (String(url).endsWith('/api/admin/recycle-bin/23/restore') && options.method === 'POST') {
+        return Promise.resolve({ ok: true, json: async () => ({ success: true }) });
+      }
+      return defaultFetch(url, options);
+    });
+    render(<Products allowCatalogManagement />);
+
+    await screen.findByText('Strawberry Cake');
+    fireEvent.click(screen.getByRole('button', { name: /table/i }));
+    fireEvent.click(screen.getByRole('button', { name: 'Delete Strawberry Cake' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Move to Recycle Bin' }));
+
+    expect(await screen.findByRole('button', { name: 'Undo' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Undo' }));
+
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringContaining('/api/admin/recycle-bin/23/restore'),
+        expect.objectContaining({ method: 'POST' }),
+      );
     });
   });
 

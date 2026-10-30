@@ -4,6 +4,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { AlertTriangle, Archive, ArchiveRestore, ChefHat, CircleCheck, CircleX, History, ImagePlus, LayoutGrid, Pencil, Plus, RefreshCw, Search, SlidersHorizontal, Table2, Trash2, X } from "lucide-react";
 import { BASE, LARAVEL_BASE, STAFF_BASE } from "../../../services/config";
 import AdminDialog from "../../components/AdminDialog";
+import UndoToast from "../../components/UndoToast";
 
 const getStaffAuthHeaders = () => {
   let token = '';
@@ -85,6 +86,7 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState(null);
   const [adminDialog, setAdminDialog] = useState(null);
+  const [undoEntry, setUndoEntry] = useState(null);
 
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [cardSizeSelections, setCardSizeSelections] = useState({});
@@ -107,6 +109,7 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
   const [bomLoading, setBomLoading] = useState(false);
   const [operationLoading, setOperationLoading] = useState(false);
   const [archivingProductId, setArchivingProductId] = useState(null);
+  const [deletingProductId, setDeletingProductId] = useState(null);
   const [activeModal, setActiveModal] = useState(null);
   const [historyEntries, setHistoryEntries] = useState([]);
   const [historyLoading, setHistoryLoading] = useState(false);
@@ -261,6 +264,59 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
       message: `${product.name} will no longer appear in the customer menu. You can restore it later.`,
       confirmLabel: "Hide product",
       onConfirm: () => updateProductArchive(product, true),
+    });
+  };
+
+  const deleteProduct = async (product) => {
+    try {
+      setDeletingProductId(product.id);
+      const response = await laravelStaffFetch(`${LARAVEL_BASE}/api/staff/products/${product.id}`, {
+        method: "DELETE",
+        headers: { Accept: "application/json" },
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !data.success) {
+        throw new Error(data.message || "Unable to move this product to the Recycle Bin.");
+      }
+
+      setAdminDialog(null);
+      setUndoEntry({ id: data.recycle_bin_entry_id, label: product.name });
+      setFeedback({ type: "success", text: `${product.name} moved to the Recycle Bin.` });
+      fetchProducts();
+    } catch (error) {
+      setFeedback({ type: "error", text: error.message || "Unable to move this product to the Recycle Bin." });
+    } finally {
+      setDeletingProductId(null);
+    }
+  };
+
+  const undoProductDelete = async () => {
+    if (!undoEntry?.id) return;
+    try {
+      const response = await laravelStaffFetch(`${LARAVEL_BASE}/api/admin/recycle-bin/${undoEntry.id}/restore`, {
+        method: "POST",
+        headers: { Accept: "application/json" },
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !data.success) {
+        throw new Error(data.message || "Unable to restore this product.");
+      }
+
+      setUndoEntry(null);
+      setFeedback({ type: "success", text: `${undoEntry.label} restored.` });
+      fetchProducts();
+    } catch (error) {
+      setFeedback({ type: "error", text: error.message || "Unable to restore this product." });
+    }
+  };
+
+  const confirmDeleteProduct = (product) => {
+    setAdminDialog({
+      kind: "confirm",
+      title: "Move product to Recycle Bin?",
+      message: `${product.name} will be hidden from customers and moved to the Recycle Bin. You can Undo for 5 seconds or restore it from Settings within 30 days.`,
+      confirmLabel: deletingProductId === product.id ? "Moving..." : "Move to Recycle Bin",
+      onConfirm: () => deleteProduct(product),
     });
   };
 
@@ -1064,6 +1120,7 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
                       {product.is_archived ? <ArchiveRestore size={13} aria-hidden="true" /> : <Archive size={13} aria-hidden="true" />}
                     </button>
                   )}
+                  {canEditCatalog && <button type="button" onClick={() => confirmDeleteProduct(product)} title={`Move ${product.name} to Recycle Bin`} aria-label={`Delete ${product.name}`} className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[#efd8d4] bg-white text-[#8d5357] transition hover:bg-[#fff0f0]"><Trash2 size={13} aria-hidden="true" /></button>}
                   <button type="button" onClick={() => openInventoryModal(product, "history")} title={`View ${product.name} history`} aria-label={`View ${product.name} history`} className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[#eadfd8] bg-white text-[#765d50] transition hover:border-[#e7c875] hover:bg-[#fff8df]"><History size={13} aria-hidden="true" /></button>
                 </div>
 
@@ -1153,6 +1210,7 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
                       {product.is_archived ? <ArchiveRestore size={15} aria-hidden="true" /> : <Archive size={15} aria-hidden="true" />}
                     </button>
                   )}
+                  {canEditCatalog && <button type="button" onClick={() => confirmDeleteProduct(product)} title={`Move ${product.name} to Recycle Bin`} aria-label={`Delete ${product.name}`} className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[#efd8d4] bg-white text-[#8d5357] transition hover:bg-[#fff0f0]"><Trash2 size={15} aria-hidden="true" /></button>}
                   <button type="button" onClick={() => openInventoryModal(product, "history")} title={`View ${product.name} history`} aria-label={`View ${product.name} history`} className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[#eadfd8] bg-white text-[#765d50] transition hover:bg-[#fff8df]"><History size={15} aria-hidden="true" /></button>
                 </div>
               </div>
@@ -1871,6 +1929,7 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
 
         </AnimatePresence>
         <AdminDialog dialog={adminDialog} onClose={() => setAdminDialog(null)} onConfirm={adminDialog?.onConfirm} />
+        <UndoToast message={undoEntry ? `${undoEntry.label} moved to the Recycle Bin.` : ""} onUndo={undoProductDelete} onDismiss={() => setUndoEntry(null)} />
 
       </div>
 

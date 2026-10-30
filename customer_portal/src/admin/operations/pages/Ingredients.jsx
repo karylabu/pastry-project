@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useLocation } from "react-router-dom";
-import { AlertTriangle, CalendarDays, Check, ChevronRight, CircleAlert, History, Package, PackagePlus, Pencil, Plus, Search, X } from "lucide-react";
+import { AlertTriangle, CalendarDays, Check, ChevronRight, CircleAlert, History, Package, PackagePlus, Pencil, Plus, Search, Trash2, X } from "lucide-react";
 import { LARAVEL_BASE, STAFF_BASE } from "../../../services/config";
+import UndoToast from "../../components/UndoToast";
 
 const staffFetch = (url, options = {}) => fetch(url, { credentials: "include", ...options });
 const laravelStaffFetch = (url, options = {}) => {
@@ -83,6 +84,7 @@ export default function Ingredients({
 }) {
   const location = useLocation();
   const [ingredients, setIngredients] = useState([]);
+  const [undoEntry, setUndoEntry] = useState(null);
   const [allBatches, setAllBatches] = useState([]);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
@@ -117,6 +119,36 @@ export default function Ingredients({
   const showAlert = (message, variant = 'error') => setAlertDialog({ message, variant });
   const currentUser = (() => { try { return JSON.parse(window.localStorage.getItem('user') || 'null'); } catch (e) { return null; } })();
   const canApproveDiscard = String(currentUser?.role || '').toLowerCase() === 'admin';
+  const deleteIngredient = async (ingredient) => {
+    if (!window.confirm(`Move ${ingredient.name} to the Recycle Bin? You can Undo for 5 seconds or restore it from Settings within 30 days.`)) return;
+    try {
+      const response = await laravelStaffFetch(`${LARAVEL_BASE}/api/staff/ingredients/${ingredient.id}`, {
+        method: 'DELETE',
+        headers: { Accept: 'application/json' },
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !data.success) throw new Error(data.message || 'Unable to move ingredient to the Recycle Bin.');
+      setUndoEntry({ id: data.recycle_bin_entry_id, label: ingredient.name });
+      await loadIngredients();
+    } catch (error) {
+      showAlert(error.message || 'Unable to move ingredient to the Recycle Bin.');
+    }
+  };
+  const undoIngredientDelete = async () => {
+    if (!undoEntry?.id) return;
+    try {
+      const response = await laravelStaffFetch(`${LARAVEL_BASE}/api/admin/recycle-bin/${undoEntry.id}/restore`, {
+        method: 'POST',
+        headers: { Accept: 'application/json' },
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !data.success) throw new Error(data.message || 'Unable to restore ingredient.');
+      setUndoEntry(null);
+      await loadIngredients();
+    } catch (error) {
+      showAlert(error.message || 'Unable to restore ingredient.');
+    }
+  };
   const normalizedModalName = normalizeIngredientName(modalName);
   const duplicateIngredientName = modalType === 'create' && normalizedModalName
     ? ingredients.some((ingredient) => normalizeIngredientName(ingredient.name) === normalizedModalName)
@@ -665,6 +697,7 @@ export default function Ingredients({
                         <td className="px-6 py-4 text-right">
                           <div className="flex items-center justify-end gap-2">
                             <button type="button" onClick={() => openModal('edit', item)} title={`Edit ${item.name}`} aria-label={`Edit ${item.name}`} className="inline-flex h-8 w-8 items-center justify-center rounded-md bg-[#33251e] text-white transition hover:bg-[#5b4540]"><Pencil size={14} aria-hidden="true" /></button>
+                            {canApproveDiscard && <button type="button" onClick={() => deleteIngredient(item)} title={`Move ${item.name} to Recycle Bin`} aria-label={`Delete ${item.name}`} className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-[#efd8d4] bg-white text-[#8d5357] transition hover:bg-[#fff0f0]"><Trash2 size={14} aria-hidden="true" /></button>}
                             {Number(item.expired_batch_count) > 0 && Number(item.pending_discard_count) === 0 && <button onClick={() => openModal('history', item)} className="rounded-md border border-[#eadfca] bg-[#fff4cd] px-2.5 py-1.5 text-[10px] font-semibold text-[#80600a]">Discard expired</button>}
                             <button type="button" onClick={() => openModal('history', item)} title={`View ${item.name} history`} aria-label={`View ${item.name} history`} className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-[#eee4de] bg-white text-[#6a5a50] transition hover:bg-[#fff8df]"><History size={14} aria-hidden="true" /></button>
                           </div>
@@ -932,6 +965,7 @@ export default function Ingredients({
             </section>
           </div>
         )}
+        <UndoToast message={undoEntry ? `${undoEntry.label} moved to the Recycle Bin.` : ""} onUndo={undoIngredientDelete} onDismiss={() => setUndoEntry(null)} />
         </div>
       </div>
     </div>

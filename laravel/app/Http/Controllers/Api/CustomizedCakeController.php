@@ -93,6 +93,7 @@ class CustomizedCakeController extends Controller
             'recipes' => $this->service->getRecipes(),
             'ingredients' => DB::table('ingredients')
                 ->where('name', 'not like', '[DEV]%')
+                ->when(Schema::hasColumn('ingredients', 'deleted_at'), fn ($query) => $query->whereNull('deleted_at'))
                 ->orderBy('name')
                 ->get(['id', 'name', 'unit']),
         ]);

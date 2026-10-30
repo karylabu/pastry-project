@@ -11,6 +11,8 @@ use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 use Illuminate\Database\QueryException;
+use App\Services\AdminRecycleBinService;
+use RuntimeException;
 
 class UserController extends Controller
 {
@@ -256,7 +258,7 @@ class UserController extends Controller
         ]);
     }
 
-    public function destroy(User $user)
+    public function destroy(User $user, AdminRecycleBinService $recycleBin)
     {
         $request = request();
         if ($response = $this->authorizeAdmin($request)) return $response;
@@ -269,37 +271,20 @@ class UserController extends Controller
             ], 409);
         }
 
-        DB::transaction(function () use ($user) {
-            $userId = (int) $user->id;
-
-            if (Schema::hasTable('addresses') && Schema::hasColumn('addresses', 'customer_id')) {
-                DB::table('addresses')->where('customer_id', $userId)->delete();
-            }
-            if (Schema::hasTable('favorites') && Schema::hasColumn('favorites', 'customer_id')) {
-                DB::table('favorites')->where('customer_id', $userId)->delete();
-            }
-            if (Schema::hasTable('orders') && Schema::hasColumn('orders', 'user_id')) {
-                DB::table('orders')->where('user_id', $userId)->update(['user_id' => null]);
-            }
-            if (Schema::hasTable('variance') && Schema::hasColumn('variance', 'recorded_by')) {
-                DB::table('variance')->where('recorded_by', $userId)->update(['recorded_by' => null]);
-            }
-            if (Schema::hasTable('messages') && Schema::hasColumn('messages', 'user_id')) {
-                $updates = ['user_id' => null];
-                if (Schema::hasColumn('messages', 'customer_name')) $updates['customer_name'] = null;
-                if (Schema::hasColumn('messages', 'customer_email')) $updates['customer_email'] = null;
-                DB::table('messages')->where('user_id', $userId)->update($updates);
-            }
-            if (Schema::hasTable('user_sessions')) {
-                DB::table('user_sessions')->where('user_id', $userId)->delete();
-            }
-
-            $user->delete();
-        });
+        try {
+            $entryId = $recycleBin->trashUser((int) $user->id);
+            $this->revokeUserTokens((int) $user->id);
+        } catch (RuntimeException $exception) {
+            return response()->json([
+                'success' => false,
+                'message' => $exception->getMessage(),
+            ], 409);
+        }
 
         return response()->json([
             'success' => true,
-            'message' => 'User deleted successfully.',
+            'message' => 'User moved to the Recycle Bin for 30 days.',
+            'recycle_bin_entry_id' => $entryId,
         ]);
     }
 

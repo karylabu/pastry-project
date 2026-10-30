@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use App\Services\ProductionService;
+use App\Services\AdminRecycleBinService;
 use Throwable;
 
 class ProductController extends Controller
@@ -349,6 +350,29 @@ class ProductController extends Controller
             'product_id' => (int) $product->id,
             'is_archived' => $product->is_archived,
         ]);
+    }
+
+    public function destroyStaff(Request $request, Product $product, AdminRecycleBinService $recycleBin): JsonResponse
+    {
+        $admin = $this->requireRole($request, 'admin');
+        if (!$admin instanceof \App\Models\User) {
+            return $admin;
+        }
+
+        try {
+            $entryId = $recycleBin->trashProduct((int) $product->id);
+            return response()->json([
+                'success' => true,
+                'message' => 'Product moved to the Recycle Bin for 30 days.',
+                'recycle_bin_entry_id' => $entryId,
+            ]);
+        } catch (Throwable $exception) {
+            Log::error('Product could not be moved to the Recycle Bin.', [
+                'product_id' => $product->id,
+                'exception' => $exception,
+            ]);
+            return response()->json(['success' => false, 'message' => $exception->getMessage()], 409);
+        }
     }
 
     public function index(Request $request): JsonResponse

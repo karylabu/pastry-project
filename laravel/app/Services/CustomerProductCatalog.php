@@ -10,6 +10,9 @@ class CustomerProductCatalog
     public function products(bool $availableOnly = true): array
     {
         $query = DB::table('products')->where('is_archived', false)->orderBy('category')->orderBy('name');
+        if (Schema::hasColumn('products', 'deleted_at')) {
+            $query->whereNull('deleted_at');
+        }
         if ($availableOnly) {
             $query->where('available', true);
         }
@@ -50,6 +53,7 @@ class CustomerProductCatalog
             ->where('is_archived', false)
             ->where('stock', '>', 0)
             ->whereRaw("LOWER(category) IN ('cake', 'cakes')")
+            ->when(Schema::hasColumn('products', 'deleted_at'), fn ($query) => $query->whereNull('deleted_at'))
             ->get()
             ->map(function ($product) use ($salesByProduct) {
                 $row = (array) $product;
@@ -200,6 +204,7 @@ class CustomerProductCatalog
             ->where('is_archived', false)
             ->where('stock', '>', 0)
             ->whereRaw("LOWER(category) IN ('cake', 'cakes')")
+            ->when(Schema::hasColumn('products', 'deleted_at'), fn ($query) => $query->whereNull('deleted_at'))
             ->orderBy('name')
             ->get()
             ->map(fn ($product) => (array) $product);
