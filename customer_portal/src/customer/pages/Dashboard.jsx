@@ -432,15 +432,22 @@ export function ChatBubble({ aiMode = false, fullPage = false, hideFloating = fa
   }, [messages, sending, step, open]);
 
   useEffect(() => {
-    if (step === "chatting") {
-      fetchMessages();
-      return subscribeRealtime((event) => {
-        if (event.type === "chat.updated" && (!event.conversation_id || event.conversation_id === conversationId)) {
-          fetchMessages(true);
-        }
-      });
-    }
-    return undefined;
+    if (step !== "chatting") return undefined;
+
+    fetchMessages();
+    const unsubscribe = subscribeRealtime((event) => {
+      // Realtime events are already scoped to this signed-in customer. Refresh
+      // the active thread even if an older message has a missing/different ID.
+      if (event.type === "chat.updated") fetchMessages(true);
+    });
+    const pollId = open
+      ? window.setInterval(() => fetchMessages(true), 2000)
+      : null;
+
+    return () => {
+      unsubscribe();
+      if (pollId !== null) window.clearInterval(pollId);
+    };
   }, [step, conversationId, showHistory, open]);
 
   const fetchMessages = async (mergeWithCurrent = false) => {
