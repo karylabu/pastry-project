@@ -1607,13 +1607,18 @@ export default function Orders() {
                         </p>
                       )}
                       {isCustomized && isAwaitingPayment && customDownpaymentAmount > 0 && (
-                        <p className="mt-1 text-[10px] leading-4 text-gray-500">
-                          Downpayment: ₱{downpaymentBreakdown.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                        </p>
+                        <>
+                          <p className="mt-1 text-[10px] leading-4 text-gray-500">
+                            Downpayment: ₱{downpaymentBreakdown.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </p>
+                          <p className="mt-1 text-[10px] leading-4 text-gray-500">
+                            QR Ph fee (2.23%): ₱{downpaymentBreakdown.fee.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </p>
+                        </>
                       )}
                       {isCustomized && isAwaitingBalancePayment && customBalanceAmount > 0 && (
                         <p className="mt-1 text-[10px] leading-4 text-gray-500">
-                          Balance fee: ₱{balanceBreakdown.fee.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          QR Ph balance fee (2.23%): ₱{balanceBreakdown.fee.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </p>
                       )}
                     </div>

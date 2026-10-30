@@ -230,7 +230,7 @@ test('shows the full QR Ph charge as the custom cake downpayment', async () => {
 
   expect(await screen.findByRole('button', { name: 'Pay ₱1.03' })).toBeInTheDocument();
   expect(screen.getByText('Downpayment: ₱1.03')).toBeInTheDocument();
-  expect(screen.queryByText('Downpayment fee: ₱0.03')).not.toBeInTheDocument();
+  expect(screen.getByText('QR Ph fee (2.23%): ₱0.03')).toBeInTheDocument();
 });
 
 test('uses the full QR Ph downpayment credit when showing the custom cake balance', async () => {
@@ -265,4 +265,5 @@ test('uses the full QR Ph downpayment credit when showing the custom cake balanc
 
   expect(await screen.findByRole('button', { name: 'Pay ₱5.00' })).toBeInTheDocument();
   expect(screen.getByText('Deposit paid: ₱5.12 · Balance due: ₱4.88')).toBeInTheDocument();
+  expect(screen.getByText('QR Ph balance fee (2.23%): ₱0.12')).toBeInTheDocument();
 });
