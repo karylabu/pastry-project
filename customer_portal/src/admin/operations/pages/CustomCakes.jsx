@@ -833,7 +833,7 @@ export default function CustomCakes() {
             ))}
           </div>
 
-          <div className="admin-static-card admin-operations-controls mb-4 rounded-lg border border-[#e9e1d9] bg-white p-3 shadow-[0_3px_12px_rgba(60,42,28,0.035)] sm:p-4 xl:min-h-[132px]">
+          <div className="admin-static-card admin-operations-controls mb-4 rounded-lg border border-[#e9e1d9] bg-white p-3 shadow-[0_3px_12px_rgba(60,42,28,0.035)] sm:p-4">
             <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#65574d]">Request status</p>
               <label className="relative block w-full sm:max-w-[340px]">
@@ -842,10 +842,10 @@ export default function CustomCakes() {
                 {searchId && <button type="button" onClick={() => setSearchId("")} aria-label="Clear search" className="absolute right-3 top-1/2 -translate-y-1/2 text-[#8f8076] hover:text-[#33251e]"><X size={14} /></button>}
               </label>
             </div>
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 xl:grid-cols-8" role="group" aria-label="Filter requests by status">
+            <div className="flex min-w-0 gap-2 overflow-x-auto pb-1" role="group" aria-label="Filter requests by status">
               {statusFilterOptions.map((option) => (
-                <button key={option} type="button" onClick={() => setStatusFilter(option)} aria-pressed={statusFilter === option} className={`inline-flex min-h-10 w-full min-w-0 items-center justify-between gap-1 rounded-md border px-2.5 py-2 text-left text-[10px] font-medium transition sm:text-[11px] ${statusFilter === option ? "border-[#33251e] bg-[#33251e] text-white" : "border-transparent bg-[#f7f4ef] text-[#65574d] hover:bg-[#fffaf0]"}`}>
-                  <span className="truncate">{option}</span><span className={`min-w-5 rounded px-1 text-center text-[9px] ${statusFilter === option ? "bg-white/15 text-white" : "bg-white text-[#806f61]"}`}>{statusCounts[option]}</span>
+                <button key={option} type="button" onClick={() => setStatusFilter(option)} aria-pressed={statusFilter === option} className={`inline-flex min-h-10 shrink-0 items-center justify-between gap-2 whitespace-nowrap rounded-md border px-2.5 py-2 text-left text-[10px] font-medium transition sm:text-[11px] ${statusFilter === option ? "border-[#33251e] bg-[#33251e] text-white" : "border-transparent bg-[#f7f4ef] text-[#65574d] hover:bg-[#fffaf0]"}`}>
+                  <span>{option}</span><span className={`min-w-5 rounded px-1 text-center text-[9px] ${statusFilter === option ? "bg-white/15 text-white" : "bg-white text-[#806f61]"}`}>{statusCounts[option]}</span>
                 </button>
               ))}
             </div>

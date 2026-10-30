@@ -89,6 +89,21 @@ describe("CustomCakes", () => {
     });
   });
 
+  test("keeps request status filters in a single horizontal row", async () => {
+    render(<CustomCakes />);
+
+    const filterGroup = await screen.findByRole("group", { name: "Filter requests by status" });
+
+    expect(screen.getByText("Request status")).toBeInTheDocument();
+    expect(screen.getByRole("searchbox", { name: "Search custom cake requests" })).toHaveAttribute(
+      "placeholder",
+      "Search order, customer, phone",
+    );
+    expect(filterGroup).toHaveClass("flex", "overflow-x-auto");
+    expect(filterGroup.querySelectorAll("button")).toHaveLength(9);
+    expect(Array.from(filterGroup.querySelectorAll("button")).every((button) => button.classList.contains("shrink-0"))).toBe(true);
+  });
+
   test("opens the requested cake order directly from its notification link", async () => {
     window.history.pushState({}, "", "/admin/custom-cakes?order_id=31");
     render(<CustomCakes />);
