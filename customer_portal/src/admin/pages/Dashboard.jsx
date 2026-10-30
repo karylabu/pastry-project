@@ -342,7 +342,13 @@ export default function Dashboard() {
     : analytics?.salesTrend?.daily || [];
   const regularVsCustomized = analytics?.cakeTypeBreakdown || analytics?.regularVsCustomized || {};
   const lowStockIngredients = analytics?.ingredientAnalytics?.low_stock || [];
-  const mostUsedIngredients = analytics?.ingredientAnalytics?.most_used || [];
+  const actualIngredientConsumption = Array.isArray(analytics?.ingredientAnalytics?.actual_consumption)
+    ? analytics.ingredientAnalytics.actual_consumption
+    : [];
+  const maxIngredientConsumption = actualIngredientConsumption.reduce(
+    (max, ingredient) => Math.max(max, Number(ingredient.quantity || 0)),
+    0,
+  );
   const wasteAnalytics = analytics?.wasteAnalytics || {};
   const businessInsights = analytics?.businessInsights || [];
   const now = new Date();
@@ -686,9 +692,35 @@ export default function Dashboard() {
                       </div>
                     </div>
                   </Panel>
-                  <Panel eyebrow="Ingredient Analytics" title="Estimated ingredient consumption">
+                  <Panel eyebrow="Production & inventory" title="Ingredient Analytics">
                     <div className="space-y-2 p-4">
-                      {mostUsedIngredients.length ? mostUsedIngredients.slice(0, 5).map((ingredient) => <div key={ingredient.id || ingredient.name} className="rounded-lg px-3 py-2.5 hover:bg-[#fff8df]"><div className="flex items-center justify-between gap-3"><div><p className="text-[13px] text-[#5f514a]">{ingredient.name || ingredient.ingredient}</p><p className="mt-1 text-[11px] text-[#9b8c83]">Current: {Number(ingredient.current_stock || 0).toLocaleString()} {ingredient.unit || ''}</p></div><span className="text-right text-[12px] font-semibold text-[#33251e]">{Number(ingredient.quantity || ingredient.quantity_consumed || 0).toLocaleString()} {ingredient.unit || ''}<span className="block text-[10px] font-normal text-[#9b8c83]">estimated usage</span></span></div><div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[#f4ece6]"><div className="h-full rounded-full bg-[#a57c38]" style={{ width: `${Math.min(100, Number(ingredient.percentage || 0))}%` }} /></div>{ingredient.estimated_days_remaining !== null && <p className="mt-1 text-[10px] text-[#9b8c83]">Estimated remaining: {ingredient.estimated_days_remaining} days</p>}</div>) : <AnalyticsEmpty compact title="No ingredient usage yet." description="Estimated usage appears once completed orders are recorded." />}
+                      <p className="px-3 text-[11px] text-[#9b8c83]">Recorded ingredient usage from production</p>
+                      {actualIngredientConsumption.length ? actualIngredientConsumption.slice(0, 5).map((ingredient) => {
+                        const quantity = Number(ingredient.quantity || 0);
+                        const usagePercentage = maxIngredientConsumption > 0
+                          ? (quantity / maxIngredientConsumption) * 100
+                          : 0;
+
+                        return (
+                          <div key={ingredient.id || ingredient.name} className="rounded-lg px-3 py-2.5 hover:bg-[#fff8df]">
+                            <div className="flex items-center justify-between gap-3">
+                              <div>
+                                <p className="text-[13px] text-[#5f514a]">{ingredient.name}</p>
+                                <p className="mt-1 text-[11px] text-[#9b8c83]">
+                                  Current stock: {Number(ingredient.stock || 0).toLocaleString()} {ingredient.unit || ""}
+                                </p>
+                              </div>
+                              <span className="text-right text-[12px] font-semibold text-[#33251e]">
+                                {quantity.toLocaleString()} {ingredient.unit || ""}
+                                <span className="block text-[10px] font-normal text-[#9b8c83]">used in production</span>
+                              </span>
+                            </div>
+                            <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[#f4ece6]">
+                              <div className="h-full rounded-full bg-[#a57c38]" style={{ width: `${usagePercentage}%` }} />
+                            </div>
+                          </div>
+                        );
+                      }) : <AnalyticsEmpty compact title="No production usage recorded." description="Ingredient usage appears here after stock is issued for production." />}
                     </div>
                   </Panel>
                 </div>
