@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { AlertTriangle, CalendarDays, Check, ChevronRight, CircleAlert, History, Package, PackagePlus, Pencil, Plus, Search, Trash2, X } from "lucide-react";
 import { LARAVEL_BASE, STAFF_BASE } from "../../../services/config";
+import AdminDialog from "../../components/AdminDialog";
 import UndoToast from "../../components/UndoToast";
 
 const staffFetch = (url, options = {}) => fetch(url, { credentials: "include", ...options });
@@ -90,6 +91,7 @@ export default function Ingredients({
   const [query, setQuery] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
   const [alertDialog, setAlertDialog] = useState(null);
+  const [adminDialog, setAdminDialog] = useState(null);
   const [modalType, setModalType] = useState(''); // 'create' | 'edit' | 'in' | 'out' | 'history'
   const [modalIngredient, setModalIngredient] = useState(null);
   const [modalQty, setModalQty] = useState('');
@@ -119,8 +121,16 @@ export default function Ingredients({
   const showAlert = (message, variant = 'error') => setAlertDialog({ message, variant });
   const currentUser = (() => { try { return JSON.parse(window.localStorage.getItem('user') || 'null'); } catch (e) { return null; } })();
   const canApproveDiscard = String(currentUser?.role || '').toLowerCase() === 'admin';
-  const deleteIngredient = async (ingredient) => {
-    if (!window.confirm(`Move ${ingredient.name} to the Recycle Bin? You can Undo for 5 seconds or restore it from Settings within 30 days.`)) return;
+  const deleteIngredient = (ingredient) => {
+    setAdminDialog({
+      kind: "confirm",
+      title: "Move ingredient to Recycle Bin?",
+      message: `${ingredient.name} will be moved to the Recycle Bin. You can Undo for 5 seconds or restore it from Settings within 30 days.`,
+      confirmLabel: "Move to Recycle Bin",
+      onConfirm: () => moveIngredientToRecycleBin(ingredient),
+    });
+  };
+  const moveIngredientToRecycleBin = async (ingredient) => {
     try {
       const response = await laravelStaffFetch(`${LARAVEL_BASE}/api/staff/ingredients/${ingredient.id}`, {
         method: 'DELETE',
@@ -965,6 +975,15 @@ export default function Ingredients({
             </section>
           </div>
         )}
+        <AdminDialog
+          dialog={adminDialog}
+          onClose={() => setAdminDialog(null)}
+          onConfirm={() => {
+            const action = adminDialog?.onConfirm;
+            setAdminDialog(null);
+            action?.();
+          }}
+        />
         <UndoToast message={undoEntry ? `${undoEntry.label} moved to the Recycle Bin.` : ""} onUndo={undoIngredientDelete} onDismiss={() => setUndoEntry(null)} />
         </div>
       </div>

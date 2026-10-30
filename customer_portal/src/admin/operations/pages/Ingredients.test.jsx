@@ -1,5 +1,5 @@
 import React from "react";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import Ingredients from "./Ingredients";
 
 jest.mock("react-router-dom", () => ({
@@ -15,6 +15,7 @@ describe("Ingredients alerts", () => {
   beforeEach(() => {
     window.localStorage.setItem("user", JSON.stringify({ role: "admin", token: "test-token" }));
     window.alert = jest.fn();
+    window.confirm = jest.fn();
     global.fetch = jest.fn((url) => {
       if (String(url).includes("/api/staff/inventory/ingredients")) {
         return Promise.resolve({
@@ -98,5 +99,32 @@ describe("Ingredients alerts", () => {
     expect(await screen.findByText("Ingredient 11")).toBeInTheDocument();
     expect(screen.getByText("Ingredient 12")).toBeInTheDocument();
     expect(screen.getByText("Showing 11–12 of 12 ingredients")).toBeInTheDocument();
+  });
+
+  test("confirms ingredient deletion with the shared admin dialog", async () => {
+    render(<Ingredients />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Delete All-purpose Flour" }));
+
+    const confirmation = await screen.findByRole("alertdialog");
+    expect(confirmation).toHaveTextContent("Move ingredient to Recycle Bin?");
+    expect(confirmation).toHaveTextContent(
+      "All-purpose Flour will be moved to the Recycle Bin. You can Undo for 5 seconds or restore it from Settings within 30 days."
+    );
+    expect(screen.getByRole("button", { name: "Move to Recycle Bin" })).toBeInTheDocument();
+    expect(window.confirm).not.toHaveBeenCalled();
+    expect(global.fetch).not.toHaveBeenCalledWith(
+      expect.stringContaining("/api/staff/ingredients/1"),
+      expect.objectContaining({ method: "DELETE" })
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Move to Recycle Bin" }));
+
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringContaining("/api/staff/ingredients/1"),
+        expect.objectContaining({ method: "DELETE" })
+      );
+    });
   });
 });
