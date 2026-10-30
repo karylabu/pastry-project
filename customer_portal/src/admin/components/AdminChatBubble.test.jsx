@@ -56,6 +56,7 @@ describe("AdminChatBubble", () => {
 
   afterEach(() => {
     jest.restoreAllMocks();
+    jest.useRealTimers();
     if (originalScrollHeightDescriptor) {
       Object.defineProperty(HTMLElement.prototype, "scrollHeight", originalScrollHeightDescriptor);
     } else {
@@ -115,6 +116,40 @@ describe("AdminChatBubble", () => {
     await waitFor(() => {
       expect(screen.getByRole("button", { name: "Customer Chat, 5 unread messages" })).toBeInTheDocument();
     });
+  });
+
+  test("polls for new customer messages and shows an in-app alert", async () => {
+    render(<AdminChatBubble />);
+    await screen.findByRole("button", { name: "Customer Chat, 3 unread messages" });
+
+    global.fetch.mockImplementation((url) => {
+      if (String(url).includes("/api/admin/settings")) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({ success: true, notification_preferences: { messageAlerts: true } }),
+        });
+      }
+
+      return Promise.resolve({
+        ok: true,
+        json: async () => ({
+          success: true,
+          conversations: [{
+            conversation_key: "user:7:quick-chat",
+            order_id: 0,
+            user_id: 7,
+            conversation_id: "quick-chat",
+            customer_name: "New Customer",
+            unread_count: 1,
+          }],
+        }),
+      });
+    });
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Customer Chat, 1 unread messages" })).toBeInTheDocument();
+    }, { timeout: 3500 });
+    expect(screen.getByRole("status")).toHaveTextContent("New message from New Customer");
   });
 
   test("shows the most recently active chats first", async () => {

@@ -24,15 +24,26 @@ export default function AdminChatBubble() {
   const [mobilePanel, setMobilePanel] = useState("conversation");
   const [messageAlertsEnabled, setMessageAlertsEnabled] = useState(true);
   const [adminDialog, setAdminDialog] = useState(null);
-  const conversationFetchId = useRef(0);
+  const [chatNotice, setChatNotice] = useState(null);
+  const conversationFetchInFlight = useRef(false);
+  const previousUnreadCounts = useRef(null);
+  const noticeTimeout = useRef(null);
+  const openRef = useRef(open);
+  const messageAlertsEnabledRef = useRef(messageAlertsEnabled);
   const messageListRef = useRef(null);
   const keepMessagesAtBottom = useRef(true);
   const activeChatKey = useRef(null);
+  const selectedConversationRef = useRef(null);
+  const messageFetchesInFlight = useRef(new Set());
+
+  openRef.current = open;
+  messageAlertsEnabledRef.current = messageAlertsEnabled;
 
   const selectedConversation = useMemo(
     () => conversations.find((item) => String(item.conversation_key) === String(selectedConversationKey)),
     [conversations, selectedConversationKey]
   );
+  selectedConversationRef.current = selectedConversation;
 
   const visibleConversations = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -69,16 +80,34 @@ export default function AdminChatBubble() {
   }, []);
 
   const fetchConversations = useCallback(async () => {
-    const fetchId = ++conversationFetchId.current;
+    if (conversationFetchInFlight.current) return;
+    conversationFetchInFlight.current = true;
     try {
       const response = await fetch(`${LARAVEL_BASE}/api/staff/chat/conversations`, {
         credentials: "include",
+        cache: "no-store",
         headers: getAuthHeaders(),
       });
       const data = await safeParseJson(response);
-      if (!response.ok || data?.success === false || fetchId !== conversationFetchId.current) return;
+      if (!response.ok || data?.success === false) return;
       const next = (Array.isArray(data.conversations) ? data.conversations : [])
         .sort((a, b) => (Date.parse(b.last_message_at || "") || 0) - (Date.parse(a.last_message_at || "") || 0));
+      const currentUnreadCounts = new Map(next.map((item) => [
+        String(item.conversation_key),
+        Number(item.unread_count || 0),
+      ]));
+      const previousCounts = previousUnreadCounts.current;
+      if (previousCounts && messageAlertsEnabledRef.current) {
+        const incoming = next.find((item) => (
+          Number(item.unread_count || 0) > (previousCounts.get(String(item.conversation_key)) || 0)
+        ));
+        if (incoming) {
+          setChatNotice(`New message from ${incoming.customer_name || "a customer"}`);
+          window.clearTimeout(noticeTimeout.current);
+          noticeTimeout.current = window.setTimeout(() => setChatNotice(null), 7000);
+        }
+      }
+      previousUnreadCounts.current = currentUnreadCounts;
       setConversations(next);
       setSelectedConversationKey((currentKey) => (
         next.some((item) => String(item.conversation_key) === String(currentKey))
@@ -87,11 +116,16 @@ export default function AdminChatBubble() {
       ));
     } catch {
       // The inbox continues showing its last successful state.
+    } finally {
+      conversationFetchInFlight.current = false;
     }
   }, []);
 
   const fetchMessages = async (conversation = selectedConversation) => {
     if (!conversation) return;
+    const fetchKey = String(conversation.conversation_key);
+    if (messageFetchesInFlight.current.has(fetchKey)) return;
+    messageFetchesInFlight.current.add(fetchKey);
     try {
       const params = new URLSearchParams({
         order_id: String(conversation.order_id || 0),
@@ -100,10 +134,12 @@ export default function AdminChatBubble() {
       });
       const response = await fetch(`${LARAVEL_BASE}/api/staff/chat/messages?${params.toString()}`, {
         credentials: "include",
+        cache: "no-store",
         headers: getAuthHeaders(),
       });
       const data = await safeParseJson(response);
-      if (response.ok && data?.success !== false) {
+      if (response.ok && data?.success !== false &&
+          String(selectedConversationRef.current?.conversation_key) === fetchKey) {
         setMessages(Array.isArray(data.messages) ? data.messages : []);
         setConversations((current) => current.map((item) => (
           String(item.conversation_key) === String(conversation.conversation_key)
@@ -113,14 +149,22 @@ export default function AdminChatBubble() {
       }
     } catch {
       // Polling errors are non-blocking.
+    } finally {
+      messageFetchesInFlight.current.delete(fetchKey);
     }
   };
 
   useEffect(() => {
     fetchConversations();
-    return subscribeRealtime((event) => {
+    const unsubscribe = subscribeRealtime((event) => {
       if (event.type === "chat.updated") fetchConversations();
     });
+    const pollId = window.setInterval(fetchConversations, 2000);
+    return () => {
+      unsubscribe();
+      window.clearInterval(pollId);
+      window.clearTimeout(noticeTimeout.current);
+    };
   }, [fetchConversations]);
 
   useEffect(() => {
@@ -128,20 +172,27 @@ export default function AdminChatBubble() {
   }, [open, fetchConversations]);
 
   useEffect(() => {
-    if (!open || !selectedConversation) return undefined;
-    const conversationKey = String(selectedConversation.conversation_key);
+    if (!open || !selectedConversationKey) return undefined;
+    const conversationKey = String(selectedConversationKey);
     if (activeChatKey.current !== conversationKey) {
       activeChatKey.current = conversationKey;
       keepMessagesAtBottom.current = true;
       setMessages([]);
     }
-    fetchMessages(selectedConversation);
-    return subscribeRealtime((event) => {
-      if (event.type === "chat.updated" && Number(event.order_id || 0) === Number(selectedConversation.order_id || 0)) {
-        fetchMessages(selectedConversation);
+    const refreshMessages = () => fetchMessages(selectedConversationRef.current);
+    refreshMessages();
+    const unsubscribe = subscribeRealtime((event) => {
+      if (event.type === "chat.updated" &&
+          Number(event.order_id || 0) === Number(selectedConversationRef.current?.order_id || 0)) {
+        refreshMessages();
       }
     });
-  }, [open, selectedConversation]);
+    const pollId = window.setInterval(refreshMessages, 1000);
+    return () => {
+      unsubscribe();
+      window.clearInterval(pollId);
+    };
+  }, [open, selectedConversationKey]);
 
   useEffect(() => {
     if (!open) {
@@ -204,6 +255,19 @@ export default function AdminChatBubble() {
 
   return (
     <>
+      {chatNotice && (
+        <button
+          type="button"
+          role="status"
+          onClick={() => {
+            setOpen(true);
+            setChatNotice(null);
+          }}
+          className="fixed bottom-[5.25rem] right-5 z-[10002] max-w-[calc(100vw-2.5rem)] rounded-xl border border-[#e9d8ae] bg-white px-4 py-3 text-left text-sm font-semibold text-[#33251e] shadow-xl"
+        >
+          <span className="flex items-center gap-2"><MessageCircle size={16} className="shrink-0 text-[#9b7810]" />{chatNotice}</span>
+        </button>
+      )}
       {open && (
         <div className="fixed inset-0 z-[10000] bg-[#fffaf0] p-3 font-['DM_Sans'] sm:p-5 lg:p-8">
           <div className="mx-auto flex h-full max-w-[1600px] overflow-hidden rounded-[22px] border border-[#e9d8ae] bg-white shadow-[0_20px_70px_rgba(0,0,0,0.18)]">
@@ -285,7 +349,7 @@ export default function AdminChatBubble() {
         </div>
       )}
 
-      <button type="button" onClick={() => setOpen((value) => !value)} className="fixed bottom-5 right-5 z-[10001] grid h-12 w-12 place-items-center rounded-full bg-[#f0b94d] text-black shadow-xl transition hover:scale-105 hover:bg-[#e5ae3d]" title="Customer Chat" aria-label={unreadCount > 0 ? `Customer Chat, ${unreadCount} unread messages` : "Customer Chat"}><MessageCircle size={21} />{unreadCount > 0 && <span aria-hidden="true" className="absolute -right-1 -top-1 grid h-5 min-w-5 place-items-center rounded-full bg-black px-1 text-[10px] font-bold text-white">{unreadCount > 99 ? "99+" : unreadCount}</span>}</button>
+      <button type="button" onClick={() => { setOpen((value) => !value); setChatNotice(null); }} className="fixed bottom-5 right-5 z-[10001] grid h-12 w-12 place-items-center rounded-full bg-[#f0b94d] text-black shadow-xl transition hover:scale-105 hover:bg-[#e5ae3d]" title="Customer Chat" aria-label={unreadCount > 0 ? `Customer Chat, ${unreadCount} unread messages` : "Customer Chat"}><MessageCircle size={21} />{unreadCount > 0 && <span aria-hidden="true" className="absolute -right-1 -top-1 grid h-5 min-w-5 animate-pulse place-items-center rounded-full bg-black px-1 text-[10px] font-bold text-white">{unreadCount > 99 ? "99+" : unreadCount}</span>}</button>
       <AdminDialog dialog={adminDialog} onClose={() => setAdminDialog(null)} />
     </>
   );
