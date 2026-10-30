@@ -302,11 +302,20 @@ export default function Dashboard() {
     : [];
 
   const displayOrders = useMemo(() => {
-    const urgent = orders
-      .filter((order) => order.status === "Pending" || order.status === "Preparing")
-      .sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
-    const rest = orders.filter((order) => !(order.status === "Pending" || order.status === "Preparing"));
-    return [...urgent, ...rest];
+    return [...orders].sort((a, b) => {
+      const aCreatedAt = Date.parse(a.created_at || "");
+      const bCreatedAt = Date.parse(b.created_at || "");
+      const aHasValidDate = Number.isFinite(aCreatedAt);
+      const bHasValidDate = Number.isFinite(bCreatedAt);
+
+      if (aHasValidDate && bHasValidDate && aCreatedAt !== bCreatedAt) {
+        return bCreatedAt - aCreatedAt;
+      }
+      if (aHasValidDate !== bHasValidDate) {
+        return aHasValidDate ? -1 : 1;
+      }
+      return Number(b.id || 0) - Number(a.id || 0);
+    });
   }, [orders]);
 
   const mostSoldItems = Array.isArray(analytics?.topSellingCakes) ? analytics.topSellingCakes : [];
