@@ -969,7 +969,8 @@ class CustomerApiController extends Controller
             return $msg;
         });
 
-        return $this->corsResponse(['success' => true, 'messages' => $messages]);
+        return $this->corsResponse(['success' => true, 'messages' => $messages])
+            ->header('Cache-Control', 'no-store, private');
     }
 
     public function chatConversations(Request $request)

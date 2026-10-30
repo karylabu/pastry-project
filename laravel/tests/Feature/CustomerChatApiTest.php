@@ -146,7 +146,8 @@ class CustomerChatApiTest extends TestCase
             ->assertOk()
             ->assertJsonPath('success', true)
             ->assertJsonPath('messages.0.message', 'Hi, I need help')
-            ->assertJsonPath('messages.0.created_at', fn ($value) => str_ends_with($value, '+08:00'));
+            ->assertJsonPath('messages.0.created_at', fn ($value) => str_ends_with($value, '+08:00'))
+            ->assertHeader('Cache-Control', 'no-store, private');
 
         $adminHeaders = ['Authorization' => 'Bearer test-admin-token'];
         $this->withHeaders($adminHeaders)

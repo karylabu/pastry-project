@@ -402,6 +402,8 @@ export function ChatBubble({ aiMode = false, fullPage = false, hideFloating = fa
   const shouldStickToBottomRef    = useRef(true);
   const openRef                   = useRef(fullPage && hasCustomerAccount);
   const pollRef                   = useRef(null);
+  const messageFetchIdRef         = useRef(0);
+  const messageFetchesInFlightRef = useRef(new Set());
   const imageInputRef             = useRef(null);
 
   const savedUser = typeof window !== 'undefined'
@@ -441,7 +443,7 @@ export function ChatBubble({ aiMode = false, fullPage = false, hideFloating = fa
       if (event.type === "chat.updated") fetchMessages(true);
     });
     const pollId = open
-      ? window.setInterval(() => fetchMessages(true), 2000)
+      ? window.setInterval(() => fetchMessages(true), 1000)
       : null;
 
     return () => {
@@ -451,6 +453,10 @@ export function ChatBubble({ aiMode = false, fullPage = false, hideFloating = fa
   }, [step, conversationId, showHistory, open]);
 
   const fetchMessages = async (mergeWithCurrent = false) => {
+    const fetchKey = conversationId;
+    if (messageFetchesInFlightRef.current.has(fetchKey)) return;
+    messageFetchesInFlightRef.current.add(fetchKey);
+    const fetchId = ++messageFetchIdRef.current;
     try {
       const params = new URLSearchParams({
         order_id: "0",
@@ -459,12 +465,14 @@ export function ChatBubble({ aiMode = false, fullPage = false, hideFloating = fa
       });
       const res  = await fetch(`${CUSTOMER_BASE}/api/customer/chat/messages?${params.toString()}`, {
         credentials: 'include',
+        cache: "no-store",
         headers: getAuthHeaders(),
       });
       const data = await safeParseJson(res);
       if (!res.ok || !data.success) {
         throw new Error(data.message || `Chat history request failed (${res.status})`);
       }
+      if (fetchId !== messageFetchIdRef.current) return;
       const fetchedMessages = Array.isArray(data.messages) ? data.messages : [];
       setMessages(previousMessages => {
         if (!mergeWithCurrent) return fetchedMessages;
@@ -490,8 +498,11 @@ export function ChatBubble({ aiMode = false, fullPage = false, hideFloating = fa
         setUnread(newStaff);
       }
     } catch (e) {
+      if (fetchId !== messageFetchIdRef.current) return;
       console.error("Chat fetch error:", e);
       setChatError("Hindi ma-load ang chat history. Pakisubukan ulit.");
+    } finally {
+      messageFetchesInFlightRef.current.delete(fetchKey);
     }
   };
 
