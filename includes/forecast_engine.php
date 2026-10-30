@@ -147,7 +147,7 @@ function fe_metrics_summarize(array $m): array
 }
 
 /**
- * Keeps the production forecast on the configured method; backtest metrics remain for comparison.
+ * Keeps production on the configured method; backtest metrics are informational only.
  */
 function fe_select_method(array $aggregateMetrics): string
 {
