@@ -89,7 +89,7 @@ describe("CustomCakes", () => {
     });
   });
 
-  test("keeps request status filters in a single horizontal row", async () => {
+  test("fits all request status filters inside the status card", async () => {
     render(<CustomCakes />);
 
     const filterGroup = await screen.findByRole("group", { name: "Filter requests by status" });
@@ -99,9 +99,11 @@ describe("CustomCakes", () => {
       "placeholder",
       "Search order, customer, phone",
     );
-    expect(filterGroup).toHaveClass("flex", "overflow-x-auto");
+    expect(filterGroup).toHaveClass("grid", "grid-cols-2", "sm:grid-cols-3", "xl:grid-cols-5");
+    expect(filterGroup).not.toHaveClass("overflow-x-auto");
     expect(filterGroup.querySelectorAll("button")).toHaveLength(9);
-    expect(Array.from(filterGroup.querySelectorAll("button")).every((button) => button.classList.contains("shrink-0"))).toBe(true);
+    expect(Array.from(filterGroup.querySelectorAll("button")).every((button) => button.classList.contains("w-full"))).toBe(true);
+    expect(within(filterGroup).getByRole("button", { name: /Awaiting Balance Payment/ })).toBeInTheDocument();
   });
 
   test("opens the requested cake order directly from its notification link", async () => {
