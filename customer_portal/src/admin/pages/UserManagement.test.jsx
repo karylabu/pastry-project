@@ -55,6 +55,8 @@ describe("UserManagement admin creation", () => {
 
     render(<UserManagement />);
 
+    expect(screen.getByRole("columnheader", { name: "Actions" })).toHaveClass("w-[1%]", "text-right");
+
     fireEvent.click(screen.getByRole("button", { name: "Delete Jamie Baker" }));
 
     const confirmation = await screen.findByRole("alertdialog");

@@ -301,6 +301,16 @@ describe('Products admin catalog', () => {
     );
   });
 
+  test('does not show a delete action on admin product cards', async () => {
+    render(<Products allowCatalogManagement />);
+
+    await screen.findByText('Strawberry Cake');
+
+    expect(screen.getByRole('button', { name: 'Edit Strawberry Cake' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Hide Strawberry Cake from customers' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Delete Strawberry Cake' })).not.toBeInTheDocument();
+  });
+
   test('keeps table action buttons in a fixed six-button row', async () => {
     render(<Products allowCatalogManagement />);
 

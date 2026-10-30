@@ -471,7 +471,7 @@ export default function UserManagement() {
                     <th className="px-4 py-3 font-semibold sm:px-5">User</th>
                     <th className="px-4 py-3 font-semibold sm:px-5">Role</th>
                     <th className="px-4 py-3 font-semibold sm:px-5">Status</th>
-                    <th className="px-4 py-3 text-right font-semibold sm:px-5">Actions</th>
+                    <th className="w-[1%] whitespace-nowrap px-4 py-3 text-right font-semibold sm:px-5">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -503,7 +503,7 @@ export default function UserManagement() {
                         <td className="px-4 py-3.5 sm:px-5">
                           <StatusToggle checked={String(user.status || "").toLowerCase() === "active"} onChange={() => handleQuickStatusToggle(user)} disabled={updatingStatusId === user.id} />
                         </td>
-                        <td className="px-4 py-3.5 text-right sm:px-5">
+                        <td className="w-[1%] whitespace-nowrap px-4 py-3.5 text-right sm:px-5">
                           <div className="flex items-center justify-end gap-1.5">
                             <button type="button" onClick={() => openEditModal(user)} className="rounded-md p-2 text-[#74675f] transition hover:bg-[#fff4cd] hover:text-[#80600a]" aria-label={`Edit ${user.name}`} title="Edit user">
                               <Pencil size={16} />

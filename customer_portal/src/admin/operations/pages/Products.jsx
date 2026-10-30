@@ -1120,7 +1120,6 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
                       {product.is_archived ? <ArchiveRestore size={13} aria-hidden="true" /> : <Archive size={13} aria-hidden="true" />}
                     </button>
                   )}
-                  {canEditCatalog && <button type="button" onClick={() => confirmDeleteProduct(product)} title={`Move ${product.name} to Recycle Bin`} aria-label={`Delete ${product.name}`} className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[#efd8d4] bg-white text-[#8d5357] transition hover:bg-[#fff0f0]"><Trash2 size={13} aria-hidden="true" /></button>}
                   <button type="button" onClick={() => openInventoryModal(product, "history")} title={`View ${product.name} history`} aria-label={`View ${product.name} history`} className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[#eadfd8] bg-white text-[#765d50] transition hover:border-[#e7c875] hover:bg-[#fff8df]"><History size={13} aria-hidden="true" /></button>
                 </div>
 
