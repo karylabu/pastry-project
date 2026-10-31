@@ -309,27 +309,6 @@ export default function BackupManagement() {
             <button type="button" onClick={() => loadBackups()} className="inline-flex shrink-0 items-center gap-1.5 font-semibold text-[#793e38] hover:underline"><RefreshCw size={13} />Retry</button>
           </div>}
 
-          <section aria-label="Backup Health Status" role="status" aria-live="polite" className={`mb-4 rounded-md border px-4 py-4 ${health.status === "protected" ? "border-[#dce9d5] bg-[#f7fbf4]" : health.status === "needs_attention" ? "border-[#eee3c5] bg-[#fffaf0]" : "border-[#efd8d4] bg-[#fff8f6]"}`}>
-            <div className="flex items-start gap-3">
-              <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-md ${health.status === "protected" ? "bg-[#e7f1e1] text-[#58764e]" : health.status === "needs_attention" ? "bg-[#fff0c8] text-[#8b6b16]" : "bg-[#fae4df] text-[#98534b]"}`}>
-                {health.status === "protected" ? <CheckCircle2 size={17} /> : health.status === "needs_attention" ? <AlertCircle size={17} /> : <ShieldAlert size={17} />}
-              </span>
-              <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <h2 className="text-[14px] font-semibold text-[#33251e]">Backup Health Status</h2>
-                  <HealthBadge status={loading ? "needs_attention" : health.status} />
-                </div>
-                <p className="mt-1 text-[12px] leading-5 text-[#65574d]">{loading ? "Checking the latest backup…" : health.message}</p>
-                <div className="mt-3 grid grid-cols-2 gap-x-5 gap-y-2 border-t border-[#e9e1d9]/80 pt-3 sm:grid-cols-4">
-                  <div><p className="text-[9px] text-[#8f8076]">Last successful</p><p className="mt-1 truncate text-[11px] font-semibold text-[#33251e]">{formatDate(health.last_successful_backup?.created_at)}</p></div>
-                  <div><p className="text-[9px] text-[#8f8076]">Next scheduled</p><p className="mt-1 truncate text-[11px] font-semibold text-[#33251e]">{nextScheduleLabel}</p></div>
-                  <div><p className="text-[9px] text-[#8f8076]">Verification</p><p className={`mt-1 text-[11px] font-semibold ${health.file_verification_status === "verified" ? "text-[#58764e]" : health.file_verification_status === "failed" ? "text-[#98534b]" : "text-[#8b6b16]"}`}>{verificationLabel}</p></div>
-                  <div><p className="text-[9px] text-[#8f8076]">Automatic schedule</p><p className={`mt-1 text-[11px] font-semibold ${health.scheduler_status?.status === "active" ? "text-[#58764e]" : "text-[#98534b]"}`}>{health.scheduler_status?.status === "active" ? "Running" : "Not responding"}</p></div>
-                </div>
-              </div>
-            </div>
-          </section>
-
           <section aria-label="Backup overview" className="mb-5 grid grid-cols-2 gap-2.5 lg:grid-cols-4 lg:gap-3">
             <article className="h-full rounded-xl border border-t-[3px] border-[#eee4de] bg-white p-3 shadow-[0_5px_18px_rgba(91,64,39,0.04)] sm:p-3.5" style={{ borderTopColor: "#c9a94f" }}>
               <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#fff4cd] text-[#806714]"><Clock3 size={16} /></span>
@@ -358,6 +337,27 @@ export default function BackupManagement() {
                 </div>
               </form>
             </article>
+          </section>
+
+          <section aria-label="Backup Health Status" role="status" aria-live="polite" className={`mb-4 rounded-md border px-4 py-4 ${health.status === "protected" ? "border-[#dce9d5] bg-[#f7fbf4]" : health.status === "needs_attention" ? "border-[#eee3c5] bg-[#fffaf0]" : "border-[#efd8d4] bg-[#fff8f6]"}`}>
+            <div className="flex items-start gap-3">
+              <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-md ${health.status === "protected" ? "bg-[#e7f1e1] text-[#58764e]" : health.status === "needs_attention" ? "bg-[#fff0c8] text-[#8b6b16]" : "bg-[#fae4df] text-[#98534b]"}`}>
+                {health.status === "protected" ? <CheckCircle2 size={17} /> : health.status === "needs_attention" ? <AlertCircle size={17} /> : <ShieldAlert size={17} />}
+              </span>
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <h2 className="text-[14px] font-semibold text-[#33251e]">Backup Health Status</h2>
+                  <HealthBadge status={loading ? "needs_attention" : health.status} />
+                </div>
+                <p className="mt-1 text-[12px] leading-5 text-[#65574d]">{loading ? "Checking the latest backup…" : health.message}</p>
+                <div className="mt-3 grid grid-cols-2 gap-x-5 gap-y-2 border-t border-[#e9e1d9]/80 pt-3 sm:grid-cols-4">
+                  <div><p className="text-[9px] text-[#8f8076]">Last successful</p><p className="mt-1 truncate text-[11px] font-semibold text-[#33251e]">{formatDate(health.last_successful_backup?.created_at)}</p></div>
+                  <div><p className="text-[9px] text-[#8f8076]">Next scheduled</p><p className="mt-1 truncate text-[11px] font-semibold text-[#33251e]">{nextScheduleLabel}</p></div>
+                  <div><p className="text-[9px] text-[#8f8076]">Verification</p><p className={`mt-1 text-[11px] font-semibold ${health.file_verification_status === "verified" ? "text-[#58764e]" : health.file_verification_status === "failed" ? "text-[#98534b]" : "text-[#8b6b16]"}`}>{verificationLabel}</p></div>
+                  <div><p className="text-[9px] text-[#8f8076]">Automatic schedule</p><p className={`mt-1 text-[11px] font-semibold ${health.scheduler_status?.status === "active" ? "text-[#58764e]" : "text-[#98534b]"}`}>{health.scheduler_status?.status === "active" ? "Running" : "Not responding"}</p></div>
+                </div>
+              </div>
+            </div>
           </section>
 
           {!canRestore && <p className="mb-4 flex items-center gap-2 rounded-md border border-[#eee3c5] bg-[#fffaf0] px-3.5 py-3 text-[11px] text-[#74675f]"><ShieldAlert size={14} className="shrink-0 text-[#9b7810]" />Restoring a database is restricted to technical administrators.</p>}

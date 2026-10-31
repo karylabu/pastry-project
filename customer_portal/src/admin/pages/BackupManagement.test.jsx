@@ -72,6 +72,14 @@ describe("BackupManagement", () => {
     expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining("/api/admin/backups"), expect.objectContaining({ credentials: "include" }));
   });
 
+  test("shows backup overview cards above backup health status", async () => {
+    render(<BackupManagement />);
+
+    const overview = await screen.findByRole("region", { name: "Backup overview" });
+    const health = screen.getByRole("status", { name: "Backup Health Status" });
+    expect(overview.compareDocumentPosition(health) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
   test("creates a backup only after confirmation and refreshes the API history", async () => {
     global.fetch
       .mockResolvedValueOnce(jsonResponse(listResponse([])))
