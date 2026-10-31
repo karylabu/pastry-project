@@ -120,7 +120,7 @@ export default function Ingredients({
   const [pendingRequests, setPendingRequests] = useState([]);
   const showAlert = (message, variant = 'error') => setAlertDialog({ message, variant });
   const currentUser = (() => { try { return JSON.parse(window.localStorage.getItem('user') || 'null'); } catch (e) { return null; } })();
-  const canApproveDiscard = String(currentUser?.role || '').toLowerCase() === 'admin';
+  const canApproveDiscard = ['admin', 'super_admin'].includes(String(currentUser?.role || '').toLowerCase());
   const deleteIngredient = (ingredient) => {
     setAdminDialog({
       kind: "confirm",
@@ -274,7 +274,10 @@ export default function Ingredients({
     try {
       const res = await laravelStaffFetch(`${LARAVEL_BASE}/api/staff/inventory/ingredients/${encodeURIComponent(ingredientId)}/batches`);
       const data = await res.json();
-      setBatches(res.ok && data?.success ? data.batches || [] : []);
+      const datedBatches = res.ok && data?.success
+        ? (data.batches || []).filter((batch) => Boolean(batch.expiry_date?.trim?.() || batch.expiry_date))
+        : [];
+      setBatches(datedBatches);
     } catch (e) { setBatches([]); }
     finally { setBatchLoading(false); }
   };

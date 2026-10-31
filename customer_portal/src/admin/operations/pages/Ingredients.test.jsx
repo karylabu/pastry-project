@@ -101,6 +101,49 @@ describe("Ingredients alerts", () => {
     expect(screen.getByText("Showing 11–12 of 12 ingredients")).toBeInTheDocument();
   });
 
+  test("hides batches without expiry dates from the movement history modal", async () => {
+    global.fetch.mockImplementation((url) => {
+      const value = String(url);
+      if (value.includes("/api/staff/inventory/ingredients/1/batches")) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            success: true,
+            batches: [
+              { id: 1, batch_number: "DATED-001", quantity_remaining: 4, expiry_date: "2026-11-08", status: "Usable" },
+              { id: 2, batch_number: "LEGACY-9", quantity_remaining: 3, expiry_date: null, status: "Usable" },
+              { id: 3, batch_number: "MANUAL_1792238353_6ad363114773d", quantity_remaining: 10, expiry_date: "", status: "Usable" },
+            ],
+          }),
+        });
+      }
+      if (value.includes("/api/staff/inventory/ingredients") && !value.includes("/batches")) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            success: true,
+            ingredients: [{ id: 1, name: "Cake Topper", unit: "pcs", stock: 17, usable_stock: 17, threshold: 1 }],
+          }),
+        });
+      }
+      if (value.includes("api_ingredient_history.php")) {
+        return Promise.resolve({ ok: true, json: async () => ({ success: true, history: [] }) });
+      }
+      if (value.includes("/api/staff/inventory/batches")) {
+        return Promise.resolve({ ok: true, json: async () => ({ success: true, batches: [] }) });
+      }
+      return Promise.resolve({ ok: true, json: async () => ({ success: true }) });
+    });
+
+    render(<Ingredients />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "View Cake Topper history" }));
+
+    expect(await screen.findByText("DATED-001")).toBeInTheDocument();
+    expect(screen.queryByText("LEGACY-9")).not.toBeInTheDocument();
+    expect(screen.queryByText("MANUAL_1792238353_6ad363114773d")).not.toBeInTheDocument();
+  });
+
   test("confirms ingredient deletion with the shared admin dialog", async () => {
     render(<Ingredients />);
 
