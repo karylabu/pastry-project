@@ -8,9 +8,13 @@ return new class extends Migration
 {
     public function up(): void
     {
+        if (Schema::hasTable('admin_activity_logs')) {
+            return;
+        }
+
         Schema::create('admin_activity_logs', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('actor_id')->nullable()->constrained('users')->nullOnDelete();
+            $table->unsignedBigInteger('actor_id')->nullable();
             $table->string('actor_name');
             $table->string('actor_email');
             $table->string('actor_role', 40);
