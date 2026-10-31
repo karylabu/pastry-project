@@ -217,6 +217,8 @@ class AdminActivityLogCategoryFilterTest extends TestCase
             ['Inventory', 'api/staff/ingredients/1/adjust-stock'],
             ['Products', 'api/staff/customized-cakes/recipes'],
             ['Custom cakes', 'api/staff/customized-cakes/request-status'],
+            ['Users', 'api/admin-management/users'],
+            ['Promotions', 'api/admin/promotions'],
         ] as [$category, $route]) {
             DB::table('admin_activity_logs')->insert([
                 'actor_name' => 'Admin',
@@ -277,7 +279,7 @@ class AdminActivityLogCategoryFilterTest extends TestCase
         parent::tearDown();
     }
 
-    public function test_super_admin_can_filter_activity_by_the_five_categories(): void
+    public function test_super_admin_can_filter_activity_by_all_seven_categories(): void
     {
         $expectedTotals = [
             'Products' => 1,
@@ -285,6 +287,8 @@ class AdminActivityLogCategoryFilterTest extends TestCase
             'Recipe' => 2,
             'Orders' => 1,
             'Custom Cake' => 2,
+            'Promotions' => 1,
+            'Users' => 1,
         ];
 
         foreach ($expectedTotals as $category => $total) {
@@ -300,9 +304,51 @@ class AdminActivityLogCategoryFilterTest extends TestCase
         $this->withHeader('X-Auth-Token', 'owner-token')
             ->getJson('http://localhost/api/admin-management/activity-logs')
             ->assertOk()
-            ->assertJsonPath('pagination.total', 8)
+            ->assertJsonPath('pagination.total', 10)
             ->assertJsonMissing(['action' => 'Created Login'])
             ->assertJsonMissing(['action' => 'Synchronized product']);
+    }
+
+    public function test_activity_logs_support_safe_sorting_and_requested_page_size(): void
+    {
+        DB::table('admin_activity_logs')->insert([
+            [
+                'actor_name' => 'Admin',
+                'actor_email' => 'admin@example.com',
+                'actor_role' => 'admin',
+                'action' => 'Zulu operation',
+                'category' => 'Products',
+                'method' => 'POST',
+                'route' => 'api/staff/products',
+                'response_status' => 200,
+                'created_at' => '2027-01-02 10:00:00',
+                'updated_at' => '2027-01-02 10:00:00',
+            ],
+            [
+                'actor_name' => 'Admin',
+                'actor_email' => 'admin@example.com',
+                'actor_role' => 'admin',
+                'action' => 'Alpha operation',
+                'category' => 'Products',
+                'method' => 'POST',
+                'route' => 'api/staff/products',
+                'response_status' => 200,
+                'created_at' => '2027-01-01 10:00:00',
+                'updated_at' => '2027-01-01 10:00:00',
+            ],
+        ]);
+
+        $this->withHeader('X-Auth-Token', 'owner-token')
+            ->getJson('http://localhost/api/admin-management/activity-logs?sort_by=action&sort_direction=asc&per_page=10')
+            ->assertOk()
+            ->assertJsonPath('pagination.per_page', 10)
+            ->assertJsonPath('data.0.action', 'Alpha operation');
+
+        $this->withHeader('X-Auth-Token', 'owner-token')
+            ->getJson('http://localhost/api/admin-management/activity-logs?sort_by=timestamp&sort_direction=desc&per_page=1')
+            ->assertOk()
+            ->assertJsonPath('pagination.per_page', 1)
+            ->assertJsonPath('data.0.action', 'Zulu operation');
     }
 
     public function test_production_activity_names_the_product_and_stock_change(): void
@@ -819,7 +865,7 @@ class AdminActivityLogCategoryFilterTest extends TestCase
             'message' => 'Insufficient ingredients.',
         ], 409));
 
-        $this->assertSame(10, DB::table('admin_activity_logs')->count());
+        $this->assertSame(12, DB::table('admin_activity_logs')->count());
     }
 
     public function test_client_ip_uses_only_explicitly_trusted_proxy_addresses(): void

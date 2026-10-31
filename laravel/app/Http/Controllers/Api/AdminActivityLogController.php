@@ -19,7 +19,23 @@ class AdminActivityLogController extends Controller
             return response()->json(['success' => false, 'message' => 'Super Admin authorization required.'], 403);
         }
 
-        $query = AdminActivityLog::query()->orderByDesc('created_at')->orderByDesc('id');
+        $sortColumns = [
+            'action' => 'action',
+            'account' => 'actor_name',
+            'ip_address' => 'ip_address',
+            'result' => 'response_status',
+            'timestamp' => 'created_at',
+        ];
+        $sortBy = (string) $request->input('sort_by', 'timestamp');
+        $sortColumn = $sortColumns[$sortBy] ?? 'created_at';
+        $sortDirection = strtolower((string) $request->input('sort_direction', 'desc'));
+        if (!in_array($sortDirection, ['asc', 'desc'], true)) {
+            $sortDirection = 'desc';
+        }
+
+        $query = AdminActivityLog::query()
+            ->orderBy($sortColumn, $sortDirection)
+            ->orderBy('id', $sortDirection);
         $query->whereNot(function ($excluded): void {
             $excluded->whereRaw('LOWER(route) LIKE ?', ['%/login'])
                 ->orWhereRaw('LOWER(route) = ?', ['login'])
@@ -52,7 +68,7 @@ class AdminActivityLogController extends Controller
             'Recipe' => ['category' => 'Products', 'routes' => ['%/recipe%', '%/recipes%']],
             'Custom Cake' => ['category' => 'Custom cakes', 'routes' => ['%customized-cake%']],
         ];
-        if (in_array($category, ['Products', 'Ingredients', 'Recipe', 'Orders', 'Custom Cake'], true)) {
+        if (in_array($category, ['Products', 'Ingredients', 'Recipe', 'Orders', 'Custom Cake', 'Promotions', 'Users'], true)) {
             $query->where(function ($builder) use ($category, $legacyCategories): void {
                 $builder->where(function ($currentQuery) use ($category): void {
                     $currentQuery->where('category', $category);

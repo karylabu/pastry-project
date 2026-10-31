@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { AlertCircle, ChevronLeft, ChevronRight, Clock3, RefreshCw, Search } from "lucide-react";
+import { AlertCircle, ArrowDown, ArrowUp, ChevronLeft, ChevronRight, Clock3, RefreshCw, Search } from "lucide-react";
 import { LARAVEL_BASE } from "../../services/config";
 import { getAuthHeaders } from "../../services/api";
 
@@ -117,6 +117,7 @@ export default function AdminActivityLog() {
   const [search, setSearch] = useState("");
   const [actorRole, setActorRole] = useState("");
   const [category, setCategory] = useState("");
+  const [sort, setSort] = useState({ key: "timestamp", direction: "desc" });
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(0);
   const [error, setError] = useState("");
@@ -129,7 +130,12 @@ export default function AdminActivityLog() {
         setError("");
       }
       try {
-        const params = new URLSearchParams({ page: String(page), per_page: "25" });
+        const params = new URLSearchParams({
+          page: String(page),
+          per_page: "10",
+          sort_by: sort.key,
+          sort_direction: sort.direction,
+        });
         if (search.trim()) params.set("search", search.trim());
         if (actorRole) params.set("actor_role", actorRole);
         if (category) params.set("category", category);
@@ -156,14 +162,43 @@ export default function AdminActivityLog() {
       active = false;
       window.clearInterval(refreshTimer);
     };
-  }, [actorRole, category, page, refreshing, search]);
+  }, [actorRole, category, page, refreshing, search, sort]);
 
   const lastPage = Math.max(1, Number(pagination.last_page || 1));
   const accountFilters = [
     { label: "Shop Owner", role: "super_admin" },
     { label: "Admin", role: "admin" },
   ];
-  const categoryFilters = ["Products", "Ingredients", "Recipe", "Orders", "Custom Cake"];
+  const categoryFilters = ["Custom Cake", "Ingredients", "Orders", "Products", "Promotions", "Recipe", "Users"];
+  const sortableColumns = [
+    { key: "action", label: "Activity" },
+    { key: "account", label: "Admin / Staff" },
+    { key: "ip_address", label: "IP Address" },
+    { key: "result", label: "Result" },
+    { key: "timestamp", label: "Timestamp" },
+  ];
+  const renderSortableHeader = ({ key, label }) => {
+    const active = sort.key === key;
+    const nextDirection = active && sort.direction === "asc" ? "desc" : "asc";
+    const SortIcon = active && sort.direction === "desc" ? ArrowDown : ArrowUp;
+
+    return (
+      <th key={key} aria-sort={active ? (sort.direction === "asc" ? "ascending" : "descending") : "none"} className="px-4 py-3 font-semibold">
+        <button
+          type="button"
+          aria-label={`Sort by ${label} ${nextDirection === "asc" ? "ascending" : "descending"}`}
+          onClick={() => {
+            setSort({ key, direction: nextDirection });
+            setPage(1);
+          }}
+          className="inline-flex items-center gap-1.5 text-left hover:text-[#80600a]"
+        >
+          {label}
+          <SortIcon size={12} aria-hidden="true" />
+        </button>
+      </th>
+    );
+  };
 
   return (
     <div className="min-h-screen bg-[#fbfaf5] font-['DM_Sans'] text-[#33251e]">
@@ -262,12 +297,10 @@ export default function AdminActivityLog() {
               <table className="w-full min-w-[980px] text-left">
                 <thead className="border-b border-[#eee7df] bg-[#fbf9f6] text-[10px] uppercase tracking-[0.12em] text-[#74675f]">
                   <tr>
-                    <th className="px-4 py-3 font-semibold">Activity</th>
-                    <th className="px-4 py-3 font-semibold">Admin / Staff</th>
+                    {renderSortableHeader(sortableColumns[0])}
+                    {renderSortableHeader(sortableColumns[1])}
                     <th className="px-4 py-3 font-semibold">Details</th>
-                    <th className="px-4 py-3 font-semibold">IP Address</th>
-                    <th className="px-4 py-3 font-semibold">Result</th>
-                    <th className="px-4 py-3 font-semibold">Timestamp</th>
+                    {sortableColumns.slice(2).map(renderSortableHeader)}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#f0e9e2]">
@@ -318,7 +351,9 @@ export default function AdminActivityLog() {
             </div>
             {logs.length > 0 && (
             <footer className="flex items-center justify-between border-t border-[#eee7df] px-4 py-3">
-              <p className="text-xs text-[#74675f]">{pagination.total || 0} recorded actions</p>
+              <p className="text-xs text-[#74675f]">
+                Showing {pagination.total ? (page - 1) * 10 + 1 : 0}–{Math.min(page * 10, Number(pagination.total || 0))} of {pagination.total || 0} recorded actions
+              </p>
               <div className="flex items-center gap-2">
                 <button type="button" aria-label="Previous page" disabled={page <= 1 || loading} onClick={() => setPage((current) => current - 1)} className="rounded border border-[#e8dfd4] p-1.5 text-[#65574d] disabled:opacity-40"><ChevronLeft size={16} /></button>
                 <span className="text-xs text-[#74675f]">Page {page} of {lastPage}</span>

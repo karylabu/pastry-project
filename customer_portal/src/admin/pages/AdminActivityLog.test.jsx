@@ -51,9 +51,13 @@ describe("AdminActivityLog", () => {
     expect(screen.queryByRole("button", { name: "Staff" })).not.toBeInTheDocument();
     expect(screen.getByText("Account:").parentElement).toHaveClass("order-2", "justify-end");
     expect(screen.getByText("Category:").parentElement).toHaveClass("order-1", "justify-start");
-    for (const category of ["Products", "Ingredients", "Recipe", "Orders", "Custom Cake"]) {
+    const categories = ["Custom Cake", "Ingredients", "Orders", "Products", "Promotions", "Recipe", "Users"];
+    for (const category of categories) {
       expect(screen.getByRole("button", { name: category })).toHaveAttribute("aria-pressed", "false");
     }
+    expect(
+      screen.getAllByRole("button").filter((button) => categories.includes(button.textContent.trim())).map((button) => button.textContent.trim())
+    ).toEqual(categories);
     expect(screen.getByRole("button", { name: "All" })).toHaveAttribute("aria-pressed", "true");
     expect(await screen.findByText("Changed order status")).toBeInTheDocument();
     expect(screen.getAllByText("Admin").length).toBeGreaterThan(0);
@@ -179,7 +183,7 @@ describe("AdminActivityLog", () => {
     render(<AdminActivityLog />);
     await screen.findByText("Changed order status");
 
-    for (const category of ["Products", "Ingredients", "Recipe", "Orders", "Custom Cake"]) {
+    for (const category of ["Custom Cake", "Ingredients", "Orders", "Products", "Promotions", "Recipe", "Users"]) {
       fireEvent.click(screen.getByRole("button", { name: category }));
       await waitFor(() => {
         const requestUrl = global.fetch.mock.calls[global.fetch.mock.calls.length - 1][0];
@@ -189,6 +193,30 @@ describe("AdminActivityLog", () => {
         expect(screen.getByRole("columnheader", { name: heading })).toBeInTheDocument();
       }
     }
+  });
+
+  test("requests ten activities per page and sorts activities by selected columns", async () => {
+    render(<AdminActivityLog />);
+    await screen.findByText("Changed order status");
+
+    let requestUrl = new URL(global.fetch.mock.calls[0][0]);
+    expect(requestUrl.searchParams.get("per_page")).toBe("10");
+    expect(requestUrl.searchParams.get("sort_by")).toBe("timestamp");
+    expect(requestUrl.searchParams.get("sort_direction")).toBe("desc");
+
+    fireEvent.click(screen.getByRole("button", { name: "Sort by Activity ascending" }));
+    await waitFor(() => {
+      requestUrl = new URL(global.fetch.mock.calls[global.fetch.mock.calls.length - 1][0]);
+      expect(requestUrl.searchParams.get("sort_by")).toBe("action");
+      expect(requestUrl.searchParams.get("sort_direction")).toBe("asc");
+      expect(requestUrl.searchParams.get("per_page")).toBe("10");
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Sort by Activity descending" }));
+    await waitFor(() => {
+      requestUrl = new URL(global.fetch.mock.calls[global.fetch.mock.calls.length - 1][0]);
+      expect(requestUrl.searchParams.get("sort_direction")).toBe("desc");
+    });
   });
 
   test("keeps staff activity visible without a Staff account filter", async () => {
