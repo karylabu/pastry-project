@@ -58,7 +58,7 @@ export default function StaffAdminLogin() {
       }
 
       const normalizedRole = normalizeRole(data.user?.role);
-      if (normalizedRole !== "admin") {
+      if (!["admin", "super_admin"].includes(normalizedRole)) {
         setError("This login is for admin accounts only. Please use the correct sign-in page for your account.");
         return;
       }
