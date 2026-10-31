@@ -63,19 +63,6 @@ describe("UserManagement admin creation", () => {
     expect(within(dialog).getByRole("button", { name: "Create Super Admin" })).toBeInTheDocument();
   });
 
-  test("renders the separate admin-only management page", () => {
-    render(<UserManagement adminOnly />);
-
-    expect(screen.getByRole("heading", { name: "Admin Management" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Add Admin" })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Add Super Admin" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("combobox", { name: "Filter users by role" })).not.toBeInTheDocument();
-    expect(useAdminUsers).toHaveBeenLastCalledWith(expect.objectContaining({
-      endpoint: "/api/admin-management/users",
-      role: "admin",
-    }));
-  });
-
   test("uses the shared admin dialog to confirm deleting a user", async () => {
     const refetch = jest.fn();
     useAdminUsers.mockReturnValue({

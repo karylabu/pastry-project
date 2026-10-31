@@ -19,7 +19,6 @@ import {
   TrendingUp,
   User,
   Users,
-  UserCog,
   X,
   AlertTriangle,
   Gift,
@@ -78,7 +77,6 @@ const NAV_ICONS = {
   "/admin/predictive-demand": TrendingUp,
   "/admin/promotions": Tag,
   "/admin/users": Users,
-  "/admin/admin-management": UserCog,
   "/admin/activity-log": History,
   "/admin/settings": Settings,
 };
@@ -105,7 +103,6 @@ export default function AdminNavbar({ onSidebarChange }) {
   const [adminDialog, setAdminDialog] = useState(null);
   const navGroups = String(currentUser?.role || "").toLowerCase() === "super_admin"
     ? [...NAV_GROUPS, { label: "Administration", items: [
-      { name: "Admin Management", path: "/admin/admin-management" },
       { name: "Audit Trail", path: "/admin/activity-log" },
     ] }]
     : NAV_GROUPS;

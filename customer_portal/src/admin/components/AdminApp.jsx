@@ -13,7 +13,6 @@ import WasteTracking from "../pages/WasteTracking";
 import PredictiveAnalytics from "../pages/PredictiveAnalytics";
 import Promotions from "../pages/Promotions";
 import UserManagement from "../pages/UserManagement";
-import AdminManagement from "../pages/AdminManagement";
 import AdminActivityLog from "../pages/AdminActivityLog";
 import ProtectedRoute from "../../auth/ProtectedRoute";
 import SettingsPage from "../pages/Settings";
@@ -42,14 +41,7 @@ export default function AdminApp() {
       <Route path="predictive-demand" element={renderWithLayout(<PredictiveAnalytics />)} />
       <Route path="promotions" element={renderWithLayout(<Promotions />)} />
       <Route path="users" element={renderWithLayout(<UserManagement />)} />
-      <Route
-        path="admin-management"
-        element={(
-          <ProtectedRoute allowedRoles={["super_admin"]} deniedPath="/admin/dashboard">
-            {renderWithLayout(<AdminManagement />)}
-          </ProtectedRoute>
-        )}
-      />
+      <Route path="admin-management" element={<Navigate to="/admin/dashboard" replace />} />
       <Route
         path="activity-log"
         element={(
