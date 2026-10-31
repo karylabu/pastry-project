@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\AdminNotification;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
@@ -15,11 +16,14 @@ class DatabaseBackupService
 {
     private const DIRECTORY = 'backups';
     private const HISTORY_FILE = 'backups/history.json';
+    private const SCHEDULER_HEARTBEAT = 'backups/scheduler-heartbeat.json';
     private const FORMAT_HEADER = '-- pastry-project-sql-backup:v1';
+    private const FORMAT_FOOTER = '-- pastry-project-sql-backup:end:v1';
 
-    public function overview(): array
+    public function overview(string $scheduleTime = '02:00'): array
     {
         $disk = Storage::disk('local');
+        $disk->makeDirectory(self::DIRECTORY);
         $files = array_values(array_filter(
             $disk->files(self::DIRECTORY),
             static fn (string $path): bool => str_ends_with(strtolower($path), '.sql')
@@ -29,8 +33,10 @@ class DatabaseBackupService
 
         foreach ($items as &$item) {
             $path = self::DIRECTORY . '/' . $item['filename'];
-            if (($item['status'] ?? '') === 'successful' && ! $disk->exists($path)) {
+            if (($item['status'] ?? '') === 'successful'
+                && (! $disk->exists($path) || (int) $disk->size($path) <= 0 || ! is_readable($disk->path($path)))) {
                 $item['status'] = 'failed';
+                $item['verification_status'] = 'failed';
                 $item['size_bytes'] = 0;
             } elseif ($disk->exists($path)) {
                 $item['size_bytes'] = (int) $disk->size($path);
@@ -43,16 +49,77 @@ class DatabaseBackupService
             (string) ($left['created_at'] ?? '')
         ));
 
+        $latestScheduledIndex = null;
+        $latestSuccessfulIndex = null;
+        foreach ($items as $index => $item) {
+            if ($latestScheduledIndex === null && ($item['purpose'] ?? null) === 'scheduled') {
+                $latestScheduledIndex = $index;
+            }
+            if ($latestSuccessfulIndex === null && ($item['status'] ?? null) === 'successful') {
+                $latestSuccessfulIndex = $index;
+            }
+        }
+        $indexesToVerify = array_unique(array_filter([$latestScheduledIndex, $latestSuccessfulIndex], static fn ($index): bool => $index !== null));
+        foreach ($indexesToVerify as $index) {
+            if (($items[$index]['status'] ?? null) !== 'successful') {
+                continue;
+            }
+            $item = $items[$index];
+            if (! empty($item['sha256'])) {
+                try {
+                    $verification = $this->verifySqlBackup(
+                        $disk->path(self::DIRECTORY . '/' . $item['filename']),
+                        $item['sha256']
+                    );
+                    $items[$index] = array_merge($item, $verification);
+                } catch (Throwable $exception) {
+                    $items[$index] = $this->recordVerificationFailure($item, $exception);
+                }
+            } else {
+                $items[$index]['verification_status'] = 'unverified';
+            }
+        }
+
+        $availableBackups = count(array_filter($items, static fn (array $item): bool =>
+            ($item['status'] ?? null) === 'successful'
+            && isset($item['filename'])
+            && is_file(Storage::disk('local')->path(self::DIRECTORY . '/' . $item['filename']))
+            && is_readable(Storage::disk('local')->path(self::DIRECTORY . '/' . $item['filename']))
+            && (int) @filesize(Storage::disk('local')->path(self::DIRECTORY . '/' . $item['filename'])) > 0
+        ));
+        $verifiedBackups = count(array_filter($items, static fn (array $item): bool =>
+            ($item['status'] ?? null) === 'successful' && ($item['verification_status'] ?? null) === 'verified'
+        ));
+        $lastVerifiedBackup = collect($items)->first(static fn (array $item): bool =>
+            ($item['status'] ?? null) === 'successful' && ($item['verification_status'] ?? null) === 'verified'
+        );
+        $lastVerifiedScheduledBackup = collect($items)->first(static fn (array $item): bool =>
+            ($item['purpose'] ?? null) === 'scheduled'
+            && ($item['status'] ?? null) === 'successful'
+            && ($item['verification_status'] ?? null) === 'verified'
+        );
+        $lastScheduledBackup = collect($items)->first(static fn (array $item): bool => ($item['purpose'] ?? null) === 'scheduled');
+        $latestBackup = $items[0] ?? null;
+        $storage = $this->storageStatus($disk->path(self::DIRECTORY));
+        $scheduler = $this->schedulerStatus($disk);
+        $health = $this->healthStatus($scheduleTime, $lastVerifiedBackup, $lastVerifiedScheduledBackup, $lastScheduledBackup, $latestBackup, $storage, $scheduler);
+
         return [
             'backups' => array_values($items),
             'overview' => [
                 'last_backup' => $items[0] ?? null,
-                'last_successful_backup' => collect($items)->first(static fn (array $item): bool => ($item['status'] ?? null) === 'successful'),
-                'last_scheduled_backup' => collect($items)->first(static fn (array $item): bool => ($item['purpose'] ?? null) === 'scheduled'),
-                'available_backups' => count(array_filter($items, static fn (array $item): bool => ($item['status'] ?? null) === 'successful')),
+                'last_successful_backup' => $lastVerifiedBackup,
+                'last_verified_backup' => $lastVerifiedBackup,
+                'last_scheduled_backup' => $lastScheduledBackup,
+                'latest_verification' => $lastScheduledBackup['verification_status'] ?? 'unverified',
+                'storage_status' => $storage,
+                'scheduler_status' => $scheduler,
+                'verified_backups' => $verifiedBackups,
+                'available_backups' => $availableBackups,
                 'total_backups' => count($files),
                 'storage_used_bytes' => $storageUsed,
             ],
+            'health' => $health,
         ];
     }
 
@@ -95,13 +162,15 @@ class DatabaseBackupService
 
         try {
             $this->writeSqlDump($temporaryPath);
+            $verification = $this->verifySqlBackup($temporaryPath);
             if (! @rename($temporaryPath, $backupPath)) {
                 throw new RuntimeException('Unable to publish the completed backup file.');
             }
             @chmod($backupPath, 0600);
+            $verification = $this->verifySqlBackup($backupPath, $verification['sha256']);
 
             $entry['status'] = 'successful';
-            $entry['size_bytes'] = (int) filesize($backupPath);
+            $entry = array_merge($entry, $verification);
             $this->replaceHistoryEntry($entry);
 
             return $entry;
@@ -111,6 +180,8 @@ class DatabaseBackupService
             }
 
             $entry['status'] = 'failed';
+            $entry['verification_status'] = 'failed';
+            $entry['verification_error'] = 'The backup could not be completed and verified.';
             $this->replaceHistoryEntry($entry);
             Log::error('Database SQL backup failed.', ['filename' => $filename, 'exception' => $exception]);
 
@@ -123,11 +194,81 @@ class DatabaseBackupService
         $entry = $this->findEntry($filename);
         $path = Storage::disk('local')->path(self::DIRECTORY . '/' . $entry['filename']);
 
-        if (($entry['status'] ?? '') !== 'successful' || ! is_file($path)) {
+        if (($entry['status'] ?? '') !== 'successful' || ! is_file($path) || (int) filesize($path) <= 0 || ! is_readable($path)) {
             throw new \InvalidArgumentException('Backup file not found.');
+        }
+        if (! empty($entry['sha256'])) {
+            try {
+                $this->verifySqlBackup($path, $entry['sha256']);
+            } catch (Throwable $exception) {
+                $this->recordVerificationFailure($entry, $exception);
+                throw $exception;
+            }
         }
 
         return $path;
+    }
+
+    public function verifyBackup(string $filename): array
+    {
+        $entry = $this->findEntry($filename);
+        if (($entry['status'] ?? null) !== 'successful' || empty($entry['sha256'])) {
+            throw new RuntimeException('This backup has not passed file verification.');
+        }
+
+        $path = Storage::disk('local')->path(self::DIRECTORY . '/' . $entry['filename']);
+
+        try {
+            return $this->verifySqlBackup($path, $entry['sha256']);
+        } catch (Throwable $exception) {
+            $this->recordVerificationFailure($entry, $exception);
+            throw $exception;
+        }
+    }
+
+    public function testRestoreConfigured(): bool
+    {
+        $testConfig = config('database.connections.backup_test');
+        if (! is_array($testConfig) || empty($testConfig['database']) || ! empty($testConfig['url'])) {
+            return false;
+        }
+        if (in_array(strtolower((string) ($testConfig['driver'] ?? '')), ['mysql', 'mariadb'], true)
+            && (empty($testConfig['host']) || empty($testConfig['username']))) {
+            return false;
+        }
+
+        return ! $this->sameDatabase($testConfig, DB::connection()->getConfig());
+    }
+
+    public function testRestore(string $filename): array
+    {
+        $entry = $this->findEntry($filename);
+        if (($entry['status'] ?? null) !== 'successful' || ($entry['verification_status'] ?? null) !== 'verified' || empty($entry['sha256'])) {
+            throw new RuntimeException('This backup has not passed verification and cannot be tested.');
+        }
+        if (! $this->testRestoreConfigured()) {
+            throw new RuntimeException('A separate restore-test database is not configured. The live database was not changed.');
+        }
+
+        $testConfig = config('database.connections.backup_test');
+        $testDriver = strtolower((string) ($testConfig['driver'] ?? ''));
+        if (! in_array($testDriver, ['mysql', 'mariadb', 'sqlite'], true)) {
+            throw new RuntimeException('The restore-test database driver is not supported.');
+        }
+
+        $backupPath = $this->downloadPath($filename);
+        $this->applyDump($backupPath, 'backup_test');
+        $tableCount = count($this->tableNames($testDriver === 'mariadb' ? 'mysql' : $testDriver, 'backup_test'));
+        if ($tableCount === 0) {
+            throw new RuntimeException('The test database did not contain any restored tables.');
+        }
+
+        return [
+            'verified' => true,
+            'backup' => $entry,
+            'tables_restored' => $tableCount,
+            'tested_at' => now()->toIso8601String(),
+        ];
     }
 
     public function delete(string $filename): void
@@ -146,7 +287,7 @@ class DatabaseBackupService
     public function restore(string $filename): array
     {
         $entry = $this->findEntry($filename);
-        if (($entry['status'] ?? '') !== 'successful') {
+        if (($entry['status'] ?? '') !== 'successful' || ($entry['verification_status'] ?? null) !== 'verified' || empty($entry['sha256'])) {
             throw new \InvalidArgumentException('Backup file not found.');
         }
 
@@ -213,8 +354,12 @@ class DatabaseBackupService
             }
 
             $this->write($handle, $driver === 'sqlite' ? "PRAGMA foreign_keys=ON;\n" : "SET FOREIGN_KEY_CHECKS=1;\n");
+            $this->write($handle, self::FORMAT_FOOTER . "\n");
             if (! fflush($handle)) {
                 throw new RuntimeException('Unable to finish writing the backup file.');
+            }
+            if (function_exists('fsync') && ! fsync($handle)) {
+                throw new RuntimeException('Unable to sync the completed backup to storage.');
             }
         } finally {
             fclose($handle);
@@ -280,24 +425,24 @@ class DatabaseBackupService
         }
     }
 
-    private function applyDump(string $path): void
+    private function applyDump(string $path, ?string $connectionName = null): void
     {
         $contents = @file_get_contents($path);
         if (! is_string($contents) || ! str_starts_with($contents, self::FORMAT_HEADER . "\n")) {
             throw new RuntimeException('The selected file is not a supported Pastry Project SQL backup.');
         }
 
-        $driver = $this->supportedDriver();
+        $driver = $this->supportedDriver($connectionName);
         if (! preg_match('/^-- driver:([a-z]+)$/m', $contents, $matches) || $matches[1] !== $driver) {
             throw new RuntimeException('This backup was created for a different database driver.');
         }
 
-        $connection = DB::connection();
+        $connection = DB::connection($connectionName);
         $pdo = $connection->getPdo();
         $this->setForeignKeys($pdo, $driver, false);
 
         try {
-            foreach ($this->tableNames($driver) as $table) {
+            foreach ($this->tableNames($driver, $connectionName) as $table) {
                 $pdo->exec('DROP TABLE IF EXISTS ' . $this->quoteIdentifier($table, $driver));
             }
 
@@ -397,9 +542,9 @@ class DatabaseBackupService
         return $statements;
     }
 
-    private function tableNames(string $driver): array
+    private function tableNames(string $driver, ?string $connectionName = null): array
     {
-        $connection = DB::connection();
+        $connection = DB::connection($connectionName);
         if ($driver === 'sqlite') {
             return array_map(
                 static fn (object $row): string => (string) $row->name,
@@ -415,9 +560,9 @@ class DatabaseBackupService
         )));
     }
 
-    private function supportedDriver(): string
+    private function supportedDriver(?string $connectionName = null): string
     {
-        $driver = strtolower((string) DB::connection()->getDriverName());
+        $driver = strtolower((string) DB::connection($connectionName)->getDriverName());
         if (! in_array($driver, ['mysql', 'mariadb', 'sqlite'], true)) {
             throw new RuntimeException('SQL backups are currently supported for MySQL, MariaDB, and SQLite databases.');
         }
@@ -471,6 +616,216 @@ class DatabaseBackupService
         if (fwrite($handle, $contents) !== strlen($contents)) {
             throw new RuntimeException('Unable to write the database backup file.');
         }
+    }
+
+    private function verifySqlBackup(string $path, ?string $expectedHash = null): array
+    {
+        if (! is_file($path) || ! is_readable($path)) {
+            throw new RuntimeException('Backup file is missing or unreadable.');
+        }
+
+        $size = filesize($path);
+        if (! is_int($size) || $size <= 0) {
+            throw new RuntimeException('Backup file is empty.');
+        }
+
+        $handle = fopen($path, 'rb');
+        if (! is_resource($handle)) {
+            throw new RuntimeException('Backup file could not be opened for verification.');
+        }
+
+        try {
+            $header = fgets($handle);
+            $driverLine = fgets($handle);
+            $footerLength = strlen(self::FORMAT_FOOTER) + 1;
+            if ($size < $footerLength || fseek($handle, -$footerLength, SEEK_END) !== 0) {
+                throw new RuntimeException('Backup file is incomplete.');
+            }
+            $footer = fread($handle, $footerLength);
+        } finally {
+            fclose($handle);
+        }
+
+        if ($header !== self::FORMAT_HEADER . "\n"
+            || ! is_string($driverLine)
+            || ! preg_match('/^-- driver:(mysql|sqlite)\n$/', $driverLine)
+            || $footer !== self::FORMAT_FOOTER . "\n") {
+            throw new RuntimeException('Backup file integrity markers do not match.');
+        }
+
+        $sha256 = hash_file('sha256', $path);
+        if (! is_string($sha256) || ($expectedHash !== null && ! hash_equals($expectedHash, $sha256))) {
+            throw new RuntimeException('Backup checksum verification failed.');
+        }
+
+        return [
+            'size_bytes' => $size,
+            'sha256' => $sha256,
+            'verification_status' => 'verified',
+            'verified_at' => now()->toIso8601String(),
+        ];
+    }
+
+    private function recordVerificationFailure(array $entry, Throwable $exception): array
+    {
+        $entry['status'] = 'failed';
+        $entry['verification_status'] = 'failed';
+        $entry['verification_error'] = 'This backup could not be verified and is not protected.';
+        $this->replaceHistoryEntry($entry);
+        Log::error('Backup file verification failed.', [
+            'filename' => $entry['filename'] ?? null,
+            'exception' => $exception,
+        ]);
+
+        try {
+            $alreadyNotified = Schema::hasTable('notifications')
+                && AdminNotification::query()
+                    ->where('type', 'system_alert')
+                    ->where('title', 'Backup verification failed')
+                    ->get(['data'])
+                    ->contains(static fn (AdminNotification $notification): bool => ($notification->data['filename'] ?? null) === ($entry['filename'] ?? null));
+            if (! $alreadyNotified) {
+                AdminNotification::notifyRoles(['admin'], [
+                    'type' => 'system_alert',
+                    'title' => 'Backup verification failed',
+                    'message' => 'A saved backup could not be verified. It is not marked as protected. Please contact technical support.',
+                    'data' => ['filename' => $entry['filename'] ?? null],
+                    'action_url' => '/admin/backups',
+                    'is_read' => false,
+                    'created_at' => now(),
+                ]);
+            }
+        } catch (Throwable $notificationException) {
+            Log::critical('Administrators could not be notified about a failed backup verification.', [
+                'filename' => $entry['filename'] ?? null,
+                'exception' => $notificationException,
+            ]);
+        }
+
+        return $entry;
+    }
+
+    private function storageStatus(string $path): array
+    {
+        $freeBytes = @disk_free_space($path);
+        if (! is_float($freeBytes) && ! is_int($freeBytes)) {
+            return ['status' => 'unknown', 'free_bytes' => null];
+        }
+
+        $freeBytes = (int) $freeBytes;
+        $minimumFreeBytes = (int) config('backup.minimum_free_bytes', 104857600);
+
+        return [
+            'status' => $freeBytes >= $minimumFreeBytes ? 'healthy' : 'low',
+            'free_bytes' => $freeBytes,
+        ];
+    }
+
+    private function healthStatus(
+        string $scheduleTime,
+        ?array $lastVerifiedBackup,
+        ?array $lastVerifiedScheduledBackup,
+        ?array $lastScheduledBackup,
+        ?array $latestBackup,
+        array $storage,
+        array $scheduler
+    ): array {
+        $timezone = 'Asia/Manila';
+        if (! preg_match('/^(?:[01]\d|2[0-3]):[0-5]\d$/', $scheduleTime)) {
+            $scheduleTime = '02:00';
+        }
+        $now = now($timezone);
+        [$hour, $minute] = array_map('intval', explode(':', $scheduleTime));
+        $todaySchedule = $now->copy()->setTime($hour, $minute, 0);
+        $nextSchedule = $todaySchedule->isFuture() ? $todaySchedule : $todaySchedule->copy()->addDay();
+        $coveredSince = $todaySchedule->isFuture() ? $todaySchedule->copy()->subDay() : $todaySchedule;
+        $scheduledAt = $lastVerifiedScheduledBackup ? \Illuminate\Support\Carbon::parse($lastVerifiedScheduledBackup['created_at'], $timezone) : null;
+        $hasCurrentScheduledBackup = $scheduledAt && $scheduledAt->greaterThanOrEqualTo($coveredSince);
+        $verificationStatus = $latestBackup['verification_status'] ?? 'unverified';
+        $latestStatus = $latestBackup['status'] ?? 'none';
+        $scheduledStatus = $lastScheduledBackup['status'] ?? 'none';
+
+        if (! $lastVerifiedBackup) {
+            $status = 'not_protected';
+            $message = 'No verified backup copy is available yet.';
+        } elseif ($scheduler['status'] !== 'active') {
+            $status = 'needs_attention';
+            $message = 'The automatic backup schedule is not responding. Please ask the hosting administrator to check the scheduled task.';
+        } elseif ($storage['status'] !== 'healthy') {
+            $status = 'needs_attention';
+            $message = $storage['status'] === 'low'
+                ? 'Backup storage is running low. Please contact technical support.'
+                : 'Backup storage could not be checked. Please contact technical support.';
+        } elseif (! $hasCurrentScheduledBackup || $scheduledStatus === 'failed' || $verificationStatus !== 'verified') {
+            $status = 'needs_attention';
+            $message = $now->greaterThanOrEqualTo($todaySchedule) && ! $hasCurrentScheduledBackup
+                ? "Today's scheduled backup is late. Automatic retries are running."
+                : 'The latest daily backup needs attention.';
+        } else {
+            $status = 'protected';
+            $message = 'Your data is safely backed up.';
+        }
+
+        return [
+            'status' => $status,
+            'message' => $message,
+            'last_successful_backup' => $lastVerifiedBackup,
+            'next_scheduled_at' => $nextSchedule->toIso8601String(),
+            'latest_backup_status' => $latestStatus,
+            'file_verification_status' => $verificationStatus,
+            'storage_status' => $storage,
+            'scheduler_status' => $scheduler,
+            'schedule_overdue' => $now->greaterThanOrEqualTo($todaySchedule) && ! $hasCurrentScheduledBackup,
+        ];
+    }
+
+    private function schedulerStatus($disk): array
+    {
+        if (! $disk->exists(self::SCHEDULER_HEARTBEAT)) {
+            return ['status' => 'inactive', 'last_seen_at' => null];
+        }
+
+        try {
+            $heartbeat = json_decode($disk->get(self::SCHEDULER_HEARTBEAT), true, 512, JSON_THROW_ON_ERROR);
+            $lastSeen = isset($heartbeat['last_seen_at']) ? \Illuminate\Support\Carbon::parse($heartbeat['last_seen_at']) : null;
+            if (! $lastSeen) {
+                return ['status' => 'inactive', 'last_seen_at' => null];
+            }
+
+            return [
+                'status' => $lastSeen->greaterThanOrEqualTo(now()->subMinutes(3)) ? 'active' : 'inactive',
+                'last_seen_at' => $lastSeen->toIso8601String(),
+            ];
+        } catch (Throwable $exception) {
+            Log::warning('Backup scheduler heartbeat could not be read.', ['exception' => $exception]);
+
+            return ['status' => 'inactive', 'last_seen_at' => null];
+        }
+    }
+
+    private function sameDatabase(array $left, array $right): bool
+    {
+        $leftDriver = strtolower((string) ($left['driver'] ?? ''));
+        $rightDriver = strtolower((string) ($right['driver'] ?? ''));
+        $leftDriver = $leftDriver === 'mariadb' ? 'mysql' : $leftDriver;
+        $rightDriver = $rightDriver === 'mariadb' ? 'mysql' : $rightDriver;
+        if ($leftDriver !== $rightDriver) {
+            return false;
+        }
+        if ($leftDriver === 'sqlite') {
+            $leftDatabase = (string) ($left['database'] ?? '');
+            $rightDatabase = (string) ($right['database'] ?? '');
+            if ($leftDatabase === ':memory:' || $rightDatabase === ':memory:') {
+                return $leftDatabase === $rightDatabase;
+            }
+
+            $leftPath = realpath($leftDatabase) ?: $leftDatabase;
+            $rightPath = realpath($rightDatabase) ?: $rightDatabase;
+
+            return strcasecmp($leftPath, $rightPath) === 0;
+        }
+
+        return strtolower((string) ($left['database'] ?? '')) === strtolower((string) ($right['database'] ?? ''));
     }
 
     private function findEntry(string $filename): array

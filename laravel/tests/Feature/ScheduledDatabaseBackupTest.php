@@ -70,6 +70,7 @@ class ScheduledDatabaseBackupTest extends TestCase
     {
         Carbon::setTestNow(Carbon::parse('2026-10-31 01:59:00', 'Asia/Manila'));
         $this->artisan('backups:scheduled')->assertSuccessful();
+        Storage::disk('local')->assertExists('backups/scheduler-heartbeat.json');
         $this->assertSame([], array_values(array_filter(
             Storage::disk('local')->files('backups'),
             static fn (string $path): bool => str_ends_with($path, '.sql')
@@ -88,6 +89,8 @@ class ScheduledDatabaseBackupTest extends TestCase
         $this->assertSame('automatic', $history[0]['type']);
         $this->assertSame('scheduled', $history[0]['purpose']);
         $this->assertSame('successful', $history[0]['status']);
+        $this->assertSame('verified', $history[0]['verification_status']);
+        $this->assertSame('protected', app(DatabaseBackupService::class)->overview('02:00')['health']['status']);
     }
 
     public function test_failed_scheduled_backup_creates_one_admin_notification(): void
@@ -114,5 +117,44 @@ class ScheduledDatabaseBackupTest extends TestCase
             ->where('type', 'system_alert')
             ->where('title', 'Daily data backup failed')
             ->count());
+    }
+
+    public function test_health_needs_attention_when_a_backup_exists_but_server_scheduler_is_inactive(): void
+    {
+        Carbon::setTestNow(Carbon::parse('2026-10-31 01:00:00', 'Asia/Manila'));
+        DB::table('orders')->insert(['reference' => 'MANUAL-COPY']);
+        app(DatabaseBackupService::class)->create('manual');
+
+        $overview = app(DatabaseBackupService::class)->overview('02:00');
+
+        $this->assertSame('inactive', $overview['health']['scheduler_status']['status']);
+        $this->assertSame('needs_attention', $overview['health']['status']);
+        $this->assertSame('verified', $overview['health']['file_verification_status']);
+    }
+
+    public function test_late_schedule_warns_admin_and_verified_retry_sends_success_notification(): void
+    {
+        DB::table('users')->insert([
+            'id' => 1,
+            'name' => 'Shop Admin',
+            'email' => 'admin@example.com',
+            'password' => 'hash',
+            'role' => 'admin',
+            'status' => 'active',
+        ]);
+        Carbon::setTestNow(Carbon::parse('2026-10-31 02:20:00', 'Asia/Manila'));
+
+        $backupService = \Mockery::mock(DatabaseBackupService::class);
+        $backupService->shouldReceive('hasSuccessfulScheduledBackupOn')->twice()->andReturn(false, false);
+        $backupService->shouldReceive('create')->once()->with('automatic', 'scheduled')->andReturn([
+            'filename' => 'verified.sql',
+            'verification_status' => 'verified',
+        ]);
+        $this->app->instance(DatabaseBackupService::class, $backupService);
+
+        $this->artisan('backups:scheduled')->assertSuccessful();
+
+        $this->assertDatabaseHas('notifications', ['title' => 'Daily backup schedule missed']);
+        $this->assertDatabaseHas('notifications', ['title' => 'Daily system backup verified']);
     }
 }

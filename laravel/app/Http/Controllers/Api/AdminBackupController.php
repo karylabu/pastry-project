@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\AdminNotification;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -78,9 +79,14 @@ class AdminBackupController extends Controller
             return $response;
         }
 
-        $data = $backups->overview();
-        $data['schedule_time'] = ShopSettings::all()['backupScheduleTime'] ?? '02:00';
-        $data['permissions'] = ['can_restore' => $this->getAuthenticatedUser($request)?->isSuperAdmin() ?? false];
+        $scheduleTime = ShopSettings::all()['backupScheduleTime'] ?? '02:00';
+        $data = $backups->overview($scheduleTime);
+        $canRestore = $this->getAuthenticatedUser($request)?->isSuperAdmin() ?? false;
+        $data['schedule_time'] = $scheduleTime;
+        $data['permissions'] = [
+            'can_restore' => $canRestore,
+            'can_test_restore' => $canRestore && $backups->testRestoreConfigured(),
+        ];
 
         return response()->json(['success' => true, 'data' => $data]);
     }
@@ -117,13 +123,49 @@ class AdminBackupController extends Controller
         }
 
         try {
+            $backup = $backups->create('manual');
+            if (($backup['verification_status'] ?? null) !== 'verified') {
+                throw new \RuntimeException('Backup file verification did not pass.');
+            }
+            try {
+                AdminNotification::notifyRoles(['admin'], [
+                    'type' => 'system_alert',
+                    'title' => 'System backup verified',
+                    'message' => 'A new data backup was created and verified successfully.',
+                    'data' => ['filename' => $backup['filename'], 'backup_date' => now()->toDateString()],
+                    'action_url' => '/admin/backups',
+                    'is_read' => false,
+                    'created_at' => now(),
+                ]);
+            } catch (Throwable $notificationException) {
+                Log::warning('A manual backup was verified, but administrators could not be notified.', [
+                    'filename' => $backup['filename'],
+                    'exception' => $notificationException,
+                ]);
+            }
+
             return response()->json([
                 'success' => true,
-                'message' => 'Database backup created successfully.',
-                'data' => $backups->create('manual'),
+                'message' => 'Backup created and verified successfully.',
+                'data' => $backup,
             ], 201);
         } catch (Throwable $exception) {
             Log::error('Database backup creation failed.', ['exception' => $exception]);
+            try {
+                AdminNotification::notifyRoles(['admin'], [
+                    'type' => 'system_alert',
+                    'title' => 'System backup failed',
+                    'message' => 'The requested backup could not be created and verified. No successful backup is recorded.',
+                    'data' => ['backup_date' => now()->toDateString()],
+                    'action_url' => '/admin/backups',
+                    'is_read' => false,
+                    'created_at' => now(),
+                ]);
+            } catch (Throwable $notificationException) {
+                Log::critical('Administrators could not be notified about a failed manual backup.', [
+                    'exception' => $notificationException,
+                ]);
+            }
 
             return response()->json([
                 'success' => false,
@@ -173,6 +215,35 @@ class AdminBackupController extends Controller
                 'success' => false,
                 'message' => $exception->getMessage() ?: 'The database could not be restored.',
             ], 500);
+        }
+    }
+
+    public function testRestore(Request $request, string $filename, DatabaseBackupService $backups): \Illuminate\Http\JsonResponse
+    {
+        if ($response = $this->authorizeTechnicalAdmin($request)) {
+            return $response;
+        }
+        if (! $request->boolean('confirmed')) {
+            return response()->json(['success' => false, 'message' => 'Restore-test confirmation is required.'], 422);
+        }
+
+        try {
+            $result = $backups->testRestore($filename);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Backup restored and verified in the separate test database. Live data was not changed.',
+                'data' => $result,
+            ]);
+        } catch (\InvalidArgumentException $exception) {
+            return response()->json(['success' => false, 'message' => 'Verified backup file not found.'], 404);
+        } catch (Throwable $exception) {
+            Log::error('Restore test failed.', ['filename' => $filename, 'exception' => $exception]);
+
+            return response()->json([
+                'success' => false,
+                'message' => $exception->getMessage() ?: 'The restore test could not be completed. Live data was not changed.',
+            ], 422);
         }
     }
 
