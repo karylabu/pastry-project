@@ -158,7 +158,7 @@ export default function Orders() {
     Preparing: "bg-black/5 text-black border border-black/15",
     "Ready for Pickup": "bg-[#D4AF37]/10 text-black border border-[#D4AF37]/20",
     Completed: "bg-black text-white border border-black",
-    Cancelled: "bg-black/10 text-black border border-black/20",
+    Cancelled: "bg-[#fff0eb] text-[#9a5947] border border-[#f2d5ca]",
   };
 
   const statusPriority = {
