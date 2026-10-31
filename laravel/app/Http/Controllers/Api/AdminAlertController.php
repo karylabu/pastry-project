@@ -13,7 +13,7 @@ class AdminAlertController extends Controller
     protected function resolveUser(Request $request): ?User
     {
         $user = $this->getAuthenticatedUser($request);
-        if (! $user || $user->role !== 'admin') {
+        if (! $user || ! $user->isAdmin()) {
             return null;
         }
 

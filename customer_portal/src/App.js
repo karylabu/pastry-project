@@ -108,7 +108,7 @@ function App() {
           element={
             <AdminDeviceGuard>
               <ProtectedRoute
-                allowedRoles={["admin"]}
+                allowedRoles={["admin", "super_admin"]}
                 loginPath="/admin/login"
                 deniedPath="/admin/access-denied"
               >

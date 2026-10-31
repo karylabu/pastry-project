@@ -62,7 +62,12 @@ class User extends Authenticatable
      */
     public function isAdmin(): bool
     {
-        return $this->role === 'admin';
+        return self::isAdminRole($this->role);
+    }
+
+    public static function isAdminRole(mixed $role): bool
+    {
+        return in_array(strtolower(trim((string) $role)), ['admin', 'super_admin'], true);
     }
 
     /**

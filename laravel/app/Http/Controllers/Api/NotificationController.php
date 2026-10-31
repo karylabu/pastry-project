@@ -20,7 +20,7 @@ class NotificationController extends Controller
     {
         $user = $this->getAuthenticatedUser($request);
 
-        if (! $user || $user->role !== 'admin') {
+        if (! $user || ! $user->isAdmin()) {
             return null;
         }
 
@@ -342,7 +342,7 @@ class NotificationController extends Controller
             ], 422);
         }
 
-        $query = User::query()->where('role', 'admin');
+        $query = User::query()->whereIn('role', ['admin', 'super_admin']);
 
         if (is_array($userIds) && count($userIds) > 0) {
             $query->whereIn('id', $userIds);

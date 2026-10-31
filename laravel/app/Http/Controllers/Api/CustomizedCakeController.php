@@ -185,7 +185,7 @@ class CustomizedCakeController extends Controller
     {
         $user = $this->getAuthenticatedUser($request);
         if (!$user) return response()->json(['success' => false, 'message' => 'Authentication required.'], 401);
-        if (strtolower((string) $user->role) !== 'admin') return response()->json(['success' => false, 'message' => 'Admin authorization required.'], 403);
+        if (!$user->isAdmin()) return response()->json(['success' => false, 'message' => 'Admin authorization required.'], 403);
         return null;
     }
 

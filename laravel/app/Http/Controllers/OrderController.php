@@ -1519,7 +1519,7 @@ class OrderController extends Controller
     public function rejectReturnRefundRequest(Request $request, int $orderId)
     {
         $user = $this->getAuthenticatedUser($request);
-        if (!$user || strtolower((string) $user->role) !== 'admin') {
+        if (!$user || !$user->isAdmin()) {
             return response()->json(['success' => false, 'message' => 'Unauthorized'], $user ? 403 : 401);
         }
 
@@ -1583,7 +1583,7 @@ class OrderController extends Controller
     public function updateStatus(Request $request, int $id)
     {
         $user = $this->getAuthenticatedUser($request);
-        if (!$user || $user->role !== 'admin') {
+        if (!$user || !$user->isAdmin()) {
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
         }
 

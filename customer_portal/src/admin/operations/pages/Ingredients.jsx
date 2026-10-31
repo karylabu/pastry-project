@@ -121,7 +121,7 @@ export default function Ingredients({
   const [pendingRequests, setPendingRequests] = useState([]);
   const showAlert = (message, variant = 'error') => setAlertDialog({ message, variant });
   const currentUser = (() => { try { return JSON.parse(window.localStorage.getItem('user') || 'null'); } catch (e) { return null; } })();
-  const canApproveDiscard = String(currentUser?.role || '').toLowerCase() === 'admin';
+  const canApproveDiscard = ['admin', 'super_admin'].includes(String(currentUser?.role || '').toLowerCase());
   const deleteIngredient = (ingredient) => {
     setAdminDialog({
       kind: "confirm",

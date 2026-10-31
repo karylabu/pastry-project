@@ -66,7 +66,7 @@ class StaffApiController extends Controller
         }
 
         $role = strtolower((string) ($user->role ?? ''));
-        if ($role !== 'admin') {
+        if (!User::isAdminRole($role)) {
             return $this->corsResponse(['success' => false, 'message' => 'Admin access required.'], 403);
         }
         if (strtolower(trim((string) ($user->status ?? 'active'))) !== 'active') {

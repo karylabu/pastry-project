@@ -1465,7 +1465,7 @@ CREATE TABLE `users` (
   `name` varchar(100) NOT NULL,
   `email` varchar(150) NOT NULL,
   `password` varchar(255) NOT NULL,
-  `role` enum('admin','staff','customer') NOT NULL DEFAULT 'customer',
+  `role` enum('admin','staff','customer','super_admin') NOT NULL DEFAULT 'customer',
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `phone` varchar(20) DEFAULT NULL,
   `address` text DEFAULT NULL,

@@ -46,7 +46,7 @@ class RecipeController extends Controller
     public function destroy(Request $request, Product $product, AdminRecycleBinService $recycleBin): JsonResponse
     {
         if ($response = $this->authorizeOperationalStaff($request)) return $response;
-        if (strtolower((string) $this->getAuthenticatedUser($request)?->role) !== 'admin') {
+        if (!$this->getAuthenticatedUser($request)?->isAdmin()) {
             return response()->json(['success' => false, 'message' => 'Admin authorization required.'], 403);
         }
 

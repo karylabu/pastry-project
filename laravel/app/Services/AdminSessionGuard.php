@@ -5,6 +5,7 @@ namespace App\Services;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use App\Models\User;
 use RuntimeException;
 
 class AdminSessionGuard
@@ -19,7 +20,7 @@ class AdminSessionGuard
 
         return DB::transaction(function () use ($userId, $request) {
             $user = DB::table('users')->where('id', $userId)->lockForUpdate()->first();
-            if (!$user || strtolower((string) $user->role) !== 'admin') {
+            if (!$user || !User::isAdminRole($user->role)) {
                 throw new RuntimeException('The admin account could not be verified.');
             }
 

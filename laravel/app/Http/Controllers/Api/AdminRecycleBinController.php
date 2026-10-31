@@ -53,7 +53,7 @@ class AdminRecycleBinController extends Controller
         if (! $user) {
             return response()->json(['success' => false, 'message' => 'Authentication required.'], 401);
         }
-        if (strtolower((string) $user->role) !== 'admin') {
+        if (!$user->isAdmin()) {
             return response()->json(['success' => false, 'message' => 'Admin authorization required.'], 403);
         }
         return null;

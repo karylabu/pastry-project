@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use App\Models\User;
 use Tests\TestCase;
 
 class UserManagementApiTest extends TestCase
@@ -153,6 +154,28 @@ class UserManagementApiTest extends TestCase
             'role' => 'admin',
             'status' => 'active',
         ]);
+    }
+
+    public function test_admin_can_create_super_admin_and_super_admin_can_access_user_management(): void
+    {
+        $this->withHeader('Authorization', '******')
+            ->withHeader('X-Auth-Token', 'admin-token')
+            ->postJson('http://localhost/api/users', [
+                'name' => 'SUPER ADMIN',
+                'email' => 'superadmin@pastry.com',
+                'role' => 'super_admin',
+                'password' => 'chosen-password',
+                'password_confirmation' => 'chosen-password',
+            ])
+            ->assertCreated()
+            ->assertJsonPath('data.role', 'super_admin')
+            ->assertJsonPath('data.name', 'SUPER ADMIN');
+
+        $superAdmin = User::where('email', 'superadmin@pastry.com')->firstOrFail();
+        $this->actingAs($superAdmin)
+            ->getJson('http://localhost/api/users')
+            ->assertOk()
+            ->assertJsonPath('success', true);
     }
 
     public function test_admin_cannot_create_a_customer_through_user_management(): void

@@ -94,7 +94,10 @@ function requireApiRole(array $allowedRoles): array
     $role = strtolower(trim((string) ($user['role'] ?? '')));
     $allowedRoles = array_map(static fn ($value) => strtolower(trim((string) $value)), $allowedRoles);
 
-    if (!$user || !in_array($role, $allowedRoles, true)) {
+    $roleAllowed = in_array($role, $allowedRoles, true)
+        || ($role === 'super_admin' && in_array('admin', $allowedRoles, true));
+
+    if (!$user || !$roleAllowed) {
         http_response_code(!$user ? 401 : 403);
         echo json_encode([
             'success' => false,

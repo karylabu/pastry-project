@@ -8,6 +8,7 @@ import UndoToast from "../components/UndoToast";
 
 const roleStyles = {
   admin: "border border-[#f0dfa4] bg-[#fff4cd] text-[#80600a]",
+  super_admin: "border border-[#e7c6ba] bg-[#fff0e8] text-[#9a4f32]",
   customer: "border border-[#e9e1d9] bg-[#f7f4ef] text-[#65574d]",
 };
 
@@ -28,7 +29,7 @@ function RoleBadge({ role }) {
   const normalizedRole = String(role || "customer").toLowerCase();
   return (
     <span className={`inline-flex rounded-md px-2 py-1 text-[10px] font-semibold capitalize ${roleStyles[normalizedRole] || roleStyles.customer}`}>
-      {normalizedRole}
+      {normalizedRole.replace("_", " ")}
     </span>
   );
 }
@@ -166,7 +167,7 @@ export default function UserManagement() {
       nextErrors.phone_number = "Please enter a valid phone number.";
     }
 
-    if (selectedUser ? !["admin", "customer"].includes(payload.role) : payload.role !== "admin") {
+    if (selectedUser ? !["admin", "super_admin", "customer"].includes(payload.role) : !["admin", "super_admin"].includes(payload.role)) {
       nextErrors.role = selectedUser ? "Please choose a valid role." : "New managed accounts must be admins.";
     }
 
@@ -380,6 +381,17 @@ export default function UserManagement() {
     confirmStatusChange(user);
   };
 
+  const openCreateModal = (role = "admin") => {
+    resetForm();
+    setSelectedUser(null);
+    setForm({
+      ...initialForm,
+      role,
+      ...(role === "super_admin" ? { name: "SUPER ADMIN", email: "superadmin@pastry.com" } : {}),
+    });
+    setIsModalOpen(true);
+  };
+
   return (
     <div className="min-h-screen bg-[#fbfaf5] font-['DM_Sans'] text-[#33251e]">
       <div className="pt-[88px] lg:pl-[260px]">
@@ -390,18 +402,24 @@ export default function UserManagement() {
               <h1 className="mt-1 font-serif text-[27px] leading-tight text-[#33251e]">User Management</h1>
               <p className="mt-1 text-[12px] text-[#74675f]">Manage account access, roles, and status.</p>
             </div>
-            <button
-              type="button"
-              onClick={() => {
-                resetForm();
-                setSelectedUser(null);
-                setIsModalOpen(true);
-              }}
-              className="inline-flex h-10 items-center justify-center gap-2 self-start rounded-lg bg-[#33251e] px-4 text-[12px] font-semibold text-white transition hover:bg-[#5b4540] sm:self-auto"
-            >
-              <Plus size={15} />
-              Add Admin
-            </button>
+            <div className="flex flex-wrap gap-2 self-start sm:self-auto">
+              <button
+                type="button"
+                onClick={() => openCreateModal("admin")}
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-[#33251e] px-4 text-[12px] font-semibold text-white transition hover:bg-[#5b4540]"
+              >
+                <Plus size={15} />
+                Add Admin
+              </button>
+              <button
+                type="button"
+                onClick={() => openCreateModal("super_admin")}
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-[#d9c4b8] bg-white px-4 text-[12px] font-semibold text-[#7d4630] transition hover:bg-[#fff6f1]"
+              >
+                <ShieldCheck size={15} />
+                Add Super Admin
+              </button>
+            </div>
           </div>
 
           <section className="admin-user-management-metrics mb-5 grid gap-2.5 sm:grid-cols-2 xl:grid-cols-4">
@@ -436,6 +454,7 @@ export default function UserManagement() {
               >
                 <option value="all">All roles</option>
                 <option value="admin">Admin</option>
+                <option value="super_admin">Super Admin</option>
                 <option value="customer">Customer</option>
               </select>
             </div>
@@ -569,7 +588,7 @@ export default function UserManagement() {
             <dl className="mt-5 divide-y divide-[#f0e9e2] text-[12px]">
               <div className="flex justify-between gap-4 py-3 first:pt-0"><dt className="text-[#8f8076]">Email</dt><dd className="break-all text-right font-medium text-[#33251e]">{viewingUser.email || "Not provided"}</dd></div>
               <div className="flex justify-between gap-4 py-3"><dt className="text-[#8f8076]">Phone</dt><dd className="text-right font-medium text-[#33251e]">{viewingUser.phone_number || viewingUser.phone || "Not provided"}</dd></div>
-              <div className="flex justify-between gap-4 py-3"><dt className="text-[#8f8076]">Role</dt><dd className="capitalize font-medium text-[#33251e]">{viewingUser.role || "customer"}</dd></div>
+              <div className="flex justify-between gap-4 py-3"><dt className="text-[#8f8076]">Role</dt><dd className="capitalize font-medium text-[#33251e]">{String(viewingUser.role || "customer").replace("_", " ")}</dd></div>
               <div className="flex justify-between gap-4 py-3"><dt className="text-[#8f8076]">Status</dt><dd className="capitalize font-medium text-[#33251e]">{viewingUser.status || "active"}</dd></div>
               <div className="flex justify-between gap-4 py-3 last:pb-0"><dt className="text-[#8f8076]">Joined</dt><dd className="text-right font-medium text-[#33251e]">{viewingUser.created_at ? new Date(viewingUser.created_at).toLocaleDateString() : "Not available"}</dd></div>
             </dl>
@@ -615,7 +634,7 @@ export default function UserManagement() {
             <div className="mb-5 flex items-start justify-between">
               <div>
                 <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#92701e]">Account</p>
-                <h2 id="user-form-title" className="text-[18px] font-semibold text-[#33251e]">{selectedUser ? "Edit User" : "Add Admin"}</h2>
+                <h2 id="user-form-title" className="text-[18px] font-semibold text-[#33251e]">{selectedUser ? "Edit User" : form.role === "super_admin" ? "Add Super Admin" : "Add Admin"}</h2>
               </div>
               <button type="button" onClick={() => { setIsModalOpen(false); setSelectedUser(null); }} className="rounded-md border border-[#e8dfd4] px-3 py-2 text-[11px] font-medium text-[#65574d] transition hover:bg-[#fbf7f2]">
                 Close
@@ -646,6 +665,7 @@ export default function UserManagement() {
                   <label className="mb-1.5 block text-[11px] font-medium text-[#65574d]">Role</label>
                   <select aria-label="Role" value={form.role} onChange={(event) => setForm({ ...form, role: event.target.value })} className="h-10 w-full rounded-md border border-[#e8dfd4] bg-white px-3 text-[12px] text-[#33251e] outline-none transition focus:border-[#b89646] focus:ring-2 focus:ring-[#d4af37]/15">
                     <option value="admin">Admin</option>
+                    <option value="super_admin">Super Admin</option>
                     {selectedUser && <option value="customer">Customer</option>}
                   </select>
                   {formErrors.role ? <p className="mt-1 text-[11px] text-[#8b2e2e]">{formErrors.role}</p> : null}
@@ -691,7 +711,7 @@ export default function UserManagement() {
                 </button>
                 <button type="submit" disabled={savingUser} className="inline-flex items-center gap-2 rounded-md bg-[#33251e] px-4 py-2 text-[12px] font-semibold text-white transition hover:bg-[#5b4540] disabled:cursor-not-allowed disabled:opacity-60">
                   {savingUser ? <Loader2 size={16} className="animate-spin" /> : <UserPlus size={16} />}
-                  {selectedUser ? "Save Changes" : "Create Admin"}
+                  {selectedUser ? "Save Changes" : form.role === "super_admin" ? "Create Super Admin" : "Create Admin"}
                 </button>
               </div>
             </form>

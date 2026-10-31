@@ -99,7 +99,7 @@ class CustomerApiController extends Controller
             return $this->corsResponse(['success' => false, 'message' => 'Authentication required.'], 401);
         }
 
-        if (strtolower((string) $user->role) !== 'admin') {
+        if (!$user->isAdmin()) {
             return $this->corsResponse(['success' => false, 'message' => 'Admin authorization required.'], 403);
         }
 
@@ -289,7 +289,7 @@ class CustomerApiController extends Controller
                 return $this->corsResponse(['success' => false, 'message' => 'User not found.']);
             }
 
-            if (!in_array(strtolower((string) $user->role), ['customer', 'admin'], true)) {
+            if (strtolower((string) $user->role) !== 'customer' && !$user->isAdmin()) {
                 return $this->corsResponse(['success' => false, 'message' => 'This account is not eligible for access.'], 403);
             }
             if (strtolower(trim((string) ($user->status ?? 'active'))) !== 'active') {
@@ -824,7 +824,7 @@ class CustomerApiController extends Controller
             return $this->corsResponse(['success' => false, 'messages' => []], 401);
         }
 
-        $isAdmin = strtolower((string) $user->role) === 'admin';
+        $isAdmin = $user->isAdmin();
         if (!$isAdmin && strtolower((string) $user->role) !== 'customer') {
             return $this->corsResponse(['success' => false, 'messages' => []], 403);
         }
@@ -1069,7 +1069,7 @@ class CustomerApiController extends Controller
             return $this->corsResponse(['success' => false, 'message' => 'Authentication required.'], 401);
         }
 
-        $isAdmin = strtolower((string) $user->role) === 'admin';
+        $isAdmin = $user->isAdmin();
         if (!$isAdmin && strtolower((string) $user->role) !== 'customer') {
             return $this->corsResponse(['success' => false, 'message' => 'Chat authorization required.'], 403);
         }
@@ -2030,7 +2030,7 @@ PROMPT;
     public function user(Request $request)
     {
         $user = $this->getAuthenticatedUser($request);
-        if (!$user || !in_array(strtolower((string) $user->role), ['customer', 'admin'], true)) {
+        if (!$user || (strtolower((string) $user->role) !== 'customer' && !$user->isAdmin())) {
             return $this->corsResponse(['success' => false, 'message' => 'Authentication required.'], 401);
         }
 

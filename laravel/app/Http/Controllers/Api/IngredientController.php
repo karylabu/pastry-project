@@ -166,7 +166,7 @@ class IngredientController extends Controller
         if ($response = $this->authorizeOperationalStaff($request)) {
             return $response;
         }
-        if (strtolower((string) $this->getAuthenticatedUser($request)?->role) !== 'admin') {
+        if (!$this->getAuthenticatedUser($request)?->isAdmin()) {
             return response()->json(['success' => false, 'message' => 'Admin authorization required.'], 403);
         }
 

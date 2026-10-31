@@ -83,7 +83,7 @@ class UserController extends Controller
 
         if ($request->filled('role')) {
             $role = $request->role;
-            if (in_array($role, ['admin', 'customer'], true)) {
+            if (in_array($role, ['admin', 'super_admin', 'customer'], true)) {
                 $query->where('role', $role);
             }
         }
@@ -126,7 +126,7 @@ class UserController extends Controller
             'email' => ['required', 'email', 'max:255'],
             'phone_number' => ['nullable', 'string', 'max:20'],
             'phone' => ['nullable', 'string', 'max:20'],
-            'role' => ['required', Rule::in(['admin'])],
+            'role' => ['required', Rule::in(['admin', 'super_admin'])],
             'status' => ['sometimes', Rule::in(['active', 'inactive', 'banned'])],
             'password' => ['required', 'string', 'min:8', 'confirmed'],
         ]);
@@ -196,7 +196,7 @@ class UserController extends Controller
             'email' => ['sometimes', 'email', 'max:255'],
             'phone_number' => ['nullable', 'string', 'max:20'],
             'phone' => ['nullable', 'string', 'max:20'],
-            'role' => ['sometimes', Rule::in(['admin', 'customer'])],
+            'role' => ['sometimes', Rule::in(['admin', 'super_admin', 'customer'])],
             'status' => ['sometimes', Rule::in(['active', 'inactive', 'banned'])],
             'password' => ['nullable', 'string', 'min:8', 'confirmed'],
         ]);
@@ -294,7 +294,7 @@ class UserController extends Controller
         if (!$user) {
             return response()->json(['success' => false, 'message' => 'Admin authorization required.'], 401);
         }
-        if (strtolower(trim((string) $user->role)) !== 'admin') {
+        if (!$user->isAdmin()) {
             return response()->json(['success' => false, 'message' => 'Admin authorization required.'], 403);
         }
         return null;
