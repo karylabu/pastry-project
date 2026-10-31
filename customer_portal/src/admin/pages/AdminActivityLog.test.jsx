@@ -189,7 +189,7 @@ describe("AdminActivityLog", () => {
         const requestUrl = global.fetch.mock.calls[global.fetch.mock.calls.length - 1][0];
         expect(new URL(requestUrl).searchParams.get("category")).toBe(category);
       });
-      for (const heading of ["Activity", "Admin / Staff", "Details", "IP Address", "Result", "Timestamp"]) {
+      for (const heading of ["Activity", "Account", "Details", "IP Address", "Result", "Timestamp"]) {
         expect(screen.getByRole("columnheader", { name: heading })).toBeInTheDocument();
       }
     }
@@ -242,7 +242,8 @@ describe("AdminActivityLog", () => {
 
     render(<AdminActivityLog />);
 
-    expect(await screen.findByText("staff@example.com · Staff")).toBeInTheDocument();
+    expect(await screen.findByText("staff@example.com")).toBeInTheDocument();
+    expect(screen.queryByText("staff@example.com · Staff")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Staff" })).not.toBeInTheDocument();
   });
 });

@@ -11,7 +11,7 @@ function formatDate(value) {
 
 function formatRole(role) {
   if (role === "super_admin") return "Shop Owner";
-  if (role === "manager" || role === "staff") return "Staff";
+  if (role === "manager" || role === "staff") return "";
   return role || "—";
 }
 
@@ -172,7 +172,7 @@ export default function AdminActivityLog() {
   const categoryFilters = ["Custom Cake", "Ingredients", "Orders", "Products", "Promotions", "Recipe", "Users"];
   const sortableColumns = [
     { key: "action", label: "Activity" },
-    { key: "account", label: "Admin / Staff" },
+    { key: "account", label: "Account" },
     { key: "ip_address", label: "IP Address" },
     { key: "result", label: "Result" },
     { key: "timestamp", label: "Timestamp" },
@@ -208,7 +208,7 @@ export default function AdminActivityLog() {
             <div>
               <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.24em] text-[#92701e]">Access control</p>
               <h1 className="mt-1 font-serif text-[27px] leading-tight text-[#33251e]">Audit Trail</h1>
-              <p className="mt-1 text-[12px] text-[#74675f]">Review admin and staff activity, changes, timestamps, and source IP addresses.</p>
+              <p className="mt-1 text-[12px] text-[#74675f]">Review account activity, changes, timestamps, and source IP addresses.</p>
             </div>
             <div className="flex gap-2">
               <div className="flex h-10 items-center gap-2 rounded-md border border-[#e8dfd4] bg-white px-3 sm:w-72">
@@ -294,9 +294,9 @@ export default function AdminActivityLog() {
               </div>
             </div>
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[980px] text-left">
-                <thead className="border-b border-[#eee7df] bg-[#fbf9f6] text-[10px] uppercase tracking-[0.12em] text-[#74675f]">
-                  <tr>
+              <table className="w-full min-w-[980px] border-collapse text-left text-[13px]">
+                <thead>
+                  <tr className="border-b border-[#f0e7e0] bg-[#fbf7f2] text-[10px] uppercase tracking-[0.16em] text-[#9b8c83]">
                     {renderSortableHeader(sortableColumns[0])}
                     {renderSortableHeader(sortableColumns[1])}
                     <th className="px-4 py-3 font-semibold">Details</th>
@@ -321,29 +321,31 @@ export default function AdminActivityLog() {
                       </td>
                     </tr>
                   ) : logs.map((log) => (
-                    <tr key={log.id} className="align-top text-xs text-[#514239]">
-                      <td className="px-4 py-3">
+                    <tr key={log.id} className="align-top border-b border-[#f2ebe5] text-[#514239] last:border-0">
+                      <td className="px-4 py-3.5">
                         <p className="font-semibold text-[#33251e]">{log.action}</p>
                         <p className="mt-1 text-[10px] text-[#8f8076]">{log.category}</p>
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="px-4 py-3.5">
                         <p className="font-medium">{log.actor_name}</p>
-                        <p className="mt-1 text-[10px] text-[#8f8076]">{log.actor_email} · {formatRole(log.actor_role)}</p>
+                        <p className="mt-1 text-[10px] text-[#8f8076]">
+                          {log.actor_email}{formatRole(log.actor_role) ? ` · ${formatRole(log.actor_role)}` : ""}
+                        </p>
                       </td>
-                      <td className="max-w-[320px] whitespace-normal px-4 py-3 text-[#74675f]">
+                      <td className="max-w-[320px] whitespace-normal px-4 py-3.5 text-[12px] text-[#74675f]">
                         <div className="space-y-1">
                           {formatDetails(log.details).map((line, index) => (
                             <p key={`${log.id}-detail-${index}`}>{line}</p>
                           ))}
                         </div>
                       </td>
-                      <td className="px-4 py-3 font-mono text-[11px]">{log.ip_address || "—"}</td>
-                      <td className="px-4 py-3">
+                      <td className="px-4 py-3.5 font-mono text-[11px]">{log.ip_address || "—"}</td>
+                      <td className="px-4 py-3.5">
                         <span className={`rounded px-2 py-1 text-[10px] font-semibold ${log.response_status < 400 ? "bg-[#edf4e9] text-[#58744a]" : "bg-[#fff0e8] text-[#9a4f32]"}`}>
                           {log.response_status < 400 ? "Success" : "Failed"}
                         </span>
                       </td>
-                      <td className="whitespace-nowrap px-4 py-3">{formatDate(log.created_at)}</td>
+                      <td className="whitespace-nowrap px-4 py-3.5">{formatDate(log.created_at)}</td>
                     </tr>
                   ))}
                 </tbody>
