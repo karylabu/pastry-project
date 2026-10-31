@@ -41,6 +41,7 @@ describe("AdminActivityLog", () => {
     expect(getByTestId("activity-log-page-content")).toHaveClass("pt-[88px]", "lg:pl-[260px]");
     expect(screen.getByRole("button", { name: "Shop Owner" })).toHaveAttribute("aria-pressed", "false");
     expect(screen.getByRole("button", { name: "Admin" })).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByText("Account:").parentElement).toHaveClass("justify-end");
     for (const category of ["Products", "Ingredients", "Recipe", "Orders", "Custom Cake"]) {
       expect(screen.getByRole("button", { name: category })).toHaveAttribute("aria-pressed", "false");
     }
