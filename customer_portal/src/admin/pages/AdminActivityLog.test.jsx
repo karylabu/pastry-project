@@ -21,7 +21,13 @@ describe("AdminActivityLog", () => {
           actor_name: "Admin",
           actor_email: "admin@example.com",
           actor_role: "admin",
-          details: { status: "Ready for Pickup" },
+          details: {
+            Changes: {
+              order: {
+                status: { Before: "Preparing", After: "Ready for Pickup" },
+              },
+            },
+          },
           ip_address: "203.0.113.15",
           response_status: 200,
           created_at: "2026-10-31T04:30:00Z",
@@ -41,6 +47,7 @@ describe("AdminActivityLog", () => {
     expect(getByTestId("activity-log-page-content")).toHaveClass("pt-[88px]", "lg:pl-[260px]");
     expect(screen.getByRole("button", { name: "Shop Owner" })).toHaveAttribute("aria-pressed", "false");
     expect(screen.getByRole("button", { name: "Admin" })).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByRole("button", { name: "Staff" })).toHaveAttribute("aria-pressed", "false");
     expect(screen.getByText("Account:").parentElement).toHaveClass("justify-end");
     expect(screen.getByText("Category:").parentElement).toHaveClass("justify-end");
     for (const category of ["Products", "Ingredients", "Recipe", "Orders", "Custom Cake"]) {
@@ -51,7 +58,7 @@ describe("AdminActivityLog", () => {
     expect(screen.getAllByText("Admin").length).toBeGreaterThan(0);
     expect(screen.getByText("203.0.113.15")).toBeInTheDocument();
     expect(screen.getByText("Ready for Pickup", { exact: false })).toBeInTheDocument();
-    expect(screen.getByText("200")).toBeInTheDocument();
+    expect(screen.getByText("Success (HTTP 200)")).toBeInTheDocument();
     expect(screen.queryByText(/api\/staff/)).not.toBeInTheDocument();
   });
 
@@ -92,5 +99,18 @@ describe("AdminActivityLog", () => {
     });
     expect(screen.getByRole("button", { name: "Ingredients" })).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByRole("button", { name: "All" })).toHaveAttribute("aria-pressed", "false");
+  });
+
+  test("filters audit activity by staff account", async () => {
+    render(<AdminActivityLog />);
+    await screen.findByText("Changed order status");
+
+    fireEvent.click(screen.getByRole("button", { name: "Staff" }));
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenLastCalledWith(
+        expect.stringContaining("actor_role=staff"),
+        expect.any(Object)
+      );
+    });
   });
 });

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { AlertCircle, ChevronLeft, ChevronRight, Clock3, Search } from "lucide-react";
+import { AlertCircle, ChevronLeft, ChevronRight, Clock3, RefreshCw, Search } from "lucide-react";
 import { LARAVEL_BASE } from "../../services/config";
 import { getAuthHeaders } from "../../services/api";
 
@@ -9,11 +9,31 @@ function formatDate(value) {
   return Number.isNaN(date.getTime()) ? "—" : date.toLocaleString();
 }
 
+function formatRole(role) {
+  if (role === "super_admin") return "Shop Owner";
+  if (role === "manager" || role === "staff") return "Staff";
+  return role || "—";
+}
+
 function formatDetails(details) {
   if (!details || typeof details !== "object" || Object.keys(details).length === 0) return "No details";
-  return Object.entries(details)
-    .map(([key, value]) => `${key.replaceAll("_", " ")}: ${typeof value === "object" ? JSON.stringify(value) : String(value)}`)
-    .join(" · ");
+  const entries = [];
+  const displayValue = (value) => (
+    value && typeof value === "object" ? JSON.stringify(value) : String(value ?? "—")
+  );
+  const flatten = (value, label) => {
+    if (value && typeof value === "object" && !Array.isArray(value)) {
+      if (Object.prototype.hasOwnProperty.call(value, "Before") && Object.prototype.hasOwnProperty.call(value, "After")) {
+        entries.push(`${label}: ${displayValue(value.Before)} → ${displayValue(value.After)}`);
+        return;
+      }
+      Object.entries(value).forEach(([key, nestedValue]) => flatten(nestedValue, label ? `${label} · ${key}` : key));
+      return;
+    }
+    entries.push(`${label}: ${Array.isArray(value) ? JSON.stringify(value) : String(value ?? "—")}`);
+  };
+  Object.entries(details).forEach(([key, value]) => flatten(value, key));
+  return entries.join(" · ");
 }
 
 export default function AdminActivityLog() {
@@ -24,13 +44,16 @@ export default function AdminActivityLog() {
   const [actorRole, setActorRole] = useState("");
   const [category, setCategory] = useState("");
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(0);
   const [error, setError] = useState("");
 
   useEffect(() => {
     let active = true;
-    const loadLogs = async () => {
-      setLoading(true);
-      setError("");
+    const loadLogs = async (quiet = false) => {
+      if (!quiet) {
+        setLoading(true);
+        setError("");
+      }
       try {
         const params = new URLSearchParams({ page: String(page), per_page: "25" });
         if (search.trim()) params.set("search", search.trim());
@@ -49,18 +72,23 @@ export default function AdminActivityLog() {
       } catch (loadError) {
         if (active) setError(loadError.message || "Unable to load activity logs.");
       } finally {
-        if (active) setLoading(false);
+        if (active && !quiet) setLoading(false);
       }
     };
 
     loadLogs();
-    return () => { active = false; };
-  }, [actorRole, category, page, search]);
+    const refreshTimer = window.setInterval(() => loadLogs(true), 30000);
+    return () => {
+      active = false;
+      window.clearInterval(refreshTimer);
+    };
+  }, [actorRole, category, page, refreshing, search]);
 
   const lastPage = Math.max(1, Number(pagination.last_page || 1));
   const accountFilters = [
     { label: "Shop Owner", role: "super_admin" },
     { label: "Admin", role: "admin" },
+    { label: "Staff", role: "staff" },
   ];
   const categoryFilters = ["Products", "Ingredients", "Recipe", "Orders", "Custom Cake"];
 
@@ -74,15 +102,26 @@ export default function AdminActivityLog() {
               <h1 className="mt-1 font-serif text-[27px] leading-tight text-[#33251e]">Audit Trail</h1>
               <p className="mt-1 text-[12px] text-[#74675f]">Review admin and staff activity, changes, timestamps, and source IP addresses.</p>
             </div>
-            <div className="flex h-10 items-center gap-2 rounded-md border border-[#e8dfd4] bg-white px-3 sm:w-72">
-              <Search size={15} className="text-[#8f8076]" />
-              <input
-                aria-label="Search activity"
-                className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-[#a99a8e]"
-                placeholder="Search name, action, or IP"
-                value={search}
-                onChange={(event) => { setSearch(event.target.value); setPage(1); }}
-              />
+            <div className="flex gap-2">
+              <div className="flex h-10 items-center gap-2 rounded-md border border-[#e8dfd4] bg-white px-3 sm:w-72">
+                <Search size={15} className="text-[#8f8076]" />
+                <input
+                  aria-label="Search activity"
+                  className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-[#a99a8e]"
+                  placeholder="Search name, action, record, or IP"
+                  value={search}
+                  onChange={(event) => { setSearch(event.target.value); setPage(1); }}
+                />
+              </div>
+              <button
+                type="button"
+                aria-label="Refresh activity"
+                onClick={() => setRefreshing((current) => current + 1)}
+                disabled={loading}
+                className="flex h-10 w-10 items-center justify-center rounded-md border border-[#e8dfd4] bg-white text-[#65574d] hover:bg-[#fffaf0] disabled:opacity-50"
+              >
+                <RefreshCw size={15} className={loading ? "animate-spin" : ""} />
+              </button>
             </div>
           </header>
 
@@ -181,13 +220,13 @@ export default function AdminActivityLog() {
                       </td>
                       <td className="px-4 py-3">
                         <p className="font-medium">{log.actor_name}</p>
-                        <p className="mt-1 text-[10px] text-[#8f8076]">{log.actor_email} · {log.actor_role}</p>
+                        <p className="mt-1 text-[10px] text-[#8f8076]">{log.actor_email} · {formatRole(log.actor_role)}</p>
                       </td>
                       <td className="max-w-[280px] whitespace-normal px-4 py-3 text-[#74675f]">{formatDetails(log.details)}</td>
                       <td className="px-4 py-3 font-mono text-[11px]">{log.ip_address || "—"}</td>
                       <td className="px-4 py-3">
                         <span className={`rounded px-2 py-1 text-[10px] font-semibold ${log.response_status < 400 ? "bg-[#edf4e9] text-[#58744a]" : "bg-[#fff0e8] text-[#9a4f32]"}`}>
-                          {log.response_status}
+                          {log.response_status < 400 ? "Success" : "Failed"} (HTTP {log.response_status})
                         </span>
                       </td>
                       <td className="whitespace-nowrap px-4 py-3">{formatDate(log.created_at)}</td>

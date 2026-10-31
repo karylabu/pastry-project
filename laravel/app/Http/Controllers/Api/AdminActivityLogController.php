@@ -33,12 +33,15 @@ class AdminActivityLogController extends Controller
                     ->orWhere('actor_email', 'like', '%' . $search . '%')
                     ->orWhere('action', 'like', '%' . $search . '%')
                     ->orWhere('category', 'like', '%' . $search . '%')
+                    ->orWhere('details', 'like', '%' . $search . '%')
                     ->orWhere('ip_address', 'like', '%' . $search . '%');
             });
         }
 
         $actorRole = strtolower(trim((string) $request->input('actor_role', '')));
-        if (in_array($actorRole, ['admin', 'super_admin'], true)) {
+        if ($actorRole === 'staff') {
+            $query->whereIn('actor_role', ['staff', 'manager']);
+        } elseif (in_array($actorRole, ['admin', 'super_admin'], true)) {
             $query->where('actor_role', $actorRole);
         }
 

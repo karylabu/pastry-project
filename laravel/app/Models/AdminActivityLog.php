@@ -23,11 +23,8 @@ class AdminActivityLog extends Model
         'details',
     ];
 
-    protected function casts(): array
-    {
-        return [
-            'details' => 'array',
-            'response_status' => 'integer',
-        ];
-    }
+    protected $casts = [
+        'details' => 'array',
+        'response_status' => 'integer',
+    ];
 }
