@@ -45,6 +45,8 @@ describe("CustomCakes", () => {
             total: 1200,
             details: JSON.stringify({
               customer_name: "Mila Customer",
+              delivery_method: "Pickup",
+              pickup_date: "2026-10-30",
               cake_size: "8 inches",
               cake_flavor: "Vanilla",
               theme: "Blue ocean theme",
@@ -73,6 +75,9 @@ describe("CustomCakes", () => {
     expect(customerCell).toHaveTextContent("Mila Customer");
     expect(customerCell).not.toHaveTextContent("09260771217");
     expect(orderRow).not.toHaveTextContent('{"customer_name"');
+    expect(orderRow).toHaveTextContent("Pickup on Oct 30, 2026");
+    expect(orderRow).not.toHaveTextContent("Delivery method:");
+    expect(orderRow).not.toHaveTextContent("Pickup date:");
     expect(orderRow).toHaveTextContent("Blue ocean theme");
     expect(orderRow).toHaveTextContent("8 inches");
     expect(orderRow).toHaveTextContent("Vanilla");

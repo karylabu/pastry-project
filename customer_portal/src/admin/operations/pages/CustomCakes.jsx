@@ -232,8 +232,11 @@ export default function CustomCakes() {
   };
 
   const getRequestDetailsSummary = (order) => {
+    const details = new Map(parseCustomDetails(order));
+    const deliveryMethod = details.get("Delivery method");
+    const deliveryAddress = details.get("Delivery address");
+    const pickupDate = details.get("Pickup date");
     const summaryFields = new Set([
-      "Details",
       "Cake size",
       "Cake type",
       "Servings",
@@ -243,20 +246,31 @@ export default function CustomCakes() {
       "Occasion",
       "Theme",
       "Packaging",
-      "Delivery method",
-      "Delivery address",
-      "Pickup date",
-      "Pickup time",
       "Cake color",
       "Custom message",
       "Special instructions",
       "Add-ons",
     ]);
 
-    return parseCustomDetails(order)
+    const datePart = pickupDate?.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    const formattedPickupDate = datePart
+      ? new Date(`${pickupDate}T00:00:00Z`).toLocaleDateString("en-US", {
+        timeZone: "UTC",
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      })
+      : pickupDate;
+    const fulfillmentSummary = [
+      deliveryMethod,
+      formattedPickupDate && `on ${formattedPickupDate}`,
+      deliveryMethod?.toLowerCase() === "delivery" && deliveryAddress && `to ${deliveryAddress}`,
+    ].filter(Boolean).join(" ");
+    const cakeDetails = [...details]
       .filter(([label]) => summaryFields.has(label))
-      .map(([label, value]) => `${label}: ${value}`)
-      .join(" · ") || "Custom cake request details";
+      .map(([, value]) => value);
+
+    return [fulfillmentSummary, ...cakeDetails].filter(Boolean).join(" · ") || "Custom cake request details";
   };
 
   const getOrderReferenceImage = (order) => {
