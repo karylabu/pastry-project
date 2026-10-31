@@ -47,20 +47,30 @@ class DatabaseBackupService
             'backups' => array_values($items),
             'overview' => [
                 'last_backup' => $items[0] ?? null,
+                'last_successful_backup' => collect($items)->first(static fn (array $item): bool => ($item['status'] ?? null) === 'successful'),
+                'last_scheduled_backup' => collect($items)->first(static fn (array $item): bool => ($item['purpose'] ?? null) === 'scheduled'),
+                'available_backups' => count(array_filter($items, static fn (array $item): bool => ($item['status'] ?? null) === 'successful')),
                 'total_backups' => count($files),
                 'storage_used_bytes' => $storageUsed,
             ],
         ];
     }
 
-    public function create(string $type = 'manual'): array
+    public function create(string $type = 'manual', ?string $purpose = null): array
     {
         if (! in_array($type, ['manual', 'automatic'], true)) {
             throw new RuntimeException('Invalid backup type.');
         }
+        $purpose ??= $type === 'manual' ? 'manual' : 'restore_safety';
+        if (! in_array($purpose, ['manual', 'scheduled', 'restore_safety'], true)
+            || ($type === 'manual' && $purpose !== 'manual')
+            || ($type === 'automatic' && $purpose === 'manual')) {
+            throw new RuntimeException('Invalid backup purpose.');
+        }
 
         $disk = Storage::disk('local');
         $disk->makeDirectory(self::DIRECTORY);
+        @chmod($disk->path(self::DIRECTORY), 0700);
         $createdAt = now();
         $filename = sprintf(
             'pastry-project-db-%s-%s.sql',
@@ -72,6 +82,7 @@ class DatabaseBackupService
             'filename' => $filename,
             'created_at' => $createdAt->toIso8601String(),
             'type' => $type,
+            'purpose' => $purpose,
             'status' => 'in_progress',
             'size_bytes' => 0,
         ];
@@ -140,7 +151,7 @@ class DatabaseBackupService
         }
 
         $backupPath = $this->downloadPath($filename);
-        $safetyBackup = $this->create('automatic');
+        $safetyBackup = $this->create('automatic', 'restore_safety');
         $safetyPath = $this->downloadPath($safetyBackup['filename']);
 
         try {
@@ -165,6 +176,19 @@ class DatabaseBackupService
             'restored_backup' => $entry,
             'safety_backup' => $safetyBackup,
         ];
+    }
+
+    public function hasSuccessfulScheduledBackupOn(string $date): bool
+    {
+        foreach ($this->readHistory() as $entry) {
+            if (($entry['purpose'] ?? null) === 'scheduled'
+                && ($entry['status'] ?? null) === 'successful'
+                && str_starts_with((string) ($entry['created_at'] ?? ''), $date)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function writeSqlDump(string $path): void
@@ -509,5 +533,6 @@ class DatabaseBackupService
         if ($written === false) {
             throw new RuntimeException('Backup history could not be saved.');
         }
+        @chmod($disk->path(self::HISTORY_FILE), 0600);
     }
 }

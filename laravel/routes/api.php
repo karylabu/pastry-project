@@ -190,6 +190,7 @@ Route::middleware(['api'])->group(function () {
         Route::get('backup', [AdminBackupController::class, 'download']);
         Route::get('backups', [AdminBackupController::class, 'index']);
         Route::post('backups', [AdminBackupController::class, 'store']);
+        Route::put('backups/schedule', [AdminBackupController::class, 'updateSchedule']);
         Route::get('backups/{filename}/download', [AdminBackupController::class, 'downloadFile'])->where('filename', '[A-Za-z0-9._-]+');
         Route::post('backups/{filename}/restore', [AdminBackupController::class, 'restore'])->where('filename', '[A-Za-z0-9._-]+');
         Route::delete('backups/{filename}', [AdminBackupController::class, 'destroy'])->where('filename', '[A-Za-z0-9._-]+');

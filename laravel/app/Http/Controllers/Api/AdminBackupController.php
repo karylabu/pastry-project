@@ -7,7 +7,9 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Validator;
 use App\Services\DatabaseBackupService;
+use App\Services\ShopSettings;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 use Throwable;
 
@@ -76,7 +78,36 @@ class AdminBackupController extends Controller
             return $response;
         }
 
-        return response()->json(['success' => true, 'data' => $backups->overview()]);
+        $data = $backups->overview();
+        $data['schedule_time'] = ShopSettings::all()['backupScheduleTime'] ?? '02:00';
+        $data['permissions'] = ['can_restore' => $this->getAuthenticatedUser($request)?->isSuperAdmin() ?? false];
+
+        return response()->json(['success' => true, 'data' => $data]);
+    }
+
+    public function updateSchedule(Request $request): \Illuminate\Http\JsonResponse
+    {
+        if ($response = $this->authorizeAdmin($request)) {
+            return $response;
+        }
+
+        $validator = Validator::make($request->all(), ['time' => ['required', 'date_format:H:i']]);
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Choose a valid daily backup time.',
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        $time = $validator->validated()['time'];
+        ShopSettings::update(['backupScheduleTime' => $time]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Daily backup time saved.',
+            'data' => ['schedule_time' => $time],
+        ]);
     }
 
     public function store(Request $request, DatabaseBackupService $backups): \Illuminate\Http\JsonResponse
@@ -118,7 +149,7 @@ class AdminBackupController extends Controller
 
     public function restore(Request $request, string $filename, DatabaseBackupService $backups): \Illuminate\Http\JsonResponse
     {
-        if ($response = $this->authorizeAdmin($request)) {
+        if ($response = $this->authorizeTechnicalAdmin($request)) {
             return $response;
         }
         if (! $request->boolean('confirmed')) {
@@ -200,6 +231,19 @@ class AdminBackupController extends Controller
         if (!$user->isAdmin()) {
             return response()->json(['success' => false, 'message' => 'Admin authorization required.'], 403);
         }
+        return null;
+    }
+
+    private function authorizeTechnicalAdmin(Request $request): ?\Illuminate\Http\JsonResponse
+    {
+        $user = $this->getAuthenticatedUser($request);
+        if (! $user) {
+            return response()->json(['success' => false, 'message' => 'Authentication required.'], 401);
+        }
+        if (! $user->isSuperAdmin()) {
+            return response()->json(['success' => false, 'message' => 'Only technical administrators can restore a database.'], 403);
+        }
+
         return null;
     }
 }

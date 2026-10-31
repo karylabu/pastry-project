@@ -26,11 +26,17 @@ class AdminBackupControllerTest extends TestCase
             $table->string('api_token')->nullable();
             $table->longText('details')->nullable();
         });
+        Schema::create('shop_settings', function (Blueprint $table) {
+            $table->unsignedTinyInteger('id')->primary();
+            $table->json('settings');
+            $table->timestamps();
+        });
     }
 
     protected function tearDown(): void
     {
         Schema::dropIfExists('orders');
+        Schema::dropIfExists('shop_settings');
         parent::tearDown();
     }
 
@@ -53,7 +59,7 @@ class AdminBackupControllerTest extends TestCase
         $backup = json_decode((string) ob_get_clean(), true, 512, JSON_THROW_ON_ERROR);
 
         $this->assertSame('pastry-project-business-backup', $backup['format']);
-        $this->assertSame(['orders'], array_keys($backup['tables']));
+        $this->assertContains('orders', array_keys($backup['tables']));
         $this->assertSame('ORD-1', $backup['tables']['orders'][0]['reference']);
         $this->assertArrayNotHasKey('api_token', $backup['tables']['orders'][0]);
         $this->assertSame(['notes' => 'Keep this'], json_decode($backup['tables']['orders'][0]['details'], true));
@@ -103,13 +109,21 @@ class AdminBackupControllerTest extends TestCase
         DB::table('orders')->update(['reference' => 'ORD-CHANGED']);
         $restoreRequest = Request::create('/api/admin/backups/' . $filename . '/restore', 'POST', ['confirmed' => true]);
         $restoreResponse = $controller->restore($restoreRequest, $filename, $backups);
+        $this->assertSame(403, $restoreResponse->getStatusCode());
+
+        $superAdmin = new User();
+        $superAdmin->role = 'super_admin';
+        $this->actingAs($superAdmin);
+        $restoreResponse = $controller->restore($restoreRequest, $filename, $backups);
         $this->assertSame(200, $restoreResponse->getStatusCode());
         $this->assertSame('ORD-1', DB::table('orders')->value('reference'));
 
         $overview = $controller->index($request, $backups)->getData(true)['data'];
         $this->assertSame(2, $overview['overview']['total_backups']);
-        $this->assertSame('automatic', $overview['backups'][0]['type']);
+        $this->assertTrue($overview['permissions']['can_restore']);
+        $this->assertContains('restore_safety', array_column($overview['backups'], 'purpose'));
 
+        $this->actingAs($admin);
         $deleteRequest = Request::create('/api/admin/backups/' . $filename, 'DELETE', ['confirmed' => true]);
         $deleteResponse = $controller->destroy($deleteRequest, $filename, $backups);
         $this->assertSame(200, $deleteResponse->getStatusCode());
@@ -127,9 +141,25 @@ class AdminBackupControllerTest extends TestCase
         $request = Request::create('/api/admin/backups');
 
         $this->assertSame(200, $controller->index($request, $backups)->getStatusCode());
+        $this->assertTrue($controller->index($request, $backups)->getData(true)['data']['permissions']['can_restore']);
 
         $restoreRequest = Request::create('/api/admin/backups/pastry-project-db-20261031-120000-abcdef.sql/restore', 'POST');
         $response = $controller->restore($restoreRequest, 'pastry-project-db-20261031-120000-abcdef.sql', $backups);
         $this->assertSame(422, $response->getStatusCode());
+    }
+
+    public function test_admin_can_save_only_a_valid_daily_backup_time(): void
+    {
+        $admin = new User();
+        $admin->role = 'admin';
+        $this->actingAs($admin);
+        $controller = app(AdminBackupController::class);
+
+        $response = $controller->updateSchedule(Request::create('/api/admin/backups/schedule', 'PUT', ['time' => '03:30']));
+
+        $this->assertSame(200, $response->getStatusCode());
+        $this->assertSame('03:30', json_decode(DB::table('shop_settings')->where('id', 1)->value('settings'), true)['backupScheduleTime']);
+        $invalid = $controller->updateSchedule(Request::create('/api/admin/backups/schedule', 'PUT', ['time' => '25:99']));
+        $this->assertSame(422, $invalid->getStatusCode());
     }
 }

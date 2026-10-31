@@ -6,7 +6,6 @@ import {
   Clock3,
   Database,
   Download,
-  HardDrive,
   Loader2,
   RefreshCw,
   RotateCcw,
@@ -19,13 +18,19 @@ import { getAuthHeaders } from "../../services/api";
 
 const EMPTY_DATA = {
   backups: [],
-  overview: { last_backup: null, total_backups: 0, storage_used_bytes: 0 },
+  overview: { last_backup: null, last_successful_backup: null, last_scheduled_backup: null, available_backups: 0, total_backups: 0, storage_used_bytes: 0 },
+  schedule_time: "02:00",
+  permissions: { can_restore: false },
 };
 
 function formatDate(value) {
   if (!value) return "—";
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? "—" : date.toLocaleString();
+}
+
+function getBackupLabel(backup) {
+  return `Database backup · ${formatDate(backup.created_at)}`;
 }
 
 function formatBytes(value) {
@@ -62,11 +67,12 @@ function ConfirmationDialog({ action, busy, onClose, onConfirm }) {
   const isRestore = action.kind === "restore";
   const isDelete = action.kind === "delete";
   const title = isRestore ? "Restore this backup?" : isDelete ? "Delete this backup?" : "Create a database backup?";
+  const backupLabel = action.backup ? getBackupLabel(action.backup) : "this database backup";
   const message = isRestore
-    ? `Restoring ${action.backup.filename} will replace the current database data. A safety backup of the current database will be created first.`
+    ? `Restoring ${backupLabel} will replace the current database data. A safety backup of the current database will be created first.`
     : isDelete
-      ? `${action.backup.filename} will be permanently removed. This cannot be undone.`
-      : "A complete SQL snapshot of the current database will be created and stored privately.";
+      ? `${backupLabel} will be permanently removed. This cannot be undone.`
+      : "A full copy of the current database will be created and stored privately.";
   const confirmLabel = isRestore ? "Restore backup" : isDelete ? "Delete backup" : "Create backup";
 
   return (
@@ -95,10 +101,12 @@ function ConfirmationDialog({ action, busy, onClose, onConfirm }) {
 
 export default function BackupManagement() {
   const [backupData, setBackupData] = useState(EMPTY_DATA);
+  const [scheduleTime, setScheduleTime] = useState(EMPTY_DATA.schedule_time);
   const [loading, setLoading] = useState(true);
   const [listError, setListError] = useState("");
   const [feedback, setFeedback] = useState(null);
   const [busyAction, setBusyAction] = useState("");
+  const [savingSchedule, setSavingSchedule] = useState(false);
   const [confirmation, setConfirmation] = useState(null);
   const [selectedFilename, setSelectedFilename] = useState("");
 
@@ -115,8 +123,11 @@ export default function BackupManagement() {
       const nextData = {
         backups: Array.isArray(result.data.backups) ? result.data.backups : [],
         overview: { ...EMPTY_DATA.overview, ...result.data.overview },
+        schedule_time: result.data.schedule_time || EMPTY_DATA.schedule_time,
+        permissions: { ...EMPTY_DATA.permissions, ...result.data.permissions },
       };
       setBackupData(nextData);
+      setScheduleTime(nextData.schedule_time);
       setSelectedFilename((current) => nextData.backups.some((backup) => backup.filename === current && backup.status === "successful")
         ? current
         : (nextData.backups.find((backup) => backup.status === "successful")?.filename || ""));
@@ -135,6 +146,28 @@ export default function BackupManagement() {
   const requestConfirmation = (kind, backup = null) => {
     setFeedback(null);
     setConfirmation({ kind, backup });
+  };
+
+  const saveSchedule = async (event) => {
+    event.preventDefault();
+    setSavingSchedule(true);
+    setFeedback(null);
+    try {
+      const response = await fetch(`${LARAVEL_BASE}/api/admin/backups/schedule`, {
+        method: "PUT",
+        credentials: "include",
+        headers: { "Content-Type": "application/json", Accept: "application/json", ...getAuthHeaders() },
+        body: JSON.stringify({ time: scheduleTime }),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || !result.success) throw new Error(result.message || "Unable to save the daily backup time.");
+      setBackupData((current) => ({ ...current, schedule_time: result.data?.schedule_time || scheduleTime }));
+      setFeedback({ type: "success", message: "Daily backup time saved." });
+    } catch (error) {
+      setFeedback({ type: "error", message: error.message || "Unable to save the daily backup time." });
+    } finally {
+      setSavingSchedule(false);
+    }
   };
 
   const runConfirmedAction = async () => {
@@ -188,7 +221,7 @@ export default function BackupManagement() {
         credentials: "include",
         headers: { Accept: "application/sql", ...getAuthHeaders() },
       });
-      if (!response.ok) throw new Error(await getErrorMessage(response, "Unable to download this SQL backup."));
+      if (!response.ok) throw new Error(await getErrorMessage(response, "Unable to download this backup."));
       const blob = await response.blob();
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
@@ -198,17 +231,30 @@ export default function BackupManagement() {
       link.click();
       link.remove();
       window.setTimeout(() => URL.revokeObjectURL(url), 1000);
-      setFeedback({ type: "success", message: `${backup.filename} downloaded.` });
+      setFeedback({ type: "success", message: "Backup downloaded to your device." });
     } catch (error) {
-      setFeedback({ type: "error", message: error.message || "Unable to download this SQL backup." });
+      setFeedback({ type: "error", message: error.message || "Unable to download this backup." });
     } finally {
       setBusyAction("");
     }
   };
 
   const selectedBackup = backupData.backups.find((backup) => backup.filename === selectedFilename && backup.status === "successful");
-  const latestBackup = backupData.overview.last_backup;
-  const actionBusy = Boolean(busyAction);
+  const latestBackup = backupData.overview.last_successful_backup;
+  const latestScheduledBackup = backupData.overview.last_scheduled_backup;
+  const canRestore = Boolean(backupData.permissions.can_restore);
+  const actionBusy = Boolean(busyAction || savingSchedule);
+  const scheduledBackupDate = latestScheduledBackup?.created_at
+    ? new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(latestScheduledBackup.created_at))
+    : "";
+  const todayInManila = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+  const scheduledStatusMessage = latestScheduledBackup?.status === "failed" && scheduledBackupDate === todayInManila
+    ? "Today's automatic backup did not finish. Please contact technical support."
+    : latestScheduledBackup?.status === "successful" && scheduledBackupDate === todayInManila
+      ? "Your data is safely backed up for today."
+      : latestScheduledBackup?.status === "successful"
+        ? `Last daily backup completed ${formatDate(latestScheduledBackup.created_at)}.`
+        : "No successful daily backup has been recorded yet.";
 
   return (
     <div className="min-h-screen bg-[#fbfaf5] font-['DM_Sans'] text-[#33251e]">
@@ -218,7 +264,7 @@ export default function BackupManagement() {
             <div>
               <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.2em] text-[#92701e]">System · Data protection</p>
               <h1 className="font-serif text-[27px] leading-tight text-[#33251e]">Backup Management</h1>
-              <p className="mt-1.5 max-w-2xl text-[12px] leading-5 text-[#74675f]">Create and manage downloadable SQL snapshots of the connected database.</p>
+              <p className="mt-1.5 max-w-2xl text-[12px] leading-5 text-[#74675f]">Set a daily backup time and download a copy whenever you need one.</p>
             </div>
             <button type="button" onClick={() => requestConfirmation("create")} disabled={actionBusy || loading} className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-md bg-[#806714] px-4 text-[12px] font-semibold text-white transition hover:bg-[#66520d] disabled:cursor-not-allowed disabled:opacity-50">
               {busyAction === "create" ? <Loader2 size={15} className="animate-spin" /> : <Database size={15} />}
@@ -231,45 +277,53 @@ export default function BackupManagement() {
           </div>}
 
           {busyAction === "create" && <div role="status" aria-live="polite" className="mb-5 rounded-md border border-[#eee3c5] bg-[#fffaf0] px-4 py-3">
-            <div className="flex items-center gap-2 text-[12px] font-semibold text-[#806714]"><Loader2 size={15} className="animate-spin" /> Creating a database snapshot. Keep this page open.</div>
+            <div className="flex items-center gap-2 text-[12px] font-semibold text-[#806714]"><Loader2 size={15} className="animate-spin" /> Creating a database backup. Keep this page open.</div>
             <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-[#eee5d3]"><div className="h-full w-1/3 animate-pulse rounded-full bg-[#c9a94f]" /></div>
           </div>}
+
+          <form onSubmit={saveSchedule} className="mb-5 flex flex-col gap-3 rounded-md border border-[#e9e1d9] bg-white p-4 shadow-[0_2px_8px_rgba(60,42,28,0.03)] sm:flex-row sm:items-end sm:justify-between">
+            <div className="min-w-0">
+              <label htmlFor="daily-backup-time" className="block text-[12px] font-semibold text-[#33251e]">Daily backup time</label>
+              <p className="mt-1 text-[10px] leading-4 text-[#8f8076]">Philippine time. The backup runs automatically, even when nobody is signed in.</p>
+              <input id="daily-backup-time" type="time" required value={scheduleTime} onChange={(event) => setScheduleTime(event.target.value)} disabled={savingSchedule} className="mt-2 h-9 rounded-md border border-[#e8dfd4] bg-white px-3 text-[12px] text-[#33251e] outline-none focus:border-[#b89646] focus:ring-2 focus:ring-[#d4af37]/15 disabled:opacity-60" />
+            </div>
+            <button type="submit" disabled={savingSchedule || loading} className="inline-flex h-9 shrink-0 items-center justify-center gap-2 rounded-md border border-[#e8dfd4] px-3 text-[11px] font-semibold text-[#65574d] transition hover:bg-[#fffaf0] disabled:cursor-not-allowed disabled:opacity-50">{savingSchedule && <Loader2 size={13} className="animate-spin" />}Save backup time</button>
+          </form>
 
           {listError && <div role="alert" className="mb-4 flex items-center justify-between gap-3 rounded-md border border-[#efd8d4] bg-[#fff1ef] px-3.5 py-3 text-[12px] text-[#98534b]">
             <span className="flex items-start gap-2"><AlertCircle size={15} className="mt-0.5 shrink-0" />{listError}</span>
             <button type="button" onClick={() => loadBackups()} className="inline-flex shrink-0 items-center gap-1.5 font-semibold text-[#793e38] hover:underline"><RefreshCw size={13} />Retry</button>
           </div>}
 
-          <section aria-label="Backup overview" className="mb-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <section aria-label="Backup overview" className="mb-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
             <article className="rounded-md border border-[#e9e1d9] bg-white p-4 shadow-[0_2px_8px_rgba(60,42,28,0.03)]">
               <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#8f8076]">Last backup</p>
               <p className="mt-2 text-[13px] font-semibold text-[#33251e]">{loading ? "Loading…" : formatDate(latestBackup?.created_at)}</p>
-              <div className="mt-2"><StatusBadge status={latestBackup?.status} /></div>
+              <p className="mt-2 text-[10px] text-[#8f8076]">Most recent completed copy</p>
             </article>
             <article className="rounded-md border border-[#e9e1d9] bg-white p-4 shadow-[0_2px_8px_rgba(60,42,28,0.03)]">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#8f8076]">Total backups</p>
-              <p className="mt-2 text-[24px] font-semibold leading-none text-[#33251e]">{loading ? "—" : Number(backupData.overview.total_backups).toLocaleString()}</p>
-              <p className="mt-2 text-[10px] text-[#8f8076]">Completed SQL files</p>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#8f8076]">Available backup copies</p>
+              <p className="mt-2 text-[24px] font-semibold leading-none text-[#33251e]">{loading ? "—" : Number(backupData.overview.available_backups).toLocaleString()}</p>
+              <p className="mt-2 text-[10px] text-[#8f8076]">Ready to download or restore</p>
             </article>
-            <article className="rounded-md border border-[#e9e1d9] bg-white p-4 shadow-[0_2px_8px_rgba(60,42,28,0.03)]">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#8f8076]">Storage used</p>
-              <p className="mt-2 flex items-center gap-2 text-[20px] font-semibold leading-none text-[#33251e]"><HardDrive size={17} className="text-[#9b7810]" />{loading ? "—" : formatBytes(backupData.overview.storage_used_bytes)}</p>
-              <p className="mt-2 text-[10px] text-[#8f8076]">Private server storage</p>
-            </article>
-            <article className="rounded-md border border-[#e9e1d9] bg-white p-4 shadow-[0_2px_8px_rgba(60,42,28,0.03)]">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#8f8076]">Selected for restore</p>
-              <p className="mt-2 truncate text-[12px] font-semibold text-[#33251e]" title={selectedBackup?.filename}>{selectedBackup?.filename || "None selected"}</p>
-              <button type="button" onClick={() => selectedBackup && requestConfirmation("restore", selectedBackup)} disabled={!selectedBackup || actionBusy} className="mt-2 inline-flex items-center gap-1.5 text-[11px] font-semibold text-[#806714] hover:underline disabled:cursor-not-allowed disabled:text-[#a99a8e]">
-                <RotateCcw size={13} />Restore selected
-              </button>
+            <article className={`rounded-md border p-4 shadow-[0_2px_8px_rgba(60,42,28,0.03)] ${latestScheduledBackup?.status === "failed" ? "border-[#efd8d4] bg-[#fff8f6]" : "border-[#e9e1d9] bg-white"}`}>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#8f8076]">Backup status</p>
+              <div className="mt-2"><StatusBadge status={latestScheduledBackup?.status} /></div>
+              <p className="mt-2 text-[11px] leading-4 text-[#65574d]">{loading ? "Checking backup status…" : scheduledStatusMessage}</p>
             </article>
           </section>
+
+          {!canRestore && <p className="mb-4 flex items-center gap-2 rounded-md border border-[#eee3c5] bg-[#fffaf0] px-3.5 py-3 text-[11px] text-[#74675f]"><ShieldAlert size={14} className="shrink-0 text-[#9b7810]" />Restoring a database is restricted to technical administrators.</p>}
+          {canRestore && selectedBackup && <div className="mb-4 flex flex-col gap-2 rounded-md border border-[#e9e1d9] bg-white px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+            <p className="min-w-0 truncate text-[11px] text-[#65574d]">Selected copy: <span className="font-semibold text-[#33251e]">{getBackupLabel(selectedBackup)}</span></p>
+            <button type="button" onClick={() => requestConfirmation("restore", selectedBackup)} disabled={actionBusy} className="inline-flex h-8 shrink-0 items-center justify-center gap-1.5 rounded-md border border-[#e8dfd4] px-3 text-[10px] font-semibold text-[#806714] hover:bg-[#fff8df] disabled:opacity-50"><RotateCcw size={13} />Restore selected</button>
+          </div>}
 
           <section aria-labelledby="backup-history-title" className="overflow-hidden rounded-md border border-[#e9e1d9] bg-white shadow-[0_2px_8px_rgba(60,42,28,0.03)]">
             <div className="flex flex-col gap-3 border-b border-[#eee7df] px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
               <div>
                 <h2 id="backup-history-title" className="text-[14px] font-semibold text-[#33251e]">Backup History</h2>
-                <p className="mt-1 text-[11px] text-[#8f8076]">SQL snapshots stored on this server.</p>
+                <p className="mt-1 text-[11px] text-[#8f8076]">Backups stored securely on this server.</p>
               </div>
               <button type="button" onClick={() => loadBackups()} disabled={loading || actionBusy} aria-label="Refresh backup history" title="Refresh backup history" className="inline-flex h-9 items-center justify-center gap-2 self-start rounded-md border border-[#e8dfd4] px-3 text-[11px] font-semibold text-[#65574d] transition hover:bg-[#fffaf0] disabled:opacity-50 sm:self-auto"><RefreshCw size={14} className={loading ? "animate-spin" : ""} />Refresh</button>
             </div>
@@ -278,7 +332,7 @@ export default function BackupManagement() {
               <table className="w-full min-w-[820px] border-collapse text-left">
                 <thead className="bg-[#fbfaf7]">
                   <tr className="border-b border-[#eee7df] text-[10px] font-semibold uppercase tracking-[0.08em] text-[#8f8076]">
-                    <th scope="col" className="px-4 py-3">Backup file</th>
+                    <th scope="col" className="px-4 py-3">Backup name</th>
                     <th scope="col" className="px-4 py-3">Date and time</th>
                     <th scope="col" className="px-4 py-3">File size</th>
                     <th scope="col" className="px-4 py-3">Type</th>
@@ -297,8 +351,8 @@ export default function BackupManagement() {
                     return <tr key={backup.filename} className="align-middle transition hover:bg-[#fffdf8]">
                       <td className="max-w-[330px] px-4 py-3.5">
                         <label className="flex min-w-0 items-start gap-2.5">
-                          <input type="radio" name="restore-backup" value={backup.filename} checked={selectedFilename === backup.filename} disabled={!available || actionBusy} onChange={() => setSelectedFilename(backup.filename)} aria-label={`Select ${backup.filename} for restore`} className="mt-0.5 accent-[#92701e]" />
-                          <span className="min-w-0"><span className="block truncate text-[11px] font-semibold text-[#33251e]" title={backup.filename}>{backup.filename}</span><span className="mt-1 block text-[10px] text-[#9a8d82]">Database snapshot</span></span>
+                          {canRestore && <input type="radio" name="restore-backup" value={backup.filename} checked={selectedFilename === backup.filename} disabled={!available || actionBusy} onChange={() => setSelectedFilename(backup.filename)} aria-label={`Select ${getBackupLabel(backup)} for restore`} className="mt-0.5 accent-[#92701e]" />}
+                          <span className="min-w-0"><span className="block truncate text-[11px] font-semibold text-[#33251e]" title={getBackupLabel(backup)}>{getBackupLabel(backup)}</span><span className="mt-1 block text-[10px] text-[#9a8d82]">{backup.purpose === "scheduled" ? "Daily copy" : backup.purpose === "restore_safety" ? "Safety copy before restore" : "Created manually"}</span></span>
                         </label>
                       </td>
                       <td className="whitespace-nowrap px-4 py-3.5 text-[11px] text-[#65574d]">{formatDate(backup.created_at)}</td>
@@ -307,9 +361,9 @@ export default function BackupManagement() {
                       <td className="px-4 py-3.5"><StatusBadge status={backup.status} /></td>
                       <td className="px-4 py-3.5">
                         <div className="flex items-center gap-1.5">
-                          <button type="button" onClick={() => downloadBackup(backup)} disabled={!available || actionBusy} title="Download SQL backup" aria-label={`Download ${backup.filename}`} className="inline-flex h-8 items-center gap-1.5 rounded border border-[#e8dfd4] px-2 text-[10px] font-semibold text-[#65574d] hover:bg-[#fffaf0] disabled:opacity-40"><Download size={13} />Download</button>
-                          <button type="button" onClick={() => requestConfirmation("restore", backup)} disabled={!available || actionBusy} title="Restore this backup" aria-label={`Restore ${backup.filename}`} className="inline-flex h-8 items-center gap-1.5 rounded border border-[#e8dfd4] px-2 text-[10px] font-semibold text-[#806714] hover:bg-[#fff8df] disabled:opacity-40">{rowBusy && busyAction.startsWith("restore:") ? <Loader2 size={13} className="animate-spin" /> : <RotateCcw size={13} />}Restore</button>
-                          <button type="button" onClick={() => requestConfirmation("delete", backup)} disabled={actionBusy} title="Delete backup" aria-label={`Delete ${backup.filename}`} className="inline-flex h-8 items-center gap-1.5 rounded border border-[#efd8d4] px-2 text-[10px] font-semibold text-[#98534b] hover:bg-[#fff1ef] disabled:opacity-40"><Trash2 size={13} />Delete</button>
+                          <button type="button" onClick={() => downloadBackup(backup)} disabled={!available || actionBusy} title="Download backup" aria-label={`Download ${getBackupLabel(backup)}`} className="inline-flex h-8 items-center gap-1.5 rounded border border-[#e8dfd4] px-2 text-[10px] font-semibold text-[#65574d] hover:bg-[#fffaf0] disabled:opacity-40"><Download size={13} />Download</button>
+                          {canRestore && <button type="button" onClick={() => requestConfirmation("restore", backup)} disabled={!available || actionBusy} title="Restore this backup" aria-label={`Restore ${getBackupLabel(backup)}`} className="inline-flex h-8 items-center gap-1.5 rounded border border-[#e8dfd4] px-2 text-[10px] font-semibold text-[#806714] hover:bg-[#fff8df] disabled:opacity-40">{rowBusy && busyAction.startsWith("restore:") ? <Loader2 size={13} className="animate-spin" /> : <RotateCcw size={13} />}Restore</button>}
+                          <button type="button" onClick={() => requestConfirmation("delete", backup)} disabled={actionBusy} title="Delete backup" aria-label={`Delete ${getBackupLabel(backup)}`} className="inline-flex h-8 items-center gap-1.5 rounded border border-[#efd8d4] px-2 text-[10px] font-semibold text-[#98534b] hover:bg-[#fff1ef] disabled:opacity-40"><Trash2 size={13} />Delete</button>
                         </div>
                       </td>
                     </tr>;
