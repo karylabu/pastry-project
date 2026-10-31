@@ -80,6 +80,17 @@ class NotificationController extends Controller
         $data = $notification->data ?? [];
 
         if (
+            array_key_exists('active', $data)
+            && ! $data['active']
+            && (
+                in_array($type, ['inventory_alert', 'low_stock'], true)
+                || ($type === 'warning' && preg_match('/^(product|ingredient):\d+:(out_of_stock|low_stock)$/', (string) ($data['alert_key'] ?? '')))
+            )
+        ) {
+            return false;
+        }
+
+        if (
             in_array($type, ['inventory_alert', 'low_stock', 'inventory'], true)
             || isset($data['ingredient_id'])
             || preg_match('/\b(stock|inventory|ingredient)\b/', $content)
@@ -121,14 +132,21 @@ class NotificationController extends Controller
             $thresholdColumn = Schema::hasColumn('products', 'minimum_stock')
                 ? 'minimum_stock'
                 : (Schema::hasColumn('products', 'reorder_level') ? 'reorder_level' : null);
-            $productQuery = DB::table('products')->select('id', 'name', 'stock');
+            $productQuery = DB::table('products')
+                ->select('id', 'name', 'stock')
+                ->whereRaw("LOWER(TRIM(category)) IN ('cake', 'cakes')");
+            if (Schema::hasColumn('products', 'available')) {
+                $productQuery->where('available', 1);
+            }
             if ($thresholdColumn) {
                 $productQuery->addSelect("{$thresholdColumn} as threshold");
             }
 
             foreach ($productQuery->get() as $product) {
                 $stock = (float) ($product->stock ?? 0);
-                $threshold = $defaultProductThreshold;
+                $threshold = isset($product->threshold)
+                    ? (float) $product->threshold
+                    : $defaultProductThreshold;
                 $status = $stock <= 0 ? 'out_of_stock' : ($threshold > 0 && $stock <= $threshold ? 'low_stock' : null);
                 if ($status === null) {
                     continue;
@@ -186,7 +204,7 @@ class NotificationController extends Controller
 
         $existing = AdminNotification::query()
             ->where('user_id', $user->id)
-            ->whereIn('type', ['inventory_alert', 'low_stock'])
+            ->whereIn('type', ['inventory_alert', 'low_stock', 'Warning'])
             ->orderByDesc('id')
             ->get();
         $currentNotifications = [];
@@ -194,7 +212,13 @@ class NotificationController extends Controller
         foreach ($existing as $notification) {
             $data = $notification->data ?? [];
             $alertKey = $data['alert_key'] ?? null;
-            if (! $alertKey && $notification->type === 'low_stock' && ! empty($data['ingredient_id'])) {
+            if (
+                strtolower((string) $notification->type) === 'warning'
+                && ! preg_match('/^(product|ingredient):\d+:(out_of_stock|low_stock)$/', (string) $alertKey)
+            ) {
+                continue;
+            }
+            if (! $alertKey && strtolower((string) $notification->type) === 'low_stock' && ! empty($data['ingredient_id'])) {
                 $alertKey = 'ingredient:' . $data['ingredient_id'] . ':low_stock';
             }
 
