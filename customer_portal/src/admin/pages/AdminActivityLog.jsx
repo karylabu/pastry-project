@@ -112,7 +112,7 @@ export default function AdminActivityLog() {
                   );
                 })}
               </div>
-              <div className="flex flex-wrap items-center gap-2">
+              <div className="flex flex-wrap items-center justify-end gap-2">
                 <span className="mr-1 text-[11px] font-semibold text-[#74675f]">Category:</span>
                 <button
                   type="button"
