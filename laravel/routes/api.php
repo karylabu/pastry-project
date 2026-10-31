@@ -1,6 +1,7 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\Api\AdminActivityLogController;
 use App\Http\Controllers\Api\AdminAlertController;
 use App\Http\Controllers\Api\AdminSettingsController;
 use App\Http\Controllers\Api\AdminBackupController;
@@ -176,6 +177,7 @@ Route::post('promotions/unsubscribe', [PromotionUnsubscribeController::class, 'u
 Route::post('promotions/validate-coupon', [PromotionController::class, 'validateCoupon']);
 
 Route::middleware(['api'])->group(function () {
+    Route::get('admin-management/activity-logs', [AdminActivityLogController::class, 'index']);
     Route::get('admin-management/users', [UserController::class, 'adminManagementIndex']);
     Route::post('admin-management/users', [UserController::class, 'adminManagementStore']);
     Route::get('admin-management/users/{user}', [UserController::class, 'adminManagementShow']);

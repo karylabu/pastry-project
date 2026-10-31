@@ -14,6 +14,7 @@ import PredictiveAnalytics from "../pages/PredictiveAnalytics";
 import Promotions from "../pages/Promotions";
 import UserManagement from "../pages/UserManagement";
 import AdminManagement from "../pages/AdminManagement";
+import AdminActivityLog from "../pages/AdminActivityLog";
 import ProtectedRoute from "../../auth/ProtectedRoute";
 import SettingsPage from "../pages/Settings";
 import Schedule from "../pages/Schedule";
@@ -46,6 +47,14 @@ export default function AdminApp() {
         element={(
           <ProtectedRoute allowedRoles={["super_admin"]} deniedPath="/admin/dashboard">
             {renderWithLayout(<AdminManagement />)}
+          </ProtectedRoute>
+        )}
+      />
+      <Route
+        path="activity-log"
+        element={(
+          <ProtectedRoute allowedRoles={["super_admin"]} deniedPath="/admin/dashboard">
+            {renderWithLayout(<AdminActivityLog />)}
           </ProtectedRoute>
         )}
       />

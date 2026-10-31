@@ -23,6 +23,7 @@ import {
   X,
   AlertTriangle,
   Gift,
+  History,
 } from "lucide-react";
 import { BASE, LARAVEL_BASE } from "../../services/config";
 import { getAuthHeaders } from "../../services/api";
@@ -78,6 +79,7 @@ const NAV_ICONS = {
   "/admin/promotions": Tag,
   "/admin/users": Users,
   "/admin/admin-management": UserCog,
+  "/admin/activity-log": History,
   "/admin/settings": Settings,
 };
 
@@ -102,7 +104,10 @@ export default function AdminNavbar({ onSidebarChange }) {
   const [currentDateTime, setCurrentDateTime] = useState(() => new Date());
   const [adminDialog, setAdminDialog] = useState(null);
   const navGroups = String(currentUser?.role || "").toLowerCase() === "super_admin"
-    ? [...NAV_GROUPS, { label: "Administration", items: [{ name: "Admin Management", path: "/admin/admin-management" }] }]
+    ? [...NAV_GROUPS, { label: "Administration", items: [
+      { name: "Admin Management", path: "/admin/admin-management" },
+      { name: "Audit Trail", path: "/admin/activity-log" },
+    ] }]
     : NAV_GROUPS;
   const notificationsRef = useRef(null);
   const accountRef = useRef(null);
