@@ -69,7 +69,7 @@ describe("CustomCakes", () => {
 
     expect((await screen.findAllByText("Mila Customer")).length).toBeGreaterThan(0);
     const orderRow = screen.getByRole("row", { name: /#31/ });
-    const customerCell = within(orderRow).getAllByRole("cell")[1];
+    const customerCell = within(orderRow).getAllByRole("cell")[0];
     expect(customerCell).toHaveTextContent("Mila Customer");
     expect(customerCell).not.toHaveTextContent("09260771217");
     expect(orderRow).not.toHaveTextContent('{"customer_name"');

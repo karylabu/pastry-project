@@ -923,17 +923,16 @@ export default function CustomCakes() {
                 })}
               </div>
 
-              <div className="hidden overflow-x-auto rounded-lg border border-[#e9e1d9] bg-white shadow-[0_3px_12px_rgba(60,42,28,0.035)] xl:block">
-                <table className="w-full min-w-[1180px] table-fixed border-collapse">
-                  <thead className="bg-[#f7f4ef] text-[#74675f]">
-                    <tr className="border-b border-[#e8dfd4] text-[10px] uppercase tracking-[0.12em]">
-                      {sortableHeader("Order", "order", "left", "w-[8%]")}
-                      {sortableHeader("Customer", "customer", "left", "w-[14%]")}
-                      {sortableHeader("Details", "details", "left", "w-[28%]")}
-                      {sortableHeader("Total", "total", "right", "w-[8%]")}
+              <div className="hidden overflow-x-auto rounded-xl border border-[#e9e1d9] bg-white xl:block">
+                <table className="w-full min-w-[1080px] table-fixed border-collapse">
+                  <thead className="bg-[#faf8f5] text-[#74675f]">
+                    <tr className="border-b border-[#e8dfd4] text-[10px] font-semibold">
+                      {sortableHeader("Request", "order", "left", "w-[18%]")}
+                      {sortableHeader("Cake details", "details", "left", "w-[30%]")}
+                      {sortableHeader("Total", "total", "right", "w-[9%]")}
                       {sortableHeader("Status", "status", "left", "w-[14%]")}
-                      {sortableHeader("Date", "date", "left", "w-[10%]")}
-                      <th className="w-[18%] px-3 py-3 text-right font-semibold">Action</th>
+                      {sortableHeader("Date", "date", "left", "w-[11%]")}
+                      <th scope="col" className="w-[18%] px-4 py-3 text-right font-semibold">Action</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -958,50 +957,42 @@ export default function CustomCakes() {
                     const referenceImage = getOrderReferenceImage(order);
 
                     return (
-                      <tr key={order.id} className="border-b border-black/10 bg-white transition-colors hover:bg-[#fffaf0]">
-                        <td className="px-4 py-4 text-[13px] font-semibold text-black">#{order.id}</td>
-                        <td className="px-4 py-4 text-[13px] text-black/80">{customerLabel}</td>
-                        <td className="px-4 py-4 text-[12px] text-black/60">
+                      <tr key={order.id} className="border-b border-[#f0e9e2] bg-white transition-colors last:border-b-0 hover:bg-[#fffdfa]">
+                        <td className="px-4 py-4 align-top">
+                          <p className="text-[13px] font-semibold text-[#33251e]">{customerLabel}</p>
+                          <p className="mt-2 text-[10px] font-medium text-[#a99a8e]">Order #{order.id}</p>
+                        </td>
+                        <td className="px-4 py-4 align-top">
                           <div className="flex min-w-0 items-start gap-3">
-                            <div className="h-12 w-12 shrink-0 overflow-hidden rounded-lg border border-[#ddd4c2] bg-[#f4efe4]">
+                            <div className="h-11 w-11 shrink-0 overflow-hidden rounded-lg bg-[#f7f4ef]">
                               <CakeReferenceImage src={referenceImage} alt="Customer cake reference" className="h-full w-full object-contain p-1" />
                             </div>
-                            <div className="min-w-0 space-y-2">
-                              <div className="leading-5 text-black/75">
-                                <p className="font-medium">{itemLabel}</p>
-                                <p className="mt-0.5 max-w-[360px] truncate text-[11px] text-black/50">{getRequestDetailsSummary(order)}</p>
-                              </div>
-                            {hasCustomDetails && (
-                              <div className="flex flex-wrap items-center gap-2">
-                                  <button
-                                    type="button"
-                                    onClick={() => openOrderDetails(order)}
-                                    className="inline-flex h-7 items-center rounded-md border border-black/30 bg-white px-2.5 text-[10px] font-semibold uppercase tracking-[0.1em] text-black transition hover:bg-black hover:text-white"
-                                  >
-                                    View
+                            <div className="min-w-0">
+                              <p className="text-[12px] font-medium leading-5 text-[#51443c]">{itemLabel}</p>
+                              <p className="mt-0.5 max-w-[360px] truncate text-[11px] text-[#8f8076]">{getRequestDetailsSummary(order)}</p>
+                              {hasCustomDetails && (
+                                <div className="mt-2 flex items-center gap-3">
+                                  <button type="button" onClick={() => openOrderDetails(order)} className="text-[10px] font-semibold text-[#80600a] transition hover:text-[#33251e]">
+                                    View details
                                   </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => downloadOrderPdf(order)}
-                                    className="inline-flex h-7 items-center rounded-md border border-black/30 bg-white px-2.5 text-[10px] font-semibold uppercase tracking-[0.1em] text-black transition hover:bg-black hover:text-white"
-                                  >
-                                    PDF
+                                  <button type="button" onClick={() => downloadOrderPdf(order)} className="text-[10px] font-semibold text-[#80600a] transition hover:text-[#33251e]">
+                                    Download PDF
                                   </button>
-                              </div>
-                            )}
+                                </div>
+                              )}
                             </div>
                           </div>
                         </td>
-                        <td className="px-4 py-4 text-right text-[13px] font-semibold text-black">₱{Number(order.total).toLocaleString()}</td>
-                        <td className="px-4 py-4">
+                        <td className="px-4 py-4 text-right align-top text-[13px] font-semibold text-[#33251e]">₱{Number(order.total || 0).toLocaleString()}</td>
+                        <td className="px-4 py-4 align-top">
                           <span className={getStatusBadgeClasses(getStatusLabel(order.status, order.payment_status))}>
                             {getStatusLabel(order.status, order.payment_status)}
                           </span>
                         </td>
-                        <td className="px-4 py-4 text-[12px] text-black/60">
-                          {order.created_at ? new Date(order.created_at).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "No Date"}
+                        <td className="px-4 py-4 align-top text-[11px] leading-5 text-[#74675f]">
+                          {order.created_at ? new Date(order.created_at).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "No date"}
                         </td>
-                        <td className="px-3 py-3 text-right text-sm">
+                        <td className="px-4 py-4 align-top">
                           {isCancelled ? (
                             <span className={`${ACTION_BUTTON_BASE} bg-[#f4ece6] text-[#74675f]`}>Declined</span>
                           ) : isPendingRequest(order.status, order.payment_status) ? (
