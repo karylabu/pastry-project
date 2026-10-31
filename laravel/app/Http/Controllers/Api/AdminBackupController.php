@@ -5,8 +5,11 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
+use App\Services\DatabaseBackupService;
 use Symfony\Component\HttpFoundation\StreamedResponse;
+use Throwable;
 
 class AdminBackupController extends Controller
 {
@@ -65,6 +68,99 @@ class AdminBackupController extends Controller
             }
             echo '}}';
         }, $filename, ['Content-Type' => 'application/json; charset=utf-8']);
+    }
+
+    public function index(Request $request, DatabaseBackupService $backups): \Illuminate\Http\JsonResponse
+    {
+        if ($response = $this->authorizeAdmin($request)) {
+            return $response;
+        }
+
+        return response()->json(['success' => true, 'data' => $backups->overview()]);
+    }
+
+    public function store(Request $request, DatabaseBackupService $backups): \Illuminate\Http\JsonResponse
+    {
+        if ($response = $this->authorizeAdmin($request)) {
+            return $response;
+        }
+
+        try {
+            return response()->json([
+                'success' => true,
+                'message' => 'Database backup created successfully.',
+                'data' => $backups->create('manual'),
+            ], 201);
+        } catch (Throwable $exception) {
+            Log::error('Database backup creation failed.', ['exception' => $exception]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'The database backup could not be completed.',
+            ], 500);
+        }
+    }
+
+    public function downloadFile(Request $request, string $filename, DatabaseBackupService $backups): mixed
+    {
+        if ($response = $this->authorizeAdmin($request)) {
+            return $response;
+        }
+
+        try {
+            return response()->download($backups->downloadPath($filename), $filename, [
+                'Content-Type' => 'application/sql; charset=utf-8',
+            ]);
+        } catch (\InvalidArgumentException $exception) {
+            return response()->json(['success' => false, 'message' => 'Backup file not found.'], 404);
+        }
+    }
+
+    public function restore(Request $request, string $filename, DatabaseBackupService $backups): \Illuminate\Http\JsonResponse
+    {
+        if ($response = $this->authorizeAdmin($request)) {
+            return $response;
+        }
+        if (! $request->boolean('confirmed')) {
+            return response()->json(['success' => false, 'message' => 'Restore confirmation is required.'], 422);
+        }
+
+        try {
+            $result = $backups->restore($filename);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Database restored successfully. A safety backup was created first.',
+                'data' => $result,
+            ]);
+        } catch (\InvalidArgumentException $exception) {
+            return response()->json(['success' => false, 'message' => 'Backup file not found.'], 404);
+        } catch (Throwable $exception) {
+            Log::error('Database restore failed.', ['filename' => $filename, 'exception' => $exception]);
+
+            return response()->json([
+                'success' => false,
+                'message' => $exception->getMessage() ?: 'The database could not be restored.',
+            ], 500);
+        }
+    }
+
+    public function destroy(Request $request, string $filename, DatabaseBackupService $backups): \Illuminate\Http\JsonResponse
+    {
+        if ($response = $this->authorizeAdmin($request)) {
+            return $response;
+        }
+        if (! $request->boolean('confirmed')) {
+            return response()->json(['success' => false, 'message' => 'Delete confirmation is required.'], 422);
+        }
+
+        try {
+            $backups->delete($filename);
+
+            return response()->json(['success' => true, 'message' => 'Backup deleted successfully.']);
+        } catch (\InvalidArgumentException $exception) {
+            return response()->json(['success' => false, 'message' => 'Backup file not found.'], 404);
+        }
     }
 
     private static function removeSecrets(array $data): array

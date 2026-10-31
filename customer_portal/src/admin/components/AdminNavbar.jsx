@@ -7,6 +7,7 @@ import {
   CalendarDays,
   CakeSlice,
   ClipboardList,
+  Database,
   FileText,
   LayoutDashboard,
   Leaf,
@@ -59,7 +60,10 @@ const NAV_GROUPS = [
   },
   { label: "Marketing", items: [{ name: "Promotions", path: "/admin/promotions" }] },
   { label: "User Management", items: [{ name: "User Management", path: "/admin/users" }] },
-  { label: "System", items: [{ name: "Settings", path: "/admin/settings" }] },
+  { label: "System", items: [
+    { name: "Settings", path: "/admin/settings" },
+    { name: "Backup Management", path: "/admin/backups" },
+  ] },
 ];
 
 const NAV_ICONS = {
@@ -79,6 +83,7 @@ const NAV_ICONS = {
   "/admin/users": Users,
   "/admin/activity-log": History,
   "/admin/settings": Settings,
+  "/admin/backups": Database,
 };
 
 function getStoredUser() {

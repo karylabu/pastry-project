@@ -19,6 +19,7 @@ import SettingsPage from "../pages/Settings";
 import Schedule from "../pages/Schedule";
 import CakeRecipes from "../pages/CakeRecipes";
 import Reviews from "../pages/Reviews";
+import BackupManagement from "../pages/BackupManagement";
 
 const renderWithLayout = (element) => <AdminLayout>{element}</AdminLayout>;
 
@@ -51,6 +52,7 @@ export default function AdminApp() {
         )}
       />
       <Route path="settings" element={renderWithLayout(<SettingsPage />)} />
+      <Route path="backups" element={renderWithLayout(<BackupManagement />)} />
       <Route path="schedule" element={renderWithLayout(<Schedule />)} />
     </Routes>
   );

@@ -188,6 +188,11 @@ Route::middleware(['api'])->group(function () {
 
     Route::prefix('admin')->group(function () {
         Route::get('backup', [AdminBackupController::class, 'download']);
+        Route::get('backups', [AdminBackupController::class, 'index']);
+        Route::post('backups', [AdminBackupController::class, 'store']);
+        Route::get('backups/{filename}/download', [AdminBackupController::class, 'downloadFile'])->where('filename', '[A-Za-z0-9._-]+');
+        Route::post('backups/{filename}/restore', [AdminBackupController::class, 'restore'])->where('filename', '[A-Za-z0-9._-]+');
+        Route::delete('backups/{filename}', [AdminBackupController::class, 'destroy'])->where('filename', '[A-Za-z0-9._-]+');
         Route::get('recycle-bin', [AdminRecycleBinController::class, 'index']);
         Route::post('recycle-bin/{entryId}/restore', [AdminRecycleBinController::class, 'restore'])->whereNumber('entryId');
         Route::delete('recycle-bin/{entryId}', [AdminRecycleBinController::class, 'destroy'])->whereNumber('entryId');
