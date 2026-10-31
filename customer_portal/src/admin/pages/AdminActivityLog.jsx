@@ -200,8 +200,8 @@ export default function AdminActivityLog() {
           </header>
 
           <section className="overflow-hidden rounded-lg border border-[#e9e1d9] bg-white shadow-[0_3px_12px_rgba(60,42,28,0.035)]">
-            <div className="space-y-3 border-b border-[#f0e9e2] px-4 py-3">
-              <div className="flex flex-wrap items-center justify-end gap-2">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#f0e9e2] px-4 py-3">
+              <div className="order-2 flex flex-wrap items-center justify-end gap-2">
                 <span className="mr-1 text-[11px] font-semibold text-[#74675f]">Account:</span>
                 {accountFilters.map((filter) => {
                   const selected = actorRole === filter.role;
@@ -225,7 +225,7 @@ export default function AdminActivityLog() {
                   );
                 })}
               </div>
-              <div className="flex flex-wrap items-center justify-end gap-2">
+              <div className="order-1 flex flex-wrap items-center justify-start gap-2">
                 <span className="mr-1 text-[11px] font-semibold text-[#74675f]">Category:</span>
                 <button
                   type="button"
