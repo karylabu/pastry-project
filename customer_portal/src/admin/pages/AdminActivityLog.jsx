@@ -21,6 +21,7 @@ export default function AdminActivityLog() {
   const [pagination, setPagination] = useState({ current_page: 1, last_page: 1, total: 0 });
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
+  const [actorRole, setActorRole] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -32,6 +33,7 @@ export default function AdminActivityLog() {
       try {
         const params = new URLSearchParams({ page: String(page), per_page: "25" });
         if (search.trim()) params.set("search", search.trim());
+        if (actorRole) params.set("actor_role", actorRole);
         const response = await fetch(`${LARAVEL_BASE}/api/admin-management/activity-logs?${params}`, {
           credentials: "include",
           headers: { Accept: "application/json", ...getAuthHeaders() },
@@ -51,9 +53,13 @@ export default function AdminActivityLog() {
 
     loadLogs();
     return () => { active = false; };
-  }, [page, search]);
+  }, [actorRole, page, search]);
 
   const lastPage = Math.max(1, Number(pagination.last_page || 1));
+  const accountFilters = [
+    { label: "Shop Owner", role: "super_admin" },
+    { label: "Admin", role: "admin" },
+  ];
 
   return (
     <div className="min-h-screen bg-[#fbfaf5] font-['DM_Sans'] text-[#33251e]">
@@ -78,6 +84,30 @@ export default function AdminActivityLog() {
           </header>
 
           <section className="overflow-hidden rounded-lg border border-[#e9e1d9] bg-white shadow-[0_3px_12px_rgba(60,42,28,0.035)]">
+        <div className="flex flex-wrap items-center gap-2 border-b border-[#f0e9e2] px-4 py-3">
+          <span className="mr-1 text-[11px] font-semibold text-[#74675f]">Account:</span>
+          {accountFilters.map((filter) => {
+            const selected = actorRole === filter.role;
+            return (
+              <button
+                key={filter.role}
+                type="button"
+                aria-pressed={selected}
+                onClick={() => {
+                  setActorRole((current) => (current === filter.role ? "" : filter.role));
+                  setPage(1);
+                }}
+                className={`rounded-md border px-3 py-1.5 text-[11px] font-semibold transition ${
+                  selected
+                    ? "border-[#c9a94f] bg-[#fff4cd] text-[#80600a]"
+                    : "border-[#e8dfd4] bg-white text-[#65574d] hover:border-[#c9a94f] hover:bg-[#fffaf0]"
+                }`}
+              >
+                {filter.label}
+              </button>
+            );
+          })}
+        </div>
         {error ? (
           <div role="alert" className="flex items-center gap-2 px-5 py-8 text-sm text-[#a33d32]">
             <AlertCircle size={17} /> {error}

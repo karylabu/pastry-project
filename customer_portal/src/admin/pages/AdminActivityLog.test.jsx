@@ -1,5 +1,5 @@
 import React from "react";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import AdminActivityLog from "./AdminActivityLog";
 
 jest.mock("../../services/config", () => ({
@@ -39,10 +39,36 @@ describe("AdminActivityLog", () => {
     expect(screen.getByText("Access control")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Audit Trail" })).toBeInTheDocument();
     expect(getByTestId("activity-log-page-content")).toHaveClass("pt-[88px]", "lg:pl-[260px]");
+    expect(screen.getByRole("button", { name: "Shop Owner" })).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByRole("button", { name: "Admin" })).toHaveAttribute("aria-pressed", "false");
     expect(await screen.findByText("Changed order status")).toBeInTheDocument();
-    expect(screen.getByText("Admin")).toBeInTheDocument();
+    expect(screen.getAllByText("Admin").length).toBeGreaterThan(0);
     expect(screen.getByText("203.0.113.15")).toBeInTheDocument();
     expect(screen.getByText("Ready for Pickup", { exact: false })).toBeInTheDocument();
     expect(screen.getByText("200")).toBeInTheDocument();
+  });
+
+  test("filters audit activity by the Shop Owner and Admin accounts", async () => {
+    render(<AdminActivityLog />);
+    await screen.findByText("Changed order status");
+
+    fireEvent.click(screen.getByRole("button", { name: "Shop Owner" }));
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenLastCalledWith(
+        expect.stringContaining("actor_role=super_admin"),
+        expect.any(Object)
+      );
+    });
+    expect(screen.getByRole("button", { name: "Shop Owner" })).toHaveAttribute("aria-pressed", "true");
+
+    fireEvent.click(screen.getByRole("button", { name: "Admin" }));
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenLastCalledWith(
+        expect.stringContaining("actor_role=admin"),
+        expect.any(Object)
+      );
+    });
+    expect(screen.getByRole("button", { name: "Shop Owner" })).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByRole("button", { name: "Admin" })).toHaveAttribute("aria-pressed", "true");
   });
 });

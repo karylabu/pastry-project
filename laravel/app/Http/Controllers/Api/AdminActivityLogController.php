@@ -31,6 +31,11 @@ class AdminActivityLogController extends Controller
             });
         }
 
+        $actorRole = strtolower(trim((string) $request->input('actor_role', '')));
+        if (in_array($actorRole, ['admin', 'super_admin'], true)) {
+            $query->where('actor_role', $actorRole);
+        }
+
         $logs = $query->paginate(min(max((int) $request->input('per_page', 25), 1), 100));
 
         return response()->json([
