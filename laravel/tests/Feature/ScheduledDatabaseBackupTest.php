@@ -93,6 +93,15 @@ class ScheduledDatabaseBackupTest extends TestCase
         $this->assertSame('protected', app(DatabaseBackupService::class)->overview('02:00')['health']['status']);
     }
 
+    public function test_compatibility_backups_command_invokes_the_scheduled_backup_task(): void
+    {
+        Carbon::setTestNow(Carbon::parse('2026-10-31 01:59:00', 'Asia/Manila'));
+
+        $this->artisan('backups')->assertSuccessful();
+
+        Storage::disk('local')->assertExists('backups/scheduler-heartbeat.json');
+    }
+
     public function test_failed_scheduled_backup_creates_one_admin_notification(): void
     {
         DB::table('users')->insert([
