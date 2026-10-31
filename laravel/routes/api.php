@@ -176,6 +176,12 @@ Route::post('promotions/unsubscribe', [PromotionUnsubscribeController::class, 'u
 Route::post('promotions/validate-coupon', [PromotionController::class, 'validateCoupon']);
 
 Route::middleware(['api'])->group(function () {
+    Route::get('admin-management/users', [UserController::class, 'adminManagementIndex']);
+    Route::post('admin-management/users', [UserController::class, 'adminManagementStore']);
+    Route::get('admin-management/users/{user}', [UserController::class, 'adminManagementShow']);
+    Route::match(['put', 'patch'], 'admin-management/users/{user}', [UserController::class, 'adminManagementUpdate']);
+    Route::delete('admin-management/users/{user}', [UserController::class, 'adminManagementDestroy']);
+
     Route::apiResource('users', UserController::class);
 
     Route::prefix('admin')->group(function () {

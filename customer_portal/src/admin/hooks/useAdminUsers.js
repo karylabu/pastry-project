@@ -2,8 +2,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { LARAVEL_BASE } from "../../services/config";
 import { getAuthHeaders } from "../../services/api";
 
-const buildUsersUrl = ({ search = "", role = "all", page = 1, perPage = 10 }) => {
-  const url = new URL(`${LARAVEL_BASE}/api/users`);
+const buildUsersUrl = ({ endpoint = "/api/users", search = "", role = "all", page = 1, perPage = 10 }) => {
+  const url = new URL(`${LARAVEL_BASE}${endpoint}`);
 
   if (search?.trim()) {
     url.searchParams.set("search", search.trim());
@@ -24,7 +24,7 @@ const buildUsersUrl = ({ search = "", role = "all", page = 1, perPage = 10 }) =>
   return url.toString();
 };
 
-export function useAdminUsers({ search = "", role = "all", page = 1 }) {
+export function useAdminUsers({ endpoint = "/api/users", search = "", role = "all", page = 1 }) {
   const [users, setUsers] = useState([]);
   const [pagination, setPagination] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -35,7 +35,7 @@ export function useAdminUsers({ search = "", role = "all", page = 1 }) {
     setError("");
 
     try {
-      const response = await fetch(buildUsersUrl({ search, role, page, perPage: 10 }), {
+      const response = await fetch(buildUsersUrl({ endpoint, search, role, page, perPage: 10 }), {
         credentials: "include",
         headers: { Accept: "application/json", ...getAuthHeaders() },
       });
@@ -56,7 +56,7 @@ export function useAdminUsers({ search = "", role = "all", page = 1 }) {
     } finally {
       setLoading(false);
     }
-  }, [page, role, search]);
+  }, [endpoint, page, role, search]);
 
   useEffect(() => {
     fetchUsers();
@@ -86,7 +86,7 @@ export function useAdminUsers({ search = "", role = "all", page = 1 }) {
     );
 
     try {
-      const response = await fetch(`${LARAVEL_BASE}/api/users/${userId}`, {
+      const response = await fetch(`${LARAVEL_BASE}${endpoint}/${userId}`, {
         method: "PATCH",
         credentials: "include",
         headers: { "Content-Type": "application/json", ...getAuthHeaders() },
@@ -102,7 +102,7 @@ export function useAdminUsers({ search = "", role = "all", page = 1 }) {
       setError("Unable to update user status.");
       throw err;
     }
-  }, [users]);
+  }, [endpoint, users]);
 
   return {
     users,

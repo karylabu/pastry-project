@@ -63,7 +63,14 @@ const initialForm = {
   password_confirmation: "",
 };
 
-export default function UserManagement() {
+export default function UserManagement({ adminOnly = false }) {
+  const isSuperAdmin = (() => {
+    try {
+      return String(JSON.parse(localStorage.getItem("user") || "{}").role || "").toLowerCase() === "super_admin";
+    } catch {
+      return false;
+    }
+  })();
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
   const [page, setPage] = useState(1);
@@ -84,9 +91,11 @@ export default function UserManagement() {
   const [formErrors, setFormErrors] = useState({});
   const [form, setForm] = useState(initialForm);
 
+  const apiEndpoint = adminOnly ? "/api/admin-management/users" : "/api/users";
   const { users, pagination, loading, error, metrics, handleStatusToggle, refetch } = useAdminUsers({
+    endpoint: apiEndpoint,
     search,
-    role: roleFilter,
+    role: adminOnly ? "admin" : roleFilter,
     page,
   });
 
@@ -121,7 +130,7 @@ export default function UserManagement() {
     setLoadingViewedUser(true);
     setViewUserError("");
     try {
-      const response = await fetch(`${LARAVEL_BASE}/api/users/${user.id}`, {
+      const response = await fetch(`${LARAVEL_BASE}${apiEndpoint}/${user.id}`, {
         credentials: "include",
         headers: { Accept: "application/json", ...getAuthHeaders() },
       });
@@ -167,7 +176,9 @@ export default function UserManagement() {
       nextErrors.phone_number = "Please enter a valid phone number.";
     }
 
-    if (selectedUser ? !["admin", "super_admin", "customer"].includes(payload.role) : !["admin", "super_admin"].includes(payload.role)) {
+    const editableRoles = adminOnly ? ["admin"] : ["admin", "super_admin", "customer"];
+    const creatableRoles = adminOnly ? ["admin"] : ["admin", "super_admin"];
+    if (selectedUser ? !editableRoles.includes(payload.role) : !creatableRoles.includes(payload.role)) {
       nextErrors.role = selectedUser ? "Please choose a valid role." : "New managed accounts must be admins.";
     }
 
@@ -234,8 +245,8 @@ export default function UserManagement() {
 
     try {
       const url = selectedUser
-        ? `${LARAVEL_BASE}/api/users/${selectedUser.id}`
-        : `${LARAVEL_BASE}/api/users`;
+        ? `${LARAVEL_BASE}${apiEndpoint}/${selectedUser.id}`
+        : `${LARAVEL_BASE}${apiEndpoint}`;
       const method = selectedUser ? "PUT" : "POST";
       const bodyPayload = payload;
 
@@ -309,7 +320,7 @@ export default function UserManagement() {
   const deleteUser = async (user) => {
     setDeletingUserId(user.id);
     try {
-      const response = await fetch(`${LARAVEL_BASE}/api/users/${user.id}`, {
+      const response = await fetch(`${LARAVEL_BASE}${apiEndpoint}/${user.id}`, {
         method: "DELETE",
         credentials: "include",
         headers: { Accept: "application/json", ...getAuthHeaders() },
@@ -399,8 +410,8 @@ export default function UserManagement() {
           <div className="mb-6 flex min-h-[72px] flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.24em] text-[#92701e]">Access control</p>
-              <h1 className="mt-1 font-serif text-[27px] leading-tight text-[#33251e]">User Management</h1>
-              <p className="mt-1 text-[12px] text-[#74675f]">Manage account access, roles, and status.</p>
+              <h1 className="mt-1 font-serif text-[27px] leading-tight text-[#33251e]">{adminOnly ? "Admin Management" : "User Management"}</h1>
+              <p className="mt-1 text-[12px] text-[#74675f]">{adminOnly ? "Create and manage administrator accounts." : "Manage account access, roles, and status."}</p>
             </div>
             <div className="flex flex-wrap gap-2 self-start sm:self-auto">
               <button
@@ -411,14 +422,14 @@ export default function UserManagement() {
                 <Plus size={15} />
                 Add Admin
               </button>
-              <button
+              {!adminOnly && isSuperAdmin && <button
                 type="button"
                 onClick={() => openCreateModal("super_admin")}
                 className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-[#d9c4b8] bg-white px-4 text-[12px] font-semibold text-[#7d4630] transition hover:bg-[#fff6f1]"
               >
                 <ShieldCheck size={15} />
                 Add Super Admin
-              </button>
+              </button>}
             </div>
           </div>
 
@@ -443,7 +454,7 @@ export default function UserManagement() {
                   className="h-10 w-full rounded-lg border border-[#e8dfd4] bg-white pl-9 pr-3 text-[12px] text-[#33251e] outline-none transition placeholder:text-[#a99a8e] focus:border-[#b89646] focus:ring-2 focus:ring-[#d4af37]/15"
                 />
               </label>
-              <select
+              {!adminOnly && <select
                 value={roleFilter}
                 onChange={(event) => {
                   setRoleFilter(event.target.value);
@@ -456,7 +467,7 @@ export default function UserManagement() {
                 <option value="admin">Admin</option>
                 <option value="super_admin">Super Admin</option>
                 <option value="customer">Customer</option>
-              </select>
+              </select>}
             </div>
           </section>
 
@@ -665,8 +676,8 @@ export default function UserManagement() {
                   <label className="mb-1.5 block text-[11px] font-medium text-[#65574d]">Role</label>
                   <select aria-label="Role" value={form.role} onChange={(event) => setForm({ ...form, role: event.target.value })} className="h-10 w-full rounded-md border border-[#e8dfd4] bg-white px-3 text-[12px] text-[#33251e] outline-none transition focus:border-[#b89646] focus:ring-2 focus:ring-[#d4af37]/15">
                     <option value="admin">Admin</option>
-                    <option value="super_admin">Super Admin</option>
-                    {selectedUser && <option value="customer">Customer</option>}
+                    {!adminOnly && isSuperAdmin && <option value="super_admin">Super Admin</option>}
+                    {!adminOnly && selectedUser && <option value="customer">Customer</option>}
                   </select>
                   {formErrors.role ? <p className="mt-1 text-[11px] text-[#8b2e2e]">{formErrors.role}</p> : null}
                 </div>

@@ -25,6 +25,7 @@ describe("UserManagement admin creation", () => {
   });
 
   test("offers admin and super admin account creation", () => {
+    localStorage.setItem("user", JSON.stringify({ role: "super_admin" }));
     render(<UserManagement />);
 
     fireEvent.click(screen.getByRole("button", { name: "Add Admin" }));
@@ -38,7 +39,18 @@ describe("UserManagement admin creation", () => {
     expect(within(roleSelect).getByRole("option", { name: "Super Admin" })).toBeInTheDocument();
   });
 
+  test("does not offer Super Admin account creation to an Admin", () => {
+    localStorage.setItem("user", JSON.stringify({ role: "admin" }));
+    render(<UserManagement />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Add Admin" }));
+
+    expect(screen.queryByRole("button", { name: "Add Super Admin" })).not.toBeInTheDocument();
+    expect(within(screen.getByRole("dialog")).queryByRole("option", { name: "Super Admin" })).not.toBeInTheDocument();
+  });
+
   test("prefills the requested Super Admin account details", () => {
+    localStorage.setItem("user", JSON.stringify({ role: "super_admin" }));
     render(<UserManagement />);
 
     fireEvent.click(screen.getByRole("button", { name: "Add Super Admin" }));
@@ -49,6 +61,19 @@ describe("UserManagement admin creation", () => {
     expect(within(dialog).getByDisplayValue("superadmin@pastry.com")).toBeInTheDocument();
     expect(within(dialog).getByRole("combobox", { name: "Role" })).toHaveValue("super_admin");
     expect(within(dialog).getByRole("button", { name: "Create Super Admin" })).toBeInTheDocument();
+  });
+
+  test("renders the separate admin-only management page", () => {
+    render(<UserManagement adminOnly />);
+
+    expect(screen.getByRole("heading", { name: "Admin Management" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Add Admin" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Add Super Admin" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("combobox", { name: "Filter users by role" })).not.toBeInTheDocument();
+    expect(useAdminUsers).toHaveBeenLastCalledWith(expect.objectContaining({
+      endpoint: "/api/admin-management/users",
+      role: "admin",
+    }));
   });
 
   test("uses the shared admin dialog to confirm deleting a user", async () => {

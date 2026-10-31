@@ -19,6 +19,7 @@ import {
   TrendingUp,
   User,
   Users,
+  UserCog,
   X,
   AlertTriangle,
   Gift,
@@ -76,6 +77,7 @@ const NAV_ICONS = {
   "/admin/predictive-demand": TrendingUp,
   "/admin/promotions": Tag,
   "/admin/users": Users,
+  "/admin/admin-management": UserCog,
   "/admin/settings": Settings,
 };
 
@@ -99,6 +101,9 @@ export default function AdminNavbar({ onSidebarChange }) {
   const [currentUser, setCurrentUser] = useState(() => getStoredUser());
   const [currentDateTime, setCurrentDateTime] = useState(() => new Date());
   const [adminDialog, setAdminDialog] = useState(null);
+  const navGroups = String(currentUser?.role || "").toLowerCase() === "super_admin"
+    ? [...NAV_GROUPS, { label: "Administration", items: [{ name: "Admin Management", path: "/admin/admin-management" }] }]
+    : NAV_GROUPS;
   const notificationsRef = useRef(null);
   const accountRef = useRef(null);
 
@@ -266,7 +271,7 @@ export default function AdminNavbar({ onSidebarChange }) {
         </div>
 
         <nav className="flex-1 space-y-6 overflow-y-auto px-4 py-6" aria-label="Admin pages">
-          {NAV_GROUPS.map((group) => (
+          {navGroups.map((group) => (
             <div key={group.label}>
               <p className="mb-2 px-3 text-[9px] font-bold uppercase tracking-[0.25em] text-[#9b7810]">{group.label}</p>
               <div className="space-y-1">

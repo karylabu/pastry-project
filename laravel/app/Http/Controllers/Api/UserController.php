@@ -112,6 +112,14 @@ class UserController extends Controller
         ]);
     }
 
+    public function adminManagementIndex(Request $request)
+    {
+        if ($response = $this->authorizeSuperAdmin($request)) return $response;
+
+        $request->merge(['role' => 'admin']);
+        return $this->index($request);
+    }
+
     /**
     * Create a new user account.
      */
@@ -142,6 +150,11 @@ class UserController extends Controller
         });
         $validated = $validator->validate();
 
+        $actor = $this->getAuthenticatedUser($request);
+        if (($validated['role'] ?? null) === 'super_admin' && !$actor?->isSuperAdmin()) {
+            return response()->json(['success' => false, 'message' => 'Super Admin authorization required.'], 403);
+        }
+
         $validated = $this->normalizeValidatedData($validated);
         $validated['status'] = $validated['status'] ?? 'active';
 
@@ -169,17 +182,39 @@ class UserController extends Controller
         ], 201);
     }
 
+    public function adminManagementStore(Request $request)
+    {
+        if ($response = $this->authorizeSuperAdmin($request)) return $response;
+
+        $request->merge(['role' => 'admin']);
+        return $this->store($request);
+    }
+
     /**
      * Show a single user record.
      */
     public function show(User $user)
     {
         if ($response = $this->authorizeAdmin(request())) return $response;
+        $actor = $this->getAuthenticatedUser(request());
+        if ($user->isSuperAdmin() && !$actor?->isSuperAdmin()) {
+            return response()->json(['success' => false, 'message' => 'Super Admin authorization required.'], 403);
+        }
 
         return response()->json([
             'success' => true,
             'data' => $user,
         ]);
+    }
+
+    public function adminManagementShow(Request $request, User $user)
+    {
+        if ($response = $this->authorizeSuperAdmin($request)) return $response;
+        if (strtolower(trim((string) $user->role)) !== 'admin') {
+            return response()->json(['success' => false, 'message' => 'Admin account not found.'], 404);
+        }
+
+        return $this->show($user);
     }
 
     /**
@@ -214,6 +249,11 @@ class UserController extends Controller
             }
         });
         $validated = $validator->validate();
+
+        $actor = $this->getAuthenticatedUser($request);
+        if (($user->isSuperAdmin() || (($validated['role'] ?? null) === 'super_admin')) && !$actor?->isSuperAdmin()) {
+            return response()->json(['success' => false, 'message' => 'Super Admin authorization required.'], 403);
+        }
 
         $validated = $this->normalizeValidatedData($validated);
 
@@ -258,12 +298,26 @@ class UserController extends Controller
         ]);
     }
 
+    public function adminManagementUpdate(Request $request, User $user)
+    {
+        if ($response = $this->authorizeSuperAdmin($request)) return $response;
+        if (strtolower(trim((string) $user->role)) !== 'admin') {
+            return response()->json(['success' => false, 'message' => 'Admin account not found.'], 404);
+        }
+
+        $request->merge(['role' => 'admin']);
+        return $this->update($request, $user);
+    }
+
     public function destroy(User $user, AdminRecycleBinService $recycleBin)
     {
         $request = request();
         if ($response = $this->authorizeAdmin($request)) return $response;
 
         $admin = $this->getAuthenticatedUser($request);
+        if ($user->isSuperAdmin() && !$admin?->isSuperAdmin()) {
+            return response()->json(['success' => false, 'message' => 'Super Admin authorization required.'], 403);
+        }
         if ($admin && (int) $admin->id === (int) $user->id) {
             return response()->json([
                 'success' => false,
@@ -288,6 +342,16 @@ class UserController extends Controller
         ]);
     }
 
+    public function adminManagementDestroy(Request $request, User $user, AdminRecycleBinService $recycleBin)
+    {
+        if ($response = $this->authorizeSuperAdmin($request)) return $response;
+        if (strtolower(trim((string) $user->role)) !== 'admin') {
+            return response()->json(['success' => false, 'message' => 'Admin account not found.'], 404);
+        }
+
+        return $this->destroy($user, $recycleBin);
+    }
+
     protected function authorizeAdmin(Request $request): ?\Illuminate\Http\JsonResponse
     {
         $user = $this->getAuthenticatedUser($request);
@@ -297,6 +361,19 @@ class UserController extends Controller
         if (!$user->isAdmin()) {
             return response()->json(['success' => false, 'message' => 'Admin authorization required.'], 403);
         }
+        return null;
+    }
+
+    private function authorizeSuperAdmin(Request $request): ?\Illuminate\Http\JsonResponse
+    {
+        $user = $this->getAuthenticatedUser($request);
+        if (!$user) {
+            return response()->json(['success' => false, 'message' => 'Authentication required.'], 401);
+        }
+        if (strtolower(trim((string) $user->role)) !== 'super_admin') {
+            return response()->json(['success' => false, 'message' => 'Super Admin authorization required.'], 403);
+        }
+
         return null;
     }
 }
