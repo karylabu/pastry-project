@@ -15,25 +15,94 @@ function formatRole(role) {
   return role || "—";
 }
 
+function formatDetailLabel(value) {
+  const labels = {
+    name: "Name",
+    price: "Price",
+    stock: "Stock",
+    stock_quantity: "Stock",
+    status: "Status",
+    payment_status: "Payment status",
+    quantity: "Quantity",
+    unit: "Unit",
+    threshold: "Low-stock alert level",
+    available: "Availability",
+    active: "Active",
+    reason: "Reason",
+    notes: "Notes",
+    enabled: "Enabled",
+    role: "Role",
+    email: "Email",
+    description: "Description",
+    expiry: "Expiry date",
+    expiry_date: "Expiry date",
+    minimum_stock: "Low-stock alert level",
+    discount_value: "Discount",
+    delivery_date: "Delivery date",
+  };
+  const words = String(value).replaceAll("_", " ");
+  return labels[words.toLowerCase()] || words.replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function formatDetailValue(value) {
+  if (value === null || value === undefined || value === "") return "—";
+  if (typeof value === "boolean") return value ? "Yes" : "No";
+  if (typeof value === "object") return JSON.stringify(value);
+  return String(value);
+}
+
 function formatDetails(details) {
-  if (!details || typeof details !== "object" || Object.keys(details).length === 0) return "No details";
-  const entries = [];
-  const displayValue = (value) => (
-    value && typeof value === "object" ? JSON.stringify(value) : String(value ?? "—")
-  );
-  const flatten = (value, label) => {
+  if (!details || typeof details !== "object" || Object.keys(details).length === 0) return ["No details recorded"];
+
+  const lines = [];
+  const handled = new Set();
+  const previousStock = details["Previous stock"];
+  const newStock = details["New stock"];
+  const stockAdded = details["Quantity added"];
+  const stockRemoved = details["Quantity removed"];
+
+  if (previousStock !== undefined && newStock !== undefined) {
+    let change = "";
+    if (stockAdded !== undefined) change = ` (added ${formatDetailValue(stockAdded)})`;
+    if (stockRemoved !== undefined) change = ` (removed ${formatDetailValue(stockRemoved)})`;
+    lines.push(`Stock: ${formatDetailValue(previousStock)} → ${formatDetailValue(newStock)}${change}`);
+    ["Previous stock", "New stock", "Quantity added", "Quantity removed"].forEach((key) => handled.add(key));
+  } else if (stockAdded !== undefined || stockRemoved !== undefined) {
+    const key = stockAdded !== undefined ? "Quantity added" : "Quantity removed";
+    lines.push(`${stockAdded !== undefined ? "Added to stock" : "Removed from stock"}: ${formatDetailValue(details[key])}`);
+    handled.add(key);
+  }
+
+  const flatten = (value, path = []) => {
     if (value && typeof value === "object" && !Array.isArray(value)) {
       if (Object.prototype.hasOwnProperty.call(value, "Before") && Object.prototype.hasOwnProperty.call(value, "After")) {
-        entries.push(`${label}: ${displayValue(value.Before)} → ${displayValue(value.After)}`);
+        const label = path.filter((part) => part.toLowerCase() !== "changes").map(formatDetailLabel).join(" · ");
+        lines.push(`${label}: ${formatDetailValue(value.Before)} → ${formatDetailValue(value.After)}`);
         return;
       }
-      Object.entries(value).forEach(([key, nestedValue]) => flatten(nestedValue, label ? `${label} · ${key}` : key));
+      Object.entries(value).forEach(([key, nestedValue]) => flatten(nestedValue, [...path, key]));
       return;
     }
-    entries.push(`${label}: ${Array.isArray(value) ? JSON.stringify(value) : String(value ?? "—")}`);
+
+    const label = path.map(formatDetailLabel).join(" · ");
+    lines.push(`${label}: ${formatDetailValue(value)}`);
   };
-  Object.entries(details).forEach(([key, value]) => flatten(value, key));
-  return entries.join(" · ");
+
+  Object.entries(details).forEach(([key, value]) => {
+    if (handled.has(key)) return;
+    if (["Product", "Ingredient"].includes(key)) return;
+    if (key === "Record" && Object.keys(details).length > 1) return;
+
+    if (key === "Expiry date" && typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+      const [year, month, day] = value.split("-").map(Number);
+      lines.push(`Expires: ${new Date(year, month - 1, day).toLocaleDateString()}`);
+      return;
+    }
+
+    flatten(value, [key]);
+  });
+
+  return lines;
 }
 
 export default function AdminActivityLog() {
@@ -222,7 +291,13 @@ export default function AdminActivityLog() {
                         <p className="font-medium">{log.actor_name}</p>
                         <p className="mt-1 text-[10px] text-[#8f8076]">{log.actor_email} · {formatRole(log.actor_role)}</p>
                       </td>
-                      <td className="max-w-[280px] whitespace-normal px-4 py-3 text-[#74675f]">{formatDetails(log.details)}</td>
+                      <td className="max-w-[320px] whitespace-normal px-4 py-3 text-[#74675f]">
+                        <div className="space-y-1">
+                          {formatDetails(log.details).map((line, index) => (
+                            <p key={`${log.id}-detail-${index}`}>{line}</p>
+                          ))}
+                        </div>
+                      </td>
                       <td className="px-4 py-3 font-mono text-[11px]">{log.ip_address || "—"}</td>
                       <td className="px-4 py-3">
                         <span className={`rounded px-2 py-1 text-[10px] font-semibold ${log.response_status < 400 ? "bg-[#edf4e9] text-[#58744a]" : "bg-[#fff0e8] text-[#9a4f32]"}`}>

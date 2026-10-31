@@ -62,6 +62,43 @@ describe("AdminActivityLog", () => {
     expect(screen.queryByText(/api\/staff/)).not.toBeInTheDocument();
   });
 
+  test("explains stock changes in a concise, readable way", async () => {
+    global.fetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        success: true,
+        data: [{
+          id: 9,
+          action: "Added 1 Blueberry Cheesecake (small) to stock",
+          category: "Products",
+          actor_name: "Shop Owner",
+          actor_email: "owner@example.com",
+          actor_role: "super_admin",
+          details: {
+            Product: "Blueberry Cheesecake",
+            "Quantity added": 1,
+            Size: "small",
+            "Expiry date": "2026-11-30",
+            "Previous stock": 12,
+            "New stock": 13,
+          },
+          ip_address: "203.0.113.15",
+          response_status: 200,
+          created_at: "2026-10-31T04:30:00Z",
+        }],
+        pagination: { current_page: 1, last_page: 1, total: 1 },
+      }),
+    });
+
+    render(<AdminActivityLog />);
+
+    expect(await screen.findByText("Added 1 Blueberry Cheesecake (small) to stock")).toBeInTheDocument();
+    expect(screen.getByText("Stock: 12 → 13 (added 1)")).toBeInTheDocument();
+    expect(screen.getByText("Size: small")).toBeInTheDocument();
+    expect(screen.getByText(/^Expires:/)).toBeInTheDocument();
+    expect(screen.queryByText(/Previous stock|New stock|Quantity added|Product:/)).not.toBeInTheDocument();
+  });
+
   test("filters audit activity by the Shop Owner and Admin accounts", async () => {
     render(<AdminActivityLog />);
     await screen.findByText("Changed order status");
