@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { ChevronLeft, ChevronRight, Eye, EyeOff, Loader2, Pencil, Plus, Search, ShieldCheck, Trash2, UserPlus } from "lucide-react";
 import { LARAVEL_BASE } from "../../services/config";
 import { getAuthHeaders } from "../../services/api";
@@ -414,6 +415,14 @@ export default function UserManagement({ adminOnly = false }) {
               <p className="mt-1 text-[12px] text-[#74675f]">{adminOnly ? "Create and manage administrator accounts." : "Manage account access, roles, and status."}</p>
             </div>
             <div className="flex flex-wrap gap-2 self-start sm:self-auto">
+              {adminOnly && (
+                <Link
+                  to="/admin/activity-log"
+                  className="inline-flex h-10 items-center justify-center rounded-lg border border-[#e8dfd4] bg-white px-4 text-[12px] font-semibold text-[#65574d] transition hover:border-[#c9a94f] hover:bg-[#fffaf0] hover:text-[#33251e]"
+                >
+                  Audit Trail
+                </Link>
+              )}
               <button
                 type="button"
                 onClick={() => openCreateModal("admin")}
