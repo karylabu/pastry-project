@@ -7,6 +7,7 @@ import {
   CalendarDays,
   CakeSlice,
   ClipboardList,
+  Database,
   FileText,
   LayoutDashboard,
   Leaf,
@@ -22,6 +23,7 @@ import {
   X,
   AlertTriangle,
   Gift,
+  History,
 } from "lucide-react";
 import { BASE, LARAVEL_BASE } from "../../services/config";
 import { getAuthHeaders } from "../../services/api";
@@ -58,7 +60,10 @@ const NAV_GROUPS = [
   },
   { label: "Marketing", items: [{ name: "Promotions", path: "/admin/promotions" }] },
   { label: "User Management", items: [{ name: "User Management", path: "/admin/users" }] },
-  { label: "System", items: [{ name: "Settings", path: "/admin/settings" }] },
+  { label: "System", items: [
+    { name: "Settings", path: "/admin/settings" },
+    { name: "Backup Management", path: "/admin/backups" },
+  ] },
 ];
 
 const NAV_ICONS = {
@@ -76,7 +81,9 @@ const NAV_ICONS = {
   "/admin/predictive-demand": TrendingUp,
   "/admin/promotions": Tag,
   "/admin/users": Users,
+  "/admin/activity-log": History,
   "/admin/settings": Settings,
+  "/admin/backups": Database,
 };
 
 function getStoredUser() {
@@ -99,6 +106,11 @@ export default function AdminNavbar({ onSidebarChange }) {
   const [currentUser, setCurrentUser] = useState(() => getStoredUser());
   const [currentDateTime, setCurrentDateTime] = useState(() => new Date());
   const [adminDialog, setAdminDialog] = useState(null);
+  const navGroups = String(currentUser?.role || "").toLowerCase() === "super_admin"
+    ? [...NAV_GROUPS, { label: "Administration", items: [
+      { name: "Audit Trail", path: "/admin/activity-log" },
+    ] }]
+    : NAV_GROUPS;
   const notificationsRef = useRef(null);
   const accountRef = useRef(null);
 
@@ -266,7 +278,7 @@ export default function AdminNavbar({ onSidebarChange }) {
         </div>
 
         <nav className="flex-1 space-y-6 overflow-y-auto px-4 py-6" aria-label="Admin pages">
-          {NAV_GROUPS.map((group) => (
+          {navGroups.map((group) => (
             <div key={group.label}>
               <p className="mb-2 px-3 text-[9px] font-bold uppercase tracking-[0.25em] text-[#9b7810]">{group.label}</p>
               <div className="space-y-1">

@@ -1,6 +1,7 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\Api\AdminActivityLogController;
 use App\Http\Controllers\Api\AdminAlertController;
 use App\Http\Controllers\Api\AdminSettingsController;
 use App\Http\Controllers\Api\AdminBackupController;
@@ -176,10 +177,24 @@ Route::post('promotions/unsubscribe', [PromotionUnsubscribeController::class, 'u
 Route::post('promotions/validate-coupon', [PromotionController::class, 'validateCoupon']);
 
 Route::middleware(['api'])->group(function () {
+    Route::get('admin-management/activity-logs', [AdminActivityLogController::class, 'index']);
+    Route::get('admin-management/users', [UserController::class, 'adminManagementIndex']);
+    Route::post('admin-management/users', [UserController::class, 'adminManagementStore']);
+    Route::get('admin-management/users/{user}', [UserController::class, 'adminManagementShow']);
+    Route::match(['put', 'patch'], 'admin-management/users/{user}', [UserController::class, 'adminManagementUpdate']);
+    Route::delete('admin-management/users/{user}', [UserController::class, 'adminManagementDestroy']);
+
     Route::apiResource('users', UserController::class);
 
     Route::prefix('admin')->group(function () {
         Route::get('backup', [AdminBackupController::class, 'download']);
+        Route::get('backups', [AdminBackupController::class, 'index']);
+        Route::post('backups', [AdminBackupController::class, 'store']);
+        Route::put('backups/schedule', [AdminBackupController::class, 'updateSchedule']);
+        Route::get('backups/{filename}/download', [AdminBackupController::class, 'downloadFile'])->where('filename', '[A-Za-z0-9._-]+');
+        Route::post('backups/{filename}/test-restore', [AdminBackupController::class, 'testRestore'])->where('filename', '[A-Za-z0-9._-]+');
+        Route::post('backups/{filename}/restore', [AdminBackupController::class, 'restore'])->where('filename', '[A-Za-z0-9._-]+');
+        Route::delete('backups/{filename}', [AdminBackupController::class, 'destroy'])->where('filename', '[A-Za-z0-9._-]+');
         Route::get('recycle-bin', [AdminRecycleBinController::class, 'index']);
         Route::post('recycle-bin/{entryId}/restore', [AdminRecycleBinController::class, 'restore'])->whereNumber('entryId');
         Route::delete('recycle-bin/{entryId}', [AdminRecycleBinController::class, 'destroy'])->whereNumber('entryId');

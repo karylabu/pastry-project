@@ -155,8 +155,8 @@ export default function Orders() {
     "Awaiting Payment": "bg-amber-50 text-amber-800 border border-amber-200",
     "Awaiting Balance Payment": "bg-amber-50 text-amber-800 border border-amber-200",
     Pending: "bg-[#D4AF37]/15 text-black border border-[#D4AF37]/30",
-    Preparing: "bg-black/5 text-black border border-black/15",
-    "Ready for Pickup": "bg-[#D4AF37]/10 text-black border border-[#D4AF37]/20",
+    Preparing: "bg-[#edf5eb] text-[#4f7654] border border-[#d8e8d4]",
+    "Ready for Pickup": "bg-[#e8f1ff] text-[#3563a8] border border-[#cbdcf5]",
     Completed: "bg-black text-white border border-black",
     Cancelled: "bg-[#fff0eb] text-[#9a5947] border border-[#f2d5ca]",
   };

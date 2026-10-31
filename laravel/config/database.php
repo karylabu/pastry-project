@@ -86,6 +86,45 @@ return [
             ]) : [],
         ],
 
+        'backup_test' => [
+            'driver' => env('BACKUP_TEST_DB_CONNECTION', 'mysql'),
+            'host' => env('BACKUP_TEST_DB_HOST'),
+            'port' => env('BACKUP_TEST_DB_PORT', '3306'),
+            'database' => env('BACKUP_TEST_DB_DATABASE'),
+            'username' => env('BACKUP_TEST_DB_USERNAME'),
+            'password' => env('BACKUP_TEST_DB_PASSWORD'),
+            'unix_socket' => env('BACKUP_TEST_DB_SOCKET', ''),
+            'charset' => env('BACKUP_TEST_DB_CHARSET', 'utf8mb4'),
+            'collation' => env('BACKUP_TEST_DB_COLLATION', 'utf8mb4_unicode_ci'),
+            'prefix' => '',
+            'prefix_indexes' => true,
+            'strict' => true,
+            'engine' => null,
+            'options' => extension_loaded('pdo_mysql') && in_array(env('BACKUP_TEST_DB_CONNECTION', 'mysql'), ['mysql', 'mariadb'], true) ? array_filter([
+                (PHP_VERSION_ID >= 80500 ? Mysql::ATTR_SSL_CA : PDO::MYSQL_ATTR_SSL_CA) => env('BACKUP_TEST_MYSQL_ATTR_SSL_CA'),
+            ]) : [],
+        ],
+
+        'backup_test' => [
+            'driver' => env('BACKUP_TEST_DB_CONNECTION', 'mysql'),
+            'url' => env('BACKUP_TEST_DB_URL'),
+            'host' => env('BACKUP_TEST_DB_HOST'),
+            'port' => env('BACKUP_TEST_DB_PORT', '3306'),
+            'database' => env('BACKUP_TEST_DB_DATABASE'),
+            'username' => env('BACKUP_TEST_DB_USERNAME'),
+            'password' => env('BACKUP_TEST_DB_PASSWORD'),
+            'unix_socket' => env('BACKUP_TEST_DB_SOCKET', ''),
+            'charset' => env('BACKUP_TEST_DB_CHARSET', 'utf8mb4'),
+            'collation' => env('BACKUP_TEST_DB_COLLATION', 'utf8mb4_unicode_ci'),
+            'prefix' => '',
+            'prefix_indexes' => true,
+            'strict' => true,
+            'engine' => null,
+            'options' => extension_loaded('pdo_mysql') ? array_filter([
+                (PHP_VERSION_ID >= 80500 ? Mysql::ATTR_SSL_CA : PDO::MYSQL_ATTR_SSL_CA) => env('BACKUP_TEST_MYSQL_ATTR_SSL_CA'),
+            ]) : [],
+        ],
+
         'pgsql' => [
             'driver' => 'pgsql',
             'url' => env('DB_URL'),

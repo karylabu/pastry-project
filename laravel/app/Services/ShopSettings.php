@@ -16,6 +16,7 @@ class ShopSettings
         'minimumOrder' => '0',
         'preparationTime' => '30',
         'lowStockThreshold' => '5',
+        'backupScheduleTime' => '02:00',
     ];
 
     public static function all(): array

@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\AdminNotification;
 use App\Models\User;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -39,6 +40,15 @@ class AdminSettingsTest extends TestCase
             $table->timestamp('read_at')->nullable();
             $table->timestamp('created_at')->nullable();
         });
+        Schema::create('users', function ($table) {
+            $table->id();
+            $table->string('name');
+            $table->string('email');
+            $table->string('password');
+            $table->string('role');
+            $table->string('status')->default('active');
+            $table->timestamp('deleted_at')->nullable();
+        });
         DB::table('shop_settings')->insert([
             'id' => 1,
             'settings' => json_encode([
@@ -62,8 +72,149 @@ class AdminSettingsTest extends TestCase
         Schema::dropIfExists('notifications');
         Schema::dropIfExists('products');
         Schema::dropIfExists('shop_settings');
+        Schema::dropIfExists('users');
 
         parent::tearDown();
+    }
+
+    public function test_super_admin_receives_notifications_sent_to_admins(): void
+    {
+        DB::table('users')->insert([
+            [
+                'id' => 20,
+                'name' => 'Shop Admin',
+                'email' => 'admin@example.com',
+                'password' => 'password',
+                'role' => 'admin',
+                'status' => 'active',
+            ],
+            [
+                'id' => 21,
+                'name' => 'Super Admin',
+                'email' => 'super-admin@example.com',
+                'password' => 'password',
+                'role' => 'super_admin',
+                'status' => 'active',
+            ],
+        ]);
+
+        AdminNotification::notifyRoles(['admin'], [
+            'type' => 'order_received',
+            'title' => 'New order received',
+            'message' => 'Order #123 was placed.',
+            'data' => ['order_id' => 123],
+            'action_url' => '/admin/orders',
+            'is_read' => false,
+        ]);
+
+        $admin = (new User())->forceFill([
+            'id' => 20,
+            'name' => 'Shop Admin',
+            'email' => 'admin@example.com',
+            'role' => 'admin',
+            'status' => 'active',
+        ]);
+        $superAdmin = (new User())->forceFill([
+            'id' => 21,
+            'name' => 'Super Admin',
+            'email' => 'super-admin@example.com',
+            'role' => 'super_admin',
+            'status' => 'active',
+        ]);
+
+        $adminResponse = $this->actingAs($admin)->getJson('/api/admin/notifications');
+        $superAdminResponse = $this->actingAs($superAdmin)->getJson('/api/admin/notifications');
+
+        $adminResponse->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.title', 'New order received');
+        $superAdminResponse->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.title', 'New order received');
+
+        $superAdminNotificationId = $superAdminResponse->json('data.0.id');
+        $this->actingAs($superAdmin)
+            ->patchJson("/api/admin/notifications/{$superAdminNotificationId}/read")
+            ->assertOk();
+
+        $this->assertDatabaseHas('notifications', [
+            'user_id' => 21,
+            'type' => 'order_received',
+            'title' => 'New order received',
+            'message' => 'Order #123 was placed.',
+            'is_read' => true,
+        ]);
+        $this->assertDatabaseHas('notifications', [
+            'user_id' => 20,
+            'type' => 'order_received',
+            'title' => 'New order received',
+            'message' => 'Order #123 was placed.',
+            'is_read' => false,
+        ]);
+    }
+
+    public function test_super_admin_notifications_exclude_meals_pasta_and_inactive_cakes(): void
+    {
+        Schema::create('products', function ($table) {
+            $table->id();
+            $table->string('name');
+            $table->string('category');
+            $table->integer('stock')->default(0);
+            $table->integer('minimum_stock')->default(5);
+            $table->boolean('available')->default(true);
+        });
+
+        DB::table('products')->insert([
+            ['id' => 1, 'name' => 'Blueberry Cheesecake', 'category' => 'Cakes', 'stock' => 2, 'minimum_stock' => 5, 'available' => true],
+            ['id' => 2, 'name' => 'Baked Mac', 'category' => 'Pasta', 'stock' => 0, 'minimum_stock' => 5, 'available' => true],
+            ['id' => 3, 'name' => 'Chicken Fillet', 'category' => 'Meals', 'stock' => 0, 'minimum_stock' => 5, 'available' => true],
+            ['id' => 4, 'name' => 'Archived Cake', 'category' => 'Cakes', 'stock' => 0, 'minimum_stock' => 5, 'available' => false],
+        ]);
+
+        foreach ([
+            ['id' => 32, 'title' => 'Out of stock: Baked Mac'],
+            ['id' => 33, 'title' => 'Out of stock: Chicken Fillet'],
+        ] as $oldAlert) {
+            DB::table('notifications')->insert([
+                'user_id' => 21,
+                'type' => 'Warning',
+                'title' => $oldAlert['title'],
+                'message' => $oldAlert['title'],
+                'data' => json_encode([
+                    'alert_key' => "product:{$oldAlert['id']}:out_of_stock",
+                    'active' => true,
+                ]),
+                'action_url' => '/admin/products',
+                'is_read' => false,
+                'created_at' => now(),
+            ]);
+        }
+
+        $superAdmin = (new User())->forceFill([
+            'id' => 21,
+            'name' => 'Super Admin',
+            'email' => 'super-admin@example.com',
+            'role' => 'super_admin',
+            'status' => 'active',
+        ]);
+
+        $this->actingAs($superAdmin)
+            ->getJson('/api/admin/notifications')
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.title', 'Low stock: Blueberry Cheesecake')
+            ->assertJsonPath('meta.unread_count', 1);
+
+        foreach ([32, 33] as $alertId) {
+            $alert = DB::table('notifications')
+                ->where('user_id', 21)
+                ->where('data', 'like', '%"alert_key":"product:' . $alertId . ':out_of_stock"%')
+                ->first();
+
+            $this->assertNotNull($alert);
+            $this->assertTrue((bool) $alert->is_read);
+            $this->assertFalse(json_decode($alert->data, true)['active']);
+        }
     }
 
     public function test_admin_settings_are_saved_globally_and_alert_preferences_per_admin(): void
@@ -249,14 +400,18 @@ class AdminSettingsTest extends TestCase
         Schema::create('products', function ($table) {
             $table->id();
             $table->string('name');
+            $table->string('category');
             $table->decimal('stock', 10, 2);
             $table->decimal('minimum_stock', 10, 2)->default(0);
+            $table->boolean('available')->default(true);
         });
         DB::table('products')->insert([
             'id' => 1,
             'name' => 'Test Product',
+            'category' => 'Cakes',
             'stock' => 7,
-            'minimum_stock' => 3,
+            'minimum_stock' => 7,
+            'available' => true,
         ]);
 
         $this->actingAs($admin)->putJson('/api/admin/settings', [

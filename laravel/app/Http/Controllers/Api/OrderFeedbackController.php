@@ -107,7 +107,7 @@ class OrderFeedbackController extends Controller
         if (!$user) {
             return response()->json(['success' => false, 'message' => 'Admin authorization required.'], 401);
         }
-        if (strtolower((string) $user->role) !== 'admin') {
+        if (!$user->isAdmin()) {
             return response()->json(['success' => false, 'message' => 'Admin authorization required.'], 403);
         }
 

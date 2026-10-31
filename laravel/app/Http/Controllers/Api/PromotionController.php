@@ -21,7 +21,7 @@ class PromotionController extends Controller
     {
         $user = $this->getAuthenticatedUser($request);
 
-        if (! $user || $user->role !== 'admin') {
+        if (! $user || ! $user->isAdmin()) {
             return null;
         }
 

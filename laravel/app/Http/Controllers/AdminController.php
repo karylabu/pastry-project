@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\User;
 use App\Services\InventoryService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -18,8 +19,8 @@ class AdminController extends Controller
         $currentUser = $userId > 0
             ? DB::table('users')->where('id', $userId)->first(['role', 'status'])
             : null;
-        if (!$user || $role !== 'admin' || !$currentUser
-            || strtolower((string) $currentUser->role) !== 'admin'
+        if (!$user || !User::isAdminRole($role) || !$currentUser
+            || !User::isAdminRole($currentUser->role)
             || strtolower(trim((string) ($currentUser->status ?? 'active'))) !== 'active') {
             session()->forget('user');
             return redirect('/staff_login.php');
@@ -43,7 +44,7 @@ class AdminController extends Controller
             } else {
                 $user = DB::table('users')->where('email', $email)->first();
 
-                if ($user && strtolower((string) ($user->role ?? '')) === 'admin'
+                if ($user && User::isAdminRole($user->role ?? '')
                     && strtolower(trim((string) ($user->status ?? 'active'))) === 'active'
                     && Hash::check($password, $user->password)) {
                     $this->clearRateLimit($attemptKey);
@@ -66,7 +67,7 @@ class AdminController extends Controller
             return view('staff.login', compact('error'));
         }
 
-        if (session('user') && strtolower((string) (session('user.role') ?? '')) === 'admin') {
+        if (session('user') && User::isAdminRole(session('user.role'))) {
             return redirect('/staff/dashboard.php');
         }
 
@@ -214,7 +215,7 @@ class AdminController extends Controller
             return $redirect;
         }
 
-        if (session('user.role') !== 'admin') {
+        if (!User::isAdminRole(session('user.role'))) {
             return redirect('/staff/dashboard.php');
         }
 
@@ -317,7 +318,7 @@ class AdminController extends Controller
             return $redirect;
         }
 
-        if (session('user.role') !== 'admin') {
+        if (!User::isAdminRole(session('user.role'))) {
             return redirect('/staff/dashboard.php');
         }
 
@@ -361,7 +362,7 @@ class AdminController extends Controller
             return $redirect;
         }
 
-        if (session('user.role') !== 'admin') {
+        if (!User::isAdminRole(session('user.role'))) {
             return redirect('/staff/dashboard.php');
         }
 
@@ -420,7 +421,7 @@ class AdminController extends Controller
             return $redirect;
         }
 
-        if (session('user.role') !== 'admin') {
+        if (!User::isAdminRole(session('user.role'))) {
             return redirect('/staff/dashboard.php');
         }
 
@@ -472,7 +473,7 @@ class AdminController extends Controller
             return $redirect;
         }
 
-        if (!in_array(session('user.role'), ['admin', 'staff'])) {
+        if (!User::isAdminRole(session('user.role')) && session('user.role') !== 'staff') {
             return redirect('/staff/dashboard.php');
         }
 
@@ -515,7 +516,7 @@ class AdminController extends Controller
             return $redirect;
         }
 
-        if (!in_array(session('user.role'), ['admin', 'staff'])) {
+        if (!User::isAdminRole(session('user.role')) && session('user.role') !== 'staff') {
             return redirect('/staff/dashboard.php');
         }
 
@@ -556,7 +557,7 @@ class AdminController extends Controller
                 'created_at' => now(),
             ]);
 
-            if (session('user.role') !== 'admin') {
+            if (!User::isAdminRole(session('user.role'))) {
                 $itemName = 'Inventory item';
                 if ($ingredientId) {
                     $item = DB::table('ingredients')->where('id', $ingredientId)->first();
@@ -566,7 +567,7 @@ class AdminController extends Controller
                     $itemName = $item?->name ?? $itemName;
                 }
 
-                $adminIds = DB::table('users')->where('role', 'admin')->pluck('id')->toArray();
+                $adminIds = DB::table('users')->whereIn('role', ['admin', 'super_admin'])->pluck('id')->toArray();
                 foreach ($adminIds as $adminId) {
                     if ($adminId === $userId) {
                         continue;
@@ -594,7 +595,7 @@ class AdminController extends Controller
             return $redirect;
         }
 
-        if (session('user.role') !== 'admin') {
+        if (!User::isAdminRole(session('user.role'))) {
             return redirect('/staff/dashboard.php');
         }
 
@@ -607,7 +608,7 @@ class AdminController extends Controller
             return $redirect;
         }
 
-        if (session('user.role') !== 'admin') {
+        if (!User::isAdminRole(session('user.role'))) {
             return redirect('/staff/dashboard.php');
         }
 

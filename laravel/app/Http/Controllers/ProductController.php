@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -16,7 +17,7 @@ class ProductController extends Controller
 
     public function index(Request $request)
     {
-        if (session('user.role') === 'admin') {
+        if (User::isAdminRole(session('user.role'))) {
             return redirect()->route('admin.products');
         }
 

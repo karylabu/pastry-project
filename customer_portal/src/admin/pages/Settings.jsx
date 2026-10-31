@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Bell, Building2, Check, Clock3, Download, Eye, EyeOff, KeyRound, LogOut, RotateCcw, Save, Trash2, UserCircle2, X } from "lucide-react";
+import { Bell, Building2, Check, Clock3, Database, Eye, EyeOff, KeyRound, LogOut, RotateCcw, Save, Trash2, UserCircle2, X } from "lucide-react";
 import { LARAVEL_BASE } from "../../services/config";
 import { getAuthHeaders } from "../../services/api";
 
@@ -85,7 +85,6 @@ export default function Settings() {
   const [settingsLoaded, setSettingsLoaded] = useState(false);
   const [savingPreferences, setSavingPreferences] = useState(false);
   const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
-  const [backupDownloading, setBackupDownloading] = useState(false);
   const [recycleBinOpen, setRecycleBinOpen] = useState(false);
   const [recycleItems, setRecycleItems] = useState([]);
   const [recycleLoading, setRecycleLoading] = useState(false);
@@ -202,36 +201,6 @@ export default function Settings() {
     finally { setSavingPassword(false); }
   };
 
-  const downloadBackup = async () => {
-    setBackupDownloading(true);
-    setError("");
-    setNotice("");
-    try {
-      const response = await fetch(`${LARAVEL_BASE}/api/admin/backup`, {
-        credentials: "include",
-        headers: { Accept: "application/json", ...getAuthHeaders() },
-      });
-      if (!response.ok) {
-        const data = await response.json().catch(() => ({}));
-        throw new Error(data.message || "Unable to download the business backup.");
-      }
-      const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = `pastry-business-backup-${new Date().toISOString().slice(0, 10)}.json`;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
-      setNotice("Business data backup downloaded. Passwords and account secrets are excluded.");
-    } catch (backupError) {
-      setError(backupError.message);
-    } finally {
-      setBackupDownloading(false);
-    }
-  };
-
   const loadRecycleBin = async () => {
     setRecycleLoading(true);
     setRecycleError("");
@@ -312,7 +281,7 @@ export default function Settings() {
     <div className="min-h-screen bg-[#fbfaf5] font-['DM_Sans'] text-[#33251e]">
       <div className="pt-[88px] lg:pl-[260px]">
         <main className="mx-auto max-w-[1400px] px-4 py-5 sm:px-6 md:px-8 lg:px-10 lg:py-7">
-          <div className="mb-6 flex min-h-[112px] flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <div className="mb-6 flex min-h-[72px] flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.24em] text-[#92701e]">System</p>
               <h1 className="mt-1 font-serif text-[27px] leading-tight text-[#33251e]">Admin Settings</h1>
@@ -326,7 +295,7 @@ export default function Settings() {
               </div>
               <button type="button" onClick={() => setLogoutConfirmOpen(true)} className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-[#efd8d4] px-3 text-[11px] font-semibold text-[#8d5357] transition hover:bg-[#fff0f0]"><LogOut size={14} /> Log out</button>
               <div className="flex flex-wrap gap-2">
-                <button type="button" onClick={downloadBackup} disabled={backupDownloading} className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-[#e8dfd4] bg-white px-3 text-[11px] font-semibold text-[#65574d] transition hover:border-[#c9a94f] hover:bg-[#fffaf0] disabled:opacity-60"><Download size={14} /> {backupDownloading ? "Preparing..." : "Backup"}</button>
+                <button type="button" onClick={() => navigate("/admin/backups")} className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-[#e8dfd4] bg-white px-3 text-[11px] font-semibold text-[#65574d] transition hover:border-[#c9a94f] hover:bg-[#fffaf0]"><Database size={14} /> Backup Management</button>
                 <button type="button" onClick={openRecycleBin} className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-[#efd8d4] bg-white px-3 text-[11px] font-semibold text-[#8d5357] transition hover:bg-[#fff0f0]"><Trash2 size={14} /> Recycle Bin</button>
                 <button type="button" onClick={savePreferences} disabled={settingsLoading || !settingsLoaded || savingPreferences} className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-[#33251e] px-4 text-[12px] font-semibold text-white transition hover:bg-[#5b4540] disabled:cursor-not-allowed disabled:opacity-60"><Save size={15} /> {settingsLoading ? "Loading settings..." : savingPreferences ? "Saving..." : settingsLoaded ? "Save settings" : "Settings unavailable"}</button>
               </div>

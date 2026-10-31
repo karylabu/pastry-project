@@ -45,6 +45,8 @@ describe("CustomCakes", () => {
             total: 1200,
             details: JSON.stringify({
               customer_name: "Mila Customer",
+              delivery_method: "Pickup",
+              pickup_date: "2026-10-30",
               cake_size: "8 inches",
               cake_flavor: "Vanilla",
               theme: "Blue ocean theme",
@@ -69,13 +71,18 @@ describe("CustomCakes", () => {
 
     expect((await screen.findAllByText("Mila Customer")).length).toBeGreaterThan(0);
     const orderRow = screen.getByRole("row", { name: /#31/ });
-    const customerCell = within(orderRow).getAllByRole("cell")[1];
+    const customerCell = within(orderRow).getAllByRole("cell")[0];
     expect(customerCell).toHaveTextContent("Mila Customer");
     expect(customerCell).not.toHaveTextContent("09260771217");
     expect(orderRow).not.toHaveTextContent('{"customer_name"');
-    expect(orderRow).toHaveTextContent("Blue ocean theme");
-    expect(orderRow).toHaveTextContent("8 inches");
-    expect(orderRow).toHaveTextContent("Vanilla");
+    expect(orderRow).toHaveTextContent("Pickup · Oct 30, 2026");
+    expect(orderRow).not.toHaveTextContent("Delivery method:");
+    expect(orderRow).not.toHaveTextContent("Pickup date:");
+    expect(orderRow).not.toHaveTextContent("6 x 3 inch");
+    expect(orderRow).not.toHaveTextContent("Single Tier");
+    expect(orderRow).not.toHaveTextContent("Blue ocean theme");
+    expect(orderRow).not.toHaveTextContent("8 inches");
+    expect(orderRow).not.toHaveTextContent("Vanilla");
     expect(within(orderRow).getByRole("img", { name: "Customer cake reference" })).toHaveAttribute(
       "src",
       "/assets/logo.png",

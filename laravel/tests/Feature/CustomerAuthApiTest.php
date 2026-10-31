@@ -177,6 +177,33 @@ class CustomerAuthApiTest extends TestCase
         $this->assertDatabaseHas('user_sessions', ['user_id' => 9, 'token' => $activeToken]);
     }
 
+    public function test_super_admin_can_login_and_refresh_an_admin_session(): void
+    {
+        DB::table('users')->insert([
+            'id' => 12,
+            'name' => 'SUPER ADMIN',
+            'email' => 'superadmin@pastry.com',
+            'password' => Hash::make('chosen-password'),
+            'role' => 'super_admin',
+            'status' => 'active',
+        ]);
+
+        $login = $this->postJson('http://localhost/api/login', [
+            'email' => 'superadmin@pastry.com',
+            'password' => 'chosen-password',
+        ], ['User-Agent' => 'Google Chrome/130.0'])
+            ->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('user.role', 'super_admin');
+
+        $token = $login->json('token');
+        $this->getJson('http://localhost/api/auth/status', ['Authorization' => 'Bearer ' . $token])
+            ->assertOk()
+            ->assertJsonPath('user.role', 'super_admin');
+
+        $this->assertDatabaseHas('user_sessions', ['user_id' => 12, 'token' => $token]);
+    }
+
     public function test_admin_can_sign_in_again_from_the_same_browser_and_device(): void
     {
         DB::table('users')->insert([

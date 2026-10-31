@@ -34,14 +34,14 @@
             <a href="{{ url('staff/products.php') }}" class="{{ request()->is('staff/products.php') ? 'active' : '' }}">PRODUCTS</a>
             <a href="{{ url('staff/inventory.php') }}" class="{{ request()->is('staff/inventory.php') ? 'active' : '' }}">INVENTORY</a>
             <a href="{{ url('staff/orders.php') }}" class="{{ request()->is('staff/orders.php') ? 'active' : '' }}">ORDERS</a>
-            @if(session('user.role') === 'admin')
+            @if(in_array(session('user.role'), ['admin', 'super_admin']))
                 <a href="{{ url('recipes.php') }}" class="{{ request()->is('recipes.php') ? 'active' : '' }}">RECIPES</a>
                 <a href="{{ url('update_categories.php') }}" class="{{ request()->is('update_categories.php') ? 'active' : '' }}">CATEGORIES</a>
             @endif
-            @if(in_array(session('user.role'), ['admin', 'staff']))
+            @if(in_array(session('user.role'), ['admin', 'super_admin', 'staff']))
                 <a href="{{ url('variance.php') }}" class="{{ request()->is('variance.php') ? 'active' : '' }}">VARIANCE</a>
             @endif
-            @if(session('user.role') === 'admin')
+            @if(in_array(session('user.role'), ['admin', 'super_admin']))
                 <a href="{{ url('analytics.php') }}" class="{{ request()->is('analytics.php') ? 'active' : '' }}">ANALYTICS</a>
                 <a href="{{ url('reports.php') }}" class="{{ request()->is('reports.php') ? 'active' : '' }}">REPORTS</a>
             @endif

@@ -695,7 +695,7 @@ function buildDetailedForecastPayload(array $history, array $products, array $in
             'peakDay' => !empty($forecastDayTotals) ? array_search(max($forecastDayTotals), $forecastDayTotals, true) : null,
         ],
         'model' => [
-            'name' => 'Selected by shop-total WAPE (rolling backtest)',
+            'name' => 'Fixed 28-day average (rolling backtest)',
             'selected_forecast_method' => $selectedForecastMethod,
             'selected_forecast_method_wape' => $selectedAggregate['wape'] ?? null,
             'mae' => $selectedAggregate['mae'] ?? null,

@@ -5,9 +5,19 @@ namespace Tests\Unit;
 use PHPUnit\Framework\TestCase;
 
 require_once __DIR__ . '/../../../includes/predictive_forecasting.php';
+require_once __DIR__ . '/../../../includes/forecast_engine.php';
 
 class PredictiveForecastingTest extends TestCase
 {
+    public function test_production_forecast_stays_on_the_configured_method(): void
+    {
+        $this->assertSame('moving_average_28', fe_select_method([
+            'moving_average_7' => ['wape' => 1.0, 'records' => 7],
+            'moving_average_28' => ['wape' => 99.0, 'records' => 7],
+        ]));
+        $this->assertSame('moving_average_28', fe_select_method([]));
+    }
+
     public function test_merges_overlapping_and_adjacent_coverage_without_bridging_unknown_gaps(): void
     {
         $this->assertSame([

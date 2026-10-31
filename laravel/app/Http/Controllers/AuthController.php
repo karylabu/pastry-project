@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Services\CustomerTwoFactor;
 use App\Services\AdminSessionGuard;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\DB;
@@ -47,7 +48,7 @@ class AuthController extends Controller
 
             if (!$user) {
                 $error = 'User not found.';
-            } elseif (!in_array(strtolower((string) ($user->role ?? '')), ['customer', 'admin'], true)) {
+            } elseif (strtolower((string) ($user->role ?? '')) !== 'customer' && !User::isAdminRole($user->role ?? '')) {
                 $error = 'This account is not eligible for access.';
             } elseif (strtolower(trim((string) ($user->status ?? 'active'))) !== 'active') {
                 $error = 'This account is deactivated.';
@@ -58,7 +59,7 @@ class AuthController extends Controller
                 $error = 'Two-factor authentication is enabled. Please sign in through the customer portal to verify your code.';
             } else {
                 $adminToken = null;
-                if (strtolower((string) ($user->role ?? '')) === 'admin') {
+                if (User::isAdminRole($user->role ?? '')) {
                     try {
                         $adminToken = app(AdminSessionGuard::class)->claim((int) $user->id, $request);
                     } catch (\Throwable $exception) {
@@ -95,7 +96,7 @@ class AuthController extends Controller
                 }
 
                 // Redirect to React app on port 3000
-                if (strtolower($userData['role']) === 'admin') {
+                if (User::isAdminRole($userData['role'])) {
                     return redirect('http://127.0.0.1:3000/admin');
                 }
                 return redirect('http://127.0.0.1:3000/customer');
@@ -210,7 +211,7 @@ class AuthController extends Controller
             if ($requestedEmail !== '') {
                 $existingUser = DB::table('users')->whereRaw('LOWER(email) = ?', [$requestedEmail])->first();
                 if ($existingUser) {
-                    if (strtolower((string) ($existingUser->role ?? '')) === 'admin') {
+                    if (User::isAdminRole($existingUser->role ?? '')) {
                         return $this->googleCorsResponse([
                             'success' => false,
                             'code' => 'admin_account_not_allowed',
@@ -315,7 +316,7 @@ class AuthController extends Controller
 
         if ($intent === 'signup_check') {
             if ($user) {
-                if (strtolower((string) ($user->role ?? '')) === 'admin') {
+                if (User::isAdminRole($user->role ?? '')) {
                     return $this->googleCorsResponse([
                         'success' => false,
                         'code' => 'admin_account_not_allowed',
@@ -338,7 +339,7 @@ class AuthController extends Controller
         }
 
         if ($intent === 'signup' && $user) {
-            if (strtolower((string) ($user->role ?? '')) === 'admin') {
+            if (User::isAdminRole($user->role ?? '')) {
                 return $this->googleCorsResponse([
                     'success' => false,
                     'code' => 'admin_account_not_allowed',
@@ -387,7 +388,7 @@ class AuthController extends Controller
             }
         }
 
-        if (!in_array(strtolower((string) ($user->role ?? '')), ['customer', 'admin'], true)) {
+        if (strtolower((string) ($user->role ?? '')) !== 'customer' && !User::isAdminRole($user->role ?? '')) {
             return $this->googleCorsResponse(['success' => false, 'message' => 'This account is not eligible for access.'], 403);
         }
         if (strtolower(trim((string) ($user->status ?? 'active'))) !== 'active') {
@@ -595,7 +596,7 @@ class AuthController extends Controller
         $configured = env('FRONTEND_URL');
         if ($configured) {
             $base = rtrim($configured, '/');
-            if (strtolower($role) === 'admin') {
+            if (User::isAdminRole($role)) {
                 return $base . '/admin';
             }
             if (strtolower($role) === 'staff') {
@@ -605,7 +606,7 @@ class AuthController extends Controller
         }
 
         $base = $request->getSchemeAndHttpHost() . '/GitHub/Capstone--Development';
-        if (strtolower($role) === 'admin') {
+        if (User::isAdminRole($role)) {
             return $base . '/admin';
         }
         if (strtolower($role) === 'staff') {
@@ -705,7 +706,7 @@ class AuthController extends Controller
             $user = DB::table('users')->where('email', $email)->first();
         }
 
-        if (!in_array(strtolower((string) ($user->role ?? '')), ['customer', 'admin'], true)
+        if ((strtolower((string) ($user->role ?? '')) !== 'customer' && !User::isAdminRole($user->role ?? ''))
             || strtolower(trim((string) ($user->status ?? 'active'))) !== 'active') {
             return redirect()->route('auth.login')->with('error', 'This account is not eligible for access.');
         }

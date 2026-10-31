@@ -440,7 +440,7 @@ export default function OrderHistory() {
             {filteredOrders.map((order) => {
               const { label: orderTypeLabel, isCustomCake, isUrgent } = getOrderTypeMeta(order);
               const fulfillmentDate = order.completed_at || order.updated_at || order.created_at;
-              const statusStyle = order.isImportedSales ? "bg-[#fff4cd] text-[#80600a]" : order.status === "Cancelled" ? "bg-[#fff0eb] text-[#9a5947]" : order.status === "Ready for Pickup" ? "bg-[#fff4cd] text-[#80600a]" : "bg-[#edf5eb] text-[#4f7654]";
+              const statusStyle = order.isImportedSales ? "bg-[#fff4cd] text-[#80600a]" : order.status === "Cancelled" ? "bg-[#fff0eb] text-[#9a5947]" : order.status === "Ready for Pickup" ? "bg-[#e8f1ff] text-[#3563a8]" : "bg-[#edf5eb] text-[#4f7654]";
               const orderTypeStyle = isCustomCake ? "bg-[#f3edf9] text-[#705b83]" : isUrgent ? "bg-[#fff0eb] text-[#9a5947]" : "bg-[#f7f4ef] text-[#65574d]";
 
               return (
@@ -509,7 +509,7 @@ export default function OrderHistory() {
                           <span className={`rounded-md px-2 py-1 text-[9px] font-semibold ${orderTypeBadge}`}>{orderTypeLabel}</span>
                         </td>
                         <td className="px-4 py-4">
-                          <span className={`rounded-md px-2 py-1 text-[9px] font-semibold ${order.status === "Cancelled" ? "bg-[#fff0eb] text-[#9a5947]" : order.status === "Ready for Pickup" ? "bg-[#fff4cd] text-[#80600a]" : "bg-[#edf5eb] text-[#4f7654]"}`}>{order.status}</span>
+                          <span className={`rounded-md px-2 py-1 text-[9px] font-semibold ${order.status === "Cancelled" ? "bg-[#fff0eb] text-[#9a5947]" : order.status === "Ready for Pickup" ? "bg-[#e8f1ff] text-[#3563a8]" : "bg-[#edf5eb] text-[#4f7654]"}`}>{order.status}</span>
                         </td>
                         <td className="px-3 py-3 text-[11px] text-[#74675f]">{fulfillmentDate ? new Date(fulfillmentDate).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }) : '—'}</td>
                         <td className="px-3 py-3 text-[12px] font-semibold text-[#33251e]">

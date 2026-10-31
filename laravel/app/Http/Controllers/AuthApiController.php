@@ -27,7 +27,7 @@ class AuthApiController extends Controller
             ], 401);
         }
 
-        if (strtolower((string) $user->role) === 'admin') {
+        if ($user->isAdmin()) {
             app(AdminSessionGuard::class)->refresh((int) $user->id, $request);
         }
 
@@ -118,7 +118,7 @@ class AuthApiController extends Controller
             return null;
         }
 
-        if (strtolower((string) $existingUser->role) === 'admin') {
+        if ($existingUser->isAdmin()) {
             return response()->json([
                 'success' => false,
                 'code' => 'admin_account_not_allowed',
@@ -165,7 +165,7 @@ class AuthApiController extends Controller
             ], 200);
         }
 
-        if (!in_array(strtolower((string) $user->role), ['customer', 'admin'], true)) {
+        if (strtolower((string) $user->role) !== 'customer' && !$user->isAdmin()) {
             return response()->json([
                 'success' => false,
                 'message' => 'This account is not eligible for access.',
@@ -218,7 +218,7 @@ class AuthApiController extends Controller
             ]);
         }
 
-        if (strtolower((string) $user->role) === 'admin') {
+        if ($user->isAdmin()) {
             try {
                 $token = app(AdminSessionGuard::class)->claim((int) $user->id, $request);
             } catch (\Throwable $exception) {
@@ -553,7 +553,7 @@ class AuthApiController extends Controller
     public function changePassword(Request $request)
     {
         $user = $this->getAuthenticatedUser($request);
-        if (!$user || !in_array(strtolower((string) $user->role), ['customer', 'admin'], true)) {
+        if (!$user || (strtolower((string) $user->role) !== 'customer' && !$user->isAdmin())) {
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
         }
 

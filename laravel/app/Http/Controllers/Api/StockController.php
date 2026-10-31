@@ -82,6 +82,7 @@ class StockController extends Controller
         $query = DB::table('product_inventory_movements as m')
             ->join('products as p', 'p.id', '=', 'm.product_id')
             ->leftJoin('users as u', 'u.id', '=', 'm.user_id')
+            ->whereIn('u.role', ['admin', 'super_admin'])
             ->where('m.product_id', $validated['product_id']);
 
         if (!empty($validated['product_size_id'])) {
@@ -115,7 +116,7 @@ class StockController extends Controller
                 'm.reference_type',
                 'm.reference_id',
                 'm.created_at',
-                'u.name as staff_name',
+                'u.name as admin_name',
             ])
             ->orderByDesc('m.created_at')
             ->orderByDesc('m.id')
@@ -134,7 +135,7 @@ class StockController extends Controller
                 'reason' => $row->reason,
                 'reference_type' => $row->reference_type,
                 'reference_id' => $row->reference_id === null ? null : (int) $row->reference_id,
-                'staff' => $row->staff_name ?: 'System',
+                'admin' => $row->admin_name ?: 'Admin',
                 'created_at' => $row->created_at,
             ]);
 
@@ -259,7 +260,7 @@ class StockController extends Controller
         if (!$user) {
             return response()->json(['success' => false, 'message' => 'Admin authorization required.'], 401);
         }
-        if ($user->role !== 'admin') {
+        if (!$user->isAdmin()) {
             return response()->json(['success' => false, 'message' => 'Admin authorization required.'], 403);
         }
         return null;

@@ -13,10 +13,13 @@ import WasteTracking from "../pages/WasteTracking";
 import PredictiveAnalytics from "../pages/PredictiveAnalytics";
 import Promotions from "../pages/Promotions";
 import UserManagement from "../pages/UserManagement";
+import AdminActivityLog from "../pages/AdminActivityLog";
+import ProtectedRoute from "../../auth/ProtectedRoute";
 import SettingsPage from "../pages/Settings";
 import Schedule from "../pages/Schedule";
 import CakeRecipes from "../pages/CakeRecipes";
 import Reviews from "../pages/Reviews";
+import BackupManagement from "../pages/BackupManagement";
 
 const renderWithLayout = (element) => <AdminLayout>{element}</AdminLayout>;
 
@@ -39,7 +42,17 @@ export default function AdminApp() {
       <Route path="predictive-demand" element={renderWithLayout(<PredictiveAnalytics />)} />
       <Route path="promotions" element={renderWithLayout(<Promotions />)} />
       <Route path="users" element={renderWithLayout(<UserManagement />)} />
+      <Route path="admin-management" element={<Navigate to="/admin/dashboard" replace />} />
+      <Route
+        path="activity-log"
+        element={(
+          <ProtectedRoute allowedRoles={["super_admin"]} deniedPath="/admin/dashboard">
+            {renderWithLayout(<AdminActivityLog />)}
+          </ProtectedRoute>
+        )}
+      />
       <Route path="settings" element={renderWithLayout(<SettingsPage />)} />
+      <Route path="backups" element={renderWithLayout(<BackupManagement />)} />
       <Route path="schedule" element={renderWithLayout(<Schedule />)} />
     </Routes>
   );

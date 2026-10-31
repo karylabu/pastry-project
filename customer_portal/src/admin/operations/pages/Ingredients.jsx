@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { AlertTriangle, CalendarDays, Check, ChevronRight, CircleAlert, History, Package, PackagePlus, Pencil, Plus, Search, Trash2, X } from "lucide-react";
 import { LARAVEL_BASE, STAFF_BASE } from "../../../services/config";
+import { subscribeRealtime } from "../../../services/realtime";
 import AdminDialog from "../../components/AdminDialog";
 import UndoToast from "../../components/UndoToast";
 
@@ -182,6 +183,17 @@ export default function Ingredients({
       loadIngredients();
       if (canApproveDiscard) loadPendingRequests();
     })();
+  }, [canApproveDiscard]);
+
+  useEffect(() => {
+    const unsubscribe = subscribeRealtime((event) => {
+      if (event.type === "inventory.updated" || event.type === "order.updated") {
+        loadIngredients();
+        if (canApproveDiscard) loadPendingRequests();
+      }
+    });
+
+    return unsubscribe;
   }, [canApproveDiscard]);
 
   const loadPendingRequests = async () => {

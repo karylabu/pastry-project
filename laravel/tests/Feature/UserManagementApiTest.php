@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use App\Models\User;
 use Tests\TestCase;
 
 class UserManagementApiTest extends TestCase
@@ -153,6 +154,114 @@ class UserManagementApiTest extends TestCase
             'role' => 'admin',
             'status' => 'active',
         ]);
+    }
+
+    public function test_admin_can_create_super_admin_and_super_admin_can_access_user_management(): void
+    {
+        $this->withHeader('Authorization', '******')
+            ->withHeader('X-Auth-Token', 'admin-token')
+            ->postJson('http://localhost/api/users', [
+                'name' => 'SUPER ADMIN',
+                'email' => 'superadmin@pastry.com',
+                'role' => 'super_admin',
+                'password' => 'chosen-password',
+                'password_confirmation' => 'chosen-password',
+            ])
+            ->assertForbidden();
+
+        $superAdmin = User::create([
+            'name' => 'SUPER ADMIN',
+            'email' => 'superadmin@pastry.com',
+            'password' => 'chosen-password',
+            'role' => 'super_admin',
+            'status' => 'active',
+        ]);
+        $this->actingAs($superAdmin)
+            ->getJson('http://localhost/api/users')
+            ->assertOk()
+            ->assertJsonPath('success', true);
+    }
+
+    public function test_admin_cannot_promote_an_account_to_super_admin(): void
+    {
+        $this->withHeader('Authorization', '******')
+            ->withHeader('X-Auth-Token', 'admin-token')
+            ->putJson('http://localhost/api/users/2', ['role' => 'super_admin'])
+            ->assertForbidden();
+
+        $this->assertDatabaseHas('users', ['id' => 2, 'role' => 'customer']);
+    }
+
+    public function test_admin_cannot_view_or_delete_super_admin_account(): void
+    {
+        DB::table('users')->insert([
+            'id' => 3,
+            'name' => 'SUPER ADMIN',
+            'email' => 'superadmin@pastry.com',
+            'password' => 'unused',
+            'role' => 'super_admin',
+            'status' => 'active',
+        ]);
+
+        $this->withHeader('Authorization', '******')
+            ->withHeader('X-Auth-Token', 'admin-token')
+            ->getJson('http://localhost/api/users/3')
+            ->assertForbidden();
+
+        $this->withHeader('Authorization', '******')
+            ->withHeader('X-Auth-Token', 'admin-token')
+            ->deleteJson('http://localhost/api/users/3')
+            ->assertForbidden();
+
+        $this->assertDatabaseHas('users', ['id' => 3, 'role' => 'super_admin']);
+    }
+
+    public function test_only_super_admin_can_use_admin_management_and_it_only_manages_admins(): void
+    {
+        $this->withHeader('Authorization', '******')
+            ->withHeader('X-Auth-Token', 'admin-token')
+            ->getJson('http://localhost/api/admin-management/users')
+            ->assertForbidden();
+
+        DB::table('users')->insert([
+            'id' => 3,
+            'name' => 'SUPER ADMIN',
+            'email' => 'superadmin@pastry.com',
+            'password' => 'unused',
+            'role' => 'super_admin',
+            'status' => 'active',
+        ]);
+        DB::table('user_sessions')->insert([
+            'user_id' => 3,
+            'token' => 'super-admin-token',
+            'expires_at' => now()->addHour(),
+        ]);
+
+        $this->withHeader('Authorization', '******')
+            ->withHeader('X-Auth-Token', 'super-admin-token')
+            ->getJson('http://localhost/api/admin-management/users')
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.role', 'admin');
+
+        $this->withHeader('Authorization', '******')
+            ->withHeader('X-Auth-Token', 'super-admin-token')
+            ->postJson('http://localhost/api/admin-management/users', [
+                'name' => 'Managed Admin',
+                'email' => 'managed-admin@example.com',
+                'role' => 'super_admin',
+                'password' => 'new-password',
+                'password_confirmation' => 'new-password',
+            ])
+            ->assertCreated()
+            ->assertJsonPath('data.role', 'admin');
+
+        $this->withHeader('Authorization', '******')
+            ->withHeader('X-Auth-Token', 'super-admin-token')
+            ->putJson('http://localhost/api/admin-management/users/2', ['name' => 'Not an admin'])
+            ->assertNotFound();
+
+        $this->assertDatabaseHas('users', ['email' => 'managed-admin@example.com', 'role' => 'admin']);
     }
 
     public function test_admin_cannot_create_a_customer_through_user_management(): void

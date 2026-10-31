@@ -24,6 +24,7 @@ class IngredientBatchController extends Controller
                 $request->validated(),
                 (int) $user->id,
             );
+            app(\App\Services\RealtimeEventPublisher::class)->inventoryUpdated();
 
             return response()->json([
                 'success' => true,

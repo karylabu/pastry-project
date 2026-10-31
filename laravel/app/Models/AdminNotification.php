@@ -78,6 +78,10 @@ class AdminNotification extends Model
 
     public static function notifyRoles(array $roles, array $attributes): void
     {
+        if (in_array('admin', $roles, true) && !in_array('super_admin', $roles, true)) {
+            $roles[] = 'super_admin';
+        }
+
         $users = User::whereIn('role', $roles)
             ->where('status', 'active')
             ->get();

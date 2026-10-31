@@ -149,7 +149,7 @@ class InventoryService
             if (
                 $isExpired
                 && $discard->reason === 'Expired'
-                && in_array($requesterRole, ['admin', 'manager'], true)
+                && in_array($requesterRole, ['admin', 'super_admin', 'manager'], true)
             ) {
                 return $this->approveDiscard((int) $discard->id, $userId);
             }

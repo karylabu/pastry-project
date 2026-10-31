@@ -123,7 +123,7 @@ abstract class Controller
             ], 401);
         }
 
-        if (strtolower((string) $user->role) !== $role) {
+        if ($role === 'admin' ? !$user->isAdmin() : strtolower((string) $user->role) !== $role) {
             return response()->json([
                 'success' => false,
                 'message' => 'Forbidden.',
@@ -140,7 +140,7 @@ abstract class Controller
             return response()->json(['success' => false, 'message' => 'Authentication required.'], 401);
         }
 
-        if (!in_array(strtolower((string) $user->role), ['admin', 'manager', 'staff'], true)) {
+        if (!$user->isAdmin() && !in_array(strtolower((string) $user->role), ['manager', 'staff'], true)) {
             return response()->json(['success' => false, 'message' => 'Staff authorization required.'], 403);
         }
 
@@ -154,7 +154,7 @@ abstract class Controller
             return response()->json(['success' => false, 'message' => 'Authentication required.'], 401);
         }
 
-        if (!in_array(strtolower((string) $user->role), ['admin', 'manager'], true)) {
+        if (!$user->isAdmin() && strtolower((string) $user->role) !== 'manager') {
             return response()->json(['success' => false, 'message' => 'Manager authorization required.'], 403);
         }
 
