@@ -101,6 +101,48 @@ describe("Ingredients alerts", () => {
     expect(screen.getByText("Showing 11–12 of 12 ingredients")).toBeInTheDocument();
   });
 
+  test("keeps null-expiry batches visible and shows a dash for expiry", async () => {
+    global.fetch.mockImplementation((url) => {
+      const value = String(url);
+      if (value.includes("/api/staff/inventory/ingredients/1/batches")) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            success: true,
+            batches: [
+              { id: 1, batch_number: "LEGACY-9", quantity_remaining: 3, expiry_date: null, status: "Usable" },
+              { id: 2, batch_number: "DATED-001", quantity_remaining: 4, expiry_date: "2026-11-08", status: "Usable" },
+            ],
+          }),
+        });
+      }
+      if (value.includes("/api/staff/inventory/ingredients") || value.includes("/api/staff/inventory/batches")) {
+        if (value.includes("/api/staff/inventory/ingredients")) {
+          return Promise.resolve({
+            ok: true,
+            json: async () => ({
+              success: true,
+              ingredients: [{ id: 1, name: "Cake Topper", unit: "pcs", stock: 7, usable_stock: 7, threshold: 1 }],
+            }),
+          });
+        }
+        return Promise.resolve({ ok: true, json: async () => ({ success: true, batches: [] }) });
+      }
+      if (value.includes("api_ingredient_history.php")) {
+        return Promise.resolve({ ok: true, json: async () => ({ success: true, history: [] }) });
+      }
+      return Promise.resolve({ ok: true, json: async () => ({ success: true }) });
+    });
+
+    render(<Ingredients />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "View Cake Topper history" }));
+
+    expect(await screen.findByText("LEGACY-9")).toBeInTheDocument();
+    expect(screen.getAllByText("—").length).toBeGreaterThan(0);
+    expect(screen.getByText("DATED-001")).toBeInTheDocument();
+  });
+
   test("confirms ingredient deletion with the shared admin dialog", async () => {
     render(<Ingredients />);
 

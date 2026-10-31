@@ -755,9 +755,34 @@ class StaffApiController extends Controller
                 ->orderByDesc('quantity')
                 ->get();
 
-            $nearExpiry = $ingredients->filter(function ($ingredient) use ($today) {
-                    return $ingredient->expiry !== null && $ingredient->expiry >= $today->toDateString() && $ingredient->expiry <= $today->copy()->addDays(7)->toDateString();
+            $nearExpiry = DB::table('ingredient_batches as ib')
+                ->where('ib.quantity_remaining', '>', 0)
+                ->whereNotNull('ib.expiry_date')
+                ->whereDate('ib.expiry_date', '>=', $today->toDateString())
+                ->whereDate('ib.expiry_date', '<=', $today->copy()->addDays(7)->toDateString())
+                ->select([
+                    'ib.ingredient_id as id',
+                    DB::raw('MIN(ib.expiry_date) as expiry'),
+                ])
+                ->groupBy('ib.ingredient_id')
+                ->orderBy('expiry')
+                ->get()
+                ->map(function ($batchExpiry) use ($ingredients) {
+                    $ingredient = $ingredients->firstWhere('id', $batchExpiry->id);
+                    if (!$ingredient) {
+                        return null;
+                    }
+
+                    return [
+                        'id' => (int) $ingredient->id,
+                        'name' => $ingredient->name,
+                        'unit' => $ingredient->unit,
+                        'stock' => (float) ($ingredient->stock ?? 0),
+                        'threshold' => (float) ($ingredient->threshold ?? 0),
+                        'expiry' => $batchExpiry->expiry,
+                    ];
                 })
+                ->filter()
                 ->values();
             $totalInventoryItems = $productInventoryItemCount + $ingredients->count();
             $lowStockCount = $lowStock->count() + $lowStockIngredients->count();

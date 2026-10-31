@@ -6,6 +6,7 @@ use App\Models\User;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\URL;
 use Tests\TestCase;
 
 class StaffProductCatalogTest extends TestCase
@@ -13,6 +14,8 @@ class StaffProductCatalogTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+
+        URL::forceRootUrl('http://localhost');
 
         Schema::create('products', function ($table) {
             $table->id();
@@ -611,5 +614,48 @@ class StaffProductCatalogTest extends TestCase
             'stock' => 0,
             'inventory_type' => 'product',
         ]);
+    }
+
+    public function test_staff_dashboard_near_expiry_uses_active_batch_expiry_dates(): void
+    {
+        $admin = new User();
+        $admin->role = 'admin';
+        $admin->status = 'active';
+
+        DB::table('ingredients')->where('id', 1)->update([
+            'expiry' => now()->addMonth()->toDateString(),
+            'stock' => 99,
+        ]);
+        DB::table('ingredient_batches')->where('ingredient_id', 1)->delete();
+        DB::table('ingredients')->insert([
+            ['id' => 2, 'name' => 'Sugar', 'unit' => 'kg', 'stock' => 3, 'threshold' => 1],
+            ['id' => 3, 'name' => 'Salt', 'unit' => 'kg', 'stock' => 2, 'threshold' => 1],
+            ['id' => 4, 'name' => 'Yeast', 'unit' => 'g', 'stock' => 1, 'threshold' => 1],
+            ['id' => 5, 'name' => 'Butter', 'unit' => 'kg', 'stock' => 4, 'threshold' => 1],
+        ]);
+        DB::table('ingredient_batches')->insert([
+            ['ingredient_id' => 1, 'batch_number' => 'FLOUR-NEAR-1', 'quantity_received' => 5, 'quantity_remaining' => 5, 'expiry_date' => now()->addDays(3)->toDateString()],
+            ['ingredient_id' => 1, 'batch_number' => 'FLOUR-NEAR-2', 'quantity_received' => 3, 'quantity_remaining' => 3, 'expiry_date' => now()->addDays(5)->toDateString()],
+            ['ingredient_id' => 2, 'batch_number' => 'SUGAR-NULL', 'quantity_received' => 3, 'quantity_remaining' => 3, 'expiry_date' => null],
+            ['ingredient_id' => 3, 'batch_number' => 'SALT-DEPLETED', 'quantity_received' => 2, 'quantity_remaining' => 0, 'expiry_date' => now()->addDays(2)->toDateString()],
+            ['ingredient_id' => 4, 'batch_number' => 'YEAST-EXPIRED', 'quantity_received' => 1, 'quantity_remaining' => 1, 'expiry_date' => now()->subDay()->toDateString()],
+            ['ingredient_id' => 5, 'batch_number' => 'BUTTER-LATER', 'quantity_received' => 4, 'quantity_remaining' => 4, 'expiry_date' => now()->addDays(8)->toDateString()],
+        ]);
+
+        $response = $this->actingAs($admin)
+            ->getJson('/api/staff/dashboard')
+            ->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonCount(1, 'inventory.near_expiry')
+            ->assertJsonPath('inventory.near_expiry.0.id', 1)
+            ->assertJsonPath('inventory.near_expiry.0.name', 'Flour')
+            ->assertJsonPath('inventory.near_expiry.0.stock', 8)
+            ->assertJsonPath('inventory.near_expiry.0.expiry', now()->addDays(3)->toDateString())
+            ->assertJsonPath('needs_attention.near_expiry', 1)
+            ->assertJsonPath('inventory_health.near_expiry', 1);
+
+        $nearExpiry = $response->json('inventory.near_expiry');
+        $this->assertCount(1, $nearExpiry);
+        $this->assertSame(['Flour'], array_column($nearExpiry, 'name'));
     }
 }
