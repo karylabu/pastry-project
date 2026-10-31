@@ -48,7 +48,7 @@ describe("AdminActivityLog", () => {
     expect(getByTestId("activity-log-page-content")).toHaveClass("pt-[88px]", "lg:pl-[260px]");
     expect(screen.getByRole("button", { name: "Shop Owner" })).toHaveAttribute("aria-pressed", "false");
     expect(screen.getByRole("button", { name: "Admin" })).toHaveAttribute("aria-pressed", "false");
-    expect(screen.getByRole("button", { name: "Staff" })).toHaveAttribute("aria-pressed", "false");
+    expect(screen.queryByRole("button", { name: "Staff" })).not.toBeInTheDocument();
     expect(screen.getByText("Account:").parentElement).toHaveClass("order-2", "justify-end");
     expect(screen.getByText("Category:").parentElement).toHaveClass("order-1", "justify-start");
     for (const category of ["Products", "Ingredients", "Recipe", "Orders", "Custom Cake"]) {
@@ -174,16 +174,46 @@ describe("AdminActivityLog", () => {
     expect(screen.getByRole("button", { name: "All" })).toHaveAttribute("aria-pressed", "false");
   });
 
-  test("filters audit activity by staff account", async () => {
+  test("keeps the activity table headers visible for every category", async () => {
     render(<AdminActivityLog />);
     await screen.findByText("Changed order status");
 
-    fireEvent.click(screen.getByRole("button", { name: "Staff" }));
-    await waitFor(() => {
-      expect(global.fetch).toHaveBeenLastCalledWith(
-        expect.stringContaining("actor_role=staff"),
-        expect.any(Object)
-      );
+    for (const category of ["Products", "Ingredients", "Recipe", "Orders", "Custom Cake"]) {
+      fireEvent.click(screen.getByRole("button", { name: category }));
+      await waitFor(() => {
+        const requestUrl = global.fetch.mock.calls[global.fetch.mock.calls.length - 1][0];
+        expect(new URL(requestUrl).searchParams.get("category")).toBe(category);
+      });
+      for (const heading of ["Activity", "Admin / Staff", "Details", "IP Address", "Result", "Timestamp"]) {
+        expect(screen.getByRole("columnheader", { name: heading })).toBeInTheDocument();
+      }
+    }
+  });
+
+  test("keeps staff activity visible without a Staff account filter", async () => {
+    global.fetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        success: true,
+        data: [{
+          id: 11,
+          action: "Stocked in flour",
+          category: "Ingredients",
+          actor_name: "Staff Member",
+          actor_email: "staff@example.com",
+          actor_role: "staff",
+          details: { Ingredient: "Flour", "Quantity added": 3 },
+          ip_address: "203.0.113.15",
+          response_status: 200,
+          created_at: "2026-10-31T04:30:00Z",
+        }],
+        pagination: { current_page: 1, last_page: 1, total: 1 },
+      }),
     });
+
+    render(<AdminActivityLog />);
+
+    expect(await screen.findByText("staff@example.com · Staff")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Staff" })).not.toBeInTheDocument();
   });
 });

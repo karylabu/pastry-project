@@ -162,7 +162,6 @@ export default function AdminActivityLog() {
   const accountFilters = [
     { label: "Shop Owner", role: "super_admin" },
     { label: "Admin", role: "admin" },
-    { label: "Staff", role: "staff" },
   ];
   const categoryFilters = ["Products", "Ingredients", "Recipe", "Orders", "Custom Cake"];
 
@@ -259,20 +258,6 @@ export default function AdminActivityLog() {
                 })}
               </div>
             </div>
-        {error ? (
-          <div role="alert" className="flex items-center gap-2 px-5 py-8 text-sm text-[#a33d32]">
-            <AlertCircle size={17} /> {error}
-          </div>
-        ) : loading ? (
-          <p className="px-5 py-10 text-center text-sm text-[#74675f]">Loading activity…</p>
-        ) : logs.length === 0 ? (
-          <div className="px-5 py-12 text-center">
-            <Clock3 size={22} className="mx-auto text-[#b6a99d]" />
-            <p className="mt-2 text-sm font-medium text-[#514239]">No activity found</p>
-            <p className="mt-1 text-xs text-[#8f8076]">Admin and staff changes will appear here.</p>
-          </div>
-        ) : (
-          <>
             <div className="overflow-x-auto">
               <table className="w-full min-w-[980px] text-left">
                 <thead className="border-b border-[#eee7df] bg-[#fbf9f6] text-[10px] uppercase tracking-[0.12em] text-[#74675f]">
@@ -286,7 +271,23 @@ export default function AdminActivityLog() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#f0e9e2]">
-                  {logs.map((log) => (
+                  {error ? (
+                    <tr>
+                      <td colSpan={6} role="alert" className="px-5 py-8 text-sm text-[#a33d32]">
+                        <span className="flex items-center gap-2"><AlertCircle size={17} /> {error}</span>
+                      </td>
+                    </tr>
+                  ) : loading ? (
+                    <tr><td colSpan={6} className="px-5 py-10 text-center text-sm text-[#74675f]">Loading activity…</td></tr>
+                  ) : logs.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="px-5 py-8 text-center">
+                        <Clock3 size={22} className="mx-auto text-[#b6a99d]" />
+                        <p className="mt-2 text-sm font-medium text-[#514239]">No activity found</p>
+                        <p className="mt-1 text-xs text-[#8f8076]">Admin and staff changes will appear here.</p>
+                      </td>
+                    </tr>
+                  ) : logs.map((log) => (
                     <tr key={log.id} className="align-top text-xs text-[#514239]">
                       <td className="px-4 py-3">
                         <p className="font-semibold text-[#33251e]">{log.action}</p>
@@ -315,6 +316,7 @@ export default function AdminActivityLog() {
                 </tbody>
               </table>
             </div>
+            {logs.length > 0 && (
             <footer className="flex items-center justify-between border-t border-[#eee7df] px-4 py-3">
               <p className="text-xs text-[#74675f]">{pagination.total || 0} recorded actions</p>
               <div className="flex items-center gap-2">
@@ -323,8 +325,7 @@ export default function AdminActivityLog() {
                 <button type="button" aria-label="Next page" disabled={page >= lastPage || loading} onClick={() => setPage((current) => current + 1)} className="rounded border border-[#e8dfd4] p-1.5 text-[#65574d] disabled:opacity-40"><ChevronRight size={16} /></button>
               </div>
             </footer>
-          </>
-        )}
+            )}
           </section>
         </div>
       </div>
