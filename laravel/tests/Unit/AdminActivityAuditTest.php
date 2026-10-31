@@ -66,4 +66,25 @@ class AdminActivityAuditTest extends TestCase
             ],
         ];
     }
+
+    /**
+     * @dataProvider excludedActivities
+     */
+    public function test_it_excludes_login_and_recipe_sync_activity(string $uri): void
+    {
+        $request = Request::create('/' . $uri, 'POST');
+        $isExcludedActivity = new \ReflectionMethod(AuditAdminActivity::class, 'isExcludedActivity');
+        $isExcludedActivity->setAccessible(true);
+
+        $this->assertTrue($isExcludedActivity->invoke(new AuditAdminActivity(), $request));
+    }
+
+    public static function excludedActivities(): array
+    {
+        return [
+            'API login' => ['api/login'],
+            'staff login' => ['staff/login'],
+            'recipe sync' => ['api/staff/ingredients/sync-recipes'],
+        ];
+    }
 }

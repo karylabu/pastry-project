@@ -81,6 +81,24 @@ class AdminActivityLogCategoryFilterTest extends TestCase
                 'updated_at' => $now,
             ]);
         }
+
+        foreach ([
+            ['System', 'api/login'],
+            ['Products', 'api/staff/ingredients/sync-recipes'],
+        ] as [$category, $route]) {
+            DB::table('admin_activity_logs')->insert([
+                'actor_name' => 'Shop Owner',
+                'actor_email' => 'owner@example.com',
+                'actor_role' => 'super_admin',
+                'action' => $route === 'api/login' ? 'Created Login' : 'Synchronized product',
+                'category' => $category,
+                'method' => 'POST',
+                'route' => $route,
+                'response_status' => 200,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ]);
+        }
     }
 
     protected function tearDown(): void
@@ -108,5 +126,15 @@ class AdminActivityLogCategoryFilterTest extends TestCase
                 ->assertOk()
                 ->assertJsonPath('pagination.total', $total);
         }
+    }
+
+    public function test_login_and_recipe_sync_entries_are_hidden_from_the_audit_trail(): void
+    {
+        $this->withHeader('X-Auth-Token', 'owner-token')
+            ->getJson('http://localhost/api/admin-management/activity-logs')
+            ->assertOk()
+            ->assertJsonPath('pagination.total', 8)
+            ->assertJsonMissing(['action' => 'Created Login'])
+            ->assertJsonMissing(['action' => 'Synchronized product']);
     }
 }

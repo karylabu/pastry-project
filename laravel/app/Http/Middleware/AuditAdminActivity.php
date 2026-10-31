@@ -22,6 +22,10 @@ class AuditAdminActivity
             return $response;
         }
 
+        if ($this->isExcludedActivity($request)) {
+            return $response;
+        }
+
         if (in_array($request->method(), ['GET', 'HEAD', 'OPTIONS'], true)) {
             return $response;
         }
@@ -74,6 +78,14 @@ class AuditAdminActivity
         ]);
 
         return $response;
+    }
+
+    private function isExcludedActivity(Request $request): bool
+    {
+        $route = strtolower((string) ($request->route()?->uri() ?? $request->path()));
+
+        return preg_match('~(?:^|/)login/?$~', $route) === 1
+            || str_contains($route, 'sync-recipes');
     }
 
     private function resolveActor(Request $request): ?User

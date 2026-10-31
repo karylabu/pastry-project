@@ -20,6 +20,12 @@ class AdminActivityLogController extends Controller
         }
 
         $query = AdminActivityLog::query()->orderByDesc('created_at')->orderByDesc('id');
+        $query->whereNot(function ($excluded): void {
+            $excluded->whereRaw('LOWER(route) LIKE ?', ['%/login'])
+                ->orWhereRaw('LOWER(route) = ?', ['login'])
+                ->orWhereRaw('LOWER(route) LIKE ?', ['%/sync-recipes']);
+        });
+
         if ($request->filled('search')) {
             $search = trim((string) $request->input('search'));
             $query->where(function ($builder) use ($search): void {
