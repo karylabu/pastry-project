@@ -36,6 +36,35 @@ class AdminActivityLogController extends Controller
             $query->where('actor_role', $actorRole);
         }
 
+        $category = trim((string) $request->input('category', ''));
+        $legacyCategories = [
+            'Products' => ['category' => 'Inventory', 'routes' => ['%stock/mutate%', '%production%']],
+            'Ingredients' => ['category' => 'Inventory', 'routes' => ['%ingredient%', '%inventory%', '%waste%']],
+            'Recipe' => ['category' => 'Products', 'routes' => ['%/recipe%', '%/recipes%']],
+            'Custom Cake' => ['category' => 'Custom cakes', 'routes' => ['%customized-cake%']],
+        ];
+        if (in_array($category, ['Products', 'Ingredients', 'Recipe', 'Orders', 'Custom Cake'], true)) {
+            $query->where(function ($builder) use ($category, $legacyCategories): void {
+                $builder->where(function ($currentQuery) use ($category): void {
+                    $currentQuery->where('category', $category);
+                    if ($category === 'Products') {
+                        $currentQuery->where('route', 'not like', '%recipe%');
+                    }
+                });
+                if (isset($legacyCategories[$category])) {
+                    $legacy = $legacyCategories[$category];
+                    $builder->orWhere(function ($legacyQuery) use ($legacy): void {
+                        $legacyQuery->where('category', $legacy['category'])
+                            ->where(function ($routeQuery) use ($legacy): void {
+                                foreach ($legacy['routes'] as $routePattern) {
+                                    $routeQuery->orWhere('route', 'like', $routePattern);
+                                }
+                            });
+                    });
+                }
+            });
+        }
+
         $logs = $query->paginate(min(max((int) $request->input('per_page', 25), 1), 100));
 
         return response()->json([

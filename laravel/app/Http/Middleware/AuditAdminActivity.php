@@ -123,14 +123,15 @@ class AuditAdminActivity
         $parameters = $request->route()?->parameters() ?? [];
 
         $category = match (true) {
-            str_contains($route, 'waste') => 'Inventory',
-            str_contains($route, 'order') => 'Orders',
-            str_contains($route, 'product'), str_contains($route, 'recipe') => 'Products',
-            str_contains($route, 'inventory'),
             str_contains($route, 'ingredient'),
-            str_contains($route, 'stock'),
-            str_contains($route, 'production') => 'Inventory',
-            str_contains($route, 'customized-cake') => 'Custom cakes',
+            str_contains($route, 'inventory') => 'Ingredients',
+            str_contains($route, 'recipe') => 'Recipe',
+            str_contains($route, 'stock/mutate'),
+            str_contains($route, 'product'),
+            str_contains($route, 'production') => 'Products',
+            str_contains($route, 'customized-cake') => 'Custom Cake',
+            str_contains($route, 'order') => 'Orders',
+            str_contains($route, 'waste') => 'Ingredients',
             str_contains($route, 'promotion') => 'Promotions',
             str_contains($route, 'user'), str_contains($route, 'staff') => 'Users',
             str_contains($route, 'setting') => 'Settings',
@@ -141,8 +142,10 @@ class AuditAdminActivity
         $subjectType = match ($category) {
             'Orders' => 'order',
             'Products' => 'product',
+            'Ingredients' => 'ingredient',
+            'Recipe' => 'recipe',
+            'Custom Cake' => 'custom cake',
             'Inventory' => 'inventory',
-            'Custom cakes' => 'custom cake',
             'Promotions' => 'promotion',
             'Users' => 'user',
             'Settings' => 'settings',
@@ -158,25 +161,32 @@ class AuditAdminActivity
             default => 'Changed',
         };
         if ($category === 'Orders' && str_contains($route, 'status')) {
-            $action = 'Changed order status';
-            $category = 'Orders';
-            $subjectType = 'order';
-        } elseif (str_contains($route, 'request-status')) {
-            $action = 'Changed custom cake request status';
-            $category = 'Custom cakes';
-            $subjectType = 'custom cake';
-        } elseif (str_contains($route, 'adjust-stock') || str_contains($route, 'stock/mutate')) {
-            $action = 'Adjusted inventory';
-            $category = 'Inventory';
-            $subjectType = 'inventory';
+            $newStatus = strtolower(trim((string) $request->input('status', '')));
+            $action = in_array($newStatus, ['preparing', 'confirmed', 'approved'], true)
+                ? 'Accepted order'
+                : 'Changed order status';
+        } elseif ($category === 'Custom Cake' && str_contains($route, 'request-status')) {
+            $action = $request->boolean('enabled')
+                ? 'Enabled custom cake requests'
+                : 'Disabled custom cake requests';
+        } elseif (str_contains($route, 'stock/mutate')) {
+            $action = strtolower(trim((string) $request->input('action_type', ''))) === 'stock_in'
+                ? 'Stocked in product'
+                : 'Stocked out product';
+        } elseif (str_contains($route, 'ingredients') && str_contains($route, 'adjust-stock')) {
+            $action = strtolower(trim((string) $request->input('action', ''))) === 'stock_in'
+                ? 'Stocked in ingredient'
+                : 'Stocked out ingredient';
+        } elseif (str_contains($route, 'inventory/batches') && strtoupper($request->method()) === 'POST') {
+            $action = 'Stocked in ingredient';
+        } elseif (str_contains($route, 'ingredient') && strtoupper($request->method()) === 'DELETE') {
+            $action = 'Deleted ingredient';
+        } elseif ($category === 'Recipe') {
+            $action = strtoupper($request->method()) === 'DELETE' ? 'Deleted recipe' : 'Saved recipe';
         } elseif (str_contains($route, 'waste')) {
             $action = 'Logged waste';
-            $category = 'Inventory';
-            $subjectType = 'inventory';
         } elseif (str_contains($route, 'archive')) {
             $action = 'Changed product archive status';
-            $category = 'Products';
-            $subjectType = 'product';
         } elseif (str_contains($route, 'approve') || str_contains($route, 'reject')) {
             $action = ucfirst(str_contains($route, 'approve') ? 'approved ' : 'rejected ') . ($subjectType ?? 'record');
         } elseif (str_contains($route, 'restore')) {
@@ -198,6 +208,15 @@ class AuditAdminActivity
             if (is_scalar($parameter) && is_numeric($parameter)) {
                 $subjectId = (string) $parameter;
                 break;
+            }
+        }
+        if ($subjectId === null) {
+            foreach (['product_id', 'product_size_id', 'ingredient_id', 'order_id', 'recipe_id'] as $key) {
+                $value = $request->input($key);
+                if (is_scalar($value) && is_numeric($value)) {
+                    $subjectId = (string) $value;
+                    break;
+                }
             }
         }
 

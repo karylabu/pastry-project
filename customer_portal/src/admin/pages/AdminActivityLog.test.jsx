@@ -41,6 +41,10 @@ describe("AdminActivityLog", () => {
     expect(getByTestId("activity-log-page-content")).toHaveClass("pt-[88px]", "lg:pl-[260px]");
     expect(screen.getByRole("button", { name: "Shop Owner" })).toHaveAttribute("aria-pressed", "false");
     expect(screen.getByRole("button", { name: "Admin" })).toHaveAttribute("aria-pressed", "false");
+    for (const category of ["Products", "Ingredients", "Recipe", "Orders", "Custom Cake"]) {
+      expect(screen.getByRole("button", { name: category })).toHaveAttribute("aria-pressed", "false");
+    }
+    expect(screen.getByRole("button", { name: "All" })).toHaveAttribute("aria-pressed", "true");
     expect(await screen.findByText("Changed order status")).toBeInTheDocument();
     expect(screen.getAllByText("Admin").length).toBeGreaterThan(0);
     expect(screen.getByText("203.0.113.15")).toBeInTheDocument();
@@ -70,5 +74,20 @@ describe("AdminActivityLog", () => {
     });
     expect(screen.getByRole("button", { name: "Shop Owner" })).toHaveAttribute("aria-pressed", "false");
     expect(screen.getByRole("button", { name: "Admin" })).toHaveAttribute("aria-pressed", "true");
+  });
+
+  test("filters audit activity by category", async () => {
+    render(<AdminActivityLog />);
+    await screen.findByText("Changed order status");
+
+    fireEvent.click(screen.getByRole("button", { name: "Ingredients" }));
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenLastCalledWith(
+        expect.stringContaining("category=Ingredients"),
+        expect.any(Object)
+      );
+    });
+    expect(screen.getByRole("button", { name: "Ingredients" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "All" })).toHaveAttribute("aria-pressed", "false");
   });
 });
