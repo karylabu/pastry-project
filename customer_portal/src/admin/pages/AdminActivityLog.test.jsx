@@ -34,8 +34,11 @@ describe("AdminActivityLog", () => {
   afterEach(() => jest.restoreAllMocks());
 
   test("shows the recorded actor, action, changes, IP address, and result", async () => {
-    render(<AdminActivityLog />);
+    const { getByTestId } = render(<AdminActivityLog />);
 
+    expect(screen.getByText("Access control")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Audit Trail" })).toBeInTheDocument();
+    expect(getByTestId("activity-log-page-content")).toHaveClass("pt-[88px]", "lg:pl-[260px]");
     expect(await screen.findByText("Changed order status")).toBeInTheDocument();
     expect(screen.getByText("Admin")).toBeInTheDocument();
     expect(screen.getByText("203.0.113.15")).toBeInTheDocument();

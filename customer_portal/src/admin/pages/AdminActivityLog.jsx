@@ -56,26 +56,28 @@ export default function AdminActivityLog() {
   const lastPage = Math.max(1, Number(pagination.last_page || 1));
 
   return (
-    <div className="space-y-5">
-      <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#92701e]">Administration</p>
-          <h1 className="mt-1 text-2xl font-bold text-[#33251e]">Audit Trail</h1>
-          <p className="mt-1 text-sm text-[#74675f]">Review admin and staff activity, changes, timestamps, and source IP addresses.</p>
-        </div>
-        <div className="flex h-10 items-center gap-2 rounded-md border border-[#e8dfd4] bg-white px-3 sm:w-72">
-          <Search size={15} className="text-[#8f8076]" />
-          <input
-            aria-label="Search activity"
-            className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-[#a99a8e]"
-            placeholder="Search name, action, or IP"
-            value={search}
-            onChange={(event) => { setSearch(event.target.value); setPage(1); }}
-          />
-        </div>
-      </header>
+    <div className="min-h-screen bg-[#fbfaf5] font-['DM_Sans'] text-[#33251e]">
+      <div data-testid="activity-log-page-content" className="pt-[88px] lg:pl-[260px]">
+        <div className="mx-auto max-w-[1400px] space-y-5 px-4 py-5 sm:px-6 md:px-8 lg:px-10 lg:py-7">
+          <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.24em] text-[#92701e]">Access control</p>
+              <h1 className="mt-1 font-serif text-[27px] leading-tight text-[#33251e]">Audit Trail</h1>
+              <p className="mt-1 text-[12px] text-[#74675f]">Review admin and staff activity, changes, timestamps, and source IP addresses.</p>
+            </div>
+            <div className="flex h-10 items-center gap-2 rounded-md border border-[#e8dfd4] bg-white px-3 sm:w-72">
+              <Search size={15} className="text-[#8f8076]" />
+              <input
+                aria-label="Search activity"
+                className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-[#a99a8e]"
+                placeholder="Search name, action, or IP"
+                value={search}
+                onChange={(event) => { setSearch(event.target.value); setPage(1); }}
+              />
+            </div>
+          </header>
 
-      <section className="overflow-hidden rounded-lg border border-[#e9e1d9] bg-white shadow-[0_3px_12px_rgba(60,42,28,0.035)]">
+          <section className="overflow-hidden rounded-lg border border-[#e9e1d9] bg-white shadow-[0_3px_12px_rgba(60,42,28,0.035)]">
         {error ? (
           <div role="alert" className="flex items-center gap-2 px-5 py-8 text-sm text-[#a33d32]">
             <AlertCircle size={17} /> {error}
@@ -136,7 +138,9 @@ export default function AdminActivityLog() {
             </footer>
           </>
         )}
-      </section>
+          </section>
+        </div>
+      </div>
     </div>
   );
 }
