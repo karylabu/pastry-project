@@ -75,12 +75,14 @@ describe("CustomCakes", () => {
     expect(customerCell).toHaveTextContent("Mila Customer");
     expect(customerCell).not.toHaveTextContent("09260771217");
     expect(orderRow).not.toHaveTextContent('{"customer_name"');
-    expect(orderRow).toHaveTextContent("Pickup on Oct 30, 2026");
+    expect(orderRow).toHaveTextContent("Pickup · Oct 30, 2026");
     expect(orderRow).not.toHaveTextContent("Delivery method:");
     expect(orderRow).not.toHaveTextContent("Pickup date:");
-    expect(orderRow).toHaveTextContent("Blue ocean theme");
-    expect(orderRow).toHaveTextContent("8 inches");
-    expect(orderRow).toHaveTextContent("Vanilla");
+    expect(orderRow).not.toHaveTextContent("6 x 3 inch");
+    expect(orderRow).not.toHaveTextContent("Single Tier");
+    expect(orderRow).not.toHaveTextContent("Blue ocean theme");
+    expect(orderRow).not.toHaveTextContent("8 inches");
+    expect(orderRow).not.toHaveTextContent("Vanilla");
     expect(within(orderRow).getByRole("img", { name: "Customer cake reference" })).toHaveAttribute(
       "src",
       "/assets/logo.png",

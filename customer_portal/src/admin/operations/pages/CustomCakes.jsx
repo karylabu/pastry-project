@@ -234,23 +234,7 @@ export default function CustomCakes() {
   const getRequestDetailsSummary = (order) => {
     const details = new Map(parseCustomDetails(order));
     const deliveryMethod = details.get("Delivery method");
-    const deliveryAddress = details.get("Delivery address");
     const pickupDate = details.get("Pickup date");
-    const summaryFields = new Set([
-      "Cake size",
-      "Cake type",
-      "Servings",
-      "Cake flavor",
-      "Filling flavor",
-      "Frosting type",
-      "Occasion",
-      "Theme",
-      "Packaging",
-      "Cake color",
-      "Custom message",
-      "Special instructions",
-      "Add-ons",
-    ]);
 
     const datePart = pickupDate?.match(/^(\d{4})-(\d{2})-(\d{2})$/);
     const formattedPickupDate = datePart
@@ -261,16 +245,8 @@ export default function CustomCakes() {
         year: "numeric",
       })
       : pickupDate;
-    const fulfillmentSummary = [
-      deliveryMethod,
-      formattedPickupDate && `on ${formattedPickupDate}`,
-      deliveryMethod?.toLowerCase() === "delivery" && deliveryAddress && `to ${deliveryAddress}`,
-    ].filter(Boolean).join(" ");
-    const cakeDetails = [...details]
-      .filter(([label]) => summaryFields.has(label))
-      .map(([, value]) => value);
 
-    return [fulfillmentSummary, ...cakeDetails].filter(Boolean).join(" · ") || "Custom cake request details";
+    return [deliveryMethod, formattedPickupDate].filter(Boolean).join(" · ") || "Custom cake request details";
   };
 
   const getOrderReferenceImage = (order) => {
