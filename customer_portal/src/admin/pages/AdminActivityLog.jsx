@@ -51,58 +51,63 @@ function formatDetailValue(value) {
   return String(value);
 }
 
+function formatChange(field, before, after, record) {
+  const label = formatDetailLabel(field);
+  const name = record && record !== "system record" ? `${record} ` : "";
+
+  if (["archived", "is_archived"].includes(field.toLowerCase())) {
+    return after ? `${record || "Record"} is archived` : `${record || "Record"} is no longer archived`;
+  }
+  if (["available", "active", "enabled"].includes(field.toLowerCase())) {
+    if (after) return `${record || "Record"} is now ${field.toLowerCase() === "available" ? "available" : "active"}`;
+    return `${record || "Record"} is no longer ${field.toLowerCase() === "available" ? "available" : "active"}`;
+  }
+  if (field.toLowerCase() === "status") {
+    return `${record ? `${record} status` : "Status"} changed from ${formatDetailValue(before)} to ${formatDetailValue(after)}`;
+  }
+
+  return `${label} changed from ${formatDetailValue(before)} to ${formatDetailValue(after)}`;
+}
+
 function formatDetails(details) {
   if (!details || typeof details !== "object" || Object.keys(details).length === 0) return ["No details recorded"];
 
   const lines = [];
-  const handled = new Set();
-  const previousStock = details["Previous stock"];
-  const newStock = details["New stock"];
+  const record = details.Product || details.Ingredient || details.Record;
   const stockAdded = details["Quantity added"];
   const stockRemoved = details["Quantity removed"];
 
-  if (previousStock !== undefined && newStock !== undefined) {
-    let change = "";
-    if (stockAdded !== undefined) change = ` (added ${formatDetailValue(stockAdded)})`;
-    if (stockRemoved !== undefined) change = ` (removed ${formatDetailValue(stockRemoved)})`;
-    lines.push(`Stock: ${formatDetailValue(previousStock)} → ${formatDetailValue(newStock)}${change}`);
-    ["Previous stock", "New stock", "Quantity added", "Quantity removed"].forEach((key) => handled.add(key));
-  } else if (stockAdded !== undefined || stockRemoved !== undefined) {
-    const key = stockAdded !== undefined ? "Quantity added" : "Quantity removed";
-    lines.push(`${stockAdded !== undefined ? "Added to stock" : "Removed from stock"}: ${formatDetailValue(details[key])}`);
-    handled.add(key);
+  if ((stockAdded !== undefined || stockRemoved !== undefined) && record) {
+    const quantity = formatDetailValue(stockAdded ?? stockRemoved);
+    lines.push(stockAdded !== undefined
+      ? `Added ${quantity} stock for ${record}`
+      : `Removed ${quantity} stock from ${record}`);
   }
 
   const flatten = (value, path = []) => {
     if (value && typeof value === "object" && !Array.isArray(value)) {
       if (Object.prototype.hasOwnProperty.call(value, "Before") && Object.prototype.hasOwnProperty.call(value, "After")) {
-        const label = path.filter((part) => part.toLowerCase() !== "changes").map(formatDetailLabel).join(" · ");
-        lines.push(`${label}: ${formatDetailValue(value.Before)} → ${formatDetailValue(value.After)}`);
+        const field = path[path.length - 1] || "Value";
+        lines.push(formatChange(field, value.Before, value.After, record));
         return;
       }
       Object.entries(value).forEach(([key, nestedValue]) => flatten(nestedValue, [...path, key]));
       return;
     }
 
-    const label = path.map(formatDetailLabel).join(" · ");
-    lines.push(`${label}: ${formatDetailValue(value)}`);
+    const field = path[path.length - 1] || "Value";
+    if (field === "Record" || ["Product", "Ingredient"].includes(field)) return;
+    lines.push(`${formatDetailLabel(field)}: ${formatDetailValue(value)}`);
   };
 
   Object.entries(details).forEach(([key, value]) => {
-    if (handled.has(key)) return;
-    if (["Product", "Ingredient"].includes(key)) return;
-    if (key === "Record" && Object.keys(details).length > 1) return;
-
-    if (key === "Expiry date" && typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
-      const [year, month, day] = value.split("-").map(Number);
-      lines.push(`Expires: ${new Date(year, month - 1, day).toLocaleDateString()}`);
+    if (["Product", "Ingredient", "Record", "Previous stock", "New stock", "Quantity added", "Quantity removed", "Size", "Expiry date"].includes(key)) {
       return;
     }
-
     flatten(value, [key]);
   });
 
-  return lines;
+  return [...new Set(lines)];
 }
 
 export default function AdminActivityLog() {

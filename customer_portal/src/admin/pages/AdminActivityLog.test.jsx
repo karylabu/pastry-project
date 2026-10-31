@@ -22,6 +22,7 @@ describe("AdminActivityLog", () => {
           actor_email: "admin@example.com",
           actor_role: "admin",
           details: {
+            Record: "ORD-100",
             Changes: {
               order: {
                 status: { Before: "Preparing", After: "Ready for Pickup" },
@@ -62,7 +63,7 @@ describe("AdminActivityLog", () => {
     expect(screen.queryByText(/api\/staff/)).not.toBeInTheDocument();
   });
 
-  test("explains stock changes in a concise, readable way", async () => {
+  test("describes stock changes in one simple sentence", async () => {
     global.fetch.mockResolvedValueOnce({
       ok: true,
       json: async () => ({
@@ -93,10 +94,45 @@ describe("AdminActivityLog", () => {
     render(<AdminActivityLog />);
 
     expect(await screen.findByText("Added 1 Blueberry Cheesecake (small) to stock")).toBeInTheDocument();
-    expect(screen.getByText("Stock: 12 → 13 (added 1)")).toBeInTheDocument();
-    expect(screen.getByText("Size: small")).toBeInTheDocument();
-    expect(screen.getByText(/^Expires:/)).toBeInTheDocument();
-    expect(screen.queryByText(/Previous stock|New stock|Quantity added|Product:/)).not.toBeInTheDocument();
+    expect(screen.getByText("Added 1 stock for Blueberry Cheesecake")).toBeInTheDocument();
+    expect(screen.queryByText(/Previous stock|New stock|Quantity added|Product:|Size:|Expires:/)).not.toBeInTheDocument();
+  });
+
+  test("describes archive changes as a simple sentence", async () => {
+    global.fetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        success: true,
+        data: [{
+          id: 10,
+          action: "Archived Mika",
+          category: "Users",
+          actor_name: "Shop Owner",
+          actor_email: "owner@example.com",
+          actor_role: "super_admin",
+          details: {
+            Record: "Mika",
+            Changes: {
+              user: { is_archived: { Before: false, After: true } },
+            },
+          },
+          ip_address: "203.0.113.15",
+          response_status: 200,
+          created_at: "2026-10-31T04:30:00Z",
+        }],
+        pagination: { current_page: 1, last_page: 1, total: 1 },
+      }),
+    });
+
+    render(<AdminActivityLog />);
+
+    expect(await screen.findByText("Mika is archived")).toBeInTheDocument();
+  });
+
+  test("describes status updates using everyday language", async () => {
+    render(<AdminActivityLog />);
+
+    expect(await screen.findByText("ORD-100 status changed from Preparing to Ready for Pickup")).toBeInTheDocument();
   });
 
   test("filters audit activity by the Shop Owner and Admin accounts", async () => {
