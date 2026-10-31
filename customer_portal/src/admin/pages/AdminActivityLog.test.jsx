@@ -59,7 +59,8 @@ describe("AdminActivityLog", () => {
     expect(screen.getAllByText("Admin").length).toBeGreaterThan(0);
     expect(screen.getByText("203.0.113.15")).toBeInTheDocument();
     expect(screen.getByText("Ready for Pickup", { exact: false })).toBeInTheDocument();
-    expect(screen.getByText("Success (HTTP 200)")).toBeInTheDocument();
+    expect(screen.getByText("Success")).toBeInTheDocument();
+    expect(screen.queryByText(/HTTP 200/)).not.toBeInTheDocument();
     expect(screen.queryByText(/api\/staff/)).not.toBeInTheDocument();
   });
 

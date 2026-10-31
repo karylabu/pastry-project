@@ -307,7 +307,7 @@ export default function AdminActivityLog() {
                       <td className="px-4 py-3 font-mono text-[11px]">{log.ip_address || "—"}</td>
                       <td className="px-4 py-3">
                         <span className={`rounded px-2 py-1 text-[10px] font-semibold ${log.response_status < 400 ? "bg-[#edf4e9] text-[#58744a]" : "bg-[#fff0e8] text-[#9a4f32]"}`}>
-                          {log.response_status < 400 ? "Success" : "Failed"} (HTTP {log.response_status})
+                          {log.response_status < 400 ? "Success" : "Failed"}
                         </span>
                       </td>
                       <td className="whitespace-nowrap px-4 py-3">{formatDate(log.created_at)}</td>
