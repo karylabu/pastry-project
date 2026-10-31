@@ -52,6 +52,7 @@ describe("AdminActivityLog", () => {
     expect(screen.getByText("203.0.113.15")).toBeInTheDocument();
     expect(screen.getByText("Ready for Pickup", { exact: false })).toBeInTheDocument();
     expect(screen.getByText("200")).toBeInTheDocument();
+    expect(screen.queryByText(/api\/staff/)).not.toBeInTheDocument();
   });
 
   test("filters audit activity by the Shop Owner and Admin accounts", async () => {

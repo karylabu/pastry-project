@@ -2,6 +2,9 @@
 
 namespace Tests\Feature;
 
+use App\Http\Middleware\AuditAdminActivity;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
@@ -43,6 +46,15 @@ class AdminActivityLogCategoryFilterTest extends TestCase
             $table->json('details')->nullable();
             $table->timestamps();
         });
+        Schema::create('products', function ($table): void {
+            $table->id();
+            $table->string('name');
+        });
+        Schema::create('product_sizes', function ($table): void {
+            $table->id();
+            $table->unsignedBigInteger('product_id');
+            $table->string('size');
+        });
 
         DB::table('users')->insert([
             'id' => 1,
@@ -56,6 +68,8 @@ class AdminActivityLogCategoryFilterTest extends TestCase
             'token' => 'owner-token',
             'expires_at' => now()->addHour(),
         ]);
+        DB::table('products')->insert(['id' => 1, 'name' => 'Blueberry']);
+        DB::table('product_sizes')->insert(['id' => 2, 'product_id' => 1, 'size' => 'Big']);
 
         $now = now();
         foreach ([
@@ -104,6 +118,8 @@ class AdminActivityLogCategoryFilterTest extends TestCase
     protected function tearDown(): void
     {
         Schema::dropIfExists('admin_activity_logs');
+        Schema::dropIfExists('product_sizes');
+        Schema::dropIfExists('products');
         Schema::dropIfExists('user_sessions');
         Schema::dropIfExists('users');
 
@@ -136,5 +152,32 @@ class AdminActivityLogCategoryFilterTest extends TestCase
             ->assertJsonPath('pagination.total', 8)
             ->assertJsonMissing(['action' => 'Created Login'])
             ->assertJsonMissing(['action' => 'Synchronized product']);
+    }
+
+    public function test_production_activity_names_the_product_and_stock_change(): void
+    {
+        $request = Request::create('http://localhost/api/staff/production', 'POST', [
+            'product_id' => 1,
+            'product_size_id' => 2,
+            'quantity' => 5,
+            'expiry_date' => '2026-11-30',
+        ]);
+        $middleware = new \ReflectionMethod(AuditAdminActivity::class, 'describeProductionActivity');
+        $middleware->setAccessible(true);
+
+        [$action, $details] = $middleware->invoke(
+            new AuditAdminActivity(),
+            $request,
+            new JsonResponse(['status' => 'success', 'size_stock' => 12])
+        );
+
+        $this->assertSame('Added 5 Blueberry (Big) to stock', $action);
+        $this->assertSame([
+            'Product' => 'Blueberry',
+            'Quantity' => 5,
+            'Size' => 'Big',
+            'Expiry date' => '2026-11-30',
+            'Stock after' => 12,
+        ], $details);
     }
 }

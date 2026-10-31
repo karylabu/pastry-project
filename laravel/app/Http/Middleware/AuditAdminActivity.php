@@ -40,7 +40,7 @@ class AuditAdminActivity
         }
 
         [$action, $category, $subjectType, $subjectId] = $this->describeRequest($request);
-        $details = json_encode($this->sanitize($request->except([
+        $activityDetails = $request->except([
             'password',
             'password_confirmation',
             'current_password',
@@ -55,7 +55,11 @@ class AuditAdminActivity
             'photo',
             'file',
             'files',
-        ])), JSON_THROW_ON_ERROR);
+        ]);
+        if ($this->isProductionRequest($request)) {
+            [$action, $activityDetails] = $this->describeProductionActivity($request, $response);
+        }
+        $details = json_encode($this->sanitize($activityDetails), JSON_THROW_ON_ERROR);
         if (strlen($details) > 12000) {
             $details = json_encode(['_truncated' => 'Request details exceeded the audit log size limit.'], JSON_THROW_ON_ERROR);
         }
@@ -86,6 +90,56 @@ class AuditAdminActivity
 
         return preg_match('~(?:^|/)login/?$~', $route) === 1
             || str_contains($route, 'sync-recipes');
+    }
+
+    private function isProductionRequest(Request $request): bool
+    {
+        $route = strtolower((string) ($request->route()?->uri() ?? $request->path()));
+
+        return strtoupper($request->method()) === 'POST'
+            && preg_match('~(?:^|/)staff/production/?$~', $route) === 1;
+    }
+
+    private function describeProductionActivity(Request $request, Response $response): array
+    {
+        $productId = $request->integer('product_id');
+        $sizeId = $request->integer('product_size_id');
+        $productName = $productId > 0
+            ? DB::table('products')->where('id', $productId)->value('name')
+            : null;
+        $sizeName = $sizeId > 0
+            ? DB::table('product_sizes')->where('id', $sizeId)->value('size')
+            : null;
+        $productName = trim((string) $productName) ?: 'product';
+        $quantity = max(0, $request->integer('quantity'));
+        $result = json_decode($response->getContent(), true);
+        $succeeded = $response->getStatusCode() < 400
+            && is_array($result)
+            && ($result['status'] ?? null) === 'success';
+
+        $action = $succeeded
+            ? "Added {$quantity} {$productName}" . ($sizeName ? " ({$sizeName})" : '') . ' to stock'
+            : "Production failed for {$productName}";
+        $details = [
+            'Product' => $productName,
+            'Quantity' => $quantity,
+        ];
+        if ($sizeName) {
+            $details['Size'] = $sizeName;
+        }
+        if ($request->filled('expiry_date')) {
+            $details['Expiry date'] = $request->input('expiry_date');
+        }
+        if ($succeeded) {
+            $newStock = data_get($result, 'size_stock') ?? data_get($result, 'new_stock');
+            if (is_numeric($newStock)) {
+                $details['Stock after'] = $newStock;
+            }
+        } elseif (is_array($result) && !empty($result['message'])) {
+            $details['Reason'] = $result['message'];
+        }
+
+        return [$action, $details];
     }
 
     private function resolveActor(Request $request): ?User

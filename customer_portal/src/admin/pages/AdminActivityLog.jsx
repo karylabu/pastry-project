@@ -177,7 +177,7 @@ export default function AdminActivityLog() {
                     <tr key={log.id} className="align-top text-xs text-[#514239]">
                       <td className="px-4 py-3">
                         <p className="font-semibold text-[#33251e]">{log.action}</p>
-                        <p className="mt-1 text-[10px] text-[#8f8076]">{log.category} · {log.method} {log.route}</p>
+                        <p className="mt-1 text-[10px] text-[#8f8076]">{log.category}</p>
                       </td>
                       <td className="px-4 py-3">
                         <p className="font-medium">{log.actor_name}</p>
