@@ -45,9 +45,9 @@ export default function AdminApp() {
       <Route path="admin-management" element={<Navigate to="/admin/dashboard" replace />} />
       <Route
         path="activity-log"
-        element={(
+        element={renderWithLayout(
           <ProtectedRoute allowedRoles={["super_admin"]} deniedPath="/admin/dashboard">
-            {renderWithLayout(<AdminActivityLog />)}
+            <AdminActivityLog />
           </ProtectedRoute>
         )}
       />

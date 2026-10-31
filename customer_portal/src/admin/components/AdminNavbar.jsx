@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import {
   BarChart2,
   Bell,
@@ -96,7 +96,6 @@ function getStoredUser() {
 
 export default function AdminNavbar({ onSidebarChange }) {
   const navigate = useNavigate();
-  const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(() => window.matchMedia("(min-width: 1024px)").matches);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [notifications, setNotifications] = useState([]);
@@ -114,21 +113,12 @@ export default function AdminNavbar({ onSidebarChange }) {
     : NAV_GROUPS;
   const notificationsRef = useRef(null);
   const accountRef = useRef(null);
-  const navRef = useRef(null);
 
   useEffect(() => {
     const syncUser = () => setCurrentUser(getStoredUser());
     window.addEventListener("storage", syncUser);
     return () => window.removeEventListener("storage", syncUser);
   }, []);
-
-  useEffect(() => {
-    const frameId = window.requestAnimationFrame(() => {
-      const savedScrollTop = Number(sessionStorage.getItem("admin-sidebar-scroll") || 0);
-      if (navRef.current) navRef.current.scrollTop = savedScrollTop;
-    });
-    return () => window.cancelAnimationFrame(frameId);
-  }, [location.pathname]);
 
   useEffect(() => {
     onSidebarChange?.(sidebarOpen);
@@ -244,9 +234,6 @@ export default function AdminNavbar({ onSidebarChange }) {
   }, [notifications, notifFilter]);
 
   const closeSidebarAfterNavigation = () => {
-    if (navRef.current) {
-      sessionStorage.setItem("admin-sidebar-scroll", String(navRef.current.scrollTop));
-    }
     if (!window.matchMedia("(min-width: 1024px)").matches) setSidebarOpen(false);
   };
 
@@ -290,7 +277,7 @@ export default function AdminNavbar({ onSidebarChange }) {
           </button>
         </div>
 
-        <nav ref={navRef} className="flex-1 space-y-6 overflow-y-auto px-4 py-6" aria-label="Admin pages">
+        <nav className="flex-1 space-y-6 overflow-y-auto px-4 py-6" aria-label="Admin pages">
           {navGroups.map((group) => (
             <div key={group.label}>
               <p className="mb-2 px-3 text-[9px] font-bold uppercase tracking-[0.25em] text-[#9b7810]">{group.label}</p>
