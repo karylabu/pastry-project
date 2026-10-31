@@ -281,18 +281,6 @@ export default function BackupManagement() {
 
   return (
     <div className="min-h-screen bg-[#fbfaf5] font-['DM_Sans'] text-[#33251e]">
-      <style>{`
-        .backup-management-page :is(section, article, form)[class*="rounded-"][class*="border"] {
-          border-top-width: 1px !important;
-          border-top-color: #e9e1d9 !important;
-          box-shadow: none !important;
-          transform: none !important;
-        }
-        .backup-management-page :is(section, article)[class*="rounded-"][class*="border"]:hover {
-          box-shadow: none !important;
-          transform: none !important;
-        }
-      `}</style>
       <div className="pt-[88px] lg:pl-[260px]">
         <main className="backup-management-page mx-auto max-w-[1400px] px-4 py-5 sm:px-6 md:px-8 lg:px-10 lg:py-7">
           <header className="mb-5 flex flex-col gap-4 border-b border-[#e9e1d9] pb-5 sm:flex-row sm:items-end sm:justify-between">
@@ -315,13 +303,6 @@ export default function BackupManagement() {
             <div className="flex items-center gap-2 text-[12px] font-semibold text-[#806714]"><Loader2 size={15} className="animate-spin" /> Creating a database backup. Keep this page open.</div>
             <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-[#eee5d3]"><div className="h-full w-1/3 animate-pulse rounded-full bg-[#c9a94f]" /></div>
           </div>}
-
-          <form onSubmit={saveSchedule} className="mb-4 flex flex-col gap-3 rounded-md border border-[#e9e1d9] bg-white px-4 py-3 sm:flex-row sm:items-center">
-            <Clock3 size={16} className="hidden shrink-0 text-[#92701e] sm:block" />
-            <label htmlFor="daily-backup-time" className="text-[12px] font-semibold text-[#33251e] sm:mr-auto">Daily backup time</label>
-            <input id="daily-backup-time" type="time" required value={scheduleTime} onChange={(event) => setScheduleTime(event.target.value)} disabled={savingSchedule} className="h-9 rounded-md border border-[#e8dfd4] bg-white px-3 text-[12px] text-[#33251e] outline-none focus:border-[#92701e] focus:ring-2 focus:ring-[#c9a94f]/15 disabled:opacity-60" />
-            <button type="submit" disabled={savingSchedule || loading} className="inline-flex h-9 shrink-0 items-center justify-center gap-2 rounded-md border border-[#e8dfd4] bg-white px-3 text-[11px] font-semibold text-[#65574d] transition hover:bg-[#f7f4ef] disabled:cursor-not-allowed disabled:opacity-50">{savingSchedule && <Loader2 size={13} className="animate-spin" />}Save backup time</button>
-          </form>
 
           {listError && <div role="alert" className="mb-4 flex items-center justify-between gap-3 rounded-md border border-[#efd8d4] bg-[#fff1ef] px-3.5 py-3 text-[12px] text-[#98534b]">
             <span className="flex items-start gap-2"><AlertCircle size={15} className="mt-0.5 shrink-0" />{listError}</span>
@@ -349,18 +330,33 @@ export default function BackupManagement() {
             </div>
           </section>
 
-          <section aria-label="Backup overview" className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-3">
-            <article className="rounded-md border border-[#e9e1d9] bg-white px-4 py-3">
-              <p className="text-[10px] text-[#8f8076]">Last backup</p>
-              <p className="mt-1.5 truncate text-[12px] font-semibold text-[#33251e]">{loading ? "Loading…" : formatDate(backupData.overview.last_successful_backup?.created_at)}</p>
+          <section aria-label="Backup overview" className="mb-5 grid grid-cols-2 gap-2.5 lg:grid-cols-4 lg:gap-3">
+            <article className="h-full rounded-xl border border-t-[3px] border-[#eee4de] bg-white p-3 shadow-[0_5px_18px_rgba(91,64,39,0.04)] sm:p-3.5" style={{ borderTopColor: "#c9a94f" }}>
+              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#fff4cd] text-[#806714]"><Clock3 size={16} /></span>
+              <p className="mt-2 text-[11px] font-semibold text-[#5d4a42]">Last backup</p>
+              <p className="mt-1 min-h-[23px] truncate text-[13px] font-bold leading-[23px] text-[#33251e]">{loading ? "Loading…" : formatDate(backupData.overview.last_successful_backup?.created_at)}</p>
             </article>
-            <article className="rounded-md border border-[#e9e1d9] bg-white px-4 py-3">
-              <p className="text-[10px] text-[#8f8076]">Available copies</p>
-              <p className="mt-1 text-[20px] font-semibold leading-none text-[#33251e]">{loading ? "—" : Number(backupData.overview.available_backups).toLocaleString()}</p>
+            <article className="h-full rounded-xl border border-t-[3px] border-[#eee4de] bg-white p-3 shadow-[0_5px_18px_rgba(91,64,39,0.04)] sm:p-3.5" style={{ borderTopColor: "#c9a94f" }}>
+              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#edf5eb] text-[#58764e]"><Archive size={16} /></span>
+              <p className="mt-2 text-[11px] font-semibold text-[#5d4a42]">Available copies</p>
+              <p className="mt-0.5 text-[23px] font-bold leading-none text-[#58764e]">{loading ? "—" : Number(backupData.overview.available_backups).toLocaleString()}</p>
             </article>
-            <article className="col-span-2 rounded-md border border-[#e9e1d9] bg-white px-4 py-3 sm:col-span-1">
-              <p className="text-[10px] text-[#8f8076]">Storage used</p>
-              <p className="mt-1 text-[20px] font-semibold leading-none text-[#33251e]">{loading ? "—" : formatBytes(backupData.overview.storage_used_bytes)}</p>
+            <article className="h-full rounded-xl border border-t-[3px] border-[#eee4de] bg-white p-3 shadow-[0_5px_18px_rgba(91,64,39,0.04)] sm:p-3.5" style={{ borderTopColor: "#c9a94f" }}>
+              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#f3edf8] text-[#7a6489]"><Database size={16} /></span>
+              <p className="mt-2 text-[11px] font-semibold text-[#5d4a42]">Storage used</p>
+              <p className="mt-0.5 text-[23px] font-bold leading-none text-[#7a6489]">{loading ? "—" : formatBytes(backupData.overview.storage_used_bytes)}</p>
+            </article>
+            <article className="col-span-2 h-full rounded-xl border border-t-[3px] border-[#eee4de] bg-white p-3 shadow-[0_5px_18px_rgba(91,64,39,0.04)] lg:col-span-1 sm:p-3.5" style={{ borderTopColor: "#c9a94f" }}>
+              <form onSubmit={saveSchedule} className="h-full">
+                <div className="flex items-center gap-2">
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#fff4cd] text-[#806714]"><Clock3 size={16} /></span>
+                  <label htmlFor="daily-backup-time" className="text-[11px] font-semibold text-[#5d4a42]">Daily backup time</label>
+                </div>
+                <div className="mt-2 flex items-center gap-2">
+                  <input id="daily-backup-time" type="time" required value={scheduleTime} onChange={(event) => setScheduleTime(event.target.value)} disabled={savingSchedule} className="h-9 min-w-0 flex-1 rounded-md border border-[#e8dfd4] bg-white px-2.5 text-[11px] text-[#33251e] outline-none focus:border-[#92701e] focus:ring-2 focus:ring-[#c9a94f]/15 disabled:opacity-60" />
+                  <button type="submit" aria-label="Save backup time" disabled={savingSchedule || loading} className="inline-flex h-9 shrink-0 items-center justify-center rounded-md border border-[#e8dfd4] bg-white px-2.5 text-[10px] font-semibold text-[#65574d] transition hover:bg-[#f7f4ef] disabled:cursor-not-allowed disabled:opacity-50">{savingSchedule && <Loader2 size={12} className="animate-spin" />}Save</button>
+                </div>
+              </form>
             </article>
           </section>
 
