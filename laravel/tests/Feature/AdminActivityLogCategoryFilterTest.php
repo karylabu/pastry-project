@@ -420,7 +420,7 @@ class AdminActivityLogCategoryFilterTest extends TestCase
         $this->assertSame(1, (int) $log->actor_id);
         $this->assertSame('Shop Owner', $log->actor_name);
         $this->assertSame(200, (int) $log->response_status);
-        $this->assertSame('127.0.0.1', $log->ip_address);
+        $this->assertNull($log->ip_address);
         $this->assertSame(200, $response->getStatusCode());
     }
 
@@ -964,6 +964,7 @@ class AdminActivityLogCategoryFilterTest extends TestCase
             'category' => 'Products',
             'method' => 'POST',
             'route' => 'api/admin/stock/mutate',
+            'ip_address' => '203.0.113.15',
             'response_status' => 200,
             'details' => json_encode(['Product' => 'Blueberry Supreme']),
             'created_at' => now(),
@@ -987,6 +988,7 @@ class AdminActivityLogCategoryFilterTest extends TestCase
             'category' => 'Products',
             'method' => 'POST',
             'route' => 'api/admin/stock/mutate',
+            'ip_address' => '203.0.113.15',
             'response_status' => 200,
             'details' => json_encode(['Product' => 'Blueberry', 'New stock' => 50]),
             'created_at' => now(),
@@ -997,6 +999,7 @@ class AdminActivityLogCategoryFilterTest extends TestCase
             ->getJson('http://localhost/api/admin-management/activity-logs')
             ->assertOk()
             ->assertJsonPath('data.0.details.Product', 'Blueberry')
-            ->assertJsonPath('data.0.details.New stock', 50);
+            ->assertJsonPath('data.0.details.New stock', 50)
+            ->assertJsonMissingPath('data.0.ip_address');
     }
 }

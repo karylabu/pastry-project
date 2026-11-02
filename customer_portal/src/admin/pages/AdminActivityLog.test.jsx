@@ -40,7 +40,7 @@ describe("AdminActivityLog", () => {
 
   afterEach(() => jest.restoreAllMocks());
 
-  test("shows the recorded actor, action, changes, IP address, and result", async () => {
+  test("shows the recorded actor, action, changes, and result without an IP address", async () => {
     const { getByTestId } = render(<AdminActivityLog />);
 
     expect(screen.getByText("Access control")).toBeInTheDocument();
@@ -61,7 +61,7 @@ describe("AdminActivityLog", () => {
     expect(screen.getByRole("button", { name: "All" })).toHaveAttribute("aria-pressed", "true");
     expect(await screen.findByText("Changed order status")).toBeInTheDocument();
     expect(screen.getAllByText("Admin").length).toBeGreaterThan(0);
-    expect(screen.getByText("203.0.113.15")).toBeInTheDocument();
+    expect(screen.queryByText("203.0.113.15")).not.toBeInTheDocument();
     expect(screen.getByText("Ready for Pickup", { exact: false })).toBeInTheDocument();
     expect(screen.getByText("Success")).toBeInTheDocument();
     expect(screen.queryByText(/HTTP 200/)).not.toBeInTheDocument();
@@ -189,9 +189,10 @@ describe("AdminActivityLog", () => {
         const requestUrl = global.fetch.mock.calls[global.fetch.mock.calls.length - 1][0];
         expect(new URL(requestUrl).searchParams.get("category")).toBe(category);
       });
-      for (const heading of ["Activity", "Account", "Details", "IP Address", "Result", "Timestamp"]) {
+      for (const heading of ["Activity", "Account", "Details", "Result", "Timestamp"]) {
         expect(screen.getByRole("columnheader", { name: heading })).toBeInTheDocument();
       }
+      expect(screen.queryByRole("columnheader", { name: "IP Address" })).not.toBeInTheDocument();
     }
   });
 

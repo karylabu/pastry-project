@@ -22,7 +22,6 @@ class AdminActivityLogController extends Controller
         $sortColumns = [
             'action' => 'action',
             'account' => 'actor_name',
-            'ip_address' => 'ip_address',
             'result' => 'response_status',
             'timestamp' => 'created_at',
         ];
@@ -34,6 +33,24 @@ class AdminActivityLogController extends Controller
         }
 
         $query = AdminActivityLog::query()
+            ->select([
+                'id',
+                'actor_id',
+                'actor_name',
+                'actor_email',
+                'actor_role',
+                'action',
+                'category',
+                'subject_type',
+                'subject_id',
+                'method',
+                'route',
+                'user_agent',
+                'details',
+                'response_status',
+                'created_at',
+                'updated_at',
+            ])
             ->orderBy($sortColumn, $sortDirection)
             ->orderBy('id', $sortDirection);
         $query->whereNot(function ($excluded): void {
@@ -49,8 +66,7 @@ class AdminActivityLogController extends Controller
                     ->orWhere('actor_email', 'like', '%' . $search . '%')
                     ->orWhere('action', 'like', '%' . $search . '%')
                     ->orWhere('category', 'like', '%' . $search . '%')
-                    ->orWhere('details', 'like', '%' . $search . '%')
-                    ->orWhere('ip_address', 'like', '%' . $search . '%');
+                    ->orWhere('details', 'like', '%' . $search . '%');
             });
         }
 

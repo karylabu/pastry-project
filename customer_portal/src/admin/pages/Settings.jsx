@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Bell, Building2, Check, Clock3, Database, Eye, EyeOff, KeyRound, LogOut, RotateCcw, Save, Trash2, UserCircle2, X } from "lucide-react";
 import { LARAVEL_BASE } from "../../services/config";
 import { getAuthHeaders } from "../../services/api";
+import AdminDialog from "../components/AdminDialog";
 
 const defaultPreferences = {
   shopName: "Pastry Project",
@@ -90,6 +91,7 @@ export default function Settings() {
   const [recycleLoading, setRecycleLoading] = useState(false);
   const [recycleError, setRecycleError] = useState("");
   const [recycleActionId, setRecycleActionId] = useState(null);
+  const [recycleDeleteConfirm, setRecycleDeleteConfirm] = useState(null);
 
   useEffect(() => {
     if (user) setProfile({ full_name: user.name || "", email: user.email || "", phone: user.phone || "" });
@@ -245,7 +247,6 @@ export default function Settings() {
   };
 
   const permanentlyDeleteRecycleItem = async (item) => {
-    if (!window.confirm(`Permanently delete "${item.label}"? This cannot be undone.`)) return;
     setRecycleActionId(item.id);
     setRecycleError("");
     try {
@@ -305,8 +306,8 @@ export default function Settings() {
           {(notice || error) && <div role="status" className={`mb-4 flex items-center gap-2 rounded-lg border px-4 py-3 text-[12px] ${error ? "border-[#efd8d4] bg-[#fff0f0] text-[#8d5357]" : "border-[#d8e7d5] bg-[#edf5eb] text-[#4f7654]"}`}><Check size={15} />{error || notice}</div>}
 
           {recycleBinOpen && (
-            <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[#211812]/50 p-4" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setRecycleBinOpen(false); }}>
-              <section role="dialog" aria-modal="true" aria-labelledby="recycle-bin-title" className="max-h-[85vh] w-full max-w-2xl overflow-hidden rounded-xl border border-[#eadfd8] bg-white shadow-2xl">
+            <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-[#241812]/55 px-4 py-5 backdrop-blur-[2px]" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setRecycleBinOpen(false); }}>
+              <section role="dialog" aria-modal="true" aria-labelledby="recycle-bin-title" className="max-h-[85vh] w-full max-w-2xl overflow-hidden rounded-lg border border-[#eee4de] bg-white shadow-[0_24px_70px_rgba(38,25,16,0.28)]">
                 <header className="flex items-center justify-between border-b border-[#f0e9e2] px-5 py-4">
                   <div>
                     <h2 id="recycle-bin-title" className="font-serif text-lg text-[#33251e]">Recycle Bin</h2>
@@ -325,8 +326,8 @@ export default function Settings() {
                             <p className="mt-1 text-[10px] capitalize text-[#8f8076]">{item.type.replaceAll("_", " ")} · expires {new Date(item.expires_at).toLocaleDateString()}</p>
                           </div>
                           <div className="flex shrink-0 gap-2">
-                            <button type="button" disabled={recycleActionId !== null} onClick={() => restoreRecycleItem(item)} className="inline-flex h-9 items-center gap-1.5 rounded-md bg-[#edf5eb] px-3 text-[11px] font-semibold text-[#4f7654] disabled:opacity-50"><RotateCcw size={13} /> Restore</button>
-                            <button type="button" disabled={recycleActionId !== null} onClick={() => permanentlyDeleteRecycleItem(item)} className="inline-flex h-9 items-center gap-1.5 rounded-md border border-[#efd8d4] px-3 text-[11px] font-semibold text-[#8d5357] disabled:opacity-50"><Trash2 size={13} /> Delete</button>
+                            <button type="button" disabled={recycleActionId !== null} onClick={() => restoreRecycleItem(item)} className="inline-flex h-9 items-center gap-1.5 rounded-md bg-[#edf5eb] px-3 text-[11px] font-semibold text-[#4f7654] transition hover:bg-[#dfeedd] disabled:opacity-50"><RotateCcw size={13} /> Restore</button>
+                            <button type="button" disabled={recycleActionId !== null} onClick={() => setRecycleDeleteConfirm(item)} className="inline-flex h-9 items-center gap-1.5 rounded-md border border-[#efd8d4] text-[#8d5357] px-3 text-[11px] font-semibold transition hover:bg-[#fff0f0] disabled:opacity-50"><Trash2 size={13} /> Delete</button>
                           </div>
                         </li>
                       ))}</ul>}
@@ -403,6 +404,20 @@ export default function Settings() {
           </section>
         </div>
       )}
+      <AdminDialog
+        dialog={recycleDeleteConfirm ? {
+          kind: "confirm",
+          title: "Permanently delete this item?",
+          message: `"${recycleDeleteConfirm.label}" will be permanently deleted. This cannot be undone.`,
+          confirmLabel: "Permanently delete",
+        } : null}
+        onClose={() => setRecycleDeleteConfirm(null)}
+        onConfirm={() => {
+          const item = recycleDeleteConfirm;
+          setRecycleDeleteConfirm(null);
+          if (item) permanentlyDeleteRecycleItem(item);
+        }}
+      />
     </div>
   );
 }

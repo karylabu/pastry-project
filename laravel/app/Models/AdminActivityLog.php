@@ -17,7 +17,6 @@ class AdminActivityLog extends Model
         'subject_id',
         'method',
         'route',
-        'ip_address',
         'user_agent',
         'response_status',
         'details',

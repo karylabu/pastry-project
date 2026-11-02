@@ -106,7 +106,6 @@ class AdminActivityAuditService
             'subject_id' => $this->subjectId($ids),
             'method' => strtoupper($request->method()),
             'route' => $request->route()?->uri() ?? $request->path(),
-            'ip_address' => $request->ip(),
             'user_agent' => $request->userAgent(),
             'response_status' => $response->getStatusCode(),
             'details' => $this->sanitize($details),

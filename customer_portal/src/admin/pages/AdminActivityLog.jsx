@@ -173,7 +173,6 @@ export default function AdminActivityLog() {
   const sortableColumns = [
     { key: "action", label: "Activity" },
     { key: "account", label: "Account" },
-    { key: "ip_address", label: "IP Address" },
     { key: "result", label: "Result" },
     { key: "timestamp", label: "Timestamp" },
   ];
@@ -208,7 +207,7 @@ export default function AdminActivityLog() {
             <div>
               <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.24em] text-[#92701e]">Access control</p>
               <h1 className="mt-1 font-serif text-[27px] leading-tight text-[#33251e]">Audit Trail</h1>
-              <p className="mt-1 text-[12px] text-[#74675f]">Review account activity, changes, timestamps, and source IP addresses.</p>
+              <p className="mt-1 text-[12px] text-[#74675f]">Review account activity, changes, and timestamps.</p>
             </div>
             <div className="flex gap-2">
               <div className="flex h-10 items-center gap-2 rounded-md border border-[#e8dfd4] bg-white px-3 sm:w-72">
@@ -216,7 +215,7 @@ export default function AdminActivityLog() {
                 <input
                   aria-label="Search activity"
                   className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-[#a99a8e]"
-                  placeholder="Search name, action, record, or IP"
+                  placeholder="Search name, action, or record"
                   value={search}
                   onChange={(event) => { setSearch(event.target.value); setPage(1); }}
                 />
@@ -294,7 +293,7 @@ export default function AdminActivityLog() {
               </div>
             </div>
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[980px] border-collapse text-left text-[13px]">
+              <table className="w-full min-w-[820px] border-collapse text-left text-[13px]">
                 <thead>
                   <tr className="border-b border-[#f0e7e0] bg-[#fbf7f2] text-[10px] uppercase tracking-[0.16em] text-[#9b8c83]">
                     {renderSortableHeader(sortableColumns[0])}
@@ -306,15 +305,15 @@ export default function AdminActivityLog() {
                 <tbody className="divide-y divide-[#f0e9e2]">
                   {error ? (
                     <tr>
-                      <td colSpan={6} role="alert" className="px-5 py-8 text-sm text-[#a33d32]">
+                      <td colSpan={5} role="alert" className="px-5 py-8 text-sm text-[#a33d32]">
                         <span className="flex items-center gap-2"><AlertCircle size={17} /> {error}</span>
                       </td>
                     </tr>
                   ) : loading ? (
-                    <tr><td colSpan={6} className="px-5 py-10 text-center text-sm text-[#74675f]">Loading activity…</td></tr>
+                    <tr><td colSpan={5} className="px-5 py-10 text-center text-sm text-[#74675f]">Loading activity…</td></tr>
                   ) : logs.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="px-5 py-8 text-center">
+                      <td colSpan={5} className="px-5 py-8 text-center">
                         <Clock3 size={22} className="mx-auto text-[#b6a99d]" />
                         <p className="mt-2 text-sm font-medium text-[#514239]">No activity found</p>
                         <p className="mt-1 text-xs text-[#8f8076]">Admin and staff changes will appear here.</p>
@@ -339,7 +338,6 @@ export default function AdminActivityLog() {
                           ))}
                         </div>
                       </td>
-                      <td className="px-4 py-3.5 font-mono text-[11px]">{log.ip_address || "—"}</td>
                       <td className="px-4 py-3.5">
                         <span className={`rounded px-2 py-1 text-[10px] font-semibold ${log.response_status < 400 ? "bg-[#edf4e9] text-[#58744a]" : "bg-[#fff0e8] text-[#9a4f32]"}`}>
                           {log.response_status < 400 ? "Success" : "Failed"}
