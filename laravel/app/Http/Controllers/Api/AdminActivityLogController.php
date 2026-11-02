@@ -15,8 +15,8 @@ class AdminActivityLogController extends Controller
         if (!$actor) {
             return response()->json(['success' => false, 'message' => 'Authentication required.'], 401);
         }
-        if (!$actor->isSuperAdmin()) {
-            return response()->json(['success' => false, 'message' => 'Super Admin authorization required.'], 403);
+        if (!$actor->isAdmin()) {
+            return response()->json(['success' => false, 'message' => 'Admin authorization required.'], 403);
         }
 
         $sortColumns = [

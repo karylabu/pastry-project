@@ -299,6 +299,41 @@ class AdminActivityLogCategoryFilterTest extends TestCase
         }
     }
 
+    public function test_admin_can_view_the_audit_trail_but_customers_cannot(): void
+    {
+        DB::table('users')->insert([
+            [
+                'id' => 2,
+                'name' => 'Admin',
+                'email' => 'admin@example.com',
+                'password' => 'unused',
+                'role' => 'admin',
+            ],
+            [
+                'id' => 3,
+                'name' => 'Customer',
+                'email' => 'customer@example.com',
+                'password' => 'unused',
+                'role' => 'customer',
+            ],
+        ]);
+        DB::table('user_sessions')->insert([
+            ['user_id' => 2, 'token' => 'admin-token', 'expires_at' => now()->addHour()],
+            ['user_id' => 3, 'token' => 'customer-token', 'expires_at' => now()->addHour()],
+        ]);
+
+        $this->withHeader('X-Auth-Token', 'admin-token')
+            ->getJson('http://localhost/api/admin-management/activity-logs')
+            ->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('pagination.total', 10);
+
+        $this->withHeader('X-Auth-Token', 'customer-token')
+            ->getJson('http://localhost/api/admin-management/activity-logs')
+            ->assertForbidden()
+            ->assertJsonPath('message', 'Admin authorization required.');
+    }
+
     public function test_login_and_recipe_sync_entries_are_hidden_from_the_audit_trail(): void
     {
         $this->withHeader('X-Auth-Token', 'owner-token')

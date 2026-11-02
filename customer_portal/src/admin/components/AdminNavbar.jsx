@@ -106,7 +106,7 @@ export default function AdminNavbar({ onSidebarChange }) {
   const [currentUser, setCurrentUser] = useState(() => getStoredUser());
   const [currentDateTime, setCurrentDateTime] = useState(() => new Date());
   const [adminDialog, setAdminDialog] = useState(null);
-  const navGroups = String(currentUser?.role || "").toLowerCase() === "super_admin"
+  const navGroups = ["admin", "super_admin"].includes(String(currentUser?.role || "").toLowerCase())
     ? [...NAV_GROUPS, { label: "Administration", items: [
       { name: "Audit Trail", path: "/admin/activity-log" },
     ] }]
