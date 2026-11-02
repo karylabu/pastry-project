@@ -170,15 +170,17 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
   const getCardSizeName = (product) => cardSizeSelections[product.id]
     || (getProductSizeByName(product, "small") ? "small" : "big");
   const canEditCatalog = Boolean(allowCatalogManagement);
-  const editRecipeSize = editProduct ? getProductSizeForCategory(editProduct, activeCat) : null;
+  const editRecipeCategory = editProduct?.category === "Small Cakes" ? "Small Cakes" : "Cakes";
+  const editRecipeSize = editProduct ? getProductSizeForCategory(editProduct, editRecipeCategory) : null;
   const editRecipeSizeId = editRecipeSize?.id ? String(editRecipeSize.id) : "";
 
   const openEditProductModal = (product) => {
+    const category = product.category || "";
     setEditProduct({
       ...product,
       name: product.name || "",
-      category: product.category || "",
-      price: getProductPriceForSize(product, activeCat) || "",
+      category,
+      price: getProductPriceForSize(product, category) || "",
       stock: product.stock ?? "",
       description: product.description || "",
       image: product.image || "",
@@ -1719,7 +1721,14 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
                     <select
                       id="edit-product-category"
                       value={editProduct.category}
-                      onChange={(e) => setEditProduct((p) => ({ ...p, category: e.target.value }))}
+                      onChange={(e) => {
+                        const category = e.target.value;
+                        setEditProduct((p) => ({
+                          ...p,
+                          category,
+                          price: getProductPriceForSize(p, category) || "",
+                        }));
+                      }}
                       className="w-full rounded-xl border border-[#eadfd8] bg-white px-3 py-2.5 text-[12px] text-[#33251e] outline-none transition focus:border-[#d4af37] focus:ring-2 focus:ring-[#d4af37]/15"
                     >
                       {[...new Set([
@@ -1732,7 +1741,7 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
                   </div>
 
                   <div className="space-y-2">
-                    <label htmlFor="edit-product-price" className="block text-[10px] font-bold uppercase tracking-[0.16em] text-[#8f8076]">{activeCat === "Small Cakes" ? "Small Cake Price" : "Big Cake Price"}</label>
+                    <label htmlFor="edit-product-price" className="block text-[10px] font-bold uppercase tracking-[0.16em] text-[#8f8076]">{editProduct.category === "Small Cakes" ? "Small Cake Price" : "Big Cake Price"}</label>
                     <input
                       id="edit-product-price"
                       type="number"
@@ -1874,7 +1883,7 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
                         formData.append('id', editProduct.id);
                         formData.append('name', (editProduct.name || '').toString());
                         formData.append('category', (editProduct.category || '').toString());
-                        if (canManageCatalog) formData.append('price_size', activeCat === "Small Cakes" ? "small" : "big");
+                        if (canManageCatalog) formData.append('price_size', editProduct.category === "Small Cakes" ? "small" : "big");
                         formData.append('price', Number(editProduct.price) || 0);
                         formData.append('description', (editProduct.description || '').toString());
                         if (editImage) formData.append('image', editImage);

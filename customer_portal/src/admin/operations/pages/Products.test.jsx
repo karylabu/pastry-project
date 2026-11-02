@@ -501,7 +501,7 @@ describe('Products admin catalog', () => {
     fireEvent.click(screen.getAllByRole('button', { name: /^Edit / })[0]);
     fireEvent.change(screen.getByLabelText('Product Name'), { target: { value: 'Pistachio Dream' } });
     fireEvent.change(screen.getByLabelText('Category'), { target: { value: 'Small Cakes' } });
-    fireEvent.change(screen.getByLabelText('Big Cake Price'), { target: { value: '525' } });
+    fireEvent.change(screen.getByLabelText('Small Cake Price'), { target: { value: '525' } });
 
     expect(screen.queryByLabelText('Current Stock')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
@@ -519,7 +519,7 @@ describe('Products admin catalog', () => {
     expect(formData.get('name')).toBe('Pistachio Dream');
     expect(formData.get('category')).toBe('Small Cakes');
     expect(formData.get('price')).toBe('525');
-    expect(formData.get('price_size')).toBe('big');
+    expect(formData.get('price_size')).toBe('small');
     expect(formData.has('stock')).toBe(false);
     expect(updateCall[1].headers).toEqual({
       Accept: 'application/json',
@@ -561,7 +561,7 @@ describe('Products admin catalog', () => {
     });
   });
 
-  test('loads and saves the recipe for the selected cake tab without a size picker', async () => {
+  test('loads and saves the recipe for the product category without a size picker', async () => {
     mockLocationSearch = '?category=Small%20Cakes';
     render(<Products allowCatalogManagement />);
 
@@ -571,11 +571,11 @@ describe('Products admin catalog', () => {
 
     fireEvent.click(screen.getAllByRole('button', { name: /^Edit / })[0]);
 
-    expect(screen.getByText('Recipe for: Small Cake')).toBeInTheDocument();
+    expect(screen.getByText('Recipe for: Big Cake')).toBeInTheDocument();
     expect(screen.queryByLabelText('Big Cake')).not.toBeInTheDocument();
     await waitFor(() => {
       expect(global.fetch).toHaveBeenCalledWith(
-        expect.stringContaining('/api/staff/products/1/recipe?product_size_id=11'),
+        expect.stringContaining('/api/staff/products/1/recipe?product_size_id=12'),
         expect.any(Object),
       );
     });
@@ -592,7 +592,7 @@ describe('Products admin catalog', () => {
       );
       expect(recipeUpdate).toBeDefined();
       expect(JSON.parse(recipeUpdate[1].body)).toEqual({
-        product_size_id: 11,
+        product_size_id: 12,
         recipes: [{ ingredient_id: 4, qty: 1 }],
       });
     });

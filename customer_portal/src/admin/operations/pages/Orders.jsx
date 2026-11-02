@@ -499,10 +499,12 @@ export default function Orders() {
     const hasReviewableProof = order.status === 'Awaiting Payment'
       && String(order.payment_status || '').toLowerCase() === 'proof_submitted'
       && (order.has_payment_proof || order.customer_payment_reference);
+    const paymentIsConfirmed = order.status === 'Awaiting Payment'
+      && ['paid', 'downpayment_paid'].includes(String(order.payment_status || '').toLowerCase());
     const hasReviewableBalanceProof = order.status === 'Awaiting Balance Payment'
       && String(order.payment_status || '').toLowerCase() === 'proof_submitted'
       && (order.has_payment_proof || order.customer_payment_reference);
-    const nextStatus = hasReviewableProof
+    const nextStatus = hasReviewableProof || paymentIsConfirmed
       ? 'Pending'
       : hasReviewableBalanceProof
         ? 'Ready for Pickup'
@@ -707,6 +709,8 @@ export default function Orders() {
                 const needsPaymentReview = order.status === "Awaiting Payment"
                   && String(order.payment_status || "").toLowerCase() === "proof_submitted"
                   && (order.has_payment_proof || order.customer_payment_reference);
+                const paymentIsConfirmed = order.status === "Awaiting Payment"
+                  && ["paid", "downpayment_paid"].includes(String(order.payment_status || "").toLowerCase());
                 const needsBalancePaymentReview = order.status === "Awaiting Balance Payment"
                   && String(order.payment_status || "").toLowerCase() === "proof_submitted"
                   && (order.has_payment_proof || order.customer_payment_reference);
@@ -720,7 +724,7 @@ export default function Orders() {
                 const customerLabel = order.customer || order.customer_name || order.name || order.phone || "Customer";
                 const addressLabel = order.address || order.delivery_address || order.customer_address || "No address provided";
                 const canAdvance = !["Completed", "Cancelled"].includes(order.status)
-                  && (order.status !== "Awaiting Payment" || needsPaymentReview)
+                  && (order.status !== "Awaiting Payment" || needsPaymentReview || paymentIsConfirmed)
                   && (order.status !== "Awaiting Balance Payment" || needsBalancePaymentReview);
 
                 return (
@@ -747,7 +751,7 @@ export default function Orders() {
                       <div className="mt-3 flex flex-wrap gap-1.5">
                         {!order.is_wasted && <>
                           <button type="button" onClick={() => toggleOrderDetails(order, isExpanded)} title={`${isExpanded ? "Hide" : "View"} details for order ${order.order_number || order.id}`} aria-label={`${isExpanded ? "Hide" : "View"} details for order ${order.order_number || order.id}`} className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-[#e8dfd4] bg-white text-[#65574d] transition hover:bg-[#faf7f2]">{isExpanded ? <ChevronUp size={15} aria-hidden="true" /> : <ChevronDown size={15} aria-hidden="true" />}</button>
-                          {canAdvance && <button type="button" onClick={() => advanceOrder(order)} disabled={updatingId === order.id} className="rounded-md bg-black px-2.5 py-1.5 text-[10px] font-semibold text-white disabled:opacity-50">{updatingId === order.id ? "Updating..." : needsPaymentReview ? "Review payment" : needsBalancePaymentReview ? "Verify balance" : order.status === "Pending" ? "Accept" : order.status === "Preparing" ? needsBalancePayment ? "Pay Balance" : "Ready" : "Complete"}</button>}
+                          {canAdvance && <button type="button" onClick={() => advanceOrder(order)} disabled={updatingId === order.id} className="rounded-md bg-black px-2.5 py-1.5 text-[10px] font-semibold text-white disabled:opacity-50">{updatingId === order.id ? "Updating..." : needsPaymentReview ? "Review payment" : paymentIsConfirmed ? "Accept" : needsBalancePaymentReview ? "Verify balance" : order.status === "Pending" ? "Accept" : order.status === "Preparing" ? needsBalancePayment ? "Pay Balance" : "Ready" : "Complete"}</button>}
                           {order.return_refund_request?.status === "Pending Review"
                             ? <button type="button" onClick={() => { setRejectModalOrderId(order.id); setRejectReason(""); }} disabled={updatingId === order.id} className="rounded-md border border-red-200 bg-red-50 px-2.5 py-1.5 text-[10px] font-semibold text-red-700 disabled:opacity-50">Reject</button>
                             : !["Completed", "Cancelled"].includes(order.status) && <button type="button" onClick={() => updateStatus(order.id, "Cancelled")} disabled={updatingId === order.id} className="rounded-md border border-red-200 bg-red-50 px-2.5 py-1.5 text-[10px] font-semibold text-red-700 disabled:opacity-50">Cancel</button>}
@@ -878,6 +882,8 @@ export default function Orders() {
                     const needsPaymentReview = order.status === 'Awaiting Payment'
                       && String(order.payment_status || '').toLowerCase() === 'proof_submitted'
                       && (order.has_payment_proof || order.customer_payment_reference);
+                    const paymentIsConfirmed = order.status === 'Awaiting Payment'
+                      && ['paid', 'downpayment_paid'].includes(String(order.payment_status || '').toLowerCase());
                     const needsBalancePaymentReview = order.status === 'Awaiting Balance Payment'
                       && String(order.payment_status || '').toLowerCase() === 'proof_submitted'
                       && (order.has_payment_proof || order.customer_payment_reference);
@@ -921,7 +927,7 @@ export default function Orders() {
                             <div className="flex min-w-[210px] flex-wrap justify-end gap-1.5">
                               {!order.is_wasted && <>
                                 <button type="button" onClick={() => toggleOrderDetails(order, isExpanded)} className="rounded-md border border-[#e8dfd4] bg-white px-2.5 py-1.5 text-[10px] font-semibold text-[#65574d] transition hover:border-[#c9b895] hover:bg-[#faf7f2]">{isExpanded ? "Hide" : "View"}</button>
-                                {(!(order.status === "Completed" || order.status === "Cancelled") && (order.status !== 'Awaiting Payment' || needsPaymentReview) && (order.status !== 'Awaiting Balance Payment' || needsBalancePaymentReview)) && <button type="button" onClick={() => advanceOrder(order)} disabled={updatingId === order.id} className="rounded-md bg-[#33251e] px-2.5 py-1.5 text-[10px] font-semibold text-white transition hover:bg-black disabled:opacity-50">{needsPaymentReview ? "Verify payment" : needsBalancePaymentReview ? "Verify balance" : order.status === "Pending" ? "Accept" : order.status === "Preparing" ? needsBalancePayment ? "Pay Balance" : "Ready" : "Complete"}</button>}
+                                {(!(order.status === "Completed" || order.status === "Cancelled") && (order.status !== 'Awaiting Payment' || needsPaymentReview || paymentIsConfirmed) && (order.status !== 'Awaiting Balance Payment' || needsBalancePaymentReview)) && <button type="button" onClick={() => advanceOrder(order)} disabled={updatingId === order.id} className="rounded-md bg-[#33251e] px-2.5 py-1.5 text-[10px] font-semibold text-white transition hover:bg-black disabled:opacity-50">{needsPaymentReview ? "Verify payment" : paymentIsConfirmed ? "Accept" : needsBalancePaymentReview ? "Verify balance" : order.status === "Pending" ? "Accept" : order.status === "Preparing" ? needsBalancePayment ? "Pay Balance" : "Ready" : "Complete"}</button>}
                                 {order.return_refund_request?.status === "Pending Review"
                                   ? <button type="button" onClick={() => { setRejectModalOrderId(order.id); setRejectReason(""); }} disabled={updatingId === order.id || rejectSubmitting} className="rounded-md border border-red-200 bg-red-50 px-2.5 py-1.5 text-[10px] font-semibold text-red-700 transition hover:bg-red-100 disabled:opacity-50">Reject</button>
                                   : !["Completed", "Cancelled"].includes(order.status) && <button type="button" onClick={() => updateStatus(order.id, "Cancelled")} disabled={updatingId === order.id} className="rounded-md border border-red-200 bg-white px-2.5 py-1.5 text-[10px] font-semibold text-red-700 transition hover:bg-red-50 disabled:opacity-50">Cancel</button>}

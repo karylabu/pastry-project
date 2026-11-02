@@ -613,6 +613,7 @@ class OrderController extends Controller
                         'action_url' => '/customer/orders',
                         'created_at' => now(),
                     ]);
+                    app(\App\Services\RealtimeEventPublisher::class)->notificationUpdated((int) $user->id);
                 }
 
                 return response()->json([
@@ -814,7 +815,9 @@ class OrderController extends Controller
 
             try {
                 $paymentState = $this->getPayMongoPaymentState($secretKey, $paymentReference);
-                if ($paymentState === 'unpaid') {
+                if ($paymentState === 'unpaid'
+                    && !str_starts_with(strtolower($paymentReference), 'cs_')
+                    && !str_starts_with(strtolower($paymentReference), 'cs-')) {
                     $archiveResponse = Http::withBasicAuth($secretKey, '')
                         ->acceptJson()
                         ->timeout(15)
@@ -943,6 +946,7 @@ class OrderController extends Controller
                             'created_at' => now(),
                         ]);
                     }
+                    app(\App\Services\RealtimeEventPublisher::class)->notificationUpdated((int) $user->id);
                 }
 
                 return response()->json(['success' => true, 'payment_status' => 'failed']);
@@ -961,20 +965,50 @@ class OrderController extends Controller
 
     private function getPayMongoPaymentState(string $secretKey, string $paymentReference): string
     {
-        $response = Http::withBasicAuth($secretKey, '')
-            ->acceptJson()
-            ->timeout(15)
-            ->get('https://api.paymongo.com/v1/payment_links/' . rawurlencode($paymentReference) . '/payments');
+        $isCheckoutSession = str_starts_with(strtolower($paymentReference), 'cs_')
+            || str_starts_with(strtolower($paymentReference), 'cs-');
+        $urls = $isCheckoutSession
+            ? [
+                'https://api.paymongo.com/v2/checkout_sessions/' . rawurlencode($paymentReference) . '/payments',
+                'https://api.paymongo.com/v1/checkout_sessions/' . rawurlencode($paymentReference) . '/payments',
+                'https://api.paymongo.com/v2/checkout_sessions/' . rawurlencode($paymentReference),
+                'https://api.paymongo.com/v1/checkout_sessions/' . rawurlencode($paymentReference),
+            ]
+            : [
+                'https://api.paymongo.com/v1/payment_links/' . rawurlencode($paymentReference) . '/payments',
+            ];
 
-        if (!$response->successful() || !is_array($response->json('data'))) {
+        $response = null;
+        foreach ($urls as $url) {
+            $candidate = Http::withBasicAuth($secretKey, '')
+                ->acceptJson()
+                ->timeout(15)
+                ->get($url);
+            if ($candidate->successful() && is_array($candidate->json('data'))) {
+                $response = $candidate;
+                break;
+            }
+            Log::warning('PayMongo payment status endpoint returned no usable data.', [
+                'url' => $url,
+                'http_status' => $candidate->status(),
+            ]);
+        }
+
+        if (!$response) {
             Log::warning('PayMongo payment status could not be verified.', [
-                'http_status' => $response->status(),
+                'payment_reference' => $paymentReference,
             ]);
 
             return 'unverified';
         }
 
         $payments = $response->json('data');
+        if (!is_array($payments)) {
+            $payments = [];
+        }
+        if (isset($payments['id']) || isset($payments['attributes']) || isset($payments['status'])) {
+            $payments = [$payments];
+        }
         $hasSuccessfulPayment = collect($payments)->contains(function ($payment) {
             $status = strtolower((string) ($payment['status'] ?? $payment['attributes']['status'] ?? ''));
             return in_array($status, ['paid', 'succeeded'], true);
@@ -1245,6 +1279,7 @@ class OrderController extends Controller
                         'action_url' => '/customer/orders',
                         'created_at' => now(),
                     ]);
+                    app(\App\Services\RealtimeEventPublisher::class)->notificationUpdated((int) $user->id);
 
                     AdminNotification::notifyRoles(['admin'], [
                         'type' => 'order_cancelled',
@@ -1431,6 +1466,7 @@ class OrderController extends Controller
                         'action_url' => '/customer/orders',
                         'created_at' => now(),
                     ]);
+                    app(\App\Services\RealtimeEventPublisher::class)->notificationUpdated((int) $user->id);
                 }
             });
         } catch (\Throwable $exception) {
@@ -1631,7 +1667,7 @@ class OrderController extends Controller
                 if (
                     strtolower($newStatus) === 'pending'
                     && $normalizedOldStatus === 'awaiting payment'
-                    && $paymentStatus === 'proof_submitted'
+                    && in_array($paymentStatus, ['proof_submitted', 'paid', 'downpayment_paid'], true)
                 ) {
                     $isStandardPickupDownpayment = strtolower((string) $order->method) === 'pickup'
                         && !(bool) $order->is_customized
@@ -1711,6 +1747,7 @@ class OrderController extends Controller
                         'action_url' => '/customer/orders',
                         'created_at' => now(),
                     ]);
+                    app(\App\Services\RealtimeEventPublisher::class)->notificationUpdated((int) $order->user_id);
                 }
 
                 return $order->fresh();
@@ -1770,6 +1807,7 @@ class OrderController extends Controller
                 'action_url' => '/customer/orders',
                 'created_at' => now(),
             ]);
+            app(\App\Services\RealtimeEventPublisher::class)->notificationUpdated((int) $order->user_id);
         }
     }
 
