@@ -128,29 +128,15 @@ describe("BackupManagement", () => {
     ));
   });
 
-  test("tests a backup only in the separate database and confirms live data is untouched", async () => {
-    global.fetch
-      .mockResolvedValueOnce(jsonResponse({
-        ...listResponse(),
-        data: { ...listResponse().data, permissions: { can_restore: true, can_test_restore: true } },
-      }))
-      .mockResolvedValueOnce(jsonResponse({ success: true, message: "Backup restored and verified in the separate test database. Live data was not changed." }))
-      .mockResolvedValueOnce(jsonResponse(listResponse()));
+  test("does not show test restore in backup actions even when test restore is enabled", async () => {
+    global.fetch.mockResolvedValueOnce(jsonResponse({
+      ...listResponse(),
+      data: { ...listResponse().data, permissions: { can_restore: true, can_test_restore: true } },
+    }));
     render(<BackupManagement />);
 
-    fireEvent.click(await screen.findByRole("button", { name: `Test restore ${backupLabel}` }));
-    const dialog = await screen.findByRole("alertdialog");
-    expect(dialog).toHaveTextContent("separate test database");
-    expect(dialog).toHaveTextContent("will not change live customer data");
-    expect(global.fetch).toHaveBeenCalledTimes(1);
-
-    fireEvent.click(within(dialog).getByRole("button", { name: "Test restore" }));
-    expect(await screen.findByText(/Live data was not changed/)).toBeInTheDocument();
-    expect(global.fetch).toHaveBeenNthCalledWith(
-      2,
-      expect.stringContaining(`/api/admin/backups/${backup.filename}/test-restore`),
-      expect.objectContaining({ method: "POST", body: JSON.stringify({ confirmed: true }) })
-    );
+    expect(await screen.findByRole("button", { name: `Restore ${backupLabel}` })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: `Test restore ${backupLabel}` })).not.toBeInTheDocument();
   });
 
   test("requires confirmation before deleting a backup", async () => {
