@@ -658,7 +658,7 @@ class OrderController extends Controller
             ]);
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to create order. ' . get_class($e) . ': ' . $e->getMessage()
+                'message' => 'Failed to create order. Please try again.'
             ], 500);
         }
     }

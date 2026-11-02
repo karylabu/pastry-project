@@ -22,6 +22,26 @@ class RealtimeEventPublisher
         $this->publish('inventory.updated', 0, 0);
     }
 
+    public function notificationUpdated(int $userId): void
+    {
+        if ($userId <= 0) {
+            return;
+        }
+
+        try {
+            DB::table('realtime_events')->insert([
+                'audience' => 'user',
+                'user_id' => $userId,
+                'event_name' => 'notification.updated',
+                'order_id' => null,
+                'conversation_id' => null,
+                'created_at' => now(),
+            ]);
+        } catch (Throwable) {
+            // Notification delivery must never block the notification write.
+        }
+    }
+
     private function publish(string $eventName, int $userId, int $orderId, string $conversationId = ''): void
     {
         $events = [['audience' => 'admins', 'user_id' => null]];
