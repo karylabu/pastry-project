@@ -197,14 +197,25 @@ describe("BackupManagement", () => {
     );
   });
 
-  test("does not offer database restore to ordinary administrators", async () => {
+  test("offers database restore to administrators but keeps test restore restricted", async () => {
+    global.fetch.mockResolvedValueOnce(jsonResponse({
+      ...listResponse(),
+      data: { ...listResponse().data, permissions: { can_restore: true, can_test_restore: false } },
+    }));
+    render(<BackupManagement />);
+
+    expect(await screen.findByRole("button", { name: `Restore ${backupLabel}` })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: `Test restore ${backupLabel}` })).not.toBeInTheDocument();
+  });
+
+  test("hides restore actions when the backend denies restore access", async () => {
     global.fetch.mockResolvedValueOnce(jsonResponse({
       ...listResponse(),
       data: { ...listResponse().data, permissions: { can_restore: false, can_test_restore: false } },
     }));
     render(<BackupManagement />);
 
-    expect(await screen.findByText("Restoring a database is restricted to technical administrators.")).toBeInTheDocument();
+    expect(await screen.findByText("Restoring a database is restricted to administrator accounts.")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: `Restore ${backupLabel}` })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: `Test restore ${backupLabel}` })).not.toBeInTheDocument();
   });

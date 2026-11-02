@@ -119,18 +119,13 @@ class AdminBackupControllerTest extends TestCase
         DB::table('orders')->update(['reference' => 'ORD-CHANGED']);
         $restoreRequest = Request::create('/api/admin/backups/' . $filename . '/restore', 'POST', ['confirmed' => true]);
         $restoreResponse = $controller->restore($restoreRequest, $filename, $backups);
-        $this->assertSame(403, $restoreResponse->getStatusCode());
-
-        $superAdmin = new User();
-        $superAdmin->role = 'super_admin';
-        $this->actingAs($superAdmin);
-        $restoreResponse = $controller->restore($restoreRequest, $filename, $backups);
         $this->assertSame(200, $restoreResponse->getStatusCode());
         $this->assertSame('ORD-1', DB::table('orders')->value('reference'));
 
         $overview = $controller->index($request, $backups)->getData(true)['data'];
         $this->assertSame(2, $overview['overview']['total_backups']);
         $this->assertTrue($overview['permissions']['can_restore']);
+        $this->assertFalse($overview['permissions']['can_test_restore']);
         $this->assertContains('restore_safety', array_column($overview['backups'], 'purpose'));
 
         $this->actingAs($admin);

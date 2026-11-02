@@ -81,7 +81,7 @@ class AdminBackupController extends Controller
 
         $scheduleTime = ShopSettings::all()['backupScheduleTime'] ?? '02:00';
         $data = $backups->overview($scheduleTime);
-        $canRestore = $this->getAuthenticatedUser($request)?->isSuperAdmin() ?? false;
+        $canRestore = $this->getAuthenticatedUser($request)?->isAdmin() ?? false;
         $data['schedule_time'] = $scheduleTime;
         $data['permissions'] = [
             'can_restore' => $canRestore,
@@ -191,7 +191,7 @@ class AdminBackupController extends Controller
 
     public function restore(Request $request, string $filename, DatabaseBackupService $backups): \Illuminate\Http\JsonResponse
     {
-        if ($response = $this->authorizeTechnicalAdmin($request)) {
+        if ($response = $this->authorizeAdmin($request)) {
             return $response;
         }
         if (! $request->boolean('confirmed')) {

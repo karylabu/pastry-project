@@ -360,7 +360,7 @@ export default function BackupManagement() {
             </div>
           </section>
 
-          {!canRestore && <p className="mb-4 flex items-center gap-2 rounded-md border border-[#eee3c5] bg-[#fffaf0] px-3.5 py-3 text-[11px] text-[#74675f]"><ShieldAlert size={14} className="shrink-0 text-[#9b7810]" />Restoring a database is restricted to technical administrators.</p>}
+          {!canRestore && <p className="mb-4 flex items-center gap-2 rounded-md border border-[#eee3c5] bg-[#fffaf0] px-3.5 py-3 text-[11px] text-[#74675f]"><ShieldAlert size={14} className="shrink-0 text-[#9b7810]" />Restoring a database is restricted to administrator accounts.</p>}
           {canRestore && !canTestRestore && <p className="mb-4 flex items-center gap-2 rounded-md border border-[#eee3c5] bg-[#fffaf0] px-3.5 py-3 text-[11px] text-[#74675f]"><FlaskConical size={14} className="shrink-0 text-[#9b7810]" />Restore testing is unavailable until a separate test database is configured by a technical administrator.</p>}
           {canRestore && selectedBackup && <div className="mb-4 flex flex-col gap-2 rounded-md border border-[#e9e1d9] bg-white px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
             <p className="min-w-0 truncate text-[11px] text-[#65574d]">Selected copy: <span className="font-semibold text-[#33251e]">{getBackupLabel(selectedBackup)}</span></p>
