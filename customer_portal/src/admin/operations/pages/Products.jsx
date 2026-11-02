@@ -1720,65 +1720,6 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
                   </div>
 
                   <div className="space-y-2">
-                    <label htmlFor="edit-product-category" className="block text-[10px] font-bold uppercase tracking-[0.16em] text-[#8f8076]">Category</label>
-                    <select
-                      id="edit-product-category"
-                      value={editProduct.category}
-                      onChange={(e) => {
-                        const category = e.target.value;
-                        setEditProduct((p) => ({
-                          ...p,
-                          category,
-                        }));
-                      }}
-                      className="w-full rounded-xl border border-[#eadfd8] bg-white px-3 py-2.5 text-[12px] text-[#33251e] outline-none transition focus:border-[#d4af37] focus:ring-2 focus:ring-[#d4af37]/15"
-                    >
-                      {[...new Set([
-                        ...(canManageCatalog ? ["Cakes"] : ["Cakes", "Meals", "Pasta", "Starter"]),
-                        editProduct.category,
-                      ].filter(Boolean))].map((category) => (
-                        <option key={category} value={category}>{category}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {canManageCatalog && (
-                    <div className="space-y-2 sm:col-span-2">
-                      <p className="block text-[10px] font-bold uppercase tracking-[0.16em] text-[#8f8076]">Cake Size</p>
-                      <div className="grid grid-cols-2 gap-3">
-                        {["small", "big"].map((sizeName) => {
-                          const sizeOption = getProductSizeByName(editProduct, sizeName);
-                          const selected = editSize === sizeName;
-                          return (
-                            <button
-                              key={sizeName}
-                              type="button"
-                              disabled={!sizeOption}
-                              aria-label={`Edit ${sizeName === "small" ? "Small" : "Big"} Cake size`}
-                              onClick={() => {
-                                setEditSize(sizeName);
-                                setEditProduct((p) => ({
-                                  ...p,
-                                  price: getProductPriceForSize(p, sizeName) || "",
-                                }));
-                              }}
-                              className={`rounded-xl border px-3 py-2.5 text-[12px] font-semibold transition ${
-                                !sizeOption
-                                  ? "cursor-not-allowed border-stone-200 bg-stone-100 text-stone-400"
-                                  : selected
-                                  ? "border-[#d4af37] bg-[#fff8df] text-[#765d50]"
-                                  : "border-[#eadfd8] bg-white text-[#765d50] hover:border-[#d4af37]"
-                              }`}
-                            >
-                              {sizeName === "small" ? "Small Cake" : "Big Cake"}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="space-y-2">
                     <label htmlFor="edit-product-price" className="block text-[10px] font-bold uppercase tracking-[0.16em] text-[#8f8076]">{editSize === "small" ? "Small Cake Price" : "Big Cake Price"}</label>
                     <input
                       id="edit-product-price"

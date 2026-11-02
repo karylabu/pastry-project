@@ -491,18 +491,20 @@ describe('Products admin catalog', () => {
     });
   });
 
-  test('edits product name, category, and selected cake price without submitting stock', async () => {
+  test('uses the selected card size for the edit price without category controls', async () => {
     render(<Products allowCatalogManagement />);
 
     await waitFor(() => {
       expect(screen.getByText('Strawberry Cake')).toBeInTheDocument();
     });
 
+    fireEvent.click(screen.getByRole('button', { name: 'Small size for Strawberry Cake' }));
     fireEvent.click(screen.getAllByRole('button', { name: /^Edit / })[0]);
     fireEvent.change(screen.getByLabelText('Product Name'), { target: { value: 'Pistachio Dream' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Edit Small Cake size' }));
     fireEvent.change(screen.getByLabelText('Small Cake Price'), { target: { value: '525' } });
 
+    expect(screen.queryByLabelText('Category')).not.toBeInTheDocument();
+    expect(screen.queryByText('Cake Size')).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Current Stock')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
 
