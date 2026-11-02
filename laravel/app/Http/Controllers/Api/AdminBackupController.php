@@ -8,6 +8,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Facades\Validator;
 use App\Services\DatabaseBackupService;
 use App\Services\FullSystemBackupService;
@@ -214,16 +215,49 @@ class AdminBackupController extends Controller
         }
     }
 
-    public function downloadSystem(Request $request, string $filename, FullSystemBackupService $systemBackups): mixed
+    public function createSystemDownloadLink(Request $request, string $filename, FullSystemBackupService $systemBackups): \Illuminate\Http\JsonResponse
     {
         if ($response = $this->authorizeTechnicalAdmin($request)) {
             return $response;
         }
 
         try {
-            return response()->download($systemBackups->downloadPath($filename), $filename, [
-                'Content-Type' => 'application/zip',
+            $systemBackups->downloadPath($filename);
+            $expiresAt = now()->addMinutes(5);
+
+            return response()->json([
+                'success' => true,
+                'data' => [
+                    'url' => URL::temporarySignedRoute(
+                        'admin.system-backups.download',
+                        $expiresAt,
+                        ['filename' => $filename],
+                        false
+                    ),
+                    'expires_at' => $expiresAt->toIso8601String(),
+                ],
             ]);
+        } catch (\InvalidArgumentException $exception) {
+            return response()->json(['success' => false, 'message' => 'System backup file not found.'], 404);
+        } catch (Throwable $exception) {
+            Log::error('System backup download link creation failed.', ['filename' => $filename, 'exception' => $exception]);
+
+            return response()->json(['success' => false, 'message' => $exception->getMessage()], 500);
+        }
+    }
+
+    public function downloadSystem(Request $request, string $filename, FullSystemBackupService $systemBackups): mixed
+    {
+        try {
+            $response = response()->download($systemBackups->downloadPath($filename), $filename, [
+                'Content-Type' => 'application/zip',
+                'Cache-Control' => 'private, no-store, no-cache, must-revalidate',
+                'Pragma' => 'no-cache',
+                'Referrer-Policy' => 'no-referrer',
+                'X-Content-Type-Options' => 'nosniff',
+            ]);
+
+            return $response;
         } catch (\InvalidArgumentException $exception) {
             return response()->json(['success' => false, 'message' => 'System backup file not found.'], 404);
         } catch (Throwable $exception) {

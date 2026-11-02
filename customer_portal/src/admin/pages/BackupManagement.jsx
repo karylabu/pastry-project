@@ -291,21 +291,23 @@ export default function BackupManagement() {
     setBusyAction(`download-system:${backup.filename}`);
     setFeedback(null);
     try {
-      const response = await fetch(`${LARAVEL_BASE}/api/admin/system-backups/${encodeURIComponent(backup.filename)}/download`, {
+      const response = await fetch(`${LARAVEL_BASE}/api/admin/system-backups/${encodeURIComponent(backup.filename)}/download-link`, {
+        method: "POST",
         credentials: "include",
-        headers: { Accept: "application/zip", ...getAuthHeaders() },
+        headers: { Accept: "application/json", ...getAuthHeaders() },
       });
       if (!response.ok) throw new Error(await getErrorMessage(response, "Unable to download this system backup."));
-      const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
+      const result = await response.json().catch(() => ({}));
+      if (!result.success || !result.data?.url) {
+        throw new Error(result.message || "The system backup download link could not be created.");
+      }
       const link = document.createElement("a");
-      link.href = url;
+      link.href = new URL(result.data.url, window.location.origin).toString();
       link.download = backup.filename;
       document.body.appendChild(link);
       link.click();
       link.remove();
-      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
-      setFeedback({ type: "success", message: "Full system ZIP downloaded to your device." });
+      setFeedback({ type: "success", message: "Full system ZIP download started. Check your browser downloads." });
     } catch (error) {
       setFeedback({ type: "error", message: error.message || "Unable to download this system backup." });
     } finally {

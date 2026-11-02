@@ -138,7 +138,7 @@ describe("BackupManagement", () => {
     expect(screen.queryByRole("button", { name: "Create Full System Backup" })).not.toBeInTheDocument();
   });
 
-  test("downloads a verified system backup as a ZIP", async () => {
+  test("starts a verified system ZIP download using a temporary secure link", async () => {
     const systemBackup = {
       filename: "pastry-project-system-20261101-020000-abcdef.zip",
       created_at: "2026-11-01T02:00:00+08:00",
@@ -152,20 +152,23 @@ describe("BackupManagement", () => {
         permissions: { can_restore: true, can_test_restore: false, can_manage_system_backups: true },
         system_backups: { backups: [systemBackup], overview: { available_backups: 1, storage_used_bytes: 4096 } },
       })))
-      .mockResolvedValueOnce({ ok: true, blob: jest.fn().mockResolvedValue(new Blob(["zip data"])) });
-    URL.createObjectURL = jest.fn(() => "blob:system-backup");
-    URL.revokeObjectURL = jest.fn();
-    jest.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+      .mockResolvedValueOnce(jsonResponse({
+        success: true,
+        data: { url: `/api/admin/system-backups/${systemBackup.filename}/download?expires=1793500000&signature=valid` },
+      }));
+    const clickSpy = jest.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
     render(<BackupManagement />);
 
     fireEvent.click(await screen.findByRole("button", { name: /Download system backup/ }));
 
-    expect(await screen.findByText("Full system ZIP downloaded to your device.")).toBeInTheDocument();
+    expect(await screen.findByText("Full system ZIP download started. Check your browser downloads.")).toBeInTheDocument();
     expect(global.fetch).toHaveBeenNthCalledWith(
       2,
-      expect.stringContaining(`/api/admin/system-backups/${systemBackup.filename}/download`),
-      expect.objectContaining({ headers: expect.objectContaining({ Accept: "application/zip" }) })
+      expect.stringContaining(`/api/admin/system-backups/${systemBackup.filename}/download-link`),
+      expect.objectContaining({ method: "POST", headers: expect.objectContaining({ Accept: "application/json" }) })
     );
+    expect(clickSpy).toHaveBeenCalled();
+    expect(clickSpy.mock.instances[0].href).toContain(`/api/admin/system-backups/${systemBackup.filename}/download?`);
   });
 
   test("requires explicit confirmation before restoring and sends the confirmation to the API", async () => {

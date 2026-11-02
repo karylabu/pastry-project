@@ -174,12 +174,44 @@ class AdminBackupControllerTest extends TestCase
         $systemBackups = app(FullSystemBackupService::class);
 
         $this->assertSame(403, $controller->storeSystem($request, $backups, $systemBackups)->getStatusCode());
-        $this->assertSame(403, $controller->downloadSystem($request, 'pastry-project-system-20261101-020000-abcdef.zip', $systemBackups)->getStatusCode());
+        $this->assertSame(403, $controller->createSystemDownloadLink(
+            $request,
+            'pastry-project-system-20261101-020000-abcdef.zip',
+            $systemBackups
+        )->getStatusCode());
         $this->assertSame(403, $controller->destroySystem(
             Request::create('/api/admin/system-backups/file.zip', 'DELETE', ['confirmed' => true]),
             'pastry-project-system-20261101-020000-abcdef.zip',
             $systemBackups
         )->getStatusCode());
+    }
+
+    public function test_super_admin_downloads_a_system_backup_from_a_temporary_signed_url(): void
+    {
+        $superAdmin = new User();
+        $superAdmin->role = 'super_admin';
+        $this->actingAs($superAdmin);
+        $filename = 'pastry-project-system-20261101-020000-abcdef.zip';
+        $this->systemFixturePath = storage_path('framework/testing/system-download-' . uniqid('', true));
+        mkdir($this->systemFixturePath, 0700, true);
+        $zipPath = $this->systemFixturePath . DIRECTORY_SEPARATOR . $filename;
+        file_put_contents($zipPath, 'verified zip fixture');
+
+        $systemBackups = \Mockery::mock(FullSystemBackupService::class);
+        $systemBackups->shouldReceive('downloadPath')->twice()->with($filename)->andReturn($zipPath);
+        $this->app->instance(FullSystemBackupService::class, $systemBackups);
+
+        $linkResponse = $this->postJson('/api/admin/system-backups/' . $filename . '/download-link');
+        $linkResponse->assertOk()->assertJsonPath('success', true);
+        $downloadUrl = $linkResponse->json('data.url');
+        $this->assertStringStartsWith('/api/admin/system-backups/' . $filename . '/download?', $downloadUrl);
+
+        $this->get($downloadUrl)
+            ->assertOk()
+            ->assertHeader('Content-Type', 'application/zip')
+            ->assertHeader('Referrer-Policy', 'no-referrer');
+
+        $this->get($downloadUrl . '&signature=invalid')->assertForbidden();
     }
 
     public function test_super_admin_creates_a_system_zip_only_after_database_backup_verifies(): void
