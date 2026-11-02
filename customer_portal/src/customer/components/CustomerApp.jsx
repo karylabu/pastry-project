@@ -41,6 +41,19 @@ import { CUSTOMER_BASE, LARAVEL_BASE } from '../../services/config';
 
 const PENDING_PAYMONGO_CHECKOUT_KEY = 'pendingPaymongoCheckout';
 
+const formatShopTime = (time) => {
+  const match = String(time || '').match(/^([01]\d|2[0-3]):([0-5]\d)$/);
+  if (!match) return time;
+  const hour = Number(match[1]);
+  return `${hour % 12 || 12}:${match[2]} ${hour < 12 ? 'AM' : 'PM'}`;
+};
+
+const getShopHoursMessage = (openingHours) => {
+  const match = String(openingHours || '').match(/^(\d{2}:\d{2})\s*-\s*(\d{2}:\d{2})$/);
+  if (!match) return 'Our shop is currently closed. Please come back during our posted shop hours.';
+  return `Our shop is currently closed. Shop hours are ${formatShopTime(match[1])}–${formatShopTime(match[2])}. Please come back when we reopen at ${formatShopTime(match[1])}.`;
+};
+
 function ContactInformationPage() {
   return (
     <main className="min-h-[60vh] bg-[#fffaf3] px-5 py-12 text-[#33251e] sm:px-8">
@@ -97,6 +110,7 @@ export default function CustomerApp() {
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [showGuestPrompt, setShowGuestPrompt] = useState(false);
   const [shopAccessNotice, setShopAccessNotice] = useState(null);
+  const [shopOpeningHours, setShopOpeningHours] = useState('');
   const [floatingFooterApproaching, setFloatingFooterApproaching] = useState(false);
   const returnPolicyCheckoutRef = useRef(false);
   const paymentReturnInProgress = useRef(false);
@@ -349,6 +363,7 @@ export default function CustomerApp() {
       if (!response.ok || typeof status?.is_open !== 'boolean') {
         throw new Error(status?.message || `Shop status request failed (${response.status}).`);
       }
+      setShopOpeningHours(status.settings?.openingHours || '');
       if (!status.is_open) {
         setShopAccessNotice('closed');
         return false;
@@ -625,7 +640,7 @@ export default function CustomerApp() {
             </h2>
             <p className="mt-3 text-sm leading-6 text-gray-600">
               {shopAccessNotice === 'closed'
-                ? 'Our shop is currently closed. Shop hours are 8AM–8PM. Please come back when we reopen at 8AM.'
+                ? getShopHoursMessage(shopOpeningHours)
                 : 'We couldn’t verify whether the shop is open, so we can’t add items right now. Please try again shortly.'}
             </p>
             <button
