@@ -153,6 +153,35 @@ class PaymentProofSecurityTest extends TestCase
         ]);
     }
 
+    public function test_customer_can_attach_proof_to_a_paid_order_without_changing_its_status(): void
+    {
+        DB::table('orders')->insert([
+            'id' => 11,
+            'user_id' => 9,
+            'status' => 'Pending',
+            'payment' => 'QRPh',
+            'payment_status' => 'paid',
+            'order_type' => 'Standard',
+            'is_customized' => false,
+        ]);
+        RateLimiter::clear('payment-proof:' . hash('sha256', '9:11'));
+
+        $this->withHeader('X-Auth-Token', 'proof-customer-token')
+            ->postJson('/api/orders/11/payment-proof', [
+                'customer_payment_reference' => 'QRPH_PAID_11',
+            ])
+            ->assertOk()
+            ->assertJsonPath('payment_status', 'paid')
+            ->assertJsonPath('has_payment_proof', false);
+
+        $this->assertDatabaseHas('orders', [
+            'id' => 11,
+            'status' => 'Pending',
+            'payment_status' => 'paid',
+            'customer_payment_reference' => 'QRPH_PAID_11',
+        ]);
+    }
+
     public function test_customer_can_submit_balance_proof_after_the_deposit_is_paid(): void
     {
         DB::table('orders')->insert([

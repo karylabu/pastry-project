@@ -213,7 +213,10 @@ function PaymentProofDialog({ order, onSubmit, onDismiss, isLoading, error }) {
         <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#9b7b3d]">QRPh payment</p>
         <h2 className="mt-2 text-xl font-semibold text-slate-900">Send payment proof</h2>
         <p className="mt-2 text-sm leading-6 text-slate-600">
-          Upload a screenshot, enter the payment reference number, or provide both for Order #{order.id}. Admin will review your payment details.
+          Upload a screenshot, enter the payment reference number, or provide both for Order #{order.id}.
+          {String(order.payment_status || '').toLowerCase() === 'paid'
+            ? ' Your payment is already confirmed; this proof will be attached without changing that status.'
+            : ' Admin will review your payment details.'}
         </p>
         <label className="mt-5 block text-sm font-medium text-slate-700" htmlFor="payment-proof-file">Payment screenshot or photo</label>
         <input
@@ -568,17 +571,6 @@ export default function Orders() {
       window.removeEventListener("focus", refreshOrders);
     };
   }, [loadOrders]);
-
-  useEffect(() => {
-    if (!paymentProofTarget) return;
-    const currentOrder = orders.find((order) => Number(order.id) === Number(paymentProofTarget.id));
-    if (!currentOrder) return;
-    const currentPaymentStatus = String(currentOrder.payment_status || '').toLowerCase();
-    if (['paid', 'downpayment_paid'].includes(currentPaymentStatus)) {
-      setPaymentProofError('');
-      setPaymentProofTarget(null);
-    }
-  }, [orders, paymentProofTarget]);
 
   useEffect(() => {
     if (feedbackTarget || feedbackPromptSuppressed) return;
@@ -1410,6 +1402,7 @@ export default function Orders() {
                     && ['maya', 'maribank', 'visamastercard', 'onlinebanking'].includes(paymentMethodKey));
                 const paymentStatusKey = String(order.payment_status || '').toLowerCase();
                 const isPaymentConfirmed = ['paid', 'downpayment_paid'].includes(paymentStatusKey);
+                const hasPaymentEvidence = Boolean(order.has_payment_proof || order.customer_payment_reference);
                 const isAwaitingPayment = order.status === 'Awaiting Payment'
                   && supportsPaymentProof
                   && !isPaymentConfirmed;
@@ -1418,6 +1411,10 @@ export default function Orders() {
                 const hasPaymentSubmission = paymentStatusKey === 'proof_submitted';
                 const isPending    = order.status === "Pending";
                 const isPendingQrPayment = isPending && supportsPaymentProof && !isPaymentConfirmed;
+                const canSubmitConfirmedPaymentProof = paymentStatusKey === 'paid'
+                  && supportsPaymentProof
+                  && ['Pending', 'Awaiting Payment', 'Awaiting Balance Payment'].includes(order.status)
+                  && !hasPaymentEvidence;
                 const isToReceive  = String(order.status || '').toLowerCase() === "ready for pickup";
                 const isCompleted  = order.status === "Completed";
                 const hasReturnRefundRequest = Boolean(order.return_refund_request);
@@ -1724,6 +1721,18 @@ export default function Orders() {
                           >
                             Send proof
                           </button>
+                      )}
+                      {canSubmitConfirmedPaymentProof && (
+                        <button
+                          type="button"
+                          onClick={() => { setPaymentProofError(''); setPaymentProofTarget(order); }}
+                          className="inline-flex h-9 w-[126px] shrink-0 items-center justify-center gap-1.5 rounded-lg bg-slate-900 px-3 py-2 text-center text-[11px] font-semibold leading-4 text-white transition-colors hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-700 focus-visible:ring-offset-2"
+                        >
+                          Send proof
+                        </button>
+                      )}
+                      {isPaymentConfirmed && hasPaymentEvidence && (
+                        <span className="text-right text-[11px] font-semibold text-emerald-700">Proof attached</span>
                       )}
                       {isToReceive && (
                         <>

@@ -233,10 +233,19 @@ test('shows the bakery logo for custom cake orders without a reference image', a
   );
 });
 
-test('does not offer QR payment proof after the order is paid', async () => {
+test('allows proof to be attached to a paid order without changing its paid status', async () => {
+  let proofSubmitted = false;
   global.fetch = jest.fn((url) => {
     if (String(url).includes('/api/customer/products')) {
       return Promise.resolve({ ok: true, json: async () => [] });
+    }
+
+    if (String(url).includes('/api/orders/276/payment-proof')) {
+      proofSubmitted = true;
+      return Promise.resolve({
+        ok: true,
+        json: async () => ({ success: true, payment_status: 'paid', has_payment_proof: true }),
+      });
     }
 
     return Promise.resolve({
@@ -250,6 +259,8 @@ test('does not offer QR payment proof after the order is paid', async () => {
           status: 'Pending',
           payment: 'QRPh',
           payment_status: 'paid',
+          has_payment_proof: proofSubmitted,
+          customer_payment_reference: proofSubmitted ? 'QRPH-276' : null,
           method: 'Pickup',
           items: [{ name: 'Blueberry Cheesecake', qty: 1, price: 2 }],
         }],
@@ -260,6 +271,19 @@ test('does not offer QR payment proof after the order is paid', async () => {
   render(<Orders />);
 
   expect(await screen.findByText('Payment confirmed — awaiting Admin acceptance')).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Send proof' }));
+  fireEvent.change(screen.getByLabelText('Payment reference number (optional)'), {
+    target: { value: 'QRPH-276' },
+  });
+  fireEvent.click(screen.getByRole('button', { name: 'Submit payment details' }));
+
+  await waitFor(() => {
+    expect(global.fetch).toHaveBeenCalledWith(
+      expect.stringContaining('/api/orders/276/payment-proof'),
+      expect.objectContaining({ method: 'POST' }),
+    );
+    expect(screen.getByText('Proof attached')).toBeInTheDocument();
+  });
   expect(screen.queryByRole('button', { name: 'Send proof' })).not.toBeInTheDocument();
 });
 

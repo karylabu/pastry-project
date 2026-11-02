@@ -139,6 +139,7 @@ class OrderController extends Controller
 
         foreach ($orders as $order) {
             $order->setAttribute('order_number', (int) $order->id);
+            $order->setAttribute('has_payment_proof', !empty($order->payment_proof_path));
         }
 
         return response()->json([
@@ -714,13 +715,6 @@ class OrderController extends Controller
             && strtolower((string) $order->payment_status) === 'proof_submitted';
         $paymentStatusKey = strtolower((string) $order->payment_status);
 
-        if ($supportedPaymentMethod && in_array($paymentStatusKey, ['paid', 'downpayment_paid'], true)) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Payment is already confirmed. No additional proof is required.',
-            ], 409);
-        }
-
         if (!$supportedPaymentMethod
             || !in_array($order->status, ['Pending', 'Awaiting Payment', 'Awaiting Balance Payment'], true)
             || $paymentStatusKey === 'failed'
@@ -780,13 +774,17 @@ class OrderController extends Controller
         }
 
         $oldPath = $order->payment_proof_path;
+        $updatedPaymentStatus = $paymentStatusKey === 'paid' ? 'paid' : 'proof_submitted';
+        $updates = [
+            ...$downpaymentUpdates,
+            'customer_payment_reference' => $paymentReference !== '' ? $paymentReference : null,
+            'payment_status' => $updatedPaymentStatus,
+        ];
+        if ($newPath) {
+            $updates['payment_proof_path'] = $newPath;
+        }
         try {
-            $order->update([
-                ...$downpaymentUpdates,
-                'payment_proof_path' => $newPath,
-                'customer_payment_reference' => $paymentReference !== '' ? $paymentReference : null,
-                'payment_status' => 'proof_submitted',
-            ]);
+            $order->update($updates);
         } catch (\Throwable $exception) {
             if ($newPath) {
                 Storage::disk('local')->delete($newPath);
@@ -803,8 +801,11 @@ class OrderController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Payment proof submitted for review.',
-            'payment_status' => 'proof_submitted',
+            'message' => $updatedPaymentStatus === 'paid'
+                ? 'Payment proof attached to the confirmed order.'
+                : 'Payment proof submitted for review.',
+            'payment_status' => $updatedPaymentStatus,
+            'has_payment_proof' => (bool) ($newPath ?: $oldPath),
         ]);
     }
 

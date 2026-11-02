@@ -369,10 +369,8 @@ class StaffApiController extends Controller
                 $order->order_number = (int) $order->id;
                 $order->customer = $order->customer ?: $order->email ?: 'Guest';
                 $order->has_discount_id = !empty($order->discount_id_path);
-                $order->has_payment_proof = !empty($order->payment_proof_path)
-                    && strtolower((string) ($order->payment_status ?? '')) === 'proof_submitted';
-                $order->has_payment_reference = !empty($order->customer_payment_reference)
-                    && strtolower((string) ($order->payment_status ?? '')) === 'proof_submitted';
+                $order->has_payment_proof = !empty($order->payment_proof_path);
+                $order->has_payment_reference = !empty($order->customer_payment_reference);
                 unset($order->discount_id_path, $order->payment_proof_path);
                 $order->items = $items;
                 $order->is_customized = $isCustomCakeRequest;
@@ -551,9 +549,9 @@ class StaffApiController extends Controller
             return $admin;
         }
 
-        $order = DB::table('orders')->where('id', $orderId)->first(['payment_proof_path', 'payment_status']);
+        $order = DB::table('orders')->where('id', $orderId)->first(['payment_proof_path']);
         $path = $order->payment_proof_path ?? null;
-        if (!$path || strtolower((string) ($order->payment_status ?? '')) !== 'proof_submitted') {
+        if (!$path) {
             return $this->corsResponse(['success' => false, 'message' => 'Payment proof not found.'], 404);
         }
 
