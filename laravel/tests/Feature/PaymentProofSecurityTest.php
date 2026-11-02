@@ -158,7 +158,7 @@ class PaymentProofSecurityTest extends TestCase
         DB::table('orders')->insert([
             'id' => 11,
             'user_id' => 9,
-            'status' => 'Preparing',
+            'status' => 'Pending',
             'payment' => 'QRPh',
             'payment_status' => 'paid',
             'order_type' => 'Standard',
@@ -176,9 +176,37 @@ class PaymentProofSecurityTest extends TestCase
 
         $this->assertDatabaseHas('orders', [
             'id' => 11,
-            'status' => 'Preparing',
+            'status' => 'Pending',
             'payment_status' => 'paid',
             'customer_payment_reference' => 'QRPH_PAID_11',
+        ]);
+    }
+
+    public function test_customer_cannot_submit_proof_after_order_is_preparing(): void
+    {
+        DB::table('orders')->insert([
+            'id' => 12,
+            'user_id' => 9,
+            'status' => 'Preparing',
+            'payment' => 'QRPh',
+            'payment_status' => 'paid',
+            'order_type' => 'Standard',
+            'is_customized' => false,
+        ]);
+        RateLimiter::clear('payment-proof:' . hash('sha256', '9:12'));
+
+        $this->withHeader('X-Auth-Token', 'proof-customer-token')
+            ->postJson('/api/orders/12/payment-proof', [
+                'customer_payment_reference' => 'QRPH_PAID_12',
+            ])
+            ->assertStatus(409)
+            ->assertJsonPath('message', 'This order is not awaiting a QR payment.');
+
+        $this->assertDatabaseHas('orders', [
+            'id' => 12,
+            'status' => 'Preparing',
+            'payment_status' => 'paid',
+            'customer_payment_reference' => null,
         ]);
     }
 

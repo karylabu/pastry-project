@@ -1412,7 +1412,7 @@ export default function Orders() {
                 const isPendingQrPayment = isPending && supportsPaymentProof && !isPaymentConfirmed;
                 const canSubmitConfirmedPaymentProof = paymentStatusKey === 'paid'
                   && supportsPaymentProof
-                  && ['Pending', 'Awaiting Payment', 'Awaiting Balance Payment', 'Preparing', 'Ready for Pickup'].includes(order.status)
+                  && ['Pending', 'Awaiting Payment', 'Awaiting Balance Payment'].includes(order.status)
                   && !order.has_payment_proof;
                 const isToReceive  = String(order.status || '').toLowerCase() === "ready for pickup";
                 const isCompleted  = order.status === "Completed";

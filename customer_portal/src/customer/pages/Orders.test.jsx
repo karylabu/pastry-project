@@ -233,7 +233,7 @@ test('shows the bakery logo for custom cake orders without a reference image', a
   );
 });
 
-test('allows proof to be attached to a preparing paid order without changing its paid status', async () => {
+test('allows proof to be attached to a pending paid order without changing its paid status', async () => {
   let proofSubmitted = false;
   URL.createObjectURL = jest.fn(() => 'blob:paid-proof');
   URL.revokeObjectURL = jest.fn();
@@ -258,7 +258,7 @@ test('allows proof to be attached to a preparing paid order without changing its
           id: 276,
           user_id: 7,
           customer: 'Customer',
-          status: 'Preparing',
+          status: 'Pending',
           payment: 'QRPh',
           payment_status: 'paid',
           has_payment_proof: proofSubmitted,
@@ -272,7 +272,7 @@ test('allows proof to be attached to a preparing paid order without changing its
 
   render(<Orders />);
 
-  expect(await screen.findByText('Being prepared in kitchen')).toBeInTheDocument();
+  expect(await screen.findByText('Payment confirmed — awaiting Admin acceptance')).toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: 'Send proof' }));
   fireEvent.change(screen.getByLabelText('Payment screenshot or photo'), {
     target: { files: [new File(['proof'], 'payment.png', { type: 'image/png' })] },
@@ -286,6 +286,36 @@ test('allows proof to be attached to a preparing paid order without changing its
     );
     expect(screen.getByText('Proof attached')).toBeInTheDocument();
   });
+  expect(screen.queryByRole('button', { name: 'Send proof' })).not.toBeInTheDocument();
+});
+
+test('does not offer proof submission for a paid order that is already preparing', async () => {
+  global.fetch = jest.fn((url) => {
+    if (String(url).includes('/api/customer/products')) {
+      return Promise.resolve({ ok: true, json: async () => [] });
+    }
+
+    return Promise.resolve({
+      ok: true,
+      json: async () => ({
+        success: true,
+        orders: [{
+          id: 277,
+          user_id: 7,
+          customer: 'Customer',
+          status: 'Preparing',
+          payment: 'QRPh',
+          payment_status: 'paid',
+          method: 'Pickup',
+          items: [{ name: 'Blueberry Cheesecake', qty: 1, price: 2 }],
+        }],
+      }),
+    });
+  });
+
+  render(<Orders />);
+
+  expect(await screen.findByText('Being prepared in kitchen')).toBeInTheDocument();
   expect(screen.queryByRole('button', { name: 'Send proof' })).not.toBeInTheDocument();
 });
 
