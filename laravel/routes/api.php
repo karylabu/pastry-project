@@ -51,6 +51,10 @@ Route::post('login', [AuthApiController::class, 'login'])
     ->middleware(\Illuminate\Routing\Middleware\ThrottleRequests::class . ':5,15');
 Route::post('login/two-factor', [CustomerTwoFactorController::class, 'verifyLogin'])
     ->middleware(\Illuminate\Routing\Middleware\ThrottleRequests::class . ':5,15');
+Route::post('registration/phone-otp', [AuthApiController::class, 'sendRegistrationPhoneOtp'])
+    ->middleware(\Illuminate\Routing\Middleware\ThrottleRequests::class . ':5,15');
+Route::post('registration/phone-otp/verify', [AuthApiController::class, 'verifyRegistrationPhoneOtp'])
+    ->middleware(\Illuminate\Routing\Middleware\ThrottleRequests::class . ':10,15');
 Route::get('customer/two-factor', [CustomerTwoFactorController::class, 'status']);
 Route::post('customer/two-factor/setup', [CustomerTwoFactorController::class, 'setup'])
     ->middleware(\Illuminate\Routing\Middleware\ThrottleRequests::class . ':5,1');

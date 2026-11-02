@@ -54,6 +54,12 @@ export default function Register() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
+  const [phoneVerificationId, setPhoneVerificationId] = useState("");
+  const [phoneOtp, setPhoneOtp] = useState("");
+  const [phoneOtpMessage, setPhoneOtpMessage] = useState("");
+  const [phoneVerified, setPhoneVerified] = useState(false);
+  const [phoneOtpLoading, setPhoneOtpLoading] = useState(false);
+  const [phoneVerifyLoading, setPhoneVerifyLoading] = useState(false);
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [googleSignup, setGoogleSignup] = useState(null);
@@ -84,6 +90,7 @@ export default function Register() {
     !validateName(name) &&
     !validateEmail(email) &&
     !validatePhone(phone) &&
+    phoneVerified &&
     (googleSignup || (!validatePassword(password) && !validateConfirmPassword(confirmPassword, password))) &&
     agreeTerms &&
     agreePrivacy;
@@ -121,8 +128,85 @@ export default function Register() {
     setErrors(nextErrors);
   };
 
+  const requestPhoneOtp = async () => {
+    const phoneError = validatePhone(phone);
+    if (phoneError) {
+      setTouched((prev) => ({ ...prev, phone: true }));
+      setErrors((prev) => ({ ...prev, phone: phoneError }));
+      return;
+    }
+
+    setError("");
+    setPhoneOtpMessage("");
+    setPhoneOtpLoading(true);
+
+    try {
+      const response = await fetch(`${LARAVEL_BASE}/api/registration/phone-otp`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({ phone: phone.trim() }),
+      });
+      const data = await safeParseJson(response);
+
+      if (!response.ok || !data?.success) {
+        setError(data?.message || "Could not send the verification code. Please try again.");
+        return;
+      }
+
+      setPhoneVerificationId(data.verification_id);
+      setPhoneOtp("");
+      setPhoneVerified(false);
+      setPhoneOtpMessage("A six-digit verification code was sent to your phone. It expires in 10 minutes.");
+    } catch (requestError) {
+      setError("Network error while sending the verification code. Please try again.");
+    } finally {
+      setPhoneOtpLoading(false);
+    }
+  };
+
+  const verifyPhoneOtp = async () => {
+    if (!/^\d{6}$/.test(phoneOtp)) {
+      setError("Enter the six-digit verification code sent to your phone.");
+      return;
+    }
+
+    setError("");
+    setPhoneOtpMessage("");
+    setPhoneVerifyLoading(true);
+
+    try {
+      const response = await fetch(`${LARAVEL_BASE}/api/registration/phone-otp/verify`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({
+          phone: phone.trim(),
+          verification_id: phoneVerificationId,
+          code: phoneOtp,
+        }),
+      });
+      const data = await safeParseJson(response);
+
+      if (!response.ok || !data?.success) {
+        setError(data?.message || "The verification code could not be verified.");
+        return;
+      }
+
+      setPhoneVerified(true);
+      setPhoneOtpMessage("Phone number verified.");
+    } catch (requestError) {
+      setError("Network error while verifying your phone. Please try again.");
+    } finally {
+      setPhoneVerifyLoading(false);
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!phoneVerified) {
+      setError("Verify your phone number before creating an account.");
+      return;
+    }
+
     if (!googleSignup && !recaptchaProof) {
       setError("Please complete the “I’m not a robot” check before creating an account.");
       return;
@@ -164,6 +248,7 @@ export default function Register() {
             phone: phone.trim(),
             agree_terms: agreeTerms,
             agree_privacy: agreePrivacy,
+            registration_verification_id: phoneVerificationId,
             photoUrl: googleSignup.photoURL,
           }),
         });
@@ -200,6 +285,7 @@ export default function Register() {
           name,
           email,
           phone: phone.trim(),
+          registration_verification_id: phoneVerificationId,
           password,
           recaptcha_proof: recaptchaProof,
           agree_terms: true,
@@ -287,6 +373,10 @@ export default function Register() {
       setName(googleProfile.name);
       setEmail(googleProfile.email);
       setPhone("");
+      setPhoneVerificationId("");
+      setPhoneOtp("");
+      setPhoneOtpMessage("");
+      setPhoneVerified(false);
       setPassword("");
       setConfirmPassword("");
       setAgreeTerms(false);
@@ -831,7 +921,7 @@ export default function Register() {
               <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-x-4 gap-y-2 sm:grid-cols-2">
                 {googleSignup && (
                   <p className="rounded-lg bg-[#fff8e9] p-3 text-sm text-[#765d50] sm:col-span-2">
-                    Your Google details are ready. Add your phone number and accept the Terms &amp; Conditions and Privacy Policy to finish signing up.
+                    Your Google details are ready. Verify your phone number and accept the Terms &amp; Conditions and Privacy Policy to finish signing up.
                   </p>
                 )}
                 <div>
@@ -882,6 +972,10 @@ export default function Register() {
                     onBlur={() => handleBlur("phone")}
                     onChange={(e) => {
                       setPhone(e.target.value);
+                      setPhoneVerificationId("");
+                      setPhoneOtp("");
+                      setPhoneOtpMessage("");
+                      setPhoneVerified(false);
                       if (touched.phone) {
                         setErrors((prev) => ({ ...prev, phone: validatePhone(e.target.value) }));
                       }
@@ -889,6 +983,44 @@ export default function Register() {
                     className="register-input w-full bg-white text-[#171717]"
                   />
                   {touched.phone && errors.phone && <p className="mt-1 text-[10px] text-[#A8354A]">{errors.phone}</p>}
+                  {!phoneVerified && (
+                    <button
+                      type="button"
+                      onClick={requestPhoneOtp}
+                      disabled={phoneOtpLoading || !phone.trim() || Boolean(validatePhone(phone))}
+                      className="mt-2 w-full rounded-lg border border-[#d8c18d] px-3 py-2 text-xs font-bold text-[#765d30] disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {phoneOtpLoading ? "Sending code…" : phoneVerificationId ? "Resend verification code" : "Send verification code"}
+                    </button>
+                  )}
+                  {phoneVerificationId && !phoneVerified && (
+                    <div className="mt-2 flex gap-2">
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        autoComplete="one-time-code"
+                        maxLength={6}
+                        placeholder="6-digit code"
+                        aria-label="Phone verification code"
+                        value={phoneOtp}
+                        onChange={(e) => setPhoneOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                        className="register-input min-w-0 flex-1 bg-white text-[#171717]"
+                      />
+                      <button
+                        type="button"
+                        onClick={verifyPhoneOtp}
+                        disabled={phoneVerifyLoading || phoneOtp.length !== 6}
+                        className="rounded-lg bg-[#F0B94D] px-3 text-xs font-bold text-[#171717] disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        {phoneVerifyLoading ? "Checking…" : "Verify"}
+                      </button>
+                    </div>
+                  )}
+                  {phoneOtpMessage && (
+                    <p className={`mt-1 text-[10px] ${phoneVerified ? "text-green-700" : "text-[#765d30]"}`} role="status">
+                      {phoneOtpMessage}
+                    </p>
+                  )}
                 </div>
 
                 {!googleSignup && (
@@ -1036,6 +1168,10 @@ export default function Register() {
                       setName("");
                       setEmail("");
                       setPhone("");
+                      setPhoneVerificationId("");
+                      setPhoneOtp("");
+                      setPhoneOtpMessage("");
+                      setPhoneVerified(false);
                       setError("");
                       setAccountAlreadyRegistered(false);
                       setAgreeTerms(false);

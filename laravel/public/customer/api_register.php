@@ -40,9 +40,16 @@ try {
     $email    = strtolower(trim($data['email'] ?? ''));
     $phone    = trim($data['phone'] ?? '');
     $password = $data['password'] ?? '';
+    $verificationId = trim($data['registration_verification_id'] ?? '');
 
     if (!$name || !$email || !$phone || !$password) {
         echo json_encode(["success" => false, "message" => "Please fill in Name, Email, Phone Number and Password."]);
+        exit;
+    }
+
+    if (!preg_match('/^[a-f0-9]{64}$/', $verificationId)) {
+        http_response_code(422);
+        echo json_encode(["success" => false, "code" => "phone_verification_required", "message" => "Verify your phone number before creating an account."]);
         exit;
     }
 
@@ -62,7 +69,43 @@ try {
     $ins = mysqli_prepare($conn, "INSERT INTO users (name, email, phone, password, role) VALUES (?, ?, ?, ?, 'customer')");
     mysqli_stmt_bind_param($ins, "ssss", $name, $email, $phone, $hashed);
 
+    $digits = preg_replace('/\D+/', '', $phone);
+    $normalizedPhone = strlen($digits) === 12 && str_starts_with($digits, '63')
+        ? '0' . substr($digits, 2)
+        : $digits;
+    mysqli_begin_transaction($conn);
+    $verification = mysqli_prepare($conn, "SELECT id FROM customer_registration_phone_verifications WHERE id = ? AND phone_normalized = ? AND verified_at IS NOT NULL AND consumed_at IS NULL AND expires_at > NOW() FOR UPDATE");
+    if (!$verification) {
+        mysqli_rollback($conn);
+        http_response_code(503);
+        echo json_encode(["success" => false, "message" => "Phone verification is unavailable. Please try again later."]);
+        exit;
+    }
+    mysqli_stmt_bind_param($verification, "ss", $verificationId, $normalizedPhone);
+    mysqli_stmt_execute($verification);
+    mysqli_stmt_store_result($verification);
+    $canRegister = mysqli_stmt_num_rows($verification) === 1;
+    mysqli_stmt_close($verification);
+    if (!$canRegister) {
+        mysqli_rollback($conn);
+        http_response_code(422);
+        echo json_encode(["success" => false, "code" => "phone_verification_required", "message" => "Verify your phone number before creating an account."]);
+        exit;
+    }
+
     if (mysqli_stmt_execute($ins)) {
+        $consume = mysqli_prepare($conn, "UPDATE customer_registration_phone_verifications SET consumed_at = NOW(), updated_at = NOW() WHERE id = ? AND consumed_at IS NULL");
+        mysqli_stmt_bind_param($consume, "s", $verificationId);
+        mysqli_stmt_execute($consume);
+        $consumed = mysqli_stmt_affected_rows($consume) === 1;
+        mysqli_stmt_close($consume);
+        if (!$consumed) {
+            mysqli_rollback($conn);
+            http_response_code(422);
+            echo json_encode(["success" => false, "code" => "phone_verification_required", "message" => "Verify your phone number before creating an account."]);
+            exit;
+        }
+        mysqli_commit($conn);
         $newId = mysqli_insert_id($conn);
         echo json_encode([
             "success" => true,
@@ -76,6 +119,7 @@ try {
             ]
         ]);
     } else {
+        mysqli_rollback($conn);
         echo json_encode(["success" => false, "message" => "Registration failed: " . mysqli_error($conn)]);
     }
     mysqli_stmt_close($ins);

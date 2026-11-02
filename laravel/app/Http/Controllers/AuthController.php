@@ -185,7 +185,12 @@ class AuthController extends Controller
         ]);
     }
 
-    public function googleLogin(Request $request, CustomerTwoFactor $twoFactor, \App\Services\CustomerTwoFactorDelivery $delivery)
+    public function googleLogin(
+        Request $request,
+        CustomerTwoFactor $twoFactor,
+        \App\Services\CustomerTwoFactorDelivery $delivery,
+        \App\Services\RegistrationPhoneVerification $phoneVerification
+    )
     {
         if ($request->isMethod('options')) {
             return $this->googleCorsResponse(['success' => true]);
@@ -227,18 +232,21 @@ class AuthController extends Controller
                 }
             }
 
-            $requestedPhone = $this->normalizePhoneNumber((string) $request->input('phone'));
-            $phoneAlreadyRegistered = DB::table('users')
-                ->whereNotNull('phone')
-                ->pluck('phone')
-                ->contains(fn ($savedPhone) => $this->normalizePhoneNumber((string) $savedPhone) === $requestedPhone);
-
-            if ($phoneAlreadyRegistered) {
+            if ($phoneVerification->isPhoneRegistered((string) $request->input('phone'))) {
                 return $this->googleCorsResponse([
                     'success' => false,
                     'code' => 'phone_already_registered',
                     'message' => 'This phone number is already linked to an account. Please log in to your existing account.',
                 ], 409);
+            }
+
+            $verificationId = trim((string) $request->input('registration_verification_id', ''));
+            if (!$phoneVerification->isVerified($verificationId, (string) $request->input('phone'))) {
+                return $this->googleCorsResponse([
+                    'success' => false,
+                    'code' => 'phone_verification_required',
+                    'message' => 'Verify your phone number before creating an account.',
+                ], 422);
             }
         }
 
@@ -376,7 +384,24 @@ class AuthController extends Controller
             if ($profileColumn) {
                 $newUser[$profileColumn] = $profilePicture ?: null;
             }
-            DB::table('users')->insert($newUser);
+            try {
+                DB::transaction(function () use ($phoneVerification, $request, $newUser) {
+                    if (!$phoneVerification->consumeVerified(
+                        (string) $request->input('registration_verification_id'),
+                        (string) $request->input('phone')
+                    )) {
+                        throw new \DomainException('The phone verification has expired or was already used.');
+                    }
+
+                    DB::table('users')->insert($newUser);
+                });
+            } catch (\DomainException $exception) {
+                return $this->googleCorsResponse([
+                    'success' => false,
+                    'code' => 'phone_verification_required',
+                    'message' => 'Verify your phone number before creating an account.',
+                ], 422);
+            }
 
             $user = DB::table('users')->where('email', $email)->first();
         } elseif ($profilePicture && $profileColumn) {
@@ -523,17 +548,6 @@ class AuthController extends Controller
         }
 
         return null;
-    }
-
-    private function normalizePhoneNumber(string $phone): string
-    {
-        $digits = preg_replace('/\D+/', '', $phone) ?? '';
-
-        if (strlen($digits) === 12 && str_starts_with($digits, '63')) {
-            return '0' . substr($digits, 2);
-        }
-
-        return $digits;
     }
 
     private function googleCorsResponse(array $payload, int $status = 200)
@@ -695,15 +709,8 @@ class AuthController extends Controller
         $user = DB::table('users')->where('email', $email)->first();
 
         if (!$user) {
-            DB::table('users')->insert([
-                'name' => $name,
-                'email' => $email,
-                'password' => Hash::make(bin2hex(random_bytes(16))),
-                'role' => 'customer',
-                'created_at' => now(),
-            ]);
-
-            $user = DB::table('users')->where('email', $email)->first();
+            return redirect(rtrim($this->resolveFrontendRedirect($request, 'customer'), '/') . '/register')
+                ->with('error', 'Verify your phone number through customer registration before creating an account.');
         }
 
         if ((strtolower((string) ($user->role ?? '')) !== 'customer' && !User::isAdminRole($user->role ?? ''))
@@ -728,45 +735,12 @@ class AuthController extends Controller
 
     public function showRegister(Request $request)
     {
-        return view('auth.register', [
-            'error' => session('error', ''),
-            'success' => session('auth_success', ''),
-        ]);
+        return redirect(rtrim($this->resolveFrontendRedirect($request, 'customer'), '/') . '/register');
     }
 
     public function register(Request $request)
     {
-        $name = trim($request->input('name', ''));
-        $email = trim($request->input('email', ''));
-        $password = trim($request->input('password', ''));
-        $agreeTerms = $request->has('agree_terms');
-        $agreePrivacy = $request->has('agree_privacy');
-        $error = '';
-
-        if (!$agreeTerms || !$agreePrivacy) {
-            $error = 'You must agree to the Terms & Conditions and Privacy Policy.';
-        } elseif (!$name || !$email || !$password) {
-            $error = 'Please fill all fields.';
-        } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-            $error = 'Enter a valid email address.';
-        } elseif (strlen($password) < 8) {
-            $error = 'Password must be at least 8 characters.';
-        } elseif (DB::table('users')->where('email', $email)->exists()) {
-            $error = 'Email already exists.';
-        } else {
-            DB::table('users')->insert([
-                'name' => $name,
-                'email' => $email,
-                'password' => Hash::make($password),
-                'role' => 'customer',
-                'created_at' => now(),
-            ]);
-
-            // Redirect to React login with success message
-            return redirect('http://127.0.0.1:3000/customer/login?registered=true');
-        }
-
-        return back()->withInput()->with('error', $error);
+        return redirect(rtrim($this->resolveFrontendRedirect($request, 'customer'), '/') . '/register');
     }
 
     public function logout(Request $request)
