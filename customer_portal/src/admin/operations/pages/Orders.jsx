@@ -782,8 +782,9 @@ export default function Orders() {
                           {order.return_refund_request.admin_reason && <p className="mt-2 whitespace-pre-wrap text-[11px] text-red-800"><span className="font-semibold">Admin rejection reason:</span> {order.return_refund_request.admin_reason}</p>}
                         </div>
                       )}
+                      <div className="rounded-xl border border-[#eee6de] bg-white p-3.5">
                       <div className="grid gap-3 sm:grid-cols-2">
-                        <section className="rounded-xl border border-[#eee6de] bg-white p-3.5">
+                        <section className="min-w-0">
                           <div className="flex items-start justify-between gap-3">
                             <div>
                               <p className="text-[9px] font-bold uppercase tracking-[0.16em] text-[#9b8c83]">Order summary</p>
@@ -802,7 +803,7 @@ export default function Orders() {
                             {order.status === "Cancelled" && <><dt className="text-[#9b8c83]">Cancelled</dt><dd className="text-right text-[#65574d]">{formatOrderDateTime(order.cancelled_at)}</dd></>}
                           </dl>
                         </section>
-                        <section className="rounded-xl border border-[#eee6de] bg-white p-3.5">
+                        <section className="min-w-0">
                           <div className="flex items-center justify-between gap-2">
                             <p className="text-[9px] font-bold uppercase tracking-[0.16em] text-[#9b8c83]">Items</p>
                             <span className="text-[9px] text-[#9b8c83]">{(order.items || []).length} item{(order.items || []).length === 1 ? "" : "s"}</span>
@@ -824,7 +825,7 @@ export default function Orders() {
                         </section>
                       </div>
                       {isQrPayment(order.payment) && (
-                        <section className="mt-3 rounded-xl border border-amber-200 bg-[#fffaf0] p-3.5">
+                        <section className="mt-3 border-t border-[#eee6de] pt-3.5">
                           <div className="flex flex-wrap items-center justify-between gap-2">
                             <div>
                               <p className="text-[9px] font-bold uppercase tracking-[0.16em] text-amber-800">QRPh payment</p>
@@ -855,7 +856,7 @@ export default function Orders() {
                         </section>
                       )}
                       {order.discount_type && order.discount_type !== "none" && (
-                        <div className="mt-3 rounded-md border border-[#e8dfd4] bg-white p-3">
+                        <div className="mt-3 border-t border-[#eee6de] pt-3">
                           <p className="text-[9px] font-semibold uppercase tracking-[0.14em] text-[#8f8076]">
                             {getOrderDiscountLabel(order, true)}
                           </p>
@@ -869,6 +870,7 @@ export default function Orders() {
                           ) : null}
                         </div>
                       )}
+                      </div>
                     </div>}
                   </article>
                 );
@@ -957,8 +959,9 @@ export default function Orders() {
                                   {order.return_refund_request.admin_reason && <p className="mt-2 whitespace-pre-wrap text-[11px] text-red-800"><span className="font-semibold">Admin rejection reason:</span> {order.return_refund_request.admin_reason}</p>}
                                 </div>
                               )}
+                              <div className="rounded-xl border border-[#eee6de] bg-white p-4">
                               <div className="grid gap-4 md:grid-cols-2">
-                                <section className="rounded-xl border border-black/10 bg-white p-4">
+                                <section className="min-w-0">
                                   <div className="flex items-start justify-between gap-3">
                                     <div>
                                       <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-black/45">Order summary</p>
@@ -977,7 +980,7 @@ export default function Orders() {
                                     {order.status === "Cancelled" && <><dt className="text-black/45">Cancelled</dt><dd className="text-right text-black/70">{formatOrderDateTime(order.cancelled_at)}</dd></>}
                                   </dl>
                                 </section>
-                                <section className="rounded-xl border border-black/10 bg-white p-4">
+                                <section className="min-w-0">
                                   <div className="flex items-center justify-between gap-2">
                                     <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-black/45">Items</p>
                                     <span className="text-[10px] text-black/45">{(order.items || []).length} item{(order.items || []).length === 1 ? "" : "s"}</span>
@@ -997,7 +1000,7 @@ export default function Orders() {
                                 </section>
                               </div>
                               {isQrPayment(order.payment) && (
-                                <section className="mt-4 rounded-xl border border-amber-200 bg-[#fffaf0] p-4">
+                                <section className="mt-4 border-t border-black/10 pt-4">
                                   <div className="flex flex-wrap items-center justify-between gap-2">
                                     <div>
                                       <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-amber-800">QRPh payment</p>
@@ -1051,7 +1054,7 @@ export default function Orders() {
                                 </section>
                               )}
                               {order.discount_type && order.discount_type !== 'none' && (
-                                <div className="mt-4 rounded-xl border border-black/10 bg-white p-3">
+                                <div className="mt-4 border-t border-black/10 pt-4">
                                   <p className="text-[9px] uppercase tracking-[0.2em] text-black/50">Discount</p>
                                   <p className="mt-1 font-semibold text-black">
                                     {getOrderDiscountLabel(order)}
@@ -1077,6 +1080,7 @@ export default function Orders() {
                                   ) : null}
                                 </div>
                               )}
+                              </div>
                             </td>
                           </tr>
                         )}
