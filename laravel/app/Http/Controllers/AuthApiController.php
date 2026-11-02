@@ -183,6 +183,10 @@ class AuthApiController extends Controller
 
         if (!$passwordValid && !$isLegacyPassword) {
             $this->recordRateLimitAttempt($attemptKey, 900);
+            if ($response = $this->rateLimitResponse($attemptKey, 3, 'account_login_locked')) {
+                return $response;
+            }
+
             return response()->json([
                 'success' => false,
                 'message' => 'Incorrect password. Please try again.'
