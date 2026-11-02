@@ -819,6 +819,21 @@ export default function Orders() {
                               </div>
                             ))}
                           </div>
+                          {order.discount_type && order.discount_type !== "none" && (
+                            <div className="mt-2 border-t border-[#eee6de] pt-2">
+                              <div className="flex items-center justify-between gap-3 text-[10px]">
+                                <span className="font-semibold text-[#65574d]">{getOrderDiscountLabel(order, true)}</span>
+                                <span className="shrink-0 text-[#65574d]">−₱{Number(order.discount || 0).toFixed(2)}</span>
+                              </div>
+                              {isDiscountIdType(order.discount_type) && order.has_discount_id && discountIdPreviews[order.id] ? (
+                                <img src={discountIdPreviews[order.id]} alt={`Discount ID for order ${order.id}`} className="mt-2 max-h-64 w-full rounded border border-black/10 bg-white object-contain" />
+                              ) : isDiscountIdType(order.discount_type) && order.has_discount_id ? (
+                                <button type="button" onClick={() => viewDiscountId(order.id)} disabled={discountIdLoading === order.id} className="mt-2 rounded-md bg-black px-3 py-2 text-[10px] font-semibold text-white disabled:opacity-60">{discountIdLoading === order.id ? "Loading ID..." : "View uploaded ID"}</button>
+                              ) : isDiscountIdType(order.discount_type) ? (
+                                <p className="mt-1 text-[10px] text-red-700">No ID image attached.</p>
+                              ) : null}
+                            </div>
+                          )}
                           <div className="mt-3 flex items-center justify-between border-t border-[#eee6de] pt-2.5 text-[11px] font-bold text-[#33251e]">
                             <span>Total</span><span>₱{Number(order.total || 0).toLocaleString()}</span>
                           </div>
@@ -854,21 +869,6 @@ export default function Orders() {
                           {needsBalancePaymentReview && <p className="mt-3 rounded-lg bg-amber-100/70 px-3 py-2 text-[10px] leading-4 text-amber-950">Confirm the balance payment before marking this order ready for pickup.</p>}
                           {needsPaymentReview && <p className="mt-3 rounded-lg bg-amber-100/70 px-3 py-2 text-[10px] leading-4 text-amber-950">Review the payment proof, then mark the order paid to begin preparation.</p>}
                         </section>
-                      )}
-                      {order.discount_type && order.discount_type !== "none" && (
-                        <div className="mt-3 border-t border-[#eee6de] pt-3">
-                          <p className="text-[9px] font-semibold uppercase tracking-[0.14em] text-[#8f8076]">
-                            {getOrderDiscountLabel(order, true)}
-                          </p>
-                          <p className="mt-1">₱{Number(order.discount || 0).toFixed(2)}</p>
-                          {isDiscountIdType(order.discount_type) && order.has_discount_id && discountIdPreviews[order.id] ? (
-                            <img src={discountIdPreviews[order.id]} alt={`Discount ID for order ${order.id}`} className="mt-2 max-h-64 w-full rounded border border-black/10 bg-white object-contain" />
-                          ) : isDiscountIdType(order.discount_type) && order.has_discount_id ? (
-                            <button type="button" onClick={() => viewDiscountId(order.id)} disabled={discountIdLoading === order.id} className="mt-2 rounded-md bg-black px-3 py-2 text-[10px] font-semibold text-white disabled:opacity-60">{discountIdLoading === order.id ? "Loading ID..." : "View uploaded ID"}</button>
-                          ) : isDiscountIdType(order.discount_type) ? (
-                            <p className="mt-1 text-[10px] text-red-700">No ID image attached.</p>
-                          ) : null}
-                        </div>
                       )}
                       </div>
                     </div>}
@@ -996,6 +996,32 @@ export default function Orders() {
                                       </div>
                                     ))}
                                   </div>
+                                  {order.discount_type && order.discount_type !== 'none' && (
+                                    <div className="mt-3 border-t border-black/10 pt-3">
+                                      <div className="flex items-center justify-between gap-4 text-[11px]">
+                                        <span className="font-semibold text-black/70">{getOrderDiscountLabel(order)}</span>
+                                        <span className="shrink-0 text-black/70">−₱{Number(order.discount || 0).toFixed(2)}</span>
+                                      </div>
+                                      {isDiscountIdType(order.discount_type) && order.has_discount_id && discountIdPreviews[order.id] ? (
+                                        <img
+                                          src={discountIdPreviews[order.id]}
+                                          alt={`${order.discount_type === 'pwd' ? 'PWD' : 'Senior Citizen'} ID for order ${order.id}`}
+                                          className="mt-3 max-h-80 w-full rounded-lg border border-black/10 bg-black/[0.03] object-contain"
+                                        />
+                                      ) : isDiscountIdType(order.discount_type) && order.has_discount_id ? (
+                                        <button
+                                          type="button"
+                                          onClick={() => viewDiscountId(order.id)}
+                                          disabled={discountIdLoading === order.id}
+                                          className="mt-2 rounded-lg bg-black px-3 py-2 text-xs font-semibold text-white disabled:opacity-60"
+                                        >
+                                          {discountIdLoading === order.id ? 'Loading ID...' : 'View uploaded ID'}
+                                        </button>
+                                      ) : isDiscountIdType(order.discount_type) ? (
+                                        <p className="mt-2 text-xs text-red-700">No ID image attached.</p>
+                                      ) : null}
+                                    </div>
+                                  )}
                                   <div className="mt-3 flex justify-between border-t border-black/10 pt-3 font-bold text-black"><span>Total</span><span>₱{Number(order.total || 0).toLocaleString()}</span></div>
                                 </section>
                               </div>
@@ -1052,33 +1078,6 @@ export default function Orders() {
                                   {needsPaymentReview && <p className="mt-3 max-w-2xl rounded-lg bg-amber-100/70 px-3 py-2 text-[11px] leading-5 text-amber-950">Review the payment proof, then mark the order paid to begin preparation.</p>}
                                   {needsBalancePaymentReview && <p className="mt-3 max-w-2xl rounded-lg bg-amber-100/70 px-3 py-2 text-[11px] leading-5 text-amber-950">Confirm the balance payment before marking this order ready for pickup.</p>}
                                 </section>
-                              )}
-                              {order.discount_type && order.discount_type !== 'none' && (
-                                <div className="mt-4 border-t border-black/10 pt-4">
-                                  <p className="text-[9px] uppercase tracking-[0.2em] text-black/50">Discount</p>
-                                  <p className="mt-1 font-semibold text-black">
-                                    {getOrderDiscountLabel(order)}
-                                    {' '}(₱{Number(order.discount || 0).toFixed(2)})
-                                  </p>
-                                  {isDiscountIdType(order.discount_type) && order.has_discount_id && discountIdPreviews[order.id] ? (
-                                    <img
-                                      src={discountIdPreviews[order.id]}
-                                      alt={`${order.discount_type === 'pwd' ? 'PWD' : 'Senior Citizen'} ID for order ${order.id}`}
-                                      className="mt-3 max-h-80 w-full rounded-lg border border-black/10 bg-black/[0.03] object-contain"
-                                    />
-                                  ) : isDiscountIdType(order.discount_type) && order.has_discount_id ? (
-                                    <button
-                                      type="button"
-                                      onClick={() => viewDiscountId(order.id)}
-                                      disabled={discountIdLoading === order.id}
-                                      className="mt-2 rounded-lg bg-black px-3 py-2 text-xs font-semibold text-white disabled:opacity-60"
-                                    >
-                                      {discountIdLoading === order.id ? 'Loading ID...' : 'View uploaded ID'}
-                                    </button>
-                                  ) : isDiscountIdType(order.discount_type) ? (
-                                    <p className="mt-2 text-xs text-red-700">No ID image attached.</p>
-                                  ) : null}
-                                </div>
                               )}
                               </div>
                             </td>
