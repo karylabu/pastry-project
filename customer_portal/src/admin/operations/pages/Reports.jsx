@@ -339,16 +339,22 @@ export function buildBusinessAnalyticsCsv({
     ]),
     [],
     ['Sales Transactions'],
-    ['Date / Time', 'Order Ref', 'Items Sold', 'Size', 'Order Type', 'Gross Amount', 'Status'],
+    ['Date / Time', 'Order Ref', 'Items Sold', 'Quantity', 'Size', 'Unit Price', 'Gross Amount', 'Order Type', 'Status'],
     ...salesTransactionOrders.map((order) => [
       order.created_at ? new Date(order.created_at).toLocaleString() : '—',
       order.id || order.order_ref || 'N/A',
       Array.isArray(order.items) && order.items.length
         ? order.items.map((item) => `${Number(item.qty || 0)}x ${item.name || 'Item'}`).join('; ')
         : '—',
+      Array.isArray(order.items)
+        ? order.items.reduce((quantity, item) => quantity + Number(item.qty || item.quantity || 0), 0)
+        : '',
       formatOrderItemSizes(order.items),
-      order.order_type || 'Standard',
+      Array.isArray(order.items) && order.items.length === 1
+        ? Number(order.items[0].price || order.items[0].unit_price || 0)
+        : '',
       Number(order.total || 0),
+      order.order_type || 'Standard',
       order.status || 'Unknown',
     ]),
     ...historicalSales.map((sale) => {
@@ -363,9 +369,13 @@ export function buildBusinessAnalyticsCsv({
         sale.sale_date || '—',
         'Historical',
         sale.cake_name || '—',
+        Number(sale.units_sold || 0),
         sale.size || '—',
-        type,
+        Number(sale.units_sold) > 0
+          ? Number(sale.price || 0) / Number(sale.units_sold)
+          : '',
         Number(sale.price || 0),
+        type,
         'Imported',
       ];
     }),

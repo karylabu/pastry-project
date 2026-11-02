@@ -127,13 +127,13 @@ describe("all-time report exports", () => {
       salesTransactionOrders: [{
         created_at: "2026-10-16T10:00:00.000Z",
         id: 101,
-        items: [{ name: "Chocolate Cake", qty: 2 }],
+        items: [{ name: "Chocolate Cake", qty: 2, price: 850 }],
         total: 1700,
         status: "Completed",
         order_type: "Rush",
       }],
       historicalSales: [
-        { sale_date: "2026-09-01", cake_name: "Vanilla Cake", size: "6 inch", price: 650, source: "imported", sales_type: "finished_product" },
+        { sale_date: "2026-09-01", cake_name: "Vanilla Cake", size: "6 inch", units_sold: 2, price: 650, source: "imported", sales_type: "finished_product" },
         { sale_date: "2026-09-02", cake_name: "Legacy Bread", price: 25, source: "legacy" },
       ],
     });
@@ -145,6 +145,9 @@ describe("all-time report exports", () => {
     expect(csv).toContain('"2x Chocolate Cake"');
     expect(csv).toContain('"Vanilla Cake"');
     expect(csv).toContain('"Legacy Bread"');
+    expect(csv).toContain('"Items Sold","Quantity","Size","Unit Price","Gross Amount","Order Type","Status"');
+    expect(csv).toContain('"2x Chocolate Cake","2","—","850","1700","Rush","Completed"');
+    expect(csv).toContain('"2026-09-01","Historical","Vanilla Cake","2","6 inch","325","650","Finished product","Imported"');
     expect(csv).not.toContain("sales-import-template");
   });
 
