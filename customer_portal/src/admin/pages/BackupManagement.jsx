@@ -435,7 +435,7 @@ export default function BackupManagement() {
               <button type="button" onClick={() => loadBackups()} disabled={loading || actionBusy} aria-label="Refresh backup history" title="Refresh backup history" className="inline-flex h-9 items-center justify-center gap-2 self-start rounded-md border border-[#e8dfd4] px-3 text-[11px] font-semibold text-[#65574d] transition hover:bg-[#fffaf0] disabled:opacity-50 sm:self-auto"><RefreshCw size={14} className={loading ? "animate-spin" : ""} />Refresh</button>
             </div>
 
-            <div className="overflow-x-auto">
+            <div className="backup-history-table-scroll overflow-x-auto">
               <table className="w-full min-w-[860px] border-collapse text-left">
                 <thead className="bg-[#fbfaf7]">
                   <tr className="border-b border-[#eee7df] text-[10px] font-semibold uppercase tracking-[0.08em] text-[#8f8076]">

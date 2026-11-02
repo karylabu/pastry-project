@@ -110,6 +110,15 @@ input.password-toggle-input::-ms-clear {
   background: #d1d5db; 
 }
 
+.backup-history-table-scroll {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.backup-history-table-scroll::-webkit-scrollbar {
+  display: none;
+}
+
 @media (min-width: 600px) and (max-width: 767px) and (orientation: portrait) {
   .admin-dashboard-analytics-cards {
     grid-template-columns: repeat(2, minmax(0, 1fr));
