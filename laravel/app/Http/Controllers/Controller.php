@@ -28,19 +28,23 @@ abstract class Controller
         return $scope . ':' . hash('sha256', strtolower(trim($identity)));
     }
 
-    protected function rateLimitResponse(string $key, int $maxAttempts): ?JsonResponse
+    protected function rateLimitResponse(string $key, int $maxAttempts, ?string $code = null): ?JsonResponse
     {
         if (!RateLimiter::tooManyAttempts($key, $maxAttempts)) {
             return null;
         }
 
         $retryAfter = RateLimiter::availableIn($key);
-
-        return response()->json([
+        $payload = [
             'success' => false,
             'message' => 'Too many attempts. Please wait before trying again.',
             'retry_after' => $retryAfter,
-        ], 429)->header('Retry-After', (string) $retryAfter);
+        ];
+        if ($code !== null) {
+            $payload['code'] = $code;
+        }
+
+        return response()->json($payload, 429)->header('Retry-After', (string) $retryAfter);
     }
 
     protected function recordRateLimitAttempt(string $key, int $decaySeconds): void

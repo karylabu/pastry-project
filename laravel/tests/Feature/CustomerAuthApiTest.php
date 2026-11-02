@@ -1054,20 +1054,38 @@ class CustomerAuthApiTest extends TestCase
     public function test_login_attempts_are_limited_per_account(): void
     {
         $this->withoutMiddleware(\Illuminate\Routing\Middleware\ThrottleRequests::class);
-        $attemptKey = 'login-email:' . hash('sha256', 'locked@example.com');
+        $this->seedCustomer();
+        DB::table('users')->insert([
+            'id' => 8,
+            'name' => 'Another Customer',
+            'email' => 'another@example.com',
+            'password' => Hash::make('another-password'),
+            'role' => 'customer',
+            'status' => 'active',
+        ]);
+        $attemptKey = 'login-email:' . hash('sha256', 'customer@example.com');
         RateLimiter::clear($attemptKey);
+        $otherAttemptKey = 'login-email:' . hash('sha256', 'another@example.com');
+        RateLimiter::clear($otherAttemptKey);
 
-        for ($attempt = 0; $attempt < 10; $attempt++) {
+        for ($attempt = 0; $attempt < 2; $attempt++) {
             $this->postJson('/api/login', [
-                'email' => 'locked@example.com',
+                'email' => 'customer@example.com',
                 'password' => 'incorrect-password',
-            ])->assertOk();
+            ])->assertOk()->assertJsonPath('message', 'Incorrect password. Please try again.');
         }
 
         $this->postJson('/api/login', [
-            'email' => 'locked@example.com',
+            'email' => 'customer@example.com',
             'password' => 'incorrect-password',
-        ])->assertStatus(429)->assertHeader('Retry-After');
+        ])->assertStatus(429)
+            ->assertHeader('Retry-After')
+            ->assertJsonPath('code', 'account_login_locked');
+
+        $this->postJson('/api/login', [
+            'email' => 'another@example.com',
+            'password' => 'wrong-password',
+        ])->assertOk()->assertJsonPath('message', 'Incorrect password. Please try again.');
     }
 
     private function seedCustomer(): void

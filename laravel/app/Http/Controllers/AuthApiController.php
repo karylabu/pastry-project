@@ -151,14 +151,13 @@ class AuthApiController extends Controller
             return response()->json(['success' => false, 'message' => 'Invalid input'], 422);
         }
 
-        if ($response = $this->rateLimitResponse($attemptKey, 10)) {
+        if ($response = $this->rateLimitResponse($attemptKey, 3, 'account_login_locked')) {
             return $response;
         }
 
         $user = User::whereRaw('LOWER(email) = ?', [$email])->first();
 
         if (!$user) {
-            $this->recordRateLimitAttempt($attemptKey, 900);
             return response()->json([
                 'success' => false,
                 'message' => 'Account not found. Please register first.'

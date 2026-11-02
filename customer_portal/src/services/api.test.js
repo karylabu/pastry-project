@@ -12,9 +12,14 @@ describe('authentication response errors', () => {
     ).rejects.toThrow("We couldn't sign you in.");
   });
 
-  test('explains rate limits without exposing server text', () => {
-    expect(getUserFriendlyAuthError(makeResponse('Too Many Attempts.', 429), null, 'Try again.'))
+  test('explains account lockout after three failed attempts', () => {
+    expect(getUserFriendlyAuthError(makeResponse('Too Many Attempts.', 429), { code: 'account_login_locked' }, 'Try again.'))
       .toBe('Too many sign-in attempts. Please wait 15 minutes, then try again.');
+  });
+
+  test('does not describe unrelated rate limits as an account lockout', () => {
+    expect(getUserFriendlyAuthError(makeResponse('Too Many Attempts.', 429), null, 'Try again.'))
+      .toBe('Too many requests. Please wait a moment, then try again.');
   });
 
   test('replaces technical server output with the provided friendly message', () => {

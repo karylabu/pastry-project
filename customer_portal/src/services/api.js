@@ -78,7 +78,9 @@ export async function parseJsonResponse(response, fallbackMessage) {
 
 export function getUserFriendlyAuthError(response, payload, fallbackMessage) {
   if (response?.status === 429) {
-    return 'Too many sign-in attempts. Please wait 15 minutes, then try again.';
+    return payload?.code === 'account_login_locked'
+      ? 'Too many sign-in attempts. Please wait 15 minutes, then try again.'
+      : 'Too many requests. Please wait a moment, then try again.';
   }
 
   if (response?.status >= 500) {
