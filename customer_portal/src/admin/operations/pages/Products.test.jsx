@@ -491,7 +491,7 @@ describe('Products admin catalog', () => {
     });
   });
 
-  test('uses the selected card size for the edit price without category controls', async () => {
+  test('uses the selected card size and shows Cakes as the only category', async () => {
     render(<Products allowCatalogManagement />);
 
     await waitFor(() => {
@@ -503,7 +503,9 @@ describe('Products admin catalog', () => {
     fireEvent.change(screen.getByLabelText('Product Name'), { target: { value: 'Pistachio Dream' } });
     fireEvent.change(screen.getByLabelText('Small Cake Price'), { target: { value: '525' } });
 
-    expect(screen.queryByLabelText('Category')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Category')).toHaveValue('Cakes');
+    expect(screen.getByLabelText('Category')).toBeDisabled();
+    expect(screen.getByRole('option', { name: 'Cakes' })).toBeInTheDocument();
     expect(screen.queryByText('Cake Size')).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Current Stock')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));

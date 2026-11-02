@@ -177,7 +177,7 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
 
   const openEditProductModal = (product, selectedSizeName = getCardSizeName(product)) => {
     const sizeName = String(selectedSizeName || "").toLowerCase() === "small" ? "small" : "big";
-    const category = ["Cakes", "Small Cakes"].includes(product.category) || product.sizes?.length ? "Cakes" : (product.category || "Cakes");
+    const category = canManageCatalog ? "Cakes" : (["Cakes", "Small Cakes"].includes(product.category) || product.sizes?.length ? "Cakes" : (product.category || "Cakes"));
     setEditSize(sizeName);
     setEditProduct({
       ...product,
@@ -1720,6 +1720,18 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
                   </div>
 
                   <div className="space-y-2">
+                    <label htmlFor="edit-product-category" className="block text-[10px] font-bold uppercase tracking-[0.16em] text-[#8f8076]">Category</label>
+                    <select
+                      id="edit-product-category"
+                      value="Cakes"
+                      disabled
+                      className="w-full rounded-xl border border-[#eadfd8] bg-[#fbf7f2] px-3 py-2.5 text-[12px] text-[#33251e] outline-none"
+                    >
+                      <option value="Cakes">Cakes</option>
+                    </select>
+                  </div>
+
+                  <div className="space-y-2">
                     <label htmlFor="edit-product-price" className="block text-[10px] font-bold uppercase tracking-[0.16em] text-[#8f8076]">{editSize === "small" ? "Small Cake Price" : "Big Cake Price"}</label>
                     <input
                       id="edit-product-price"
@@ -1861,7 +1873,7 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
                         const formData = new FormData();
                         formData.append('id', editProduct.id);
                         formData.append('name', (editProduct.name || '').toString());
-                        formData.append('category', (editProduct.category || '').toString());
+                        formData.append('category', canManageCatalog ? 'Cakes' : (editProduct.category || '').toString());
                         if (canManageCatalog) formData.append('price_size', editSize);
                         formData.append('price', Number(editProduct.price) || 0);
                         formData.append('description', (editProduct.description || '').toString());
