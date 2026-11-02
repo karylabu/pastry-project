@@ -117,7 +117,7 @@ class PromotionController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Promotion sent to subscribed customers.',
+            'message' => $this->deliveryMessage($delivery),
             'data' => array_merge(['promotion' => $promotion], $delivery),
         ]);
     }
@@ -144,7 +144,7 @@ class PromotionController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Draft promotion sent to subscribed customers.',
+            'message' => $this->deliveryMessage($delivery),
             'data' => array_merge(['promotion' => $promotion], $delivery),
         ]);
     }
@@ -198,9 +198,9 @@ class PromotionController extends Controller
 
         $promotion->sent_count = $sentCount;
         $promotion->failed_count = $failedCount;
-        $promotion->status = $failedCount === 0
-            ? 'sent'
-            : ($sentCount > 0 ? 'sent_with_failures' : 'failed');
+        $promotion->status = count($recipients) === 0
+            ? 'draft'
+            : ($failedCount === 0 ? 'sent' : ($sentCount > 0 ? 'sent_with_failures' : 'failed'));
         $promotion->save();
 
         return [
@@ -208,6 +208,23 @@ class PromotionController extends Controller
             'sent_count' => $sentCount,
             'failed_count' => $failedCount,
         ];
+    }
+
+    private function deliveryMessage(array $delivery): string
+    {
+        if ($delivery['recipient_count'] === 0) {
+            return 'No subscribed customers were found. No email was sent; the promotion remains a draft.';
+        }
+
+        if ($delivery['failed_count'] > 0 && $delivery['sent_count'] > 0) {
+            return "Promotion partially sent: {$delivery['sent_count']} sent, {$delivery['failed_count']} failed. Check the email configuration and hosting logs.";
+        }
+
+        if ($delivery['failed_count'] > 0) {
+            return "Promotion failed: no emails were sent ({$delivery['failed_count']} failed). Check the email configuration and hosting logs.";
+        }
+
+        return "Promotion sent to {$delivery['sent_count']} subscribed customers.";
     }
 
     public function validateCoupon(Request $request): JsonResponse

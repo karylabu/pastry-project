@@ -260,6 +260,39 @@ class PromotionDraftEditingTest extends TestCase
         ]);
     }
 
+    public function test_admin_sees_a_failure_when_promotion_emails_cannot_be_sent(): void
+    {
+        $promotionId = $this->createPromotion('draft');
+        DB::table('users')->insert([
+            'id' => 2,
+            'name' => 'Subscribed Customer',
+            'email' => 'customer@example.com',
+            'password' => 'unused',
+            'role' => 'customer',
+            'subscribed_promo' => true,
+        ]);
+        Mail::shouldReceive('to')
+            ->once()
+            ->with('customer@example.com')
+            ->andThrow(new \RuntimeException('SMTP unavailable'));
+
+        $this->withHeader('X-Auth-Token', 'admin-token')
+            ->postJson("http://localhost/api/admin/promotions/{$promotionId}/send")
+            ->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('message', 'Promotion failed: no emails were sent (1 failed). Check the email configuration and hosting logs.')
+            ->assertJsonPath('data.sent_count', 0)
+            ->assertJsonPath('data.failed_count', 1)
+            ->assertJsonPath('data.promotion.status', 'failed');
+
+        $this->assertDatabaseHas('promotion_email_logs', [
+            'promotion_id' => $promotionId,
+            'email' => 'customer@example.com',
+            'status' => 'failed',
+            'error_message' => 'SMTP unavailable',
+        ]);
+    }
+
     public function test_admin_sends_promotions_to_active_footer_subscribers_without_duplicate_emails(): void
     {
         Mail::fake();
@@ -372,7 +405,9 @@ class PromotionDraftEditingTest extends TestCase
             ->postJson("http://localhost/api/admin/promotions/{$promotionId}/send")
             ->assertOk()
             ->assertJsonPath('data.recipient_count', 0)
-            ->assertJsonPath('data.sent_count', 0);
+            ->assertJsonPath('data.sent_count', 0)
+            ->assertJsonPath('message', 'No subscribed customers were found. No email was sent; the promotion remains a draft.')
+            ->assertJsonPath('data.promotion.status', 'draft');
 
         Mail::assertNothingSent();
     }

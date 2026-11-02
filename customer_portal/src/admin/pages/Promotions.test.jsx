@@ -94,6 +94,43 @@ describe("Promotions campaign history", () => {
     expect(couponCodeField.style.backgroundColor).toBe("rgb(255, 255, 255)");
   });
 
+  test("shows delivery failure instead of a success notice when no promotion emails are sent", async () => {
+    global.fetch = jest.fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ success: true, data: [] }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          success: true,
+          data: {
+            promotion: { ...campaign, status: "failed", sent_count: 0, failed_count: 2 },
+            recipient_count: 2,
+            sent_count: 0,
+            failed_count: 2,
+          },
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ success: true, data: [{ ...campaign, status: "failed", sent_count: 0, failed_count: 2 }] }),
+      });
+    render(<Promotions />);
+
+    fireEvent.change(await screen.findByLabelText("Title"), { target: { value: "Failed campaign" } });
+    fireEvent.change(screen.getByLabelText("Message"), { target: { value: "Promotion details" } });
+    fireEvent.change(screen.getByLabelText("Starts"), { target: { value: "2026-11-02T10:00" } });
+    fireEvent.change(screen.getByLabelText("Ends"), { target: { value: "2026-11-03T10:00" } });
+    fireEvent.click(screen.getByRole("button", { name: "Send promotion" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Promotion failed: no emails were sent (2 failed). Check the email configuration and hosting logs."
+    );
+    expect(screen.queryByText("Promotion scheduled and sent to subscribed customers successfully.")).not.toBeInTheDocument();
+    expect(screen.getByText("0 sent · 2 failed. Check the email configuration and hosting logs.")).toBeInTheDocument();
+  });
+
   test("deletes the selected campaign after confirmation", async () => {
     render(<Promotions />);
 

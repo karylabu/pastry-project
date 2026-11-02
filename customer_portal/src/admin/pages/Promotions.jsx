@@ -53,6 +53,23 @@ const emptyForm = {
   ends_at: "",
 };
 
+function getDeliveryOutcome(delivery = {}) {
+  const recipientCount = Number(delivery.recipient_count || 0);
+  const sentCount = Number(delivery.sent_count || 0);
+  const failedCount = Number(delivery.failed_count || 0);
+
+  if (recipientCount === 0) {
+    return { type: "error", message: "No subscribed customers were found. No email was sent; the promotion remains a draft." };
+  }
+  if (failedCount > 0 && sentCount > 0) {
+    return { type: "error", message: `Promotion partially sent: ${sentCount} sent, ${failedCount} failed. Check the email configuration and hosting logs.` };
+  }
+  if (failedCount > 0) {
+    return { type: "error", message: `Promotion failed: no emails were sent (${failedCount} failed). Check the email configuration and hosting logs.` };
+  }
+  return { type: "success", message: `Promotion sent to ${sentCount} subscribed customers.` };
+}
+
 function formatDate(value) {
   if (!value) return "—";
 
@@ -202,8 +219,10 @@ export default function Promotions() {
         throw new Error(data.message || "Unable to send the draft promotion.");
       }
 
-      setNotice(`Draft promotion sent to ${data.data?.sent_count ?? 0} subscribed customers.`);
       await fetchPromotions();
+      const outcome = getDeliveryOutcome(data.data);
+      if (outcome.type === "error") setError(outcome.message);
+      else setNotice(outcome.message);
     } catch (sendError) {
       setError(sendError.message || "Unable to send the draft promotion.");
     } finally {
@@ -307,12 +326,15 @@ export default function Promotions() {
         throw new Error(data.message || "Unable to send the promotion.");
       }
 
-      setNotice(editingPromotion ? "Promotion updated successfully." : "Promotion scheduled and sent to subscribed customers successfully.");
+      const outcome = editingPromotion ? null : getDeliveryOutcome(data.data);
       setEditingPromotion(null);
       setForm(emptyForm);
       setImageFile(null);
       setImagePreview("");
       await fetchPromotions();
+      if (editingPromotion) setNotice("Promotion updated successfully.");
+      else if (outcome.type === "error") setError(outcome.message);
+      else setNotice(outcome.message);
     } catch (submitError) {
       setError(submitError.message || "Unable to send the promotion.");
     } finally {
@@ -464,7 +486,7 @@ export default function Promotions() {
                 </div>
 
                 {error && (
-                  <div className="mt-4 flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2.5 text-sm text-red-700">
+                  <div role="alert" className="mt-4 flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2.5 text-sm text-red-700">
                     <XCircle size={16} />
                     {error}
                   </div>
@@ -522,7 +544,7 @@ export default function Promotions() {
                             <p className="mt-1 text-[12px] text-black/60">{promotion.description}</p>
                           </div>
                           <div className="flex shrink-0 items-center gap-2">
-                            <span className={`rounded-full px-2 py-1 text-[9px] font-semibold uppercase tracking-[0.15em] ${promotion.status === "sent" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
+                            <span className={`rounded-full px-2 py-1 text-[9px] font-semibold uppercase tracking-[0.15em] ${promotion.status === "sent" ? "bg-emerald-100 text-emerald-700" : promotion.status === "failed" || promotion.status === "sent_with_failures" ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-700"}`}>
                               {promotion.status || "draft"}
                             </span>
                             <button
@@ -565,6 +587,12 @@ export default function Promotions() {
                             )}
                           </div>
                         </div>
+
+                        {Number(promotion.failed_count) > 0 && (
+                          <p role="status" className="mt-2 text-[11px] font-medium text-red-700">
+                            {Number(promotion.sent_count || 0)} sent · {Number(promotion.failed_count)} failed. Check the email configuration and hosting logs.
+                          </p>
+                        )}
 
                         {promotion.coupon_code && (
                           <div className="mt-3 flex flex-wrap gap-2">
