@@ -233,8 +233,10 @@ test('shows the bakery logo for custom cake orders without a reference image', a
   );
 });
 
-test('allows proof to be attached to a paid order without changing its paid status', async () => {
+test('allows proof to be attached to a preparing paid order without changing its paid status', async () => {
   let proofSubmitted = false;
+  URL.createObjectURL = jest.fn(() => 'blob:paid-proof');
+  URL.revokeObjectURL = jest.fn();
   global.fetch = jest.fn((url) => {
     if (String(url).includes('/api/customer/products')) {
       return Promise.resolve({ ok: true, json: async () => [] });
@@ -256,7 +258,7 @@ test('allows proof to be attached to a paid order without changing its paid stat
           id: 276,
           user_id: 7,
           customer: 'Customer',
-          status: 'Pending',
+          status: 'Preparing',
           payment: 'QRPh',
           payment_status: 'paid',
           has_payment_proof: proofSubmitted,
@@ -270,10 +272,10 @@ test('allows proof to be attached to a paid order without changing its paid stat
 
   render(<Orders />);
 
-  expect(await screen.findByText('Payment confirmed — awaiting Admin acceptance')).toBeInTheDocument();
+  expect(await screen.findByText('Being prepared in kitchen')).toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: 'Send proof' }));
-  fireEvent.change(screen.getByLabelText('Payment reference number (optional)'), {
-    target: { value: 'QRPH-276' },
+  fireEvent.change(screen.getByLabelText('Payment screenshot or photo'), {
+    target: { files: [new File(['proof'], 'payment.png', { type: 'image/png' })] },
   });
   fireEvent.click(screen.getByRole('button', { name: 'Submit payment details' }));
 

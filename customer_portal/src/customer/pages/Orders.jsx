@@ -1402,7 +1402,6 @@ export default function Orders() {
                     && ['maya', 'maribank', 'visamastercard', 'onlinebanking'].includes(paymentMethodKey));
                 const paymentStatusKey = String(order.payment_status || '').toLowerCase();
                 const isPaymentConfirmed = ['paid', 'downpayment_paid'].includes(paymentStatusKey);
-                const hasPaymentEvidence = Boolean(order.has_payment_proof || order.customer_payment_reference);
                 const isAwaitingPayment = order.status === 'Awaiting Payment'
                   && supportsPaymentProof
                   && !isPaymentConfirmed;
@@ -1413,8 +1412,8 @@ export default function Orders() {
                 const isPendingQrPayment = isPending && supportsPaymentProof && !isPaymentConfirmed;
                 const canSubmitConfirmedPaymentProof = paymentStatusKey === 'paid'
                   && supportsPaymentProof
-                  && ['Pending', 'Awaiting Payment', 'Awaiting Balance Payment'].includes(order.status)
-                  && !hasPaymentEvidence;
+                  && ['Pending', 'Awaiting Payment', 'Awaiting Balance Payment', 'Preparing', 'Ready for Pickup'].includes(order.status)
+                  && !order.has_payment_proof;
                 const isToReceive  = String(order.status || '').toLowerCase() === "ready for pickup";
                 const isCompleted  = order.status === "Completed";
                 const hasReturnRefundRequest = Boolean(order.return_refund_request);
@@ -1495,7 +1494,9 @@ export default function Orders() {
                 const primaryProductImage = getProductThumbnail(order, primaryItem);
                 const paymentHint = isCancelled
                   ? 'Order cancelled'
-                  : isPaymentConfirmed && paymentStatusKey === 'paid'
+                  : isPaymentConfirmed
+                  && paymentStatusKey === 'paid'
+                  && ['Pending', 'Awaiting Payment'].includes(order.status)
                   ? 'Payment confirmed — awaiting Admin acceptance'
                   : isAwaitingPayment
                   ? hasPaymentSubmission
@@ -1731,8 +1732,11 @@ export default function Orders() {
                           Send proof
                         </button>
                       )}
-                      {isPaymentConfirmed && hasPaymentEvidence && (
+                      {isPaymentConfirmed && order.has_payment_proof && (
                         <span className="text-right text-[11px] font-semibold text-emerald-700">Proof attached</span>
+                      )}
+                      {isPaymentConfirmed && !order.has_payment_proof && order.customer_payment_reference && (
+                        <span className="text-right text-[11px] font-semibold text-emerald-700">Reference submitted</span>
                       )}
                       {isToReceive && (
                         <>

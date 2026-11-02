@@ -714,9 +714,12 @@ class OrderController extends Controller
         $canResubmitBalanceProof = $order->status === 'Awaiting Balance Payment'
             && strtolower((string) $order->payment_status) === 'proof_submitted';
         $paymentStatusKey = strtolower((string) $order->payment_status);
+        $canAttachPaidProof = $paymentStatusKey === 'paid'
+            && in_array($order->status, ['Preparing', 'Ready for Pickup'], true);
 
         if (!$supportedPaymentMethod
-            || !in_array($order->status, ['Pending', 'Awaiting Payment', 'Awaiting Balance Payment'], true)
+            || (!in_array($order->status, ['Pending', 'Awaiting Payment', 'Awaiting Balance Payment'], true)
+                && !$canAttachPaidProof)
             || $paymentStatusKey === 'failed'
             || ($paymentStatusKey === 'proof_submitted' && !$canResubmitBalanceProof)) {
             return response()->json(['success' => false, 'message' => 'This order is not awaiting a QR payment.'], 409);

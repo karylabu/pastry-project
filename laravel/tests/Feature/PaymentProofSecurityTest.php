@@ -158,7 +158,7 @@ class PaymentProofSecurityTest extends TestCase
         DB::table('orders')->insert([
             'id' => 11,
             'user_id' => 9,
-            'status' => 'Pending',
+            'status' => 'Preparing',
             'payment' => 'QRPh',
             'payment_status' => 'paid',
             'order_type' => 'Standard',
@@ -176,7 +176,7 @@ class PaymentProofSecurityTest extends TestCase
 
         $this->assertDatabaseHas('orders', [
             'id' => 11,
-            'status' => 'Pending',
+            'status' => 'Preparing',
             'payment_status' => 'paid',
             'customer_payment_reference' => 'QRPH_PAID_11',
         ]);
