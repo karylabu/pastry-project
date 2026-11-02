@@ -110,7 +110,8 @@ describe("BackupManagement", () => {
     render(<BackupManagement />);
 
     const restoreButton = await screen.findByRole("button", { name: `Restore ${backupLabel}` });
-    expect(restoreButton).toHaveClass("bg-black", "text-white");
+    expect(restoreButton).toHaveClass("border-[#e8dfd4]", "text-[#806714]");
+    expect(restoreButton).not.toHaveClass("bg-black");
     expect(screen.getByRole("button", { name: "Restore selected" })).toHaveClass("bg-black", "text-white");
     fireEvent.click(restoreButton);
     const dialog = await screen.findByRole("alertdialog");
