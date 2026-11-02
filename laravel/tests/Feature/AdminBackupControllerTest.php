@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Http\Controllers\Api\AdminBackupController;
 use App\Models\User;
 use App\Services\DatabaseBackupService;
+use App\Services\FullSystemBackupService;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -16,6 +17,7 @@ use Tests\TestCase;
 class AdminBackupControllerTest extends TestCase
 {
     private ?string $restoreTestDatabasePath = null;
+    private ?string $systemFixturePath = null;
 
     protected function setUp(): void
     {
@@ -40,6 +42,9 @@ class AdminBackupControllerTest extends TestCase
         DB::purge('backup_test');
         if ($this->restoreTestDatabasePath && is_file($this->restoreTestDatabasePath)) {
             @unlink($this->restoreTestDatabasePath);
+        }
+        if ($this->systemFixturePath && is_dir($this->systemFixturePath)) {
+            \Illuminate\Support\Facades\File::deleteDirectory($this->systemFixturePath);
         }
         Schema::dropIfExists('notifications');
         Schema::dropIfExists('users');
@@ -146,12 +151,107 @@ class AdminBackupControllerTest extends TestCase
         $request = Request::create('/api/admin/backups');
 
         $this->assertSame(200, $controller->index($request, $backups)->getStatusCode());
-        $this->assertTrue($controller->index($request, $backups)->getData(true)['data']['permissions']['can_restore']);
-        $this->assertFalse($controller->index($request, $backups)->getData(true)['data']['permissions']['can_test_restore']);
+        $overview = $controller->index($request, $backups)->getData(true)['data'];
+        $this->assertTrue($overview['permissions']['can_restore']);
+        $this->assertFalse($overview['permissions']['can_test_restore']);
+        $this->assertTrue($overview['permissions']['can_manage_system_backups']);
+        $this->assertSame([], $overview['system_backups']['backups']);
 
         $restoreRequest = Request::create('/api/admin/backups/pastry-project-db-20261031-120000-abcdef.sql/restore', 'POST');
         $response = $controller->restore($restoreRequest, 'pastry-project-db-20261031-120000-abcdef.sql', $backups);
         $this->assertSame(422, $response->getStatusCode());
+    }
+
+    public function test_regular_admin_cannot_manage_full_system_backups(): void
+    {
+        Storage::fake('local');
+        $admin = new User();
+        $admin->role = 'admin';
+        $this->actingAs($admin);
+        $controller = app(AdminBackupController::class);
+        $request = Request::create('/api/admin/system-backups', 'POST');
+        $backups = app(DatabaseBackupService::class);
+        $systemBackups = app(FullSystemBackupService::class);
+
+        $this->assertSame(403, $controller->storeSystem($request, $backups, $systemBackups)->getStatusCode());
+        $this->assertSame(403, $controller->downloadSystem($request, 'pastry-project-system-20261101-020000-abcdef.zip', $systemBackups)->getStatusCode());
+        $this->assertSame(403, $controller->destroySystem(
+            Request::create('/api/admin/system-backups/file.zip', 'DELETE', ['confirmed' => true]),
+            'pastry-project-system-20261101-020000-abcdef.zip',
+            $systemBackups
+        )->getStatusCode());
+    }
+
+    public function test_super_admin_creates_a_system_zip_only_after_database_backup_verifies(): void
+    {
+        $superAdmin = new User();
+        $superAdmin->role = 'super_admin';
+        $this->actingAs($superAdmin);
+
+        $databaseBackup = ['filename' => 'pastry-project-db-20261101-020000-abcdef.sql', 'verification_status' => 'verified'];
+        $databaseBackups = \Mockery::mock(DatabaseBackupService::class);
+        $databaseBackups->shouldReceive('create')->once()->with('manual')->andReturn($databaseBackup);
+        $systemBackup = ['filename' => 'pastry-project-system-20261101-020000-abcdef.zip', 'status' => 'successful'];
+        $systemBackups = \Mockery::mock(FullSystemBackupService::class);
+        $systemBackups->shouldReceive('create')->once()->with('manual', $databaseBackup)->andReturn($systemBackup);
+
+        $response = app(AdminBackupController::class)->storeSystem(
+            Request::create('/api/admin/system-backups', 'POST'),
+            $databaseBackups,
+            $systemBackups
+        );
+
+        $this->assertSame(201, $response->getStatusCode());
+        $this->assertSame($systemBackup, $response->getData(true)['data']);
+    }
+
+    public function test_full_system_backup_contains_verified_database_and_deployed_files_without_secrets(): void
+    {
+        Storage::fake('local');
+        $this->systemFixturePath = storage_path('framework/testing/system-fixture-' . uniqid('', true));
+        foreach ([
+            '.htaccess' => 'RewriteEngine On',
+            'index.php' => '<?php echo "site";',
+            'customer/orders.php' => '<?php echo "orders";',
+            'customer/.env' => 'SECRET=hidden',
+            'includes/db.php' => '<?php $password = "hidden";',
+            'uploads/custom_cake/reference.jpg' => 'uploaded-photo',
+            'laravel/app/Example.php' => '<?php',
+            'laravel/bootstrap/cache/config.php' => '<?php return ["secret" => "hidden"];',
+            'laravel/storage/logs/app.log' => 'sensitive log',
+        ] as $relativePath => $contents) {
+            $path = $this->systemFixturePath . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $relativePath);
+            if (! is_dir(dirname($path))) {
+                mkdir(dirname($path), 0700, true);
+            }
+            file_put_contents($path, $contents);
+        }
+
+        $databaseBackup = app(DatabaseBackupService::class)->create('manual');
+        $backup = app(FullSystemBackupService::class)->create('manual', $databaseBackup, $this->systemFixturePath);
+        $zipPath = app(FullSystemBackupService::class)->downloadPath($backup['filename']);
+        $zip = new \ZipArchive();
+        $this->assertTrue($zip->open($zipPath));
+
+        $entries = [];
+        for ($index = 0; $index < $zip->numFiles; $index++) {
+            $entries[] = $zip->getNameIndex($index);
+        }
+        $this->assertContains('.htaccess', $entries);
+        $this->assertContains('customer/orders.php', $entries);
+        $this->assertContains('uploads/custom_cake/reference.jpg', $entries);
+        $this->assertContains('laravel/app/Example.php', $entries);
+        $this->assertContains('database/' . $databaseBackup['filename'], $entries);
+        $this->assertContains('SYSTEM-BACKUP-MANIFEST.json', $entries);
+        $this->assertContains('RESTORE-GUIDE.txt', $entries);
+        $this->assertNotContains('customer/.env', $entries);
+        $this->assertNotContains('includes/db.php', $entries);
+        $this->assertNotContains('laravel/bootstrap/cache/config.php', $entries);
+        $this->assertNotContains('laravel/storage/logs/app.log', $entries);
+        $manifest = json_decode($zip->getFromName('SYSTEM-BACKUP-MANIFEST.json'), true, 512, JSON_THROW_ON_ERROR);
+        $this->assertSame('pastry-project-full-system-backup', $manifest['format']);
+        $this->assertSame('verified', $backup['verification_status']);
+        $zip->close();
     }
 
     public function test_admin_can_save_only_a_valid_daily_backup_time(): void

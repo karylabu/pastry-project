@@ -4,8 +4,10 @@ namespace App\Console\Commands;
 
 use App\Models\AdminNotification;
 use App\Services\DatabaseBackupService;
+use App\Services\FullSystemBackupService;
 use App\Services\ShopSettings;
 use Illuminate\Console\Command;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
@@ -15,9 +17,9 @@ class RunScheduledDatabaseBackup extends Command
 {
     protected $signature = 'backups:scheduled';
 
-    protected $description = 'Create the daily database backup when its configured local time is due';
+    protected $description = 'Create the daily database and full-system backups when their configured time is due';
 
-    public function handle(DatabaseBackupService $backups): int
+    public function handle(DatabaseBackupService $backups, FullSystemBackupService $systemBackups): int
     {
         $scheduleTime = (string) (ShopSettings::all()['backupScheduleTime'] ?? '02:00');
         if (! preg_match('/^(?:[01]\d|2[0-3]):[0-5]\d$/', $scheduleTime)) {
@@ -36,8 +38,14 @@ class RunScheduledDatabaseBackup extends Command
 
             return self::SUCCESS;
         }
-        if ($backups->hasSuccessfulScheduledBackupOn($today)) {
-            $this->info('A successful daily backup is already available.');
+        if ($backups->successfulScheduledBackupOn($today)
+            && $systemBackups->successfulScheduledBackupOn($today)) {
+            $this->info('A successful daily system backup is already available.');
+
+            return self::SUCCESS;
+        }
+        if ($this->systemBackupRetryIsCoolingDown($systemBackups, $today)) {
+            $this->info('The previous system backup attempt failed recently. It will be retried automatically.');
 
             return self::SUCCESS;
         }
@@ -63,8 +71,14 @@ class RunScheduledDatabaseBackup extends Command
         }
 
         try {
-            if ($backups->hasSuccessfulScheduledBackupOn($today)) {
-                $this->info('A successful daily backup is already available.');
+            $databaseBackup = $backups->successfulScheduledBackupOn($today);
+            if ($databaseBackup && $systemBackups->successfulScheduledBackupOn($today)) {
+                $this->info('A successful daily system backup is already available.');
+
+                return self::SUCCESS;
+            }
+            if ($this->systemBackupRetryIsCoolingDown($systemBackups, $today)) {
+                $this->info('The previous system backup attempt failed recently. It will be retried automatically.');
 
                 return self::SUCCESS;
             }
@@ -75,27 +89,29 @@ class RunScheduledDatabaseBackup extends Command
             }
 
             try {
-                $backup = $backups->create('automatic', 'scheduled');
-                if (($backup['verification_status'] ?? null) !== 'verified') {
+                $databaseBackup ??= $backups->create('automatic', 'scheduled');
+                if (($databaseBackup['verification_status'] ?? null) !== 'verified') {
                     throw new \RuntimeException('The scheduled backup did not pass file verification.');
                 }
+                $systemBackup = $systemBackups->successfulScheduledBackupOn($today)
+                    ?? $systemBackups->create('scheduled', $databaseBackup);
                 try {
                     AdminNotification::notifyRoles(['admin'], [
                         'type' => 'system_alert',
-                        'title' => 'Daily system backup verified',
-                        'message' => 'Your daily data copy completed and passed its file verification.',
-                        'data' => ['filename' => $backup['filename'], 'backup_date' => now()->toDateString()],
+                        'title' => 'Daily full system backup verified',
+                        'message' => 'Your daily database and website files backup completed and passed verification.',
+                        'data' => ['filename' => $systemBackup['filename'], 'backup_date' => now()->toDateString()],
                         'action_url' => '/admin/backups',
                         'is_read' => false,
                         'created_at' => now(),
                     ]);
                 } catch (Throwable $notificationException) {
                     Log::warning('A scheduled backup was verified, but administrators could not be notified.', [
-                        'filename' => $backup['filename'],
+                        'filename' => $systemBackup['filename'],
                         'exception' => $notificationException,
                     ]);
                 }
-                $this->info('Daily backup completed: ' . $backup['filename']);
+                $this->info('Daily full system backup completed: ' . $systemBackup['filename']);
 
                 return self::SUCCESS;
             } catch (Throwable $exception) {
@@ -109,19 +125,19 @@ class RunScheduledDatabaseBackup extends Command
 
     private function reportFailure(string $scheduleTime, Throwable $exception): int
     {
-        Log::error('Daily database backup failed.', ['schedule_time' => $scheduleTime, 'exception' => $exception]);
+        Log::error('Daily full system backup failed.', ['schedule_time' => $scheduleTime, 'exception' => $exception]);
         try {
             $alreadyNotified = Schema::hasTable('notifications')
                 && AdminNotification::query()
                     ->where('type', 'system_alert')
-                    ->where('title', 'Daily data backup failed')
+                    ->where('title', 'Daily full system backup failed')
                     ->get(['data'])
                     ->contains(static fn (AdminNotification $notification): bool => ($notification->data['backup_date'] ?? null) === now()->toDateString());
             if (! $alreadyNotified) {
                 AdminNotification::notifyRoles(['admin'], [
                     'type' => 'system_alert',
-                    'title' => 'Daily data backup failed',
-                    'message' => 'The scheduled backup did not finish. The system will retry automatically. Please contact technical support if the warning continues.',
+                    'title' => 'Daily full system backup failed',
+                    'message' => 'The scheduled database and website backup did not finish. The system will retry automatically. Please contact technical support if the warning continues.',
                     'data' => ['scheduled_time' => $scheduleTime, 'backup_date' => now()->toDateString()],
                     'action_url' => '/admin/backups',
                     'is_read' => false,
@@ -134,7 +150,7 @@ class RunScheduledDatabaseBackup extends Command
             ]);
         }
 
-        $this->error('Daily backup failed. Administrators were notified when possible.');
+        $this->error('Daily full system backup failed. Administrators were notified when possible.');
 
         return self::FAILURE;
     }
@@ -145,25 +161,38 @@ class RunScheduledDatabaseBackup extends Command
             $alreadyNotified = Schema::hasTable('notifications')
                 && AdminNotification::query()
                     ->where('type', 'system_alert')
-                    ->where('title', 'Daily backup schedule missed')
+                    ->where('title', 'Daily system backup schedule missed')
                     ->get(['data'])
                     ->contains(static fn (AdminNotification $notification): bool => ($notification->data['backup_date'] ?? null) === now()->toDateString());
             if (! $alreadyNotified) {
                 AdminNotification::notifyRoles(['admin'], [
                     'type' => 'system_alert',
-                    'title' => 'Daily backup schedule missed',
-                    'message' => 'The daily data copy started later than planned. The system is retrying automatically.',
+                    'title' => 'Daily system backup schedule missed',
+                    'message' => 'The daily full system backup started later than planned. The system is retrying automatically.',
                     'data' => ['scheduled_time' => $scheduleTime, 'backup_date' => now()->toDateString()],
                     'action_url' => '/admin/backups',
                     'is_read' => false,
                     'created_at' => now(),
                 ]);
             }
+
         } catch (Throwable $exception) {
             Log::warning('Administrators could not be notified about a missed daily backup schedule.', [
                 'exception' => $exception,
             ]);
         }
+    }
+
+    private function systemBackupRetryIsCoolingDown(FullSystemBackupService $backups, string $date): bool
+    {
+        $latestAttempt = $backups->latestScheduledBackupOn($date);
+        if (! $latestAttempt || ($latestAttempt['status'] ?? null) === 'successful') {
+            return false;
+        }
+
+        $createdAt = Carbon::parse((string) ($latestAttempt['created_at'] ?? ''));
+
+        return $createdAt->diffInMinutes(now()) < 15;
     }
 
     private function writeHeartbeat(): void

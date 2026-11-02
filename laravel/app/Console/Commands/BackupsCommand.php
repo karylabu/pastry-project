@@ -12,7 +12,7 @@ class BackupsCommand extends Command
      */
     protected $signature = 'backups';
 
-    protected $description = 'Compatibility wrapper for the scheduled database backup task.';
+    protected $description = 'Compatibility wrapper for scheduled database and full-system backups.';
 
     public function handle(): int
     {

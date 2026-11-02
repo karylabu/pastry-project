@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Validator;
 use App\Services\DatabaseBackupService;
+use App\Services\FullSystemBackupService;
 use App\Services\ShopSettings;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 use Throwable;
@@ -73,7 +74,11 @@ class AdminBackupController extends Controller
         }, $filename, ['Content-Type' => 'application/json; charset=utf-8']);
     }
 
-    public function index(Request $request, DatabaseBackupService $backups): \Illuminate\Http\JsonResponse
+    public function index(
+        Request $request,
+        DatabaseBackupService $backups,
+        ?FullSystemBackupService $systemBackups = null
+    ): \Illuminate\Http\JsonResponse
     {
         if ($response = $this->authorizeAdmin($request)) {
             return $response;
@@ -86,7 +91,11 @@ class AdminBackupController extends Controller
         $data['permissions'] = [
             'can_restore' => $canRestore,
             'can_test_restore' => $canRestore && $backups->testRestoreConfigured(),
+            'can_manage_system_backups' => $this->getAuthenticatedUser($request)?->isSuperAdmin() ?? false,
         ];
+        if ($data['permissions']['can_manage_system_backups']) {
+            $data['system_backups'] = ($systemBackups ?? app(FullSystemBackupService::class))->overview();
+        }
 
         return response()->json(['success' => true, 'data' => $data]);
     }
@@ -171,6 +180,78 @@ class AdminBackupController extends Controller
                 'success' => false,
                 'message' => 'The database backup could not be completed.',
             ], 500);
+        }
+    }
+
+    public function storeSystem(
+        Request $request,
+        DatabaseBackupService $databaseBackups,
+        FullSystemBackupService $systemBackups
+    ): \Illuminate\Http\JsonResponse {
+        if ($response = $this->authorizeTechnicalAdmin($request)) {
+            return $response;
+        }
+
+        try {
+            $databaseBackup = $databaseBackups->create('manual');
+            if (($databaseBackup['verification_status'] ?? null) !== 'verified') {
+                throw new \RuntimeException('The database backup did not pass verification.');
+            }
+            $backup = $systemBackups->create('manual', $databaseBackup);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Full system backup created and verified. Restore the ZIP manually through Hostinger.',
+                'data' => $backup,
+            ], 201);
+        } catch (Throwable $exception) {
+            Log::error('Full system backup request failed.', ['exception' => $exception]);
+
+            return response()->json([
+                'success' => false,
+                'message' => $exception->getMessage() ?: 'The full system backup could not be completed.',
+            ], 500);
+        }
+    }
+
+    public function downloadSystem(Request $request, string $filename, FullSystemBackupService $systemBackups): mixed
+    {
+        if ($response = $this->authorizeTechnicalAdmin($request)) {
+            return $response;
+        }
+
+        try {
+            return response()->download($systemBackups->downloadPath($filename), $filename, [
+                'Content-Type' => 'application/zip',
+            ]);
+        } catch (\InvalidArgumentException $exception) {
+            return response()->json(['success' => false, 'message' => 'System backup file not found.'], 404);
+        } catch (Throwable $exception) {
+            Log::error('System backup download failed.', ['filename' => $filename, 'exception' => $exception]);
+
+            return response()->json(['success' => false, 'message' => $exception->getMessage()], 500);
+        }
+    }
+
+    public function destroySystem(Request $request, string $filename, FullSystemBackupService $systemBackups): \Illuminate\Http\JsonResponse
+    {
+        if ($response = $this->authorizeTechnicalAdmin($request)) {
+            return $response;
+        }
+        if (! $request->boolean('confirmed')) {
+            return response()->json(['success' => false, 'message' => 'Delete confirmation is required.'], 422);
+        }
+
+        try {
+            $systemBackups->delete($filename);
+
+            return response()->json(['success' => true, 'message' => 'System backup deleted successfully.']);
+        } catch (\InvalidArgumentException $exception) {
+            return response()->json(['success' => false, 'message' => 'System backup file not found.'], 404);
+        } catch (Throwable $exception) {
+            Log::error('System backup deletion failed.', ['filename' => $filename, 'exception' => $exception]);
+
+            return response()->json(['success' => false, 'message' => 'The system backup could not be deleted.'], 500);
         }
     }
 
@@ -312,7 +393,7 @@ class AdminBackupController extends Controller
             return response()->json(['success' => false, 'message' => 'Authentication required.'], 401);
         }
         if (! $user->isSuperAdmin()) {
-            return response()->json(['success' => false, 'message' => 'Only technical administrators can restore a database.'], 403);
+            return response()->json(['success' => false, 'message' => 'Only super administrators can access technical backup features.'], 403);
         }
 
         return null;

@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Services\DatabaseBackupService;
+use App\Services\FullSystemBackupService;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -68,6 +69,22 @@ class ScheduledDatabaseBackupTest extends TestCase
 
     public function test_daily_backup_waits_for_configured_manila_time_and_runs_once_per_day(): void
     {
+        $systemBackup = ['filename' => 'pastry-project-system-daily.zip'];
+        $systemBackupService = \Mockery::mock(FullSystemBackupService::class);
+        $systemBackupService->shouldReceive('successfulScheduledBackupOn')
+            ->with('2026-10-31')
+            ->twice()
+            ->andReturn(null, $systemBackup);
+        $systemBackupService->shouldReceive('latestScheduledBackupOn')
+            ->with('2026-10-31')
+            ->twice()
+            ->andReturn(null, null);
+        $systemBackupService->shouldReceive('create')
+            ->once()
+            ->with('scheduled', \Mockery::on(static fn (array $backup): bool => ($backup['verification_status'] ?? null) === 'verified'))
+            ->andReturn($systemBackup);
+        $this->app->instance(FullSystemBackupService::class, $systemBackupService);
+
         Carbon::setTestNow(Carbon::parse('2026-10-31 01:59:00', 'Asia/Manila'));
         $this->artisan('backups:scheduled')->assertSuccessful();
         Storage::disk('local')->assertExists('backups/scheduler-heartbeat.json');
@@ -115,16 +132,19 @@ class ScheduledDatabaseBackupTest extends TestCase
         Carbon::setTestNow(Carbon::parse('2026-10-31 02:05:00', 'Asia/Manila'));
 
         $backupService = \Mockery::mock(DatabaseBackupService::class);
-        $backupService->shouldReceive('hasSuccessfulScheduledBackupOn')->times(4)->andReturn(false, false, false, false);
+        $backupService->shouldReceive('successfulScheduledBackupOn')->times(4)->andReturn(null, null, null, null);
         $backupService->shouldReceive('create')->twice()->with('automatic', 'scheduled')->andThrow(new RuntimeException('disk full'));
         $this->app->instance(DatabaseBackupService::class, $backupService);
+        $systemBackupService = \Mockery::mock(FullSystemBackupService::class);
+        $systemBackupService->shouldReceive('latestScheduledBackupOn')->times(4)->andReturn(null, null, null, null);
+        $this->app->instance(FullSystemBackupService::class, $systemBackupService);
 
         $this->artisan('backups:scheduled')->assertFailed();
         $this->artisan('backups:scheduled')->assertFailed();
 
         $this->assertSame(1, DB::table('notifications')
             ->where('type', 'system_alert')
-            ->where('title', 'Daily data backup failed')
+            ->where('title', 'Daily full system backup failed')
             ->count());
     }
 
@@ -154,16 +174,23 @@ class ScheduledDatabaseBackupTest extends TestCase
         Carbon::setTestNow(Carbon::parse('2026-10-31 02:20:00', 'Asia/Manila'));
 
         $backupService = \Mockery::mock(DatabaseBackupService::class);
-        $backupService->shouldReceive('hasSuccessfulScheduledBackupOn')->twice()->andReturn(false, false);
+        $backupService->shouldReceive('successfulScheduledBackupOn')->twice()->andReturn(null, null);
         $backupService->shouldReceive('create')->once()->with('automatic', 'scheduled')->andReturn([
             'filename' => 'verified.sql',
             'verification_status' => 'verified',
         ]);
         $this->app->instance(DatabaseBackupService::class, $backupService);
+        $systemBackupService = \Mockery::mock(FullSystemBackupService::class);
+        $systemBackupService->shouldReceive('latestScheduledBackupOn')->twice()->andReturn(null, null);
+        $systemBackupService->shouldReceive('successfulScheduledBackupOn')->once()->andReturn(null);
+        $systemBackupService->shouldReceive('create')->once()->with('scheduled', \Mockery::on(
+            static fn (array $backup): bool => $backup['filename'] === 'verified.sql'
+        ))->andReturn(['filename' => 'verified-system.zip']);
+        $this->app->instance(FullSystemBackupService::class, $systemBackupService);
 
         $this->artisan('backups:scheduled')->assertSuccessful();
 
-        $this->assertDatabaseHas('notifications', ['title' => 'Daily backup schedule missed']);
-        $this->assertDatabaseHas('notifications', ['title' => 'Daily system backup verified']);
+        $this->assertDatabaseHas('notifications', ['title' => 'Daily system backup schedule missed']);
+        $this->assertDatabaseHas('notifications', ['title' => 'Daily full system backup verified']);
     }
 }

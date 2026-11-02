@@ -15,7 +15,7 @@ const backup = {
 };
 const backupLabel = `Database backup · ${new Date(backup.created_at).toLocaleString()}`;
 
-const listResponse = (backups = [backup]) => ({
+const listResponse = (backups = [backup], dataOverrides = {}) => ({
   success: true,
   data: {
     backups,
@@ -40,6 +40,7 @@ const listResponse = (backups = [backup]) => ({
     },
     schedule_time: "02:00",
     permissions: { can_restore: true, can_test_restore: false },
+    ...dataOverrides,
   },
 });
 
@@ -76,7 +77,7 @@ describe("BackupManagement", () => {
     render(<BackupManagement />);
 
     const overview = await screen.findByRole("region", { name: "Backup overview" });
-    const health = screen.getByRole("status", { name: "Backup Health Status" });
+    const health = screen.getByRole("status", { name: "Database Backup Health Status" });
     expect(overview.compareDocumentPosition(health) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
@@ -88,7 +89,7 @@ describe("BackupManagement", () => {
     render(<BackupManagement />);
 
     expect(await screen.findByText("No backups yet")).toBeInTheDocument();
-    const createButton = await screen.findByRole("button", { name: "Create Backup Now" });
+    const createButton = await screen.findByRole("button", { name: "Create Database Backup Now" });
     expect(createButton).toHaveClass("bg-black", "text-white");
     fireEvent.click(createButton);
     const dialog = await screen.findByRole("alertdialog");
@@ -100,6 +101,71 @@ describe("BackupManagement", () => {
     expect(await screen.findByText("Database backup created successfully.")).toBeInTheDocument();
     expect(global.fetch).toHaveBeenNthCalledWith(2, expect.stringContaining("/api/admin/backups"), expect.objectContaining({ method: "POST" }));
     expect(await screen.findAllByText(backupLabel)).toHaveLength(2);
+  });
+
+  test("creates a full system ZIP only after confirmation for superadmins", async () => {
+    const systemData = {
+      permissions: { can_restore: true, can_test_restore: false, can_manage_system_backups: true },
+      system_backups: { backups: [], overview: {} },
+    };
+    global.fetch
+      .mockResolvedValueOnce(jsonResponse(listResponse([], systemData)))
+      .mockResolvedValueOnce(jsonResponse({ success: true, message: "Full system backup created and verified.", data: {} }, 201))
+      .mockResolvedValueOnce(jsonResponse(listResponse([], systemData)));
+    render(<BackupManagement />);
+
+    const createButton = await screen.findByRole("button", { name: "Create Full System Backup" });
+    fireEvent.click(createButton);
+    const dialog = await screen.findByRole("alertdialog");
+    expect(dialog).toHaveTextContent("deployed website files, and uploads");
+    expect(dialog).toHaveTextContent("credentials are excluded");
+    expect(dialog).toHaveTextContent("manually through Hostinger");
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(within(dialog).getByRole("button", { name: "Create system backup" }));
+    expect(await screen.findByText("Full system backup created and verified.")).toBeInTheDocument();
+    expect(global.fetch).toHaveBeenNthCalledWith(
+      2,
+      expect.stringContaining("/api/admin/system-backups"),
+      expect.objectContaining({ method: "POST" })
+    );
+  });
+
+  test("keeps full system backup actions hidden from regular administrators", async () => {
+    render(<BackupManagement />);
+
+    expect(await screen.findByRole("button", { name: "Create Database Backup Now" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Create Full System Backup" })).not.toBeInTheDocument();
+  });
+
+  test("downloads a verified system backup as a ZIP", async () => {
+    const systemBackup = {
+      filename: "pastry-project-system-20261101-020000-abcdef.zip",
+      created_at: "2026-11-01T02:00:00+08:00",
+      purpose: "scheduled",
+      status: "successful",
+      verification_status: "verified",
+      size_bytes: 4096,
+    };
+    global.fetch
+      .mockResolvedValueOnce(jsonResponse(listResponse([], {
+        permissions: { can_restore: true, can_test_restore: false, can_manage_system_backups: true },
+        system_backups: { backups: [systemBackup], overview: { available_backups: 1, storage_used_bytes: 4096 } },
+      })))
+      .mockResolvedValueOnce({ ok: true, blob: jest.fn().mockResolvedValue(new Blob(["zip data"])) });
+    URL.createObjectURL = jest.fn(() => "blob:system-backup");
+    URL.revokeObjectURL = jest.fn();
+    jest.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+    render(<BackupManagement />);
+
+    fireEvent.click(await screen.findByRole("button", { name: /Download system backup/ }));
+
+    expect(await screen.findByText("Full system ZIP downloaded to your device.")).toBeInTheDocument();
+    expect(global.fetch).toHaveBeenNthCalledWith(
+      2,
+      expect.stringContaining(`/api/admin/system-backups/${systemBackup.filename}/download`),
+      expect.objectContaining({ headers: expect.objectContaining({ Accept: "application/zip" }) })
+    );
   });
 
   test("requires explicit confirmation before restoring and sends the confirmation to the API", async () => {

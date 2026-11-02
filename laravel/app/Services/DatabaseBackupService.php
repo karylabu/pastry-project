@@ -321,15 +321,21 @@ class DatabaseBackupService
 
     public function hasSuccessfulScheduledBackupOn(string $date): bool
     {
+        return $this->successfulScheduledBackupOn($date) !== null;
+    }
+
+    public function successfulScheduledBackupOn(string $date): ?array
+    {
         foreach ($this->readHistory() as $entry) {
             if (($entry['purpose'] ?? null) === 'scheduled'
                 && ($entry['status'] ?? null) === 'successful'
+                && ($entry['verification_status'] ?? null) === 'verified'
                 && str_starts_with((string) ($entry['created_at'] ?? ''), $date)) {
-                return true;
+                return $entry;
             }
         }
 
-        return false;
+        return null;
     }
 
     private function writeSqlDump(string $path): void
