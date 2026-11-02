@@ -352,64 +352,6 @@ export default function BackupManagement() {
             {feedback.type === "error" ? <AlertCircle size={15} className="mt-0.5 shrink-0" /> : <CheckCircle2 size={15} className="mt-0.5 shrink-0" />}{feedback.message}
           </div>}
 
-          {canManageSystemBackups && <section aria-labelledby="system-backup-title" className="mb-5 overflow-hidden rounded-md border border-[#e9e1d9] bg-white shadow-[0_2px_8px_rgba(60,42,28,0.03)]">
-            <div className="flex flex-col gap-3 border-b border-[#eee7df] bg-[#fffdf8] px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
-              <div>
-                <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#92701e]">Superadmin · Full backup</p>
-                <h2 id="system-backup-title" className="mt-1 text-[16px] font-semibold text-[#33251e]">System Backup</h2>
-                <p className="mt-1 max-w-2xl text-[11px] leading-5 text-[#74675f]">Database, deployed website files, and uploads in one verified ZIP. Secrets and hosting credentials are excluded. The ZIP contains sensitive customer records; store it securely.</p>
-              </div>
-              <button type="button" onClick={() => requestConfirmation("create_system")} disabled={actionBusy || loading} className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-md bg-black px-4 text-[12px] font-semibold text-white transition hover:bg-[#33251e] disabled:cursor-not-allowed disabled:opacity-50">
-                {busyAction === "create_system" ? <Loader2 size={15} className="animate-spin" /> : <Archive size={15} />}
-                {busyAction === "create_system" ? "Creating system ZIP…" : "Create Full System Backup"}
-              </button>
-            </div>
-            <div className="border-b border-[#f1ece6] px-4 py-3 text-[11px] text-[#74675f] sm:px-5">
-              Verified ZIPs: <span className="font-semibold text-[#33251e]">{loading ? "—" : Number(backupData.system_backups.overview.available_backups).toLocaleString()}</span>
-              <span className="mx-2 text-[#c5b9ab]">·</span>
-              Storage used: <span className="font-semibold text-[#33251e]">{loading ? "—" : formatBytes(backupData.system_backups.overview.storage_used_bytes)}</span>
-              <span className="mx-2 text-[#c5b9ab]">·</span>
-              Full ZIP restore is manual through Hostinger. The existing database restore remains available separately.
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[690px] border-collapse text-left">
-                <thead className="bg-[#fbfaf7]">
-                  <tr className="border-b border-[#eee7df] text-[10px] font-semibold uppercase tracking-[0.08em] text-[#8f8076]">
-                    <th scope="col" className="px-4 py-3">System backup</th>
-                    <th scope="col" className="px-4 py-3">Date and time</th>
-                    <th scope="col" className="px-4 py-3">File size</th>
-                    <th scope="col" className="px-4 py-3">Type</th>
-                    <th scope="col" className="px-4 py-3">Status</th>
-                    <th scope="col" className="px-4 py-3">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[#f1ece6]">
-                  {loading && <tr><td colSpan="6" className="px-4 py-10 text-center text-[12px] text-[#8f8076]"><Loader2 size={17} className="mx-auto mb-2 animate-spin" />Loading system backups…</td></tr>}
-                  {!loading && backupData.system_backups.backups.length === 0 && <tr><td colSpan="6" className="px-4 py-10 text-center">
-                    <Archive size={22} className="mx-auto text-[#b8aa9b]" /><p className="mt-2 text-[12px] font-semibold text-[#65574d]">No system backups yet</p><p className="mt-1 text-[11px] text-[#8f8076]">Create one now or wait for the next daily backup schedule.</p>
-                  </td></tr>}
-                  {!loading && backupData.system_backups.backups.map((backup) => {
-                    const available = backup.status === "successful" && backup.verification_status === "verified";
-                    const rowBusy = busyAction.endsWith(`:${backup.filename}`);
-                    return <tr key={backup.filename} className="align-middle">
-                      <td className="px-4 py-3.5 text-[11px] font-semibold text-[#33251e]">Full system ZIP</td>
-                      <td className="px-4 py-3.5 text-[11px] text-[#65574d]">{formatDate(backup.created_at)}</td>
-                      <td className="px-4 py-3.5 text-[11px] text-[#65574d]">{formatBytes(backup.size_bytes)}</td>
-                      <td className="px-4 py-3.5 text-[11px] text-[#65574d]">{backup.purpose === "scheduled" ? "Automatic daily" : "Manual"}</td>
-                      <td className="px-4 py-3.5"><StatusBadge status={backup.status} /></td>
-                      <td className="px-4 py-3.5">
-                        <div className="flex items-center gap-1.5">
-                          <button type="button" onClick={() => downloadSystemBackup(backup)} disabled={!available || actionBusy} aria-label={`Download system backup ${formatDate(backup.created_at)}`} className="inline-flex h-8 items-center gap-1.5 rounded border border-[#e8dfd4] px-2 text-[10px] font-semibold text-[#65574d] hover:bg-[#fffaf0] disabled:opacity-40"><Download size={13} />Download ZIP</button>
-                          <button type="button" onClick={() => requestConfirmation("delete_system", backup)} disabled={actionBusy} aria-label={`Delete system backup ${formatDate(backup.created_at)}`} className="inline-flex h-8 items-center gap-1.5 rounded border border-[#efd8d4] px-2 text-[10px] font-semibold text-[#98534b] hover:bg-[#fff1ef] disabled:opacity-40"><Trash2 size={13} />Delete</button>
-                        </div>
-                      </td>
-                    </tr>;
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </section>}
-
           {(busyAction === "create" || busyAction === "create_system") && <div role="status" aria-live="polite" className="mb-5 rounded-md border border-[#eee3c5] bg-[#fffaf0] px-4 py-3">
             <div className="flex items-center gap-2 text-[12px] font-semibold text-[#806714]"><Loader2 size={15} className="animate-spin" />{busyAction === "create_system" ? "Creating and verifying the full system ZIP. Keep this page open." : "Creating a database backup. Keep this page open."}</div>
             <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-[#eee5d3]"><div className="h-full w-1/3 animate-pulse rounded-full bg-[#c9a94f]" /></div>
@@ -539,6 +481,64 @@ export default function BackupManagement() {
             </div>
             <div className="flex items-start gap-2 border-t border-[#eee7df] bg-[#fffdf8] px-4 py-3.5 text-[10px] leading-4 text-[#74675f] sm:px-5"><Clock3 size={14} className="mt-0.5 shrink-0 text-[#9b7810]" /><p>Restoring replaces current database records. A safety snapshot is created automatically before the restore begins.</p></div>
           </section>
+
+          {canManageSystemBackups && <section aria-labelledby="system-backup-title" className="mt-5 overflow-hidden rounded-md border border-[#e9e1d9] bg-white shadow-[0_2px_8px_rgba(60,42,28,0.03)]">
+            <div className="flex flex-col gap-3 border-b border-[#eee7df] bg-[#fffdf8] px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#92701e]">Superadmin · Full backup</p>
+                <h2 id="system-backup-title" className="mt-1 text-[16px] font-semibold text-[#33251e]">System Backup</h2>
+                <p className="mt-1 max-w-2xl text-[11px] leading-5 text-[#74675f]">Database, deployed website files, and uploads in one verified ZIP. Secrets and hosting credentials are excluded. The ZIP contains sensitive customer records; store it securely.</p>
+              </div>
+              <button type="button" onClick={() => requestConfirmation("create_system")} disabled={actionBusy || loading} className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-md bg-black px-4 text-[12px] font-semibold text-white transition hover:bg-[#33251e] disabled:cursor-not-allowed disabled:opacity-50">
+                {busyAction === "create_system" ? <Loader2 size={15} className="animate-spin" /> : <Archive size={15} />}
+                {busyAction === "create_system" ? "Creating system ZIP…" : "Create Full System Backup"}
+              </button>
+            </div>
+            <div className="border-b border-[#f1ece6] px-4 py-3 text-[11px] text-[#74675f] sm:px-5">
+              Verified ZIPs: <span className="font-semibold text-[#33251e]">{loading ? "—" : Number(backupData.system_backups.overview.available_backups).toLocaleString()}</span>
+              <span className="mx-2 text-[#c5b9ab]">·</span>
+              Storage used: <span className="font-semibold text-[#33251e]">{loading ? "—" : formatBytes(backupData.system_backups.overview.storage_used_bytes)}</span>
+              <span className="mx-2 text-[#c5b9ab]">·</span>
+              Full ZIP restore is manual through Hostinger. The existing database restore remains available separately.
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[690px] border-collapse text-left">
+                <thead className="bg-[#fbfaf7]">
+                  <tr className="border-b border-[#eee7df] text-[10px] font-semibold uppercase tracking-[0.08em] text-[#8f8076]">
+                    <th scope="col" className="px-4 py-3">System backup</th>
+                    <th scope="col" className="px-4 py-3">Date and time</th>
+                    <th scope="col" className="px-4 py-3">File size</th>
+                    <th scope="col" className="px-4 py-3">Type</th>
+                    <th scope="col" className="px-4 py-3">Status</th>
+                    <th scope="col" className="px-4 py-3">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[#f1ece6]">
+                  {loading && <tr><td colSpan="6" className="px-4 py-10 text-center text-[12px] text-[#8f8076]"><Loader2 size={17} className="mx-auto mb-2 animate-spin" />Loading system backups…</td></tr>}
+                  {!loading && backupData.system_backups.backups.length === 0 && <tr><td colSpan="6" className="px-4 py-10 text-center">
+                    <Archive size={22} className="mx-auto text-[#b8aa9b]" /><p className="mt-2 text-[12px] font-semibold text-[#65574d]">No system backups yet</p><p className="mt-1 text-[11px] text-[#8f8076]">Create one now or wait for the next daily backup schedule.</p>
+                  </td></tr>}
+                  {!loading && backupData.system_backups.backups.map((backup) => {
+                    const available = backup.status === "successful" && backup.verification_status === "verified";
+                    const rowBusy = busyAction.endsWith(`:${backup.filename}`);
+                    return <tr key={backup.filename} className="align-middle">
+                      <td className="px-4 py-3.5 text-[11px] font-semibold text-[#33251e]">Full system ZIP</td>
+                      <td className="px-4 py-3.5 text-[11px] text-[#65574d]">{formatDate(backup.created_at)}</td>
+                      <td className="px-4 py-3.5 text-[11px] text-[#65574d]">{formatBytes(backup.size_bytes)}</td>
+                      <td className="px-4 py-3.5 text-[11px] text-[#65574d]">{backup.purpose === "scheduled" ? "Automatic daily" : "Manual"}</td>
+                      <td className="px-4 py-3.5"><StatusBadge status={backup.status} /></td>
+                      <td className="px-4 py-3.5">
+                        <div className="flex items-center gap-1.5">
+                          <button type="button" onClick={() => downloadSystemBackup(backup)} disabled={!available || actionBusy} aria-label={`Download system backup ${formatDate(backup.created_at)}`} className="inline-flex h-8 items-center gap-1.5 rounded border border-[#e8dfd4] px-2 text-[10px] font-semibold text-[#65574d] hover:bg-[#fffaf0] disabled:opacity-40"><Download size={13} />Download ZIP</button>
+                          <button type="button" onClick={() => requestConfirmation("delete_system", backup)} disabled={actionBusy} aria-label={`Delete system backup ${formatDate(backup.created_at)}`} className="inline-flex h-8 items-center gap-1.5 rounded border border-[#efd8d4] px-2 text-[10px] font-semibold text-[#98534b] hover:bg-[#fff1ef] disabled:opacity-40"><Trash2 size={13} />Delete</button>
+                        </div>
+                      </td>
+                    </tr>;
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </section>}
         </main>
       </div>
       <ConfirmationDialog action={confirmation} busy={actionBusy === confirmation?.kind} onClose={() => setConfirmation(null)} onConfirm={runConfirmedAction} />
