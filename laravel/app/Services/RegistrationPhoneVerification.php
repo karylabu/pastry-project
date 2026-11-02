@@ -28,7 +28,12 @@ class RegistrationPhoneVerification
         $columns = array_filter(['phone', 'phone_number'], fn ($column) => Schema::hasColumn('users', $column));
 
         foreach ($columns as $column) {
-            $registeredPhones = DB::table('users')->whereNotNull($column)->pluck($column);
+            $users = DB::table('users')->whereNotNull($column);
+            if (Schema::hasColumn('users', 'deleted_at')) {
+                $users->whereNull('deleted_at');
+            }
+
+            $registeredPhones = $users->pluck($column);
             if ($registeredPhones->contains(fn ($savedPhone) => $this->normalizePhone((string) $savedPhone) === $normalizedPhone)) {
                 return true;
             }

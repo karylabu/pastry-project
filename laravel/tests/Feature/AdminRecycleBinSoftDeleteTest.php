@@ -6,6 +6,7 @@ use App\Models\Ingredient;
 use App\Models\Product;
 use App\Models\User;
 use App\Services\AdminRecycleBinService;
+use App\Services\RegistrationPhoneVerification;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
@@ -20,6 +21,10 @@ class AdminRecycleBinSoftDeleteTest extends TestCase
             Schema::create($tableName, function ($table) use ($tableName) {
                 $table->id();
                 $table->string('name');
+                if ($tableName === 'users') {
+                    $table->string('phone')->nullable();
+                    $table->string('phone_number')->nullable();
+                }
                 if ($tableName === 'products') {
                     $table->string('image')->nullable();
                 }
@@ -39,7 +44,11 @@ class AdminRecycleBinSoftDeleteTest extends TestCase
 
         DB::table('products')->insert(['id' => 1, 'name' => 'Cake', 'image' => null]);
         DB::table('ingredients')->insert(['id' => 2, 'name' => 'Flour']);
-        DB::table('users')->insert(['id' => 3, 'name' => 'Customer']);
+        DB::table('users')->insert([
+            'id' => 3,
+            'name' => 'Customer',
+            'phone' => '+63 912-345-6789',
+        ]);
     }
 
     protected function tearDown(): void
@@ -93,5 +102,24 @@ class AdminRecycleBinSoftDeleteTest extends TestCase
         $this->assertDatabaseMissing('ingredients', ['id' => 2]);
         $this->assertDatabaseMissing('users', ['id' => 3]);
         $this->assertCount(0, $recycleBin->entries());
+    }
+
+    public function test_user_phone_is_released_in_recycle_bin_and_reserved_again_if_restored(): void
+    {
+        $recycleBin = app(AdminRecycleBinService::class);
+        $phoneVerification = app(RegistrationPhoneVerification::class);
+
+        $this->assertTrue($phoneVerification->isPhoneRegistered('09123456789'));
+
+        $entryId = $recycleBin->trashUser(3);
+        $this->assertFalse($phoneVerification->isPhoneRegistered('09123456789'));
+
+        $recycleBin->restore($entryId);
+        $this->assertTrue($phoneVerification->isPhoneRegistered('09123456789'));
+
+        $entryId = $recycleBin->trashUser(3);
+        $recycleBin->permanentlyDelete($entryId);
+
+        $this->assertFalse($phoneVerification->isPhoneRegistered('09123456789'));
     }
 }
