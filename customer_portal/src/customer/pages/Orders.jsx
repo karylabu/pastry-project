@@ -840,6 +840,8 @@ export default function Orders() {
             ? `Promotion coupon${o.coupon_code ? ` (${formatReceiptValue(o.coupon_code)})` : ''}`
             : o.discount_type === 'reward_5_percent'
               ? 'Rewards (5%)'
+              : o.discount_type === 'first_order_5_percent'
+                ? 'First order discount (5%)'
               : formatReceiptValue(o.discount_type)} · ₱${Number(o.discount).toLocaleString()}`
           : ''],
       ].filter(([, value]) => value);

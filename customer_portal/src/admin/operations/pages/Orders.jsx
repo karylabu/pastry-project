@@ -26,6 +26,21 @@ const isQrPayment = (payment) => ['gcash', 'qrph'].includes(
   String(payment || '').toLowerCase().replace(/[^a-z0-9]/g, '')
 );
 
+const isDiscountIdType = (discountType) => ['pwd', 'senior_citizen'].includes(discountType);
+
+const getOrderDiscountLabel = (order, includeDiscountWord = false) => {
+  if (order.discount_type === 'promotion_coupon') {
+    return `Promotion coupon${order.coupon_code ? `: ${order.coupon_code}` : ''}`;
+  }
+  if (order.discount_type === 'reward_5_percent') return 'Rewards discount · 5%';
+  if (order.discount_type === 'first_order_5_percent') return 'First order discount · 5%';
+  if (order.discount_type === 'pwd') return `${includeDiscountWord ? 'PWD discount' : 'PWD'} · 5%`;
+  if (order.discount_type === 'senior_citizen') {
+    return `${includeDiscountWord ? 'Senior Citizen discount' : 'Senior Citizen'} · 5%`;
+  }
+  return String(order.discount_type || '').replaceAll('_', ' ');
+};
+
 const formatOrderDateTime = (value) => {
   if (!value) return "Date and time unavailable";
   const date = new Date(value);
@@ -842,18 +857,14 @@ export default function Orders() {
                       {order.discount_type && order.discount_type !== "none" && (
                         <div className="mt-3 rounded-md border border-[#e8dfd4] bg-white p-3">
                           <p className="text-[9px] font-semibold uppercase tracking-[0.14em] text-[#8f8076]">
-                            {order.discount_type === 'promotion_coupon'
-                              ? `Promotion coupon${order.coupon_code ? `: ${order.coupon_code}` : ''}`
-                              : order.discount_type === 'reward_5_percent'
-                                ? 'Rewards discount · 5%'
-                                : `${order.discount_type === "pwd" ? "PWD" : "Senior Citizen"} discount · 5%`}
+                            {getOrderDiscountLabel(order, true)}
                           </p>
                           <p className="mt-1">₱{Number(order.discount || 0).toFixed(2)}</p>
-                          {order.discount_type !== 'promotion_coupon' && order.discount_type !== 'reward_5_percent' && order.has_discount_id && discountIdPreviews[order.id] ? (
+                          {isDiscountIdType(order.discount_type) && order.has_discount_id && discountIdPreviews[order.id] ? (
                             <img src={discountIdPreviews[order.id]} alt={`Discount ID for order ${order.id}`} className="mt-2 max-h-64 w-full rounded border border-black/10 bg-white object-contain" />
-                          ) : order.discount_type !== 'promotion_coupon' && order.discount_type !== 'reward_5_percent' && order.has_discount_id ? (
+                          ) : isDiscountIdType(order.discount_type) && order.has_discount_id ? (
                             <button type="button" onClick={() => viewDiscountId(order.id)} disabled={discountIdLoading === order.id} className="mt-2 rounded-md bg-black px-3 py-2 text-[10px] font-semibold text-white disabled:opacity-60">{discountIdLoading === order.id ? "Loading ID..." : "View uploaded ID"}</button>
-                          ) : order.discount_type !== 'promotion_coupon' && order.discount_type !== 'reward_5_percent' ? (
+                          ) : isDiscountIdType(order.discount_type) ? (
                             <p className="mt-1 text-[10px] text-red-700">No ID image attached.</p>
                           ) : null}
                         </div>
@@ -1043,20 +1054,16 @@ export default function Orders() {
                                 <div className="mt-4 rounded-xl border border-black/10 bg-white p-3">
                                   <p className="text-[9px] uppercase tracking-[0.2em] text-black/50">Discount</p>
                                   <p className="mt-1 font-semibold text-black">
-                                    {order.discount_type === 'promotion_coupon'
-                                      ? `Promotion coupon${order.coupon_code ? `: ${order.coupon_code}` : ''}`
-                                      : order.discount_type === 'reward_5_percent'
-                                        ? 'Rewards discount · 5%'
-                                        : `${order.discount_type === 'pwd' ? 'PWD' : 'Senior Citizen'} · 5%`}
+                                    {getOrderDiscountLabel(order)}
                                     {' '}(₱{Number(order.discount || 0).toFixed(2)})
                                   </p>
-                                  {order.discount_type !== 'promotion_coupon' && order.discount_type !== 'reward_5_percent' && order.has_discount_id && discountIdPreviews[order.id] ? (
+                                  {isDiscountIdType(order.discount_type) && order.has_discount_id && discountIdPreviews[order.id] ? (
                                     <img
                                       src={discountIdPreviews[order.id]}
                                       alt={`${order.discount_type === 'pwd' ? 'PWD' : 'Senior Citizen'} ID for order ${order.id}`}
                                       className="mt-3 max-h-80 w-full rounded-lg border border-black/10 bg-black/[0.03] object-contain"
                                     />
-                                  ) : order.discount_type !== 'promotion_coupon' && order.discount_type !== 'reward_5_percent' && order.has_discount_id ? (
+                                  ) : isDiscountIdType(order.discount_type) && order.has_discount_id ? (
                                     <button
                                       type="button"
                                       onClick={() => viewDiscountId(order.id)}
@@ -1065,7 +1072,7 @@ export default function Orders() {
                                     >
                                       {discountIdLoading === order.id ? 'Loading ID...' : 'View uploaded ID'}
                                     </button>
-                                  ) : order.discount_type !== 'promotion_coupon' && order.discount_type !== 'reward_5_percent' ? (
+                                  ) : isDiscountIdType(order.discount_type) ? (
                                     <p className="mt-2 text-xs text-red-700">No ID image attached.</p>
                                   ) : null}
                                 </div>
