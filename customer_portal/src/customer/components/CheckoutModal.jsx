@@ -791,15 +791,19 @@ export default function CheckoutModal({
         console.error('Order API returned non-OK:', response.status, text);
         try {
           const errorResult = JSON.parse(text);
-          const stockError = errorResult.message || errorResult.errors?.items?.[0] || errorResult.error;
+          const stockError = errorResult.message
+            || errorResult.errors?.items?.[0]
+            || errorResult.errors?.address?.[0]
+            || errorResult.errors?.phone?.[0]
+            || errorResult.error;
           if (isStockAvailabilityError(stockError)) {
             setOrderError(stockError);
             return;
           }
+          alert(stockError ? `Order failed: ${stockError}` : `Order failed: ${response.status}`);
         } catch {
-          // Fall through to the existing response detail for non-JSON errors.
+          alert(`Order failed: ${response.status} - ${text}`);
         }
-        alert(`Order failed: ${response.status} - ${text}`);
         return;
       }
 

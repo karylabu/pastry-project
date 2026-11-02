@@ -348,6 +348,16 @@ class OrderController extends Controller
                         ? $productSizes->whereKey($productSizeId)->where('available', true)->first()
                         : null;
 
+                    if (!$productSize && $hasConfiguredSizes) {
+                        $variant = strtolower(trim((string) ($item['variant'] ?? '')));
+                        if ($variant !== '') {
+                            $productSize = $productSizes
+                                ->where('available', true)
+                                ->whereRaw('LOWER(size) = ?', [$variant === 'big cake' ? 'big' : ($variant === 'small cake' ? 'small' : $variant)])
+                                ->first();
+                        }
+                    }
+
                     if (($productSizeId > 0 && !$productSize) || ($hasConfiguredSizes && !$productSize)) {
                         return response()->json([
                             'success' => false,
