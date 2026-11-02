@@ -249,6 +249,10 @@ class AdminBackupController extends Controller
     public function downloadSystem(Request $request, string $filename, FullSystemBackupService $systemBackups): mixed
     {
         try {
+            if (function_exists('set_time_limit')) {
+                set_time_limit(0);
+            }
+
             $response = response()->download($systemBackups->downloadPath($filename), $filename, [
                 'Content-Type' => 'application/zip',
                 'Cache-Control' => 'private, no-store, no-cache, must-revalidate',
