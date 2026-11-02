@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { AlertTriangle, ArrowRight, BarChart3, ShoppingCart, TrendingUp, CakeSlice, Package, Sparkles, CalendarDays, Sun, Clock3, ChefHat, CircleCheck, ChevronRight, Star, MessageSquare } from "lucide-react";
+import { AlertTriangle, ArrowRight, BarChart3, ShoppingCart, TrendingUp, CakeSlice, Package, Sparkles, Sun, Clock3, ChefHat, CircleCheck, ChevronRight, Star, MessageSquare } from "lucide-react";
 import { Area, Bar, CartesianGrid, Cell, ComposedChart, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Link } from "react-router-dom";
 import { LARAVEL_BASE, ROOT_BASE } from "../../services/config";
@@ -359,8 +359,6 @@ export default function Dashboard() {
       return "Admin";
     }
   })();
-  const todayLabel = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric" }).format(now);
-
   return (
     <div className="min-h-screen bg-[#fbfaf5] font-['DM_Sans'] text-[#33251e]">
       <div className="pt-[88px] lg:pl-[260px]">
@@ -373,13 +371,6 @@ export default function Dashboard() {
                 <h1 className="truncate font-serif text-[27px] leading-tight text-[#33251e]">Good {greeting}, {adminName}!</h1>
                 <p className="truncate text-[11px] text-[#8f8076]">Here's what's happening with your pastry business today.</p>
               </div>
-            </div>
-            <div className="-translate-y-1 inline-flex w-fit items-center gap-2 rounded-lg border border-[#eee4de] bg-white px-3 py-2 text-[10px] text-[#6a5a50] shadow-[0_3px_10px_rgba(91,64,39,0.03)]">
-              <CalendarDays size={13} className="text-[#a57c38]" />
-              <span className="font-semibold">Today</span>
-              <span className="text-[#d1bfae]">·</span>
-              <span>{todayLabel}</span>
-              <ChevronRight size={12} className="rotate-90 text-[#9b8c83]" />
             </div>
           </div>
 
