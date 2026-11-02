@@ -3,6 +3,46 @@ import { CUSTOMER_BASE } from './config';
 
 const BASE_URL = CUSTOMER_BASE;
 
+export function hasAuthSession() {
+  try {
+    const user = JSON.parse(localStorage.getItem('user') || 'null');
+    return Boolean(user?.id);
+  } catch {
+    return false;
+  }
+}
+
+export function clearAuthState() {
+  localStorage.removeItem('user');
+  localStorage.removeItem('auth_token');
+  window.dispatchEvent(new Event('auth:logout'));
+}
+
+export function handleAuthResponse(response) {
+  if (response?.status === 401) {
+    clearAuthState();
+  }
+  return response;
+}
+
+
+export async function authenticatedFetch(url, options = {}) {
+  if (!hasAuthSession()) {
+    throw new Error('AUTH_SESSION_REQUIRED');
+  }
+
+  const response = await fetch(url, {
+    credentials: 'include',
+    ...options,
+    headers: {
+      Accept: 'application/json',
+      ...(options.headers || {}),
+      ...getAuthHeaders(),
+    },
+  });
+  return handleAuthResponse(response);
+}
+
 export function getAuthHeaders() {
   try {
     const user = JSON.parse(localStorage.getItem('user') || 'null');
