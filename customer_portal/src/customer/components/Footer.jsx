@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Cake, Phone, Mail, HelpCircle, Loader2, Heart } from "lucide-react";
 import { LARAVEL_BASE } from "../../services/config";
@@ -9,6 +9,42 @@ export default function Footer() {
   const [status, setStatus] = useState({ type: "idle", message: "" });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showCredits, setShowCredits] = useState(false);
+  const [contactContent, setContactContent] = useState("");
+  const [contactUnavailable, setContactUnavailable] = useState(false);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch(`${LARAVEL_BASE}/api/content-pages/contact-information`, {
+      headers: { Accept: "application/json" },
+      signal: controller.signal,
+    })
+      .then(async (response) => {
+        if (response.status === 410) return { unavailable: true };
+        if (!response.ok) return "";
+        const data = await response.json();
+        return {
+          content: data.success && typeof data.data?.content === "string" ? data.data.content.trim() : "",
+          unavailable: false,
+        };
+      })
+      .then((result) => {
+        if (typeof result === "string") {
+          setContactContent("");
+          setContactUnavailable(false);
+          return;
+        }
+        setContactContent(result.content);
+        setContactUnavailable(result.unavailable);
+      })
+      .catch((error) => {
+        if (error.name !== "AbortError") {
+          setContactContent("");
+          setContactUnavailable(false);
+        }
+      });
+
+    return () => controller.abort();
+  }, []);
 
   const handleSubscribe = async (e) => {
     e.preventDefault();
@@ -104,6 +140,11 @@ export default function Footer() {
                   Return Policy
                 </Link>
               </li>
+              <li>
+                <Link to="/customer/contact-information" onClick={() => window.scrollTo(0, 0)} className="hover:text-white transition">
+                  Contact Information
+                </Link>
+              </li>
             </ul>
           </div>
 
@@ -113,14 +154,22 @@ export default function Footer() {
               Get in Touch
             </p>
             <ul className="space-y-2 text-[10px] text-gray-300 md:text-xs">
-              <li className="grid grid-cols-[14px_1fr] items-center gap-x-2">
-                <Phone size={14} className="text-[#d4af37]" />
-                0938-796-2033
-              </li>
-              <li className="grid grid-cols-[14px_1fr] items-center gap-x-2 whitespace-nowrap">
-                <Mail size={12} className="shrink-0 text-[#d4af37] md:h-[14px] md:w-[14px]" />
-                <span className="text-[10px] md:text-xs">pastryproject.bc@gmail.com</span>
-              </li>
+              {contactUnavailable ? (
+                <li className="leading-relaxed">Contact information is currently unavailable.</li>
+              ) : contactContent ? (
+                <li className="whitespace-pre-line break-words leading-relaxed">{contactContent}</li>
+              ) : (
+                <>
+                  <li className="grid grid-cols-[14px_1fr] items-center gap-x-2">
+                    <Phone size={14} className="text-[#d4af37]" />
+                    0938-796-2033
+                  </li>
+                  <li className="grid grid-cols-[14px_1fr] items-center gap-x-2 whitespace-nowrap">
+                    <Mail size={12} className="shrink-0 text-[#d4af37] md:h-[14px] md:w-[14px]" />
+                    <span className="text-[10px] md:text-xs">pastryproject.bc@gmail.com</span>
+                  </li>
+                </>
+              )}
               <li className="grid grid-cols-[14px_1fr] items-center gap-x-2">
                 <HelpCircle size={13} className="text-[#d4af37]" />
                 <Link to="/customer/chat-support" onClick={() => window.scrollTo(0, 0)} className="hover:text-white transition">

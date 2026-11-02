@@ -30,6 +30,7 @@ import Rewards from '../pages/Rewards';
 import Favorites from '../pages/Favorites';
 import AccountSettings from '../pages/AccountSettings';
 import ChatSupport from '../pages/ChatSupport';
+import ManagedContentPage from './ManagedContentPage';
 
 import CartModal from './CartModal';
 import CheckoutModal from './CheckoutModal';
@@ -39,6 +40,20 @@ import { getAuthHeaders } from '../../services/api';
 import { CUSTOMER_BASE, LARAVEL_BASE } from '../../services/config';
 
 const PENDING_PAYMONGO_CHECKOUT_KEY = 'pendingPaymongoCheckout';
+
+function ContactInformationPage() {
+  return (
+    <main className="min-h-[60vh] bg-[#fffaf3] px-5 py-12 text-[#33251e] sm:px-8">
+      <article className="mx-auto max-w-4xl">
+        <p className="mb-2 text-xs font-bold uppercase tracking-[0.22em] text-[#92701e]">Pastry Project</p>
+        <h1 className="text-3xl font-bold sm:text-4xl">Contact Information &amp; Business Details</h1>
+        <p className="mt-6 text-sm leading-7 text-[#55473f] sm:text-base">
+          Call us at 0938-796-2033 or email pastryproject.bc@gmail.com for inquiries and assistance.
+        </p>
+      </article>
+    </main>
+  );
+}
 
 function GuestAccountPrompt({ onClose }) {
   return (
@@ -444,6 +459,7 @@ export default function CustomerApp() {
     '/return-policy',
     '/credits',
     '/about-us',
+    '/contact-information',
     '/chat-support',
     '/careers',
     '/customer/terms',
@@ -452,6 +468,7 @@ export default function CustomerApp() {
     '/customer/return-policy',
     '/customer/credits',
     '/customer/about-us',
+    '/customer/contact-information',
     '/customer/chat-support',
     '/customer/careers',
   ];
@@ -509,11 +526,12 @@ export default function CustomerApp() {
           <Route path="account-settings" element={<AccountSettings />} />
           <Route path="chat-support" element={<ChatSupport />} />
           <Route path="careers" element={<CareersPage />} />
-          <Route path="about-us" element={<AboutUsPage />} />
-          <Route path="terms" element={<TermsPage />} />
-          <Route path="privacy-policy" element={<PrivacyPage />} />
-          <Route path="cookie-policy" element={<CookiePolicyPage />} />
-          <Route path="return-policy" element={<ReturnPolicyPage />} />
+          <Route path="about-us" element={<ManagedContentPage slug="about-us" fallback={<AboutUsPage />} />} />
+          <Route path="terms" element={<ManagedContentPage slug="terms" fallback={<TermsPage />} />} />
+          <Route path="privacy-policy" element={<ManagedContentPage slug="privacy-policy" fallback={<PrivacyPage />} />} />
+          <Route path="cookie-policy" element={<ManagedContentPage slug="cookie-policy" fallback={<CookiePolicyPage />} />} />
+          <Route path="return-policy" element={<ManagedContentPage slug="return-policy" fallback={<ReturnPolicyPage />} />} />
+          <Route path="contact-information" element={<ManagedContentPage slug="contact-information" fallback={<ContactInformationPage />} />} />
           <Route path="credits" element={<CreditsPage />} />
         </Routes>
       </div>

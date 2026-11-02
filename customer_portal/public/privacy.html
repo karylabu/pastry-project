@@ -108,5 +108,45 @@
         </div>
       </div>
     </div>
+    <script>
+      (() => {
+        const prefix = window.location.pathname
+          .replace(/\/privacy\.html$/i, "")
+          .replace(/\/$/, "");
+        const card = document.querySelector(".card");
+
+        fetch(`${prefix}/laravel/public/api/content-pages/privacy-policy`, {
+          headers: { Accept: "application/json" },
+        })
+          .then(async (response) => {
+            if (response.status === 410) return { unavailable: true };
+            if (!response.ok) return null;
+            return response.json();
+          })
+          .then((result) => {
+            if (!card || !result) return;
+            const title = result.unavailable ? "Page unavailable" : result.data?.title;
+            const content = result.data?.content?.trim();
+            if (!result.unavailable && !content) return;
+
+            const heading = document.createElement("h1");
+            heading.textContent = title || "Privacy Policy";
+            card.replaceChildren(heading);
+            if (result.unavailable) {
+              const message = document.createElement("p");
+              message.textContent = "This page is currently unavailable.";
+              card.append(message);
+              return;
+            }
+
+            const body = document.createElement("div");
+            body.style.whiteSpace = "pre-wrap";
+            body.textContent = content;
+            card.append(body);
+            document.title = `${heading.textContent} - Pastry Project`;
+          })
+          .catch(() => {});
+      })();
+    </script>
   </body>
 </html>

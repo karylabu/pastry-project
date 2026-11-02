@@ -40,6 +40,7 @@ Route::get('products', [ProductController::class, 'index']);
 Route::get('reviews', [OrderFeedbackController::class, 'publicIndex']);
 Route::post('reviews', [OrderFeedbackController::class, 'store']);
 Route::get('shop/status', [CustomerApiController::class, 'shopStatus']);
+Route::get('content-pages/{slug}', [ContentPageController::class, 'show']);
 Route::match(['get', 'post'], 'customer/products', [CustomerApiController::class, 'products']);
 Route::match(['get', 'options'], 'staff/dashboard', [StaffApiController::class, 'getDashboard']);
 Route::get('staff/products', [ProductController::class, 'staffIndex']);
@@ -191,6 +192,10 @@ Route::middleware(['api'])->group(function () {
     Route::apiResource('users', UserController::class);
 
     Route::prefix('admin')->group(function () {
+        Route::get('content-pages', [ContentPageController::class, 'index']);
+        Route::post('content-pages', [ContentPageController::class, 'store']);
+        Route::put('content-pages/{slug}', [ContentPageController::class, 'update']);
+        Route::delete('content-pages/{slug}', [ContentPageController::class, 'destroy']);
         Route::get('backup', [AdminBackupController::class, 'download']);
         Route::get('backups', [AdminBackupController::class, 'index']);
         Route::post('backups', [AdminBackupController::class, 'store']);
