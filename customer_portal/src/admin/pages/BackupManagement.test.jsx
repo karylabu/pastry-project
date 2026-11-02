@@ -88,9 +88,12 @@ describe("BackupManagement", () => {
     render(<BackupManagement />);
 
     expect(await screen.findByText("No backups yet")).toBeInTheDocument();
-    fireEvent.click(await screen.findByRole("button", { name: "Create Backup Now" }));
+    const createButton = await screen.findByRole("button", { name: "Create Backup Now" });
+    expect(createButton).toHaveClass("bg-black", "text-white");
+    fireEvent.click(createButton);
     const dialog = await screen.findByRole("alertdialog");
     expect(dialog).toHaveTextContent("full copy of the current database");
+    expect(within(dialog).getByRole("button", { name: "Create backup" })).toHaveClass("bg-black");
     expect(global.fetch).toHaveBeenCalledTimes(1);
 
     fireEvent.click(within(dialog).getByRole("button", { name: "Create backup" }));

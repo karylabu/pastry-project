@@ -106,7 +106,7 @@ function ConfirmationDialog({ action, busy, onClose, onConfirm }) {
         </div>
         <div className="flex flex-col-reverse gap-2 border-t border-[#f0e7e0] bg-[#fbfaf5] p-4 sm:flex-row sm:justify-end">
           <button type="button" onClick={onClose} disabled={busy} className="rounded-lg border border-[#eadfd8] bg-white px-4 py-2.5 text-sm font-semibold text-[#6a5a50] transition hover:bg-[#fff8df] disabled:opacity-50">Cancel</button>
-          <button type="button" onClick={onConfirm} disabled={busy} className={`inline-flex items-center justify-center gap-2 rounded-lg px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-60 ${isRestore ? "bg-black hover:bg-[#33251e]" : isDelete ? "bg-[#8f432d] hover:bg-[#713522]" : "bg-[#806714] hover:bg-[#66520d]"}`}>
+          <button type="button" onClick={onConfirm} disabled={busy} className={`inline-flex items-center justify-center gap-2 rounded-lg px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-60 ${isRestore || action.kind === "create" ? "bg-black hover:bg-[#33251e]" : isDelete ? "bg-[#8f432d] hover:bg-[#713522]" : "bg-[#806714] hover:bg-[#66520d]"}`}>
             {busy && <Loader2 size={15} className="animate-spin" />}{confirmLabel}
           </button>
         </div>
@@ -289,7 +289,7 @@ export default function BackupManagement() {
               <h1 className="font-serif text-[27px] leading-tight text-[#33251e]">Backup Management</h1>
               <p className="mt-1.5 max-w-2xl text-[12px] leading-5 text-[#74675f]">Set a daily backup time and download a copy whenever you need one.</p>
             </div>
-            <button type="button" onClick={() => requestConfirmation("create")} disabled={actionBusy || loading} className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-md bg-[#806714] px-4 text-[12px] font-semibold text-white transition hover:bg-[#66520d] disabled:cursor-not-allowed disabled:opacity-50">
+            <button type="button" onClick={() => requestConfirmation("create")} disabled={actionBusy || loading} className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-md bg-black px-4 text-[12px] font-semibold text-white transition hover:bg-[#33251e] disabled:cursor-not-allowed disabled:opacity-50">
               {busyAction === "create" ? <Loader2 size={15} className="animate-spin" /> : <Database size={15} />}
               {busyAction === "create" ? "Creating backup…" : "Create Backup Now"}
             </button>
