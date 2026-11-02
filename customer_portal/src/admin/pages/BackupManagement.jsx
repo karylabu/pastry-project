@@ -340,7 +340,7 @@ export default function BackupManagement() {
             <div>
               <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.2em] text-[#92701e]">System · Data protection</p>
               <h1 className="font-serif text-[27px] leading-tight text-[#33251e]">Backup Management</h1>
-              <p className="mt-1.5 max-w-2xl text-[12px] leading-5 text-[#74675f]">Create verified database backups and, for superadmins, complete website ZIP packages.</p>
+              <p className="mt-1.5 max-w-2xl text-[12px] leading-5 text-[#74675f]">Create verified database backups and complete website ZIP packages.</p>
             </div>
             <button type="button" onClick={() => requestConfirmation("create")} disabled={actionBusy || loading} className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-md bg-black px-4 text-[12px] font-semibold text-white transition hover:bg-[#33251e] disabled:cursor-not-allowed disabled:opacity-50">
               {busyAction === "create" ? <Loader2 size={15} className="animate-spin" /> : <Database size={15} />}
@@ -485,7 +485,7 @@ export default function BackupManagement() {
           {canManageSystemBackups && <section aria-labelledby="system-backup-title" className="mt-5 overflow-hidden rounded-md border border-[#e9e1d9] bg-white shadow-[0_2px_8px_rgba(60,42,28,0.03)]">
             <div className="flex flex-col gap-3 border-b border-[#eee7df] bg-[#fffdf8] px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
               <div>
-                <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#92701e]">Superadmin · Full backup</p>
+                <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#92701e]">Admin · Full system backup</p>
                 <h2 id="system-backup-title" className="mt-1 text-[16px] font-semibold text-[#33251e]">System Backup</h2>
                 <p className="mt-1 max-w-2xl text-[11px] leading-5 text-[#74675f]">Database, deployed website files, and uploads in one verified ZIP. Secrets and hosting credentials are excluded. The ZIP contains sensitive customer records; store it securely.</p>
               </div>

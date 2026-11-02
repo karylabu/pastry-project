@@ -92,7 +92,7 @@ class AdminBackupController extends Controller
         $data['permissions'] = [
             'can_restore' => $canRestore,
             'can_test_restore' => $canRestore && $backups->testRestoreConfigured(),
-            'can_manage_system_backups' => $this->getAuthenticatedUser($request)?->isSuperAdmin() ?? false,
+            'can_manage_system_backups' => $this->getAuthenticatedUser($request)?->isAdmin() ?? false,
         ];
         if ($data['permissions']['can_manage_system_backups']) {
             $data['system_backups'] = ($systemBackups ?? app(FullSystemBackupService::class))->overview();
@@ -189,7 +189,7 @@ class AdminBackupController extends Controller
         DatabaseBackupService $databaseBackups,
         FullSystemBackupService $systemBackups
     ): \Illuminate\Http\JsonResponse {
-        if ($response = $this->authorizeTechnicalAdmin($request)) {
+        if ($response = $this->authorizeAdmin($request)) {
             return $response;
         }
 
@@ -217,7 +217,7 @@ class AdminBackupController extends Controller
 
     public function createSystemDownloadLink(Request $request, string $filename, FullSystemBackupService $systemBackups): \Illuminate\Http\JsonResponse
     {
-        if ($response = $this->authorizeTechnicalAdmin($request)) {
+        if ($response = $this->authorizeAdmin($request)) {
             return $response;
         }
 
@@ -273,7 +273,7 @@ class AdminBackupController extends Controller
 
     public function destroySystem(Request $request, string $filename, FullSystemBackupService $systemBackups): \Illuminate\Http\JsonResponse
     {
-        if ($response = $this->authorizeTechnicalAdmin($request)) {
+        if ($response = $this->authorizeAdmin($request)) {
             return $response;
         }
         if (! $request->boolean('confirmed')) {

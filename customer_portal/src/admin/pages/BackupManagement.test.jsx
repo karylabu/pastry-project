@@ -103,7 +103,7 @@ describe("BackupManagement", () => {
     expect(await screen.findAllByText(backupLabel)).toHaveLength(2);
   });
 
-  test("creates a full system ZIP only after confirmation for superadmins", async () => {
+  test("creates a full system ZIP only after confirmation for admins", async () => {
     const systemData = {
       permissions: { can_restore: true, can_test_restore: false, can_manage_system_backups: true },
       system_backups: { backups: [], overview: {} },
@@ -131,11 +131,16 @@ describe("BackupManagement", () => {
     );
   });
 
-  test("keeps full system backup actions hidden from regular administrators", async () => {
+  test("shows full system backup actions for regular administrators", async () => {
+    global.fetch.mockResolvedValueOnce(jsonResponse(listResponse([], {
+      permissions: { can_restore: true, can_test_restore: false, can_manage_system_backups: true },
+      system_backups: { backups: [], overview: {} },
+    })));
     render(<BackupManagement />);
 
     expect(await screen.findByRole("button", { name: "Create Database Backup Now" })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Create Full System Backup" })).not.toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Create Full System Backup" })).toBeInTheDocument();
+    expect(screen.getByText("Admin · Full system backup")).toBeInTheDocument();
   });
 
   test("starts a verified system ZIP download using a temporary secure link", async () => {

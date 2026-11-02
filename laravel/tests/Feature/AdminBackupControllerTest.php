@@ -162,26 +162,41 @@ class AdminBackupControllerTest extends TestCase
         $this->assertSame(422, $response->getStatusCode());
     }
 
-    public function test_regular_admin_cannot_manage_full_system_backups(): void
+    public function test_regular_admin_can_view_and_manage_full_system_backups(): void
     {
         Storage::fake('local');
         $admin = new User();
         $admin->role = 'admin';
         $this->actingAs($admin);
         $controller = app(AdminBackupController::class);
-        $request = Request::create('/api/admin/system-backups', 'POST');
         $backups = app(DatabaseBackupService::class);
-        $systemBackups = app(FullSystemBackupService::class);
+        $overview = $controller->index(Request::create('/api/admin/backups'), $backups)->getData(true)['data'];
+        $this->assertTrue($overview['permissions']['can_manage_system_backups']);
+        $this->assertArrayHasKey('system_backups', $overview);
 
-        $this->assertSame(403, $controller->storeSystem($request, $backups, $systemBackups)->getStatusCode());
-        $this->assertSame(403, $controller->createSystemDownloadLink(
-            $request,
-            'pastry-project-system-20261101-020000-abcdef.zip',
+        $filename = 'pastry-project-system-20261101-020000-abcdef.zip';
+        $databaseBackup = ['filename' => 'pastry-project-db-20261101-020000-abcdef.sql', 'verification_status' => 'verified'];
+        $systemBackup = ['filename' => $filename, 'status' => 'successful'];
+        $databaseBackups = \Mockery::mock(DatabaseBackupService::class);
+        $databaseBackups->shouldReceive('create')->once()->with('manual')->andReturn($databaseBackup);
+        $systemBackups = \Mockery::mock(FullSystemBackupService::class);
+        $systemBackups->shouldReceive('create')->once()->with('manual', $databaseBackup)->andReturn($systemBackup);
+        $systemBackups->shouldReceive('downloadPath')->once()->with($filename)->andReturn(storage_path('app/' . $filename));
+        $systemBackups->shouldReceive('delete')->once()->with($filename);
+
+        $this->assertSame(201, $controller->storeSystem(
+            Request::create('/api/admin/system-backups', 'POST'),
+            $databaseBackups,
             $systemBackups
         )->getStatusCode());
-        $this->assertSame(403, $controller->destroySystem(
-            Request::create('/api/admin/system-backups/file.zip', 'DELETE', ['confirmed' => true]),
-            'pastry-project-system-20261101-020000-abcdef.zip',
+        $this->assertSame(200, $controller->createSystemDownloadLink(
+            Request::create('/api/admin/system-backups/' . $filename . '/download-link', 'POST'),
+            $filename,
+            $systemBackups
+        )->getStatusCode());
+        $this->assertSame(200, $controller->destroySystem(
+            Request::create('/api/admin/system-backups/' . $filename, 'DELETE', ['confirmed' => true]),
+            $filename,
             $systemBackups
         )->getStatusCode());
     }
