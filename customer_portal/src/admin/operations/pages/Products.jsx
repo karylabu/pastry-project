@@ -68,7 +68,8 @@ const getProductBasePrice = (product) => {
 };
 
 const getProductPriceForSize = (product, category) => {
-  const sizeName = category === "Small Cakes" ? "small" : "big";
+  const normalized = String(category || "").trim().toLowerCase();
+  const sizeName = normalized === "small" || normalized === "small cakes" ? "small" : "big";
   const sizeOption = getProductSizeByName(product, sizeName);
   const sizePrice = [sizeOption?.price, product?.[`${sizeName}_price`]]
     .map(Number)
@@ -96,6 +97,7 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
   const [feedback, setFeedback] = useState(null);
   const [editOpen, setEditOpen] = useState(false);
   const [editProduct, setEditProduct] = useState(null);
+  const [editSize, setEditSize] = useState("big");
   const [editImage, setEditImage] = useState(null);
   const [editImagePreview, setEditImagePreview] = useState("");
   const [editSaving, setEditSaving] = useState(false);
@@ -170,17 +172,18 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
   const getCardSizeName = (product) => cardSizeSelections[product.id]
     || (getProductSizeByName(product, "small") ? "small" : "big");
   const canEditCatalog = Boolean(allowCatalogManagement);
-  const editRecipeCategory = editProduct?.category === "Small Cakes" ? "Small Cakes" : "Cakes";
-  const editRecipeSize = editProduct ? getProductSizeForCategory(editProduct, editRecipeCategory) : null;
+  const editRecipeSize = editProduct ? getProductSizeByName(editProduct, editSize) : null;
   const editRecipeSizeId = editRecipeSize?.id ? String(editRecipeSize.id) : "";
 
-  const openEditProductModal = (product) => {
-    const category = product.category || "";
+  const openEditProductModal = (product, selectedSizeName = getCardSizeName(product)) => {
+    const sizeName = String(selectedSizeName || "").toLowerCase() === "small" ? "small" : "big";
+    const category = ["Cakes", "Small Cakes"].includes(product.category) || product.sizes?.length ? "Cakes" : (product.category || "Cakes");
+    setEditSize(sizeName);
     setEditProduct({
       ...product,
       name: product.name || "",
       category,
-      price: getProductPriceForSize(product, category) || "",
+      price: getProductPriceForSize(product, sizeName) || "",
       stock: product.stock ?? "",
       description: product.description || "",
       image: product.image || "",
@@ -1102,7 +1105,7 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
                   {canEditCatalog && (
                     <button
                       type="button"
-                      onClick={() => openEditProductModal(product)}
+                      onClick={() => openEditProductModal(product, cardSizeName)}
                       title={`Edit ${product.name}`}
                       aria-label={`Edit ${product.name}`}
                       className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[#eadfd8] bg-white text-[#5f514a] transition hover:bg-[#fff8df]"
@@ -1191,7 +1194,7 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
                   {canEditCatalog ? (
                     <button
                       type="button"
-                      onClick={() => openEditProductModal(product)}
+                      onClick={() => openEditProductModal(product, getCardSizeName(product))}
                       title={`Edit ${product.name}`}
                       aria-label={`Edit ${product.name}`}
                       className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[#eadfd8] bg-white text-[#5f514a] transition hover:bg-[#fff8df]"
@@ -1726,13 +1729,12 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
                         setEditProduct((p) => ({
                           ...p,
                           category,
-                          price: getProductPriceForSize(p, category) || "",
                         }));
                       }}
                       className="w-full rounded-xl border border-[#eadfd8] bg-white px-3 py-2.5 text-[12px] text-[#33251e] outline-none transition focus:border-[#d4af37] focus:ring-2 focus:ring-[#d4af37]/15"
                     >
                       {[...new Set([
-                        ...(canManageCatalog ? ["Cakes", "Small Cakes"] : ["Cakes", "Small Cakes", "Meals", "Pasta", "Starter"]),
+                        ...(canManageCatalog ? ["Cakes"] : ["Cakes", "Meals", "Pasta", "Starter"]),
                         editProduct.category,
                       ].filter(Boolean))].map((category) => (
                         <option key={category} value={category}>{category}</option>
@@ -1740,8 +1742,44 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
                     </select>
                   </div>
 
+                  {canManageCatalog && (
+                    <div className="space-y-2 sm:col-span-2">
+                      <p className="block text-[10px] font-bold uppercase tracking-[0.16em] text-[#8f8076]">Cake Size</p>
+                      <div className="grid grid-cols-2 gap-3">
+                        {["small", "big"].map((sizeName) => {
+                          const sizeOption = getProductSizeByName(editProduct, sizeName);
+                          const selected = editSize === sizeName;
+                          return (
+                            <button
+                              key={sizeName}
+                              type="button"
+                              disabled={!sizeOption}
+                              aria-label={`Edit ${sizeName === "small" ? "Small" : "Big"} Cake size`}
+                              onClick={() => {
+                                setEditSize(sizeName);
+                                setEditProduct((p) => ({
+                                  ...p,
+                                  price: getProductPriceForSize(p, sizeName) || "",
+                                }));
+                              }}
+                              className={`rounded-xl border px-3 py-2.5 text-[12px] font-semibold transition ${
+                                !sizeOption
+                                  ? "cursor-not-allowed border-stone-200 bg-stone-100 text-stone-400"
+                                  : selected
+                                  ? "border-[#d4af37] bg-[#fff8df] text-[#765d50]"
+                                  : "border-[#eadfd8] bg-white text-[#765d50] hover:border-[#d4af37]"
+                              }`}
+                            >
+                              {sizeName === "small" ? "Small Cake" : "Big Cake"}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
                   <div className="space-y-2">
-                    <label htmlFor="edit-product-price" className="block text-[10px] font-bold uppercase tracking-[0.16em] text-[#8f8076]">{editProduct.category === "Small Cakes" ? "Small Cake Price" : "Big Cake Price"}</label>
+                    <label htmlFor="edit-product-price" className="block text-[10px] font-bold uppercase tracking-[0.16em] text-[#8f8076]">{editSize === "small" ? "Small Cake Price" : "Big Cake Price"}</label>
                     <input
                       id="edit-product-price"
                       type="number"
@@ -1840,11 +1878,11 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
                   </div>
                   <div>
                     <p className="text-[11px] font-semibold text-black/70">
-                      Recipe for: {activeCat === "Small Cakes" ? "Small" : "Big"} Cake
+                      Recipe for: {editSize === "small" ? "Small" : "Big"} Cake
                     </p>
                     {!editRecipeSizeId && (
                       <p className="mt-1 text-[11px] text-amber-700">
-                        No {activeCat === "Small Cakes" ? "small" : "big"} cake size is configured for this product.
+                        No {editSize === "small" ? "small" : "big"} cake size is configured for this product.
                       </p>
                     )}
                   </div>
@@ -1883,7 +1921,7 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
                         formData.append('id', editProduct.id);
                         formData.append('name', (editProduct.name || '').toString());
                         formData.append('category', (editProduct.category || '').toString());
-                        if (canManageCatalog) formData.append('price_size', editProduct.category === "Small Cakes" ? "small" : "big");
+                        if (canManageCatalog) formData.append('price_size', editSize);
                         formData.append('price', Number(editProduct.price) || 0);
                         formData.append('description', (editProduct.description || '').toString());
                         if (editImage) formData.append('image', editImage);
