@@ -61,7 +61,6 @@ const NAV_GROUPS = [
   { label: "Marketing", items: [{ name: "Promotions", path: "/admin/promotions" }] },
   { label: "User Management", items: [{ name: "User Management", path: "/admin/users" }] },
   { label: "System", items: [
-    { name: "Content Management", path: "/admin/content-pages" },
     { name: "Settings", path: "/admin/settings" },
     { name: "Backup Management", path: "/admin/backups" },
   ] },
@@ -84,7 +83,6 @@ const NAV_ICONS = {
   "/admin/users": Users,
   "/admin/activity-log": History,
   "/admin/settings": Settings,
-  "/admin/content-pages": FileText,
   "/admin/backups": Database,
 };
 

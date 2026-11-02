@@ -20,7 +20,6 @@ import Schedule from "../pages/Schedule";
 import CakeRecipes from "../pages/CakeRecipes";
 import Reviews from "../pages/Reviews";
 import BackupManagement from "../pages/BackupManagement";
-import ContentPages from "../pages/ContentPages";
 
 const renderWithLayout = (element) => <AdminLayout>{element}</AdminLayout>;
 
@@ -53,7 +52,7 @@ export default function AdminApp() {
         )}
       />
       <Route path="settings" element={renderWithLayout(<SettingsPage />)} />
-      <Route path="content-pages" element={renderWithLayout(<ContentPages />)} />
+      <Route path="content-pages" element={<Navigate to="/admin/dashboard" replace />} />
       <Route path="backups" element={renderWithLayout(<BackupManagement />)} />
       <Route path="schedule" element={renderWithLayout(<Schedule />)} />
     </Routes>
