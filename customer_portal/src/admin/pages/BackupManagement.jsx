@@ -420,31 +420,37 @@ export default function BackupManagement() {
             <button type="button" onClick={() => loadBackups()} className="inline-flex shrink-0 items-center gap-1.5 font-semibold text-[#793e38] hover:underline"><RefreshCw size={13} />Retry</button>
           </div>}
 
-          <section aria-label="Backup overview" className="mb-5 grid grid-cols-2 gap-2.5 lg:grid-cols-4 lg:gap-3">
-            <article className="h-full rounded-xl border border-t-[3px] border-[#eee4de] bg-white p-3 shadow-[0_5px_18px_rgba(91,64,39,0.04)] sm:p-3.5" style={{ borderTopColor: "#c9a94f" }}>
-              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#fff4cd] text-[#806714]"><Clock3 size={16} /></span>
-              <p className="mt-2 text-[11px] font-semibold text-[#5d4a42]">Last database backup</p>
-              <p className="mt-1 min-h-[23px] truncate text-[13px] font-bold leading-[23px] text-[#33251e]">{loading ? "Loading…" : formatDate(backupData.overview.last_successful_backup?.created_at)}</p>
+          <section aria-label="Backup overview" className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <article className="min-h-[132px] rounded-xl border border-[#eee4de] bg-white p-4 shadow-[0_5px_18px_rgba(91,64,39,0.05)]">
+              <div className="flex items-center gap-2.5">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#fff4cd] text-[#806714]"><Clock3 size={17} /></span>
+                <p className="text-xs font-semibold text-[#65574d]">Last database backup</p>
+              </div>
+              <p className="mt-4 text-sm font-bold leading-5 text-[#33251e]">{loading ? "Loading…" : formatDate(backupData.overview.last_successful_backup?.created_at)}</p>
             </article>
-            <article className="h-full rounded-xl border border-t-[3px] border-[#eee4de] bg-white p-3 shadow-[0_5px_18px_rgba(91,64,39,0.04)] sm:p-3.5" style={{ borderTopColor: "#c9a94f" }}>
-              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#edf5eb] text-[#58764e]"><Archive size={16} /></span>
-              <p className="mt-2 text-[11px] font-semibold text-[#5d4a42]">Available database copies</p>
-              <p className="mt-0.5 text-[23px] font-bold leading-none text-[#58764e]">{loading ? "—" : Number(backupData.overview.available_backups).toLocaleString()}</p>
+            <article className="min-h-[132px] rounded-xl border border-[#eee4de] bg-white p-4 shadow-[0_5px_18px_rgba(91,64,39,0.05)]">
+              <div className="flex items-center gap-2.5">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#edf5eb] text-[#58764e]"><Archive size={17} /></span>
+                <p className="text-xs font-semibold text-[#65574d]">Available database copies</p>
+              </div>
+              <p className="mt-4 text-2xl font-bold leading-none text-[#58764e]">{loading ? "—" : Number(backupData.overview.available_backups).toLocaleString()}</p>
             </article>
-            <article className="h-full rounded-xl border border-t-[3px] border-[#eee4de] bg-white p-3 shadow-[0_5px_18px_rgba(91,64,39,0.04)] sm:p-3.5" style={{ borderTopColor: "#c9a94f" }}>
-              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#f3edf8] text-[#7a6489]"><Database size={16} /></span>
-              <p className="mt-2 text-[11px] font-semibold text-[#5d4a42]">Database backup storage</p>
-              <p className="mt-0.5 text-[23px] font-bold leading-none text-[#7a6489]">{loading ? "—" : formatBytes(backupData.overview.storage_used_bytes)}</p>
+            <article className="min-h-[132px] rounded-xl border border-[#eee4de] bg-white p-4 shadow-[0_5px_18px_rgba(91,64,39,0.05)]">
+              <div className="flex items-center gap-2.5">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#f3edf8] text-[#7a6489]"><Database size={17} /></span>
+                <p className="text-xs font-semibold text-[#65574d]">Database backup storage</p>
+              </div>
+              <p className="mt-4 text-2xl font-bold leading-none text-[#7a6489]">{loading ? "—" : formatBytes(backupData.overview.storage_used_bytes)}</p>
             </article>
-            <article className="col-span-2 h-full rounded-xl border border-t-[3px] border-[#eee4de] bg-white p-3 shadow-[0_5px_18px_rgba(91,64,39,0.04)] lg:col-span-1 sm:p-3.5" style={{ borderTopColor: "#c9a94f" }}>
-              <form onSubmit={saveSchedule} className="h-full">
-                <div className="flex items-center gap-2">
-                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#fff4cd] text-[#806714]"><Clock3 size={16} /></span>
-                  <label htmlFor="daily-backup-time" className="text-[11px] font-semibold text-[#5d4a42]">{canManageSystemBackups ? "Daily system backup time" : "Daily backup time"}</label>
+            <article className="min-h-[132px] rounded-xl border border-[#eee4de] bg-white p-4 shadow-[0_5px_18px_rgba(91,64,39,0.05)]">
+              <form onSubmit={saveSchedule}>
+                <div className="flex items-center gap-2.5">
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#fff4cd] text-[#806714]"><Clock3 size={17} /></span>
+                  <label htmlFor="daily-backup-time" className="text-xs font-semibold text-[#65574d]">{canManageSystemBackups ? "Daily system backup time" : "Daily backup time"}</label>
                 </div>
-                <div className="mt-2 flex items-center gap-2">
-                  <input id="daily-backup-time" type="time" required value={scheduleTime} onChange={(event) => setScheduleTime(event.target.value)} disabled={savingSchedule} className="h-9 min-w-0 flex-1 rounded-md border border-[#e8dfd4] bg-white px-2.5 text-[11px] text-[#33251e] outline-none focus:border-[#92701e] focus:ring-2 focus:ring-[#c9a94f]/15 disabled:opacity-60" />
-                  <button type="submit" aria-label="Save backup time" disabled={savingSchedule || loading} className="inline-flex h-9 shrink-0 items-center justify-center rounded-md border border-[#e8dfd4] bg-white px-2.5 text-[10px] font-semibold text-[#65574d] transition hover:bg-[#f7f4ef] disabled:cursor-not-allowed disabled:opacity-50">{savingSchedule && <Loader2 size={12} className="animate-spin" />}Save</button>
+                <div className="mt-4 flex items-center gap-2">
+                  <input id="daily-backup-time" type="time" required value={scheduleTime} onChange={(event) => setScheduleTime(event.target.value)} disabled={savingSchedule} className="h-9 min-w-0 flex-1 rounded-md border border-[#e8dfd4] bg-white px-2.5 text-xs text-[#33251e] outline-none focus:border-[#92701e] focus:ring-2 focus:ring-[#c9a94f]/15 disabled:opacity-60" />
+                  <button type="submit" aria-label="Save backup time" disabled={savingSchedule || loading} className="inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-md bg-black px-3 text-xs font-semibold text-white transition hover:bg-[#33251e] disabled:cursor-not-allowed disabled:opacity-50">{savingSchedule && <Loader2 size={12} className="animate-spin" />}Save</button>
                 </div>
               </form>
             </article>
