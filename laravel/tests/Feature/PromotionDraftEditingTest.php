@@ -222,6 +222,16 @@ class PromotionDraftEditingTest extends TestCase
         ]);
     }
 
+    public function test_repair_migration_creates_missing_promotion_email_logs_table(): void
+    {
+        Schema::drop('promotion_email_logs');
+
+        $migration = require database_path('migrations/2026_11_02_000001_ensure_promotion_email_logs_table.php');
+        $migration->up();
+
+        $this->assertTrue(Schema::hasTable('promotion_email_logs'));
+    }
+
     public function test_admin_can_send_a_saved_draft_to_subscribed_customers(): void
     {
         Mail::fake();
