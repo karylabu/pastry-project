@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, AlertTriangle, PackageCheck, Filter, ChevronDown, Search, Cookie, Printer, Star, CreditCard } from "lucide-react";
 import PageShell from '../components/PageShell';
-import { getAuthHeaders, safeParseJson } from '../../services/api';
+import { getAuthHeaders, handleAuthResponse, hasAuthSession, safeParseJson } from '../../services/api';
 import { subscribeRealtime } from '../../services/realtime';
 import { CUSTOMER_BASE, LARAVEL_BASE, ROOT_BASE } from "../../services/config";
 import {
@@ -505,7 +505,7 @@ export default function Orders() {
   }, [userEmail, userName, user?.id]);
 
   const loadOrders = useCallback(async () => {
-    if (!user?.token && !user?.id && !user?.email) {
+    if (!hasAuthSession() || (!user?.token && !user?.id && !user?.email)) {
       setOrders([]);
       setOrdersLoadError(false);
       return;
@@ -516,6 +516,7 @@ export default function Orders() {
         credentials: 'include',
         headers: getAuthHeaders(),
       });
+      handleAuthResponse(ordersResponse);
       if (!ordersResponse.ok) {
         throw new Error(`Orders request failed with status ${ordersResponse.status}.`);
       }
@@ -567,6 +568,17 @@ export default function Orders() {
       window.removeEventListener("focus", refreshOrders);
     };
   }, [loadOrders]);
+
+  useEffect(() => {
+    if (!paymentProofTarget) return;
+    const currentOrder = orders.find((order) => Number(order.id) === Number(paymentProofTarget.id));
+    if (!currentOrder) return;
+    const currentPaymentStatus = String(currentOrder.payment_status || '').toLowerCase();
+    if (['paid', 'downpayment_paid'].includes(currentPaymentStatus)) {
+      setPaymentProofError('');
+      setPaymentProofTarget(null);
+    }
+  }, [orders, paymentProofTarget]);
 
   useEffect(() => {
     if (feedbackTarget || feedbackPromptSuppressed) return;
@@ -1396,13 +1408,16 @@ export default function Orders() {
                 const supportsPaymentProof = ['gcash', 'qrph'].includes(paymentMethodKey)
                   || (Boolean(order.is_customized)
                     && ['maya', 'maribank', 'visamastercard', 'onlinebanking'].includes(paymentMethodKey));
+                const paymentStatusKey = String(order.payment_status || '').toLowerCase();
+                const isPaymentConfirmed = ['paid', 'downpayment_paid'].includes(paymentStatusKey);
                 const isAwaitingPayment = order.status === 'Awaiting Payment'
-                  && supportsPaymentProof;
+                  && supportsPaymentProof
+                  && !isPaymentConfirmed;
                 const isAwaitingBalancePayment = order.status === 'Awaiting Balance Payment'
                   && supportsPaymentProof;
-                const hasPaymentSubmission = String(order.payment_status || '').toLowerCase() === 'proof_submitted';
+                const hasPaymentSubmission = paymentStatusKey === 'proof_submitted';
                 const isPending    = order.status === "Pending";
-                const isPendingQrPayment = isPending && supportsPaymentProof;
+                const isPendingQrPayment = isPending && supportsPaymentProof && !isPaymentConfirmed;
                 const isToReceive  = String(order.status || '').toLowerCase() === "ready for pickup";
                 const isCompleted  = order.status === "Completed";
                 const hasReturnRefundRequest = Boolean(order.return_refund_request);
@@ -1483,6 +1498,8 @@ export default function Orders() {
                 const primaryProductImage = getProductThumbnail(order, primaryItem);
                 const paymentHint = isCancelled
                   ? 'Order cancelled'
+                  : isPaymentConfirmed && paymentStatusKey === 'paid'
+                  ? 'Payment confirmed — awaiting Admin acceptance'
                   : isAwaitingPayment
                   ? hasPaymentSubmission
                     ? 'Payment details submitted — awaiting Admin review'
@@ -1496,6 +1513,8 @@ export default function Orders() {
                     ? hasPaymentSubmission
                       ? 'Payment details submitted — awaiting Admin review'
                       : 'Send payment proof for review'
+                    : isPaymentConfirmed
+                    ? 'Payment confirmed — awaiting Admin acceptance'
                     : 'Please complete before pickup'
                   : isPreparing
                   ? 'Being prepared in kitchen'

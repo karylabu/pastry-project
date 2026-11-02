@@ -712,11 +712,19 @@ class OrderController extends Controller
             : in_array($paymentMethodKey, ['gcash', 'qrph'], true);
         $canResubmitBalanceProof = $order->status === 'Awaiting Balance Payment'
             && strtolower((string) $order->payment_status) === 'proof_submitted';
+        $paymentStatusKey = strtolower((string) $order->payment_status);
+
+        if ($supportedPaymentMethod && in_array($paymentStatusKey, ['paid', 'downpayment_paid'], true)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Payment is already confirmed. No additional proof is required.',
+            ], 409);
+        }
 
         if (!$supportedPaymentMethod
             || !in_array($order->status, ['Pending', 'Awaiting Payment', 'Awaiting Balance Payment'], true)
-            || in_array(strtolower((string) $order->payment_status), ['failed', 'paid'], true)
-            || (strtolower((string) $order->payment_status) === 'proof_submitted' && !$canResubmitBalanceProof)) {
+            || $paymentStatusKey === 'failed'
+            || ($paymentStatusKey === 'proof_submitted' && !$canResubmitBalanceProof)) {
             return response()->json(['success' => false, 'message' => 'This order is not awaiting a QR payment.'], 409);
         }
 

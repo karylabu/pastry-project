@@ -10,6 +10,8 @@ jest.mock('../../services/config', () => ({
 }));
 jest.mock('../../services/api', () => ({
   getAuthHeaders: () => ({}),
+  handleAuthResponse: (response) => response,
+  hasAuthSession: () => true,
   safeParseJson: (response) => response.json(),
 }));
 jest.mock('../../services/realtime', () => ({
@@ -229,6 +231,36 @@ test('shows the bakery logo for custom cake orders without a reference image', a
     'src',
     'https://example.test/uploads/logo.png?v=logo-v2',
   );
+});
+
+test('does not offer QR payment proof after the order is paid', async () => {
+  global.fetch = jest.fn((url) => {
+    if (String(url).includes('/api/customer/products')) {
+      return Promise.resolve({ ok: true, json: async () => [] });
+    }
+
+    return Promise.resolve({
+      ok: true,
+      json: async () => ({
+        success: true,
+        orders: [{
+          id: 276,
+          user_id: 7,
+          customer: 'Customer',
+          status: 'Pending',
+          payment: 'QRPh',
+          payment_status: 'paid',
+          method: 'Pickup',
+          items: [{ name: 'Blueberry Cheesecake', qty: 1, price: 2 }],
+        }],
+      }),
+    });
+  });
+
+  render(<Orders />);
+
+  expect(await screen.findByText('Payment confirmed — awaiting Admin acceptance')).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Send proof' })).not.toBeInTheDocument();
 });
 
 test('replaces a broken custom cake image with the bakery logo', async () => {
