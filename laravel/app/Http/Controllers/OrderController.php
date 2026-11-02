@@ -648,14 +648,17 @@ class OrderController extends Controller
                     ]
                 ], 201);
             });
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             if ($discountIdPath) {
                 Storage::disk('local')->delete($discountIdPath);
             }
-            Log::error('Order creation failed: ' . $e->getMessage());
+            Log::error('Order creation failed: ' . $e->getMessage(), [
+                'exception' => get_class($e),
+                'trace' => $e->getTraceAsString(),
+            ]);
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to create order. ' . $e->getMessage()
+                'message' => 'Failed to create order. ' . get_class($e) . ': ' . $e->getMessage()
             ], 500);
         }
     }
