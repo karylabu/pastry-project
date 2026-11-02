@@ -106,10 +106,14 @@ describe("BackupManagement", () => {
       .mockResolvedValueOnce(jsonResponse(listResponse()));
     render(<BackupManagement />);
 
-    fireEvent.click(await screen.findByRole("button", { name: `Restore ${backupLabel}` }));
+    const restoreButton = await screen.findByRole("button", { name: `Restore ${backupLabel}` });
+    expect(restoreButton).toHaveClass("bg-black", "text-white");
+    expect(screen.getByRole("button", { name: "Restore selected" })).toHaveClass("bg-black", "text-white");
+    fireEvent.click(restoreButton);
     const dialog = await screen.findByRole("alertdialog");
     expect(dialog).toHaveTextContent("will replace the current database data");
     expect(dialog).toHaveTextContent("safety backup");
+    expect(within(dialog).getByRole("button", { name: "Restore backup" })).toHaveClass("bg-black");
     expect(global.fetch).toHaveBeenCalledTimes(1);
 
     fireEvent.click(within(dialog).getByRole("button", { name: "Restore backup" }));
