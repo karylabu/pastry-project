@@ -143,4 +143,33 @@ describe('CustomizedCakes availability', () => {
       expect.objectContaining({ headers: { Accept: 'application/json' } }),
     ));
   });
+
+  it('disables the request form and asks guests to log in', async () => {
+    window.localStorage.removeItem('user');
+    global.fetch.mockImplementation(async (url) => ({
+      ok: true,
+      text: async () => JSON.stringify((() => {
+        if (url.includes('/customized-cakes/request-status')) return { enabled: true };
+        if (url.includes('/customized-cakes/flavors')) return { flavors: [] };
+        if (url.includes('/customized-cakes/sizes')) return { sizes: [] };
+        return {};
+      })()),
+    }));
+
+    render(<CustomizedCakes />);
+
+    const form = screen.getByRole('button', { name: 'Send Request' }).closest('form');
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Please log in to your account before filling out the custom cake request form.',
+    );
+    expect(screen.getByRole('button', { name: 'Log in' })).toBeInTheDocument();
+    expect(form.querySelector('fieldset')).toBeDisabled();
+    expect(screen.getByPlaceholderText('Enter full name')).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Send Request' })).toBeDisabled();
+
+    expect(global.fetch).not.toHaveBeenCalledWith(
+      'https://example.test/laravel/api/customized-cakes/order',
+      expect.anything(),
+    );
+  });
 });

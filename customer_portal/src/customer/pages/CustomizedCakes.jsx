@@ -126,7 +126,8 @@ export default function CustomizedCakes() {
   const [isReferencePreviewOpen, setIsReferencePreviewOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
-  const [userId, setUserId] = useState(0);
+  const [showLoginPrompt, setShowLoginPrompt] = useState(false);
+  const [userId, setUserId] = useState(() => Number(storedUser?.id) || 0);
   const [savedAddresses, setSavedAddresses] = useState([]);
   const [addressesLoading, setAddressesLoading] = useState(false);
   const [showSavedAddressSuggestions, setShowSavedAddressSuggestions] = useState(false);
@@ -134,7 +135,7 @@ export default function CustomizedCakes() {
   const [sizeCatalog, setSizeCatalog] = useState([]);
   const [customCakeRequestsEnabled, setCustomCakeRequestsEnabled] = useState(null);
   const [customCakeStatusUnavailable, setCustomCakeStatusUnavailable] = useState(false);
-  const requestFormDisabled = customCakeRequestsEnabled !== true || loading;
+  const requestFormDisabled = !userId || customCakeRequestsEnabled !== true || loading;
 
   useEffect(() => {
     let isActive = true;
@@ -521,6 +522,12 @@ export default function CustomizedCakes() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!userId) {
+      setShowLoginPrompt(true);
+      setMessage('Please log in to your account first before sending your custom cake request.');
+      return;
+    }
+    setShowLoginPrompt(false);
     if (customCakeRequestsEnabled !== true) {
       setMessage(customCakeStatusUnavailable
         ? 'Custom cake requests are temporarily unavailable. Please try again later.'
@@ -533,11 +540,6 @@ export default function CustomizedCakes() {
     }
     if (pickupDate && pickupDate < getLocalDateString()) {
       setMessage('Please choose today or a future date.');
-      return;
-    }
-    if (!userId) {
-      setMessage('Please log in to your customer account before sending a custom cake request.');
-      navigate('/customer/login');
       return;
     }
     if (deliveryMethod === 'Delivery' && !deliveryService) {
@@ -854,6 +856,21 @@ export default function CustomizedCakes() {
         onSubmit={handleSubmit}
         className="rounded-2xl border border-[#eadfd8] bg-[#fffdf9] p-4 shadow-[0_8px_22px_rgba(91,64,39,0.05)] sm:rounded-3xl sm:p-6"
       >
+        {!userId && (
+          <div
+            role="alert"
+            className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900"
+          >
+            <span>Please log in to your account before filling out the custom cake request form.</span>
+            <button
+              type="button"
+              onClick={() => navigate('/customer/login')}
+              className="font-bold underline underline-offset-2"
+            >
+              Log in
+            </button>
+          </div>
+        )}
         {customCakeRequestsEnabled !== true && (
           <div
             role="status"
@@ -1262,23 +1279,34 @@ export default function CustomizedCakes() {
                 </div>
               </div>
               {message && (
-                <div className="mt-3 text-right text-[13px] text-[#7b5b3a]" role="status" aria-live="polite">
+                <div
+                  className={`mt-3 rounded-lg px-3 py-2 text-right text-[13px] ${
+                    showLoginPrompt
+                      ? 'border border-amber-300 bg-amber-50 text-amber-900'
+                      : 'text-[#7b5b3a]'
+                  }`}
+                  role={showLoginPrompt ? 'alert' : 'status'}
+                  aria-live={showLoginPrompt ? 'assertive' : 'polite'}
+                >
                   {message}
+                  {showLoginPrompt && (
+                    <button
+                      type="button"
+                      onClick={() => navigate('/customer/login')}
+                      className="ml-2 font-bold underline underline-offset-2"
+                    >
+                      Log in
+                    </button>
+                  )}
                 </div>
               )}
               <div className="mt-4 flex flex-wrap justify-end gap-2 border-t border-[#f3ece6] pt-3">
-                <button type="button" onClick={() => { setCakeType('single'); setSingleSizeId(sizeCatalog[0] ? String(sizeCatalog[0].id) : ''); setTwoTierPreset('standard'); setFlavorId(flavorCatalog[0] ? String(flavorCatalog[0].id) : ''); setCakeStyle(''); setPackaging('Standard'); setAddons([]); setCupcakeQuantity(12); setBudget(''); setFiles([]); setGalleryReferences([]); setReferenceImage(null); window.sessionStorage.removeItem(referenceStorageKey); window.sessionStorage.removeItem('customCakeReferenceImage'); setMessage(''); }} className="min-h-9 rounded-lg border border-[#f0d98a] bg-white px-3 py-1.5 text-xs font-semibold text-[#6b4f1d] transition hover:border-[#e5bd45] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#b89646]">
+                <button type="button" onClick={() => { setCakeType('single'); setSingleSizeId(sizeCatalog[0] ? String(sizeCatalog[0].id) : ''); setTwoTierPreset('standard'); setFlavorId(flavorCatalog[0] ? String(flavorCatalog[0].id) : ''); setCakeStyle(''); setPackaging('Standard'); setAddons([]); setCupcakeQuantity(12); setBudget(''); setFiles([]); setGalleryReferences([]); setReferenceImage(null); window.sessionStorage.removeItem(referenceStorageKey); window.sessionStorage.removeItem('customCakeReferenceImage'); setMessage(''); setShowLoginPrompt(false); }} className="min-h-9 rounded-lg border border-[#f0d98a] bg-white px-3 py-1.5 text-xs font-semibold text-[#6b4f1d] transition hover:border-[#e5bd45] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#b89646]">
                   Reset
                 </button>
-                {userId > 0 ? (
-                  <button disabled={requestFormDisabled} type="submit" className="min-h-9 rounded-lg border border-[#e5bd45] bg-[#ffe89a] px-3 py-1.5 text-xs font-semibold text-[#6b4f1d] transition hover:bg-[#ffedb5] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#b89646] disabled:cursor-not-allowed disabled:opacity-50">
-                    {loading ? 'Sending...' : 'Send Request'}
-                  </button>
-                ) : (
-                  <button type="button" onClick={() => navigate('/customer/login')} className="min-h-9 rounded-lg border border-[#e5bd45] bg-[#ffe89a] px-3 py-1.5 text-xs font-semibold text-[#6b4f1d] transition hover:bg-[#ffedb5] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#b89646]">
-                    Log in to Send Request
-                  </button>
-                )}
+                <button disabled={requestFormDisabled} type="submit" className="min-h-9 rounded-lg border border-[#e5bd45] bg-[#ffe89a] px-3 py-1.5 text-xs font-semibold text-[#6b4f1d] transition hover:bg-[#ffedb5] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#b89646] disabled:cursor-not-allowed disabled:opacity-50">
+                  {loading ? 'Sending...' : 'Send Request'}
+                </button>
               </div>
             </div>
 
