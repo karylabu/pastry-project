@@ -562,15 +562,6 @@ export default function OrderHistory() {
             </div>
           </nav>
         )}
-        {(orderTypeFilter === "All" || orderTypeFilter === "Imported Sales") && (statusFilter === "All" || statusFilter === "Imported") && importHistoryPagination.last_page > 1 && (
-          <div className="mt-4 flex items-center justify-between rounded-lg border border-[#e9e1d9] bg-white px-4 py-3 text-[11px] text-[#74675f]">
-            <span>{importHistoryLoading ? "Loading imported sales..." : `Imported sales page ${importHistoryPagination.current_page} of ${importHistoryPagination.last_page} · ${importHistoryPagination.total} records`}</span>
-            <div className="flex gap-2">
-              <button type="button" disabled={importHistoryLoading || importHistoryPage <= 1} onClick={() => setImportHistoryPage((page) => Math.max(1, page - 1))} className="rounded-md border border-[#e8dfd4] px-3 py-2 disabled:opacity-40">Previous sales</button>
-              <button type="button" disabled={importHistoryLoading || importHistoryPage >= importHistoryPagination.last_page} onClick={() => setImportHistoryPage((page) => Math.min(importHistoryPagination.last_page, page + 1))} className="rounded-md border border-[#e8dfd4] px-3 py-2 disabled:opacity-40">Next sales</button>
-            </div>
-          </div>
-        )}
         </div>
       </div>
 
