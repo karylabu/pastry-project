@@ -66,6 +66,21 @@ function formatPeso(value) {
   return `₱${Number(value || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
+function dateKey(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function formatDateKey(value) {
+  if (!value) return null;
+  const [year, month, day] = value.split("-");
+  return `${day}/${month}/${year}`;
+}
+
 // Enriches an API log entry with catalogue display metadata.
 function enrich(entry, catalogue) {
   const type = entry.type || 'Raw Material';
@@ -85,6 +100,8 @@ export default function WasteTracking() {
   const [catalogue, setCatalogue] = useState([]);
   const [completedOrders, setCompletedOrders] = useState([]);
   const [range, setRange] = useState("all"); // all | daily | weekly | monthly
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const [auditPage, setAuditPage] = useState(1);
   const [showModal, setShowModal] = useState(false);
   const [adminDialog, setAdminDialog] = useState(null);
@@ -160,7 +177,7 @@ export default function WasteTracking() {
   }, [auditPage, auditPageCount]);
 
   const periodStart = useMemo(() => {
-    if (range === 'all') return new Date(0);
+    if (range === 'all' || range === 'custom') return new Date(0);
     const start = new Date();
     start.setHours(0, 0, 0, 0);
     if (range === 'weekly') {
@@ -171,22 +188,31 @@ export default function WasteTracking() {
     return start;
   }, [range]);
 
-  const periodLabel = range === 'all' ? 'all time' : range === 'daily' ? 'today' : range === 'weekly' ? 'this week' : 'this month';
+  const invalidDateRange = Boolean(dateFrom && dateTo && dateFrom > dateTo);
+  const periodLabel = dateFrom || dateTo
+    ? `${formatDateKey(dateFrom) || "any date"} to ${formatDateKey(dateTo) || "present"}`
+    : range === 'all' ? 'all time' : range === 'daily' ? 'today' : range === 'weekly' ? 'this week' : 'this month';
 
   const periodEntries = useMemo(
     () => enrichedEntries.filter((entry) => {
-      const date = new Date(entry.datetime);
-      return !Number.isNaN(date.getTime()) && date >= periodStart;
+      if (invalidDateRange) return false;
+      const key = dateKey(entry.datetime);
+      if (!key) return false;
+      if (dateFrom || dateTo) return (!dateFrom || key >= dateFrom) && (!dateTo || key <= dateTo);
+      return new Date(entry.datetime) >= periodStart;
     }),
-    [enrichedEntries, periodStart]
+    [dateFrom, dateTo, enrichedEntries, invalidDateRange, periodStart]
   );
 
   const periodCompletedOrderCount = useMemo(
     () => completedOrders.filter((order) => {
-      const date = new Date(order.created_at);
-      return !Number.isNaN(date.getTime()) && date >= periodStart;
+      if (invalidDateRange) return false;
+      const key = dateKey(order.created_at);
+      if (!key) return false;
+      if (dateFrom || dateTo) return (!dateFrom || key >= dateFrom) && (!dateTo || key <= dateTo);
+      return new Date(order.created_at) >= periodStart;
     }).length,
-    [completedOrders, periodStart]
+    [completedOrders, dateFrom, dateTo, invalidDateRange, periodStart]
   );
 
   /* ---------------- Overview card figures ---------------- */
@@ -359,7 +385,13 @@ export default function WasteTracking() {
               <div className="relative">
                 <select
                   value={range}
-                  onChange={(e) => setRange(e.target.value)}
+                  onChange={(e) => {
+                    setRange(e.target.value);
+                    if (e.target.value !== "custom") {
+                      setDateFrom("");
+                      setDateTo("");
+                    }
+                  }}
                   aria-label="Waste reporting period"
                   className="h-10 appearance-none rounded-md border border-[#e8dfd4] bg-white pl-3 pr-9 text-[12px] font-semibold text-[#33251e] outline-none focus:border-[#b89646] focus:ring-2 focus:ring-[#d4af37]/15"
                 >
@@ -367,9 +399,27 @@ export default function WasteTracking() {
                   <option value="daily">Daily</option>
                   <option value="weekly">Weekly</option>
                   <option value="monthly">Monthly</option>
+                  <option value="custom">Custom range</option>
                 </select>
                 <ChevronDown size={14} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[#8f8076]" />
               </div>
+              <div className="flex items-end gap-2">
+                <label className="block text-[10px] font-semibold text-[#74675f]">
+                  From
+                  <input type="date" lang="en-GB" value={dateFrom} max={dateTo || undefined}
+                    onChange={(event) => { setRange("custom"); setDateFrom(event.target.value); }}
+                    aria-label="From date" aria-invalid={invalidDateRange}
+                    className="mt-1 h-10 rounded-md border border-[#e8dfd4] bg-white px-2 text-[12px] text-[#33251e] outline-none focus:border-[#b89646] focus:ring-2 focus:ring-[#d4af37]/15" />
+                </label>
+                <label className="block text-[10px] font-semibold text-[#74675f]">
+                  To
+                  <input type="date" lang="en-GB" value={dateTo} min={dateFrom || undefined}
+                    onChange={(event) => { setRange("custom"); setDateTo(event.target.value); }}
+                    aria-label="To date" aria-invalid={invalidDateRange}
+                    className="mt-1 h-10 rounded-md border border-[#e8dfd4] bg-white px-2 text-[12px] text-[#33251e] outline-none focus:border-[#b89646] focus:ring-2 focus:ring-[#d4af37]/15" />
+                </label>
+              </div>
+              {invalidDateRange && <p role="alert" className="w-full text-[11px] text-[#b55f52]">From date must be on or before To date.</p>}
               <button
                 onClick={openModal}
                 className="inline-flex h-10 items-center gap-2 rounded-md bg-[#33251e] px-4 text-[12px] font-semibold text-white transition hover:bg-[#5b4540]"

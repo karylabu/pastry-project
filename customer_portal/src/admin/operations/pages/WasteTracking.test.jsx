@@ -85,3 +85,19 @@ test("waste audit log shows ten table entries per page", async () => {
   expect(screen.getByText("Showing 11–12 of 12 entries")).toBeInTheDocument();
   expect(screen.getByText("Page 2 of 2")).toBeInTheDocument();
 });
+
+test("custom date range filters waste reporting totals inclusively", async () => {
+  render(<WasteTracking />);
+
+  expect(await screen.findAllByText("Waste item 11")).not.toHaveLength(0);
+
+  fireEvent.change(screen.getByLabelText("From date"), { target: { value: "2026-10-23" } });
+  fireEvent.change(screen.getByLabelText("To date"), { target: { value: "2026-10-23" } });
+  expect(await screen.findAllByText("₱120.00")).toHaveLength(2);
+
+  fireEvent.change(screen.getByLabelText("From date"), { target: { value: "2026-10-24" } });
+  fireEvent.change(screen.getByLabelText("To date"), { target: { value: "2026-10-25" } });
+
+  expect(await screen.findAllByText("No waste logged for this period.")).toHaveLength(2);
+  expect(screen.queryByText("₱120.00")).not.toBeInTheDocument();
+});

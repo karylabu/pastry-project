@@ -264,6 +264,19 @@ function getSalesCoverageIntervals(mysqli $conn): array {
     return mergeForecastCoverageIntervals($intervals);
 }
 
+function parseOptionalAnalyticsDate(string $value, string $label): ?string {
+    if ($value === '') {
+        return null;
+    }
+    $date = DateTimeImmutable::createFromFormat('!Y-m-d', $value);
+    $errors = DateTimeImmutable::getLastErrors();
+    if (!$date || ($errors && ($errors['warning_count'] > 0 || $errors['error_count'] > 0)) || $date->format('Y-m-d') !== $value) {
+        throw new InvalidArgumentException("{$label} date must use YYYY-MM-DD format.");
+    }
+
+    return $value;
+}
+
 function getIngredientStock(mysqli $conn): array {
     $result = mysqli_query($conn, "SELECT id, name, stock, threshold, unit FROM ingredients ORDER BY name ASC");
     if (!$result) {
@@ -853,8 +866,28 @@ try {
         exit;
     }
 
+    $fromDate = parseOptionalAnalyticsDate((string) ($_GET['from'] ?? ''), 'From');
+    $toDate = parseOptionalAnalyticsDate((string) ($_GET['to'] ?? ''), 'To');
+    if ($fromDate !== null && $toDate !== null && $fromDate > $toDate) {
+        throw new InvalidArgumentException('From date must be on or before To date.');
+    }
+
     $history = getSalesHistory($conn);
     $coverageIntervals = getSalesCoverageIntervals($conn);
+    if ($fromDate !== null || $toDate !== null) {
+        $history = array_values(array_filter($history, static function (array $entry) use ($fromDate, $toDate): bool {
+            $date = (string) ($entry['date'] ?? '');
+            return $date !== '' && ($fromDate === null || $date >= $fromDate) && ($toDate === null || $date <= $toDate);
+        }));
+        $coverageIntervals = array_values(array_filter(array_map(
+            static function (array $interval) use ($fromDate, $toDate): ?array {
+                $start = $fromDate === null ? $interval['start'] : max($interval['start'], $fromDate);
+                $end = $toDate === null ? $interval['end'] : min($interval['end'], $toDate);
+                return $start <= $end ? ['start' => $start, 'end' => $end] : null;
+            },
+            $coverageIntervals
+        )));
+    }
     $period = (int) ($_GET['period'] ?? 7);
     $products = getProducts($conn);
     $ingredientStock = getIngredientStock($conn);

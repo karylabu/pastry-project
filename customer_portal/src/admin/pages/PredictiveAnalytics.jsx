@@ -714,6 +714,8 @@ export default function PredictiveAnalytics() {
   const [isWorking, setIsWorking] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [period, setPeriod] = useState(7);
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const [productFilter, setProductFilter] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
   const [comparisonProductName, setComparisonProductName] = useState("");
@@ -728,6 +730,11 @@ export default function PredictiveAnalytics() {
   // ---- Forecast ------------------------------------------------------------
 
   const loadForecast = async (options = {}) => {
+    if (dateFrom && dateTo && dateFrom > dateTo) {
+      setErrorMessage("From date must be on or before To date.");
+      setStatusMessage("The forecast could not be refreshed.");
+      return;
+    }
     setIsWorking(true);
     setErrorMessage("");
 
@@ -735,6 +742,8 @@ export default function PredictiveAnalytics() {
       const query = new URLSearchParams();
       if (options.action) query.set("action", options.action);
       query.set("period", String(period));
+      if (dateFrom) query.set("from", dateFrom);
+      if (dateTo) query.set("to", dateTo);
       const headers = {
         Accept: "application/json",
         ...getAuthHeaders(),
@@ -744,7 +753,9 @@ export default function PredictiveAnalytics() {
         method: options.action === "refresh" ? "POST" : "GET",
         credentials: "include",
         headers,
-        body: options.action === "refresh" ? JSON.stringify({ action: "refresh", period }) : undefined,
+        body: options.action === "refresh"
+          ? JSON.stringify({ action: "refresh", period, from: dateFrom || null, to: dateTo || null })
+          : undefined,
       });
       const data = await response.json().catch(() => ({}));
 
@@ -765,7 +776,7 @@ export default function PredictiveAnalytics() {
   useEffect(() => {
     loadForecast();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [period]);
+  }, [period, dateFrom, dateTo]);
 
   // ---- Derived data --------------------------------------------------------
 
@@ -878,6 +889,20 @@ export default function PredictiveAnalytics() {
                 onChange={setPeriod}
                 options={[7, 14, 30].map((value) => ({ value, label: `${value} days` }))}
               />
+              <label className="text-[10px] font-semibold text-[#74675f]">
+                From
+                <input type="date" lang="en-GB" value={dateFrom} max={dateTo || undefined}
+                  onChange={(event) => setDateFrom(event.target.value)} aria-label="From date"
+                  aria-invalid={Boolean(dateFrom && dateTo && dateFrom > dateTo)}
+                  className="mt-1 block h-10 rounded-lg border border-[#e0d6c8] bg-white px-3 text-sm text-[#33251e] focus:outline-none focus:ring-2 focus:ring-[#d4af37]/40" />
+              </label>
+              <label className="text-[10px] font-semibold text-[#74675f]">
+                To
+                <input type="date" lang="en-GB" value={dateTo} min={dateFrom || undefined}
+                  onChange={(event) => setDateTo(event.target.value)} aria-label="To date"
+                  aria-invalid={Boolean(dateFrom && dateTo && dateFrom > dateTo)}
+                  className="mt-1 block h-10 rounded-lg border border-[#e0d6c8] bg-white px-3 text-sm text-[#33251e] focus:outline-none focus:ring-2 focus:ring-[#d4af37]/40" />
+              </label>
               <button type="button" onClick={() => loadForecast({ action: "refresh" })} disabled={isWorking} className={BUTTON_PRIMARY}>
                 <Calculator size={16} />
                 {isWorking ? "Running..." : "Run forecast"}
