@@ -65,13 +65,6 @@ const initialForm = {
 };
 
 export default function UserManagement({ adminOnly = false }) {
-  const isSuperAdmin = (() => {
-    try {
-      return String(JSON.parse(localStorage.getItem("user") || "{}").role || "").toLowerCase() === "super_admin";
-    } catch {
-      return false;
-    }
-  })();
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
   const [page, setPage] = useState(1);
@@ -177,9 +170,13 @@ export default function UserManagement({ adminOnly = false }) {
       nextErrors.phone_number = "Please enter a valid phone number.";
     }
 
-    const editableRoles = adminOnly ? ["admin"] : ["admin", "super_admin", "customer"];
-    const creatableRoles = adminOnly ? ["admin"] : ["admin", "super_admin"];
-    if (selectedUser ? !editableRoles.includes(payload.role) : !creatableRoles.includes(payload.role)) {
+    const editableRoles = adminOnly ? ["admin"] : ["admin", "customer"];
+    const roleIsAllowed = selectedUser?.role === "super_admin"
+      ? payload.role === "super_admin"
+      : selectedUser
+        ? editableRoles.includes(payload.role)
+        : payload.role === "admin";
+    if (!roleIsAllowed) {
       nextErrors.role = selectedUser ? "Please choose a valid role." : "New managed accounts must be admins.";
     }
 
@@ -393,14 +390,10 @@ export default function UserManagement({ adminOnly = false }) {
     confirmStatusChange(user);
   };
 
-  const openCreateModal = (role = "admin") => {
+  const openCreateModal = () => {
     resetForm();
     setSelectedUser(null);
-    setForm({
-      ...initialForm,
-      role,
-      ...(role === "super_admin" ? { name: "SUPER ADMIN", email: "superadmin@pastry.com" } : {}),
-    });
+    setForm(initialForm);
     setIsModalOpen(true);
   };
 
@@ -425,20 +418,12 @@ export default function UserManagement({ adminOnly = false }) {
               )}
               <button
                 type="button"
-                onClick={() => openCreateModal("admin")}
+                onClick={openCreateModal}
                 className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-[#33251e] px-4 text-[12px] font-semibold text-white transition hover:bg-[#5b4540]"
               >
                 <Plus size={15} />
                 Add Admin
               </button>
-              {!adminOnly && isSuperAdmin && <button
-                type="button"
-                onClick={() => openCreateModal("super_admin")}
-                className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-[#d9c4b8] bg-white px-4 text-[12px] font-semibold text-[#7d4630] transition hover:bg-[#fff6f1]"
-              >
-                <ShieldCheck size={15} />
-                Add Super Admin
-              </button>}
             </div>
           </div>
 
@@ -654,7 +639,7 @@ export default function UserManagement({ adminOnly = false }) {
             <div className="mb-5 flex items-start justify-between">
               <div>
                 <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#92701e]">Account</p>
-                <h2 id="user-form-title" className="text-[18px] font-semibold text-[#33251e]">{selectedUser ? "Edit User" : form.role === "super_admin" ? "Add Super Admin" : "Add Admin"}</h2>
+                <h2 id="user-form-title" className="text-[18px] font-semibold text-[#33251e]">{selectedUser ? "Edit User" : "Add Admin"}</h2>
               </div>
               <button type="button" onClick={() => { setIsModalOpen(false); setSelectedUser(null); }} className="rounded-md border border-[#e8dfd4] px-3 py-2 text-[11px] font-medium text-[#65574d] transition hover:bg-[#fbf7f2]">
                 Close
@@ -683,11 +668,14 @@ export default function UserManagement({ adminOnly = false }) {
                 </div>
                 <div>
                   <label className="mb-1.5 block text-[11px] font-medium text-[#65574d]">Role</label>
-                  <select aria-label="Role" value={form.role} onChange={(event) => setForm({ ...form, role: event.target.value })} className="h-10 w-full rounded-md border border-[#e8dfd4] bg-white px-3 text-[12px] text-[#33251e] outline-none transition focus:border-[#b89646] focus:ring-2 focus:ring-[#d4af37]/15">
-                    <option value="admin">Admin</option>
-                    {!adminOnly && isSuperAdmin && <option value="super_admin">Super Admin</option>}
-                    {!adminOnly && selectedUser && <option value="customer">Customer</option>}
-                  </select>
+                  {selectedUser?.role === "super_admin" ? (
+                    <p className="flex h-10 items-center rounded-md border border-[#e8dfd4] bg-[#f7f4ef] px-3 text-[12px] text-[#65574d]">Super Admin (cannot be changed)</p>
+                  ) : (
+                    <select aria-label="Role" value={form.role} onChange={(event) => setForm({ ...form, role: event.target.value })} className="h-10 w-full rounded-md border border-[#e8dfd4] bg-white px-3 text-[12px] text-[#33251e] outline-none transition focus:border-[#b89646] focus:ring-2 focus:ring-[#d4af37]/15">
+                      <option value="admin">Admin</option>
+                      {!adminOnly && selectedUser && <option value="customer">Customer</option>}
+                    </select>
+                  )}
                   {formErrors.role ? <p className="mt-1 text-[11px] text-[#8b2e2e]">{formErrors.role}</p> : null}
                 </div>
               </div>
@@ -731,7 +719,7 @@ export default function UserManagement({ adminOnly = false }) {
                 </button>
                 <button type="submit" disabled={savingUser} className="inline-flex items-center gap-2 rounded-md bg-[#33251e] px-4 py-2 text-[12px] font-semibold text-white transition hover:bg-[#5b4540] disabled:cursor-not-allowed disabled:opacity-60">
                   {savingUser ? <Loader2 size={16} className="animate-spin" /> : <UserPlus size={16} />}
-                  {selectedUser ? "Save Changes" : form.role === "super_admin" ? "Create Super Admin" : "Create Admin"}
+                  {selectedUser ? "Save Changes" : "Create Admin"}
                 </button>
               </div>
             </form>

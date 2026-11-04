@@ -24,7 +24,7 @@ describe("UserManagement admin creation", () => {
     });
   });
 
-  test("offers admin and super admin account creation", () => {
+  test("only offers Admin when creating an account", () => {
     localStorage.setItem("user", JSON.stringify({ role: "super_admin" }));
     render(<UserManagement />);
 
@@ -34,33 +34,50 @@ describe("UserManagement admin creation", () => {
     expect(within(dialog).getByRole("heading", { name: "Add Admin" })).toBeInTheDocument();
 
     const roleSelect = within(dialog).getByRole("combobox", { name: "Role" });
-    expect(within(roleSelect).getAllByRole("option")).toHaveLength(2);
+    expect(within(roleSelect).getAllByRole("option")).toHaveLength(1);
     expect(within(roleSelect).getByRole("option", { name: "Admin" })).toBeInTheDocument();
-    expect(within(roleSelect).getByRole("option", { name: "Super Admin" })).toBeInTheDocument();
-  });
-
-  test("does not offer Super Admin account creation to an Admin", () => {
-    localStorage.setItem("user", JSON.stringify({ role: "admin" }));
-    render(<UserManagement />);
-
-    fireEvent.click(screen.getByRole("button", { name: "Add Admin" }));
-
+    expect(within(dialog).queryByRole("option", { name: "Super Admin" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Add Super Admin" })).not.toBeInTheDocument();
-    expect(within(screen.getByRole("dialog")).queryByRole("option", { name: "Super Admin" })).not.toBeInTheDocument();
   });
 
-  test("prefills the requested Super Admin account details", () => {
-    localStorage.setItem("user", JSON.stringify({ role: "super_admin" }));
+  test("keeps an existing Super Admin role read-only when editing the account", async () => {
+    const superAdmin = {
+      id: 3,
+      name: "Shop Owner",
+      email: "owner@example.test",
+      phone_number: "",
+      role: "super_admin",
+      status: "active",
+    };
+    useAdminUsers.mockReturnValue({
+      users: [superAdmin],
+      pagination: null,
+      loading: false,
+      error: "",
+      metrics: [],
+      handleStatusToggle: jest.fn(),
+      refetch: jest.fn(),
+    });
+    global.fetch = jest.fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ success: true, data: superAdmin }) })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ success: true }) });
+
     render(<UserManagement />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Add Super Admin" }));
+    fireEvent.click(screen.getByRole("button", { name: "Edit Shop Owner" }));
 
-    const dialog = screen.getByRole("dialog");
-    expect(within(dialog).getByRole("heading", { name: "Add Super Admin" })).toBeInTheDocument();
-    expect(within(dialog).getByDisplayValue("SUPER ADMIN")).toBeInTheDocument();
-    expect(within(dialog).getByDisplayValue("superadmin@pastry.com")).toBeInTheDocument();
-    expect(within(dialog).getByRole("combobox", { name: "Role" })).toHaveValue("super_admin");
-    expect(within(dialog).getByRole("button", { name: "Create Super Admin" })).toBeInTheDocument();
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByText("Super Admin (cannot be changed)")).toBeInTheDocument();
+    expect(within(dialog).queryByRole("combobox", { name: "Role" })).not.toBeInTheDocument();
+
+    fireEvent.change(within(dialog).getByDisplayValue("Shop Owner"), { target: { value: "Updated Owner" } });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Save Changes" }));
+
+    await waitFor(() => {
+      const updateCall = global.fetch.mock.calls.find(([, options]) => options?.method === "PUT");
+      expect(updateCall).toBeDefined();
+      expect(JSON.parse(updateCall[1].body).role).toBe("super_admin");
+    });
   });
 
   test("uses the shared admin dialog to confirm deleting a user", async () => {
