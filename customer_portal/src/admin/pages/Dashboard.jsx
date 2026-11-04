@@ -672,9 +672,8 @@ export default function Dashboard() {
                       </tr>
                     ) : (
                       displayOrders.slice(0, 8).map((order) => {
-                        const isUrgent = order.status === "Pending" || order.status === "Preparing";
                         return (
-                          <tr key={order.id} className={`border-b border-[#f0e7e0] last:border-0 ${isUrgent ? "bg-[#fff8e9]" : ""}`}>
+                          <tr key={order.id} className="border-b border-[#f0e7e0] transition-colors last:border-0 hover:bg-[#faf8f5]">
                             <td className="px-6 py-4 text-[13px] font-semibold text-[#33251e]">#{order.id}</td>
                             <td className="px-4 py-4 text-[13px] text-[#5f514a]">{order.customer || order.email || "—"}</td>
                             <td className="px-4 py-4 text-[12px] text-[#74675f]">
