@@ -363,28 +363,28 @@ export default function BackupManagement() {
           </div>}
 
           <section aria-label="Backup overview" className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <article className="rounded-xl border border-[#eee4de] bg-white px-4 py-3.5 shadow-[0_5px_18px_rgba(91,64,39,0.05)]">
+            <article className="rounded-xl border border-[#e9e1d9] border-t-[3px] border-t-[#d4af37] bg-white px-4 py-3.5 shadow-[0_5px_18px_rgba(91,64,39,0.05)]">
               <div className="flex items-center gap-2.5">
                 <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#fff4cd] text-[#806714]"><Clock3 size={16} /></span>
                 <p className="text-xs font-semibold text-[#65574d]">Last database backup</p>
               </div>
               <p className="mt-2.5 text-sm font-bold leading-5 text-[#33251e]">{loading ? "Loading…" : formatDate(backupData.overview.last_successful_backup?.created_at)}</p>
             </article>
-            <article className="rounded-xl border border-[#eee4de] bg-white px-4 py-3.5 shadow-[0_5px_18px_rgba(91,64,39,0.05)]">
+            <article className="rounded-xl border border-[#e9e1d9] border-t-[3px] border-t-[#d4af37] bg-white px-4 py-3.5 shadow-[0_5px_18px_rgba(91,64,39,0.05)]">
               <div className="flex items-center gap-2.5">
                 <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#edf5eb] text-[#58764e]"><Archive size={16} /></span>
                 <p className="text-xs font-semibold text-[#65574d]">Available database copies</p>
               </div>
               <p className="mt-2.5 text-2xl font-bold leading-none text-[#58764e]">{loading ? "—" : Number(backupData.overview.available_backups).toLocaleString()}</p>
             </article>
-            <article className="rounded-xl border border-[#eee4de] bg-white px-4 py-3.5 shadow-[0_5px_18px_rgba(91,64,39,0.05)]">
+            <article className="rounded-xl border border-[#e9e1d9] border-t-[3px] border-t-[#d4af37] bg-white px-4 py-3.5 shadow-[0_5px_18px_rgba(91,64,39,0.05)]">
               <div className="flex items-center gap-2.5">
                 <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#f3edf8] text-[#7a6489]"><Database size={16} /></span>
                 <p className="text-xs font-semibold text-[#65574d]">Database backup storage</p>
               </div>
               <p className="mt-2.5 text-2xl font-bold leading-none text-[#7a6489]">{loading ? "—" : formatBytes(backupData.overview.storage_used_bytes)}</p>
             </article>
-            <article className="rounded-xl border border-[#eee4de] bg-white px-4 py-3.5 shadow-[0_5px_18px_rgba(91,64,39,0.05)]">
+            <article className="rounded-xl border border-[#e9e1d9] border-t-[3px] border-t-[#d4af37] bg-white px-4 py-3.5 shadow-[0_5px_18px_rgba(91,64,39,0.05)]">
               <form onSubmit={saveSchedule}>
                 <div className="flex items-center gap-2.5">
                   <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#fff4cd] text-[#806714]"><Clock3 size={16} /></span>
