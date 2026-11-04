@@ -35,6 +35,7 @@ export default function OrderHistory() {
   const [timeRange, setTimeRange] = useState("All");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [loadError, setLoadError] = useState("");
   const [importedSales, setImportedSales] = useState([]);
@@ -182,6 +183,19 @@ export default function OrderHistory() {
     () => statusIndependentOrders.filter((order) => statusFilter === "All" || order.status === statusFilter),
     [statusIndependentOrders, statusFilter]
   );
+  const pageSize = 10;
+  const pageCount = Math.max(1, Math.ceil(filteredOrders.length / pageSize));
+  const pageOrders = filteredOrders.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+  const firstVisibleOrder = filteredOrders.length ? (currentPage - 1) * pageSize + 1 : 0;
+  const lastVisibleOrder = Math.min(currentPage * pageSize, filteredOrders.length);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [query, orderTypeFilter, statusFilter, timeRange, startDate, endDate]);
+
+  useEffect(() => {
+    if (currentPage > pageCount) setCurrentPage(pageCount);
+  }, [currentPage, pageCount]);
 
   const summaryMetrics = useMemo(() => {
     const completedLiveCount = filteredOrders.filter((order) => order.status === "Completed" && !order.isImportedSales).length;
@@ -437,7 +451,7 @@ export default function OrderHistory() {
         ) : (
           <>
           <div className="space-y-2.5 xl:hidden">
-            {filteredOrders.map((order) => {
+            {pageOrders.map((order) => {
               const { label: orderTypeLabel, isCustomCake, isUrgent } = getOrderTypeMeta(order);
               const fulfillmentDate = order.completed_at || order.updated_at || order.created_at;
               const statusStyle = order.isImportedSales ? "bg-[#fff4cd] text-[#80600a]" : order.status === "Cancelled" ? "bg-[#fff0eb] text-[#9a5947]" : order.status === "Ready for Pickup" ? "bg-[#e8f1ff] text-[#3563a8]" : "bg-[#edf5eb] text-[#4f7654]";
@@ -488,7 +502,7 @@ export default function OrderHistory() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredOrders.map((order) => {
+                  {pageOrders.map((order) => {
                     const { label: orderTypeLabel, isCustomCake, isUrgent } = getOrderTypeMeta(order);
                     const orderTypeBadge = isCustomCake
                       ? "bg-purple-50 text-purple-700 border border-purple-200"
@@ -537,6 +551,16 @@ export default function OrderHistory() {
           )}
           </div>
           </>
+        )}
+        {!loading && filteredOrders.length > 0 && pageCount > 1 && (
+          <nav className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[#e9e1d9] bg-white px-4 py-3 text-[11px] text-[#74675f]" aria-label="Order history pagination">
+            <span>Showing {firstVisibleOrder}–{lastVisibleOrder} of {filteredOrders.length} orders</span>
+            <div className="flex items-center gap-2">
+              <button type="button" onClick={() => setCurrentPage((page) => Math.max(1, page - 1))} disabled={currentPage === 1} className="rounded-md border border-[#e8dfd4] px-3 py-2 disabled:cursor-not-allowed disabled:opacity-40">Previous</button>
+              <span>Page {currentPage} of {pageCount}</span>
+              <button type="button" onClick={() => setCurrentPage((page) => Math.min(pageCount, page + 1))} disabled={currentPage === pageCount} className="rounded-md border border-[#e8dfd4] px-3 py-2 disabled:cursor-not-allowed disabled:opacity-40">Next</button>
+            </div>
+          </nav>
         )}
         {(orderTypeFilter === "All" || orderTypeFilter === "Imported Sales") && (statusFilter === "All" || statusFilter === "Imported") && importHistoryPagination.last_page > 1 && (
           <div className="mt-4 flex items-center justify-between rounded-lg border border-[#e9e1d9] bg-white px-4 py-3 text-[11px] text-[#74675f]">

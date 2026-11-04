@@ -1,5 +1,5 @@
 import React from "react";
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import OrderHistory from "./OrderHistory";
 
 jest.mock("../../../services/config", () => ({
@@ -139,5 +139,47 @@ describe("OrderHistory", () => {
 
     expect(await screen.findAllByText("Standard Order")).toHaveLength(2);
     expect(screen.getAllByText("Custom Cake Request")).toHaveLength(2);
+  });
+
+  test("paginates order history in groups of 10", async () => {
+    const orders = Array.from({ length: 12 }, (_, index) => ({
+      ...standardOrder,
+      id: index + 1,
+      customer: `Customer ${index + 1}`,
+    }));
+    global.fetch.mockImplementation((url) => {
+      if (String(url).includes("/api/staff/orders")) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            success: true,
+            orders: String(url).includes("custom=1") ? [] : orders,
+          }),
+        });
+      }
+
+      return Promise.resolve({
+        ok: true,
+        json: async () => ({
+          success: true,
+          sales: [],
+          summary: { records: 0, total_sales: 0 },
+          pagination: { current_page: 1, last_page: 1, total: 0 },
+        }),
+      });
+    });
+
+    render(<OrderHistory />);
+
+    const table = await screen.findByRole("table");
+    await screen.findByText("Showing 1–10 of 12 orders");
+    expect(table.querySelectorAll("tbody tr")).toHaveLength(10);
+    expect(screen.getByText("Page 1 of 2")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Next" }));
+
+    expect(table.querySelectorAll("tbody tr")).toHaveLength(2);
+    expect(screen.getByText("Showing 11–12 of 12 orders")).toBeInTheDocument();
+    expect(screen.getByText("Page 2 of 2")).toBeInTheDocument();
   });
 });
