@@ -4,6 +4,7 @@ import {
   Calculator,
   ChevronLeft,
   ChevronRight,
+  FileText,
   Package2,
   TrendingUp,
 } from "lucide-react";
@@ -709,6 +710,7 @@ const WORKFLOW_STEPS = [
 
 export default function PredictiveAnalytics() {
   const [forecast, setForecast] = useState(EMPTY_FORECAST);
+  const [statusMessage, setStatusMessage] = useState("Loading live sales and inventory data...");
   const [isWorking, setIsWorking] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [period, setPeriod] = useState(7);
@@ -730,6 +732,7 @@ export default function PredictiveAnalytics() {
   const loadForecast = async (options = {}) => {
     if (dateFrom && dateTo && dateFrom > dateTo) {
       setErrorMessage("From date must be on or before To date.");
+      setStatusMessage("The forecast could not be refreshed.");
       return;
     }
 
@@ -762,8 +765,10 @@ export default function PredictiveAnalytics() {
       }
 
       setForecast(data.forecast || EMPTY_FORECAST);
+      setStatusMessage("Forecast refreshed from live orders and completed Sales Reports imports.");
     } catch (error) {
       setErrorMessage(error.message || "Failed to load forecast data.");
+      setStatusMessage("The forecast could not be refreshed.");
     } finally {
       setIsWorking(false);
     }
@@ -922,6 +927,16 @@ export default function PredictiveAnalytics() {
               </button>
             </div>
           </header>
+
+          <div className="mb-6 flex flex-wrap items-center justify-between gap-2 text-xs">
+            <p className="flex items-center gap-2 text-[#33251e]" role="status" aria-live="polite">
+              <span className={`h-2 w-2 rounded-full ${isWorking ? "animate-pulse bg-[#d4af37]" : "bg-[#81906c]"}`} />
+              {statusMessage}
+            </p>
+            <p className="inline-flex items-center gap-1.5 text-[#74675f]">
+              <FileText size={13} /> Live orders, completed sales imports, and ingredient inventory
+            </p>
+          </div>
 
           {errorMessage ? (
             <p role="alert" className="mb-6 rounded-lg bg-[#fff4cd] px-3 py-2 text-xs text-[#33251e]">{errorMessage}</p>
