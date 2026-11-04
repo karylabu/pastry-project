@@ -105,6 +105,11 @@ export default function AdminLayout({ children }) {
           box-shadow: none !important;
         }
 
+        .admin-page-surface table tbody tr:hover {
+          background-color: #fff8e9 !important;
+          transition: background-color 120ms ease;
+        }
+
         @media (min-width: 600px) and (max-width: 767px) {
           .admin-page-surface,
           .admin-page-surface > * {
