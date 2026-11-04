@@ -90,6 +90,11 @@ test("custom date range filters waste reporting totals inclusively", async () =>
   render(<WasteTracking />);
 
   expect(await screen.findAllByText("Waste item 11")).not.toHaveLength(0);
+  expect(screen.queryByLabelText("From date")).not.toBeInTheDocument();
+
+  fireEvent.change(screen.getByLabelText("Waste reporting period"), { target: { value: "custom" } });
+  expect(screen.getByLabelText("From date")).toBeInTheDocument();
+  expect(screen.getByLabelText("To date")).toBeInTheDocument();
 
   fireEvent.change(screen.getByLabelText("From date"), { target: { value: "2026-10-23" } });
   fireEvent.change(screen.getByLabelText("To date"), { target: { value: "2026-10-23" } });

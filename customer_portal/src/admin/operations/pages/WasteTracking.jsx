@@ -403,23 +403,41 @@ export default function WasteTracking() {
                 </select>
                 <ChevronDown size={14} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[#8f8076]" />
               </div>
-              <div className="flex items-end gap-2">
-                <label className="block text-[10px] font-semibold text-[#74675f]">
-                  From
-                  <input type="date" lang="en-GB" value={dateFrom} max={dateTo || undefined}
-                    onChange={(event) => { setRange("custom"); setDateFrom(event.target.value); }}
-                    aria-label="From date" aria-invalid={invalidDateRange}
-                    className="mt-1 h-10 rounded-md border border-[#e8dfd4] bg-white px-2 text-[12px] text-[#33251e] outline-none focus:border-[#b89646] focus:ring-2 focus:ring-[#d4af37]/15" />
-                </label>
-                <label className="block text-[10px] font-semibold text-[#74675f]">
-                  To
-                  <input type="date" lang="en-GB" value={dateTo} min={dateFrom || undefined}
-                    onChange={(event) => { setRange("custom"); setDateTo(event.target.value); }}
-                    aria-label="To date" aria-invalid={invalidDateRange}
-                    className="mt-1 h-10 rounded-md border border-[#e8dfd4] bg-white px-2 text-[12px] text-[#33251e] outline-none focus:border-[#b89646] focus:ring-2 focus:ring-[#d4af37]/15" />
-                </label>
-              </div>
-              {invalidDateRange && <p role="alert" className="w-full text-[11px] text-[#b55f52]">From date must be on or before To date.</p>}
+              {range === "custom" && (
+                <>
+                  <div className="flex items-end gap-2">
+                    <label className="block text-[10px] font-semibold text-[#74675f]">
+                      From
+                      <input
+                        type="date"
+                        lang="en-GB"
+                        value={dateFrom}
+                        max={dateTo || undefined}
+                        onChange={(event) => setDateFrom(event.target.value)}
+                        aria-label="From date"
+                        aria-invalid={invalidDateRange}
+                        className="mt-1 h-10 rounded-md border border-[#e8dfd4] bg-white px-2 text-[12px] text-[#33251e] outline-none focus:border-[#b89646] focus:ring-2 focus:ring-[#d4af37]/15"
+                      />
+                    </label>
+                    <label className="block text-[10px] font-semibold text-[#74675f]">
+                      To
+                      <input
+                        type="date"
+                        lang="en-GB"
+                        value={dateTo}
+                        min={dateFrom || undefined}
+                        onChange={(event) => setDateTo(event.target.value)}
+                        aria-label="To date"
+                        aria-invalid={invalidDateRange}
+                        className="mt-1 h-10 rounded-md border border-[#e8dfd4] bg-white px-2 text-[12px] text-[#33251e] outline-none focus:border-[#b89646] focus:ring-2 focus:ring-[#d4af37]/15"
+                      />
+                    </label>
+                  </div>
+                  {invalidDateRange && (
+                    <p role="alert" className="w-full text-[11px] text-[#b55f52]">From date must be on or before To date.</p>
+                  )}
+                </>
+              )}
               <button
                 onClick={openModal}
                 className="inline-flex h-10 items-center gap-2 rounded-md bg-[#33251e] px-4 text-[12px] font-semibold text-white transition hover:bg-[#5b4540]"
