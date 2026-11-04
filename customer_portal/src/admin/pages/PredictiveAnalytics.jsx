@@ -876,34 +876,54 @@ export default function PredictiveAnalytics() {
       <div className="pt-[88px] lg:pl-[260px]">
         <div className="mx-auto max-w-[1400px] px-4 py-6 sm:px-6 md:px-8 lg:px-10 lg:py-8">
           {/* Header */}
-          <header className="mb-6 flex min-h-[72px] flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+          <header className="mb-6 flex min-h-[72px] flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
             <div>
               <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.24em] text-[#92701e]">Business analytics</p>
               <h1 className="mt-1 font-serif text-[27px] leading-tight text-[#33251e]">Predictive demand</h1>
               <p className="mt-1 text-[12px] text-[#74675f]">Forecast pastry demand and plan production before stock runs low.</p>
             </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <Segmented
-                label="Forecast period"
-                value={period}
-                onChange={setPeriod}
-                options={[7, 14, 30].map((value) => ({ value, label: `${value} days` }))}
-              />
-              <label className="text-[10px] font-semibold text-[#74675f]">
-                From
-                <input type="date" lang="en-GB" value={dateFrom} max={dateTo || undefined}
-                  onChange={(event) => setDateFrom(event.target.value)} aria-label="From date"
-                  aria-invalid={Boolean(dateFrom && dateTo && dateFrom > dateTo)}
-                  className="mt-1 block h-10 rounded-lg border border-[#e0d6c8] bg-white px-3 text-sm text-[#33251e] focus:outline-none focus:ring-2 focus:ring-[#d4af37]/40" />
-              </label>
-              <label className="text-[10px] font-semibold text-[#74675f]">
-                To
-                <input type="date" lang="en-GB" value={dateTo} min={dateFrom || undefined}
-                  onChange={(event) => setDateTo(event.target.value)} aria-label="To date"
-                  aria-invalid={Boolean(dateFrom && dateTo && dateFrom > dateTo)}
-                  className="mt-1 block h-10 rounded-lg border border-[#e0d6c8] bg-white px-3 text-sm text-[#33251e] focus:outline-none focus:ring-2 focus:ring-[#d4af37]/40" />
-              </label>
-              <button type="button" onClick={() => loadForecast({ action: "refresh" })} disabled={isWorking} className={BUTTON_PRIMARY}>
+            <div className="grid gap-3 rounded-xl border border-[#e8dfd4] bg-white p-3 sm:grid-cols-[auto_minmax(0,1fr)] xl:w-auto xl:grid-cols-[auto_auto_auto] xl:items-end">
+              <div>
+                <p className="mb-1.5 text-[10px] font-semibold text-[#74675f]">Forecast period</p>
+                <Segmented
+                  label="Forecast period"
+                  value={period}
+                  onChange={setPeriod}
+                  options={[7, 14, 30].map((value) => ({ value, label: `${value} days` }))}
+                />
+              </div>
+              <fieldset className="min-w-0">
+                <legend className="mb-1.5 text-[10px] font-semibold text-[#74675f]">Sales history date range</legend>
+                <div className="grid grid-cols-2 gap-2">
+                  <label className="min-w-0 text-[10px] font-semibold text-[#74675f]">
+                    From
+                    <input
+                      type="date"
+                      lang="en-GB"
+                      value={dateFrom}
+                      max={dateTo || undefined}
+                      onChange={(event) => setDateFrom(event.target.value)}
+                      aria-label="From date"
+                      aria-invalid={Boolean(dateFrom && dateTo && dateFrom > dateTo)}
+                      className="mt-1 block h-10 w-full min-w-0 rounded-lg border border-[#e0d6c8] bg-white px-2 text-sm text-[#33251e] focus:outline-none focus:ring-2 focus:ring-[#d4af37]/40 sm:w-[148px] sm:px-3"
+                    />
+                  </label>
+                  <label className="min-w-0 text-[10px] font-semibold text-[#74675f]">
+                    To
+                    <input
+                      type="date"
+                      lang="en-GB"
+                      value={dateTo}
+                      min={dateFrom || undefined}
+                      onChange={(event) => setDateTo(event.target.value)}
+                      aria-label="To date"
+                      aria-invalid={Boolean(dateFrom && dateTo && dateFrom > dateTo)}
+                      className="mt-1 block h-10 w-full min-w-0 rounded-lg border border-[#e0d6c8] bg-white px-2 text-sm text-[#33251e] focus:outline-none focus:ring-2 focus:ring-[#d4af37]/40 sm:w-[148px] sm:px-3"
+                    />
+                  </label>
+                </div>
+              </fieldset>
+              <button type="button" onClick={() => loadForecast({ action: "refresh" })} disabled={isWorking} className={`${BUTTON_PRIMARY} w-full sm:col-span-2 xl:col-span-1`}>
                 <Calculator size={16} />
                 {isWorking ? "Running..." : "Run forecast"}
               </button>
