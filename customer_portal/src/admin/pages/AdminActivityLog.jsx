@@ -69,8 +69,27 @@ function formatChange(field, before, after, record) {
   return `${label} changed from ${formatDetailValue(before)} to ${formatDetailValue(after)}`;
 }
 
-function formatDetails(details) {
+function formatRecycleBinDetails(details) {
+  const changes = details.Changes;
+  if (!changes || typeof changes !== "object") return null;
+
+  const entry = Object.values(changes).find((value) => (
+    value && typeof value === "object" && (value.label || value.item_type)
+  ));
+  if (!entry) return null;
+
+  const label = entry.label?.Before || entry.label?.After;
+  const itemType = entry.item_type?.Before || entry.item_type?.After;
+  if (!label && !itemType) return null;
+  if (label && itemType) return [`${label} (${formatDetailValue(itemType)})`];
+  return [label || formatDetailValue(itemType)];
+}
+
+function formatDetails(details, category) {
   if (!details || typeof details !== "object" || Object.keys(details).length === 0) return ["No details recorded"];
+  if (category === "Recycle Bin") {
+    return formatRecycleBinDetails(details) || ["Recycle Bin entry updated"];
+  }
 
   const lines = [];
   const record = details.Product || details.Ingredient || details.Record;
@@ -333,7 +352,7 @@ export default function AdminActivityLog() {
                       </td>
                       <td className="max-w-[320px] whitespace-normal px-4 py-3.5 text-[12px] text-[#74675f]">
                         <div className="space-y-1">
-                          {formatDetails(log.details).map((line, index) => (
+                          {formatDetails(log.details, log.category).map((line, index) => (
                             <p key={`${log.id}-detail-${index}`}>{line}</p>
                           ))}
                         </div>

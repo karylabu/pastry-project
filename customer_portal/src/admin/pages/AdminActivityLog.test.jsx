@@ -140,6 +140,42 @@ describe("AdminActivityLog", () => {
     expect(await screen.findByText("ORD-100 status changed from Preparing to Ready for Pickup")).toBeInTheDocument();
   });
 
+  test("summarizes Recycle Bin changes without internal IDs or timestamps", async () => {
+    global.fetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        success: true,
+        data: [{
+          id: 18,
+          action: "Permanently deleted Abbygail Eunice Talas",
+          category: "Recycle Bin",
+          actor_name: "Shop Owner",
+          actor_email: "owner@example.com",
+          actor_role: "super_admin",
+          details: {
+            EntryId: 18,
+            Changes: {
+              admin_recycle_bin: {
+                item_type: { Before: "user", After: null },
+                label: { Before: "Abbygail Eunice Talas", After: null },
+                deleted_at: { Before: "2026-11-03 01:30:24", After: null },
+                expires_at: { Before: "2026-12-03 01:30:24", After: null },
+              },
+            },
+          },
+          response_status: 200,
+          created_at: "2026-11-03T01:30:24Z",
+        }],
+        pagination: { current_page: 1, last_page: 1, total: 1 },
+      }),
+    });
+
+    render(<AdminActivityLog />);
+
+    expect(await screen.findByText("Abbygail Eunice Talas (user)")).toBeInTheDocument();
+    expect(screen.queryByText(/EntryId|changed from|2026-11-03 01:30:24|2026-12-03 01:30:24/)).not.toBeInTheDocument();
+  });
+
   test("filters audit activity by the Shop Owner and Admin accounts", async () => {
     render(<AdminActivityLog />);
     await screen.findByText("Changed order status");
