@@ -9,8 +9,8 @@ import { subscribeRealtime } from "../../services/realtime";
 
 const STATUS_STYLES = {
   Pending: "bg-[#fff4cd] text-[#80600a] border border-[#f0dfa4]",
-  Preparing: "bg-[#fff8e2] text-[#947018] border border-[#f0e3b5]",
-  "Ready for Pickup": "bg-[#f4f4e7] text-[#69713a] border border-[#e3e4c9]",
+  Preparing: "bg-[#fff0e8] text-[#9a5947] border border-[#efd8ce]",
+  "Ready for Pickup": "bg-[#edf5eb] text-[#4f7654] border border-[#d8e7d5]",
   Completed: "bg-[#edf5eb] text-[#4f7654] border border-[#d8e7d5]",
   Cancelled: "bg-[#fff0eb] text-[#9a5947] border border-[#efd8ce]",
 };
@@ -46,7 +46,7 @@ const ORDER_STATUS_COLORS = {
   Completed: "#6f9a74",
   Cancelled: "#c8785f",
 };
-const FALLBACK_STATUS_COLOR = "#d6c66f";
+const FALLBACK_STATUS_COLOR = "#a89b91";
 
 function OrderStatusBreakdown({ rows }) {
   const total = rows.reduce((sum, row) => sum + Number(row.value || 0), 0);
