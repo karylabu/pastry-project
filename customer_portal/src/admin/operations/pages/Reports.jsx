@@ -405,7 +405,7 @@ function StatCard({ title, value, sub, icon: Icon, color, soft, trend, isMock })
   return (
     <motion.div
       whileHover={{ y: -3 }}
-      className="relative flex min-h-[124px] flex-col justify-between overflow-hidden rounded-lg border border-t-[3px] bg-white p-4 shadow-[0_3px_12px_rgba(60,42,28,0.035)] transition-shadow"
+      className="relative flex min-h-[104px] flex-col justify-between overflow-hidden rounded-lg border border-t-[3px] bg-white p-3 shadow-[0_3px_12px_rgba(60,42,28,0.035)] transition-shadow"
       style={{ borderColor: C.border, borderTopColor: color }}
     >
       {isMock && (
@@ -413,22 +413,22 @@ function StatCard({ title, value, sub, icon: Icon, color, soft, trend, isMock })
           sample
         </span>
       )}
-      <div className="flex items-center gap-2.5">
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg" style={{ background: soft }}>
-          <Icon size={16} style={{ color }} />
+      <div className="flex items-center gap-2">
+        <div className="flex h-7 w-7 items-center justify-center rounded-lg" style={{ background: soft }}>
+          <Icon size={14} style={{ color }} />
         </div>
-        <span className="text-sm font-semibold" style={{ color: C.ink }}>{title}</span>
+        <span className="text-[13px] font-semibold" style={{ color: C.ink }}>{title}</span>
       </div>
       <div>
-        <h2 className="text-[27px] font-bold tracking-tight" style={{ color: C.ink }}>{value}</h2>
+        <h2 className="text-[22px] font-bold leading-tight tracking-tight" style={{ color: C.ink }}>{value}</h2>
         <div className="flex items-center gap-2 mt-1">
           {trend !== undefined && (
-            <span className="flex items-center gap-0.5 text-xs font-bold" style={{ color: trend >= 0 ? C.emerald : C.red }}>
+            <span className="flex items-center gap-0.5 text-[10px] font-bold" style={{ color: trend >= 0 ? C.emerald : C.red }}>
               {trend >= 0 ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
               {Math.abs(trend)}%
             </span>
           )}
-          <p className="text-xs" style={{ color: C.sub }}>{sub}</p>
+          <p className="text-[10px] leading-tight" style={{ color: C.sub }}>{sub}</p>
         </div>
       </div>
     </motion.div>
