@@ -40,44 +40,25 @@ describe("UserManagement admin creation", () => {
     expect(screen.queryByRole("button", { name: "Add Super Admin" })).not.toBeInTheDocument();
   });
 
-  test("keeps an existing Super Admin role read-only when editing the account", async () => {
-    const superAdmin = {
-      id: 3,
-      name: "Shop Owner",
-      email: "owner@example.test",
-      phone_number: "",
-      role: "super_admin",
-      status: "active",
-    };
+  test("hides Super Admin accounts and role filter from the directory", () => {
     useAdminUsers.mockReturnValue({
-      users: [superAdmin],
-      pagination: null,
+      users: [
+        { id: 3, name: "SUPER ADMIN", email: "superadmin@example.test", role: "super_admin", status: "active" },
+        { id: 4, name: "Jamie Customer", email: "jamie@example.test", role: "customer", status: "active" },
+      ],
+      pagination: { current_page: 1, last_page: 1, per_page: 10, total: 1 },
       loading: false,
       error: "",
       metrics: [],
       handleStatusToggle: jest.fn(),
       refetch: jest.fn(),
     });
-    global.fetch = jest.fn()
-      .mockResolvedValueOnce({ ok: true, json: async () => ({ success: true, data: superAdmin }) })
-      .mockResolvedValueOnce({ ok: true, json: async () => ({ success: true }) });
 
     render(<UserManagement />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Edit Shop Owner" }));
-
-    const dialog = await screen.findByRole("dialog");
-    expect(within(dialog).getByText("Super Admin (cannot be changed)")).toBeInTheDocument();
-    expect(within(dialog).queryByRole("combobox", { name: "Role" })).not.toBeInTheDocument();
-
-    fireEvent.change(within(dialog).getByDisplayValue("Shop Owner"), { target: { value: "Updated Owner" } });
-    fireEvent.click(within(dialog).getByRole("button", { name: "Save Changes" }));
-
-    await waitFor(() => {
-      const updateCall = global.fetch.mock.calls.find(([, options]) => options?.method === "PUT");
-      expect(updateCall).toBeDefined();
-      expect(JSON.parse(updateCall[1].body).role).toBe("super_admin");
-    });
+    expect(screen.queryByText("SUPER ADMIN")).not.toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: "Super Admin" })).not.toBeInTheDocument();
+    expect(screen.getByText("Jamie Customer")).toBeInTheDocument();
   });
 
   test("uses the shared admin dialog to confirm deleting a user", async () => {

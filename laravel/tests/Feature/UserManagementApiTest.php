@@ -216,6 +216,26 @@ class UserManagementApiTest extends TestCase
         $this->assertDatabaseHas('users', ['id' => 3, 'role' => 'super_admin']);
     }
 
+    public function test_user_directory_excludes_super_admin_accounts_and_pagination_counts(): void
+    {
+        DB::table('users')->insert([
+            'id' => 3,
+            'name' => 'SUPER ADMIN',
+            'email' => 'superadmin@pastry.com',
+            'password' => 'unused',
+            'role' => 'super_admin',
+            'status' => 'active',
+        ]);
+
+        $this->withHeader('Authorization', '******')
+            ->withHeader('X-Auth-Token', 'admin-token')
+            ->getJson('http://localhost/api/users')
+            ->assertOk()
+            ->assertJsonCount(2, 'data')
+            ->assertJsonPath('pagination.total', 2)
+            ->assertJsonMissing(['email' => 'superadmin@pastry.com']);
+    }
+
     public function test_only_super_admin_can_use_admin_management_and_it_only_manages_admins(): void
     {
         $this->withHeader('Authorization', '******')

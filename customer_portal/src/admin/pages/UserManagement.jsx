@@ -92,6 +92,7 @@ export default function UserManagement({ adminOnly = false }) {
     role: adminOnly ? "admin" : roleFilter,
     page,
   });
+  const directoryUsers = users.filter((user) => String(user.role || "").toLowerCase() !== "super_admin");
 
   const currentPage = Number(pagination?.current_page || page);
   const lastPage = Math.max(1, Number(pagination?.last_page || 1));
@@ -459,7 +460,6 @@ export default function UserManagement({ adminOnly = false }) {
               >
                 <option value="all">All roles</option>
                 <option value="admin">Admin</option>
-                <option value="super_admin">Super Admin</option>
                 <option value="customer">Customer</option>
               </select>}
             </div>
@@ -515,7 +515,7 @@ export default function UserManagement({ adminOnly = false }) {
                       </td>
                     </tr>
                   ) : (
-                    users.map((user) => (
+                    directoryUsers.map((user) => (
                       <tr key={user.id} className="border-b border-[#f0e9e2] last:border-0 hover:bg-[#fffaf0]">
                         <td className="px-4 py-3.5 sm:px-5">
                           <div className="font-semibold text-[#33251e]">{user.name}</div>

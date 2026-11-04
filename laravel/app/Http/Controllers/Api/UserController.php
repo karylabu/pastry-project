@@ -71,7 +71,9 @@ class UserController extends Controller
     {
         if ($response = $this->authorizeAdmin($request)) return $response;
 
-        $query = User::query()->orderByDesc('created_at');
+        $query = User::query()
+            ->whereRaw('LOWER(role) <> ?', ['super_admin'])
+            ->orderByDesc('created_at');
 
         if ($request->filled('search')) {
             $search = trim($request->search);
