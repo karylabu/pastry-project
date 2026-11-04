@@ -248,6 +248,19 @@ class AuthController extends Controller
                     'message' => 'Verify your phone number before creating an account.',
                 ], 422);
             }
+        } elseif ($intent === 'complete_phone') {
+            $validator = Validator::make($request->all(), [
+                'phone' => ['required', 'string', 'max:30', 'regex:/^\+?[0-9\s-]{7,15}$/'],
+                'registration_verification_id' => ['required', 'string', 'size:64', 'regex:/^[a-f0-9]{64}$/'],
+            ]);
+
+            if ($validator->fails()) {
+                return $this->googleCorsResponse([
+                    'success' => false,
+                    'message' => 'A valid verified phone number is required.',
+                    'errors' => $validator->errors(),
+                ], 422);
+            }
         }
 
         $idToken = $request->input('id_token');
@@ -413,11 +426,97 @@ class AuthController extends Controller
             }
         }
 
+        if ($intent === 'complete_phone') {
+            if (!$user) {
+                return $this->googleCorsResponse([
+                    'success' => false,
+                    'code' => 'user_not_found',
+                    'message' => 'We could not find an account for this Google sign-in.',
+                ], 404);
+            }
+
+            if (User::isAdminRole($user->role ?? '')) {
+                return $this->googleCorsResponse([
+                    'success' => false,
+                    'code' => 'admin_account_not_allowed',
+                    'message' => 'This is an admin account. Please continue to the admin login page.',
+                ], 403);
+            }
+
+            if (strtolower((string) ($user->role ?? '')) !== 'customer') {
+                return $this->googleCorsResponse([
+                    'success' => false,
+                    'message' => 'This account is not eligible for access.',
+                ], 403);
+            }
+
+            if (strtolower(trim((string) ($user->status ?? 'active'))) !== 'active') {
+                return $this->googleCorsResponse([
+                    'success' => false,
+                    'message' => 'This account is deactivated.',
+                ], 403);
+            }
+
+            $phone = trim((string) $request->input('phone'));
+            $verificationId = trim((string) $request->input('registration_verification_id'));
+            $existingPhone = trim((string) ($user->phone ?? ''))
+                ?: trim((string) ($user->phone_number ?? ''));
+
+            if ($existingPhone === '') {
+                if ($phoneVerification->isPhoneRegistered($phone)) {
+                    return $this->googleCorsResponse([
+                        'success' => false,
+                        'code' => 'phone_already_registered',
+                        'message' => 'This phone number is already linked to an account. Please log in to your existing account.',
+                    ], 409);
+                }
+
+                try {
+                    DB::transaction(function () use ($user, $phone, $verificationId, $phoneVerification) {
+                        $lockedUser = DB::table('users')->where('id', $user->id)->lockForUpdate()->first();
+                        $lockedPhone = trim((string) ($lockedUser->phone ?? ''))
+                            ?: trim((string) ($lockedUser->phone_number ?? ''));
+
+                        if ($lockedPhone !== '') {
+                            return;
+                        }
+
+                        if (!$phoneVerification->consumeVerified($verificationId, $phone)) {
+                            throw new \DomainException('The phone verification has expired or was already used.');
+                        }
+
+                        DB::table('users')->where('id', $user->id)->update(['phone' => $phone]);
+                    });
+                } catch (\DomainException $exception) {
+                    return $this->googleCorsResponse([
+                        'success' => false,
+                        'code' => 'phone_verification_required',
+                        'message' => 'Verify your phone number before continuing.',
+                    ], 422);
+                }
+            }
+
+            $user = DB::table('users')->where('id', $user->id)->first();
+        }
+
         if (strtolower((string) ($user->role ?? '')) !== 'customer' && !User::isAdminRole($user->role ?? '')) {
             return $this->googleCorsResponse(['success' => false, 'message' => 'This account is not eligible for access.'], 403);
         }
         if (strtolower(trim((string) ($user->status ?? 'active'))) !== 'active') {
             return $this->googleCorsResponse(['success' => false, 'message' => 'This account is deactivated.'], 403);
+        }
+
+        if (
+            $intent === 'login_or_signup'
+            && strtolower((string) ($user->role ?? '')) === 'customer'
+            && trim((string) ($user->phone ?? '')) === ''
+            && trim((string) ($user->phone_number ?? '')) === ''
+        ) {
+            return $this->googleCorsResponse([
+                'success' => false,
+                'code' => 'phone_required',
+                'message' => 'Add and verify your phone number to continue.',
+            ], 409);
         }
 
         if (strtolower((string) ($user->role ?? '')) === 'customer' && $twoFactor->isEnabled((int) $user->id)) {

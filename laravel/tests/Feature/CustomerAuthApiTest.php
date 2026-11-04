@@ -1004,6 +1004,21 @@ class CustomerAuthApiTest extends TestCase
             ->assertJsonPath('code', 'recaptcha_required');
     }
 
+    public function test_google_phone_completion_requires_a_valid_phone_and_verification_id(): void
+    {
+        $this->postJson('http://localhost/api/google-login', [
+            'intent' => 'complete_phone',
+            'id_token' => 'firebase-id-token',
+            'phone' => 'invalid',
+            'registration_verification_id' => 'invalid',
+        ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['phone', 'registration_verification_id']);
+
+        $this->assertDatabaseCount('users', 0);
+        $this->assertDatabaseCount('user_sessions', 0);
+    }
+
     public function test_google_signup_rejects_phone_already_used_by_an_existing_account(): void
     {
         DB::table('users')->insert([

@@ -45,6 +45,16 @@ export default function Login() {
   const [twoFactorCode, setTwoFactorCode] = useState("");
   const [twoFactorMethod, setTwoFactorMethod] = useState("authenticator");
   const [twoFactorDestination, setTwoFactorDestination] = useState("");
+  const [googleOnboarding, setGoogleOnboarding] = useState(null);
+  const [googlePhone, setGooglePhone] = useState("");
+  const [googlePhoneVerificationId, setGooglePhoneVerificationId] = useState("");
+  const [googlePhoneCode, setGooglePhoneCode] = useState("");
+  const [googlePhoneVerified, setGooglePhoneVerified] = useState(false);
+  const [googlePhoneStatus, setGooglePhoneStatus] = useState("");
+  const [googleOnboardingError, setGoogleOnboardingError] = useState("");
+  const [googleTermsAccepted, setGoogleTermsAccepted] = useState(false);
+  const [googlePrivacyAccepted, setGooglePrivacyAccepted] = useState(false);
+  const [googleOnboardingLoading, setGoogleOnboardingLoading] = useState(false);
   useEffect(() => {
     localStorage.removeItem('pastry_saved_accounts');
   }, []);
@@ -103,8 +113,39 @@ export default function Login() {
 
       if (!response.ok || !data?.success) {
         if (response.status === 404 && data?.code === "user_not_found") {
-          setError(getUserFriendlyAuthError(response, data, "We couldn't find an account for this Google sign-in."));
-          setGoogleUserNotFound(true);
+          setGoogleOnboarding({
+            idToken,
+            recaptchaProof: verifiedProof,
+            email: googlePayload.email,
+            name: googlePayload.name,
+            photoURL: googlePayload.photoUrl,
+            mode: "signup",
+          });
+          setGooglePhone("");
+          setGooglePhoneVerificationId("");
+          setGooglePhoneCode("");
+          setGooglePhoneVerified(false);
+          setGooglePhoneStatus("");
+          setGoogleTermsAccepted(false);
+          setGooglePrivacyAccepted(false);
+          setGoogleOnboardingError("");
+          return;
+        }
+        if (data?.code === "phone_required") {
+          setGoogleOnboarding({
+            idToken,
+            recaptchaProof: verifiedProof,
+            email: googlePayload.email,
+            name: googlePayload.name,
+            photoURL: googlePayload.photoUrl,
+            mode: "complete_phone",
+          });
+          setGooglePhone("");
+          setGooglePhoneVerificationId("");
+          setGooglePhoneCode("");
+          setGooglePhoneVerified(false);
+          setGooglePhoneStatus("");
+          setGoogleOnboardingError("");
           return;
         }
         setError(getUserFriendlyAuthError(response, data, fallbackMessage));
@@ -135,6 +176,138 @@ export default function Login() {
       }
     } finally {
       setGoogleLoading(false);
+    }
+  };
+
+  const requestGooglePhoneCode = async () => {
+    if (!googlePhone.trim()) return;
+
+    setGoogleOnboardingError("");
+    setGooglePhoneStatus("");
+    setGoogleOnboardingLoading(true);
+    let response;
+    try {
+      response = await fetch(`${LARAVEL_BASE}/api/registration/phone-otp`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({ phone: googlePhone.trim() }),
+      });
+      const data = await parseJsonResponse(response, "Could not send the verification code. Please try again.");
+      if (!response.ok || !data?.success) {
+        setGoogleOnboardingError(data?.message || "Could not send the verification code. Please try again.");
+        return;
+      }
+
+      setGooglePhoneVerificationId(data.verification_id);
+      setGooglePhoneCode("");
+      setGooglePhoneVerified(false);
+      setGooglePhoneStatus("A six-digit verification code was sent to your phone.");
+    } catch {
+      setGoogleOnboardingError("Network error while sending the verification code. Please try again.");
+    } finally {
+      setGoogleOnboardingLoading(false);
+    }
+  };
+
+  const verifyGooglePhoneCode = async () => {
+    if (!googlePhoneVerificationId || !/^\d{6}$/.test(googlePhoneCode)) return;
+
+    setGoogleOnboardingError("");
+    setGooglePhoneStatus("");
+    setGoogleOnboardingLoading(true);
+    let response;
+    try {
+      response = await fetch(`${LARAVEL_BASE}/api/registration/phone-otp/verify`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({
+          phone: googlePhone.trim(),
+          verification_id: googlePhoneVerificationId,
+          code: googlePhoneCode,
+        }),
+      });
+      const data = await parseJsonResponse(response, "The verification code could not be verified.");
+      if (!response.ok || !data?.success) {
+        setGoogleOnboardingError(data?.message || "The verification code could not be verified.");
+        return;
+      }
+
+      setGooglePhoneVerified(true);
+      setGooglePhoneStatus("Phone number verified.");
+    } catch {
+      setGoogleOnboardingError("Network error while verifying your phone. Please try again.");
+    } finally {
+      setGoogleOnboardingLoading(false);
+    }
+  };
+
+  const completeGoogleOnboarding = async (event) => {
+    event.preventDefault();
+    if (!googleOnboarding || !googlePhoneVerified) {
+      setGoogleOnboardingError("Verify your phone number before continuing.");
+      return;
+    }
+    if (googleOnboarding.mode === "signup" && (!googleTermsAccepted || !googlePrivacyAccepted)) {
+      setGoogleOnboardingError("Please accept the Terms & Conditions and Privacy Policy to create your account.");
+      return;
+    }
+
+    setGoogleOnboardingError("");
+    setGoogleOnboardingLoading(true);
+    let response;
+    try {
+      response = await fetch(`${LARAVEL_BASE}/api/google-login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          id_token: googleOnboarding.idToken,
+          recaptcha_proof: googleOnboarding.recaptchaProof,
+          intent: googleOnboarding.mode,
+          phone: googlePhone.trim(),
+          registration_verification_id: googlePhoneVerificationId,
+          agree_terms: googleOnboarding.mode === "signup" ? googleTermsAccepted : undefined,
+          agree_privacy: googleOnboarding.mode === "signup" ? googlePrivacyAccepted : undefined,
+          email: googleOnboarding.email,
+          name: googleOnboarding.name,
+          photoUrl: googleOnboarding.photoURL,
+        }),
+      });
+      const fallbackMessage = "We couldn't finish setting up your account. Please try again.";
+      const data = await parseJsonResponse(response, fallbackMessage);
+      if (data?.requires_two_factor && data.challenge_token) {
+        setTwoFactorChallenge(data.challenge_token);
+        setTwoFactorMethod(data.two_factor_method || "authenticator");
+        setTwoFactorDestination(data.delivery_destination || "");
+        setTwoFactorCode("");
+        setGoogleOnboarding(null);
+        return;
+      }
+      if (!response.ok || !data?.success) {
+        setGoogleOnboardingError(getUserFriendlyAuthError(response, data, fallbackMessage));
+        return;
+      }
+      if (!isCustomerRole(data.user?.role)) {
+        setGoogleOnboardingError("This login is for customer accounts only. Please use the correct sign-in page for your account.");
+        return;
+      }
+
+      const googleAccount = {
+        ...data.user,
+        token: data.token || "",
+        avatar: data.user.avatar || data.user.profile_picture || data.user.profile_image || googleOnboarding.photoURL || "",
+      };
+      localStorage.setItem("user", JSON.stringify(googleAccount));
+      setGoogleOnboarding(null);
+      setJustLoggedUser(googleAccount);
+      setShowLoginSuccess(true);
+    } catch {
+      const fallbackMessage = response
+        ? "We couldn't finish setting up your account. Please try again."
+        : "We couldn't connect to the sign-in service. Check your internet connection and try again.";
+      setGoogleOnboardingError(getUserFriendlyAuthError(response, null, fallbackMessage));
+    } finally {
+      setGoogleOnboardingLoading(false);
     }
   };
 
@@ -1196,6 +1369,155 @@ export default function Login() {
       </div>
 
       <CreditsModal isOpen={showCredits} onClose={() => setShowCredits(false)} />
+
+      {googleOnboarding && (
+        <div
+          className="fixed inset-0 z-[110] flex items-center justify-center bg-black/50 px-4 py-6 backdrop-blur-sm"
+          onClick={() => setGoogleOnboarding(null)}
+        >
+          <motion.section
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="google-onboarding-title"
+            initial={{ opacity: 0, y: 12, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            onClick={(event) => event.stopPropagation()}
+            className="max-h-full w-full max-w-md overflow-y-auto rounded-3xl bg-white p-6 shadow-2xl sm:p-8"
+          >
+            <div className="mb-5 flex items-start justify-between gap-4">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#a87c28]">Google sign-in</p>
+                <h2 id="google-onboarding-title" className="mt-1 text-2xl font-bold text-[#2b1b14]">One step away!</h2>
+                <p className="mt-2 text-sm leading-6 text-[#6b5b51]">
+                  Add and verify your phone number to {googleOnboarding.mode === "signup" ? "finish creating your account" : "continue to your account"}.
+                </p>
+                {googleOnboarding.email && <p className="mt-1 break-all text-xs text-[#8c7c72]">{googleOnboarding.email}</p>}
+              </div>
+              <button
+                type="button"
+                aria-label="Close phone setup"
+                onClick={() => setGoogleOnboarding(null)}
+                className="rounded-full px-2 py-1 text-xl leading-none text-[#8c7c72] hover:bg-[#f8f4eb]"
+              >
+                ×
+              </button>
+            </div>
+
+            {googleOnboardingError && (
+              <div role="alert" className="mb-4 rounded-xl border border-red-100 bg-red-50 p-3 text-sm text-red-700">
+                {googleOnboardingError}
+              </div>
+            )}
+
+            <form onSubmit={completeGoogleOnboarding} className="space-y-4">
+              <div>
+                <label htmlFor="google-onboarding-phone" className="mb-1.5 block text-sm font-bold text-[#33251e]">
+                  Phone number
+                </label>
+                <input
+                  id="google-onboarding-phone"
+                  type="tel"
+                  autoComplete="tel"
+                  required
+                  value={googlePhone}
+                  onChange={(event) => {
+                    setGooglePhone(event.target.value);
+                    setGooglePhoneVerificationId("");
+                    setGooglePhoneCode("");
+                    setGooglePhoneVerified(false);
+                    setGooglePhoneStatus("");
+                    setGoogleOnboardingError("");
+                  }}
+                  placeholder="09123456789"
+                  className="w-full rounded-xl border border-[#e5d8c8] px-4 py-3 text-sm outline-none focus:border-[#c9972d] focus:ring-2 focus:ring-[#fff1bd]"
+                />
+              </div>
+
+              {!googlePhoneVerified && (
+                <button
+                  type="button"
+                  onClick={requestGooglePhoneCode}
+                  disabled={googleOnboardingLoading || !googlePhone.trim()}
+                  className="w-full rounded-xl border border-[#d8c18d] px-4 py-3 text-sm font-bold text-[#765d30] disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {googleOnboardingLoading ? "Please wait..." : googlePhoneVerificationId ? "Resend verification code" : "Send verification code"}
+                </button>
+              )}
+
+              {googlePhoneVerificationId && !googlePhoneVerified && (
+                <div>
+                  <label htmlFor="google-onboarding-code" className="mb-1.5 block text-sm font-bold text-[#33251e]">
+                    Verification code
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      id="google-onboarding-code"
+                      type="text"
+                      inputMode="numeric"
+                      autoComplete="one-time-code"
+                      maxLength={6}
+                      required
+                      value={googlePhoneCode}
+                      onChange={(event) => setGooglePhoneCode(event.target.value.replace(/\D/g, "").slice(0, 6))}
+                      placeholder="6-digit code"
+                      className="min-w-0 flex-1 rounded-xl border border-[#e5d8c8] px-4 py-3 text-sm outline-none focus:border-[#c9972d] focus:ring-2 focus:ring-[#fff1bd]"
+                    />
+                    <button
+                      type="button"
+                      onClick={verifyGooglePhoneCode}
+                      disabled={googleOnboardingLoading || googlePhoneCode.length !== 6}
+                      className="rounded-xl bg-[#f0b94d] px-4 text-sm font-bold text-[#2b1b14] disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      Verify
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {googlePhoneStatus && (
+                <p role="status" className={`text-sm ${googlePhoneVerified ? "text-green-700" : "text-[#6b5b51]"}`}>
+                  {googlePhoneStatus}
+                </p>
+              )}
+
+              {googleOnboarding.mode === "signup" && (
+                <div className="space-y-3 rounded-xl bg-[#fcfbf8] p-4 text-sm text-[#594a42]">
+                  <label className="flex items-start gap-2">
+                    <input
+                      type="checkbox"
+                      checked={googleTermsAccepted}
+                      onChange={(event) => setGoogleTermsAccepted(event.target.checked)}
+                      className="mt-1"
+                    />
+                    <span>I agree to the <Link to="/customer/terms" className="font-bold underline">Terms &amp; Conditions</Link>.</span>
+                  </label>
+                  <label className="flex items-start gap-2">
+                    <input
+                      type="checkbox"
+                      checked={googlePrivacyAccepted}
+                      onChange={(event) => setGooglePrivacyAccepted(event.target.checked)}
+                      className="mt-1"
+                    />
+                    <span>I agree to the <Link to="/customer/privacy-policy" className="font-bold underline">Privacy Policy</Link>.</span>
+                  </label>
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={
+                  googleOnboardingLoading
+                  || !googlePhoneVerified
+                  || (googleOnboarding.mode === "signup" && (!googleTermsAccepted || !googlePrivacyAccepted))
+                }
+                className="w-full rounded-xl bg-[#f0b94d] px-4 py-3 text-sm font-bold text-[#2b1b14] transition hover:bg-[#e6ad3e] disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {googleOnboardingLoading ? "Opening your account..." : "Continue to account"}
+              </button>
+            </form>
+          </motion.section>
+        </div>
+      )}
 
       {/* Success Modal */}
       {showLoginSuccess && justLoggedUser && (
