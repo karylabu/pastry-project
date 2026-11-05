@@ -126,6 +126,40 @@ test("shows the newest order number first when timestamps are identical", async 
   expect(container.querySelector("article")).toHaveTextContent("#108");
 });
 
+test("shows refund status, amount, and PayMongo reference for admins", async () => {
+  global.fetch = jest.fn((url) => {
+    if (String(url).includes("/inventory/ingredients")) {
+      return Promise.resolve({ ok: true, json: async () => ({ ingredients: [] }) });
+    }
+
+    return Promise.resolve({
+      ok: true,
+      json: async () => ({
+        success: true,
+        orders: [orderFixture(107, "Cancellation Pending", 1, {
+          payment: "QRPh",
+          payment_status: "paid",
+          refund_status: "failed",
+          refund_amount: 13,
+          refund_reference: "ref_107",
+        })],
+      }),
+    });
+  });
+
+  const { container } = renderOrders();
+  await screen.findAllByText("Customer 107");
+
+  const orderCard = Array.from(container.querySelectorAll("article")).find((card) => card.textContent.includes("#107"));
+  expect(orderCard).toHaveTextContent("Refund failed");
+
+  fireEvent.click(within(orderCard).getByRole("button", { name: /View details for order 107/i }));
+
+  expect(within(orderCard).getByText("Refund status")).toBeInTheDocument();
+  expect(within(orderCard).getByText("₱13.00")).toBeInTheDocument();
+  expect(within(orderCard).getByText("ref_107")).toBeInTheDocument();
+});
+
 test("does not show waste actions for completed orders", async () => {
   const { container } = renderOrders();
   await screen.findAllByText("Customer 104");
