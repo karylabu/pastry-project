@@ -63,6 +63,7 @@ export default function Register() {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [googleSignup, setGoogleSignup] = useState(null);
+  const [showGoogleOnboarding, setShowGoogleOnboarding] = useState(false);
   const [showEmailVerificationModal, setShowEmailVerificationModal] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -402,6 +403,7 @@ export default function Register() {
 
   const cancelGoogleSignup = () => {
     setGoogleSignup(null);
+    setShowGoogleOnboarding(false);
     setName("");
     setEmail("");
     setPhone("");
@@ -414,6 +416,17 @@ export default function Register() {
     setAgreeTerms(false);
     setAgreePrivacy(false);
     setErrors({});
+  };
+
+  const openGoogleOnboarding = (event) => {
+    event.preventDefault();
+    const phoneError = validatePhone(phone);
+    setTouched((prev) => ({ ...prev, phone: true }));
+    setErrors((prev) => ({ ...prev, phone: phoneError }));
+    setError("");
+
+    if (phoneError) return;
+    setShowGoogleOnboarding(true);
   };
 
   return (
@@ -936,7 +949,48 @@ export default function Register() {
                 </div>
               )}
 
-              <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-x-4 gap-y-2 sm:grid-cols-2">
+              <form onSubmit={googleSignup ? openGoogleOnboarding : handleSubmit} className="grid grid-cols-1 gap-x-4 gap-y-2 sm:grid-cols-2">
+                {googleSignup ? (
+                  <>
+                    <p className="rounded-lg bg-[#fff8e9] p-3 text-sm text-[#765d50] sm:col-span-2">
+                      Google account selected: <span className="font-semibold">{googleSignup.email}</span>
+                    </p>
+                    <div className="sm:col-span-2">
+                      <label htmlFor="google-signup-phone" className="mb-1.5 block text-xs font-bold text-[#171717]">Phone Number</label>
+                      <input
+                        id="google-signup-phone"
+                        type="tel"
+                        autoComplete="tel"
+                        required
+                        placeholder="09123456789"
+                        value={phone}
+                        onBlur={() => handleBlur("phone")}
+                        onChange={(event) => {
+                          setPhone(event.target.value);
+                          if (touched.phone) {
+                            setErrors((prev) => ({ ...prev, phone: validatePhone(event.target.value) }));
+                          }
+                        }}
+                        className="register-input w-full bg-white text-[#171717]"
+                      />
+                      {touched.phone && errors.phone && <p className="mt-1 text-[10px] text-[#A8354A]">{errors.phone}</p>}
+                    </div>
+                    <button
+                      type="submit"
+                      className="btn-primary w-full text-sm active:scale-[0.98] sm:col-span-2"
+                    >
+                      Create account
+                    </button>
+                    <button
+                      type="button"
+                      onClick={cancelGoogleSignup}
+                      className="btn-secondary w-full text-sm font-semibold text-[#171717] sm:col-span-2"
+                    >
+                      Choose a different Google account
+                    </button>
+                  </>
+                ) : (
+                  <>
                 {googleSignup && (
                   <p className="rounded-lg bg-[#fff8e9] p-3 text-sm text-[#765d50] sm:col-span-2">
                     Your Google details are ready. Verify your email and accept the Terms &amp; Conditions and Privacy Policy to finish signing up.
@@ -1153,6 +1207,8 @@ export default function Register() {
                 <p className="mt-2 text-center text-xs text-[#171717]/80 sm:col-span-2">
                   Already have an account? <Link to="/customer/login" className="font-bold text-[#F0B94D] hover:underline">Log in</Link>
                 </p>
+                  </>
+                )}
               </form>
             </motion.div>
           </div>
@@ -1178,7 +1234,7 @@ export default function Register() {
         </footer>
       </div>
       <CreditsModal isOpen={showCredits} onClose={() => setShowCredits(false)} />
-      {googleSignup && (
+      {googleSignup && showGoogleOnboarding && (
         <div
           className="fixed inset-0 z-[120] flex items-center justify-center bg-black/50 px-4 py-6 backdrop-blur-sm"
           onClick={cancelGoogleSignup}
@@ -1197,7 +1253,7 @@ export default function Register() {
                 <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#a87c28]">Google sign-up</p>
                 <h2 id="google-signup-title" className="mt-1 text-2xl font-bold text-[#2b1b14]">One step away!</h2>
                 <p className="mt-2 text-sm leading-6 text-[#6b5b51]">
-                  Verify your email and add your phone number to finish creating your account.
+                  Verify your email and accept the terms to finish creating your account.
                 </p>
                 <p className="mt-1 break-all text-xs text-[#8c7c72]">{googleSignup.email}</p>
               </div>
@@ -1218,22 +1274,6 @@ export default function Register() {
             )}
 
             <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <label htmlFor="google-signup-phone" className="mb-1.5 block text-sm font-bold text-[#33251e]">
-                  Phone number
-                </label>
-                <input
-                  id="google-signup-phone"
-                  type="tel"
-                  autoComplete="tel"
-                  required
-                  value={phone}
-                  onChange={(event) => setPhone(event.target.value)}
-                  placeholder="09123456789"
-                  className="w-full rounded-xl border border-[#e5d8c8] px-4 py-3 text-sm outline-none focus:border-[#c9972d] focus:ring-2 focus:ring-[#fff1bd]"
-                />
-              </div>
-
               {!emailVerified && (
                 <button
                   type="button"
@@ -1272,11 +1312,21 @@ export default function Register() {
 
               <div className="space-y-3 rounded-xl bg-[#fcfbf8] p-4 text-sm text-[#594a42]">
                 <label className="flex items-start gap-2">
-                  <input type="checkbox" checked={agreeTerms} onChange={(event) => setAgreeTerms(event.target.checked)} className="mt-1" />
+                  <input
+                    type="checkbox"
+                    checked={agreeTerms}
+                    onChange={(event) => setAgreeTerms(event.target.checked)}
+                    className="mt-1"
+                  />
                   <span>I agree to the <Link to="/customer/terms" className="font-bold underline">Terms &amp; Conditions</Link>.</span>
                 </label>
                 <label className="flex items-start gap-2">
-                  <input type="checkbox" checked={agreePrivacy} onChange={(event) => setAgreePrivacy(event.target.checked)} className="mt-1" />
+                  <input
+                    type="checkbox"
+                    checked={agreePrivacy}
+                    onChange={(event) => setAgreePrivacy(event.target.checked)}
+                    className="mt-1"
+                  />
                   <span>I agree to the <Link to="/customer/privacy-policy" className="font-bold underline">Privacy Policy</Link>.</span>
                 </label>
               </div>
