@@ -222,6 +222,10 @@ export default function Login() {
       setGoogleOnboardingError("Enter your phone number before verifying your email.");
       return;
     }
+    if (googleOnboarding.mode === "signup" && (!googleTermsAccepted || !googlePrivacyAccepted)) {
+      setGoogleOnboardingError("Please accept the Terms & Conditions and Privacy Policy to create your account.");
+      return;
+    }
 
     setGoogleOnboardingError("");
     setGoogleEmailStatus("");
@@ -1514,7 +1518,11 @@ export default function Login() {
                     <button
                       type="button"
                       onClick={verifyGoogleEmailCode}
-                      disabled={googleOnboardingLoading || googleEmailCode.length !== 6}
+                      disabled={
+                        googleOnboardingLoading ||
+                        googleEmailCode.length !== 6 ||
+                        (googleOnboarding.mode === "signup" && (!googleTermsAccepted || !googlePrivacyAccepted))
+                      }
                       className="w-full rounded-xl bg-[#f0b94d] px-4 py-3 text-sm font-bold text-[#2b1b14] disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       Verify

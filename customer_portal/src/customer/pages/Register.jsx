@@ -165,6 +165,61 @@ export default function Register() {
     }
   };
 
+  const completeGoogleSignup = async (verifiedEmail = emailVerified) => {
+    if (!googleSignup || !verifiedEmail) return;
+    if (!agreeTerms || !agreePrivacy) {
+      setError("Please accept the Terms & Conditions and Privacy Policy to create your account.");
+      return;
+    }
+
+    setError("");
+    setLoading(true);
+    try {
+      const response = await fetch(`${LARAVEL_BASE}/api/google-login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          id_token: googleSignup.idToken,
+          recaptcha_proof: googleSignup.recaptchaProof,
+          intent: "signup",
+          phone: phone.trim(),
+          agree_terms: agreeTerms,
+          agree_privacy: agreePrivacy,
+          email_verification_id: emailVerificationId,
+          photoUrl: googleSignup.photoURL,
+        }),
+      });
+      const data = await safeParseJson(response);
+
+      if (!response.ok || !data?.success) {
+        if (data?.code === "admin_account_not_allowed") {
+          setAdminAccountNotAllowed(true);
+          setError(data.message || "This is an admin account. Please continue to the admin login page.");
+          return;
+        }
+        if (data?.code === "account_already_registered" || data?.code === "account_already_exists") {
+          setAccountAlreadyRegistered(true);
+        }
+        setError(data?.message || "Google sign-up failed. Please try again.");
+        return;
+      }
+
+      localStorage.setItem("user", JSON.stringify({
+        ...data.user,
+        token: data.token || "",
+        avatar: data.user.avatar || data.user.profile_picture || data.user.profile_image || googleSignup.photoURL || "",
+      }));
+      setGoogleSignup(null);
+      setShowGoogleOnboarding(false);
+      navigate("/customer", { replace: true });
+    } catch {
+      setError("Network error. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const verifyEmailOtp = async () => {
     if (!/^\d{6}$/.test(emailOtp)) {
       setError("Enter the six-digit verification code sent to your email.");
@@ -194,6 +249,9 @@ export default function Register() {
 
       setEmailVerified(true);
       setEmailOtpMessage("Email address verified.");
+      if (googleSignup) {
+        await completeGoogleSignup(true);
+      }
     } catch (requestError) {
       setError("Network error while verifying your email. Please try again.");
     } finally {
@@ -235,49 +293,13 @@ export default function Register() {
     }
 
     setShowEmailVerificationModal(false);
+    if (googleSignup) {
+      return completeGoogleSignup(true);
+    }
+
     setLoading(true);
 
     try {
-      if (googleSignup) {
-        const response = await fetch(`${LARAVEL_BASE}/api/google-login`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Accept: "application/json" },
-          credentials: "include",
-          body: JSON.stringify({
-            id_token: googleSignup.idToken,
-            recaptcha_proof: googleSignup.recaptchaProof,
-            intent: "signup",
-            phone: phone.trim(),
-            agree_terms: agreeTerms,
-            agree_privacy: agreePrivacy,
-            email_verification_id: emailVerificationId,
-            photoUrl: googleSignup.photoURL,
-          }),
-        });
-        const data = await safeParseJson(response);
-
-        if (!response.ok || !data?.success) {
-          if (data?.code === "admin_account_not_allowed") {
-            setAdminAccountNotAllowed(true);
-            setError(data.message || "This is an admin account. Please continue to the admin login page.");
-            return;
-          }
-          if (data?.code === "account_already_registered" || data?.code === "account_already_exists") {
-            setAccountAlreadyRegistered(true);
-          }
-          setError(data?.message || "Google sign-up failed. Please try again.");
-          return;
-        }
-
-        localStorage.setItem("user", JSON.stringify({
-          ...data.user,
-          token: data.token || '',
-          avatar: data.user.avatar || data.user.profile_picture || data.user.profile_image || googleSignup.photoURL || '',
-        }));
-        navigate("/customer", { replace: true });
-        return;
-      }
-
       const response = await fetch(`${LARAVEL_BASE}/api/register`, {
         method: "POST",
         headers: {
@@ -1012,13 +1034,6 @@ export default function Register() {
                     >
                       Create account
                     </button>
-                    <button
-                      type="button"
-                      onClick={cancelGoogleSignup}
-                      className="btn-secondary w-full text-sm font-semibold text-[#171717] sm:col-span-2"
-                    >
-                      Choose a different Google account
-                    </button>
                   </>
                 ) : (
                   <>
@@ -1204,7 +1219,7 @@ export default function Register() {
                   disabled={loading || !isFormValid || !(googleSignup?.recaptchaProof || recaptchaProof)}
                   className="btn-primary w-full text-sm active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40 sm:col-span-2"
                 >
-                  {loading ? "Creating account…" : googleSignup ? "Complete Google Sign Up" : "Create account"}
+                  {loading ? "Creating account…" : "Create account"}
                 </button>
 
                 {!googleSignup && <div className="flex items-center gap-4 py-1 sm:col-span-2">
@@ -1213,25 +1228,15 @@ export default function Register() {
                   <div className="h-px flex-1 bg-gray-200" />
                 </div>}
 
-                {!googleSignup ? (
-                  <>
-                    <button
-                      type="button"
-                      onClick={handleGoogleSignup}
-                      disabled={googleLoading || !recaptchaProof}
-                      className="btn-secondary flex w-full items-center justify-center gap-3 text-sm font-semibold text-[#171717] active:scale-[0.98] disabled:opacity-50 sm:col-span-2"
-                    >
-                      <GoogleIcon />
-                      {googleLoading ? "Redirecting…" : "Sign Up with Google"}
-                    </button>
-                  </>
-                ) : (
+                {!googleSignup && (
                   <button
                     type="button"
-                    onClick={cancelGoogleSignup}
-                    className="btn-secondary w-full text-sm font-semibold text-[#171717] sm:col-span-2"
+                    onClick={handleGoogleSignup}
+                    disabled={googleLoading || !recaptchaProof}
+                    className="btn-secondary flex w-full items-center justify-center gap-3 text-sm font-semibold text-[#171717] active:scale-[0.98] disabled:opacity-50 sm:col-span-2"
                   >
-                    Choose a different Google account
+                    <GoogleIcon />
+                    {googleLoading ? "Redirecting…" : "Sign Up with Google"}
                   </button>
                 )}
 
@@ -1341,16 +1346,16 @@ export default function Register() {
                 </p>
               )}
 
-              <button
-                type="submit"
-                disabled={loading || !emailVerified || !isFormValid}
-                className="w-full rounded-xl bg-[#f0b94d] px-4 py-3 text-sm font-bold text-[#2b1b14] transition hover:bg-[#e6ad3e] disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {loading ? "Creating account..." : "Complete Google Sign Up"}
-              </button>
-              <button type="button" onClick={cancelGoogleSignup} className="w-full rounded-xl border border-[#e5d8c8] px-4 py-3 text-sm font-bold text-[#765d30]">
-                Choose a different Google account
-              </button>
+              {emailVerified && error && (
+                <button
+                  type="button"
+                  onClick={() => completeGoogleSignup(true)}
+                  disabled={loading}
+                  className="w-full rounded-xl border border-[#e5d8c8] px-4 py-3 text-sm font-bold text-[#765d30] disabled:opacity-50"
+                >
+                  {loading ? "Creating account..." : "Try again"}
+                </button>
+              )}
             </form>
           </motion.section>
         </div>

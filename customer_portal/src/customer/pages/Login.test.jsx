@@ -114,6 +114,28 @@ describe("Google sign-in email onboarding", () => {
     });
   });
 
+  it("disables email verification if consent is unchecked after requesting a code", async () => {
+    global.fetch = jest.fn()
+      .mockResolvedValueOnce(jsonResponse({ success: false, code: "user_not_found", message: "User not found." }, false, 404))
+      .mockResolvedValueOnce(jsonResponse({ success: true, verification_id: "c".repeat(64) }));
+
+    render(<Login />);
+    startGoogleSignIn();
+
+    const onboarding = within(await screen.findByRole("dialog"));
+    fireEvent.change(onboarding.getByLabelText("Phone number"), { target: { value: "09123456789" } });
+    fireEvent.click(onboarding.getByRole("checkbox", { name: /Terms & Conditions/ }));
+    fireEvent.click(onboarding.getByRole("checkbox", { name: /Privacy Policy/ }));
+    fireEvent.click(onboarding.getByRole("button", { name: "Send email verification code" }));
+    expect(await screen.findByText("A six-digit verification code was sent to your email.")).toBeInTheDocument();
+
+    fireEvent.click(onboarding.getByRole("checkbox", { name: /Privacy Policy/ }));
+    fireEvent.change(onboarding.getByRole("textbox", { name: "Email verification code" }), { target: { value: "123456" } });
+    expect(onboarding.getByRole("button", { name: "Verify" })).toBeDisabled();
+    fireEvent.click(onboarding.getByRole("button", { name: "Verify" }));
+    expect(global.fetch).toHaveBeenCalledTimes(2);
+  });
+
   it("verifies email and saves a phone for an existing Google account before logging in", async () => {
     global.fetch = jest.fn()
       .mockResolvedValueOnce(jsonResponse({ success: false, code: "phone_required", message: "Phone required." }, false, 409))
