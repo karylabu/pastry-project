@@ -20,9 +20,8 @@ function requestPayMongoOrderRefund(array $orderRow, int $orderId, string $reaso
         $amount = $downpaymentAmount;
     }
 
-    $paymentMethod = strtolower((string) preg_replace('/[^a-z0-9]/i', '', (string) ($orderRow['payment'] ?? '')));
     $paymentReference = trim((string) ($orderRow['payment_reference'] ?? ''));
-    if (!in_array($paymentMethod, ['gcash', 'qrph'], true) || $paymentReference === '') {
+    if ($paymentReference === '') {
         return ['status' => 'manual_required', 'reference' => null, 'amount' => $amount];
     }
 
@@ -148,10 +147,11 @@ function sendPayMongoOrderRefundSms(?string $phone, int $orderId, array $refundR
     $phone = '63' . $phone;
 
     $messages = [
-        'pending' => "Order #{$orderId} cancelled. Your refund request is being processed by PayMongo.",
+        'pending' => "Your cancellation for order #{$orderId} is waiting for PayMongo refund confirmation.",
         'succeeded' => "Order #{$orderId} cancelled. PayMongo confirmed your refund was returned.",
         'refunded' => "Order #{$orderId} cancelled. PayMongo confirmed your refund was returned.",
-        'manual_required' => "Order #{$orderId} cancelled. Your refund is not yet returned; the shop has been asked to process it manually.",
+        'failed' => "PayMongo could not process the refund for order #{$orderId}. Please contact the shop.",
+        'manual_required' => "Your cancellation for order #{$orderId} is waiting for the shop to process your refund.",
     ];
     if (!isset($messages[$status])) {
         error_log("Refund SMS was not sent for order #{$orderId}: unrecognized refund status '{$status}'.");

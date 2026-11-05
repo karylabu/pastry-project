@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/cors.php';
+require_once __DIR__ . '/../includes/realtime_events.php';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     http_response_code(405);
@@ -13,7 +14,7 @@ function loadWebhookSecret() {
         return $value;
     }
 
-    foreach ([__DIR__ . '/.env', __DIR__ . '/../.env'] as $envFile) {
+    foreach ([__DIR__ . '/.env', __DIR__ . '/../.env', __DIR__ . '/../laravel/.env'] as $envFile) {
         if (!is_readable($envFile)) {
             continue;
         }
@@ -248,6 +249,102 @@ if ($timestamp === '' || $providedSignature === '' || !hash_equals($expectedSign
 
 $data = json_decode($payload, true);
 $eventType = strtolower((string)($data['data']['attributes']['type'] ?? $data['type'] ?? ''));
+$refundEventStatus = match ($eventType) {
+    'refund.succeeded' => 'succeeded',
+    'refund.failed' => 'failed',
+    'refund.updated' => strtolower((string) ($data['data']['attributes']['status'] ?? '')),
+    default => '',
+};
+
+if (in_array($refundEventStatus, ['succeeded', 'refunded', 'failed'], true)) {
+    $refundId = trim((string) ($data['data']['id'] ?? ''));
+    if ($refundId === '') {
+        http_response_code(400);
+        echo json_encode(['status' => 'error', 'message' => 'Refund reference not found.']);
+        exit;
+    }
+
+    require_once __DIR__ . '/../includes/db.php';
+    if (!$conn) {
+        http_response_code(500);
+        echo json_encode(['status' => 'error', 'message' => 'Database connection failed.']);
+        exit;
+    }
+
+    try {
+        $conn->begin_transaction();
+        $stmt = $conn->prepare('SELECT id, user_id, refund_status FROM orders WHERE refund_reference = ? LIMIT 1 FOR UPDATE');
+        if (!$stmt) {
+            throw new RuntimeException('Unable to find the PayMongo refund order.');
+        }
+        $stmt->bind_param('s', $refundId);
+        if (!$stmt->execute()) {
+            $stmt->close();
+            throw new RuntimeException('Unable to find the PayMongo refund order.');
+        }
+        $refundOrder = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+        if (!$refundOrder) {
+            $conn->rollback();
+            $conn->close();
+            echo json_encode(['status' => 'ignored', 'message' => 'Refund reference not found.']);
+            exit;
+        }
+
+        $orderId = (int) $refundOrder['id'];
+        $userId = (int) ($refundOrder['user_id'] ?? 0);
+        $storedRefundStatus = strtolower((string) ($refundOrder['refund_status'] ?? ''));
+        $alreadyHandled = $storedRefundStatus === 'succeeded'
+            || ($storedRefundStatus === 'failed' && $refundEventStatus === 'failed');
+        if (!$alreadyHandled) {
+            $succeeded = in_array($refundEventStatus, ['succeeded', 'refunded'], true);
+            $stmt = $conn->prepare($succeeded
+                ? "UPDATE orders SET refund_status = 'succeeded', payment_status = 'refunded', status = 'Cancelled', cancelled_at = COALESCE(cancelled_at, NOW()) WHERE id = ?"
+                : "UPDATE orders SET refund_status = 'failed' WHERE id = ?");
+            if (!$stmt) {
+                throw new RuntimeException('Unable to update PayMongo refund status.');
+            }
+            $stmt->bind_param('i', $orderId);
+            if (!$stmt->execute()) {
+                $stmt->close();
+                throw new RuntimeException('Unable to update PayMongo refund status.');
+            }
+            $stmt->close();
+
+            if ($userId > 0) {
+                $title = $succeeded ? 'Refund Processed' : 'Refund Failed';
+                $message = $succeeded
+                    ? "PayMongo confirmed your refund for order #{$orderId}."
+                    : "PayMongo could not process your refund for order #{$orderId}. You can retry the cancellation or contact support.";
+                $type = $succeeded ? 'Success' : 'Warning';
+                $actionUrl = '/customer/orders';
+                $notification = $conn->prepare('INSERT INTO notifications (user_id, title, message, type, is_read, action_url, created_at) VALUES (?, ?, ?, ?, 0, ?, NOW())');
+                if (!$notification) {
+                    throw new RuntimeException('Unable to create refund notification.');
+                }
+                $notification->bind_param('issss', $userId, $title, $message, $type, $actionUrl);
+                if (!$notification->execute()) {
+                    $notification->close();
+                    throw new RuntimeException('Unable to create refund notification.');
+                }
+                $notification->close();
+                publishRealtimeEvent($conn, 'notification.updated', $userId);
+            }
+            publishRealtimeEvent($conn, 'order.updated', $userId, $orderId);
+        }
+        $conn->commit();
+        $conn->close();
+        echo json_encode(['status' => $alreadyHandled ? 'ignored' : $refundEventStatus, 'order_id' => $orderId]);
+    } catch (Throwable $exception) {
+        $conn->rollback();
+        error_log('PayMongo refund webhook failed: ' . $exception->getMessage());
+        $conn->close();
+        http_response_code(500);
+        echo json_encode(['status' => 'error', 'message' => 'Unable to record refund status.']);
+    }
+    exit;
+}
+
 $successfulEvents = ['link.payment.paid', 'payment.paid'];
 if (!in_array($eventType, $successfulEvents, true)) {
     echo json_encode(['status' => 'ignored']);
@@ -265,7 +362,7 @@ if ($orderId <= 0) {
     exit;
 }
 
-$conn = @mysqli_connect('localhost', 'root', '', 'pastry_db');
+require_once __DIR__ . '/../includes/db.php';
 if (!$conn) {
     http_response_code(500);
     echo json_encode(['status' => 'error', 'message' => 'Database connection failed.']);
@@ -331,6 +428,7 @@ if ($paymentConfirmed) {
         $notificationStmt->bind_param('isssis', $userId, $title, $message, $type, $isRead, $actionUrl);
         $notificationStmt->execute();
         $notificationStmt->close();
+        publishRealtimeEvent($conn, 'notification.updated', $userId);
     }
 }
 

@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Http\Controllers\OrderController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
 
@@ -52,6 +53,9 @@ class CustomerOrdersApiTest extends TestCase
             $table->string('status');
             $table->string('payment_status')->nullable();
             $table->string('payment_reference')->nullable();
+            $table->string('refund_reference')->nullable();
+            $table->string('refund_status')->nullable();
+            $table->decimal('refund_amount', 10, 2)->nullable();
             $table->boolean('is_customized')->default(false);
             $table->string('order_type')->nullable();
             $table->timestamp('created_at')->nullable();
@@ -231,7 +235,7 @@ class CustomerOrdersApiTest extends TestCase
         $this->assertSame(42, $response->getData(true)['orders'][0]['order_number']);
     }
 
-    public function test_cancelled_paid_counter_order_reports_manual_refund_without_schema_changes(): void
+    public function test_paid_counter_order_waits_for_manual_refund_confirmation(): void
     {
         DB::table('orders')->insert([
             'id' => 14,
@@ -253,11 +257,56 @@ class CustomerOrdersApiTest extends TestCase
 
         $this->assertDatabaseHas('orders', [
             'id' => 14,
-            'status' => 'Cancelled',
+            'status' => 'Cancellation Pending',
+            'payment_status' => 'paid',
         ]);
     }
 
-    public function test_customer_cancellation_succeeds_when_paymongo_refund_credentials_are_missing(): void
+    public function test_paymongo_refund_stays_pending_until_webhook_confirms_success(): void
+    {
+        config(['services.paymongo.secret' => 'sk_test_refund']);
+        Http::fake([
+            'https://api.paymongo.com/v1/payment_links/payment-link-16/payments' => Http::response([
+                'data' => [[
+                    'id' => 'pay_16',
+                    'attributes' => ['status' => 'paid', 'amount' => 50000],
+                ]],
+            ]),
+            'https://api.paymongo.com/v1/refunds' => Http::response([
+                'data' => [
+                    'id' => 're_16',
+                    'attributes' => ['status' => 'pending'],
+                ],
+            ]),
+        ]);
+        DB::table('orders')->insert([
+            'id' => 16,
+            'user_id' => 7,
+            'payment' => 'Maya',
+            'payment_status' => 'paid',
+            'payment_reference' => 'payment-link-16',
+            'total' => 500,
+            'status' => 'Pending',
+        ]);
+
+        $request = Request::create('/api/orders/16/cancel', 'POST', [], [], [], [
+            'HTTP_X_AUTH_TOKEN' => 'test-customer-token',
+        ]);
+        $response = app(OrderController::class)->cancel($request, 16);
+
+        $this->assertSame(200, $response->getStatusCode());
+        $this->assertSame('pending', $response->getData(true)['refund_status']);
+        $this->assertDatabaseHas('orders', [
+            'id' => 16,
+            'status' => 'Cancellation Pending',
+            'payment_status' => 'paid',
+            'refund_reference' => 're_16',
+            'refund_status' => 'pending',
+        ]);
+        Http::assertSentCount(2);
+    }
+
+    public function test_customer_cancellation_does_not_mark_payment_refunded_when_paymongo_credentials_are_missing(): void
     {
         config(['services.paymongo.secret' => null]);
         DB::table('orders')->insert([
@@ -277,8 +326,13 @@ class CustomerOrdersApiTest extends TestCase
 
         $this->assertSame(200, $response->getStatusCode());
         $this->assertTrue($response->getData(true)['success']);
-        $this->assertSame('manual_required', $response->getData(true)['refund_status']);
-        $this->assertDatabaseHas('orders', ['id' => 15, 'status' => 'Cancelled']);
+        $this->assertSame('failed', $response->getData(true)['refund_status']);
+        $this->assertDatabaseHas('orders', [
+            'id' => 15,
+            'status' => 'Cancellation Pending',
+            'payment_status' => 'paid',
+            'refund_status' => 'failed',
+        ]);
     }
 
     public function test_customer_can_confirm_a_ready_order_as_received(): void

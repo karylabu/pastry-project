@@ -18,9 +18,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 }
 
 try {
-    $conn = mysqli_connect("localhost", "root", "", "pastry_db");
+    require_once __DIR__ . '/../includes/db.php';
     if (!$conn) {
-        throw new Exception("Database Connection Failed: " . mysqli_connect_error());
+        throw new Exception("Database Connection Failed: " . ($db_error ?? 'Unknown database error'));
     }
 
     $data = json_decode(file_get_contents("php://input"), true);
@@ -35,7 +35,7 @@ try {
 
     // Lock the order and ensure a customer can only cancel their own order.
     $check = $conn->prepare(
-        "SELECT id, status, items, total, downpayment_amount, payment, payment_status, payment_reference, is_customized, order_type, phone FROM orders
+        "SELECT id, status, items, total, downpayment_amount, payment, payment_status, payment_reference, refund_status, refund_reference, refund_amount, is_customized, order_type, phone FROM orders
          WHERE id = ? AND (user_id = ? OR (user_id IS NULL AND email = ?))
          LIMIT 1 FOR UPDATE"
     );
@@ -59,10 +59,19 @@ try {
         exit;
     }
 
-    if ($row['status'] !== 'Pending') {
+    $retryingFailedRefund = $row['status'] === 'Cancellation Pending'
+        && strtolower((string) ($row['refund_status'] ?? '')) === 'failed';
+    if ($row['status'] !== 'Pending' && !$retryingFailedRefund) {
         $conn->rollback();
         http_response_code(409);
         echo json_encode(["success" => false, "message" => "This order can no longer be cancelled."]);
+        exit;
+    }
+
+    if (strtolower((string) ($row['refund_status'] ?? '')) === 'pending') {
+        $conn->rollback();
+        http_response_code(409);
+        echo json_encode(["success" => false, "message" => "The refund request is already being processed."]);
         exit;
     }
 
@@ -115,11 +124,18 @@ try {
         $update->close();
     }
 
-    $updateOrder = $conn->prepare("UPDATE orders SET status = 'Cancelled', cancelled_at = NOW() WHERE id = ?");
+    $refundStatus = strtolower((string) ($refundResult['status'] ?? ''));
+    $refundPending = $refundStatus === 'pending';
+    $refundSucceeded = in_array($refundStatus, ['succeeded', 'refunded'], true);
+    $nextStatus = $refundPending || in_array($refundStatus, ['failed', 'manual_required'], true) ? 'Cancellation Pending' : 'Cancelled';
+    $nextPaymentStatus = $refundSucceeded ? 'refunded' : (string) ($row['payment_status'] ?? '');
+    $refundReference = $refundResult['reference'] ?? $row['refund_reference'];
+    $refundAmount = $refundResult['amount'] ?? $row['refund_amount'];
+    $updateOrder = $conn->prepare("UPDATE orders SET status = ?, payment_status = COALESCE(NULLIF(?, ''), payment_status), refund_status = NULLIF(?, ''), refund_reference = ?, refund_amount = ?, cancelled_at = IF(? = 'Cancelled', NOW(), NULL) WHERE id = ?");
     if (!$updateOrder) {
         throw new Exception('Failed to prepare cancelled order update.');
     }
-    $updateOrder->bind_param('i', $order_id);
+    $updateOrder->bind_param('ssssssi', $nextStatus, $nextPaymentStatus, $refundStatus, $refundReference, $refundAmount, $nextStatus, $order_id);
     $result = $updateOrder->execute();
     $updateOrder->close();
 
@@ -128,9 +144,17 @@ try {
         if (!$customerNotification) {
             throw new Exception('Failed to prepare customer cancellation notification.');
         }
-        $title = 'Order Cancelled';
-        $message = 'Your order was cancelled.';
-        $type = 'Warning';
+        $title = $refundPending
+            ? 'Refund Processing'
+            : (in_array($refundStatus, ['failed', 'manual_required'], true) ? 'Refund Requires Attention' : 'Order Cancelled');
+        $message = match ($refundStatus) {
+            'pending' => "Your cancellation for order #{$order_id} is awaiting PayMongo refund confirmation.",
+            'succeeded', 'refunded' => "Your order #{$order_id} was cancelled and the refund was confirmed.",
+            'failed' => "PayMongo could not process the refund for order #{$order_id}. You can retry the cancellation.",
+            'manual_required' => "Your cancellation for order #{$order_id} is waiting for the shop to process your refund.",
+            default => 'Your order was cancelled.',
+        };
+        $type = $refundPending || $refundStatus === 'failed' || $refundStatus === 'manual_required' ? 'Warning' : 'Success';
         $actionUrl = '/customer/orders';
         $customerNotification->bind_param('issss', $userId, $title, $message, $type, $actionUrl);
         if (!$customerNotification->execute()) {
@@ -149,8 +173,12 @@ try {
                 $admins->free();
                 throw new Exception('Failed to prepare admin cancellation notification.');
             }
-            $title = 'Order Cancelled';
-            $message = "Order #{$order_id} was cancelled by the customer.";
+            $title = $refundPending ? 'Refund Requested' : 'Order Cancelled';
+            $message = $refundPending
+                ? "Order #{$order_id} cancellation is awaiting PayMongo refund confirmation."
+                : (in_array($refundStatus, ['failed', 'manual_required'], true)
+                    ? "Order #{$order_id} cancellation needs refund follow-up."
+                    : "Order #{$order_id} was cancelled by the customer.");
             $type = 'Warning';
             $actionUrl = '/admin/orders';
             $adminId = (int) $admin['id'];
@@ -186,10 +214,12 @@ try {
 
         $conn->commit();
         publishRealtimeEvent($conn, 'order.updated', $userId, $order_id);
+        publishRealtimeEvent($conn, 'notification.updated', $userId);
         sendPayMongoOrderRefundSms($row['phone'] ?? null, $order_id, $refundResult);
         $message = match ($refundResult['status']) {
-            'pending' => 'Order cancelled. Your PayMongo refund request is being processed.',
+            'pending' => 'Your cancellation is awaiting PayMongo refund confirmation.',
             'succeeded', 'refunded' => 'Order cancelled. PayMongo confirmed the refund.',
+            'failed' => 'PayMongo could not process the refund. Please retry the cancellation or contact support.',
             'manual_required' => 'Order cancelled. The shop will process your refund manually.',
             default => 'Order cancelled successfully.',
         };
@@ -198,6 +228,7 @@ try {
             'message' => $message,
             'refund_status' => $refundResult['status'],
             'refund_amount' => $refundResult['amount'],
+            'order_status' => $nextStatus,
         ]);
     } else {
         throw new Exception("SQL Error: " . mysqli_error($conn));

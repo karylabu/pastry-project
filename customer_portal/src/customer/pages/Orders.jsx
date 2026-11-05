@@ -67,7 +67,9 @@ function CancelDialog({ order, onConfirm, onDismiss, isLoading }) {
           <AlertTriangle size={26} className="text-slate-700" strokeWidth={1.8} />
         </div>
         <h3 className="text-[20px] font-black text-gray-900 text-center leading-tight mb-2">
-          Cancel Order #{order.order_number ?? order.id}?
+          {order.refund_status === 'failed'
+            ? `Retry Refund for Order #${order.order_number ?? order.id}?`
+            : `Cancel Order #${order.order_number ?? order.id}?`}
         </h3>
         <p className="text-[12px] text-gray-400 text-center leading-relaxed mb-8">
           Cancelling a paid order starts a PayMongo refund when available. Cash or direct-transfer refunds must be completed manually by the shop.
@@ -84,7 +86,7 @@ function CancelDialog({ order, onConfirm, onDismiss, isLoading }) {
             disabled={isLoading}
             className="flex-1 py-4 rounded-[20px] bg-slate-900 text-white text-[11px] font-black uppercase tracking-[0.2em] hover:bg-slate-800 transition-all disabled:opacity-50 active:scale-[0.97]"
           >
-            {isLoading ? "Cancelling…" : "Yes, Cancel"}
+            {isLoading ? "Processing…" : order.refund_status === 'failed' ? "Retry Refund" : "Yes, Cancel"}
           </button>
         </div>
       </motion.div>
@@ -645,13 +647,14 @@ export default function Orders() {
       });
       const data = await safeParseJson(res);
       if (data.success) {
-        setCancellationNotice(`Your order #${cancelTarget.id} is already cancelled.`);
-        updateLocalStatus(cancelTarget.id, "Cancelled", {
+        const orderStatus = data.order_status || (data.refund_status ? "Cancellation Pending" : "Cancelled");
+        setCancellationNotice(data.message || `Cancellation update received for order #${cancelTarget.id}.`);
+        updateLocalStatus(cancelTarget.id, orderStatus, {
           refund_status: data.refund_status,
           refund_amount: data.refund_amount,
           cancelled_at: data.cancelled_at,
         });
-        setStatusFilter("Cancelled");
+        setStatusFilter(orderStatus);
       } else {
         setActionError(data.message || "Failed to cancel order.");
       }
@@ -1181,7 +1184,7 @@ export default function Orders() {
   }
 
   // ── Helpers ─────────────────────────────────────────────────────────────────
-  const statusOptions = ["All", "Pending", "Awaiting Payment", "Preparing", "Awaiting Balance Payment", "Ready for Pickup", "Completed", "Cancelled"];
+  const statusOptions = ["All", "Pending", "Cancellation Pending", "Awaiting Payment", "Preparing", "Awaiting Balance Payment", "Ready for Pickup", "Completed", "Cancelled"];
 
   const statusCounts = statusOptions.reduce((acc, s) => {
     acc[s] = s === 'All' ? orders.length : orders.filter((o) => (
@@ -1245,6 +1248,7 @@ export default function Orders() {
       case "Cancelled":  return "bg-slate-100 text-slate-700";
       case "Awaiting Balance Payment": return "bg-amber-50 text-amber-800";
       default:           return "bg-gray-100 text-gray-600";
+      case "Cancellation Pending": return "bg-amber-100 text-amber-800";
     }
   };
 
@@ -1400,6 +1404,7 @@ export default function Orders() {
                 const isCancelled  = order.status === "Cancelled";
                 const paymentMethodKey = String(order.payment || '').toLowerCase().replace(/[^a-z0-9]/g, '');
                 const supportsPaymentProof = ['gcash', 'qrph'].includes(paymentMethodKey)
+                const isCancellationPending = order.status === "Cancellation Pending";
                   || (Boolean(order.is_customized)
                     && ['maya', 'maribank', 'visamastercard', 'onlinebanking'].includes(paymentMethodKey));
                 const paymentStatusKey = String(order.payment_status || '').toLowerCase();
@@ -1494,7 +1499,13 @@ export default function Orders() {
                   && isPickupDownpaymentPaid
                   && remainingBalanceAmount > 0;
                 const primaryProductImage = getProductThumbnail(order, primaryItem);
-                const paymentHint = isCancelled
+                const paymentHint = isCancellationPending
+                  ? order.refund_status === 'failed'
+                    ? 'Refund failed — retry or contact the shop'
+                    : order.refund_status === 'manual_required'
+                    ? 'Cancellation pending — the shop must process your refund'
+                    : 'Cancellation pending — PayMongo is processing your refund'
+                  : isCancelled
                   ? 'Order cancelled'
                   : isPaymentConfirmed
                   && paymentStatusKey === 'paid'
@@ -1775,22 +1786,24 @@ export default function Orders() {
                         </button>
                       )}
 
-                      {isPending && (
+                      {(isPending || (isCancellationPending && order.refund_status === 'failed')) && (
                         <button
                           onClick={() => setCancelTarget(order)}
                           disabled={processingId === order.id}
                           className="inline-flex h-9 w-[126px] shrink-0 items-center justify-center gap-1.5 rounded-lg border border-gray-300 px-3 py-2 text-center text-[11px] font-semibold leading-4 text-slate-900 transition-colors hover:bg-gray-100 hover:border-gray-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-700 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-40"
                         >
-                          {processingId === order.id ? 'Cancelling…' : 'Cancel Order'}
+                          {processingId === order.id ? 'Processing…' : isCancellationPending ? 'Retry Refund' : 'Cancel Order'}
                         </button>
                       )}
 
-                      {isCancelled && (
+                      {(isCancelled || isCancellationPending) && (
                         <span className="text-[12px] font-semibold text-slate-500">
-                          {order.refund_status === 'pending'
-                            ? 'Cancelled · Refund processing'
+                          {isCancellationPending && order.refund_status === 'pending'
+                            ? 'Cancellation pending · Refund processing'
                             : order.refund_status === 'manual_required'
-                            ? 'Cancelled · Refund pending from shop'
+                            ? 'Cancellation pending · Refund pending from shop'
+                            : order.refund_status === 'failed'
+                            ? 'Cancellation pending · Refund failed'
                             : ['succeeded', 'refunded'].includes(order.refund_status)
                             ? 'Cancelled · Refund confirmed'
                             : 'Cancelled'}

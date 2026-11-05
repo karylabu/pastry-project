@@ -1279,24 +1279,47 @@ class OrderController extends Controller
                 if (!$order || (int) $order->user_id !== (int) $user->id) {
                     throw new RuntimeException('Order not found.');
                 }
-                if ($order->status !== 'Pending') {
+                $retryingFailedRefund = $order->status === 'Cancellation Pending'
+                    && strtolower((string) $order->refund_status) === 'failed';
+                if ($order->status !== 'Pending' && !$retryingFailedRefund) {
                     throw new RuntimeException('Only pending orders can be cancelled.');
                 }
 
                 $refundResult = $this->refundPaidOrderIfNeeded($order);
                 $this->restoreOrderSizeStock($order, (int) $user->id);
                 $this->restoreOrderProductStock($order, (int) $user->id);
+                $refundPending = $refundResult['status'] === 'pending';
+                $refundSucceeded = in_array($refundResult['status'], ['succeeded', 'refunded'], true);
+                $customerNotificationMessage = match ($refundResult['status']) {
+                    'pending' => "Your cancellation for order #{$order->id} is awaiting PayMongo refund confirmation.",
+                    'failed' => "PayMongo could not process the refund for order #{$order->id}. You can retry the cancellation.",
+                    'manual_required' => "Your cancellation for order #{$order->id} is waiting for the shop to process your refund.",
+                    'succeeded', 'refunded' => "Your order #{$order->id} was cancelled and the refund was confirmed.",
+                    default => 'Your order was cancelled.',
+                };
                 $order->update([
-                    'status' => 'Cancelled',
-                    'cancelled_at' => now(),
+                    'status' => $refundPending || in_array($refundResult['status'], ['failed', 'manual_required'], true)
+                        ? 'Cancellation Pending'
+                        : 'Cancelled',
+                    'payment_status' => $refundSucceeded
+                        ? 'refunded'
+                        : $order->payment_status,
+                    'refund_reference' => $refundResult['reference'] ?? $order->refund_reference,
+                    'refund_status' => $refundResult['status'] ?? $order->refund_status,
+                    'refund_amount' => $refundResult['amount'] ?? $order->refund_amount,
+                    'cancelled_at' => $refundPending || in_array($refundResult['status'], ['failed', 'manual_required'], true)
+                        ? null
+                        : now(),
                 ]);
 
                 if (Schema::hasTable('notifications')) {
                     DB::table('notifications')->insert([
                         'user_id' => $user->id,
-                        'title' => 'Order Cancelled',
-                        'message' => 'Your order was cancelled.',
-                        'type' => 'Warning',
+                        'title' => $refundPending
+                            ? 'Refund Processing'
+                            : (in_array($refundResult['status'], ['failed', 'manual_required'], true) ? 'Refund Requires Attention' : 'Order Cancelled'),
+                        'message' => $customerNotificationMessage,
+                        'type' => $refundPending || in_array($refundResult['status'], ['failed', 'manual_required'], true) ? 'Warning' : 'Success',
                         'is_read' => 0,
                         'action_url' => '/customer/orders',
                         'created_at' => now(),
@@ -1304,9 +1327,13 @@ class OrderController extends Controller
                     app(\App\Services\RealtimeEventPublisher::class)->notificationUpdated((int) $user->id);
 
                     AdminNotification::notifyRoles(['admin'], [
-                        'type' => 'order_cancelled',
-                        'title' => 'Order Cancelled',
-                        'message' => "Order #{$order->id} was cancelled by the customer.",
+                        'type' => $refundPending ? 'refund_requested' : 'order_cancelled',
+                        'title' => $refundPending ? 'Refund Requested' : 'Order Cancelled',
+                        'message' => $refundPending
+                            ? "Order #{$order->id} cancellation is awaiting PayMongo refund confirmation."
+                            : (in_array($refundResult['status'], ['failed', 'manual_required'], true)
+                                ? "Order #{$order->id} cancellation needs refund follow-up."
+                                : "Order #{$order->id} was cancelled by the customer."),
                         'data' => ['order_id' => (int) $order->id],
                         'action_url' => '/admin/orders',
                         'is_read' => false,
@@ -1314,11 +1341,11 @@ class OrderController extends Controller
                     ]);
                 }
 
-                if ($refundResult['status'] === 'manual_required') {
+                if (in_array($refundResult['status'], ['manual_required', 'failed'], true)) {
                     AdminNotification::notifyRoles(['admin'], [
                         'type' => 'refund_required',
-                        'title' => "Manual refund required for order #{$order->id}",
-                        'message' => "Order #{$order->id} was cancelled after payment. Please refund ₱" . number_format($refundResult['amount'], 2) . ' manually.',
+                        'title' => "Refund requires attention for order #{$order->id}",
+                        'message' => "PayMongo refund for order #{$order->id} needs attention. Amount: ₱" . number_format((float) ($refundResult['amount'] ?? 0), 2) . '.',
                         'data' => ['order_id' => (int) $order->id, 'refund_amount' => $refundResult['amount']],
                         'action_url' => '/admin/orders',
                         'is_read' => false,
@@ -1339,16 +1366,18 @@ class OrderController extends Controller
 
         $order = Order::query()->findOrFail($id);
         $smsMessage = match ($refundResult['status']) {
-            'pending' => "Order #{$id} cancelled. Your refund request is being processed by PayMongo.",
+            'pending' => "Your cancellation for order #{$id} is waiting for PayMongo refund confirmation.",
             'succeeded', 'refunded' => "Order #{$id} cancelled. PayMongo confirmed your refund was returned.",
-            'manual_required' => "Order #{$id} cancelled. Your refund is not yet returned; the shop has been asked to process it manually.",
+            'failed' => "PayMongo could not process the refund for order #{$id}. Please contact support.",
+            'manual_required' => "Your cancellation for order #{$id} is waiting for the shop to process the refund.",
             default => "Order #{$id} has been cancelled.",
         };
         $this->sendSmsNotification($order, 'Cancelled', $smsMessage);
 
         $message = match ($refundResult['status']) {
-            'pending' => 'Order cancelled. Your refund request was submitted to PayMongo and is being processed.',
+            'pending' => 'Your cancellation is awaiting PayMongo refund confirmation.',
             'succeeded', 'refunded' => 'Order cancelled. PayMongo confirmed the refund.',
+            'failed' => 'PayMongo could not process the refund. Please retry the cancellation or contact support.',
             'manual_required' => 'Order cancelled. The admin has been notified to refund your payment manually.',
             default => 'Order cancelled successfully.',
         };
@@ -1358,6 +1387,7 @@ class OrderController extends Controller
             'message' => $message,
             'refund_status' => $refundResult['status'],
             'refund_amount' => $refundResult['amount'],
+            'order_status' => $order->status,
             'cancelled_at' => $order->cancelled_at,
         ]);
     }
@@ -1366,7 +1396,7 @@ class OrderController extends Controller
     {
         $paymentStatus = strtolower(trim((string) $order->payment_status));
         if (!in_array($paymentStatus, ['paid', 'downpayment_paid'], true)) {
-            return ['status' => null, 'amount' => null];
+            return ['status' => null, 'amount' => null, 'reference' => null];
         }
 
         $amount = (float) ($order->total ?? 0);
@@ -1381,9 +1411,8 @@ class OrderController extends Controller
         ) {
             $amount = $downpaymentAmount;
         }
-        $paymentMethod = strtolower((string) preg_replace('/[^a-z0-9]/i', '', (string) $order->payment));
-        if (!in_array($paymentMethod, ['gcash', 'qrph'], true) || empty($order->payment_reference)) {
-            return ['status' => 'manual_required', 'amount' => $amount];
+        if (empty($order->payment_reference)) {
+            return ['status' => 'manual_required', 'amount' => $amount, 'reference' => null];
         }
 
         $secretKey = config('services.paymongo.secret');
@@ -1391,7 +1420,7 @@ class OrderController extends Controller
             Log::warning('PayMongo refund could not be attempted because the secret key is missing.', [
                 'order_id' => $order->id,
             ]);
-            return ['status' => 'manual_required', 'amount' => $amount];
+            return ['status' => 'failed', 'amount' => $amount, 'reference' => null];
         }
 
         try {
@@ -1444,19 +1473,19 @@ class OrderController extends Controller
             $refundData = $refundResponse->json('data');
             $refundId = (string) ($refundData['id'] ?? '');
             $refundStatus = strtolower((string) ($refundData['attributes']['status'] ?? 'pending'));
-            if ($refundId === '' || !in_array($refundStatus, ['pending', 'succeeded', 'refunded'], true)) {
+            if ($refundId === '' || !in_array($refundStatus, ['pending', 'succeeded', 'refunded', 'failed'], true)) {
                 throw new RuntimeException('PayMongo returned an unrecognized refund status.');
             }
 
             $amount = $refundAmount / 100;
-            return ['status' => $refundStatus, 'amount' => $amount];
+            return ['status' => $refundStatus, 'amount' => $amount, 'reference' => $refundId];
         } catch (\Throwable $exception) {
             Log::error('Payment refund could not be completed for order.', [
                 'order_id' => $order->id,
                 'exception' => get_class($exception),
                 'message' => $exception->getMessage(),
             ]);
-            return ['status' => 'manual_required', 'amount' => $amount];
+            return ['status' => 'failed', 'amount' => $amount, 'reference' => null];
         }
     }
 

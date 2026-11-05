@@ -47,6 +47,9 @@ class Order extends Model
         'payment_proof_path',
         'customer_payment_reference',
         'cancelled_at',
+        'refund_reference',
+        'refund_status',
+        'refund_amount',
     ];
 
     protected $hidden = ['discount_id_path', 'payment_proof_path'];
@@ -58,6 +61,7 @@ class Order extends Model
         'total' => 'decimal:2',
         'downpayment_amount' => 'decimal:2',
         'downpayment_base_amount' => 'decimal:2',
+        'refund_amount' => 'decimal:2',
         'lat' => 'decimal:7',
         'lng' => 'decimal:7',
         'is_customized' => 'boolean',
