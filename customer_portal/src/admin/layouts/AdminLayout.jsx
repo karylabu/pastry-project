@@ -1,6 +1,7 @@
 import { useState } from "react";
 import AdminNavbar from "../components/AdminNavbar";
 import AdminChatBubble from "../components/AdminChatBubble";
+import { ROOT_BASE } from "../../services/config";
 
 export default function AdminLayout({ children }) {
   const [sidebarOpen, setSidebarOpen] = useState(() => window.matchMedia("(min-width: 1024px)").matches);
@@ -11,6 +12,10 @@ export default function AdminLayout({ children }) {
       <main className="admin-page-surface min-h-screen bg-[#fbfaf5]">
         {children}
       </main>
+      <footer className="flex w-full flex-col items-center gap-2 border-t border-[#e9e1d9] bg-[#fbfaf5] px-5 py-4 sm:flex-row sm:justify-center sm:gap-3">
+        <img src={`${ROOT_BASE}/uploads/logo.png`} alt="Logo" className="h-9 w-9 object-contain" />
+        <p className="text-center text-xs text-gray-500 sm:text-sm">© 2017 Pastry Project. All rights reserved.</p>
+      </footer>
       <AdminChatBubble />
       <style>{`
         .admin-shell {
