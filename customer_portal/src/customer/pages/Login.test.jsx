@@ -37,7 +37,7 @@ const jsonResponse = (data, ok = true, status = 200) => ({
   text: async () => JSON.stringify(data),
 });
 
-describe("Google sign-in phone onboarding", () => {
+describe("Google sign-in email onboarding", () => {
   const originalFetch = global.fetch;
 
   beforeEach(() => {
@@ -62,17 +62,17 @@ describe("Google sign-in phone onboarding", () => {
     fireEvent.click(screen.getByRole("button", { name: "Continue with Google" }));
   };
 
-  const verifyPhone = async () => {
+  const verifyEmail = async () => {
     fireEvent.change(screen.getByLabelText("Phone number"), { target: { value: "09123456789" } });
-    fireEvent.click(screen.getByRole("button", { name: "Send verification code" }));
-    expect(await screen.findByText("A six-digit verification code was sent to your phone.")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Send email verification code" }));
+    expect(await screen.findByText("A six-digit verification code was sent to your email.")).toBeInTheDocument();
 
-    fireEvent.change(screen.getByLabelText("Verification code"), { target: { value: "123456" } });
+    fireEvent.change(screen.getByLabelText("Email verification code"), { target: { value: "123456" } });
     fireEvent.click(screen.getByRole("button", { name: "Verify" }));
-    expect(await screen.findByText("Phone number verified.")).toBeInTheDocument();
+    expect(await screen.findByText("Email address verified.")).toBeInTheDocument();
   };
 
-  it("collects a verified phone and consent before creating a Google account and logging in", async () => {
+  it("verifies the Google email and collects consent before creating a Google account and logging in", async () => {
     global.fetch = jest.fn()
       .mockResolvedValueOnce(jsonResponse({ success: false, code: "user_not_found", message: "User not found." }, false, 404))
       .mockResolvedValueOnce(jsonResponse({ success: true, verification_id: "a".repeat(64) }))
@@ -87,7 +87,7 @@ describe("Google sign-in phone onboarding", () => {
     startGoogleSignIn();
 
     expect(await screen.findByRole("dialog")).toHaveTextContent("One step away!");
-    await verifyPhone();
+    await verifyEmail();
     fireEvent.click(screen.getByRole("checkbox", { name: /Terms & Conditions/ }));
     fireEvent.click(screen.getByRole("checkbox", { name: /Privacy Policy/ }));
     fireEvent.click(screen.getByRole("button", { name: "Continue to account" }));
@@ -98,7 +98,7 @@ describe("Google sign-in phone onboarding", () => {
       recaptcha_proof: "verified-captcha-proof",
       intent: "signup",
       phone: "09123456789",
-      registration_verification_id: "a".repeat(64),
+      email_verification_id: "a".repeat(64),
       agree_terms: true,
       agree_privacy: true,
     });
@@ -108,7 +108,7 @@ describe("Google sign-in phone onboarding", () => {
     });
   });
 
-  it("verifies and saves a phone for an existing Google account before logging in", async () => {
+  it("verifies email and saves a phone for an existing Google account before logging in", async () => {
     global.fetch = jest.fn()
       .mockResolvedValueOnce(jsonResponse({ success: false, code: "phone_required", message: "Phone required." }, false, 409))
       .mockResolvedValueOnce(jsonResponse({ success: true, verification_id: "b".repeat(64) }))
@@ -123,7 +123,7 @@ describe("Google sign-in phone onboarding", () => {
     startGoogleSignIn();
 
     expect(await screen.findByRole("dialog")).toHaveTextContent("One step away!");
-    await verifyPhone();
+    await verifyEmail();
     fireEvent.click(screen.getByRole("button", { name: "Continue to account" }));
 
     await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(4));
@@ -131,7 +131,7 @@ describe("Google sign-in phone onboarding", () => {
       id_token: "firebase-id-token",
       intent: "complete_phone",
       phone: "09123456789",
-      registration_verification_id: "b".repeat(64),
+      email_verification_id: "b".repeat(64),
     });
     expect(JSON.parse(localStorage.getItem("user"))).toMatchObject({
       id: 43,

@@ -4,6 +4,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\AdminActivityLogController;
 use App\Http\Controllers\Api\AdminAlertController;
 use App\Http\Controllers\Api\AdminSettingsController;
+use App\Http\Controllers\Api\ContentPageController;
 use App\Http\Controllers\Api\AdminBackupController;
 use App\Http\Controllers\Api\AdminRecycleBinController;
 use App\Http\Controllers\Api\NotificationController;
@@ -52,9 +53,9 @@ Route::post('login', [AuthApiController::class, 'login'])
     ->middleware(\Illuminate\Routing\Middleware\ThrottleRequests::class . ':5,15');
 Route::post('login/two-factor', [CustomerTwoFactorController::class, 'verifyLogin'])
     ->middleware(\Illuminate\Routing\Middleware\ThrottleRequests::class . ':5,15');
-Route::post('registration/phone-otp', [AuthApiController::class, 'sendRegistrationPhoneOtp'])
+Route::post('registration/email-otp', [AuthApiController::class, 'sendRegistrationEmailOtp'])
     ->middleware(\Illuminate\Routing\Middleware\ThrottleRequests::class . ':5,15');
-Route::post('registration/phone-otp/verify', [AuthApiController::class, 'verifyRegistrationPhoneOtp'])
+Route::post('registration/email-otp/verify', [AuthApiController::class, 'verifyRegistrationEmailOtp'])
     ->middleware(\Illuminate\Routing\Middleware\ThrottleRequests::class . ':10,15');
 Route::get('customer/two-factor', [CustomerTwoFactorController::class, 'status']);
 Route::post('customer/two-factor/setup', [CustomerTwoFactorController::class, 'setup'])
@@ -109,6 +110,7 @@ Route::post('orders', [OrderController::class, 'store']);
 Route::get('user', [CustomerApiController::class, 'user']);
 Route::get('customer/notifications', [CustomerApiController::class, 'notifications']);
 Route::post('customer/notifications/{id}/read', [CustomerApiController::class, 'markNotificationRead']);
+Route::post('customer/notifications/mark-all-read', [CustomerApiController::class, 'markAllNotificationsRead']);
 Route::get('loyalty', [CustomerLoyaltyController::class, 'index']);
 Route::post('loyalty/redeem', [CustomerLoyaltyController::class, 'redeem']);
 Route::get('customer/chat/messages', [CustomerApiController::class, 'chatFetch']);

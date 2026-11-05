@@ -25,7 +25,7 @@ class CustomerTwoFactorController extends Controller
             'success' => true,
             'enabled' => $factor && $factor->enabled_at !== null
                 && ($factor->secret !== null || in_array($factor->method ?? '', ['email', 'sms'], true)),
-            'method' => $factor->method ?? 'authenticator',
+            'method' => ($factor->method ?? 'authenticator') === 'sms' ? 'email' : ($factor->method ?? 'authenticator'),
             'recovery_codes_remaining' => DB::table('customer_two_factor_recovery_codes')
                 ->where('user_id', $user->id)
                 ->count(),
@@ -43,7 +43,7 @@ class CustomerTwoFactorController extends Controller
         }
 
         $method = strtolower((string) $request->input('method', 'authenticator'));
-        if (!in_array($method, ['authenticator', 'email', 'sms'], true)) {
+        if (!in_array($method, ['authenticator', 'email'], true)) {
             return response()->json(['success' => false, 'message' => 'Choose a valid verification method.'], 422);
         }
         if (!$delivery->isConfigured($method)) {
@@ -193,10 +193,11 @@ class CustomerTwoFactorController extends Controller
             ->where('user_id', $user->id)
             ->whereNotNull('enabled_at')
             ->first();
-        $method = $factor->method ?? 'authenticator';
-        if (!$factor || !in_array($method, ['email', 'sms'], true)) {
+        $storedMethod = $factor->method ?? 'authenticator';
+        if (!$factor || !in_array($storedMethod, ['email', 'sms'], true)) {
             return response()->json(['success' => false, 'message' => 'A delivery code is not needed for this method.'], 409);
         }
+        $method = 'email';
         if (!$delivery->isConfigured($method)) {
             return response()->json(['success' => false, 'message' => 'Code delivery is not configured. Please contact support.'], 503);
         }

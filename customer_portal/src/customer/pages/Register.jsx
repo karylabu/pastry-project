@@ -2,11 +2,10 @@ import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Eye, EyeOff } from "lucide-react";
-import { CUSTOMER_BASE, LARAVEL_BASE, ROOT_BASE } from "../../services/config";
+import { LARAVEL_BASE, ROOT_BASE } from "../../services/config";
 import { safeParseJson } from '../../services/api';
 import CreditsModal from "../components/CreditsModal";
 import GoogleRecaptcha from "../components/GoogleRecaptcha";
-import { signInWithGoogle } from "../../services/firebase";
 
 const ASSET_BASE = process.env.NODE_ENV === "production"
   ? `${ROOT_BASE}/customer_portal/build/assets`
@@ -54,16 +53,16 @@ export default function Register() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
-  const [phoneVerificationId, setPhoneVerificationId] = useState("");
-  const [phoneOtp, setPhoneOtp] = useState("");
-  const [phoneOtpMessage, setPhoneOtpMessage] = useState("");
-  const [phoneVerified, setPhoneVerified] = useState(false);
-  const [phoneOtpLoading, setPhoneOtpLoading] = useState(false);
-  const [phoneVerifyLoading, setPhoneVerifyLoading] = useState(false);
+  const [emailVerificationId, setEmailVerificationId] = useState("");
+  const [emailOtp, setEmailOtp] = useState("");
+  const [emailOtpMessage, setEmailOtpMessage] = useState("");
+  const [emailVerified, setEmailVerified] = useState(false);
+  const [emailOtpLoading, setEmailOtpLoading] = useState(false);
+  const [emailVerifyLoading, setEmailVerifyLoading] = useState(false);
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [googleSignup, setGoogleSignup] = useState(null);
-  const [showPhoneVerificationModal, setShowPhoneVerificationModal] = useState(false);
+  const [showEmailVerificationModal, setShowEmailVerificationModal] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [agreeTerms, setAgreeTerms] = useState(false);
@@ -128,22 +127,23 @@ export default function Register() {
     setErrors(nextErrors);
   };
 
-  const requestPhoneOtp = async () => {
-    const phoneError = validatePhone(phone);
-    if (phoneError) {
-      setTouched((prev) => ({ ...prev, phone: true }));
-      setErrors((prev) => ({ ...prev, phone: phoneError }));
+  const requestEmailOtp = async () => {
+    const emailError = validateEmail(email);
+    if (emailError) {
+      setTouched((prev) => ({ ...prev, email: true }));
+      setErrors((prev) => ({ ...prev, email: emailError }));
       return;
     }
+
     setError("");
-    setPhoneOtpMessage("");
-    setPhoneOtpLoading(true);
+    setEmailOtpMessage("");
+    setEmailOtpLoading(true);
 
     try {
-      const response = await fetch(`${LARAVEL_BASE}/api/registration/phone-otp`, {
+      const response = await fetch(`${LARAVEL_BASE}/api/registration/email-otp`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Accept: "application/json" },
-        body: JSON.stringify({ phone: phone.trim() }),
+        body: JSON.stringify({ email: email.trim() }),
       });
       const data = await safeParseJson(response);
 
@@ -152,35 +152,35 @@ export default function Register() {
         return;
       }
 
-      setPhoneVerificationId(data.verification_id);
-      setPhoneOtp("");
-      setPhoneVerified(false);
-      setPhoneOtpMessage("A six-digit verification code was sent to your phone. It expires in 10 minutes.");
+      setEmailVerificationId(data.verification_id);
+      setEmailOtp("");
+      setEmailVerified(false);
+      setEmailOtpMessage("A six-digit verification code was sent to your email. It expires in 10 minutes.");
     } catch (requestError) {
       setError("Network error while sending the verification code. Please try again.");
     } finally {
-      setPhoneOtpLoading(false);
+      setEmailOtpLoading(false);
     }
   };
 
-  const verifyPhoneOtp = async () => {
-    if (!/^\d{6}$/.test(phoneOtp)) {
-      setError("Enter the six-digit verification code sent to your phone.");
+  const verifyEmailOtp = async () => {
+    if (!/^\d{6}$/.test(emailOtp)) {
+      setError("Enter the six-digit verification code sent to your email.");
       return;
     }
 
     setError("");
-    setPhoneOtpMessage("");
-    setPhoneVerifyLoading(true);
+    setEmailOtpMessage("");
+    setEmailVerifyLoading(true);
 
     try {
-      const response = await fetch(`${LARAVEL_BASE}/api/registration/phone-otp/verify`, {
+      const response = await fetch(`${LARAVEL_BASE}/api/registration/email-otp/verify`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Accept: "application/json" },
         body: JSON.stringify({
-          phone: phone.trim(),
-          verification_id: phoneVerificationId,
-          code: phoneOtp,
+          email: email.trim(),
+          verification_id: emailVerificationId,
+          code: emailOtp,
         }),
       });
       const data = await safeParseJson(response);
@@ -190,12 +190,12 @@ export default function Register() {
         return;
       }
 
-      setPhoneVerified(true);
-      setPhoneOtpMessage("Phone number verified.");
+      setEmailVerified(true);
+      setEmailOtpMessage("Email address verified.");
     } catch (requestError) {
       setError("Network error while verifying your phone. Please try again.");
     } finally {
-      setPhoneVerifyLoading(false);
+      setEmailVerifyLoading(false);
     }
   };
 
@@ -227,12 +227,12 @@ export default function Register() {
       return;
     }
 
-    if (!phoneVerified) {
-      setShowPhoneVerificationModal(true);
+    if (!emailVerified) {
+      setShowEmailVerificationModal(true);
       return;
     }
 
-    setShowPhoneVerificationModal(false);
+    setShowEmailVerificationModal(false);
     setLoading(true);
 
     try {
@@ -248,7 +248,7 @@ export default function Register() {
             phone: phone.trim(),
             agree_terms: agreeTerms,
             agree_privacy: agreePrivacy,
-            registration_verification_id: phoneVerificationId,
+            email_verification_id: emailVerificationId,
             photoUrl: googleSignup.photoURL,
           }),
         });
@@ -285,7 +285,7 @@ export default function Register() {
           name,
           email,
           phone: phone.trim(),
-          registration_verification_id: phoneVerificationId,
+          email_verification_id: emailVerificationId,
           password,
           recaptcha_proof: recaptchaProof,
           agree_terms: true,
@@ -332,6 +332,7 @@ export default function Register() {
     setGoogleLoading(true);
 
     try {
+      const { signInWithGoogle } = await import("../../services/firebase");
       const { idToken, user: googleUser, email, name, photoURL } = await signInWithGoogle();
       const googleProfile = {
         idToken,
@@ -373,10 +374,10 @@ export default function Register() {
       setName(googleProfile.name);
       setEmail(googleProfile.email);
       setPhone("");
-      setPhoneVerificationId("");
-      setPhoneOtp("");
-      setPhoneOtpMessage("");
-      setPhoneVerified(false);
+      setEmailVerificationId("");
+      setEmailOtp("");
+      setEmailOtpMessage("");
+      setEmailVerified(false);
       setPassword("");
       setConfirmPassword("");
       setAgreeTerms(false);
@@ -921,7 +922,7 @@ export default function Register() {
               <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-x-4 gap-y-2 sm:grid-cols-2">
                 {googleSignup && (
                   <p className="rounded-lg bg-[#fff8e9] p-3 text-sm text-[#765d50] sm:col-span-2">
-                    Your Google details are ready. Verify your phone number and accept the Terms &amp; Conditions and Privacy Policy to finish signing up.
+                    Your Google details are ready. Verify your email and accept the Terms &amp; Conditions and Privacy Policy to finish signing up.
                   </p>
                 )}
                 <div>
@@ -953,6 +954,10 @@ export default function Register() {
                     onBlur={() => handleBlur("email")}
                     onChange={(e) => {
                       setEmail(e.target.value);
+                      setEmailVerificationId("");
+                      setEmailOtp("");
+                      setEmailOtpMessage("");
+                      setEmailVerified(false);
                       if (touched.email) {
                         setErrors((prev) => ({ ...prev, email: validateEmail(e.target.value) }));
                       }
@@ -972,10 +977,6 @@ export default function Register() {
                     onBlur={() => handleBlur("phone")}
                     onChange={(e) => {
                       setPhone(e.target.value);
-                      setPhoneVerificationId("");
-                      setPhoneOtp("");
-                      setPhoneOtpMessage("");
-                      setPhoneVerified(false);
                       if (touched.phone) {
                         setErrors((prev) => ({ ...prev, phone: validatePhone(e.target.value) }));
                       }
@@ -1130,10 +1131,10 @@ export default function Register() {
                       setName("");
                       setEmail("");
                       setPhone("");
-                      setPhoneVerificationId("");
-                      setPhoneOtp("");
-                      setPhoneOtpMessage("");
-                      setPhoneVerified(false);
+                      setEmailVerificationId("");
+                      setEmailOtp("");
+                      setEmailOtpMessage("");
+                      setEmailVerified(false);
                       setError("");
                       setAccountAlreadyRegistered(false);
                       setAgreeTerms(false);
@@ -1174,8 +1175,8 @@ export default function Register() {
         </footer>
       </div>
       <CreditsModal isOpen={showCredits} onClose={() => setShowCredits(false)} />
-      {showPhoneVerificationModal && (
-        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/50 px-4 py-6 backdrop-blur-sm" onClick={() => setShowPhoneVerificationModal(false)}>
+      {showEmailVerificationModal && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/50 px-4 py-6 backdrop-blur-sm" onClick={() => setShowEmailVerificationModal(false)}>
           <motion.section
             role="dialog"
             aria-modal="true"
@@ -1188,31 +1189,31 @@ export default function Register() {
             <div className="mb-5 flex items-start justify-between gap-4">
               <div>
                 <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#a87c28]">Account verification</p>
-                <h2 id="registration-phone-title" className="mt-1 text-2xl font-bold text-[#2b1b14]">Verify your phone</h2>
-                <p className="mt-2 text-sm leading-6 text-[#6b5b51]">Verify your phone number to finish creating your account.</p>
+                <h2 id="registration-phone-title" className="mt-1 text-2xl font-bold text-[#2b1b14]">Verify your email</h2>
+                <p className="mt-2 text-sm leading-6 text-[#6b5b51]">Enter the code sent to your email to finish creating your account.</p>
               </div>
-              <button type="button" aria-label="Close phone verification" onClick={() => setShowPhoneVerificationModal(false)} className="rounded-full px-2 py-1 text-xl leading-none text-[#8c7c72] hover:bg-[#f8f4eb]">×</button>
+              <button type="button" aria-label="Close email verification" onClick={() => setShowEmailVerificationModal(false)} className="rounded-full px-2 py-1 text-xl leading-none text-[#8c7c72] hover:bg-[#f8f4eb]">×</button>
             </div>
             {error && <div role="alert" className="mb-4 rounded-xl border border-red-100 bg-red-50 p-3 text-sm text-red-700">{error}</div>}
             <form onSubmit={handleSubmit}>
-              <label htmlFor="registration-verification-phone" className="mb-1.5 block text-sm font-bold text-[#33251e]">Phone number</label>
-              <input id="registration-verification-phone" type="tel" value={phone} readOnly className="w-full rounded-xl border border-[#e5d8c8] bg-gray-50 px-4 py-3 text-sm text-[#6b5b51]" />
-              {!phoneVerified && (
-                <button type="button" onClick={requestPhoneOtp} disabled={phoneOtpLoading || !phone.trim() || Boolean(validatePhone(phone))} className="mt-2 w-full rounded-xl border border-[#d8c18d] px-4 py-3 text-sm font-bold text-[#765d30] disabled:cursor-not-allowed disabled:opacity-50">
-                  {phoneOtpLoading ? "Sending code…" : phoneVerificationId ? "Resend verification code" : "Send verification code"}
+              <label htmlFor="registration-verification-email" className="mb-1.5 block text-sm font-bold text-[#33251e]">Email address</label>
+              <input id="registration-verification-email" type="email" value={email} readOnly className="w-full rounded-xl border border-[#e5d8c8] bg-gray-50 px-4 py-3 text-sm text-[#6b5b51]" />
+              {!emailVerified && (
+                <button type="button" onClick={requestEmailOtp} disabled={emailOtpLoading || Boolean(validateEmail(email))} className="mt-2 w-full rounded-xl border border-[#d8c18d] px-4 py-3 text-sm font-bold text-[#765d30] disabled:cursor-not-allowed disabled:opacity-50">
+                  {emailOtpLoading ? "Sending code…" : emailVerificationId ? "Resend verification code" : "Send verification code"}
                 </button>
               )}
-              {phoneVerificationId && !phoneVerified && (
+              {emailVerificationId && !emailVerified && (
                 <div className="mt-4">
-                  <label htmlFor="registration-phone-code" className="mb-1.5 block text-sm font-bold text-[#33251e]">Verification code</label>
+                  <label htmlFor="registration-email-code" className="mb-1.5 block text-sm font-bold text-[#33251e]">Verification code</label>
                   <div className="flex gap-2">
-                    <input id="registration-phone-code" type="text" inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={phoneOtp} onChange={(event) => setPhoneOtp(event.target.value.replace(/\D/g, "").slice(0, 6))} placeholder="6-digit code" className="min-w-0 flex-1 rounded-xl border border-[#e5d8c8] px-4 py-3 text-sm" />
-                    <button type="button" onClick={verifyPhoneOtp} disabled={phoneVerifyLoading || phoneOtp.length !== 6} className="rounded-xl bg-[#f0b94d] px-4 text-sm font-bold text-[#2b1b14] disabled:opacity-50">{phoneVerifyLoading ? "Checking…" : "Verify"}</button>
+                    <input id="registration-email-code" type="text" inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={emailOtp} onChange={(event) => setEmailOtp(event.target.value.replace(/\D/g, "").slice(0, 6))} placeholder="6-digit code" className="min-w-0 flex-1 rounded-xl border border-[#e5d8c8] px-4 py-3 text-sm" />
+                    <button type="button" onClick={verifyEmailOtp} disabled={emailVerifyLoading || emailOtp.length !== 6} className="rounded-xl bg-[#f0b94d] px-4 text-sm font-bold text-[#2b1b14] disabled:opacity-50">{emailVerifyLoading ? "Checking…" : "Verify"}</button>
                   </div>
                 </div>
               )}
-              {phoneOtpMessage && <p className={`mt-3 text-sm ${phoneVerified ? "text-green-700" : "text-[#765d30]"}`} role="status">{phoneOtpMessage}</p>}
-              {phoneVerified && <button type="submit" disabled={loading} className="btn-primary mt-4 w-full text-sm disabled:opacity-50">{loading ? "Creating account…" : "Continue"}</button>}
+              {emailOtpMessage && <p className={`mt-3 text-sm ${emailVerified ? "text-green-700" : "text-[#765d30]"}`} role="status">{emailOtpMessage}</p>}
+              {emailVerified && <button type="submit" disabled={loading} className="btn-primary mt-4 w-full text-sm disabled:opacity-50">{loading ? "Creating account…" : "Continue"}</button>}
             </form>
           </motion.section>
         </div>

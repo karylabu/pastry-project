@@ -6,8 +6,6 @@ import CreditsModal from "../components/CreditsModal";
 import GoogleRecaptcha from "../components/GoogleRecaptcha";
 import { LARAVEL_BASE, ROOT_BASE } from "../../services/config";
 import { getUserFriendlyAuthError, parseJsonResponse } from '../../services/api';
-import { signInWithGoogle } from "../../services/firebase";
-
 const ASSET_BASE = process.env.NODE_ENV === "production"
   ? `${ROOT_BASE}/customer_portal/build/assets`
   : "/assets";
@@ -47,10 +45,10 @@ export default function Login() {
   const [twoFactorDestination, setTwoFactorDestination] = useState("");
   const [googleOnboarding, setGoogleOnboarding] = useState(null);
   const [googlePhone, setGooglePhone] = useState("");
-  const [googlePhoneVerificationId, setGooglePhoneVerificationId] = useState("");
-  const [googlePhoneCode, setGooglePhoneCode] = useState("");
-  const [googlePhoneVerified, setGooglePhoneVerified] = useState(false);
-  const [googlePhoneStatus, setGooglePhoneStatus] = useState("");
+  const [googleEmailVerificationId, setGoogleEmailVerificationId] = useState("");
+  const [googleEmailCode, setGoogleEmailCode] = useState("");
+  const [googleEmailVerified, setGoogleEmailVerified] = useState(false);
+  const [googleEmailStatus, setGoogleEmailStatus] = useState("");
   const [googleOnboardingError, setGoogleOnboardingError] = useState("");
   const [googleTermsAccepted, setGoogleTermsAccepted] = useState(false);
   const [googlePrivacyAccepted, setGooglePrivacyAccepted] = useState(false);
@@ -82,6 +80,7 @@ export default function Login() {
 
     let response;
     try {
+      const { signInWithGoogle } = await import("../../services/firebase");
       const { idToken, user: googleUser, email, name, photoURL } = await signInWithGoogle();
       const googlePayload = {
         email: email || googleUser?.email || "",
@@ -122,10 +121,10 @@ export default function Login() {
             mode: "signup",
           });
           setGooglePhone("");
-          setGooglePhoneVerificationId("");
-          setGooglePhoneCode("");
-          setGooglePhoneVerified(false);
-          setGooglePhoneStatus("");
+          setGoogleEmailVerificationId("");
+          setGoogleEmailCode("");
+          setGoogleEmailVerified(false);
+          setGoogleEmailStatus("");
           setGoogleTermsAccepted(false);
           setGooglePrivacyAccepted(false);
           setGoogleOnboardingError("");
@@ -141,10 +140,10 @@ export default function Login() {
             mode: "complete_phone",
           });
           setGooglePhone("");
-          setGooglePhoneVerificationId("");
-          setGooglePhoneCode("");
-          setGooglePhoneVerified(false);
-          setGooglePhoneStatus("");
+          setGoogleEmailVerificationId("");
+          setGoogleEmailCode("");
+          setGoogleEmailVerified(false);
+          setGoogleEmailStatus("");
           setGoogleOnboardingError("");
           return;
         }
@@ -179,18 +178,18 @@ export default function Login() {
     }
   };
 
-  const requestGooglePhoneCode = async () => {
-    if (!googlePhone.trim()) return;
+  const requestGoogleEmailCode = async () => {
+    if (!googleOnboarding?.email) return;
 
     setGoogleOnboardingError("");
-    setGooglePhoneStatus("");
+    setGoogleEmailStatus("");
     setGoogleOnboardingLoading(true);
     let response;
     try {
-      response = await fetch(`${LARAVEL_BASE}/api/registration/phone-otp`, {
+      response = await fetch(`${LARAVEL_BASE}/api/registration/email-otp`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Accept: "application/json" },
-        body: JSON.stringify({ phone: googlePhone.trim() }),
+        body: JSON.stringify({ email: googleOnboarding.email }),
       });
       const data = await parseJsonResponse(response, "Could not send the verification code. Please try again.");
       if (!response.ok || !data?.success) {
@@ -198,10 +197,10 @@ export default function Login() {
         return;
       }
 
-      setGooglePhoneVerificationId(data.verification_id);
-      setGooglePhoneCode("");
-      setGooglePhoneVerified(false);
-      setGooglePhoneStatus("A six-digit verification code was sent to your phone.");
+      setGoogleEmailVerificationId(data.verification_id);
+      setGoogleEmailCode("");
+      setGoogleEmailVerified(false);
+      setGoogleEmailStatus("A six-digit verification code was sent to your email.");
     } catch {
       setGoogleOnboardingError("Network error while sending the verification code. Please try again.");
     } finally {
@@ -209,21 +208,21 @@ export default function Login() {
     }
   };
 
-  const verifyGooglePhoneCode = async () => {
-    if (!googlePhoneVerificationId || !/^\d{6}$/.test(googlePhoneCode)) return;
+  const verifyGoogleEmailCode = async () => {
+    if (!googleEmailVerificationId || !/^\d{6}$/.test(googleEmailCode)) return;
 
     setGoogleOnboardingError("");
-    setGooglePhoneStatus("");
+    setGoogleEmailStatus("");
     setGoogleOnboardingLoading(true);
     let response;
     try {
-      response = await fetch(`${LARAVEL_BASE}/api/registration/phone-otp/verify`, {
+      response = await fetch(`${LARAVEL_BASE}/api/registration/email-otp/verify`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Accept: "application/json" },
         body: JSON.stringify({
-          phone: googlePhone.trim(),
-          verification_id: googlePhoneVerificationId,
-          code: googlePhoneCode,
+          email: googleOnboarding.email,
+          verification_id: googleEmailVerificationId,
+          code: googleEmailCode,
         }),
       });
       const data = await parseJsonResponse(response, "The verification code could not be verified.");
@@ -232,8 +231,8 @@ export default function Login() {
         return;
       }
 
-      setGooglePhoneVerified(true);
-      setGooglePhoneStatus("Phone number verified.");
+      setGoogleEmailVerified(true);
+      setGoogleEmailStatus("Email address verified.");
     } catch {
       setGoogleOnboardingError("Network error while verifying your phone. Please try again.");
     } finally {
@@ -243,8 +242,8 @@ export default function Login() {
 
   const completeGoogleOnboarding = async (event) => {
     event.preventDefault();
-    if (!googleOnboarding || !googlePhoneVerified) {
-      setGoogleOnboardingError("Verify your phone number before continuing.");
+    if (!googleOnboarding || !googleEmailVerified) {
+      setGoogleOnboardingError("Verify your email address before continuing.");
       return;
     }
     if (googleOnboarding.mode === "signup" && (!googleTermsAccepted || !googlePrivacyAccepted)) {
@@ -265,7 +264,7 @@ export default function Login() {
           recaptcha_proof: googleOnboarding.recaptchaProof,
           intent: googleOnboarding.mode,
           phone: googlePhone.trim(),
-          registration_verification_id: googlePhoneVerificationId,
+          email_verification_id: googleEmailVerificationId,
           agree_terms: googleOnboarding.mode === "signup" ? googleTermsAccepted : undefined,
           agree_privacy: googleOnboarding.mode === "signup" ? googlePrivacyAccepted : undefined,
           email: googleOnboarding.email,
@@ -1389,13 +1388,13 @@ export default function Login() {
                 <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#a87c28]">Google sign-in</p>
                 <h2 id="google-onboarding-title" className="mt-1 text-2xl font-bold text-[#2b1b14]">One step away!</h2>
                 <p className="mt-2 text-sm leading-6 text-[#6b5b51]">
-                  Add and verify your phone number to {googleOnboarding.mode === "signup" ? "finish creating your account" : "continue to your account"}.
+                  Verify your email and add your phone number to {googleOnboarding.mode === "signup" ? "finish creating your account" : "continue to your account"}.
                 </p>
                 {googleOnboarding.email && <p className="mt-1 break-all text-xs text-[#8c7c72]">{googleOnboarding.email}</p>}
               </div>
               <button
                 type="button"
-                aria-label="Close phone setup"
+                aria-label="Close account setup"
                 onClick={() => setGoogleOnboarding(null)}
                 className="rounded-full px-2 py-1 text-xl leading-none text-[#8c7c72] hover:bg-[#f8f4eb]"
               >
@@ -1422,10 +1421,6 @@ export default function Login() {
                   value={googlePhone}
                   onChange={(event) => {
                     setGooglePhone(event.target.value);
-                    setGooglePhoneVerificationId("");
-                    setGooglePhoneCode("");
-                    setGooglePhoneVerified(false);
-                    setGooglePhoneStatus("");
                     setGoogleOnboardingError("");
                   }}
                   placeholder="09123456789"
@@ -1433,21 +1428,21 @@ export default function Login() {
                 />
               </div>
 
-              {!googlePhoneVerified && (
+              {!googleEmailVerified && (
                 <button
                   type="button"
-                  onClick={requestGooglePhoneCode}
-                  disabled={googleOnboardingLoading || !googlePhone.trim()}
+                  onClick={requestGoogleEmailCode}
+                  disabled={googleOnboardingLoading || !googleOnboarding.email}
                   className="w-full rounded-xl border border-[#d8c18d] px-4 py-3 text-sm font-bold text-[#765d30] disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  {googleOnboardingLoading ? "Please wait..." : googlePhoneVerificationId ? "Resend verification code" : "Send verification code"}
+                  {googleOnboardingLoading ? "Please wait..." : googleEmailVerificationId ? "Resend verification code" : "Send email verification code"}
                 </button>
               )}
 
-              {googlePhoneVerificationId && !googlePhoneVerified && (
+              {googleEmailVerificationId && !googleEmailVerified && (
                 <div>
                   <label htmlFor="google-onboarding-code" className="mb-1.5 block text-sm font-bold text-[#33251e]">
-                    Verification code
+                    Email verification code
                   </label>
                   <div className="flex gap-2">
                     <input
@@ -1457,15 +1452,15 @@ export default function Login() {
                       autoComplete="one-time-code"
                       maxLength={6}
                       required
-                      value={googlePhoneCode}
-                      onChange={(event) => setGooglePhoneCode(event.target.value.replace(/\D/g, "").slice(0, 6))}
+                      value={googleEmailCode}
+                      onChange={(event) => setGoogleEmailCode(event.target.value.replace(/\D/g, "").slice(0, 6))}
                       placeholder="6-digit code"
                       className="min-w-0 flex-1 rounded-xl border border-[#e5d8c8] px-4 py-3 text-sm outline-none focus:border-[#c9972d] focus:ring-2 focus:ring-[#fff1bd]"
                     />
                     <button
                       type="button"
-                      onClick={verifyGooglePhoneCode}
-                      disabled={googleOnboardingLoading || googlePhoneCode.length !== 6}
+                      onClick={verifyGoogleEmailCode}
+                      disabled={googleOnboardingLoading || googleEmailCode.length !== 6}
                       className="rounded-xl bg-[#f0b94d] px-4 text-sm font-bold text-[#2b1b14] disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       Verify
@@ -1474,9 +1469,9 @@ export default function Login() {
                 </div>
               )}
 
-              {googlePhoneStatus && (
-                <p role="status" className={`text-sm ${googlePhoneVerified ? "text-green-700" : "text-[#6b5b51]"}`}>
-                  {googlePhoneStatus}
+              {googleEmailStatus && (
+                <p role="status" className={`text-sm ${googleEmailVerified ? "text-green-700" : "text-[#6b5b51]"}`}>
+                  {googleEmailStatus}
                 </p>
               )}
 
@@ -1507,7 +1502,7 @@ export default function Login() {
                 type="submit"
                 disabled={
                   googleOnboardingLoading
-                  || !googlePhoneVerified
+                  || !googleEmailVerified
                   || (googleOnboarding.mode === "signup" && (!googleTermsAccepted || !googlePrivacyAccepted))
                 }
                 className="w-full rounded-xl bg-[#f0b94d] px-4 py-3 text-sm font-bold text-[#2b1b14] transition hover:bg-[#e6ad3e] disabled:cursor-not-allowed disabled:opacity-50"

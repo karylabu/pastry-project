@@ -50,7 +50,7 @@ describe("Google registration", () => {
     jest.clearAllMocks();
   });
 
-  it("prefills Google details and waits for phone and policy acceptance before creating the account", async () => {
+  it("prefills Google details and waits for email and policy acceptance before creating the account", async () => {
     global.fetch
       .mockResolvedValueOnce({
         ok: false,
@@ -93,16 +93,16 @@ describe("Google registration", () => {
       recaptcha_proof: "verified-captcha-proof",
       intent: "signup_check",
     });
-    fireEvent.change(screen.getByPlaceholderText("09123456789"), { target: { value: "09123456789" } });
+    fireEvent.change(screen.getByPlaceholderText("09123456789"), { target: { value: "09171234567" } });
     screen.getAllByRole("checkbox").forEach((checkbox) => fireEvent.click(checkbox));
 
     fireEvent.click(screen.getByRole("button", { name: "Complete Google Sign Up" }));
     expect(await screen.findByRole("dialog")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Send verification code" }));
-    expect(await screen.findByText(/verification code was sent/i)).toBeInTheDocument();
+    expect(await screen.findByText(/verification code was sent to your email/i)).toBeInTheDocument();
     fireEvent.change(screen.getByRole("textbox", { name: "Verification code" }), { target: { value: "123456" } });
     fireEvent.click(screen.getByRole("button", { name: "Verify" }));
-    expect(await screen.findByText("Phone number verified.")).toBeInTheDocument();
+    expect(await screen.findByText("Email address verified.")).toBeInTheDocument();
 
     const completeButton = screen.getByRole("button", { name: "Complete Google Sign Up" });
     expect(completeButton).toBeEnabled();
@@ -113,8 +113,8 @@ describe("Google registration", () => {
       id_token: "firebase-id-token",
       recaptcha_proof: "verified-captcha-proof",
       intent: "signup",
-      phone: "09123456789",
-      registration_verification_id: "a".repeat(64),
+      phone: "09171234567",
+      email_verification_id: "a".repeat(64),
       agree_terms: true,
       agree_privacy: true,
     });
@@ -124,7 +124,7 @@ describe("Google registration", () => {
     });
   });
 
-  it("keeps regular account creation disabled until the phone and robot checks are completed", async () => {
+  it("keeps regular account creation disabled until the email and robot checks are completed", async () => {
     global.fetch
       .mockResolvedValueOnce({
         ok: true,
@@ -138,7 +138,7 @@ describe("Google registration", () => {
     render(<Register />);
     fireEvent.change(screen.getByPlaceholderText("Juan Dela Cruz"), { target: { value: "Test Customer" } });
     fireEvent.change(screen.getByPlaceholderText("name@example.com"), { target: { value: "test@example.com" } });
-    fireEvent.change(screen.getByPlaceholderText("09123456789"), { target: { value: "09123456789" } });
+    fireEvent.change(screen.getByPlaceholderText("09123456789"), { target: { value: "09171234567" } });
     fireEvent.change(screen.getAllByPlaceholderText("••••••••")[0], { target: { value: "Strong123" } });
     fireEvent.change(screen.getAllByPlaceholderText("••••••••")[1], { target: { value: "Strong123" } });
     screen.getAllByRole("checkbox").forEach((checkbox) => fireEvent.click(checkbox));
@@ -151,10 +151,10 @@ describe("Google registration", () => {
     fireEvent.click(createAccountButton);
     expect(await screen.findByRole("dialog")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Send verification code" }));
-    expect(await screen.findByText(/verification code was sent/i)).toBeInTheDocument();
+    expect(await screen.findByText(/verification code was sent to your email/i)).toBeInTheDocument();
     fireEvent.change(screen.getByRole("textbox", { name: "Verification code" }), { target: { value: "123456" } });
     fireEvent.click(screen.getByRole("button", { name: "Verify" }));
-    expect(await screen.findByText("Phone number verified.")).toBeInTheDocument();
+    expect(await screen.findByText("Email address verified.")).toBeInTheDocument();
     expect(createAccountButton).toBeEnabled();
   });
 
@@ -181,6 +181,14 @@ describe("Google registration", () => {
         text: async () => JSON.stringify({ success: false, code: "user_not_found" }),
       })
       .mockResolvedValueOnce({
+        ok: true,
+        text: async () => JSON.stringify({ success: true, verification_id: "e".repeat(64) }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        text: async () => JSON.stringify({ success: true }),
+      })
+      .mockResolvedValueOnce({
         ok: false,
         status: 409,
         text: async () => JSON.stringify({
@@ -195,10 +203,15 @@ describe("Google registration", () => {
     fireEvent.click(screen.getByRole("button", { name: "Sign Up with Google" }));
 
     await waitFor(() => expect(screen.getByDisplayValue("Google Customer")).toHaveAttribute("readonly"));
-    fireEvent.change(screen.getByPlaceholderText("09123456789"), { target: { value: "09123456789" } });
+    fireEvent.change(screen.getByPlaceholderText("09123456789"), { target: { value: "09171234567" } });
     screen.getAllByRole("checkbox").forEach((checkbox) => fireEvent.click(checkbox));
     fireEvent.click(screen.getByRole("button", { name: "Complete Google Sign Up" }));
     fireEvent.click(screen.getByRole("button", { name: "Send verification code" }));
+    expect(await screen.findByText(/verification code was sent to your email/i)).toBeInTheDocument();
+    fireEvent.change(screen.getByRole("textbox", { name: "Verification code" }), { target: { value: "123456" } });
+    fireEvent.click(screen.getByRole("button", { name: "Verify" }));
+    expect(await screen.findByText("Email address verified.")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
 
     expect(await screen.findAllByText(/already linked to an account/i)).not.toHaveLength(0);
     expect(localStorage.getItem("user")).toBeNull();
@@ -274,16 +287,16 @@ describe("Google registration", () => {
     fireEvent.click(screen.getByRole("button", { name: "Complete robot check" }));
     fireEvent.change(screen.getByPlaceholderText("Juan Dela Cruz"), { target: { value: "Existing Customer" } });
     fireEvent.change(screen.getByPlaceholderText("name@example.com"), { target: { value: "existing@example.com" } });
-    fireEvent.change(screen.getByPlaceholderText("09123456789"), { target: { value: "09123456789" } });
+    fireEvent.change(screen.getByPlaceholderText("09123456789"), { target: { value: "09171234567" } });
     fireEvent.change(screen.getAllByPlaceholderText("••••••••")[0], { target: { value: "Strong123" } });
     fireEvent.change(screen.getAllByPlaceholderText("••••••••")[1], { target: { value: "Strong123" } });
     screen.getAllByRole("checkbox").forEach((checkbox) => fireEvent.click(checkbox));
     fireEvent.click(screen.getByRole("button", { name: "Create account" }));
     fireEvent.click(screen.getByRole("button", { name: "Send verification code" }));
-    expect(await screen.findByText(/verification code was sent/i)).toBeInTheDocument();
+    expect(await screen.findByText(/verification code was sent to your email/i)).toBeInTheDocument();
     fireEvent.change(screen.getByRole("textbox", { name: "Verification code" }), { target: { value: "123456" } });
     fireEvent.click(screen.getByRole("button", { name: "Verify" }));
-    expect(await screen.findByText("Phone number verified.")).toBeInTheDocument();
+    expect(await screen.findByText("Email address verified.")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Continue" }));
 
     expect(await screen.findByText(/This account is already registered/)).toBeInTheDocument();
@@ -314,16 +327,16 @@ describe("Google registration", () => {
     fireEvent.click(screen.getByRole("button", { name: "Complete robot check" }));
     fireEvent.change(screen.getByPlaceholderText("Juan Dela Cruz"), { target: { value: "Existing Admin" } });
     fireEvent.change(screen.getByPlaceholderText("name@example.com"), { target: { value: "admin@example.com" } });
-    fireEvent.change(screen.getByPlaceholderText("09123456789"), { target: { value: "09123456789" } });
+    fireEvent.change(screen.getByPlaceholderText("09123456789"), { target: { value: "09171234567" } });
     fireEvent.change(screen.getAllByPlaceholderText("••••••••")[0], { target: { value: "Strong123" } });
     fireEvent.change(screen.getAllByPlaceholderText("••••••••")[1], { target: { value: "Strong123" } });
     screen.getAllByRole("checkbox").forEach((checkbox) => fireEvent.click(checkbox));
     fireEvent.click(screen.getByRole("button", { name: "Create account" }));
     fireEvent.click(screen.getByRole("button", { name: "Send verification code" }));
-    expect(await screen.findByText(/verification code was sent/i)).toBeInTheDocument();
+    expect(await screen.findByText(/verification code was sent to your email/i)).toBeInTheDocument();
     fireEvent.change(screen.getByRole("textbox", { name: "Verification code" }), { target: { value: "123456" } });
     fireEvent.click(screen.getByRole("button", { name: "Verify" }));
-    expect(await screen.findByText("Phone number verified.")).toBeInTheDocument();
+    expect(await screen.findByText("Email address verified.")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Continue" }));
 
     expect(await screen.findByText(/This is an admin account/)).toBeInTheDocument();

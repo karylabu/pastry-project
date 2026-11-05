@@ -36,7 +36,7 @@ class CustomerTwoFactor
     {
         $method = DB::table('customer_two_factor')->where('user_id', $userId)->value('method');
 
-        return in_array($method, ['authenticator', 'email', 'sms'], true) ? $method : 'authenticator';
+        return $method === 'sms' ? 'email' : (in_array($method, ['authenticator', 'email'], true) ? $method : 'authenticator');
     }
 
     public function createLoginChallenge(int $userId, CustomerTwoFactorDelivery $delivery): array
@@ -50,9 +50,10 @@ class CustomerTwoFactor
             throw new RuntimeException('Two-factor authentication is unavailable for this account.');
         }
 
-        $method = in_array($factor->method ?? 'authenticator', ['authenticator', 'email', 'sms'], true)
-            ? ($factor->method ?? 'authenticator')
-            : 'authenticator';
+        $storedMethod = $factor->method ?? 'authenticator';
+        $method = $storedMethod === 'sms'
+            ? 'email'
+            : (in_array($storedMethod, ['authenticator', 'email'], true) ? $storedMethod : 'authenticator');
         $otp = $method === 'authenticator' ? null : $this->generateCode();
         $codeHash = $otp === null ? null : Hash::make($otp);
         $token = bin2hex(random_bytes(32));

@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\User;
 use App\Services\CustomerTwoFactor;
 use App\Services\CustomerTwoFactorDelivery;
+use App\Services\RegistrationEmailVerification;
 use App\Services\RegistrationPhoneVerification;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -43,36 +44,28 @@ class AuthApiController extends Controller
         ]);
     }
 
-    public function sendRegistrationPhoneOtp(Request $request, RegistrationPhoneVerification $phoneVerification, CustomerTwoFactorDelivery $delivery)
+    public function sendRegistrationEmailOtp(Request $request, RegistrationEmailVerification $emailVerification, CustomerTwoFactorDelivery $delivery)
     {
         $validator = Validator::make($request->all(), [
-            'phone' => ['required', 'string', 'max:30', 'regex:/^\+?[0-9\s-]{7,15}$/'],
+            'email' => ['required', 'string', 'email', 'max:150'],
         ]);
 
         if ($validator->fails()) {
             return response()->json([
                 'success' => false,
-                'message' => 'Enter a valid phone number.',
+                'message' => 'Enter a valid email address.',
                 'errors' => $validator->errors(),
             ], 422);
         }
 
-        if ($phoneVerification->isPhoneRegistered((string) $request->input('phone'))) {
-            return response()->json([
-                'success' => false,
-                'code' => 'phone_already_registered',
-                'message' => 'This phone number is already linked to an account. Please log in to your existing account.',
-            ], 409);
-        }
-
         try {
-            $verificationId = $phoneVerification->sendCode((string) $request->input('phone'), $delivery);
+            $verificationId = $emailVerification->sendCode((string) $request->input('email'), $delivery);
         } catch (\RuntimeException $exception) {
             if (str_starts_with($exception->getMessage(), 'Please wait')) {
                 return response()->json(['success' => false, 'message' => $exception->getMessage()], 429);
             }
 
-            Log::warning('Customer registration phone OTP delivery failed.');
+            Log::warning('Customer registration email OTP delivery failed.');
             return response()->json([
                 'success' => false,
                 'message' => $exception->getMessage(),
@@ -81,16 +74,16 @@ class AuthApiController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'A verification code was sent to your phone.',
+            'message' => 'A verification code was sent to your email.',
             'verification_id' => $verificationId,
             'expires_in' => 600,
         ]);
     }
 
-    public function verifyRegistrationPhoneOtp(Request $request, RegistrationPhoneVerification $phoneVerification)
+    public function verifyRegistrationEmailOtp(Request $request, RegistrationEmailVerification $emailVerification)
     {
         $validator = Validator::make($request->all(), [
-            'phone' => ['required', 'string', 'max:30', 'regex:/^\+?[0-9\s-]{7,15}$/'],
+            'email' => ['required', 'string', 'email', 'max:150'],
             'verification_id' => ['required', 'string', 'size:64', 'regex:/^[a-f0-9]{64}$/'],
             'code' => ['required', 'digits:6'],
         ]);
@@ -98,14 +91,14 @@ class AuthApiController extends Controller
         if ($validator->fails()) {
             return response()->json([
                 'success' => false,
-                'message' => 'Enter the six-digit verification code.',
+                'message' => 'Enter your email and the six-digit verification code.',
                 'errors' => $validator->errors(),
             ], 422);
         }
 
-        if (!$phoneVerification->verifyCode(
+        if (!$emailVerification->verifyCode(
             (string) $request->input('verification_id'),
-            (string) $request->input('phone'),
+            (string) $request->input('email'),
             (string) $request->input('code')
         )) {
             return response()->json([
@@ -114,13 +107,13 @@ class AuthApiController extends Controller
             ], 422);
         }
 
-        return response()->json(['success' => true, 'message' => 'Phone number verified.']);
+        return response()->json(['success' => true, 'message' => 'Email address verified.']);
     }
 
     /**
-     * Register a new user after verifying phone ownership.
+     * Register a new user after verifying email ownership.
      */
-    public function register(Request $request, RegistrationPhoneVerification $phoneVerification)
+    public function register(Request $request, RegistrationEmailVerification $emailVerification, RegistrationPhoneVerification $phoneVerification)
     {
         $request->merge(['email' => strtolower(trim((string) $request->input('email', '')))]);
         $validator = Validator::make($request->all(), [
@@ -128,7 +121,7 @@ class AuthApiController extends Controller
             'email' => 'required|string|email|max:150',
             'password' => 'required|string|min:6',
             'phone' => ['required', 'string', 'max:30', 'regex:/^\+?[0-9\s-]{7,15}$/'],
-            'registration_verification_id' => ['sometimes', 'string', 'size:64', 'regex:/^[a-f0-9]{64}$/'],
+            'email_verification_id' => ['sometimes', 'string', 'size:64', 'regex:/^[a-f0-9]{64}$/'],
             'agree_privacy' => 'sometimes|boolean',
         ]);
 
@@ -152,13 +145,13 @@ class AuthApiController extends Controller
             ], 409);
         }
 
-        $verificationId = (string) $request->input('registration_verification_id');
+        $verificationId = (string) $request->input('email_verification_id');
         $phone = (string) $request->input('phone');
-        if (!$phoneVerification->isVerified($verificationId, $phone)) {
+        if (!$emailVerification->isVerified($verificationId, $request->email)) {
             return response()->json([
                 'success' => false,
-                'code' => 'phone_verification_required',
-                'message' => 'Verify your phone number before creating an account.',
+                'code' => 'email_verification_required',
+                'message' => 'Verify your email address before creating an account.',
             ], 422);
         }
 
@@ -166,7 +159,7 @@ class AuthApiController extends Controller
         $token = bin2hex(random_bytes(32));
 
         try {
-            $user = DB::transaction(function () use ($request, $phoneVerification, $verificationId, $phone, $token) {
+            $user = DB::transaction(function () use ($request, $emailVerification, $verificationId, $phone, $token) {
                 $user = User::create([
                     'name' => $request->name,
                     'email' => $request->email,
@@ -176,8 +169,8 @@ class AuthApiController extends Controller
                     'subscribed_promo' => $request->boolean('agree_privacy'),
                 ]);
 
-                if (!$phoneVerification->consumeVerified($verificationId, $phone)) {
-                    throw new \DomainException('The phone verification has expired or was already used.');
+                if (!$emailVerification->consumeVerified($verificationId, $request->email)) {
+                    throw new \DomainException('The email verification has expired or was already used.');
                 }
 
                 DB::table('user_sessions')->updateOrInsert(
@@ -194,8 +187,8 @@ class AuthApiController extends Controller
         } catch (\DomainException $exception) {
             return response()->json([
                 'success' => false,
-                'code' => 'phone_verification_required',
-                'message' => 'Verify your phone number before creating an account.',
+                'code' => 'email_verification_required',
+                'message' => 'Verify your email address before creating an account.',
             ], 422);
         } catch (QueryException $exception) {
             if ($response = $this->existingAccountResponse($request->email)) {
