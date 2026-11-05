@@ -50,6 +50,7 @@ class Order extends Model
         'refund_reference',
         'refund_status',
         'refund_amount',
+        'refund_transfer_link',
     ];
 
     protected $hidden = ['discount_id_path', 'payment_proof_path'];

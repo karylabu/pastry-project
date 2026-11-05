@@ -80,7 +80,10 @@ function requestPayMongoOrderRefund(array $orderRow, int $orderId, string $reaso
         throw new RuntimeException('No refundable completed PayMongo payment was found.');
     }
 
-    $refundRequest = curl_init('https://api.paymongo.com/v1/refunds');
+    $isQrPh = strtolower(preg_replace('/[^a-z]/i', '', (string) ($orderRow['payment'] ?? ''))) === 'qrph';
+    $refundRequest = curl_init($isQrPh
+        ? 'https://refunds-api.paymongo.com/v1/refunds'
+        : 'https://api.paymongo.com/v1/refunds');
     curl_setopt_array($refundRequest, [
         CURLOPT_RETURNTRANSFER => true,
         CURLOPT_POST => true,
@@ -110,7 +113,10 @@ function requestPayMongoOrderRefund(array $orderRow, int $orderId, string $reaso
     }
 
     $refundReference = (string) ($refundData['data']['id'] ?? '');
-    $refundStatus = strtolower((string) ($refundData['data']['attributes']['status'] ?? 'pending'));
+    $payMongoStatus = strtolower((string) ($refundData['data']['attributes']['status'] ?? 'pending'));
+    $refundStatus = in_array($payMongoStatus, ['processing', 'refunding'], true)
+        ? 'pending'
+        : $payMongoStatus;
     if ($refundReference === '' || !in_array($refundStatus, ['pending', 'succeeded', 'refunded'], true)) {
         throw new RuntimeException('PayMongo returned an invalid refund response.');
     }
@@ -119,6 +125,7 @@ function requestPayMongoOrderRefund(array $orderRow, int $orderId, string $reaso
         'status' => $refundStatus,
         'reference' => $refundReference,
         'amount' => $refundAmount / 100,
+        'transfer_link' => $refundData['data']['attributes']['transfer_link'] ?? null,
     ];
 }
 
@@ -147,7 +154,9 @@ function sendPayMongoOrderRefundSms(?string $phone, int $orderId, array $refundR
     $phone = '63' . $phone;
 
     $messages = [
-        'pending' => "Your cancellation for order #{$orderId} is waiting for PayMongo refund confirmation.",
+        'pending' => !empty($refundResult['transfer_link'])
+            ? "Order #{$orderId} refund is ready. Claim your QR Ph refund within 3 days: {$refundResult['transfer_link']}"
+            : "Your cancellation for order #{$orderId} is waiting for PayMongo refund confirmation.",
         'succeeded' => "Order #{$orderId} cancelled. PayMongo confirmed your refund was returned.",
         'refunded' => "Order #{$orderId} cancelled. PayMongo confirmed your refund was returned.",
         'failed' => "PayMongo could not process the refund for order #{$orderId}. Please contact the shop.",

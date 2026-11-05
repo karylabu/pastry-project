@@ -56,6 +56,7 @@ class CustomerOrdersApiTest extends TestCase
             $table->string('refund_reference')->nullable();
             $table->string('refund_status')->nullable();
             $table->decimal('refund_amount', 10, 2)->nullable();
+            $table->text('refund_transfer_link')->nullable();
             $table->boolean('is_customized')->default(false);
             $table->string('order_type')->nullable();
             $table->timestamp('created_at')->nullable();
@@ -304,6 +305,56 @@ class CustomerOrdersApiTest extends TestCase
             'refund_status' => 'pending',
         ]);
         Http::assertSentCount(2);
+    }
+
+    public function test_qrph_refund_uses_qrph_api_and_returns_the_claim_link(): void
+    {
+        config(['services.paymongo.secret' => 'sk_test_refund']);
+        Http::fake([
+            'https://api.paymongo.com/v1/payment_links/payment-link-17/payments' => Http::response([
+                'data' => [[
+                    'id' => 'pay_17',
+                    'attributes' => ['status' => 'paid', 'amount' => 190],
+                ]],
+            ]),
+            'https://refunds-api.paymongo.com/v1/refunds' => Http::response([
+                'data' => [
+                    'id' => 're_17',
+                    'attributes' => [
+                        'status' => 'processing',
+                        'transfer_link' => 'https://transfer.paymongo.com/claim-17',
+                    ],
+                ],
+            ]),
+        ]);
+        DB::table('orders')->insert([
+            'id' => 17,
+            'user_id' => 7,
+            'payment' => 'QRPh',
+            'payment_status' => 'paid',
+            'payment_reference' => 'payment-link-17',
+            'total' => 1.90,
+            'status' => 'Pending',
+        ]);
+
+        $request = Request::create('/api/orders/17/cancel', 'POST', [], [], [], [
+            'HTTP_X_AUTH_TOKEN' => 'test-customer-token',
+        ]);
+        $response = app(OrderController::class)->cancel($request, 17);
+        $refundRequest = Http::recorded()->last()[0];
+
+        $this->assertSame(200, $response->getStatusCode());
+        $this->assertSame('pending', $response->getData(true)['refund_status']);
+        $this->assertSame('https://transfer.paymongo.com/claim-17', $response->getData(true)['refund_transfer_link']);
+        $this->assertSame('https://refunds-api.paymongo.com/v1/refunds', $refundRequest->url());
+        $this->assertDatabaseHas('orders', [
+            'id' => 17,
+            'status' => 'Cancellation Pending',
+            'payment_status' => 'paid',
+            'refund_reference' => 're_17',
+            'refund_status' => 'pending',
+            'refund_transfer_link' => 'https://transfer.paymongo.com/claim-17',
+        ]);
     }
 
     public function test_customer_cancellation_does_not_mark_payment_refunded_when_paymongo_credentials_are_missing(): void

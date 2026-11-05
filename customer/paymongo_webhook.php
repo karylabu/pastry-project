@@ -299,8 +299,8 @@ if (in_array($refundEventStatus, ['succeeded', 'refunded', 'failed'], true)) {
         if (!$alreadyHandled) {
             $succeeded = in_array($refundEventStatus, ['succeeded', 'refunded'], true);
             $stmt = $conn->prepare($succeeded
-                ? "UPDATE orders SET refund_status = 'succeeded', payment_status = 'refunded', status = 'Cancelled', cancelled_at = COALESCE(cancelled_at, NOW()) WHERE id = ?"
-                : "UPDATE orders SET refund_status = 'failed' WHERE id = ?");
+                ? "UPDATE orders SET refund_status = 'succeeded', refund_transfer_link = NULL, payment_status = 'refunded', status = 'Cancelled', cancelled_at = COALESCE(cancelled_at, NOW()) WHERE id = ?"
+                : "UPDATE orders SET refund_status = 'failed', refund_transfer_link = NULL WHERE id = ?");
             if (!$stmt) {
                 throw new RuntimeException('Unable to update PayMongo refund status.');
             }

@@ -652,6 +652,7 @@ export default function Orders() {
         updateLocalStatus(cancelTarget.id, orderStatus, {
           refund_status: data.refund_status,
           refund_amount: data.refund_amount,
+          refund_transfer_link: data.refund_transfer_link,
           cancelled_at: data.cancelled_at,
         });
         setStatusFilter(orderStatus);
@@ -1797,17 +1798,29 @@ export default function Orders() {
                       )}
 
                       {(isCancelled || isCancellationPending) && (
-                        <span className="text-[12px] font-semibold text-slate-500">
-                          {isCancellationPending && order.refund_status === 'pending'
-                            ? 'Cancellation pending · Refund processing'
-                            : order.refund_status === 'manual_required'
-                            ? 'Cancellation pending · Refund pending from shop'
-                            : order.refund_status === 'failed'
-                            ? 'Cancellation pending · Refund failed'
-                            : ['succeeded', 'refunded'].includes(order.refund_status)
-                            ? 'Cancelled · Refund confirmed'
-                            : 'Cancelled'}
-                        </span>
+                        <div className="flex flex-col items-start gap-1">
+                          <span className="text-[12px] font-semibold text-slate-500">
+                            {isCancellationPending && order.refund_status === 'pending'
+                              ? 'Cancellation pending · Refund processing'
+                              : order.refund_status === 'manual_required'
+                              ? 'Cancellation pending · Refund pending from shop'
+                              : order.refund_status === 'failed'
+                              ? 'Cancellation pending · Refund failed'
+                              : ['succeeded', 'refunded'].includes(order.refund_status)
+                              ? 'Cancelled · Refund confirmed'
+                              : 'Cancelled'}
+                          </span>
+                          {isCancellationPending && order.refund_transfer_link && (
+                            <a
+                              href={order.refund_transfer_link}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-[12px] font-semibold text-emerald-700 underline"
+                            >
+                              Claim QR Ph refund (valid 3 days)
+                            </a>
+                          )}
+                        </div>
                       )}
                     </div>
                   </motion.div>

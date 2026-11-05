@@ -1291,7 +1291,9 @@ class OrderController extends Controller
                 $refundPending = $refundResult['status'] === 'pending';
                 $refundSucceeded = in_array($refundResult['status'], ['succeeded', 'refunded'], true);
                 $customerNotificationMessage = match ($refundResult['status']) {
-                    'pending' => "Your cancellation for order #{$order->id} is awaiting PayMongo refund confirmation.",
+                    'pending' => !empty($refundResult['transfer_link'])
+                        ? "Your cancellation for order #{$order->id} is awaiting your QR Ph refund claim. Claim it within 3 days: {$refundResult['transfer_link']}"
+                        : "Your cancellation for order #{$order->id} is awaiting PayMongo refund confirmation.",
                     'failed' => "PayMongo could not process the refund for order #{$order->id}. You can retry the cancellation.",
                     'manual_required' => "Your cancellation for order #{$order->id} is waiting for the shop to process your refund.",
                     'succeeded', 'refunded' => "Your order #{$order->id} was cancelled and the refund was confirmed.",
@@ -1307,6 +1309,7 @@ class OrderController extends Controller
                     'refund_reference' => $refundResult['reference'] ?? $order->refund_reference,
                     'refund_status' => $refundResult['status'] ?? $order->refund_status,
                     'refund_amount' => $refundResult['amount'] ?? $order->refund_amount,
+                    'refund_transfer_link' => $refundResult['transfer_link'] ?? null,
                     'cancelled_at' => $refundPending || in_array($refundResult['status'], ['failed', 'manual_required'], true)
                         ? null
                         : now(),
@@ -1366,7 +1369,9 @@ class OrderController extends Controller
 
         $order = Order::query()->findOrFail($id);
         $smsMessage = match ($refundResult['status']) {
-            'pending' => "Your cancellation for order #{$id} is waiting for PayMongo refund confirmation.",
+            'pending' => !empty($refundResult['transfer_link'])
+                ? "Order #{$id} cancellation refund is ready. Claim your QR Ph refund within 3 days: {$refundResult['transfer_link']}"
+                : "Your cancellation for order #{$id} is waiting for PayMongo refund confirmation.",
             'succeeded', 'refunded' => "Order #{$id} cancelled. PayMongo confirmed your refund was returned.",
             'failed' => "PayMongo could not process the refund for order #{$id}. Please contact support.",
             'manual_required' => "Your cancellation for order #{$id} is waiting for the shop to process the refund.",
@@ -1375,7 +1380,9 @@ class OrderController extends Controller
         $this->sendSmsNotification($order, 'Cancelled', $smsMessage);
 
         $message = match ($refundResult['status']) {
-            'pending' => 'Your cancellation is awaiting PayMongo refund confirmation.',
+            'pending' => !empty($refundResult['transfer_link'])
+                ? 'Your QR Ph refund is ready to claim. Use the link in your notification or SMS within 3 days.'
+                : 'Your cancellation is awaiting PayMongo refund confirmation.',
             'succeeded', 'refunded' => 'Order cancelled. PayMongo confirmed the refund.',
             'failed' => 'PayMongo could not process the refund. Please retry the cancellation or contact support.',
             'manual_required' => 'Order cancelled. The admin has been notified to refund your payment manually.',
@@ -1387,6 +1394,7 @@ class OrderController extends Controller
             'message' => $message,
             'refund_status' => $refundResult['status'],
             'refund_amount' => $refundResult['amount'],
+            'refund_transfer_link' => $refundResult['transfer_link'] ?? null,
             'order_status' => $order->status,
             'cancelled_at' => $order->cancelled_at,
         ]);
@@ -1396,7 +1404,7 @@ class OrderController extends Controller
     {
         $paymentStatus = strtolower(trim((string) $order->payment_status));
         if (!in_array($paymentStatus, ['paid', 'downpayment_paid'], true)) {
-            return ['status' => null, 'amount' => null, 'reference' => null];
+            return ['status' => null, 'amount' => null, 'reference' => null, 'transfer_link' => null];
         }
 
         $amount = (float) ($order->total ?? 0);
@@ -1412,7 +1420,7 @@ class OrderController extends Controller
             $amount = $downpaymentAmount;
         }
         if (empty($order->payment_reference)) {
-            return ['status' => 'manual_required', 'amount' => $amount, 'reference' => null];
+            return ['status' => 'manual_required', 'amount' => $amount, 'reference' => null, 'transfer_link' => null];
         }
 
         $secretKey = config('services.paymongo.secret');
@@ -1448,10 +1456,14 @@ class OrderController extends Controller
                 throw new RuntimeException('The completed PayMongo payment has invalid refund details.');
             }
 
+            $isQrPh = strtolower(preg_replace('/[^a-z]/i', '', (string) $order->payment)) === 'qrph';
+            $refundEndpoint = $isQrPh
+                ? 'https://refunds-api.paymongo.com/v1/refunds'
+                : 'https://api.paymongo.com/v1/refunds';
             $refundResponse = Http::withBasicAuth($secretKey, '')
                 ->acceptJson()
                 ->timeout(15)
-                ->post('https://api.paymongo.com/v1/refunds', [
+                ->post($refundEndpoint, [
                     'data' => [
                         'attributes' => [
                             'amount' => $refundAmount,
@@ -1466,26 +1478,35 @@ class OrderController extends Controller
                 Log::warning('PayMongo refund request failed.', [
                     'order_id' => $order->id,
                     'http_status' => $refundResponse->status(),
+                    'error_code' => $refundResponse->json('errors.0.code'),
                 ]);
                 throw new RuntimeException('PayMongo did not accept the refund request.');
             }
 
             $refundData = $refundResponse->json('data');
             $refundId = (string) ($refundData['id'] ?? '');
-            $refundStatus = strtolower((string) ($refundData['attributes']['status'] ?? 'pending'));
+            $payMongoStatus = strtolower((string) ($refundData['attributes']['status'] ?? 'pending'));
+            $refundStatus = in_array($payMongoStatus, ['processing', 'refunding'], true)
+                ? 'pending'
+                : $payMongoStatus;
             if ($refundId === '' || !in_array($refundStatus, ['pending', 'succeeded', 'refunded', 'failed'], true)) {
                 throw new RuntimeException('PayMongo returned an unrecognized refund status.');
             }
 
             $amount = $refundAmount / 100;
-            return ['status' => $refundStatus, 'amount' => $amount, 'reference' => $refundId];
+            return [
+                'status' => $refundStatus,
+                'amount' => $amount,
+                'reference' => $refundId,
+                'transfer_link' => $refundData['attributes']['transfer_link'] ?? null,
+            ];
         } catch (\Throwable $exception) {
             Log::error('Payment refund could not be completed for order.', [
                 'order_id' => $order->id,
                 'exception' => get_class($exception),
                 'message' => $exception->getMessage(),
             ]);
-            return ['status' => 'failed', 'amount' => $amount, 'reference' => null];
+            return ['status' => 'failed', 'amount' => $amount, 'reference' => null, 'transfer_link' => null];
         }
     }
 

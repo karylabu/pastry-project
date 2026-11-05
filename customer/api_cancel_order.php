@@ -35,7 +35,7 @@ try {
 
     // Lock the order and ensure a customer can only cancel their own order.
     $check = $conn->prepare(
-        "SELECT id, status, items, total, downpayment_amount, payment, payment_status, payment_reference, refund_status, refund_reference, refund_amount, is_customized, order_type, phone FROM orders
+        "SELECT id, status, items, total, downpayment_amount, payment, payment_status, payment_reference, refund_status, refund_reference, refund_amount, refund_transfer_link, is_customized, order_type, phone FROM orders
          WHERE id = ? AND (user_id = ? OR (user_id IS NULL AND email = ?))
          LIMIT 1 FOR UPDATE"
     );
@@ -131,11 +131,12 @@ try {
     $nextPaymentStatus = $refundSucceeded ? 'refunded' : (string) ($row['payment_status'] ?? '');
     $refundReference = $refundResult['reference'] ?? $row['refund_reference'];
     $refundAmount = $refundResult['amount'] ?? $row['refund_amount'];
-    $updateOrder = $conn->prepare("UPDATE orders SET status = ?, payment_status = COALESCE(NULLIF(?, ''), payment_status), refund_status = NULLIF(?, ''), refund_reference = ?, refund_amount = ?, cancelled_at = IF(? = 'Cancelled', NOW(), NULL) WHERE id = ?");
+    $refundTransferLink = $refundResult['transfer_link'] ?? null;
+    $updateOrder = $conn->prepare("UPDATE orders SET status = ?, payment_status = COALESCE(NULLIF(?, ''), payment_status), refund_status = NULLIF(?, ''), refund_reference = ?, refund_amount = ?, refund_transfer_link = ?, cancelled_at = IF(? = 'Cancelled', NOW(), NULL) WHERE id = ?");
     if (!$updateOrder) {
         throw new Exception('Failed to prepare cancelled order update.');
     }
-    $updateOrder->bind_param('ssssssi', $nextStatus, $nextPaymentStatus, $refundStatus, $refundReference, $refundAmount, $nextStatus, $order_id);
+    $updateOrder->bind_param('sssssssi', $nextStatus, $nextPaymentStatus, $refundStatus, $refundReference, $refundAmount, $refundTransferLink, $nextStatus, $order_id);
     $result = $updateOrder->execute();
     $updateOrder->close();
 
@@ -148,7 +149,9 @@ try {
             ? 'Refund Processing'
             : (in_array($refundStatus, ['failed', 'manual_required'], true) ? 'Refund Requires Attention' : 'Order Cancelled');
         $message = match ($refundStatus) {
-            'pending' => "Your cancellation for order #{$order_id} is awaiting PayMongo refund confirmation.",
+            'pending' => !empty($refundResult['transfer_link'])
+                ? "Your cancellation for order #{$order_id} is awaiting your QR Ph refund claim. Claim it within 3 days: {$refundResult['transfer_link']}"
+                : "Your cancellation for order #{$order_id} is awaiting PayMongo refund confirmation.",
             'succeeded', 'refunded' => "Your order #{$order_id} was cancelled and the refund was confirmed.",
             'failed' => "PayMongo could not process the refund for order #{$order_id}. You can retry the cancellation.",
             'manual_required' => "Your cancellation for order #{$order_id} is waiting for the shop to process your refund.",
@@ -217,7 +220,9 @@ try {
         publishRealtimeEvent($conn, 'notification.updated', $userId);
         sendPayMongoOrderRefundSms($row['phone'] ?? null, $order_id, $refundResult);
         $message = match ($refundResult['status']) {
-            'pending' => 'Your cancellation is awaiting PayMongo refund confirmation.',
+            'pending' => !empty($refundResult['transfer_link'])
+                ? 'Your QR Ph refund is ready to claim. Use the link in your notification or SMS within 3 days.'
+                : 'Your cancellation is awaiting PayMongo refund confirmation.',
             'succeeded', 'refunded' => 'Order cancelled. PayMongo confirmed the refund.',
             'failed' => 'PayMongo could not process the refund. Please retry the cancellation or contact support.',
             'manual_required' => 'Order cancelled. The shop will process your refund manually.',
@@ -228,6 +233,7 @@ try {
             'message' => $message,
             'refund_status' => $refundResult['status'],
             'refund_amount' => $refundResult['amount'],
+            'refund_transfer_link' => $refundTransferLink,
             'order_status' => $nextStatus,
         ]);
     } else {
