@@ -1,5 +1,16 @@
 <?php
 
+class PayMongoOrderRefundException extends RuntimeException
+{
+    public bool $requestMayHaveBeenAccepted;
+
+    public function __construct(string $message, bool $requestMayHaveBeenAccepted = false)
+    {
+        parent::__construct($message);
+        $this->requestMayHaveBeenAccepted = $requestMayHaveBeenAccepted;
+    }
+}
+
 function requestPayMongoOrderRefund(array $orderRow, int $orderId, string $reason = 'requested_by_customer'): array
 {
     $paymentStatus = strtolower(trim((string) ($orderRow['payment_status'] ?? '')));
@@ -21,7 +32,8 @@ function requestPayMongoOrderRefund(array $orderRow, int $orderId, string $reaso
     }
 
     $paymentReference = trim((string) ($orderRow['payment_reference'] ?? ''));
-    if ($paymentReference === '') {
+    $paymentId = trim((string) ($orderRow['paymongo_payment_id'] ?? ''));
+    if ($paymentReference === '' && $paymentId === '') {
         return ['status' => 'manual_required', 'reference' => null, 'amount' => $amount];
     }
 
@@ -48,30 +60,62 @@ function requestPayMongoOrderRefund(array $orderRow, int $orderId, string $reaso
         throw new RuntimeException('PayMongo refund service is unavailable.');
     }
 
-    $paymentsRequest = curl_init('https://api.paymongo.com/v1/payment_links/' . rawurlencode($paymentReference) . '/payments');
-    curl_setopt_array($paymentsRequest, [
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_HTTPAUTH => CURLAUTH_BASIC,
-        CURLOPT_USERPWD => $secret . ':',
-        CURLOPT_HTTPHEADER => ['Accept: application/json'],
-        CURLOPT_TIMEOUT => 15,
-    ]);
-    $paymentsBody = curl_exec($paymentsRequest);
-    $paymentsHttpStatus = (int) curl_getinfo($paymentsRequest, CURLINFO_HTTP_CODE);
-    $paymentsError = curl_error($paymentsRequest);
-    curl_close($paymentsRequest);
-    $paymentsData = is_string($paymentsBody) ? json_decode($paymentsBody, true) : null;
-    if ($paymentsBody === false || $paymentsHttpStatus < 200 || $paymentsHttpStatus >= 300 || !is_array($paymentsData['data'] ?? null)) {
+    if ($paymentId !== '') {
+        $paymentUrls = ['https://api.paymongo.com/v1/payments/' . rawurlencode($paymentId)];
+    } elseif (
+        str_starts_with(strtolower($paymentReference), 'cs_')
+        || str_starts_with(strtolower($paymentReference), 'cs-')
+    ) {
+        $sessionId = rawurlencode($paymentReference);
+        $paymentUrls = [
+            'https://api.paymongo.com/v2/checkout_sessions/' . $sessionId . '/payments',
+            'https://api.paymongo.com/v1/checkout_sessions/' . $sessionId . '/payments',
+            'https://api.paymongo.com/v2/checkout_sessions/' . $sessionId,
+            'https://api.paymongo.com/v1/checkout_sessions/' . $sessionId,
+        ];
+    } else {
+        $paymentUrls = ['https://api.paymongo.com/v1/payment_links/' . rawurlencode($paymentReference) . '/payments'];
+    }
+
+    $paymentsData = null;
+    $paymentsHttpStatus = 0;
+    $paymentsError = '';
+    foreach ($paymentUrls as $paymentUrl) {
+        $paymentsRequest = curl_init($paymentUrl);
+        curl_setopt_array($paymentsRequest, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_HTTPAUTH => CURLAUTH_BASIC,
+            CURLOPT_USERPWD => $secret . ':',
+            CURLOPT_HTTPHEADER => ['Accept: application/json'],
+            CURLOPT_TIMEOUT => 15,
+        ]);
+        $paymentsBody = curl_exec($paymentsRequest);
+        $paymentsHttpStatus = (int) curl_getinfo($paymentsRequest, CURLINFO_HTTP_CODE);
+        $paymentsError = curl_error($paymentsRequest);
+        curl_close($paymentsRequest);
+        $candidateData = is_string($paymentsBody) ? json_decode($paymentsBody, true) : null;
+        if ($paymentsBody !== false && $paymentsHttpStatus >= 200 && $paymentsHttpStatus < 300 && is_array($candidateData['data'] ?? null)) {
+            $paymentsData = $candidateData;
+            break;
+        }
+    }
+    if (!is_array($paymentsData['data'] ?? null)) {
         error_log("PayMongo payment lookup failed for cancellation of order #{$orderId}: {$paymentsHttpStatus} {$paymentsError}");
         throw new RuntimeException('Unable to verify the PayMongo payment for refund.');
     }
 
-    $paymentId = '';
+    $payments = $paymentsData['data'];
+    if (isset($payments['id']) || isset($payments['attributes']) || isset($payments['status'])) {
+        $payments = [$payments];
+    }
     $refundAmount = 0;
-    foreach ($paymentsData['data'] as $payment) {
+    foreach ($payments as $payment) {
         $attributes = $payment['attributes'] ?? $payment;
-        if (in_array(strtolower((string) ($attributes['status'] ?? '')), ['paid', 'succeeded'], true)) {
-            $paymentId = (string) ($payment['id'] ?? '');
+        if (
+            ($paymentId === '' || (string) ($payment['id'] ?? '') === $paymentId)
+            && in_array(strtolower((string) ($attributes['status'] ?? '')), ['paid', 'succeeded'], true)
+        ) {
+            $paymentId = (string) ($payment['id'] ?? $paymentId);
             $refundAmount = (int) ($attributes['amount'] ?? 0);
             break;
         }
@@ -107,9 +151,19 @@ function requestPayMongoOrderRefund(array $orderRow, int $orderId, string $reaso
     $refundError = curl_error($refundRequest);
     curl_close($refundRequest);
     $refundData = is_string($refundBody) ? json_decode($refundBody, true) : null;
-    if ($refundBody === false || $refundHttpStatus < 200 || $refundHttpStatus >= 300) {
+    if ($refundBody === false || $refundHttpStatus >= 500) {
         error_log("PayMongo refund failed for cancellation of order #{$orderId}: {$refundHttpStatus} {$refundError}");
-        throw new RuntimeException('PayMongo did not accept the refund request.');
+        throw new PayMongoOrderRefundException('PayMongo refund request outcome could not be confirmed.', true);
+    }
+    if ($refundHttpStatus < 200 || $refundHttpStatus >= 300) {
+        error_log("PayMongo rejected the refund for cancellation of order #{$orderId}: {$refundHttpStatus} {$refundError}");
+        return [
+            'status' => 'failed',
+            'reference' => null,
+            'amount' => $refundAmount / 100,
+            'transfer_link' => null,
+            'payment_id' => $paymentId,
+        ];
     }
 
     $refundReference = (string) ($refundData['data']['id'] ?? '');
@@ -118,7 +172,7 @@ function requestPayMongoOrderRefund(array $orderRow, int $orderId, string $reaso
         ? 'pending'
         : $payMongoStatus;
     if ($refundReference === '' || !in_array($refundStatus, ['pending', 'succeeded', 'refunded'], true)) {
-        throw new RuntimeException('PayMongo returned an invalid refund response.');
+        throw new PayMongoOrderRefundException('PayMongo returned an invalid refund response.', true);
     }
 
     return [

@@ -219,6 +219,82 @@ class CustomerOrdersApiTest extends TestCase
         ]);
     }
 
+    public function test_cancellation_waits_when_paymongo_payment_is_still_processing(): void
+    {
+        config(['services.paymongo.secret' => 'sk_test_refund']);
+        Http::fake([
+            'https://api.paymongo.com/v1/payment_links/payment-link-processing/payments' => Http::response([
+                'data' => [[
+                    'id' => 'pay_processing',
+                    'attributes' => ['status' => 'processing', 'amount' => 50000],
+                ]],
+            ]),
+        ]);
+        DB::table('orders')->insert([
+            'id' => 20,
+            'user_id' => 7,
+            'payment' => 'GCash',
+            'payment_status' => 'processing',
+            'payment_reference' => 'payment-link-processing',
+            'total' => 500,
+            'status' => 'Pending',
+        ]);
+
+        $request = Request::create('/api/orders/20/cancel', 'POST', [], [], [], [
+            'HTTP_X_AUTH_TOKEN' => 'test-customer-token',
+        ]);
+        $response = app(OrderController::class)->cancel($request, 20);
+        $order = DB::table('orders')->where('id', 20)->first();
+
+        $this->assertSame(200, $response->getStatusCode());
+        $this->assertSame('awaiting_payment', $response->getData(true)['refund_status']);
+        $this->assertSame('Cancellation Pending', $order->status);
+        $this->assertSame('processing', $order->payment_status);
+        $this->assertSame('awaiting_payment', $order->refund_status);
+        $this->assertNull($order->cancelled_at);
+        $this->assertDatabaseHas('notifications', [
+            'user_id' => 7,
+            'title' => 'Payment Confirmation Pending',
+        ]);
+        Http::assertSentCount(1);
+    }
+
+    public function test_cancellation_without_a_successful_paymongo_payment_does_not_request_a_refund(): void
+    {
+        config(['services.paymongo.secret' => 'sk_test_refund']);
+        Http::fake([
+            'https://api.paymongo.com/v1/payment_links/payment-link-unpaid/payments' => Http::response([
+                'data' => [[
+                    'id' => 'pay_unpaid',
+                    'attributes' => ['status' => 'failed', 'amount' => 50000],
+                ]],
+            ]),
+        ]);
+        DB::table('orders')->insert([
+            'id' => 21,
+            'user_id' => 7,
+            'payment' => 'GCash',
+            'payment_status' => 'processing',
+            'payment_reference' => 'payment-link-unpaid',
+            'total' => 500,
+            'status' => 'Pending',
+        ]);
+
+        $request = Request::create('/api/orders/21/cancel', 'POST', [], [], [], [
+            'HTTP_X_AUTH_TOKEN' => 'test-customer-token',
+        ]);
+        $response = app(OrderController::class)->cancel($request, 21);
+
+        $this->assertSame(200, $response->getStatusCode());
+        $this->assertSame('Cancelled', $response->getData(true)['order_status']);
+        $this->assertDatabaseHas('orders', [
+            'id' => 21,
+            'status' => 'Cancelled',
+            'payment_status' => 'unpaid',
+        ]);
+        Http::assertSentCount(1);
+    }
+
     public function test_customer_order_number_matches_order_id(): void
     {
         DB::table('orders')->insert([

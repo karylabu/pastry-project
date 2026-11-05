@@ -1800,7 +1800,11 @@ export default function Orders() {
                       {(isCancelled || isCancellationPending) && (
                         <div className="flex flex-col items-start gap-1">
                           <span className="text-[12px] font-semibold text-slate-500">
-                            {isCancellationPending && order.refund_status === 'pending'
+                            {isCancellationPending && order.refund_status === 'awaiting_payment'
+                              ? 'Cancellation pending · Waiting for payment confirmation'
+                              : isCancellationPending && order.refund_status === 'requesting'
+                              ? 'Cancellation pending · Refund request processing'
+                              : isCancellationPending && order.refund_status === 'pending'
                               ? 'Cancellation pending · Refund processing'
                               : order.refund_status === 'manual_required'
                               ? 'Cancellation pending · Refund pending from shop'

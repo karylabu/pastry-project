@@ -1281,19 +1281,62 @@ class OrderController extends Controller
                 }
                 $retryingFailedRefund = $order->status === 'Cancellation Pending'
                     && strtolower((string) $order->refund_status) === 'failed';
-                if ($order->status !== 'Pending' && !$retryingFailedRefund) {
+                if (!in_array($order->status, ['Pending', 'Awaiting Payment'], true) && !$retryingFailedRefund) {
                     throw new RuntimeException('Only pending orders can be cancelled.');
+                }
+
+                $paymentStatus = strtolower(trim((string) $order->payment_status));
+                $paymentReference = trim((string) $order->payment_reference);
+                $hasPayMongoPayment = $paymentReference !== '' || trim((string) $order->paymongo_payment_id) !== '';
+                if (
+                    $hasPayMongoPayment
+                    && !in_array($paymentStatus, ['paid', 'downpayment_paid', 'failed', 'unpaid'], true)
+                ) {
+                    $paymentState = 'unverified';
+                    $secretKey = config('services.paymongo.secret');
+                    if ($secretKey && $paymentReference !== '') {
+                        $paymentState = $this->getPayMongoPaymentState($secretKey, $paymentReference);
+                    } elseif ($paymentStatus === 'processing') {
+                        $paymentState = 'processing';
+                    }
+
+                    if (in_array($paymentState, ['processing', 'unverified'], true)) {
+                        $this->restoreOrderSizeStock($order, (int) $user->id);
+                        $this->restoreOrderProductStock($order, (int) $user->id);
+                        $order->update([
+                            'status' => 'Cancellation Pending',
+                            'payment_status' => 'processing',
+                            'refund_status' => 'awaiting_payment',
+                            'cancelled_at' => null,
+                        ]);
+                        $this->notifyCancellationAwaitingPayment($order, (int) $user->id);
+
+                        return [
+                            'status' => 'awaiting_payment',
+                            'amount' => null,
+                            'reference' => null,
+                            'transfer_link' => null,
+                            'payment_id' => $order->paymongo_payment_id,
+                        ];
+                    }
+
+                    if ($paymentState === 'paid') {
+                        $order->payment_status = 'paid';
+                    } elseif ($paymentState === 'unpaid') {
+                        $order->payment_status = 'unpaid';
+                    }
                 }
 
                 $refundResult = $this->refundPaidOrderIfNeeded($order);
                 $this->restoreOrderSizeStock($order, (int) $user->id);
                 $this->restoreOrderProductStock($order, (int) $user->id);
-                $refundPending = $refundResult['status'] === 'pending';
+                $refundPending = in_array($refundResult['status'], ['pending', 'awaiting_payment'], true);
                 $refundSucceeded = in_array($refundResult['status'], ['succeeded', 'refunded'], true);
                 $customerNotificationMessage = match ($refundResult['status']) {
                     'pending' => !empty($refundResult['transfer_link'])
                         ? "Your cancellation for order #{$order->id} is awaiting your QR Ph refund claim. Claim it within 3 days: {$refundResult['transfer_link']}"
                         : "Your cancellation for order #{$order->id} is awaiting PayMongo refund confirmation.",
+                    'awaiting_payment' => "Your cancellation for order #{$order->id} is waiting for PayMongo to confirm the payment.",
                     'failed' => "PayMongo could not process the refund for order #{$order->id}. You can retry the cancellation.",
                     'manual_required' => "Your cancellation for order #{$order->id} is waiting for the shop to process your refund.",
                     'succeeded', 'refunded' => "Your order #{$order->id} was cancelled and the refund was confirmed.",
@@ -1319,9 +1362,11 @@ class OrderController extends Controller
                 if (Schema::hasTable('notifications')) {
                     DB::table('notifications')->insert([
                         'user_id' => $user->id,
-                        'title' => $refundPending
+                        'title' => $refundResult['status'] === 'awaiting_payment'
+                            ? 'Payment Confirmation Pending'
+                            : ($refundPending
                             ? 'Refund Processing'
-                            : (in_array($refundResult['status'], ['failed', 'manual_required'], true) ? 'Refund Requires Attention' : 'Order Cancelled'),
+                            : (in_array($refundResult['status'], ['failed', 'manual_required'], true) ? 'Refund Requires Attention' : 'Order Cancelled')),
                         'message' => $customerNotificationMessage,
                         'type' => $refundPending || in_array($refundResult['status'], ['failed', 'manual_required'], true) ? 'Warning' : 'Success',
                         'is_read' => 0,
@@ -1331,13 +1376,15 @@ class OrderController extends Controller
                     app(\App\Services\RealtimeEventPublisher::class)->notificationUpdated((int) $user->id);
 
                     AdminNotification::notifyRoles(['admin'], [
-                        'type' => $refundPending ? 'refund_requested' : 'order_cancelled',
-                        'title' => $refundPending ? 'Refund Requested' : 'Order Cancelled',
-                        'message' => $refundPending
+                        'type' => $refundResult['status'] === 'awaiting_payment' ? 'payment_confirmation_pending' : ($refundPending ? 'refund_requested' : 'order_cancelled'),
+                        'title' => $refundResult['status'] === 'awaiting_payment' ? 'Payment Confirmation Pending' : ($refundPending ? 'Refund Requested' : 'Order Cancelled'),
+                        'message' => $refundResult['status'] === 'awaiting_payment'
+                            ? "Order #{$order->id} cancellation is waiting for PayMongo payment confirmation."
+                            : ($refundPending
                             ? "Order #{$order->id} cancellation is awaiting PayMongo refund confirmation."
                             : (in_array($refundResult['status'], ['failed', 'manual_required'], true)
                                 ? "Order #{$order->id} cancellation needs refund follow-up."
-                                : "Order #{$order->id} was cancelled by the customer."),
+                                : "Order #{$order->id} was cancelled by the customer.")),
                         'data' => ['order_id' => (int) $order->id],
                         'action_url' => '/admin/orders',
                         'is_read' => false,
@@ -1373,6 +1420,7 @@ class OrderController extends Controller
             'pending' => !empty($refundResult['transfer_link'])
                 ? "Order #{$id} cancellation refund is ready. Claim your QR Ph refund within 3 days: {$refundResult['transfer_link']}"
                 : "Your cancellation for order #{$id} is waiting for PayMongo refund confirmation.",
+            'awaiting_payment' => "Your cancellation for order #{$id} is waiting for PayMongo payment confirmation.",
             'succeeded', 'refunded' => "Order #{$id} cancelled. PayMongo confirmed your refund was returned.",
             'failed' => "PayMongo could not process the refund for order #{$id}. Please contact support.",
             'manual_required' => "Your cancellation for order #{$id} is waiting for the shop to process the refund.",
@@ -1384,6 +1432,7 @@ class OrderController extends Controller
             'pending' => !empty($refundResult['transfer_link'])
                 ? 'Your QR Ph refund is ready to claim. Use the link in your notification or SMS within 3 days.'
                 : 'Your cancellation is awaiting PayMongo refund confirmation.',
+            'awaiting_payment' => 'Your cancellation is waiting for PayMongo to confirm the payment. If it succeeds, the refund will be requested automatically.',
             'succeeded', 'refunded' => 'Order cancelled. PayMongo confirmed the refund.',
             'failed' => 'PayMongo could not process the refund. Please retry the cancellation or contact support.',
             'manual_required' => 'Order cancelled. The admin has been notified to refund your payment manually.',
@@ -1399,6 +1448,32 @@ class OrderController extends Controller
             'order_status' => $order->status,
             'cancelled_at' => $order->cancelled_at,
         ]);
+    }
+
+    private function notifyCancellationAwaitingPayment(Order $order, int $userId): void
+    {
+        $message = "Your cancellation for order #{$order->id} is waiting for PayMongo to confirm the payment. If it succeeds, the refund will be requested automatically.";
+        if (Schema::hasTable('notifications')) {
+            DB::table('notifications')->insert([
+                'user_id' => $userId,
+                'title' => 'Payment Confirmation Pending',
+                'message' => $message,
+                'type' => 'Warning',
+                'is_read' => 0,
+                'action_url' => '/customer/orders',
+                'created_at' => now(),
+            ]);
+            app(\App\Services\RealtimeEventPublisher::class)->notificationUpdated($userId);
+            AdminNotification::notifyRoles(['admin'], [
+                'type' => 'payment_confirmation_pending',
+                'title' => 'Payment Confirmation Pending',
+                'message' => "Order #{$order->id} cancellation is waiting for PayMongo payment confirmation.",
+                'data' => ['order_id' => (int) $order->id],
+                'action_url' => '/admin/orders',
+                'is_read' => false,
+                'created_at' => now(),
+            ]);
+        }
     }
 
     private function refundPaidOrderIfNeeded(Order $order): array

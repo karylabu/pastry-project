@@ -29,7 +29,8 @@ const isQrPayment = (payment) => ['gcash', 'qrph'].includes(
 const getRefundStatusLabel = (status) => {
   const normalized = String(status || '').trim().toLowerCase();
   if (normalized === 'succeeded' || normalized === 'refunded') return 'Refund succeeded';
-  if (normalized === 'pending' || normalized === 'processing' || normalized === 'refunding') return 'Refund pending';
+  if (normalized === 'pending' || normalized === 'processing' || normalized === 'refunding' || normalized === 'requesting') return 'Refund pending';
+  if (normalized === 'awaiting_payment') return 'Waiting for payment confirmation';
   if (normalized === 'failed') return 'Refund failed';
   if (normalized === 'manual_required') return 'Manual refund required';
   return null;

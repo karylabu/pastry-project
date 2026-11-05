@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/cors.php';
 require_once __DIR__ . '/../includes/realtime_events.php';
+require_once __DIR__ . '/../includes/paymongo_order_refund.php';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     http_response_code(405);
@@ -290,7 +291,7 @@ if (in_array($refundEventStatus, ['succeeded', 'refunded', 'failed'], true)) {
         }
         $refundPaymentId = trim((string) $refundPaymentId);
         if (!$refundOrder && preg_match('/^pay_[A-Za-z0-9]+$/', $refundPaymentId)) {
-            $stmt = $conn->prepare("SELECT id, user_id, refund_status FROM orders WHERE paymongo_payment_id = ? AND status = 'Cancellation Pending' AND (refund_status IS NULL OR refund_status IN ('failed', 'manual_required')) LIMIT 1 FOR UPDATE");
+            $stmt = $conn->prepare("SELECT id, user_id, refund_status FROM orders WHERE paymongo_payment_id = ? AND status = 'Cancellation Pending' AND (refund_status IS NULL OR refund_status IN ('failed', 'manual_required', 'requesting')) LIMIT 1 FOR UPDATE");
             if (!$stmt) {
                 throw new RuntimeException('Unable to match the PayMongo refund to an order.');
             }
@@ -411,6 +412,8 @@ if (!$conn) {
 $paymentConfirmed = false;
 $orderRow = null;
 $payMongoPaymentId = '';
+$cancelledOrderRefund = null;
+$refundRequestClaimed = false;
 if (str_starts_with(strtolower((string) ($eventResource['id'] ?? '')), 'pay_')) {
     $payMongoPaymentId = (string) $eventResource['id'];
 } else {
@@ -428,7 +431,7 @@ if (str_starts_with(strtolower((string) ($eventResource['id'] ?? '')), 'pay_')) 
 }
 try {
     $conn->begin_transaction();
-    $stmt = $conn->prepare('SELECT id, user_id, items, payment, payment_status, payment_reference, status FROM orders WHERE id = ? LIMIT 1 FOR UPDATE');
+    $stmt = $conn->prepare('SELECT id, user_id, items, payment, payment_status, payment_reference, paymongo_payment_id, refund_status, refund_reference, total, downpayment_amount, is_customized, order_type, phone, status FROM orders WHERE id = ? LIMIT 1 FOR UPDATE');
     if (!$stmt) {
         throw new RuntimeException('Unable to lock payment order.');
     }
@@ -441,22 +444,48 @@ try {
     $stmt->close();
 
     if ($orderRow && $payMongoPaymentId !== '') {
-        $stmt = $conn->prepare("UPDATE orders SET paymongo_payment_id = ? WHERE id = ? AND (paymongo_payment_id IS NULL OR paymongo_payment_id = '')");
-        if (!$stmt) {
-            throw new RuntimeException('Unable to record the PayMongo payment ID.');
-        }
-        $stmt->bind_param('si', $payMongoPaymentId, $orderId);
-        if (!$stmt->execute()) {
+        if (trim((string) ($orderRow['paymongo_payment_id'] ?? '')) === '') {
+            $stmt = $conn->prepare("UPDATE orders SET paymongo_payment_id = ? WHERE id = ? AND (paymongo_payment_id IS NULL OR paymongo_payment_id = '')");
+            if (!$stmt) {
+                throw new RuntimeException('Unable to record the PayMongo payment ID.');
+            }
+            $stmt->bind_param('si', $payMongoPaymentId, $orderId);
+            if (!$stmt->execute()) {
+                $stmt->close();
+                throw new RuntimeException('Unable to record the PayMongo payment ID.');
+            }
             $stmt->close();
-            throw new RuntimeException('Unable to record the PayMongo payment ID.');
+            $orderRow['paymongo_payment_id'] = $payMongoPaymentId;
+        } elseif ((string) $orderRow['paymongo_payment_id'] !== $payMongoPaymentId) {
+            error_log("PayMongo payment ID mismatch on order #{$orderId}; retaining the previously verified payment ID.");
         }
-        $stmt->close();
     }
 
-    if (
+    $orderStatus = strtolower((string) ($orderRow['status'] ?? ''));
+    $storedRefundStatus = strtolower((string) ($orderRow['refund_status'] ?? ''));
+    $isCancelledOrder = in_array($orderStatus, ['cancelled', 'cancellation pending'], true);
+    $canClaimRefund = in_array($storedRefundStatus, ['', 'awaiting_payment', 'manual_required'], true)
+        && trim((string) ($orderRow['refund_reference'] ?? '')) === '';
+    if ($orderRow && $isCancelledOrder && $canClaimRefund) {
+        $stmt = $conn->prepare("UPDATE orders SET payment_status = 'paid', status = 'Cancellation Pending', refund_status = 'requesting', cancelled_at = NULL WHERE id = ?");
+        if (!$stmt) {
+            throw new RuntimeException('Unable to queue the cancellation refund.');
+        }
+        $stmt->bind_param('i', $orderId);
+        if (!$stmt->execute()) {
+            $stmt->close();
+            throw new RuntimeException('Unable to queue the cancellation refund.');
+        }
+        $refundRequestClaimed = true;
+        $stmt->close();
+        $orderRow['payment_status'] = 'paid';
+        $orderRow['status'] = 'Cancellation Pending';
+        $orderRow['refund_status'] = 'requesting';
+        $cancelledOrderRefund = $orderRow;
+    } elseif (
         $orderRow
         && in_array(strtolower((string) $orderRow['payment']), ['gcash', 'qrph'], true)
-        && in_array(strtolower((string) $orderRow['status']), ['awaiting payment', 'pending'], true)
+        && in_array($orderStatus, ['awaiting payment', 'pending'], true)
         && strtolower((string) ($orderRow['payment_status'] ?? 'pending')) !== 'paid'
     ) {
         if (!webhookOrderHasActiveStockDeduction($conn, $orderId)) {
@@ -482,6 +511,101 @@ try {
     echo json_encode(['status' => 'error', 'message' => 'Unable to record payment and update stock.']);
     $conn->close();
     exit;
+}
+
+if ($refundRequestClaimed && is_array($cancelledOrderRefund)) {
+    try {
+        $refundResult = requestPayMongoOrderRefund($cancelledOrderRefund, $orderId);
+    } catch (Throwable $exception) {
+        error_log("PayMongo refund request outcome is unknown for cancelled order #{$orderId}: " . $exception->getMessage());
+        $refundStatus = $exception instanceof PayMongoOrderRefundException && $exception->requestMayHaveBeenAccepted
+            ? 'requesting'
+            : 'failed';
+        $refundResult = ['status' => $refundStatus, 'reference' => null, 'amount' => null, 'transfer_link' => null];
+    }
+
+    $refundStatus = strtolower((string) ($refundResult['status'] ?? ''));
+    if (!in_array($refundStatus, ['pending', 'succeeded', 'refunded', 'failed', 'requesting'], true)) {
+        error_log("PayMongo returned an unrecognized refund status for cancelled order #{$orderId}.");
+        $refundStatus = 'requesting';
+        $refundResult = ['status' => $refundStatus, 'reference' => null, 'amount' => null, 'transfer_link' => null];
+    }
+
+    try {
+        $conn->begin_transaction();
+        $orderIdForUpdate = $orderId;
+        $stmt = $conn->prepare("SELECT user_id FROM orders WHERE id = ? AND refund_status = 'requesting' LIMIT 1 FOR UPDATE");
+        if (!$stmt) {
+            throw new RuntimeException('Unable to lock the queued cancellation refund.');
+        }
+        $stmt->bind_param('i', $orderIdForUpdate);
+        if (!$stmt->execute()) {
+            $stmt->close();
+            throw new RuntimeException('Unable to lock the queued cancellation refund.');
+        }
+        $refundOwner = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+        if (!$refundOwner) {
+            $conn->rollback();
+            echo json_encode(['status' => 'ignored', 'order_id' => $orderId]);
+            exit;
+        }
+
+        $isRefundSucceeded = in_array($refundStatus, ['succeeded', 'refunded'], true);
+        $nextOrderStatus = $isRefundSucceeded ? 'Cancelled' : 'Cancellation Pending';
+        $nextPaymentStatus = $isRefundSucceeded ? 'refunded' : 'paid';
+        $refundReference = $refundResult['reference'] ?? null;
+        $refundAmount = $refundResult['amount'] ?? null;
+        $transferLink = $refundResult['transfer_link'] ?? null;
+        $stmt = $conn->prepare('UPDATE orders SET status = ?, payment_status = ?, refund_status = ?, refund_reference = ?, refund_amount = ?, refund_transfer_link = ?, cancelled_at = IF(? = \'Cancelled\', NOW(), NULL) WHERE id = ? AND refund_status = \'requesting\'');
+        if (!$stmt) {
+            throw new RuntimeException('Unable to save the PayMongo refund result.');
+        }
+        $stmt->bind_param('sssssssi', $nextOrderStatus, $nextPaymentStatus, $refundStatus, $refundReference, $refundAmount, $transferLink, $nextOrderStatus, $orderIdForUpdate);
+        if (!$stmt->execute()) {
+            $stmt->close();
+            throw new RuntimeException('Unable to save the PayMongo refund result.');
+        }
+        $stmt->close();
+
+        $userId = (int) ($refundOwner['user_id'] ?? 0);
+        if ($userId > 0) {
+            $title = $isRefundSucceeded ? 'Refund Processed' : ($refundStatus === 'failed' ? 'Refund Failed' : 'Refund Processing');
+            $message = match ($refundStatus) {
+                'succeeded', 'refunded' => "PayMongo confirmed your refund for order #{$orderId}.",
+                'failed' => "PayMongo could not process your refund for order #{$orderId}. You can retry the cancellation or contact support.",
+                'requesting' => "Your refund request for order #{$orderId} is being verified. Please do not retry while the status is being checked.",
+                default => !empty($transferLink)
+                    ? "Your cancellation for order #{$orderId} is awaiting your QR Ph refund claim. Claim it within 3 days: {$transferLink}"
+                    : "Your cancellation for order #{$orderId} is awaiting PayMongo refund confirmation.",
+            };
+            $type = $isRefundSucceeded ? 'Success' : 'Warning';
+            $actionUrl = '/customer/orders';
+            $notification = $conn->prepare('INSERT INTO notifications (user_id, title, message, type, is_read, action_url, created_at) VALUES (?, ?, ?, ?, 0, ?, NOW())');
+            if (!$notification) {
+                throw new RuntimeException('Unable to create the cancellation refund notification.');
+            }
+            $notification->bind_param('issss', $userId, $title, $message, $type, $actionUrl);
+            if (!$notification->execute()) {
+                $notification->close();
+                throw new RuntimeException('Unable to create the cancellation refund notification.');
+            }
+            $notification->close();
+            publishRealtimeEvent($conn, 'notification.updated', $userId);
+            publishRealtimeEvent($conn, 'order.updated', $userId, $orderId);
+        }
+        $conn->commit();
+        if ($refundStatus !== 'requesting') {
+            sendPayMongoOrderRefundSms((string) ($cancelledOrderRefund['phone'] ?? ''), $orderId, $refundResult);
+        }
+    } catch (Throwable $exception) {
+        $conn->rollback();
+        error_log("PayMongo refund result could not be saved for cancelled order #{$orderId}: " . $exception->getMessage());
+        http_response_code(500);
+        echo json_encode(['status' => 'error', 'message' => 'Unable to save the cancellation refund result.']);
+        $conn->close();
+        exit;
+    }
 }
 
 if ($paymentConfirmed) {
