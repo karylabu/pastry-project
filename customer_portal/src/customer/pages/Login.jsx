@@ -218,6 +218,10 @@ export default function Login() {
 
   const verifyGoogleEmailCode = async () => {
     if (!googleEmailVerificationId || !/^\d{6}$/.test(googleEmailCode)) return;
+    if (!googlePhone.trim()) {
+      setGoogleOnboardingError("Enter your phone number before verifying your email.");
+      return;
+    }
 
     setGoogleOnboardingError("");
     setGoogleEmailStatus("");
@@ -241,6 +245,7 @@ export default function Login() {
 
       setGoogleEmailVerified(true);
       setGoogleEmailStatus("Email address verified.");
+      await completeGoogleOnboarding(true);
     } catch {
       setGoogleOnboardingError("Network error while verifying your phone. Please try again.");
     } finally {
@@ -248,9 +253,8 @@ export default function Login() {
     }
   };
 
-  const completeGoogleOnboarding = async (event) => {
-    event.preventDefault();
-    if (!googleOnboarding || !googleEmailVerified) {
+  const completeGoogleOnboarding = async (emailVerified = googleEmailVerified) => {
+    if (!googleOnboarding || !emailVerified) {
       setGoogleOnboardingError("Verify your email address before continuing.");
       return;
     }
@@ -1525,17 +1529,16 @@ export default function Login() {
                 </p>
               )}
 
-              <button
-                type="submit"
-                disabled={
-                  googleOnboardingLoading
-                  || !googleEmailVerified
-                  || (googleOnboarding.mode === "signup" && (!googleTermsAccepted || !googlePrivacyAccepted))
-                }
-                className="w-full rounded-xl bg-[#f0b94d] px-4 py-3 text-sm font-bold text-[#2b1b14] transition hover:bg-[#e6ad3e] disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {googleOnboardingLoading ? "Opening your account..." : "Continue to account"}
-              </button>
+              {googleEmailVerified && googleOnboardingError && (
+                <button
+                  type="button"
+                  onClick={() => completeGoogleOnboarding(true)}
+                  disabled={googleOnboardingLoading}
+                  className="w-full rounded-xl bg-[#f0b94d] px-4 py-3 text-sm font-bold text-[#2b1b14] transition hover:bg-[#e6ad3e] disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {googleOnboardingLoading ? "Opening your account..." : "Try again"}
+                </button>
+              )}
             </form>
           </motion.section>
         </div>

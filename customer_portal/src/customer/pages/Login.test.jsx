@@ -69,7 +69,8 @@ describe("Google sign-in email onboarding", () => {
 
     fireEvent.change(screen.getByRole("textbox", { name: "Email verification code" }), { target: { value: "123456" } });
     fireEvent.click(screen.getByRole("button", { name: "Verify" }));
-    expect(await screen.findByText("Email address verified.")).toBeInTheDocument();
+    await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(4));
+    await waitFor(() => expect(JSON.parse(localStorage.getItem("user"))).not.toBeNull());
   };
 
   it("verifies the Google email and collects consent before creating a Google account and logging in", async () => {
@@ -93,9 +94,9 @@ describe("Google sign-in email onboarding", () => {
     fireEvent.click(onboarding.getByRole("checkbox", { name: /Terms & Conditions/ }));
     fireEvent.click(onboarding.getByRole("checkbox", { name: /Privacy Policy/ }));
     await verifyEmail();
-    expect(onboarding.queryByRole("checkbox", { name: /Terms & Conditions/ })).not.toBeInTheDocument();
-    expect(onboarding.queryByRole("checkbox", { name: /Privacy Policy/ })).not.toBeInTheDocument();
-    fireEvent.click(onboarding.getByRole("button", { name: "Continue to account" }));
+    expect(screen.queryByRole("button", { name: "Continue to account" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(screen.getByText("Login successful!")).toBeInTheDocument();
 
     await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(4));
     expect(JSON.parse(global.fetch.mock.calls[3][1].body)).toMatchObject({
@@ -130,7 +131,8 @@ describe("Google sign-in email onboarding", () => {
     const onboarding = within(await screen.findByRole("dialog"));
     expect(onboarding.queryByRole("checkbox", { name: /Terms & Conditions/ })).not.toBeInTheDocument();
     await verifyEmail();
-    fireEvent.click(onboarding.getByRole("button", { name: "Continue to account" }));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(screen.getByText("Login successful!")).toBeInTheDocument();
 
     await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(4));
     expect(JSON.parse(global.fetch.mock.calls[3][1].body)).toMatchObject({
