@@ -643,15 +643,26 @@ class RewardCodeCheckoutTest extends TestCase
         $this->assertNull(DB::table('orders')->value('delivery_time'));
     }
 
-    public function test_delivery_qrph_order_with_empty_delivery_date_is_saved_with_null_date(): void
+    public function test_delivery_order_requires_and_stores_delivery_date(): void
     {
-        $response = $this->placeOrder('', 'none', '09:30', null, '', '', 'QRPh', 'Deliver');
+        $deliveryDate = now()->addDay()->toDateString();
+        $response = $this->placeOrder('', 'none', '09:30', null, '', $deliveryDate, 'QRPh', 'Deliver');
 
         $this->assertSame(201, $response->getStatusCode());
         $order = DB::table('orders')->first();
         $this->assertSame('Deliver', $order->method);
         $this->assertSame('QRPh', $order->payment);
-        $this->assertNull($order->delivery_date);
+        $this->assertSame($deliveryDate, $order->delivery_date);
+
+        $dateRule = (new StoreOrderRequest())->rules()['delivery_date'];
+        $this->assertTrue(Validator::make(
+            ['method' => 'Deliver'],
+            ['delivery_date' => $dateRule]
+        )->fails());
+        $this->assertTrue(Validator::make(
+            ['method' => 'Deliver', 'delivery_date' => now()->subDay()->toDateString()],
+            ['delivery_date' => $dateRule]
+        )->fails());
     }
 
     public function test_pickup_date_is_stored_and_request_rules_reject_missing_or_past_dates(): void

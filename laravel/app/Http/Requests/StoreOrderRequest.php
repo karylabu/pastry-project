@@ -52,7 +52,7 @@ class StoreOrderRequest extends FormRequest
             'items.*.image' => 'sometimes|string|nullable',
             'method' => 'required|string|in:Delivery,Deliver,Pickup',
             'delivery_service' => 'nullable|string|in:Lalamove,GrabCar',
-            'delivery_date' => 'nullable|required_if:method,Pickup|date_format:Y-m-d|after_or_equal:today',
+            'delivery_date' => 'nullable|required_if:method,Pickup,Delivery,Deliver|date_format:Y-m-d|after_or_equal:today',
             'delivery_time' => 'nullable|date_format:H:i',
             'payment' => $this->input('method') === 'Pickup'
                 ? 'required|string|in:QRPh'

@@ -75,6 +75,13 @@ const getManilaDateString = () => {
   return `${dateParts.year}-${dateParts.month}-${dateParts.day}`;
 };
 
+const getManilaTimeString = () => new Intl.DateTimeFormat('en-GB', {
+  timeZone: 'Asia/Manila',
+  hour: '2-digit',
+  minute: '2-digit',
+  hourCycle: 'h23',
+}).format(new Date());
+
 const formatSavedAddress = (address) => {
   if (!address) return '';
   const parts = [];
@@ -110,6 +117,10 @@ export default function CheckoutModal({
   const [shopOpen, setShopOpen] = useState(null);
   const [shopStatusError, setShopStatusError] = useState(false);
   const [shopSettings, setShopSettings] = useState(DEFAULT_SHOP_SETTINGS);
+  const [manilaNow, setManilaNow] = useState(() => ({
+    date: getManilaDateString(),
+    time: getManilaTimeString(),
+  }));
   const [discountType, setDiscountType] = useState('none');
   const [rewardCodeInput, setRewardCodeInput] = useState('');
   const [promotionCouponInput, setPromotionCouponInput] = useState('');
@@ -143,7 +154,7 @@ export default function CheckoutModal({
   const [checkoutData, setCheckoutData] = useState({
     method: "Deliver",
     deliveryService: "",
-    pickupDate: "",
+    fulfillmentDate: "",
     deliveryTime: "",
     payment: "QRPh",
     pickupPaymentType: "downpayment",
@@ -173,6 +184,17 @@ export default function CheckoutModal({
     setDiscountIdPreview(previewUrl);
     return () => URL.revokeObjectURL(previewUrl);
   }, [discountIdFile]);
+
+  useEffect(() => {
+    if (!isOpen) return undefined;
+    const updateManilaTime = () => setManilaNow({
+      date: getManilaDateString(),
+      time: getManilaTimeString(),
+    });
+    updateManilaTime();
+    const intervalId = window.setInterval(updateManilaTime, 30_000);
+    return () => window.clearInterval(intervalId);
+  }, [isOpen]);
 
   useEffect(() => {
     if (!isOpen || checkoutData.method !== 'Pickup' || !pickupMapElementRef.current) return undefined;
@@ -604,12 +626,23 @@ export default function CheckoutModal({
     : 0;
   const displayedTotal = total + qrPhTaxAmount;
   const fulfillmentTimeSlots = useMemo(
-    () => createFulfillmentTimeSlots(shopSettings.openingHours),
-    [shopSettings.openingHours]
+    () => createFulfillmentTimeSlots(shopSettings.openingHours)
+      .filter((slot) => checkoutData.fulfillmentDate !== manilaNow.date || slot.value > manilaNow.time),
+    [shopSettings.openingHours, checkoutData.fulfillmentDate, manilaNow]
   );
   const minimumOrder = Number(shopSettings.minimumOrder || 0);
   const belowMinimumOrder = subtotal < minimumOrder;
   const berMonths = isBerMonth();
+
+  useEffect(() => {
+    if (
+      checkoutData.fulfillmentDate === manilaNow.date
+      && checkoutData.deliveryTime
+      && !fulfillmentTimeSlots.some((slot) => slot.value === checkoutData.deliveryTime)
+    ) {
+      setCheckoutData((current) => ({ ...current, deliveryTime: '' }));
+    }
+  }, [checkoutData.fulfillmentDate, checkoutData.deliveryTime, fulfillmentTimeSlots, manilaNow.date]);
 
   useEffect(() => {
     if (berMonths && checkoutData.orderType === 'Urgent') {
@@ -650,8 +683,8 @@ export default function CheckoutModal({
     const missingFields = {
       phone: checkoutData.phone.trim() ? '' : 'Fill up this field',
       address: checkoutData.method !== 'Deliver' || checkoutData.address.trim() ? '' : 'Fill up this field',
-      pickupDate: checkoutData.method !== 'Pickup' || (checkoutData.pickupDate && checkoutData.pickupDate >= getManilaDateString()) ? '' : 'Choose today or a future date',
-      deliveryTime: checkoutData.deliveryTime ? '' : 'Fill up this field',
+      fulfillmentDate: checkoutData.fulfillmentDate && checkoutData.fulfillmentDate >= manilaNow.date ? '' : 'Choose today or a future date',
+      deliveryTime: fulfillmentTimeSlots.some((slot) => slot.value === checkoutData.deliveryTime) ? '' : 'Choose an available future time',
       deliveryService: checkoutData.method !== 'Deliver' || checkoutData.deliveryService ? '' : 'Fill up this field',
       discountId: discountType === 'none' || discountIdFile ? '' : 'Fill up this field',
     };
@@ -661,7 +694,7 @@ export default function CheckoutModal({
       const fieldIds = {
         phone: 'checkout-phone',
         address: 'checkout-address',
-        pickupDate: 'checkout-pickup-date',
+        fulfillmentDate: 'checkout-fulfillment-date',
         deliveryTime: 'checkout-fulfillment-time',
         deliveryService: 'checkout-delivery-service',
         discountId: 'discount-id-image',
@@ -730,7 +763,7 @@ export default function CheckoutModal({
 
         method: checkoutData.method,
         delivery_service: checkoutData.method === "Deliver" ? checkoutData.deliveryService : "",
-        delivery_date: checkoutData.method === "Pickup" ? checkoutData.pickupDate : "",
+        delivery_date: checkoutData.fulfillmentDate,
         delivery_time: checkoutData.deliveryTime,
         payment: checkoutData.payment,
         ...(checkoutData.method === "Pickup" ? { payment_type: checkoutData.pickupPaymentType } : {}),
@@ -1166,29 +1199,31 @@ export default function CheckoutModal({
             </div>
 
             <div className="mb-6">
-              {checkoutData.method === "Pickup" && (
-                <div className="mb-4">
-                  <label htmlFor="checkout-pickup-date" className="mb-1 block text-xs font-medium text-gray-600">
-                    Pickup date <span className="text-red-600" aria-hidden="true">*</span>
-                  </label>
-                  <input
-                    id="checkout-pickup-date"
-                    type="date"
-                    required
-                    min={getManilaDateString()}
-                    aria-invalid={Boolean(fieldErrors.pickupDate)}
-                    value={checkoutData.pickupDate}
-                    onChange={(event) => {
-                      setFieldErrors((prev) => ({ ...prev, pickupDate: '' }));
-                      setCheckoutData((current) => ({ ...current, pickupDate: event.target.value }));
-                    }}
-                    className={`w-full rounded-xl border ${fieldErrors.pickupDate ? 'border-red-500' : 'border-[#e8e1d8]'} bg-[#fffdfa] p-3 text-sm text-[#33251e] outline-none transition focus:border-[#d4af37] focus:ring-2 focus:ring-[#d4af37]/20`}
-                  />
-                  {fieldErrors.pickupDate && (
-                    <p role="alert" className="mt-1 text-xs font-medium text-red-600">{fieldErrors.pickupDate}</p>
-                  )}
-                </div>
-              )}
+              <div className="mb-4">
+                <label htmlFor="checkout-fulfillment-date" className="mb-1 block text-xs font-medium text-gray-600">
+                  {checkoutData.method === "Pickup" ? "Pickup date" : "Delivery date"} <span className="text-red-600" aria-hidden="true">*</span>
+                </label>
+                <input
+                  id="checkout-fulfillment-date"
+                  type="date"
+                  required
+                  min={manilaNow.date}
+                  aria-invalid={Boolean(fieldErrors.fulfillmentDate)}
+                  value={checkoutData.fulfillmentDate}
+                  onChange={(event) => {
+                    setFieldErrors((prev) => ({ ...prev, fulfillmentDate: '' }));
+                    setCheckoutData((current) => ({
+                      ...current,
+                      fulfillmentDate: event.target.value,
+                      deliveryTime: '',
+                    }));
+                  }}
+                  className={`w-full rounded-xl border ${fieldErrors.fulfillmentDate ? 'border-red-500' : 'border-[#e8e1d8]'} bg-[#fffdfa] p-3 text-sm text-[#33251e] outline-none transition focus:border-[#d4af37] focus:ring-2 focus:ring-[#d4af37]/20`}
+                />
+                {fieldErrors.fulfillmentDate && (
+                  <p role="alert" className="mt-1 text-xs font-medium text-red-600">{fieldErrors.fulfillmentDate}</p>
+                )}
+              </div>
               <label htmlFor="checkout-fulfillment-time" className="mb-1 block text-xs font-medium text-gray-600">
                 {checkoutData.method === "Pickup" ? "Pickup time" : "Delivery time"} <span className="text-red-600" aria-hidden="true">*</span>
               </label>
