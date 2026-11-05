@@ -1402,9 +1402,9 @@ export default function Orders() {
             <div className="divide-y divide-gray-100">
               {sortedOrders.map((order, idx) => {
                 const isCancelled  = order.status === "Cancelled";
+                const isCancellationPending = order.status === "Cancellation Pending";
                 const paymentMethodKey = String(order.payment || '').toLowerCase().replace(/[^a-z0-9]/g, '');
                 const supportsPaymentProof = ['gcash', 'qrph'].includes(paymentMethodKey)
-                const isCancellationPending = order.status === "Cancellation Pending";
                   || (Boolean(order.is_customized)
                     && ['maya', 'maribank', 'visamastercard', 'onlinebanking'].includes(paymentMethodKey));
                 const paymentStatusKey = String(order.payment_status || '').toLowerCase();
