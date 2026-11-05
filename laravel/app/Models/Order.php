@@ -33,6 +33,7 @@ class Order extends Model
         'payment_status',
         'payment_link',
         'payment_reference',
+        'paymongo_payment_id',
         'downpayment_amount',
         'downpayment_base_amount',
         'customer',

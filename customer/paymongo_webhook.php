@@ -284,6 +284,38 @@ if (in_array($refundEventStatus, ['succeeded', 'refunded', 'failed'], true)) {
         }
         $refundOrder = $stmt->get_result()->fetch_assoc();
         $stmt->close();
+        $refundPaymentId = $data['data']['attributes']['payment_id'] ?? '';
+        if (is_array($refundPaymentId)) {
+            $refundPaymentId = $refundPaymentId['id'] ?? '';
+        }
+        $refundPaymentId = trim((string) $refundPaymentId);
+        if (!$refundOrder && preg_match('/^pay_[A-Za-z0-9]+$/', $refundPaymentId)) {
+            $stmt = $conn->prepare("SELECT id, user_id, refund_status FROM orders WHERE paymongo_payment_id = ? AND status = 'Cancellation Pending' AND (refund_status IS NULL OR refund_status IN ('failed', 'manual_required')) LIMIT 1 FOR UPDATE");
+            if (!$stmt) {
+                throw new RuntimeException('Unable to match the PayMongo refund to an order.');
+            }
+            $stmt->bind_param('s', $refundPaymentId);
+            if (!$stmt->execute()) {
+                $stmt->close();
+                throw new RuntimeException('Unable to match the PayMongo refund to an order.');
+            }
+            $refundOrder = $stmt->get_result()->fetch_assoc();
+            $stmt->close();
+            if ($refundOrder) {
+                $orderId = (int) $refundOrder['id'];
+                $stmt = $conn->prepare("UPDATE orders SET refund_reference = ?, refund_status = 'pending' WHERE id = ?");
+                if (!$stmt) {
+                    throw new RuntimeException('Unable to associate the PayMongo refund with the order.');
+                }
+                $stmt->bind_param('si', $refundId, $orderId);
+                if (!$stmt->execute()) {
+                    $stmt->close();
+                    throw new RuntimeException('Unable to associate the PayMongo refund with the order.');
+                }
+                $stmt->close();
+                $refundOrder['refund_status'] = 'pending';
+            }
+        }
         if (!$refundOrder) {
             $conn->rollback();
             $conn->close();
@@ -345,15 +377,22 @@ if (in_array($refundEventStatus, ['succeeded', 'refunded', 'failed'], true)) {
     exit;
 }
 
-$successfulEvents = ['link.payment.paid', 'payment.paid'];
+$successfulEvents = ['link.payment.paid', 'payment.paid', 'checkout_session.payment.paid'];
 if (!in_array($eventType, $successfulEvents, true)) {
     echo json_encode(['status' => 'ignored']);
     exit;
 }
 
 $orderId = 0;
+$eventAttributes = $data['data']['attributes'] ?? [];
+$eventResource = $eventAttributes['data'] ?? $data['data'] ?? [];
+$resourceAttributes = $eventResource['attributes'] ?? [];
+$metadata = $resourceAttributes['metadata'] ?? $eventAttributes['metadata'] ?? [];
+if (is_array($metadata) && ctype_digit((string) ($metadata['order_id'] ?? ''))) {
+    $orderId = (int) $metadata['order_id'];
+}
 $json = json_encode($data);
-if ($json && preg_match('/Pastry Order #(\d+)/i', $json, $matches)) {
+if ($orderId <= 0 && $json && preg_match('/Pastry Order #(\d+)/i', $json, $matches)) {
     $orderId = (int) $matches[1];
 }
 
@@ -371,9 +410,25 @@ if (!$conn) {
 
 $paymentConfirmed = false;
 $orderRow = null;
+$payMongoPaymentId = '';
+if (str_starts_with(strtolower((string) ($eventResource['id'] ?? '')), 'pay_')) {
+    $payMongoPaymentId = (string) $eventResource['id'];
+} else {
+    $payments = $resourceAttributes['payments'] ?? $eventAttributes['payments'] ?? [];
+    foreach (is_array($payments) ? $payments : [] as $payment) {
+        $paymentAttributes = $payment['attributes'] ?? [];
+        if (
+            in_array(strtolower((string) ($paymentAttributes['status'] ?? $payment['status'] ?? '')), ['paid', 'succeeded'], true)
+            && str_starts_with(strtolower((string) ($payment['id'] ?? '')), 'pay_')
+        ) {
+            $payMongoPaymentId = (string) $payment['id'];
+            break;
+        }
+    }
+}
 try {
     $conn->begin_transaction();
-    $stmt = $conn->prepare('SELECT id, user_id, items, payment, payment_status, status FROM orders WHERE id = ? LIMIT 1 FOR UPDATE');
+    $stmt = $conn->prepare('SELECT id, user_id, items, payment, payment_status, payment_reference, status FROM orders WHERE id = ? LIMIT 1 FOR UPDATE');
     if (!$stmt) {
         throw new RuntimeException('Unable to lock payment order.');
     }
@@ -384,6 +439,19 @@ try {
     }
     $orderRow = $stmt->get_result()->fetch_assoc();
     $stmt->close();
+
+    if ($orderRow && $payMongoPaymentId !== '') {
+        $stmt = $conn->prepare("UPDATE orders SET paymongo_payment_id = ? WHERE id = ? AND (paymongo_payment_id IS NULL OR paymongo_payment_id = '')");
+        if (!$stmt) {
+            throw new RuntimeException('Unable to record the PayMongo payment ID.');
+        }
+        $stmt->bind_param('si', $payMongoPaymentId, $orderId);
+        if (!$stmt->execute()) {
+            $stmt->close();
+            throw new RuntimeException('Unable to record the PayMongo payment ID.');
+        }
+        $stmt->close();
+    }
 
     if (
         $orderRow

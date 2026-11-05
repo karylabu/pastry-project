@@ -53,6 +53,7 @@ class CustomerOrdersApiTest extends TestCase
             $table->string('status');
             $table->string('payment_status')->nullable();
             $table->string('payment_reference')->nullable();
+            $table->string('paymongo_payment_id')->nullable();
             $table->string('refund_reference')->nullable();
             $table->string('refund_status')->nullable();
             $table->decimal('refund_amount', 10, 2)->nullable();
@@ -355,6 +356,89 @@ class CustomerOrdersApiTest extends TestCase
             'refund_status' => 'pending',
             'refund_transfer_link' => 'https://transfer.paymongo.com/claim-17',
         ]);
+    }
+
+    public function test_refund_uses_the_saved_paymongo_payment_id(): void
+    {
+        config(['services.paymongo.secret' => 'sk_test_refund']);
+        Http::fake([
+            'https://api.paymongo.com/v1/payments/pay_saved_18' => Http::response([
+                'data' => [
+                    'id' => 'pay_saved_18',
+                    'attributes' => ['status' => 'paid', 'amount' => 25000],
+                ],
+            ]),
+            'https://api.paymongo.com/v1/refunds' => Http::response([
+                'data' => [
+                    'id' => 're_18',
+                    'attributes' => ['status' => 'pending'],
+                ],
+            ]),
+        ]);
+        DB::table('orders')->insert([
+            'id' => 18,
+            'user_id' => 7,
+            'payment' => 'GCash',
+            'payment_status' => 'paid',
+            'payment_reference' => 'checkout-session-18',
+            'paymongo_payment_id' => 'pay_saved_18',
+            'total' => 250,
+            'status' => 'Pending',
+        ]);
+
+        $request = Request::create('/api/orders/18/cancel', 'POST', [], [], [], [
+            'HTTP_X_AUTH_TOKEN' => 'test-customer-token',
+        ]);
+        $response = app(OrderController::class)->cancel($request, 18);
+
+        $this->assertSame(200, $response->getStatusCode());
+        $this->assertSame('pending', $response->getData(true)['refund_status']);
+        $this->assertSame(
+            'https://api.paymongo.com/v1/payments/pay_saved_18',
+            Http::recorded()->first()[0]->url()
+        );
+        Http::assertSentCount(2);
+    }
+
+    public function test_refund_can_resolve_a_checkout_session_payment_when_no_payment_id_was_saved(): void
+    {
+        config(['services.paymongo.secret' => 'sk_test_refund']);
+        Http::fake([
+            'https://api.paymongo.com/v2/checkout_sessions/cs_test_19/payments' => Http::response([
+                'data' => [[
+                    'id' => 'pay_19',
+                    'attributes' => ['status' => 'paid', 'amount' => 32000],
+                ]],
+            ]),
+            'https://api.paymongo.com/v1/refunds' => Http::response([
+                'data' => [
+                    'id' => 're_19',
+                    'attributes' => ['status' => 'pending'],
+                ],
+            ]),
+        ]);
+        DB::table('orders')->insert([
+            'id' => 19,
+            'user_id' => 7,
+            'payment' => 'Maya',
+            'payment_status' => 'paid',
+            'payment_reference' => 'cs_test_19',
+            'total' => 320,
+            'status' => 'Pending',
+        ]);
+
+        $request = Request::create('/api/orders/19/cancel', 'POST', [], [], [], [
+            'HTTP_X_AUTH_TOKEN' => 'test-customer-token',
+        ]);
+        $response = app(OrderController::class)->cancel($request, 19);
+
+        $this->assertSame(200, $response->getStatusCode());
+        $this->assertSame('pending', $response->getData(true)['refund_status']);
+        $this->assertSame(
+            'https://api.paymongo.com/v1/refunds',
+            Http::recorded()->last()[0]->url()
+        );
+        Http::assertSentCount(2);
     }
 
     public function test_customer_cancellation_does_not_mark_payment_refunded_when_paymongo_credentials_are_missing(): void

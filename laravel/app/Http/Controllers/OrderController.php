@@ -1310,6 +1310,7 @@ class OrderController extends Controller
                     'refund_status' => $refundResult['status'] ?? $order->refund_status,
                     'refund_amount' => $refundResult['amount'] ?? $order->refund_amount,
                     'refund_transfer_link' => $refundResult['transfer_link'] ?? null,
+                    'paymongo_payment_id' => $refundResult['payment_id'] ?? $order->paymongo_payment_id,
                     'cancelled_at' => $refundPending || in_array($refundResult['status'], ['failed', 'manual_required'], true)
                         ? null
                         : now(),
@@ -1404,7 +1405,7 @@ class OrderController extends Controller
     {
         $paymentStatus = strtolower(trim((string) $order->payment_status));
         if (!in_array($paymentStatus, ['paid', 'downpayment_paid'], true)) {
-            return ['status' => null, 'amount' => null, 'reference' => null, 'transfer_link' => null];
+            return ['status' => null, 'amount' => null, 'reference' => null, 'transfer_link' => null, 'payment_id' => null];
         }
 
         $amount = (float) ($order->total ?? 0);
@@ -1419,8 +1420,9 @@ class OrderController extends Controller
         ) {
             $amount = $downpaymentAmount;
         }
-        if (empty($order->payment_reference)) {
-            return ['status' => 'manual_required', 'amount' => $amount, 'reference' => null, 'transfer_link' => null];
+        $paymentId = trim((string) $order->paymongo_payment_id);
+        if ($paymentId === '' && empty($order->payment_reference)) {
+            return ['status' => 'manual_required', 'amount' => $amount, 'reference' => null, 'transfer_link' => null, 'payment_id' => null];
         }
 
         $secretKey = config('services.paymongo.secret');
@@ -1428,20 +1430,62 @@ class OrderController extends Controller
             Log::warning('PayMongo refund could not be attempted because the secret key is missing.', [
                 'order_id' => $order->id,
             ]);
-            return ['status' => 'failed', 'amount' => $amount, 'reference' => null];
+            return ['status' => 'failed', 'amount' => $amount, 'reference' => null, 'payment_id' => $paymentId];
         }
 
         try {
-            $paymentsResponse = Http::withBasicAuth($secretKey, '')
-                ->acceptJson()
-                ->timeout(15)
-                ->get('https://api.paymongo.com/v1/payment_links/' . rawurlencode((string) $order->payment_reference) . '/payments');
+            if ($paymentId !== '') {
+                $paymentResponse = Http::withBasicAuth($secretKey, '')
+                    ->acceptJson()
+                    ->timeout(15)
+                    ->get('https://api.paymongo.com/v1/payments/' . rawurlencode($paymentId));
+                if (!$paymentResponse->successful() || !is_array($paymentResponse->json('data'))) {
+                    throw new RuntimeException('Unable to verify the saved payment with PayMongo.');
+                }
+                $payments = [$paymentResponse->json('data')];
+            } elseif (
+                str_starts_with(strtolower((string) $order->payment_reference), 'cs_')
+                || str_starts_with(strtolower((string) $order->payment_reference), 'cs-')
+            ) {
+                $sessionUrls = [
+                    'https://api.paymongo.com/v2/checkout_sessions/' . rawurlencode((string) $order->payment_reference) . '/payments',
+                    'https://api.paymongo.com/v1/checkout_sessions/' . rawurlencode((string) $order->payment_reference) . '/payments',
+                    'https://api.paymongo.com/v2/checkout_sessions/' . rawurlencode((string) $order->payment_reference),
+                    'https://api.paymongo.com/v1/checkout_sessions/' . rawurlencode((string) $order->payment_reference),
+                ];
+                $payments = null;
+                foreach ($sessionUrls as $url) {
+                    $sessionResponse = Http::withBasicAuth($secretKey, '')
+                        ->acceptJson()
+                        ->timeout(15)
+                        ->get($url);
+                    $sessionData = $sessionResponse->json('data');
+                    if ($sessionResponse->successful() && is_array($sessionData)) {
+                        $payments = $sessionData['attributes']['payments'] ?? $sessionData;
+                        if (is_array($payments)) {
+                            break;
+                        }
+                    }
+                }
+                if (!is_array($payments)) {
+                    throw new RuntimeException('Unable to verify the Checkout Session with PayMongo.');
+                }
+            } else {
+                $paymentsResponse = Http::withBasicAuth($secretKey, '')
+                    ->acceptJson()
+                    ->timeout(15)
+                    ->get('https://api.paymongo.com/v1/payment_links/' . rawurlencode((string) $order->payment_reference) . '/payments');
 
-            if (!$paymentsResponse->successful() || !is_array($paymentsResponse->json('data'))) {
-                throw new RuntimeException('Unable to verify the payment with PayMongo.');
+                if (!$paymentsResponse->successful() || !is_array($paymentsResponse->json('data'))) {
+                    throw new RuntimeException('Unable to verify the payment with PayMongo.');
+                }
+                $payments = $paymentsResponse->json('data');
             }
 
-            $payment = collect($paymentsResponse->json('data'))->first(function ($payment) {
+            if (isset($payments['id']) || isset($payments['attributes']) || isset($payments['status'])) {
+                $payments = [$payments];
+            }
+            $payment = collect($payments)->first(function ($payment) {
                 $attributes = $payment['attributes'] ?? $payment;
                 return in_array(strtolower((string) ($attributes['status'] ?? '')), ['paid', 'succeeded'], true);
             });
@@ -1450,7 +1494,7 @@ class OrderController extends Controller
             }
 
             $attributes = $payment['attributes'] ?? $payment;
-            $paymentId = (string) ($payment['id'] ?? '');
+            $paymentId = (string) ($payment['id'] ?? $paymentId);
             $refundAmount = (int) ($attributes['amount'] ?? 0);
             if ($paymentId === '' || $refundAmount < 100) {
                 throw new RuntimeException('The completed PayMongo payment has invalid refund details.');
@@ -1475,10 +1519,12 @@ class OrderController extends Controller
                 ]);
 
             if (!$refundResponse->successful()) {
+                $errorDetail = $refundResponse->json('errors.0.detail');
                 Log::warning('PayMongo refund request failed.', [
                     'order_id' => $order->id,
                     'http_status' => $refundResponse->status(),
                     'error_code' => $refundResponse->json('errors.0.code'),
+                    'error_detail' => is_string($errorDetail) ? mb_substr($errorDetail, 0, 500) : null,
                 ]);
                 throw new RuntimeException('PayMongo did not accept the refund request.');
             }
@@ -1499,6 +1545,7 @@ class OrderController extends Controller
                 'amount' => $amount,
                 'reference' => $refundId,
                 'transfer_link' => $refundData['attributes']['transfer_link'] ?? null,
+                'payment_id' => $paymentId,
             ];
         } catch (\Throwable $exception) {
             Log::error('Payment refund could not be completed for order.', [
@@ -1506,7 +1553,7 @@ class OrderController extends Controller
                 'exception' => get_class($exception),
                 'message' => $exception->getMessage(),
             ]);
-            return ['status' => 'failed', 'amount' => $amount, 'reference' => null, 'transfer_link' => null];
+            return ['status' => 'failed', 'amount' => $amount, 'reference' => null, 'transfer_link' => null, 'payment_id' => $paymentId];
         }
     }
 
