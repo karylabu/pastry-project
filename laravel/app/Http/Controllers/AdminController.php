@@ -16,9 +16,7 @@ class AdminController extends Controller
         $user = session('user');
         $userId = is_array($user) ? (int) ($user['id'] ?? 0) : 0;
         $role = is_array($user) ? strtolower((string) ($user['role'] ?? '')) : '';
-        $currentUser = $userId > 0
-            ? DB::table('users')->where('id', $userId)->first(['role', 'status'])
-            : null;
+        $currentUser = $userId > 0 ? User::find($userId) : null;
         if (!$user || !User::isAdminRole($role) || !$currentUser
             || !User::isAdminRole($currentUser->role)
             || strtolower(trim((string) ($currentUser->status ?? 'active'))) !== 'active') {
@@ -42,7 +40,7 @@ class AdminController extends Controller
             } elseif ($response = $this->rateLimitResponse($attemptKey, 10)) {
                 $error = $response->getData(true)['message'];
             } else {
-                $user = DB::table('users')->where('email', $email)->first();
+                $user = User::where('email', $email)->first();
 
                 if ($user && User::isAdminRole($user->role ?? '')
                     && strtolower(trim((string) ($user->status ?? 'active'))) === 'active'

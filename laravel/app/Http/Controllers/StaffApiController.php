@@ -60,7 +60,7 @@ class StaffApiController extends Controller
             return $this->corsResponse(['success' => false, 'message' => 'Please provide both email and password.'], 400);
         }
 
-        $user = DB::table('users')->where('email', $email)->first();
+        $user = User::where('email', $email)->first();
         if (!$user) {
             return $this->corsResponse(['success' => false, 'message' => 'User account not found.'], 401);
         }

@@ -24,7 +24,14 @@ try {
     }
 
     $escaped = mysqli_real_escape_string($conn, $email);
-    $result  = mysqli_query($conn, "SELECT * FROM users WHERE email='$escaped' LIMIT 1");
+    $deletedAtColumn = mysqli_query($conn, "SHOW COLUMNS FROM users LIKE 'deleted_at'");
+    if (!$deletedAtColumn) {
+        throw new Exception('Unable to verify account status.');
+    }
+    $deletedAtFilter = $deletedAtColumn && mysqli_num_rows($deletedAtColumn) > 0
+        ? ' AND deleted_at IS NULL'
+        : '';
+    $result  = mysqli_query($conn, "SELECT * FROM users WHERE email='$escaped'{$deletedAtFilter} LIMIT 1");
 
     if (!$result || mysqli_num_rows($result) === 0) {
         echo json_encode(["success" => false, "message" => "User not found."]);

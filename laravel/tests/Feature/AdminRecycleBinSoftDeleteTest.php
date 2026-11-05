@@ -41,6 +41,13 @@ class AdminRecycleBinSoftDeleteTest extends TestCase
             $table->timestamp('expires_at')->index();
             $table->timestamps();
         });
+        Schema::create('user_sessions', function ($table) {
+            $table->id();
+            $table->unsignedBigInteger('user_id');
+            $table->string('token')->unique();
+            $table->timestamp('created_at')->nullable();
+            $table->timestamp('expires_at')->nullable();
+        });
 
         DB::table('products')->insert(['id' => 1, 'name' => 'Cake', 'image' => null]);
         DB::table('ingredients')->insert(['id' => 2, 'name' => 'Flour']);
@@ -49,11 +56,16 @@ class AdminRecycleBinSoftDeleteTest extends TestCase
             'name' => 'Customer',
             'phone' => '+63 912-345-6789',
         ]);
+        DB::table('user_sessions')->insert([
+            'user_id' => 3,
+            'token' => 'active-customer-token',
+        ]);
     }
 
     protected function tearDown(): void
     {
         Schema::dropIfExists('admin_recycle_bin');
+        Schema::dropIfExists('user_sessions');
         Schema::dropIfExists('users');
         Schema::dropIfExists('ingredients');
         Schema::dropIfExists('products');
@@ -73,6 +85,7 @@ class AdminRecycleBinSoftDeleteTest extends TestCase
         $this->assertNull(Product::query()->find(1));
         $this->assertNull(Ingredient::query()->find(2));
         $this->assertNull(User::query()->find(3));
+        $this->assertDatabaseMissing('user_sessions', ['user_id' => 3]);
         $this->assertCount(3, $recycleBin->entries());
 
         foreach ($entryIds as $entryId) {

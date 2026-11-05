@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\User;
 use Illuminate\Http\Request;
 
 class CustomerController extends Controller
@@ -43,6 +44,14 @@ class CustomerController extends Controller
 
         if (!isset($_SESSION['user']) && session()->has('user')) {
             $_SESSION['user'] = session('user');
+        }
+
+        $sessionUser = session('user') ?? ($_SESSION['user'] ?? null);
+        $userId = is_array($sessionUser) ? (int) ($sessionUser['id'] ?? 0) : 0;
+        if ($userId > 0 && !User::find($userId)) {
+            unset($_SESSION['user'], $_SESSION['auth_token']);
+            session()->forget(['user', 'auth_token']);
+            return redirect('/login.php');
         }
 
         return null;

@@ -226,6 +226,9 @@ class AdminRecycleBinService
                 default => throw new RuntimeException('Unsupported record type.'),
             };
             $entryId = $this->createEntry($type, $label, ['id' => $recordId]);
+            if ($type === 'user' && Schema::hasTable('user_sessions')) {
+                DB::table('user_sessions')->where('user_id', $recordId)->delete();
+            }
             DB::table($table)->where('id', $recordId)->update(['deleted_at' => now()]);
 
             return $entryId;

@@ -20,7 +20,8 @@ class AdminSessionGuard
 
         return DB::transaction(function () use ($userId, $request) {
             $user = DB::table('users')->where('id', $userId)->lockForUpdate()->first();
-            if (!$user || !User::isAdminRole($user->role)) {
+            if (!$user || !User::isAdminRole($user->role)
+                || (Schema::hasColumn('users', 'deleted_at') && $user->deleted_at !== null)) {
                 throw new RuntimeException('The admin account could not be verified.');
             }
 

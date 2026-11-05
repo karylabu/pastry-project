@@ -48,6 +48,8 @@ class AuthController extends Controller
 
             if (!$user) {
                 $error = 'User not found.';
+            } elseif (Schema::hasColumn('users', 'deleted_at') && $user->deleted_at !== null) {
+                $error = 'This account is in the Recycle Bin and cannot log in.';
             } elseif (strtolower((string) ($user->role ?? '')) !== 'customer' && !User::isAdminRole($user->role ?? '')) {
                 $error = 'This account is not eligible for access.';
             } elseif (strtolower(trim((string) ($user->status ?? 'active'))) !== 'active') {
@@ -335,6 +337,13 @@ class AuthController extends Controller
         }
 
         $user = DB::table('users')->whereRaw('LOWER(email) = ?', [$email])->first();
+        if ($user && Schema::hasColumn('users', 'deleted_at') && $user->deleted_at !== null) {
+            return $this->googleCorsResponse([
+                'success' => false,
+                'code' => 'account_deactivated',
+                'message' => 'This account is in the Recycle Bin and cannot log in.',
+            ], 403);
+        }
         $profileColumn = Schema::hasColumn('users', 'profile_picture')
             ? 'profile_picture'
             : (Schema::hasColumn('users', 'profile_image') ? 'profile_image' : null);
@@ -814,6 +823,10 @@ class AuthController extends Controller
         if (!$user) {
             return redirect(rtrim($this->resolveFrontendRedirect($request, 'customer'), '/') . '/register')
                 ->with('error', 'Verify your email through customer registration before creating an account.');
+        }
+
+        if (Schema::hasColumn('users', 'deleted_at') && $user->deleted_at !== null) {
+            return redirect()->route('auth.login')->with('error', 'This account is in the Recycle Bin and cannot log in.');
         }
 
         if ((strtolower((string) ($user->role ?? '')) !== 'customer' && !User::isAdminRole($user->role ?? ''))

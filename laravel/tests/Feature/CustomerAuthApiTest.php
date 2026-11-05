@@ -44,6 +44,7 @@ class CustomerAuthApiTest extends TestCase
             $table->boolean('subscribed_promo')->default(false);
             $table->timestamp('terms_accepted_at')->nullable();
             $table->timestamp('privacy_accepted_at')->nullable();
+            $table->timestamp('deleted_at')->nullable();
         });
         Schema::create('user_sessions', function ($table) {
             $table->id();
@@ -147,6 +148,85 @@ class CustomerAuthApiTest extends TestCase
         $storedPassword = DB::table('users')->where('id', 7)->value('password');
         $this->assertTrue(Hash::check('legacy-password', $storedPassword));
         $this->assertDatabaseHas('user_sessions', ['user_id' => 7]);
+    }
+
+    public function test_soft_deleted_customer_cannot_sign_in_through_current_or_legacy_login_routes(): void
+    {
+        DB::table('users')->insert([
+            'id' => 7,
+            'name' => 'Deleted Customer',
+            'email' => 'deleted@example.com',
+            'password' => Hash::make('current-password'),
+            'role' => 'customer',
+            'status' => 'active',
+            'deleted_at' => now(),
+        ]);
+
+        $this->postJson('/api/login', [
+            'email' => 'deleted@example.com',
+            'password' => 'current-password',
+        ])
+            ->assertOk()
+            ->assertJsonPath('success', false);
+
+        $this->postJson('/api_login.php', [
+            'email' => 'deleted@example.com',
+            'password' => 'current-password',
+        ])
+            ->assertForbidden()
+            ->assertJsonPath('success', false);
+
+        $this->post('/login.php', [
+            'email' => 'deleted@example.com',
+            'password' => 'current-password',
+        ])
+            ->assertRedirect()
+            ->assertSessionHas('error', 'This account is in the Recycle Bin and cannot log in.');
+
+        $this->withSession(['user' => [
+            'id' => 7,
+            'name' => 'Deleted Customer',
+            'email' => 'deleted@example.com',
+            'role' => 'customer',
+        ]])
+            ->get('/dashboard.php')
+            ->assertRedirect('/login.php');
+
+        $this->assertDatabaseMissing('user_sessions', ['user_id' => 7]);
+    }
+
+    public function test_soft_deleted_admin_cannot_sign_in_through_admin_routes_or_reuse_a_web_session(): void
+    {
+        DB::table('users')->insert([
+            'id' => 8,
+            'name' => 'Deleted Admin',
+            'email' => 'deleted-admin@example.com',
+            'password' => Hash::make('current-password'),
+            'role' => 'admin',
+            'status' => 'active',
+            'deleted_at' => now(),
+        ]);
+
+        $this->post('/staff_login.php', [
+            'email' => 'deleted-admin@example.com',
+            'password' => 'current-password',
+        ])
+            ->assertOk()
+            ->assertViewHas('error', 'Invalid email or password.');
+
+        $this->postJson('/staff/api/login', [
+            'email' => 'deleted-admin@example.com',
+            'password' => 'current-password',
+        ])->assertUnauthorized();
+
+        $this->withSession(['user' => [
+            'id' => 8,
+            'name' => 'Deleted Admin',
+            'email' => 'deleted-admin@example.com',
+            'role' => 'admin',
+        ]])
+            ->get('/staff/dashboard.php')
+            ->assertRedirect('/staff_login.php');
     }
 
     public function test_admin_login_is_blocked_while_another_admin_session_is_active(): void
