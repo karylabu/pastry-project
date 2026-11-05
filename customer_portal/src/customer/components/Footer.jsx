@@ -140,11 +140,6 @@ export default function Footer() {
                   Return Policy
                 </Link>
               </li>
-              <li>
-                <Link to="/customer/contact-information" onClick={() => window.scrollTo(0, 0)} className="hover:text-white transition">
-                  Contact Information
-                </Link>
-              </li>
             </ul>
           </div>
 
