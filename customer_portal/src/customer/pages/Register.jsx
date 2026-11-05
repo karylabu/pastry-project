@@ -975,8 +975,39 @@ export default function Register() {
                       />
                       {touched.phone && errors.phone && <p className="mt-1 text-[10px] text-[#A8354A]">{errors.phone}</p>}
                     </div>
+                    <div className="flex flex-col gap-2 text-xs leading-relaxed text-[#171717]/80 sm:col-span-2">
+                      <label className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={agreeTerms}
+                          onChange={(event) => setAgreeTerms(event.target.checked)}
+                          className="h-4 w-4 rounded border-black/20 text-[#F0B94D] focus:ring-[#F0B94D]"
+                        />
+                        <span>
+                          I agree to the{" "}
+                          <Link to="/customer/terms" className="font-semibold underline decoration-[#F0B94D] decoration-2 underline-offset-2">
+                            Terms &amp; Conditions
+                          </Link>.
+                        </span>
+                      </label>
+                      <label className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={agreePrivacy}
+                          onChange={(event) => setAgreePrivacy(event.target.checked)}
+                          className="h-4 w-4 rounded border-black/20 text-[#F0B94D] focus:ring-[#F0B94D]"
+                        />
+                        <span>
+                          I agree to the{" "}
+                          <Link to="/customer/privacy-policy" className="font-semibold underline decoration-[#F0B94D] decoration-2 underline-offset-2">
+                            Privacy Policy
+                          </Link>.
+                        </span>
+                      </label>
+                    </div>
                     <button
                       type="submit"
+                      disabled={!isFormValid}
                       className="btn-primary w-full text-sm active:scale-[0.98] sm:col-span-2"
                     >
                       Create account
@@ -1309,27 +1340,6 @@ export default function Register() {
                   {emailOtpMessage}
                 </p>
               )}
-
-              <div className="space-y-3 rounded-xl bg-[#fcfbf8] p-4 text-sm text-[#594a42]">
-                <label className="flex items-start gap-2">
-                  <input
-                    type="checkbox"
-                    checked={agreeTerms}
-                    onChange={(event) => setAgreeTerms(event.target.checked)}
-                    className="mt-1"
-                  />
-                  <span>I agree to the <Link to="/customer/terms" className="font-bold underline">Terms &amp; Conditions</Link>.</span>
-                </label>
-                <label className="flex items-start gap-2">
-                  <input
-                    type="checkbox"
-                    checked={agreePrivacy}
-                    onChange={(event) => setAgreePrivacy(event.target.checked)}
-                    className="mt-1"
-                  />
-                  <span>I agree to the <Link to="/customer/privacy-policy" className="font-bold underline">Privacy Policy</Link>.</span>
-                </label>
-              </div>
 
               <button
                 type="submit"

@@ -83,7 +83,7 @@ describe("Google registration", () => {
     expect(await screen.findByText(/Google account selected:/)).toHaveTextContent("google@example.com");
     expect(screen.getByPlaceholderText("09123456789")).toBeInTheDocument();
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-    expect(screen.queryAllByRole("checkbox")).toHaveLength(0);
+    expect(screen.getAllByRole("checkbox")).toHaveLength(2);
     expect(screen.queryByPlaceholderText("••••••••")).not.toBeInTheDocument();
     expect(global.fetch).toHaveBeenCalledTimes(1);
     expect(JSON.parse(global.fetch.mock.calls[0][1].body)).toMatchObject({
@@ -92,12 +92,12 @@ describe("Google registration", () => {
       intent: "signup_check",
     });
     fireEvent.change(screen.getByPlaceholderText("09123456789"), { target: { value: "09171234567" } });
+    screen.getAllByRole("checkbox").forEach((checkbox) => fireEvent.click(checkbox));
     fireEvent.click(screen.getByRole("button", { name: "Create account" }));
     const onboardingDialog = await screen.findByRole("dialog");
     const onboarding = within(onboardingDialog);
     expect(onboardingDialog).toHaveTextContent("One step away!");
-    expect(onboarding.getAllByRole("checkbox")).toHaveLength(2);
-    onboarding.getAllByRole("checkbox").forEach((checkbox) => fireEvent.click(checkbox));
+    expect(onboarding.queryAllByRole("checkbox")).toHaveLength(0);
 
     fireEvent.click(onboarding.getByRole("button", { name: "Send verification code" }));
     expect(await screen.findByText(/verification code was sent to your email/i)).toBeInTheDocument();
@@ -205,11 +205,12 @@ describe("Google registration", () => {
 
     await screen.findByText(/Google account selected:/);
     fireEvent.change(screen.getByPlaceholderText("09123456789"), { target: { value: "09171234567" } });
+    screen.getAllByRole("checkbox").forEach((checkbox) => fireEvent.click(checkbox));
     fireEvent.click(screen.getByRole("button", { name: "Create account" }));
     const onboardingDialog = await screen.findByRole("dialog");
     const onboarding = within(onboardingDialog);
     expect(onboardingDialog).toHaveTextContent("One step away!");
-    onboarding.getAllByRole("checkbox").forEach((checkbox) => fireEvent.click(checkbox));
+    expect(onboarding.queryAllByRole("checkbox")).toHaveLength(0);
     fireEvent.click(onboarding.getByRole("button", { name: "Send verification code" }));
     expect(await screen.findByText(/verification code was sent to your email/i)).toBeInTheDocument();
     fireEvent.change(onboarding.getByLabelText("Email verification code"), { target: { value: "123456" } });
