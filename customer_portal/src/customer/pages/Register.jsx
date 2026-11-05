@@ -4,9 +4,9 @@ import { motion } from "framer-motion";
 import { Eye, EyeOff } from "lucide-react";
 import { CUSTOMER_BASE, LARAVEL_BASE, ROOT_BASE } from "../../services/config";
 import { safeParseJson } from '../../services/api';
-import { signInWithGoogle } from "../../services/firebase";
 import CreditsModal from "../components/CreditsModal";
 import GoogleRecaptcha from "../components/GoogleRecaptcha";
+import { signInWithGoogle } from "../../services/firebase";
 
 const ASSET_BASE = process.env.NODE_ENV === "production"
   ? `${ROOT_BASE}/customer_portal/build/assets`
@@ -63,6 +63,7 @@ export default function Register() {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [googleSignup, setGoogleSignup] = useState(null);
+  const [showPhoneVerificationModal, setShowPhoneVerificationModal] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [agreeTerms, setAgreeTerms] = useState(false);
@@ -90,7 +91,6 @@ export default function Register() {
     !validateName(name) &&
     !validateEmail(email) &&
     !validatePhone(phone) &&
-    phoneVerified &&
     (googleSignup || (!validatePassword(password) && !validateConfirmPassword(confirmPassword, password))) &&
     agreeTerms &&
     agreePrivacy;
@@ -135,7 +135,6 @@ export default function Register() {
       setErrors((prev) => ({ ...prev, phone: phoneError }));
       return;
     }
-
     setError("");
     setPhoneOtpMessage("");
     setPhoneOtpLoading(true);
@@ -202,16 +201,6 @@ export default function Register() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!phoneVerified) {
-      setError("Verify your phone number before creating an account.");
-      return;
-    }
-
-    if (!googleSignup && !recaptchaProof) {
-      setError("Please complete the “I’m not a robot” check before creating an account.");
-      return;
-    }
-
     setError("");
     setAccountAlreadyRegistered(false);
     setAdminAccountNotAllowed(false);
@@ -233,6 +222,17 @@ export default function Register() {
       return setError("Please correct the highlighted fields.");
     }
 
+    if (!googleSignup && !recaptchaProof) {
+      setError("Please complete the “I’m not a robot” check before creating an account.");
+      return;
+    }
+
+    if (!phoneVerified) {
+      setShowPhoneVerificationModal(true);
+      return;
+    }
+
+    setShowPhoneVerificationModal(false);
     setLoading(true);
 
     try {
@@ -983,44 +983,6 @@ export default function Register() {
                     className="register-input w-full bg-white text-[#171717]"
                   />
                   {touched.phone && errors.phone && <p className="mt-1 text-[10px] text-[#A8354A]">{errors.phone}</p>}
-                  {!phoneVerified && (
-                    <button
-                      type="button"
-                      onClick={requestPhoneOtp}
-                      disabled={phoneOtpLoading || !phone.trim() || Boolean(validatePhone(phone))}
-                      className="mt-2 w-full rounded-lg border border-[#d8c18d] px-3 py-2 text-xs font-bold text-[#765d30] disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      {phoneOtpLoading ? "Sending code…" : phoneVerificationId ? "Resend verification code" : "Send verification code"}
-                    </button>
-                  )}
-                  {phoneVerificationId && !phoneVerified && (
-                    <div className="mt-2 flex gap-2">
-                      <input
-                        type="text"
-                        inputMode="numeric"
-                        autoComplete="one-time-code"
-                        maxLength={6}
-                        placeholder="6-digit code"
-                        aria-label="Phone verification code"
-                        value={phoneOtp}
-                        onChange={(e) => setPhoneOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
-                        className="register-input min-w-0 flex-1 bg-white text-[#171717]"
-                      />
-                      <button
-                        type="button"
-                        onClick={verifyPhoneOtp}
-                        disabled={phoneVerifyLoading || phoneOtp.length !== 6}
-                        className="rounded-lg bg-[#F0B94D] px-3 text-xs font-bold text-[#171717] disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        {phoneVerifyLoading ? "Checking…" : "Verify"}
-                      </button>
-                    </div>
-                  )}
-                  {phoneOtpMessage && (
-                    <p className={`mt-1 text-[10px] ${phoneVerified ? "text-green-700" : "text-[#765d30]"}`} role="status">
-                      {phoneOtpMessage}
-                    </p>
-                  )}
                 </div>
 
                 {!googleSignup && (
@@ -1212,6 +1174,49 @@ export default function Register() {
         </footer>
       </div>
       <CreditsModal isOpen={showCredits} onClose={() => setShowCredits(false)} />
+      {showPhoneVerificationModal && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/50 px-4 py-6 backdrop-blur-sm" onClick={() => setShowPhoneVerificationModal(false)}>
+          <motion.section
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="registration-phone-title"
+            initial={{ opacity: 0, y: 12, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            onClick={(event) => event.stopPropagation()}
+            className="max-h-full w-full max-w-md overflow-y-auto rounded-3xl bg-white p-6 shadow-2xl sm:p-8"
+          >
+            <div className="mb-5 flex items-start justify-between gap-4">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#a87c28]">Account verification</p>
+                <h2 id="registration-phone-title" className="mt-1 text-2xl font-bold text-[#2b1b14]">Verify your phone</h2>
+                <p className="mt-2 text-sm leading-6 text-[#6b5b51]">Verify your phone number to finish creating your account.</p>
+              </div>
+              <button type="button" aria-label="Close phone verification" onClick={() => setShowPhoneVerificationModal(false)} className="rounded-full px-2 py-1 text-xl leading-none text-[#8c7c72] hover:bg-[#f8f4eb]">×</button>
+            </div>
+            {error && <div role="alert" className="mb-4 rounded-xl border border-red-100 bg-red-50 p-3 text-sm text-red-700">{error}</div>}
+            <form onSubmit={handleSubmit}>
+              <label htmlFor="registration-verification-phone" className="mb-1.5 block text-sm font-bold text-[#33251e]">Phone number</label>
+              <input id="registration-verification-phone" type="tel" value={phone} readOnly className="w-full rounded-xl border border-[#e5d8c8] bg-gray-50 px-4 py-3 text-sm text-[#6b5b51]" />
+              {!phoneVerified && (
+                <button type="button" onClick={requestPhoneOtp} disabled={phoneOtpLoading || !phone.trim() || Boolean(validatePhone(phone))} className="mt-2 w-full rounded-xl border border-[#d8c18d] px-4 py-3 text-sm font-bold text-[#765d30] disabled:cursor-not-allowed disabled:opacity-50">
+                  {phoneOtpLoading ? "Sending code…" : phoneVerificationId ? "Resend verification code" : "Send verification code"}
+                </button>
+              )}
+              {phoneVerificationId && !phoneVerified && (
+                <div className="mt-4">
+                  <label htmlFor="registration-phone-code" className="mb-1.5 block text-sm font-bold text-[#33251e]">Verification code</label>
+                  <div className="flex gap-2">
+                    <input id="registration-phone-code" type="text" inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={phoneOtp} onChange={(event) => setPhoneOtp(event.target.value.replace(/\D/g, "").slice(0, 6))} placeholder="6-digit code" className="min-w-0 flex-1 rounded-xl border border-[#e5d8c8] px-4 py-3 text-sm" />
+                    <button type="button" onClick={verifyPhoneOtp} disabled={phoneVerifyLoading || phoneOtp.length !== 6} className="rounded-xl bg-[#f0b94d] px-4 text-sm font-bold text-[#2b1b14] disabled:opacity-50">{phoneVerifyLoading ? "Checking…" : "Verify"}</button>
+                  </div>
+                </div>
+              )}
+              {phoneOtpMessage && <p className={`mt-3 text-sm ${phoneVerified ? "text-green-700" : "text-[#765d30]"}`} role="status">{phoneOtpMessage}</p>}
+              {phoneVerified && <button type="submit" disabled={loading} className="btn-primary mt-4 w-full text-sm disabled:opacity-50">{loading ? "Creating account…" : "Continue"}</button>}
+            </form>
+          </motion.section>
+        </div>
+      )}
     </div>
   );
 }

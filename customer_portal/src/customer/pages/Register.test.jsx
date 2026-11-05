@@ -96,9 +96,11 @@ describe("Google registration", () => {
     fireEvent.change(screen.getByPlaceholderText("09123456789"), { target: { value: "09123456789" } });
     screen.getAllByRole("checkbox").forEach((checkbox) => fireEvent.click(checkbox));
 
+    fireEvent.click(screen.getByRole("button", { name: "Complete Google Sign Up" }));
+    expect(await screen.findByRole("dialog")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Send verification code" }));
     expect(await screen.findByText(/verification code was sent/i)).toBeInTheDocument();
-    fireEvent.change(screen.getByRole("textbox", { name: "Phone verification code" }), { target: { value: "123456" } });
+    fireEvent.change(screen.getByRole("textbox", { name: "Verification code" }), { target: { value: "123456" } });
     fireEvent.click(screen.getByRole("button", { name: "Verify" }));
     expect(await screen.findByText("Phone number verified.")).toBeInTheDocument();
 
@@ -143,11 +145,14 @@ describe("Google registration", () => {
 
     const createAccountButton = screen.getByRole("button", { name: "Create account" });
     expect(createAccountButton).toBeDisabled();
+    expect(screen.queryByRole("button", { name: "Send verification code" })).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Complete robot check" }));
+    fireEvent.click(createAccountButton);
+    expect(await screen.findByRole("dialog")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Send verification code" }));
     expect(await screen.findByText(/verification code was sent/i)).toBeInTheDocument();
-    fireEvent.change(screen.getByRole("textbox", { name: "Phone verification code" }), { target: { value: "123456" } });
+    fireEvent.change(screen.getByRole("textbox", { name: "Verification code" }), { target: { value: "123456" } });
     fireEvent.click(screen.getByRole("button", { name: "Verify" }));
     expect(await screen.findByText("Phone number verified.")).toBeInTheDocument();
     expect(createAccountButton).toBeEnabled();
@@ -192,9 +197,10 @@ describe("Google registration", () => {
     await waitFor(() => expect(screen.getByDisplayValue("Google Customer")).toHaveAttribute("readonly"));
     fireEvent.change(screen.getByPlaceholderText("09123456789"), { target: { value: "09123456789" } });
     screen.getAllByRole("checkbox").forEach((checkbox) => fireEvent.click(checkbox));
+    fireEvent.click(screen.getByRole("button", { name: "Complete Google Sign Up" }));
     fireEvent.click(screen.getByRole("button", { name: "Send verification code" }));
 
-    expect(await screen.findByText(/already linked to an account/i)).toBeInTheDocument();
+    expect(await screen.findAllByText(/already linked to an account/i)).not.toHaveLength(0);
     expect(localStorage.getItem("user")).toBeNull();
   });
 
@@ -272,12 +278,13 @@ describe("Google registration", () => {
     fireEvent.change(screen.getAllByPlaceholderText("••••••••")[0], { target: { value: "Strong123" } });
     fireEvent.change(screen.getAllByPlaceholderText("••••••••")[1], { target: { value: "Strong123" } });
     screen.getAllByRole("checkbox").forEach((checkbox) => fireEvent.click(checkbox));
+    fireEvent.click(screen.getByRole("button", { name: "Create account" }));
     fireEvent.click(screen.getByRole("button", { name: "Send verification code" }));
     expect(await screen.findByText(/verification code was sent/i)).toBeInTheDocument();
-    fireEvent.change(screen.getByRole("textbox", { name: "Phone verification code" }), { target: { value: "123456" } });
+    fireEvent.change(screen.getByRole("textbox", { name: "Verification code" }), { target: { value: "123456" } });
     fireEvent.click(screen.getByRole("button", { name: "Verify" }));
     expect(await screen.findByText("Phone number verified.")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Create account" }));
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
 
     expect(await screen.findByText(/This account is already registered/)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "login page" })).toHaveAttribute("href", "/customer/login");
@@ -311,12 +318,13 @@ describe("Google registration", () => {
     fireEvent.change(screen.getAllByPlaceholderText("••••••••")[0], { target: { value: "Strong123" } });
     fireEvent.change(screen.getAllByPlaceholderText("••••••••")[1], { target: { value: "Strong123" } });
     screen.getAllByRole("checkbox").forEach((checkbox) => fireEvent.click(checkbox));
+    fireEvent.click(screen.getByRole("button", { name: "Create account" }));
     fireEvent.click(screen.getByRole("button", { name: "Send verification code" }));
     expect(await screen.findByText(/verification code was sent/i)).toBeInTheDocument();
-    fireEvent.change(screen.getByRole("textbox", { name: "Phone verification code" }), { target: { value: "123456" } });
+    fireEvent.change(screen.getByRole("textbox", { name: "Verification code" }), { target: { value: "123456" } });
     fireEvent.click(screen.getByRole("button", { name: "Verify" }));
     expect(await screen.findByText("Phone number verified.")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Create account" }));
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
 
     expect(await screen.findByText(/This is an admin account/)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "admin login page" })).toHaveAttribute("href", "/admin/login");
