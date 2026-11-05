@@ -67,7 +67,7 @@ describe("Google sign-in email onboarding", () => {
     fireEvent.click(screen.getByRole("button", { name: "Send email verification code" }));
     expect(await screen.findByText("A six-digit verification code was sent to your email.")).toBeInTheDocument();
 
-    fireEvent.change(screen.getByLabelText("Email verification code"), { target: { value: "123456" } });
+    fireEvent.change(screen.getByRole("textbox", { name: "Email verification code" }), { target: { value: "123456" } });
     fireEvent.click(screen.getByRole("button", { name: "Verify" }));
     expect(await screen.findByText("Email address verified.")).toBeInTheDocument();
   };

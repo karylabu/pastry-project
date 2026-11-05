@@ -6,6 +6,7 @@ import { LARAVEL_BASE, ROOT_BASE } from "../../services/config";
 import { safeParseJson } from '../../services/api';
 import CreditsModal from "../components/CreditsModal";
 import GoogleRecaptcha from "../components/GoogleRecaptcha";
+import OtpCodeInput from "../components/OtpCodeInput";
 
 const ASSET_BASE = process.env.NODE_ENV === "production"
   ? `${ROOT_BASE}/customer_portal/build/assets`
@@ -193,7 +194,7 @@ export default function Register() {
       setEmailVerified(true);
       setEmailOtpMessage("Email address verified.");
     } catch (requestError) {
-      setError("Network error while verifying your phone. Please try again.");
+      setError("Network error while verifying your email. Please try again.");
     } finally {
       setEmailVerifyLoading(false);
     }
@@ -1180,7 +1181,7 @@ export default function Register() {
           <motion.section
             role="dialog"
             aria-modal="true"
-            aria-labelledby="registration-phone-title"
+            aria-labelledby="registration-email-title"
             initial={{ opacity: 0, y: 12, scale: 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             onClick={(event) => event.stopPropagation()}
@@ -1189,7 +1190,7 @@ export default function Register() {
             <div className="mb-5 flex items-start justify-between gap-4">
               <div>
                 <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#a87c28]">Account verification</p>
-                <h2 id="registration-phone-title" className="mt-1 text-2xl font-bold text-[#2b1b14]">Verify your email</h2>
+                <h2 id="registration-email-title" className="mt-1 text-2xl font-bold text-[#2b1b14]">Verify your email</h2>
                 <p className="mt-2 text-sm leading-6 text-[#6b5b51]">Enter the code sent to your email to finish creating your account.</p>
               </div>
               <button type="button" aria-label="Close email verification" onClick={() => setShowEmailVerificationModal(false)} className="rounded-full px-2 py-1 text-xl leading-none text-[#8c7c72] hover:bg-[#f8f4eb]">×</button>
@@ -1206,9 +1207,9 @@ export default function Register() {
               {emailVerificationId && !emailVerified && (
                 <div className="mt-4">
                   <label htmlFor="registration-email-code" className="mb-1.5 block text-sm font-bold text-[#33251e]">Verification code</label>
-                  <div className="flex gap-2">
-                    <input id="registration-email-code" type="text" inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={emailOtp} onChange={(event) => setEmailOtp(event.target.value.replace(/\D/g, "").slice(0, 6))} placeholder="6-digit code" className="min-w-0 flex-1 rounded-xl border border-[#e5d8c8] px-4 py-3 text-sm" />
-                    <button type="button" onClick={verifyEmailOtp} disabled={emailVerifyLoading || emailOtp.length !== 6} className="rounded-xl bg-[#f0b94d] px-4 text-sm font-bold text-[#2b1b14] disabled:opacity-50">{emailVerifyLoading ? "Checking…" : "Verify"}</button>
+                  <div className="space-y-3">
+                    <OtpCodeInput id="registration-email-code" label="Verification code" value={emailOtp} onChange={setEmailOtp} disabled={emailVerifyLoading} />
+                    <button type="button" onClick={verifyEmailOtp} disabled={emailVerifyLoading || emailOtp.length !== 6} className="w-full rounded-xl bg-[#f0b94d] px-4 py-3 text-sm font-bold text-[#2b1b14] disabled:opacity-50">{emailVerifyLoading ? "Checking…" : "Verify"}</button>
                   </div>
                 </div>
               )}

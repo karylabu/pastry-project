@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import ForgotPassword from "./ForgotPassword";
 import CreditsModal from "../components/CreditsModal";
 import GoogleRecaptcha from "../components/GoogleRecaptcha";
+import OtpCodeInput from "../components/OtpCodeInput";
 import { LARAVEL_BASE, ROOT_BASE } from "../../services/config";
 import { getUserFriendlyAuthError, parseJsonResponse } from '../../services/api';
 const ASSET_BASE = process.env.NODE_ENV === "production"
@@ -43,6 +44,7 @@ export default function Login() {
   const [twoFactorCode, setTwoFactorCode] = useState("");
   const [twoFactorMethod, setTwoFactorMethod] = useState("authenticator");
   const [twoFactorDestination, setTwoFactorDestination] = useState("");
+  const [usingRecoveryCode, setUsingRecoveryCode] = useState(false);
   const [googleOnboarding, setGoogleOnboarding] = useState(null);
   const [googlePhone, setGooglePhone] = useState("");
   const [googleEmailVerificationId, setGoogleEmailVerificationId] = useState("");
@@ -104,6 +106,8 @@ export default function Login() {
 
       if (data?.requires_two_factor && data.challenge_token) {
         setTwoFactorChallenge(data.challenge_token);
+        setTwoFactorCode("");
+        setUsingRecoveryCode(false);
         setTwoFactorMethod(data.two_factor_method || "authenticator");
         setTwoFactorDestination(data.delivery_destination || "");
         setError("");
@@ -276,6 +280,8 @@ export default function Login() {
       const data = await parseJsonResponse(response, fallbackMessage);
       if (data?.requires_two_factor && data.challenge_token) {
         setTwoFactorChallenge(data.challenge_token);
+        setTwoFactorCode("");
+        setUsingRecoveryCode(false);
         setTwoFactorMethod(data.two_factor_method || "authenticator");
         setTwoFactorDestination(data.delivery_destination || "");
         setTwoFactorCode("");
@@ -335,6 +341,8 @@ export default function Login() {
 
       if (data?.requires_two_factor && data.challenge_token) {
         setTwoFactorChallenge(data.challenge_token);
+        setTwoFactorCode("");
+        setUsingRecoveryCode(false);
         setTwoFactorMethod(data.two_factor_method || "authenticator");
         setTwoFactorDestination(data.delivery_destination || "");
         setTwoFactorCode("");
@@ -1199,30 +1207,48 @@ export default function Login() {
                     {twoFactorChallenge ? (
                       <form onSubmit={handleTwoFactorLogin} className="space-y-4">
                         <div className="space-y-2">
-                          <label htmlFor="customer-two-factor-code" className="text-sm font-bold text-[#171717]">
-                            {twoFactorMethod === "authenticator" ? "Authenticator or recovery code" : "Verification or recovery code"}
+                          <label htmlFor={usingRecoveryCode ? "customer-two-factor-recovery-code" : "customer-two-factor-code"} className="text-sm font-bold text-[#171717]">
+                            {usingRecoveryCode ? "Recovery code" : twoFactorMethod === "authenticator" ? "Authenticator code" : "Verification code"}
                           </label>
-                          {twoFactorMethod !== "authenticator" && (
+                          {twoFactorMethod !== "authenticator" && !usingRecoveryCode && (
                             <p className="text-xs leading-5 text-gray-500">
                               We sent a one-time code to {twoFactorDestination || (twoFactorMethod === "email" ? "your email" : "your phone")}.
                             </p>
                           )}
-                          <input
-                            id="customer-two-factor-code"
-                            type="text"
-                            inputMode={twoFactorMethod === "authenticator" ? "numeric" : "text"}
-                            autoComplete="one-time-code"
-                            value={twoFactorCode}
-                            onChange={(event) => setTwoFactorCode(event.target.value)}
-                            placeholder={twoFactorMethod === "authenticator" ? "6-digit code or recovery code" : "6-digit code or recovery code"}
-                            required
-                            className="login-input w-full text-center font-mono tracking-[0.3em]"
-                          />
-                          <p className="text-xs leading-5 text-gray-500">You can use a one-time recovery code if needed.</p>
+                          {usingRecoveryCode ? (
+                            <input
+                              id="customer-two-factor-recovery-code"
+                              type="text"
+                              autoComplete="off"
+                              value={twoFactorCode}
+                              onChange={(event) => setTwoFactorCode(event.target.value)}
+                              placeholder="Enter a recovery code"
+                              required
+                              className="login-input w-full"
+                            />
+                          ) : (
+                            <OtpCodeInput
+                              id="customer-two-factor-code"
+                              label={twoFactorMethod === "authenticator" ? "Authenticator code" : "Verification code"}
+                              value={twoFactorCode}
+                              onChange={setTwoFactorCode}
+                              disabled={loading}
+                            />
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setUsingRecoveryCode((current) => !current);
+                              setTwoFactorCode("");
+                            }}
+                            className="text-xs font-semibold text-[#765d30] underline underline-offset-2"
+                          >
+                            {usingRecoveryCode ? "Use verification code instead" : "Use a recovery code instead"}
+                          </button>
                         </div>
                         <button
                           type="submit"
-                          disabled={loading || !twoFactorCode.trim()}
+                          disabled={loading || (usingRecoveryCode ? !twoFactorCode.trim() : twoFactorCode.length !== 6)}
                           className="btn-primary w-full text-lg active:scale-[0.98] disabled:opacity-50"
                         >
                           {loading ? "Verifying..." : "Verify and Log In"}
@@ -1233,6 +1259,7 @@ export default function Login() {
                             setTwoFactorChallenge("");
                             setTwoFactorCode("");
                             setTwoFactorDestination("");
+                            setUsingRecoveryCode(false);
                             setError("");
                           }}
                           className="w-full py-2 text-sm font-semibold text-gray-500 hover:text-gray-800"
@@ -1444,24 +1471,13 @@ export default function Login() {
                   <label htmlFor="google-onboarding-code" className="mb-1.5 block text-sm font-bold text-[#33251e]">
                     Email verification code
                   </label>
-                  <div className="flex gap-2">
-                    <input
-                      id="google-onboarding-code"
-                      type="text"
-                      inputMode="numeric"
-                      autoComplete="one-time-code"
-                      maxLength={6}
-                      required
-                      value={googleEmailCode}
-                      onChange={(event) => setGoogleEmailCode(event.target.value.replace(/\D/g, "").slice(0, 6))}
-                      placeholder="6-digit code"
-                      className="min-w-0 flex-1 rounded-xl border border-[#e5d8c8] px-4 py-3 text-sm outline-none focus:border-[#c9972d] focus:ring-2 focus:ring-[#fff1bd]"
-                    />
+                  <div className="space-y-3">
+                    <OtpCodeInput id="google-onboarding-code" label="Email verification code" value={googleEmailCode} onChange={setGoogleEmailCode} disabled={googleOnboardingLoading} />
                     <button
                       type="button"
                       onClick={verifyGoogleEmailCode}
                       disabled={googleOnboardingLoading || googleEmailCode.length !== 6}
-                      className="rounded-xl bg-[#f0b94d] px-4 text-sm font-bold text-[#2b1b14] disabled:cursor-not-allowed disabled:opacity-50"
+                      className="w-full rounded-xl bg-[#f0b94d] px-4 py-3 text-sm font-bold text-[#2b1b14] disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       Verify
                     </button>
