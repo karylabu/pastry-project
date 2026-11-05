@@ -598,14 +598,11 @@ export default function CheckoutModal({
     ? Number((subtotal * 0.05).toFixed(2))
     : 0;
   const discountAmount = seniorDiscountAmount || rewardDiscountAmount || promotionCouponDiscountAmount || firstOrderDiscountAmount;
-  const taxAmount = 0;
-
-  const total = subtotal + rushFee + taxAmount - discountAmount;
-  const initialPaymentBaseAmount = checkoutData.method === "Pickup"
-    && checkoutData.pickupPaymentType === "downpayment"
-    ? total * 0.5
-    : total;
-  const initialPaymentBreakdown = getCustomCakePaymentBreakdown(initialPaymentBaseAmount);
+  const total = subtotal + rushFee - discountAmount;
+  const qrPhTaxAmount = checkoutData.payment === "QRPh"
+    ? getCustomCakePaymentBreakdown(total).fee
+    : 0;
+  const displayedTotal = total + qrPhTaxAmount;
   const fulfillmentTimeSlots = useMemo(
     () => createFulfillmentTimeSlots(shopSettings.openingHours),
     [shopSettings.openingHours]
@@ -1684,32 +1681,14 @@ export default function CheckoutModal({
               )}
 
               <div className="flex justify-between text-sm text-gray-500">
-                <span>Tax</span>
-                <span>₱{taxAmount}</span>
+                <span>{checkoutData.payment === "QRPh" ? "Tax (2.23%)" : "Tax"}</span>
+                <span>₱{qrPhTaxAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
               </div>
 
               <div className="flex justify-between rounded-xl border border-[#eadfca] bg-[#fff8e9] px-4 py-3 text-base font-bold text-[#33251e]">
                 <span>Total</span>
-                <span>₱{total.toLocaleString()}</span>
+                <span>₱{displayedTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
               </div>
-              {checkoutData.payment === "QRPh" && (
-                <>
-                  <div className="flex justify-between px-1 text-sm text-gray-500">
-                    <span>QR Ph fee (2.23%)</span>
-                    <span>₱{initialPaymentBreakdown.fee.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                  </div>
-                  <div className="flex justify-between rounded-xl border border-[#eadfca] bg-[#fffaf0] px-4 py-3 text-sm font-bold text-[#6b4f1d]">
-                    <span>Total to pay now with QR Ph</span>
-                    <span>₱{initialPaymentBreakdown.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                  </div>
-                </>
-              )}
-              {checkoutData.method === "Pickup" && (
-                <div className="flex justify-between px-1 text-sm font-semibold text-[#6b4f1d]">
-                  <span>{checkoutData.pickupPaymentType === "downpayment" ? "50% downpayment before fee" : "Full payment before fee"}</span>
-                  <span>₱{initialPaymentBaseAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                </div>
-              )}
 
               {orderError && (
                 <p role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-xs font-medium leading-5 text-red-700">

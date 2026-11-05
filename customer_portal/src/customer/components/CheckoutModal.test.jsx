@@ -68,7 +68,7 @@ describe("CheckoutModal", () => {
     jest.restoreAllMocks();
   });
 
-  test("shows the QR Ph fee and total due for a regular cake order", async () => {
+  test("includes the QR Ph fee in checkout tax and total", async () => {
     render(
       <CheckoutModal
         isOpen
@@ -79,10 +79,29 @@ describe("CheckoutModal", () => {
       />,
     );
 
-    expect(await screen.findByText("QR Ph fee (2.23%)")).toBeInTheDocument();
+    expect(await screen.findByText("Tax (2.23%)")).toBeInTheDocument();
     expect(screen.getByText("₱10.95")).toBeInTheDocument();
-    expect(screen.getByText("Total to pay now with QR Ph")).toBeInTheDocument();
     expect(screen.getByText("₱490.95")).toBeInTheDocument();
+    expect(screen.queryByText("Total to pay now with QR Ph")).not.toBeInTheDocument();
+    expect(screen.queryByText("50% downpayment before fee")).not.toBeInTheDocument();
+  });
+
+  test("shows a ₱1.03 total for a ₱1 QR Ph order", async () => {
+    render(
+      <CheckoutModal
+        isOpen
+        onClose={jest.fn()}
+        cartItems={[{ product_id: 7, name: "Strawberry Cake", price: 1 }]}
+        fullCartItems={[{ product_id: 7, name: "Strawberry Cake", price: 1 }]}
+        onOrderPlaced={jest.fn()}
+      />,
+    );
+
+    expect(await screen.findByText("Tax (2.23%)")).toBeInTheDocument();
+    expect(screen.getByText("₱0.03")).toBeInTheDocument();
+    expect(screen.getByText("₱1.03")).toBeInTheDocument();
+    expect(screen.queryByText("QR Ph fee (2.23%)")).not.toBeInTheDocument();
+    expect(screen.queryByText("Total to pay now with QR Ph")).not.toBeInTheDocument();
   });
 
   test("shows insufficient stock in checkout instead of a browser alert", async () => {
