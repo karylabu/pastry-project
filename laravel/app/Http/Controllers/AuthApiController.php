@@ -160,6 +160,13 @@ class AuthApiController extends Controller
 
         try {
             $user = DB::transaction(function () use ($request, $emailVerification, $verificationId, $phone, $token) {
+                if (!$emailVerification->consumeVerified($verificationId, $request->email)) {
+                    throw new \DomainException('The email verification has expired or was already used.');
+                }
+
+                app(\App\Services\AdminRecycleBinService::class)
+                    ->discardTrashedUserForRegistration($request->email);
+
                 $user = User::create([
                     'name' => $request->name,
                     'email' => $request->email,
@@ -168,10 +175,6 @@ class AuthApiController extends Controller
                     'phone' => $phone,
                     'subscribed_promo' => $request->boolean('agree_privacy'),
                 ]);
-
-                if (!$emailVerification->consumeVerified($verificationId, $request->email)) {
-                    throw new \DomainException('The email verification has expired or was already used.');
-                }
 
                 DB::table('user_sessions')->updateOrInsert(
                     ['user_id' => $user->id],
@@ -212,17 +215,21 @@ class AuthApiController extends Controller
 
     private function existingAccountResponse(string $email): ?\Illuminate\Http\JsonResponse
     {
-        $existingUser = User::whereRaw('LOWER(email) = ?', [$email])->first();
+        $existingUser = DB::table('users')->whereRaw('LOWER(email) = ?', [$email])->first();
         if (!$existingUser) {
             return null;
         }
 
-        if ($existingUser->isAdmin()) {
+        if (User::isAdminRole($existingUser->role ?? '')) {
             return response()->json([
                 'success' => false,
                 'code' => 'admin_account_not_allowed',
                 'message' => 'This is an admin account. Please continue to the admin login page.',
             ], 403);
+        }
+
+        if (Schema::hasColumn('users', 'deleted_at') && $existingUser->deleted_at !== null) {
+            return null;
         }
 
         return response()->json([

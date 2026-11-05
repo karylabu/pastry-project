@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Jobs\ProcessSalesCsvImport;
+use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Queue;
@@ -27,6 +28,44 @@ class AdminRecycleBinService
     public function trashUser(int $userId): int
     {
         return $this->trashRecord('users', 'user', $userId);
+    }
+
+    public function discardTrashedUserForRegistration(string $email): bool
+    {
+        if (! Schema::hasColumn('users', 'deleted_at')) {
+            return false;
+        }
+
+        return DB::transaction(function () use ($email): bool {
+            $user = DB::table('users')
+                ->whereRaw('LOWER(email) = ?', [strtolower(trim($email))])
+                ->lockForUpdate()
+                ->first();
+            if (! $user || $user->deleted_at === null || User::isAdminRole($user->role ?? '')) {
+                return false;
+            }
+
+            if (! Schema::hasTable('admin_recycle_bin')) {
+                throw new RuntimeException('The Recycle Bin entry for this account could not be verified.');
+            }
+
+            $entry = DB::table('admin_recycle_bin')
+                ->where('item_type', 'user')
+                ->lockForUpdate()
+                ->get()
+                ->first(static function ($entry) use ($user): bool {
+                    $payload = json_decode((string) $entry->payload, true);
+                    return is_array($payload) && (int) ($payload['id'] ?? 0) === (int) $user->id;
+                });
+            if (! $entry) {
+                throw new RuntimeException('The Recycle Bin entry for this account could not be verified.');
+            }
+
+            $this->permanentlyDeleteEntry($entry);
+            DB::table('admin_recycle_bin')->where('id', $entry->id)->delete();
+
+            return true;
+        });
     }
 
     public function trashPromotion(int $promotionId): void
@@ -385,7 +424,12 @@ class AdminRecycleBinService
             if (Schema::hasColumn('messages', 'customer_email')) $updates['customer_email'] = null;
             DB::table('messages')->where('user_id', $userId)->update($updates);
         }
-        foreach (['user_sessions', 'customer_two_factor_login_challenges'] as $table) {
+        foreach ([
+            'user_sessions',
+            'customer_two_factor_login_challenges',
+            'customer_two_factor_recovery_codes',
+            'customer_two_factor',
+        ] as $table) {
             if (Schema::hasTable($table) && Schema::hasColumn($table, 'user_id')) {
                 DB::table($table)->where('user_id', $userId)->delete();
             }

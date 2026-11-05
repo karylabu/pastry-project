@@ -46,6 +46,15 @@ class CustomerAuthApiTest extends TestCase
             $table->timestamp('privacy_accepted_at')->nullable();
             $table->timestamp('deleted_at')->nullable();
         });
+        Schema::create('admin_recycle_bin', function ($table) {
+            $table->id();
+            $table->string('item_type', 40);
+            $table->string('label', 255);
+            $table->longText('payload');
+            $table->timestamp('deleted_at');
+            $table->timestamp('expires_at')->index();
+            $table->timestamps();
+        });
         Schema::create('user_sessions', function ($table) {
             $table->id();
             $table->unsignedBigInteger('user_id');
@@ -111,6 +120,7 @@ class CustomerAuthApiTest extends TestCase
     protected function tearDown(): void
     {
         Schema::dropIfExists('password_resets');
+        Schema::dropIfExists('admin_recycle_bin');
         Schema::dropIfExists('notifications');
         Schema::dropIfExists('customer_two_factor_login_challenges');
         Schema::dropIfExists('customer_registration_email_verifications');
@@ -803,6 +813,61 @@ class CustomerAuthApiTest extends TestCase
         $this->assertNotNull(DB::table('customer_registration_email_verifications')
             ->where('id', $verificationId)
             ->value('consumed_at'));
+    }
+
+    public function test_registration_replaces_a_trashed_customer_and_discards_its_recycle_bin_entry(): void
+    {
+        DB::table('users')->insert([
+            'id' => 7,
+            'name' => 'Old Customer',
+            'email' => 'recycled@example.com',
+            'phone' => '09123456789',
+            'password' => Hash::make('old-password'),
+            'role' => 'customer',
+        ]);
+        DB::table('user_sessions')->insert([
+            'user_id' => 7,
+            'token' => 'old-customer-token',
+        ]);
+
+        $recycleBin = app(\App\Services\AdminRecycleBinService::class);
+        $recycleBinEntryId = $recycleBin->trashUser(7);
+        $verificationId = $this->createVerifiedRegistrationEmail('recycled@example.com');
+
+        $response = $this->postJson('http://localhost/api/register', [
+            'name' => 'New Customer',
+            'email' => 'recycled@example.com',
+            'phone' => '09123456789',
+            'email_verification_id' => $verificationId,
+            'password' => 'new-password',
+        ])
+            ->assertCreated()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('user.name', 'New Customer');
+
+        $newUserId = (int) $response->json('user.id');
+        $this->assertNotSame(7, $newUserId);
+        $this->assertDatabaseCount('users', 1);
+        $this->assertDatabaseMissing('users', ['id' => 7]);
+        $this->assertDatabaseMissing('admin_recycle_bin', ['id' => $recycleBinEntryId]);
+        $this->assertDatabaseMissing('user_sessions', ['user_id' => 7]);
+        $this->assertDatabaseHas('user_sessions', ['user_id' => $newUserId]);
+        $this->assertDatabaseHas('users', [
+            'id' => $newUserId,
+            'email' => 'recycled@example.com',
+            'deleted_at' => null,
+        ]);
+        $this->assertCount(0, $recycleBin->entries());
+
+        $this->postJson('/api/login', [
+            'email' => 'recycled@example.com',
+            'password' => 'old-password',
+        ])->assertOk()->assertJsonPath('success', false);
+
+        $this->postJson('/api/login', [
+            'email' => 'recycled@example.com',
+            'password' => 'new-password',
+        ])->assertOk()->assertJsonPath('success', true);
     }
 
     public function test_registration_rejects_an_unverified_email_address(): void

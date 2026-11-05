@@ -227,11 +227,13 @@ class AuthController extends Controller
                         ], 403);
                     }
 
-                    return $this->googleCorsResponse([
-                        'success' => false,
-                        'code' => 'account_already_exists',
-                        'message' => 'An account with this Google email already exists. Please log in instead.',
-                    ], 409);
+                    if (!Schema::hasColumn('users', 'deleted_at') || $existingUser->deleted_at === null) {
+                        return $this->googleCorsResponse([
+                            'success' => false,
+                            'code' => 'account_already_exists',
+                            'message' => 'An account with this Google email already exists. Please log in instead.',
+                        ], 409);
+                    }
                 }
             }
 
@@ -337,7 +339,8 @@ class AuthController extends Controller
         }
 
         $user = DB::table('users')->whereRaw('LOWER(email) = ?', [$email])->first();
-        if ($user && Schema::hasColumn('users', 'deleted_at') && $user->deleted_at !== null) {
+        $isTrashedUser = $user && Schema::hasColumn('users', 'deleted_at') && $user->deleted_at !== null;
+        if ($isTrashedUser && !in_array($intent, ['signup', 'signup_check'], true)) {
             return $this->googleCorsResponse([
                 'success' => false,
                 'code' => 'account_deactivated',
@@ -349,15 +352,15 @@ class AuthController extends Controller
             : (Schema::hasColumn('users', 'profile_image') ? 'profile_image' : null);
 
         if ($intent === 'signup_check') {
-            if ($user) {
-                if (User::isAdminRole($user->role ?? '')) {
-                    return $this->googleCorsResponse([
-                        'success' => false,
-                        'code' => 'admin_account_not_allowed',
-                        'message' => 'This is an admin account. Please continue to the admin login page.',
-                    ], 403);
-                }
+            if ($user && User::isAdminRole($user->role ?? '')) {
+                return $this->googleCorsResponse([
+                    'success' => false,
+                    'code' => 'admin_account_not_allowed',
+                    'message' => 'This is an admin account. Please continue to the admin login page.',
+                ], 403);
+            }
 
+            if ($user && !$isTrashedUser) {
                 return $this->googleCorsResponse([
                     'success' => false,
                     'code' => 'account_already_exists',
@@ -372,15 +375,15 @@ class AuthController extends Controller
             ], 404);
         }
 
-        if ($intent === 'signup' && $user) {
-            if (User::isAdminRole($user->role ?? '')) {
-                return $this->googleCorsResponse([
-                    'success' => false,
-                    'code' => 'admin_account_not_allowed',
-                    'message' => 'This is an admin account. Please continue to the admin login page.',
-                ], 403);
-            }
+        if ($intent === 'signup' && $user && User::isAdminRole($user->role ?? '')) {
+            return $this->googleCorsResponse([
+                'success' => false,
+                'code' => 'admin_account_not_allowed',
+                'message' => 'This is an admin account. Please continue to the admin login page.',
+            ], 403);
+        }
 
+        if ($intent === 'signup' && $user && !$isTrashedUser) {
             return $this->googleCorsResponse([
                 'success' => false,
                 'code' => 'account_already_exists',
@@ -388,7 +391,7 @@ class AuthController extends Controller
             ], 409);
         }
 
-        if (!$user) {
+        if (!$user || ($intent === 'signup' && $isTrashedUser)) {
             if ($intent !== 'signup') {
                 return $this->googleCorsResponse([
                     'success' => false,
@@ -411,12 +414,17 @@ class AuthController extends Controller
                 $newUser[$profileColumn] = $profilePicture ?: null;
             }
             try {
-                DB::transaction(function () use ($emailVerification, $request, $newUser, $email) {
+                DB::transaction(function () use ($emailVerification, $request, $newUser, $email, $isTrashedUser) {
                     if (!$emailVerification->consumeVerified(
                         (string) $request->input('email_verification_id'),
                         $email
                     )) {
                         throw new \DomainException('The email verification has expired or was already used.');
+                    }
+
+                    if ($isTrashedUser) {
+                        app(\App\Services\AdminRecycleBinService::class)
+                            ->discardTrashedUserForRegistration($email);
                     }
 
                     DB::table('users')->insert($newUser);
