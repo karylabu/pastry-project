@@ -1,5 +1,5 @@
 import React from "react";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import Register from "./Register";
 import { signInWithGoogle } from "../../services/firebase";
 
@@ -85,7 +85,11 @@ describe("Google registration", () => {
       expect(screen.getByDisplayValue("google@example.com")).toHaveAttribute("readonly");
     });
 
-    expect(screen.getByPlaceholderText("09123456789")).toBeInTheDocument();
+    const onboardingDialog = screen.getByRole("dialog");
+    const onboarding = within(onboardingDialog);
+    expect(onboardingDialog).toHaveTextContent("One step away!");
+    expect(onboardingDialog).toHaveTextContent("google@example.com");
+    expect(onboarding.getByPlaceholderText("09123456789")).toBeInTheDocument();
     expect(screen.queryByPlaceholderText("••••••••")).not.toBeInTheDocument();
     expect(global.fetch).toHaveBeenCalledTimes(1);
     expect(JSON.parse(global.fetch.mock.calls[0][1].body)).toMatchObject({
@@ -93,18 +97,16 @@ describe("Google registration", () => {
       recaptcha_proof: "verified-captcha-proof",
       intent: "signup_check",
     });
-    fireEvent.change(screen.getByPlaceholderText("09123456789"), { target: { value: "09171234567" } });
-    screen.getAllByRole("checkbox").forEach((checkbox) => fireEvent.click(checkbox));
+    fireEvent.change(onboarding.getByPlaceholderText("09123456789"), { target: { value: "09171234567" } });
+    onboarding.getAllByRole("checkbox").forEach((checkbox) => fireEvent.click(checkbox));
 
-    fireEvent.click(screen.getByRole("button", { name: "Complete Google Sign Up" }));
-    expect(await screen.findByRole("dialog")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Send verification code" }));
+    fireEvent.click(onboarding.getByRole("button", { name: "Send verification code" }));
     expect(await screen.findByText(/verification code was sent to your email/i)).toBeInTheDocument();
-    fireEvent.change(screen.getByRole("textbox", { name: "Verification code" }), { target: { value: "123456" } });
-    fireEvent.click(screen.getByRole("button", { name: "Verify" }));
+    fireEvent.change(onboarding.getByLabelText("Email verification code"), { target: { value: "123456" } });
+    fireEvent.click(onboarding.getByRole("button", { name: "Verify" }));
     expect(await screen.findByText("Email address verified.")).toBeInTheDocument();
 
-    const completeButton = screen.getByRole("button", { name: "Complete Google Sign Up" });
+    const completeButton = onboarding.getByRole("button", { name: "Complete Google Sign Up" });
     expect(completeButton).toBeEnabled();
     fireEvent.click(completeButton);
 
@@ -202,16 +204,17 @@ describe("Google registration", () => {
     fireEvent.click(screen.getByRole("button", { name: "Complete robot check" }));
     fireEvent.click(screen.getByRole("button", { name: "Sign Up with Google" }));
 
-    await waitFor(() => expect(screen.getByDisplayValue("Google Customer")).toHaveAttribute("readonly"));
-    fireEvent.change(screen.getByPlaceholderText("09123456789"), { target: { value: "09171234567" } });
-    screen.getAllByRole("checkbox").forEach((checkbox) => fireEvent.click(checkbox));
-    fireEvent.click(screen.getByRole("button", { name: "Complete Google Sign Up" }));
-    fireEvent.click(screen.getByRole("button", { name: "Send verification code" }));
+    const onboardingDialog = await screen.findByRole("dialog");
+    const onboarding = within(onboardingDialog);
+    expect(onboardingDialog).toHaveTextContent("One step away!");
+    fireEvent.change(onboarding.getByPlaceholderText("09123456789"), { target: { value: "09171234567" } });
+    onboarding.getAllByRole("checkbox").forEach((checkbox) => fireEvent.click(checkbox));
+    fireEvent.click(onboarding.getByRole("button", { name: "Send verification code" }));
     expect(await screen.findByText(/verification code was sent to your email/i)).toBeInTheDocument();
-    fireEvent.change(screen.getByRole("textbox", { name: "Verification code" }), { target: { value: "123456" } });
-    fireEvent.click(screen.getByRole("button", { name: "Verify" }));
+    fireEvent.change(onboarding.getByLabelText("Email verification code"), { target: { value: "123456" } });
+    fireEvent.click(onboarding.getByRole("button", { name: "Verify" }));
     expect(await screen.findByText("Email address verified.")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+    fireEvent.click(onboarding.getByRole("button", { name: "Complete Google Sign Up" }));
 
     expect(await screen.findAllByText(/already linked to an account/i)).not.toHaveLength(0);
     expect(localStorage.getItem("user")).toBeNull();

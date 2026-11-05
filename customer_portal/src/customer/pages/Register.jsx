@@ -400,6 +400,22 @@ export default function Register() {
     }
   };
 
+  const cancelGoogleSignup = () => {
+    setGoogleSignup(null);
+    setName("");
+    setEmail("");
+    setPhone("");
+    setEmailVerificationId("");
+    setEmailOtp("");
+    setEmailOtpMessage("");
+    setEmailVerified(false);
+    setError("");
+    setAccountAlreadyRegistered(false);
+    setAgreeTerms(false);
+    setAgreePrivacy(false);
+    setErrors({});
+  };
+
   return (
     <div className="pastry-register relative min-h-screen w-full overflow-x-hidden bg-[#f8f4eb] font-['DM_Sans'] text-[#171717]">
       <style>{`
@@ -892,7 +908,7 @@ export default function Register() {
                 <p className="mt-1 text-xs text-[#171717]/60">Create your account to get started.</p>
               </div>
 
-              {error && (
+              {error && !googleSignup && (
                 <div className="mb-4 rounded-xl border border-red-100 bg-red-50 p-4 text-sm text-red-600">
                   {accountAlreadyRegistered
                     ? "This account is already registered."
@@ -1127,21 +1143,7 @@ export default function Register() {
                 ) : (
                   <button
                     type="button"
-                    onClick={() => {
-                      setGoogleSignup(null);
-                      setName("");
-                      setEmail("");
-                      setPhone("");
-                      setEmailVerificationId("");
-                      setEmailOtp("");
-                      setEmailOtpMessage("");
-                      setEmailVerified(false);
-                      setError("");
-                      setAccountAlreadyRegistered(false);
-                      setAgreeTerms(false);
-                      setAgreePrivacy(false);
-                      setErrors({});
-                    }}
+                    onClick={cancelGoogleSignup}
                     className="btn-secondary w-full text-sm font-semibold text-[#171717] sm:col-span-2"
                   >
                     Choose a different Google account
@@ -1176,6 +1178,123 @@ export default function Register() {
         </footer>
       </div>
       <CreditsModal isOpen={showCredits} onClose={() => setShowCredits(false)} />
+      {googleSignup && (
+        <div
+          className="fixed inset-0 z-[120] flex items-center justify-center bg-black/50 px-4 py-6 backdrop-blur-sm"
+          onClick={cancelGoogleSignup}
+        >
+          <motion.section
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="google-signup-title"
+            initial={{ opacity: 0, y: 12, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            onClick={(event) => event.stopPropagation()}
+            className="max-h-full w-full max-w-md overflow-y-auto rounded-3xl bg-white p-6 shadow-2xl sm:p-8"
+          >
+            <div className="mb-5 flex items-start justify-between gap-4">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#a87c28]">Google sign-up</p>
+                <h2 id="google-signup-title" className="mt-1 text-2xl font-bold text-[#2b1b14]">One step away!</h2>
+                <p className="mt-2 text-sm leading-6 text-[#6b5b51]">
+                  Verify your email and add your phone number to finish creating your account.
+                </p>
+                <p className="mt-1 break-all text-xs text-[#8c7c72]">{googleSignup.email}</p>
+              </div>
+              <button
+                type="button"
+                aria-label="Close account setup"
+                onClick={cancelGoogleSignup}
+                className="rounded-full px-2 py-1 text-xl leading-none text-[#8c7c72] hover:bg-[#f8f4eb]"
+              >
+                ×
+              </button>
+            </div>
+
+            {error && (
+              <div role="alert" className="mb-4 rounded-xl border border-red-100 bg-red-50 p-3 text-sm text-red-700">
+                {accountAlreadyRegistered ? "This account is already registered." : error}
+              </div>
+            )}
+
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div>
+                <label htmlFor="google-signup-phone" className="mb-1.5 block text-sm font-bold text-[#33251e]">
+                  Phone number
+                </label>
+                <input
+                  id="google-signup-phone"
+                  type="tel"
+                  autoComplete="tel"
+                  required
+                  value={phone}
+                  onChange={(event) => setPhone(event.target.value)}
+                  placeholder="09123456789"
+                  className="w-full rounded-xl border border-[#e5d8c8] px-4 py-3 text-sm outline-none focus:border-[#c9972d] focus:ring-2 focus:ring-[#fff1bd]"
+                />
+              </div>
+
+              {!emailVerified && (
+                <button
+                  type="button"
+                  onClick={requestEmailOtp}
+                  disabled={emailOtpLoading || Boolean(validateEmail(email))}
+                  className="w-full rounded-xl border border-[#d8c18d] px-4 py-3 text-sm font-bold text-[#765d30] disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {emailOtpLoading ? "Sending code..." : emailVerificationId ? "Resend verification code" : "Send verification code"}
+                </button>
+              )}
+
+              {emailVerificationId && !emailVerified && (
+                <div>
+                  <label htmlFor="google-signup-code" className="mb-1.5 block text-sm font-bold text-[#33251e]">
+                    Email verification code
+                  </label>
+                  <div className="space-y-3">
+                    <OtpCodeInput id="google-signup-code" label="Verification code" value={emailOtp} onChange={setEmailOtp} disabled={emailVerifyLoading} />
+                    <button
+                      type="button"
+                      onClick={verifyEmailOtp}
+                      disabled={emailVerifyLoading || emailOtp.length !== 6}
+                      className="w-full rounded-xl bg-[#f0b94d] px-4 py-3 text-sm font-bold text-[#2b1b14] disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {emailVerifyLoading ? "Checking..." : "Verify"}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {emailOtpMessage && (
+                <p role="status" className={`text-sm ${emailVerified ? "text-green-700" : "text-[#6b5b51]"}`}>
+                  {emailOtpMessage}
+                </p>
+              )}
+
+              <div className="space-y-3 rounded-xl bg-[#fcfbf8] p-4 text-sm text-[#594a42]">
+                <label className="flex items-start gap-2">
+                  <input type="checkbox" checked={agreeTerms} onChange={(event) => setAgreeTerms(event.target.checked)} className="mt-1" />
+                  <span>I agree to the <Link to="/customer/terms" className="font-bold underline">Terms &amp; Conditions</Link>.</span>
+                </label>
+                <label className="flex items-start gap-2">
+                  <input type="checkbox" checked={agreePrivacy} onChange={(event) => setAgreePrivacy(event.target.checked)} className="mt-1" />
+                  <span>I agree to the <Link to="/customer/privacy-policy" className="font-bold underline">Privacy Policy</Link>.</span>
+                </label>
+              </div>
+
+              <button
+                type="submit"
+                disabled={loading || !emailVerified || !isFormValid}
+                className="w-full rounded-xl bg-[#f0b94d] px-4 py-3 text-sm font-bold text-[#2b1b14] transition hover:bg-[#e6ad3e] disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {loading ? "Creating account..." : "Complete Google Sign Up"}
+              </button>
+              <button type="button" onClick={cancelGoogleSignup} className="w-full rounded-xl border border-[#e5d8c8] px-4 py-3 text-sm font-bold text-[#765d30]">
+                Choose a different Google account
+              </button>
+            </form>
+          </motion.section>
+        </div>
+      )}
       {showEmailVerificationModal && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/50 px-4 py-6 backdrop-blur-sm" onClick={() => setShowEmailVerificationModal(false)}>
           <motion.section
