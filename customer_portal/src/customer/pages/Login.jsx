@@ -184,6 +184,10 @@ export default function Login() {
 
   const requestGoogleEmailCode = async () => {
     if (!googleOnboarding?.email) return;
+    if (googleOnboarding.mode === "signup" && (!googleTermsAccepted || !googlePrivacyAccepted)) {
+      setGoogleOnboardingError("Please accept the Terms & Conditions and Privacy Policy before verifying your email.");
+      return;
+    }
 
     setGoogleOnboardingError("");
     setGoogleEmailStatus("");
@@ -1455,15 +1459,45 @@ export default function Login() {
                 />
               </div>
 
+              {googleOnboarding.mode === "signup" && !googleEmailVerified && (
+                <div className="space-y-3 rounded-xl bg-[#fcfbf8] p-4 text-sm text-[#594a42]">
+                  <label className="flex items-start gap-2">
+                    <input
+                      type="checkbox"
+                      checked={googleTermsAccepted}
+                      onChange={(event) => setGoogleTermsAccepted(event.target.checked)}
+                      className="mt-1"
+                    />
+                    <span>I agree to the <Link to="/customer/terms" className="font-bold underline">Terms &amp; Conditions</Link>.</span>
+                  </label>
+                  <label className="flex items-start gap-2">
+                    <input
+                      type="checkbox"
+                      checked={googlePrivacyAccepted}
+                      onChange={(event) => setGooglePrivacyAccepted(event.target.checked)}
+                      className="mt-1"
+                    />
+                    <span>I agree to the <Link to="/customer/privacy-policy" className="font-bold underline">Privacy Policy</Link>.</span>
+                  </label>
+                </div>
+              )}
+
               {!googleEmailVerified && (
                 <button
                   type="button"
                   onClick={requestGoogleEmailCode}
-                  disabled={googleOnboardingLoading || !googleOnboarding.email}
+                  disabled={
+                    googleOnboardingLoading
+                    || !googleOnboarding.email
+                    || (googleOnboarding.mode === "signup" && (!googleTermsAccepted || !googlePrivacyAccepted))
+                  }
                   className="w-full rounded-xl border border-[#d8c18d] px-4 py-3 text-sm font-bold text-[#765d30] disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {googleOnboardingLoading ? "Please wait..." : googleEmailVerificationId ? "Resend verification code" : "Send email verification code"}
                 </button>
+              )}
+              {googleOnboarding.mode === "signup" && !googleEmailVerified && (!googleTermsAccepted || !googlePrivacyAccepted) && (
+                <p className="text-xs text-[#8c7c72]">Accept both policies to continue with email verification.</p>
               )}
 
               {googleEmailVerificationId && !googleEmailVerified && (
@@ -1489,29 +1523,6 @@ export default function Login() {
                 <p role="status" className={`text-sm ${googleEmailVerified ? "text-green-700" : "text-[#6b5b51]"}`}>
                   {googleEmailStatus}
                 </p>
-              )}
-
-              {googleOnboarding.mode === "signup" && (
-                <div className="space-y-3 rounded-xl bg-[#fcfbf8] p-4 text-sm text-[#594a42]">
-                  <label className="flex items-start gap-2">
-                    <input
-                      type="checkbox"
-                      checked={googleTermsAccepted}
-                      onChange={(event) => setGoogleTermsAccepted(event.target.checked)}
-                      className="mt-1"
-                    />
-                    <span>I agree to the <Link to="/customer/terms" className="font-bold underline">Terms &amp; Conditions</Link>.</span>
-                  </label>
-                  <label className="flex items-start gap-2">
-                    <input
-                      type="checkbox"
-                      checked={googlePrivacyAccepted}
-                      onChange={(event) => setGooglePrivacyAccepted(event.target.checked)}
-                      className="mt-1"
-                    />
-                    <span>I agree to the <Link to="/customer/privacy-policy" className="font-bold underline">Privacy Policy</Link>.</span>
-                  </label>
-                </div>
               )}
 
               <button

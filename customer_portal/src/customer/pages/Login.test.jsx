@@ -1,5 +1,5 @@
 import React from "react";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import Login from "./Login";
 import { signInWithGoogle } from "../../services/firebase";
 
@@ -86,11 +86,16 @@ describe("Google sign-in email onboarding", () => {
     render(<Login />);
     startGoogleSignIn();
 
-    expect(await screen.findByRole("dialog")).toHaveTextContent("One step away!");
+    const onboarding = within(await screen.findByRole("dialog"));
+    expect(onboarding.getByRole("checkbox", { name: /Terms & Conditions/ })).toBeInTheDocument();
+    expect(onboarding.getByRole("checkbox", { name: /Privacy Policy/ })).toBeInTheDocument();
+    expect(onboarding.getByRole("button", { name: "Send email verification code" })).toBeDisabled();
+    fireEvent.click(onboarding.getByRole("checkbox", { name: /Terms & Conditions/ }));
+    fireEvent.click(onboarding.getByRole("checkbox", { name: /Privacy Policy/ }));
     await verifyEmail();
-    fireEvent.click(screen.getByRole("checkbox", { name: /Terms & Conditions/ }));
-    fireEvent.click(screen.getByRole("checkbox", { name: /Privacy Policy/ }));
-    fireEvent.click(screen.getByRole("button", { name: "Continue to account" }));
+    expect(onboarding.queryByRole("checkbox", { name: /Terms & Conditions/ })).not.toBeInTheDocument();
+    expect(onboarding.queryByRole("checkbox", { name: /Privacy Policy/ })).not.toBeInTheDocument();
+    fireEvent.click(onboarding.getByRole("button", { name: "Continue to account" }));
 
     await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(4));
     expect(JSON.parse(global.fetch.mock.calls[3][1].body)).toMatchObject({
@@ -122,9 +127,10 @@ describe("Google sign-in email onboarding", () => {
     render(<Login />);
     startGoogleSignIn();
 
-    expect(await screen.findByRole("dialog")).toHaveTextContent("One step away!");
+    const onboarding = within(await screen.findByRole("dialog"));
+    expect(onboarding.queryByRole("checkbox", { name: /Terms & Conditions/ })).not.toBeInTheDocument();
     await verifyEmail();
-    fireEvent.click(screen.getByRole("button", { name: "Continue to account" }));
+    fireEvent.click(onboarding.getByRole("button", { name: "Continue to account" }));
 
     await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(4));
     expect(JSON.parse(global.fetch.mock.calls[3][1].body)).toMatchObject({
