@@ -34,10 +34,16 @@ class PayMongoRefundService
                 $query['data.attributes.after'] = $after;
             }
 
+            $queryString = implode('&', array_map(
+                static fn (string $key, string $value): string => str_replace('.', '%2E', rawurlencode($key)).'='.rawurlencode($value),
+                array_keys($query),
+                array_map('strval', array_values($query))
+            ));
+
             $response = Http::withBasicAuth($secretKey, '')
                 ->acceptJson()
                 ->timeout(30)
-                ->get(self::API_BASE_URL.'/refunds', $query);
+                ->get(self::API_BASE_URL.'/refunds?'.$queryString);
 
             $data = $response->json('data');
 

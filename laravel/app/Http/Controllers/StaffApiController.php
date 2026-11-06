@@ -492,7 +492,7 @@ public function syncOrderRefundStatus(Request $request, int $orderId)
 
         return $this->corsResponse([
             'success' => false,
-            'message' => 'Unable to verify the PayMongo refund status. Please check the server logs.',
+            'message' => 'Unable to verify the PayMongo refund status. ' . $exception->getMessage(),
         ], 502);
     }
 
