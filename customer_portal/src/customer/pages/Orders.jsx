@@ -67,12 +67,10 @@ function CancelDialog({ order, onConfirm, onDismiss, isLoading }) {
           <AlertTriangle size={26} className="text-slate-700" strokeWidth={1.8} />
         </div>
         <h3 className="text-[20px] font-black text-gray-900 text-center leading-tight mb-2">
-          {order.refund_status === 'failed'
-            ? `Retry Refund for Order #${order.order_number ?? order.id}?`
-            : `Cancel Order #${order.order_number ?? order.id}?`}
+          {`Cancel Order #${order.order_number ?? order.id}?`}
         </h3>
         <p className="text-[12px] text-gray-400 text-center leading-relaxed mb-8">
-          Cancelling a paid order starts a PayMongo refund when available. Cash or direct-transfer refunds must be completed manually by the shop.
+          Are you sure you want to cancel this order?
         </p>
         <div className="flex gap-3">
           <button
@@ -86,7 +84,7 @@ function CancelDialog({ order, onConfirm, onDismiss, isLoading }) {
             disabled={isLoading}
             className="flex-1 py-4 rounded-[20px] bg-slate-900 text-white text-[11px] font-black uppercase tracking-[0.2em] hover:bg-slate-800 transition-all disabled:opacity-50 active:scale-[0.97]"
           >
-            {isLoading ? "Processing…" : order.refund_status === 'failed' ? "Retry Refund" : "Yes, Cancel"}
+            {isLoading ? "Processing…" : "Yes, Cancel"}
           </button>
         </div>
       </motion.div>
@@ -648,16 +646,13 @@ export default function Orders() {
       const data = await safeParseJson(res);
       if (data.success) {
         const orderStatus = data.order_status || (data.refund_status ? "Cancellation Pending" : "Cancelled");
-        setCancellationNotice(data.message || `Cancellation update received for order #${cancelTarget.id}.`);
+        setCancellationNotice(`Cancellation update received for order #${cancelTarget.id}.`);
         updateLocalStatus(cancelTarget.id, orderStatus, {
-          refund_status: data.refund_status,
-          refund_amount: data.refund_amount,
-          refund_transfer_link: data.refund_transfer_link,
           cancelled_at: data.cancelled_at,
         });
         setStatusFilter(orderStatus);
       } else {
-        setActionError(data.message || "Failed to cancel order.");
+        setActionError("Unable to cancel this order. Please try again or contact the shop.");
       }
     } catch {
       setActionError("Network error. Please try again.");
@@ -1501,11 +1496,7 @@ export default function Orders() {
                   && remainingBalanceAmount > 0;
                 const primaryProductImage = getProductThumbnail(order, primaryItem);
                 const paymentHint = isCancellationPending
-                  ? order.refund_status === 'failed'
-                    ? 'Refund failed — retry or contact the shop'
-                    : order.refund_status === 'manual_required'
-                    ? 'Cancellation pending — the shop must process your refund'
-                    : 'Cancellation pending — PayMongo is processing your refund'
+                  ? 'Cancellation pending'
                   : isCancelled
                   ? 'Order cancelled'
                   : isPaymentConfirmed
@@ -1787,43 +1778,21 @@ export default function Orders() {
                         </button>
                       )}
 
-                      {(isPending || (isCancellationPending && order.refund_status === 'failed')) && (
+                      {isPending && (
                         <button
                           onClick={() => setCancelTarget(order)}
                           disabled={processingId === order.id}
                           className="inline-flex h-9 w-[126px] shrink-0 items-center justify-center gap-1.5 rounded-lg border border-gray-300 px-3 py-2 text-center text-[11px] font-semibold leading-4 text-slate-900 transition-colors hover:bg-gray-100 hover:border-gray-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-700 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-40"
                         >
-                          {processingId === order.id ? 'Processing…' : isCancellationPending ? 'Retry Refund' : 'Cancel Order'}
+                          {processingId === order.id ? 'Processing…' : 'Cancel Order'}
                         </button>
                       )}
 
                       {(isCancelled || isCancellationPending) && (
                         <div className="flex flex-col items-start gap-1">
                           <span className="text-[12px] font-semibold text-slate-500">
-                            {isCancellationPending && order.refund_status === 'awaiting_payment'
-                              ? 'Cancellation pending · Waiting for payment confirmation'
-                              : isCancellationPending && order.refund_status === 'requesting'
-                              ? 'Cancellation pending · Refund request processing'
-                              : isCancellationPending && order.refund_status === 'pending'
-                              ? 'Cancellation pending · Refund processing'
-                              : order.refund_status === 'manual_required'
-                              ? 'Cancellation pending · Refund pending from shop'
-                              : order.refund_status === 'failed'
-                              ? 'Cancellation pending · Refund failed'
-                              : ['succeeded', 'refunded'].includes(order.refund_status)
-                              ? 'Cancelled · Refund confirmed'
-                              : 'Cancelled'}
+                            {isCancellationPending ? 'Cancellation pending' : 'Cancelled'}
                           </span>
-                          {isCancellationPending && order.refund_transfer_link && (
-                            <a
-                              href={order.refund_transfer_link}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-[12px] font-semibold text-emerald-700 underline"
-                            >
-                              Claim QR Ph refund (valid 3 days)
-                            </a>
-                          )}
                         </div>
                       )}
                     </div>

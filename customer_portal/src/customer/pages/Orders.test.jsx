@@ -421,3 +421,38 @@ test('uses the full QR Ph downpayment credit when showing the custom cake balanc
   expect(await screen.findByRole('button', { name: 'Pay ₱5.00' })).toBeInTheDocument();
   expect(screen.getByText('Deposit paid: ₱5.12 · Balance due: ₱4.88 + ₱0.12 QR Ph fee')).toBeInTheDocument();
 });
+
+test('hides refund details and claim links from customers', async () => {
+  global.fetch = jest.fn((url) => {
+    if (String(url).includes('/api/customer/products')) {
+      return Promise.resolve({ ok: true, json: async () => [] });
+    }
+
+    return Promise.resolve({
+      ok: true,
+      json: async () => ({
+        success: true,
+        orders: [{
+          id: 605,
+          user_id: 7,
+          customer: 'Customer',
+          status: 'Cancellation Pending',
+          payment: 'QRPh',
+          refund_status: 'pending',
+          refund_amount: 500,
+          refund_reference: 'ref_605',
+          refund_transfer_link: 'https://transfer.paymongo.com/claim-605',
+          total: 500,
+          items: [{ name: 'Blueberry Cheesecake', qty: 1, price: 500 }],
+        }],
+      }),
+    });
+  });
+
+  render(<Orders />);
+
+  expect((await screen.findAllByText('Cancellation pending')).length).toBeGreaterThan(0);
+  expect(screen.queryByText(/refund/i)).not.toBeInTheDocument();
+  expect(screen.queryByRole('link', { name: /claim qr ph refund/i })).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: /retry refund/i })).not.toBeInTheDocument();
+});

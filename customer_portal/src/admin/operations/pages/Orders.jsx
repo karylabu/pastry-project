@@ -26,16 +26,6 @@ const isQrPayment = (payment) => ['gcash', 'qrph'].includes(
   String(payment || '').toLowerCase().replace(/[^a-z0-9]/g, '')
 );
 
-const getRefundStatusLabel = (status) => {
-  const normalized = String(status || '').trim().toLowerCase();
-  if (normalized === 'succeeded' || normalized === 'refunded') return 'Refund succeeded';
-  if (normalized === 'pending' || normalized === 'processing' || normalized === 'refunding' || normalized === 'requesting') return 'Refund pending';
-  if (normalized === 'awaiting_payment') return 'Waiting for payment confirmation';
-  if (normalized === 'failed') return 'Refund failed';
-  if (normalized === 'manual_required') return 'Manual refund required';
-  return null;
-};
-
 const isDiscountIdType = (discountType) => ['pwd', 'senior_citizen'].includes(discountType);
 
 const getOrderDiscountLabel = (order, includeDiscountWord = false) => {
@@ -150,7 +140,6 @@ export default function Orders() {
   const [discountIdLoading, setDiscountIdLoading] = useState(null);
   const [paymentProofPreviews, setPaymentProofPreviews] = useState({});
   const [paymentProofLoading, setPaymentProofLoading] = useState(null);
-  const [refundStatusLoadingId, setRefundStatusLoadingId] = useState(null);
   const [paymentProofLightboxOrderId, setPaymentProofLightboxOrderId] = useState(null);
   const [connectionIssue, setConnectionIssue] = useState(false);
   const [rejectModalOrderId, setRejectModalOrderId] = useState(null);
@@ -492,27 +481,6 @@ export default function Orders() {
     }
   };
 
-  const syncRefundStatus = async (order) => {
-    setRefundStatusLoadingId(order.id);
-    try {
-      const response = await laravelStaffFetch(`${LARAVEL_BASE}/api/staff/orders/${order.id}/refund/status`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-      });
-      const data = await response.json();
-      if (!response.ok || !data?.success) {
-        throw new Error(data?.message || "Unable to check the PayMongo refund status.");
-      }
-
-      fetchOrders(true);
-      addToast(data.message || `PayMongo refund status: ${getRefundStatusLabel(data.refund_status) || data.refund_status}.`);
-    } catch (error) {
-      addToast(error.message || "Unable to check the PayMongo refund status.", "error");
-    } finally {
-      setRefundStatusLoadingId(null);
-    }
-  };
-
   const submitReturnRefundRejection = async (event) => {
     event.preventDefault();
     const adminReason = rejectReason.trim();
@@ -784,17 +752,6 @@ export default function Orders() {
                           <div className="flex flex-wrap items-center gap-1.5">
                             <span className="text-[12px] font-bold text-[#33251e]">#{order.order_number ?? order.id}</span>
                             <span className={`rounded px-2 py-1 text-[9px] font-semibold ${statusColors[order.status] ?? "bg-black/5 text-black"}`}>{statusLabel(order.status)}</span>
-                            {getRefundStatusLabel(order.refund_status) && (
-                              <span className={`rounded px-2 py-1 text-[9px] font-semibold ${
-                                order.refund_status === "failed"
-                                  ? "bg-red-50 text-red-700 border border-red-200"
-                                  : ["succeeded", "refunded"].includes(String(order.refund_status).toLowerCase())
-                                  ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                                  : "bg-amber-50 text-amber-800 border border-amber-200"
-                              }`}>
-                                {getRefundStatusLabel(order.refund_status)}
-                              </span>
-                            )}
                             {order.return_refund_request && <span className="rounded bg-amber-100 px-2 py-1 text-[9px] font-semibold text-amber-900">Customer request · {order.return_refund_request.status}</span>}
                             {orderTiming.isRushOrder && <span className="inline-flex items-center gap-1 rounded bg-[#fff3d1] px-2 py-1 text-[9px] font-semibold text-[#80600a]"><AlertTriangle size={11} /> Rush order</span>}
                           </div>
@@ -845,38 +802,6 @@ export default function Orders() {
                             <dt className="text-[#9b8c83]">Address</dt><dd className="text-right text-[#65574d]">{addressLabel}</dd>
                             <dt className="text-[#9b8c83]">Payment</dt><dd className="text-right text-[#65574d]">{order.payment || "N/A"}</dd>
                             <dt className="text-[#9b8c83]">Placed</dt><dd className="text-right text-[#65574d]">{formatOrderDateTime(order.created_at)}</dd>
-                            {getRefundStatusLabel(order.refund_status) && <>
-                              <dt className="text-[#9b8c83]">Refund status</dt>
-                              <dd className={`text-right font-semibold ${
-                                order.refund_status === "failed"
-                                  ? "text-red-700"
-                                  : ["succeeded", "refunded"].includes(String(order.refund_status).toLowerCase())
-                                  ? "text-emerald-700"
-                                  : "text-amber-800"
-                              }`}>{getRefundStatusLabel(order.refund_status)}</dd>
-                              {order.refund_amount !== null && order.refund_amount !== undefined && <>
-                                <dt className="text-[#9b8c83]">Refund amount</dt>
-                                <dd className="text-right text-[#65574d]">₱{Number(order.refund_amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</dd>
-                              </>}
-                              {order.refund_reference && <>
-                                <dt className="text-[#9b8c83]">PayMongo refund reference</dt>
-                                <dd className="break-all text-right text-[#65574d]">{order.refund_reference}</dd>
-                              </>}
-                            </>}
-                            {order.status === "Cancellation Pending"
-                              && ["pending", "processing", "refunding", "requesting"].includes(String(order.refund_status || "").toLowerCase())
-                              && order.refund_reference && (
-                                <div className="col-span-2 flex justify-end">
-                                  <button
-                                    type="button"
-                                    onClick={() => syncRefundStatus(order)}
-                                    disabled={refundStatusLoadingId === order.id}
-                                    className="rounded-lg border border-[#d8c6a5] px-3 py-1.5 text-[10px] font-semibold text-[#6b4f1d] hover:bg-[#fffaf0] disabled:cursor-not-allowed disabled:opacity-50"
-                                  >
-                                    {refundStatusLoadingId === order.id ? "Checking PayMongo…" : "Check PayMongo status"}
-                                  </button>
-                                </div>
-                              )}
                             {order.status === "Cancelled" && <><dt className="text-[#9b8c83]">Cancelled</dt><dd className="text-right text-[#65574d]">{formatOrderDateTime(order.cancelled_at)}</dd></>}
                           </dl>
                         </section>
@@ -1008,17 +933,6 @@ export default function Orders() {
                           <td className="px-4 py-4">
                             <div className="flex min-w-[130px] flex-col items-start gap-1.5">
                               <span className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-semibold ${statusColors[order.status] ?? "bg-black/5 text-black"}`}>{statusLabel(order.status)}</span>
-                              {getRefundStatusLabel(order.refund_status) && (
-                                <span className={`inline-flex rounded-full px-2.5 py-1 text-[9px] font-semibold ${
-                                  order.refund_status === "failed"
-                                    ? "bg-red-50 text-red-700 border border-red-200"
-                                    : ["succeeded", "refunded"].includes(String(order.refund_status).toLowerCase())
-                                    ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                                    : "bg-amber-50 text-amber-800 border border-amber-200"
-                                }`}>
-                                  {getRefundStatusLabel(order.refund_status)}
-                                </span>
-                              )}
                               {orderTiming.isRushOrder && <span className="inline-flex rounded-full bg-[#fff3d1] px-2.5 py-1 text-[9px] font-semibold text-[#80600a]">Rush order</span>}
                               {order.return_refund_request && <span className="rounded-md bg-amber-50 px-2 py-1 text-[9px] font-semibold text-amber-900">Customer request · {order.return_refund_request.status}</span>}
                             </div>
@@ -1064,38 +978,6 @@ export default function Orders() {
                                     <dt className="text-black/45">Address</dt><dd className="text-right text-black/70">{addressLabel}</dd>
                                     <dt className="text-black/45">Payment</dt><dd className="text-right text-black/70">{order.payment || "N/A"}</dd>
                                     <dt className="text-black/45">Placed</dt><dd className="text-right text-black/70">{formatOrderDateTime(order.created_at)}</dd>
-                                    {getRefundStatusLabel(order.refund_status) && <>
-                                      <dt className="text-black/45">Refund status</dt>
-                                      <dd className={`text-right font-semibold ${
-                                        order.refund_status === "failed"
-                                          ? "text-red-700"
-                                          : ["succeeded", "refunded"].includes(String(order.refund_status).toLowerCase())
-                                          ? "text-emerald-700"
-                                          : "text-amber-800"
-                                      }`}>{getRefundStatusLabel(order.refund_status)}</dd>
-                                      {order.refund_amount !== null && order.refund_amount !== undefined && <>
-                                        <dt className="text-black/45">Refund amount</dt>
-                                        <dd className="text-right text-black/70">₱{Number(order.refund_amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</dd>
-                                      </>}
-                                      {order.refund_reference && <>
-                                        <dt className="text-black/45">PayMongo refund reference</dt>
-                                        <dd className="break-all text-right text-black/70">{order.refund_reference}</dd>
-                                      </>}
-                                    </>}
-                                    {order.status === "Cancellation Pending"
-                                      && ["pending", "processing", "refunding", "requesting"].includes(String(order.refund_status || "").toLowerCase())
-                                      && order.refund_reference && (
-                                        <div className="col-span-2 flex justify-end">
-                                          <button
-                                            type="button"
-                                            onClick={() => syncRefundStatus(order)}
-                                            disabled={refundStatusLoadingId === order.id}
-                                            className="rounded-lg border border-[#d8c6a5] px-3 py-1.5 text-[10px] font-semibold text-[#6b4f1d] hover:bg-[#fffaf0] disabled:cursor-not-allowed disabled:opacity-50"
-                                          >
-                                            {refundStatusLoadingId === order.id ? "Checking PayMongo…" : "Check PayMongo status"}
-                                          </button>
-                                        </div>
-                                      )}
                                     {order.status === "Cancelled" && <><dt className="text-black/45">Cancelled</dt><dd className="text-right text-black/70">{formatOrderDateTime(order.cancelled_at)}</dd></>}
                                   </dl>
                                 </section>
