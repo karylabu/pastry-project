@@ -75,6 +75,58 @@ describe("CakeRecipes ingredient pagination", () => {
     expect(screen.getByRole("button", { name: "Save recipe" })).toBeDisabled();
   });
 
+  test("previews two-tier recipes with one flavor and only a supported size preset", async () => {
+    global.fetch.mockImplementation((url, options = {}) => {
+      if (String(url).includes("/catalog")) {
+        return Promise.resolve({
+          ok: true,
+          text: async () => JSON.stringify({
+            success: true,
+            flavors: [
+              { id: 1, name: "Carrot", active: true },
+              { id: 2, name: "Red Velvet", active: true },
+            ],
+            sizes: [
+              { id: 11, code: "4x2", label: "4 x 2 inch", active: true },
+              { id: 12, code: "6x3", label: "6 x 3 inch", active: true },
+              { id: 13, code: "6x5", label: "6 x 5 inch", active: true },
+              { id: 14, code: "8x5", label: "8 x 5 inch", active: true },
+              { id: 15, code: "10x5", label: "10 x 5 inch", active: true },
+            ],
+            ingredients: [],
+            recipes: [],
+          }),
+        });
+      }
+      if (String(url).endsWith("/api/customized-cakes/preview")) {
+        return Promise.resolve({
+          ok: true,
+          text: async () => JSON.stringify({ success: true, preview: { requirements: {} } }),
+        });
+      }
+      return Promise.resolve({ ok: true, text: async () => JSON.stringify({ success: true }) });
+    });
+
+    render(<CakeRecipes />);
+    fireEvent.change(await screen.findByLabelText("Flavor for both tiers"), { target: { value: "2" } });
+    fireEvent.change(screen.getByLabelText("Two-tier size configuration"), { target: { value: "large" } });
+    fireEvent.click(screen.getByRole("button", { name: "Calculate requirements" }));
+
+    await waitFor(() => {
+      const previewCall = global.fetch.mock.calls.find(([url]) => String(url).endsWith("/api/customized-cakes/preview"));
+      expect(previewCall).toBeDefined();
+      expect(JSON.parse(previewCall[1].body)).toEqual({
+        tiers: [
+          { flavor_id: "2", size_id: "14" },
+          { flavor_id: "2", size_id: "15" },
+        ],
+      });
+    });
+    expect(screen.getByLabelText("Two-tier size configuration")).toHaveTextContent("Mini two tier cake");
+    expect(screen.getByLabelText("Two-tier size configuration")).toHaveTextContent("Standard two tier cake");
+    expect(screen.getByLabelText("Two-tier size configuration")).toHaveTextContent("Large two tier cake");
+  });
+
   test("confirms and saves removing an ingredient from the recipe", async () => {
     let savedIngredients = [
       { ingredient_id: 1, quantity: 240, unit: "g" },

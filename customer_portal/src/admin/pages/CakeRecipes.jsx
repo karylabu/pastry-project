@@ -8,6 +8,11 @@ import AdminDialog from "../components/AdminDialog";
 
 const emptyLine = { ingredient_id: "", quantity: "", unit: "g" };
 const INGREDIENTS_PER_PAGE = 10;
+const TWO_TIER_PRESETS = {
+  mini: { label: "Mini two tier cake", sizeLabel: "4 x 2 inch / 6 x 3 inch", sizes: ["4x2", "6x3"] },
+  standard: { label: "Standard two tier cake", sizeLabel: "6 x 5 inch / 8 x 5 inch", sizes: ["6x5", "8x5"] },
+  large: { label: "Large two tier cake", sizeLabel: "8 x 5 inch / 10 x 5 inch", sizes: ["8x5", "10x5"] },
+};
 
 const getFlavorThumbnail = (name) => {
   const flavorName = String(name || "").toLowerCase();
@@ -28,10 +33,8 @@ export default function CakeRecipes() {
   const [status, setStatus] = useState("");
   const [statusType, setStatusType] = useState("success");
   const [loading, setLoading] = useState(true);
-  const [previewTiers, setPreviewTiers] = useState([
-    { flavor_id: "", size_id: "" },
-    { flavor_id: "", size_id: "" },
-  ]);
+  const [previewFlavorId, setPreviewFlavorId] = useState("");
+  const [previewPreset, setPreviewPreset] = useState("mini");
   const [preview, setPreview] = useState(null);
   const [adminDialog, setAdminDialog] = useState(null);
   const [deletingRecipe, setDeletingRecipe] = useState(false);
@@ -279,8 +282,13 @@ export default function CakeRecipes() {
 
   const calculatePreview = async () => {
     try {
-      const tiers = previewTiers.filter((tier) => tier.flavor_id && tier.size_id);
-      if (!tiers.length) throw new Error("Select at least one flavor and size.");
+      if (!previewFlavorId) throw new Error("Select a flavor for both tiers.");
+      const preset = TWO_TIER_PRESETS[previewPreset];
+      const tiers = preset.sizes.map((code) => {
+        const size = catalog.sizes.find((item) => item.code === code && item.active);
+        if (!size) throw new Error(`The ${preset.label} size configuration is unavailable.`);
+        return { flavor_id: previewFlavorId, size_id: String(size.id) };
+      });
       const data = await request("/api/customized-cakes/preview", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -506,22 +514,24 @@ export default function CakeRecipes() {
           </div>
 
           <div className="grid gap-3 p-4 md:grid-cols-2 sm:p-5">
-            {previewTiers.map((tier, index) => (
-              <div key={index} className="grid gap-3 rounded-xl border border-[#eadfd8] bg-[#fffaf3] p-4">
-                <div className="flex items-center gap-2 border-b border-[#eee4de] pb-2">
-                  <span className="flex h-7 w-7 items-center justify-center rounded-full bg-white text-[#9b7810]"><CakeSlice size={14} /></span>
-                  <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#5f514a]">Tier {index + 1}</p>
-                </div>
-                <label className="grid gap-1.5 text-[10px] font-semibold text-[#74675f]">
-                  Flavor
-                  <select value={tier.flavor_id} onChange={(event) => setPreviewTiers((items) => items.map((item, itemIndex) => itemIndex === index ? { ...item, flavor_id: event.target.value } : item))} className="min-h-10 rounded-lg border border-[#e5d9d0] bg-white px-3 py-2 text-[12px] font-normal text-[#33251e] outline-none focus:border-[#d4af37] focus:ring-2 focus:ring-[#d4af37]/20"><option value="">Select flavor</option>{catalog.flavors.filter((flavor) => flavor.active).map((flavor) => <option key={flavor.id} value={flavor.id}>{flavor.name}</option>)}</select>
-                </label>
-                <label className="grid gap-1.5 text-[10px] font-semibold text-[#74675f]">
-                  Size
-                  <select value={tier.size_id} onChange={(event) => setPreviewTiers((items) => items.map((item, itemIndex) => itemIndex === index ? { ...item, size_id: event.target.value } : item))} className="min-h-10 rounded-lg border border-[#e5d9d0] bg-white px-3 py-2 text-[12px] font-normal text-[#33251e] outline-none focus:border-[#d4af37] focus:ring-2 focus:ring-[#d4af37]/20"><option value="">Select size</option>{catalog.sizes.filter((size) => size.active).map((size) => <option key={size.id} value={size.id}>{size.label}</option>)}</select>
-                </label>
-              </div>
-            ))}
+            <label className="grid content-start gap-1.5 text-[10px] font-semibold text-[#74675f]">
+              Flavor for both tiers
+              <select aria-label="Flavor for both tiers" value={previewFlavorId} onChange={(event) => setPreviewFlavorId(event.target.value)} className="min-h-10 rounded-lg border border-[#e5d9d0] bg-white px-3 py-2 text-[12px] font-normal text-[#33251e] outline-none focus:border-[#d4af37] focus:ring-2 focus:ring-[#d4af37]/20">
+                <option value="">Select flavor</option>
+                {catalog.flavors.filter((flavor) => flavor.active).map((flavor) => <option key={flavor.id} value={flavor.id}>{flavor.name}</option>)}
+              </select>
+            </label>
+            <label className="grid content-start gap-1.5 text-[10px] font-semibold text-[#74675f]">
+              Two-tier size configuration
+              <select aria-label="Two-tier size configuration" value={previewPreset} onChange={(event) => setPreviewPreset(event.target.value)} className="min-h-10 rounded-lg border border-[#e5d9d0] bg-white px-3 py-2 text-[12px] font-normal text-[#33251e] outline-none focus:border-[#d4af37] focus:ring-2 focus:ring-[#d4af37]/20">
+                {Object.entries(TWO_TIER_PRESETS).map(([key, preset]) => (
+                  <option key={key} value={key}>{preset.label} — {preset.sizeLabel}</option>
+                ))}
+              </select>
+            </label>
+            <p className="text-[11px] leading-5 text-[#8f8076] md:col-span-2">
+              Both tiers use the selected flavor. Available sizes are Mini (4×2 / 6×3), Standard (6×5 / 8×5), and Large (8×5 / 10×5).
+            </p>
           </div>
 
           {preview && (
