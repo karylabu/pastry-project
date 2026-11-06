@@ -126,6 +126,30 @@ test("shows the newest order number first when timestamps are identical", async 
   expect(container.querySelector("article")).toHaveTextContent("#108");
 });
 
+test("shows rider details in live order details for delivery orders", async () => {
+  global.fetch = jest.fn((url) => Promise.resolve({
+    ok: true,
+    json: async () => ({
+      success: true,
+      orders: String(url).includes("/inventory/ingredients")
+        ? { ingredients: [] }
+        : [orderFixture(201, "Ready for Pickup", 5, {
+          method: "Delivery",
+          rider_name: "Juan Dela Cruz",
+          rider_contact: "09171234567",
+          rider_plate_number: "ABC 1234",
+        })],
+    }),
+  }));
+
+  renderOrders();
+  fireEvent.click(await screen.findByRole("button", { name: /view details for order 201/i }));
+
+  expect((await screen.findAllByText("Juan Dela Cruz")).length).toBeGreaterThan(0);
+  expect(screen.getAllByText("09171234567").length).toBeGreaterThan(0);
+  expect(screen.getAllByText("ABC 1234").length).toBeGreaterThan(0);
+});
+
 test("hides refund details and status controls from admins", async () => {
   global.fetch = jest.fn((url) => {
     if (String(url).includes("/inventory/ingredients")) {

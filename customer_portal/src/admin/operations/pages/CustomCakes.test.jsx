@@ -158,6 +158,44 @@ describe("CustomCakes", () => {
     expect(await screen.findByRole("heading", { name: "Order #31" })).toBeInTheDocument();
   });
 
+  test("shows rider details in customized order details", async () => {
+    global.fetch.mockImplementation((url, options = {}) => {
+      if (url.includes("/customized-cakes/request-status")) {
+        return Promise.resolve({ ok: true, json: async () => ({ success: true, enabled: true }) });
+      }
+
+      return Promise.resolve({
+        ok: true,
+        json: async () => ({
+          success: true,
+          orders: [{
+            id: 31,
+            status: "Ready for Pickup",
+            payment_status: "paid",
+            customer: "Mila Customer",
+            method: "Delivery",
+            rider_name: "Juan Dela Cruz",
+            rider_contact: "09171234567",
+            rider_plate_number: "ABC 1234",
+            total: 1200,
+            custom_details: {},
+          }],
+        }),
+      });
+    });
+    window.history.pushState({}, "", "/admin/custom-cakes?order_id=31");
+
+    render(<CustomCakes />);
+
+    expect(await screen.findByRole("heading", { name: "Order #31" })).toBeInTheDocument();
+    expect(screen.getByText("Rider name")).toBeInTheDocument();
+    expect(screen.getByText("Juan Dela Cruz")).toBeInTheDocument();
+    expect(screen.getByText("Rider contact")).toBeInTheDocument();
+    expect(screen.getByText("09171234567")).toBeInTheDocument();
+    expect(screen.getByText("Rider plate number")).toBeInTheDocument();
+    expect(screen.getByText("ABC 1234")).toBeInTheDocument();
+  });
+
   test("admin can turn customer custom cake requests off", async () => {
     render(<CustomCakes />);
 

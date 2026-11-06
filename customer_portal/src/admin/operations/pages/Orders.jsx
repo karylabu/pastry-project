@@ -799,6 +799,11 @@ export default function Orders() {
                             <dt className="text-[#9b8c83]">Phone</dt><dd className="text-right text-[#65574d]">{order.phone || "Not provided"}</dd>
                             <dt className="text-[#9b8c83]">Email</dt><dd className="break-all text-right text-[#65574d]">{order.email || "Not provided"}</dd>
                             <dt className="text-[#9b8c83]">Fulfillment</dt><dd className="text-right text-[#65574d]">{order.method || "N/A"}</dd>
+                            {String(order.method || "").toLowerCase().includes("deliver") && <>
+                              <dt className="text-[#9b8c83]">Rider name</dt><dd className="text-right text-[#65574d]">{order.rider_name || "Not provided"}</dd>
+                              <dt className="text-[#9b8c83]">Rider contact</dt><dd className="text-right text-[#65574d]">{order.rider_contact || "Not provided"}</dd>
+                              <dt className="text-[#9b8c83]">Rider plate number</dt><dd className="text-right text-[#65574d]">{order.rider_plate_number || "Not provided"}</dd>
+                            </>}
                             <dt className="text-[#9b8c83]">Address</dt><dd className="text-right text-[#65574d]">{addressLabel}</dd>
                             <dt className="text-[#9b8c83]">Payment</dt><dd className="text-right text-[#65574d]">{order.payment || "N/A"}</dd>
                             <dt className="text-[#9b8c83]">Placed</dt><dd className="text-right text-[#65574d]">{formatOrderDateTime(order.created_at)}</dd>
@@ -975,6 +980,11 @@ export default function Orders() {
                                     <dt className="text-black/45">Email</dt><dd className="break-all text-right text-black/70">{order.email || "Not provided"}</dd>
                                     <dt className="text-black/45">Phone</dt><dd className="text-right text-black/70">{order.phone || "Not provided"}</dd>
                                     <dt className="text-black/45">Fulfillment</dt><dd className="text-right text-black/70">{order.method || "N/A"}</dd>
+                                    {String(order.method || "").toLowerCase().includes("deliver") && <>
+                                      <dt className="text-black/45">Rider name</dt><dd className="text-right text-black/70">{order.rider_name || "Not provided"}</dd>
+                                      <dt className="text-black/45">Rider contact</dt><dd className="text-right text-black/70">{order.rider_contact || "Not provided"}</dd>
+                                      <dt className="text-black/45">Rider plate number</dt><dd className="text-right text-black/70">{order.rider_plate_number || "Not provided"}</dd>
+                                    </>}
                                     <dt className="text-black/45">Address</dt><dd className="text-right text-black/70">{addressLabel}</dd>
                                     <dt className="text-black/45">Payment</dt><dd className="text-right text-black/70">{order.payment || "N/A"}</dd>
                                     <dt className="text-black/45">Placed</dt><dd className="text-right text-black/70">{formatOrderDateTime(order.created_at)}</dd>
