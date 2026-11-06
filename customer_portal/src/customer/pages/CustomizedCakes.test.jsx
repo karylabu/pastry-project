@@ -137,11 +137,33 @@ describe('CustomizedCakes availability', () => {
     expect(form.querySelector('fieldset')).toBeDisabled();
     expect(form.querySelector('fieldset')).toHaveClass('disabled:opacity-50');
     expect(screen.getByPlaceholderText('Enter full name')).toBeDisabled();
+    expect(within(form).getByLabelText('Pickup date')).toBeDisabled();
 
     await waitFor(() => expect(global.fetch).toHaveBeenCalledWith(
       'https://example.test/laravel/api/customized-cakes/request-status',
       expect.objectContaining({ headers: { Accept: 'application/json' } }),
     ));
+  });
+
+  it('uses a visible native date input for the custom cake delivery date', async () => {
+    global.fetch.mockImplementation(async (url) => ({
+      ok: true,
+      text: async () => JSON.stringify((() => {
+        if (url.includes('/customized-cakes/request-status')) return { enabled: true };
+        if (url.includes('/customized-cakes/flavors')) return { flavors: [] };
+        if (url.includes('/customized-cakes/sizes')) return { sizes: [] };
+        if (url.includes('/api/addresses')) return { status: 'success', addresses: [] };
+        if (url.includes('/api/user')) return { id: 5, name: 'Customer' };
+        return {};
+      })()),
+    }));
+
+    render(<CustomizedCakes />);
+
+    const dateInput = await screen.findByLabelText('Pickup date');
+    expect(dateInput).toHaveAttribute('type', 'date');
+    expect(dateInput).not.toHaveClass('opacity-0');
+    expect(dateInput).toHaveAttribute('min');
   });
 
   it('disables the request form and asks guests to log in', async () => {
