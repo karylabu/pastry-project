@@ -110,10 +110,88 @@ class AuthApiController extends Controller
         return response()->json(['success' => true, 'message' => 'Email address verified.']);
     }
 
+    public function sendRegistrationPhoneOtp(Request $request, RegistrationPhoneVerification $phoneVerification, CustomerTwoFactorDelivery $delivery)
+    {
+        $validator = Validator::make($request->all(), [
+            'phone' => ['required', 'string', 'max:30', 'regex:/^\+?[0-9\s-]{7,15}$/'],
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Enter a valid phone number.',
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        $phone = (string) $request->input('phone');
+        if ($phoneVerification->isPhoneRegistered($phone)) {
+            return response()->json([
+                'success' => false,
+                'code' => 'phone_already_registered',
+                'message' => 'This phone number is already linked to an account. Please log in to your existing account.',
+            ], 409);
+        }
+
+        try {
+            $verificationId = $phoneVerification->sendCode($phone, $delivery);
+        } catch (\RuntimeException $exception) {
+            if (str_starts_with($exception->getMessage(), 'Please wait')) {
+                return response()->json(['success' => false, 'message' => $exception->getMessage()], 429);
+            }
+
+            Log::warning('Customer registration SMS OTP delivery failed.', [
+                'phone' => $phoneVerification->normalizePhone($phone),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => $exception->getMessage(),
+            ], 503);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'A verification code was sent to your phone.',
+            'verification_id' => $verificationId,
+            'expires_in' => 600,
+        ]);
+    }
+
+    public function verifyRegistrationPhoneOtp(Request $request, RegistrationPhoneVerification $phoneVerification)
+    {
+        $validator = Validator::make($request->all(), [
+            'phone' => ['required', 'string', 'max:30', 'regex:/^\+?[0-9\s-]{7,15}$/'],
+            'verification_id' => ['required', 'string', 'size:64', 'regex:/^[a-f0-9]{64}$/'],
+            'code' => ['required', 'digits:6'],
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Enter your phone number and the six-digit verification code.',
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        if (! $phoneVerification->verifyCode(
+            (string) $request->input('verification_id'),
+            (string) $request->input('phone'),
+            (string) $request->input('code')
+        )) {
+            return response()->json([
+                'success' => false,
+                'message' => 'The verification code is invalid or expired. Request a new code and try again.',
+            ], 422);
+        }
+
+        return response()->json(['success' => true, 'message' => 'Phone number verified.']);
+    }
+
     /**
-     * Register a new user after verifying email ownership.
+     * Register a new user after verifying phone ownership.
      */
-    public function register(Request $request, RegistrationEmailVerification $emailVerification, RegistrationPhoneVerification $phoneVerification)
+    public function register(Request $request, RegistrationPhoneVerification $phoneVerification)
     {
         $request->merge(['email' => strtolower(trim((string) $request->input('email', '')))]);
         $validator = Validator::make($request->all(), [
@@ -121,7 +199,7 @@ class AuthApiController extends Controller
             'email' => 'required|string|email|max:150',
             'password' => 'required|string|min:6',
             'phone' => ['required', 'string', 'max:30', 'regex:/^\+?[0-9\s-]{7,15}$/'],
-            'email_verification_id' => ['sometimes', 'string', 'size:64', 'regex:/^[a-f0-9]{64}$/'],
+            'phone_verification_id' => ['sometimes', 'string', 'size:64', 'regex:/^[a-f0-9]{64}$/'],
             'agree_privacy' => 'sometimes|boolean',
         ]);
 
@@ -145,13 +223,13 @@ class AuthApiController extends Controller
             ], 409);
         }
 
-        $verificationId = (string) $request->input('email_verification_id');
         $phone = (string) $request->input('phone');
-        if (!$emailVerification->isVerified($verificationId, $request->email)) {
+        $verificationId = (string) $request->input('phone_verification_id');
+        if (!$phoneVerification->isVerified($verificationId, $phone)) {
             return response()->json([
                 'success' => false,
-                'code' => 'email_verification_required',
-                'message' => 'Verify your email address before creating an account.',
+                'code' => 'phone_verification_required',
+                'message' => 'Verify your phone number before creating an account.',
             ], 422);
         }
 
@@ -159,9 +237,9 @@ class AuthApiController extends Controller
         $token = bin2hex(random_bytes(32));
 
         try {
-            $user = DB::transaction(function () use ($request, $emailVerification, $verificationId, $phone, $token) {
-                if (!$emailVerification->consumeVerified($verificationId, $request->email)) {
-                    throw new \DomainException('The email verification has expired or was already used.');
+            $user = DB::transaction(function () use ($request, $phoneVerification, $verificationId, $phone, $token) {
+                if (!$phoneVerification->consumeVerified($verificationId, $phone)) {
+                    throw new \DomainException('The phone verification has expired or was already used.');
                 }
 
                 app(\App\Services\AdminRecycleBinService::class)
@@ -190,8 +268,8 @@ class AuthApiController extends Controller
         } catch (\DomainException $exception) {
             return response()->json([
                 'success' => false,
-                'code' => 'email_verification_required',
-                'message' => 'Verify your email address before creating an account.',
+                'code' => 'phone_verification_required',
+                'message' => 'Verify your phone number before creating an account.',
             ], 422);
         } catch (QueryException $exception) {
             if ($response = $this->existingAccountResponse($request->email)) {

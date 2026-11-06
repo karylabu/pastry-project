@@ -191,8 +191,7 @@ class AuthController extends Controller
         Request $request,
         CustomerTwoFactor $twoFactor,
         \App\Services\CustomerTwoFactorDelivery $delivery,
-        \App\Services\RegistrationPhoneVerification $phoneVerification,
-        \App\Services\RegistrationEmailVerification $emailVerification
+        \App\Services\RegistrationPhoneVerification $phoneVerification
     )
     {
         if ($request->isMethod('options')) {
@@ -203,6 +202,7 @@ class AuthController extends Controller
         if ($intent === 'signup') {
             $validator = Validator::make($request->all(), [
                 'phone' => ['required', 'string', 'max:30', 'regex:/^\+?[0-9\s-]{7,15}$/'],
+                'phone_verification_id' => ['required', 'string', 'size:64', 'regex:/^[a-f0-9]{64}$/'],
                 'agree_terms' => ['accepted'],
                 'agree_privacy' => ['accepted'],
             ]);
@@ -248,13 +248,13 @@ class AuthController extends Controller
         } elseif ($intent === 'complete_phone') {
             $validator = Validator::make($request->all(), [
                 'phone' => ['required', 'string', 'max:30', 'regex:/^\+?[0-9\s-]{7,15}$/'],
-                'email_verification_id' => ['required', 'string', 'size:64', 'regex:/^[a-f0-9]{64}$/'],
+                'phone_verification_id' => ['required', 'string', 'size:64', 'regex:/^[a-f0-9]{64}$/'],
             ]);
 
             if ($validator->fails()) {
                 return $this->googleCorsResponse([
                     'success' => false,
-                    'message' => 'A valid phone number and email verification are required.',
+                    'message' => 'A valid phone number and phone verification are required.',
                     'errors' => $validator->errors(),
                 ], 422);
             }
@@ -328,12 +328,13 @@ class AuthController extends Controller
         }
 
         if (in_array($intent, ['signup', 'complete_phone'], true)) {
-            $verificationId = trim((string) $request->input('email_verification_id', ''));
-            if (!$emailVerification->isVerified($verificationId, $email)) {
+            $verificationId = trim((string) $request->input('phone_verification_id', ''));
+            $verifiedPhone = (string) $request->input('phone', '');
+            if (!$phoneVerification->isVerified($verificationId, $verifiedPhone)) {
                 return $this->googleCorsResponse([
                     'success' => false,
-                    'code' => 'email_verification_required',
-                    'message' => 'Verify your email address before continuing.',
+                    'code' => 'phone_verification_required',
+                    'message' => 'Verify your phone number before continuing.',
                 ], 422);
             }
         }
@@ -414,12 +415,12 @@ class AuthController extends Controller
                 $newUser[$profileColumn] = $profilePicture ?: null;
             }
             try {
-                DB::transaction(function () use ($emailVerification, $request, $newUser, $email, $isTrashedUser) {
-                    if (!$emailVerification->consumeVerified(
-                        (string) $request->input('email_verification_id'),
-                        $email
+                DB::transaction(function () use ($phoneVerification, $request, $newUser, $email, $isTrashedUser) {
+                    if (!$phoneVerification->consumeVerified(
+                        (string) $request->input('phone_verification_id'),
+                        (string) $request->input('phone')
                     )) {
-                        throw new \DomainException('The email verification has expired or was already used.');
+                        throw new \DomainException('The phone verification has expired or was already used.');
                     }
 
                     if ($isTrashedUser) {
@@ -432,8 +433,8 @@ class AuthController extends Controller
             } catch (\DomainException $exception) {
                 return $this->googleCorsResponse([
                     'success' => false,
-                    'code' => 'email_verification_required',
-                    'message' => 'Verify your email address before creating an account.',
+                    'code' => 'phone_verification_required',
+                    'message' => 'Verify your phone number before creating an account.',
                 ], 422);
             }
 
@@ -479,7 +480,7 @@ class AuthController extends Controller
             }
 
             $phone = trim((string) $request->input('phone'));
-            $verificationId = trim((string) $request->input('email_verification_id'));
+            $verificationId = trim((string) $request->input('phone_verification_id'));
             $existingPhone = trim((string) ($user->phone ?? ''))
                 ?: trim((string) ($user->phone_number ?? ''));
 
@@ -493,7 +494,7 @@ class AuthController extends Controller
                 }
 
                 try {
-                    DB::transaction(function () use ($user, $phone, $verificationId, $email, $emailVerification, $phoneVerification) {
+                    DB::transaction(function () use ($user, $phone, $verificationId, $phoneVerification) {
                         $lockedUser = DB::table('users')->where('id', $user->id)->lockForUpdate()->first();
                         $lockedPhone = trim((string) ($lockedUser->phone ?? ''))
                             ?: trim((string) ($lockedUser->phone_number ?? ''));
@@ -502,8 +503,8 @@ class AuthController extends Controller
                             return;
                         }
 
-                        if (!$emailVerification->consumeVerified($verificationId, $email)) {
-                            throw new \DomainException('The email verification has expired or was already used.');
+                        if (!$phoneVerification->consumeVerified($verificationId, $phone)) {
+                            throw new \DomainException('The phone verification has expired or was already used.');
                         }
 
                         DB::table('users')->where('id', $user->id)->update(['phone' => $phone]);
@@ -511,8 +512,8 @@ class AuthController extends Controller
                 } catch (\DomainException $exception) {
                     return $this->googleCorsResponse([
                         'success' => false,
-                        'code' => 'email_verification_required',
-                        'message' => 'Verify your email address before continuing.',
+                        'code' => 'phone_verification_required',
+                        'message' => 'Verify your phone number before continuing.',
                     ], 422);
                 }
             }

@@ -115,6 +115,17 @@ class CustomerAuthApiTest extends TestCase
             $table->timestamp('consumed_at')->nullable();
             $table->timestamps();
         });
+        Schema::create('customer_registration_phone_verifications', function ($table) {
+            $table->char('id', 64)->primary();
+            $table->string('phone');
+            $table->string('phone_normalized', 20)->index();
+            $table->string('code_hash');
+            $table->unsignedTinyInteger('attempts')->default(0);
+            $table->timestamp('expires_at')->index();
+            $table->timestamp('verified_at')->nullable();
+            $table->timestamp('consumed_at')->nullable();
+            $table->timestamps();
+        });
     }
 
     protected function tearDown(): void
@@ -123,6 +134,7 @@ class CustomerAuthApiTest extends TestCase
         Schema::dropIfExists('admin_recycle_bin');
         Schema::dropIfExists('notifications');
         Schema::dropIfExists('customer_two_factor_login_challenges');
+        Schema::dropIfExists('customer_registration_phone_verifications');
         Schema::dropIfExists('customer_registration_email_verifications');
         Schema::dropIfExists('customer_two_factor_recovery_codes');
         Schema::dropIfExists('customer_two_factor');
@@ -791,12 +803,12 @@ class CustomerAuthApiTest extends TestCase
 
     public function test_registration_creates_a_customer_and_session_token(): void
     {
-        $verificationId = $this->createVerifiedRegistrationEmail('new@example.com');
+        $verificationId = $this->createVerifiedRegistrationPhone('09123456789');
         $this->postJson('http://localhost/api/register', [
             'name' => 'New Customer',
             'email' => 'new@example.com',
             'phone' => '09123456789',
-            'email_verification_id' => $verificationId,
+            'phone_verification_id' => $verificationId,
             'password' => 'new-password',
             'agree_privacy' => true,
         ])
@@ -810,7 +822,7 @@ class CustomerAuthApiTest extends TestCase
             'subscribed_promo' => true,
         ]);
         $this->assertDatabaseHas('user_sessions', ['user_id' => 1]);
-        $this->assertNotNull(DB::table('customer_registration_email_verifications')
+        $this->assertNotNull(DB::table('customer_registration_phone_verifications')
             ->where('id', $verificationId)
             ->value('consumed_at'));
     }
@@ -832,13 +844,13 @@ class CustomerAuthApiTest extends TestCase
 
         $recycleBin = app(\App\Services\AdminRecycleBinService::class);
         $recycleBinEntryId = $recycleBin->trashUser(7);
-        $verificationId = $this->createVerifiedRegistrationEmail('recycled@example.com');
+        $verificationId = $this->createVerifiedRegistrationPhone('09123456789');
 
         $response = $this->postJson('http://localhost/api/register', [
             'name' => 'New Customer',
             'email' => 'recycled@example.com',
             'phone' => '09123456789',
-            'email_verification_id' => $verificationId,
+            'phone_verification_id' => $verificationId,
             'password' => 'new-password',
         ])
             ->assertCreated()
@@ -870,17 +882,18 @@ class CustomerAuthApiTest extends TestCase
         ])->assertOk()->assertJsonPath('success', true);
     }
 
-    public function test_registration_rejects_an_unverified_email_address(): void
+    public function test_registration_rejects_an_unverified_phone_number(): void
     {
         $this->postJson('/api/register', [
             'name' => 'Unverified Customer',
             'email' => 'unverified@example.com',
             'phone' => '09123456789',
+            'phone_verification_id' => str_repeat('a', 64),
             'password' => 'new-password',
         ])
             ->assertUnprocessable()
             ->assertJsonPath('success', false)
-            ->assertJsonPath('code', 'email_verification_required');
+            ->assertJsonPath('code', 'phone_verification_required');
 
         $this->assertDatabaseCount('users', 0);
         $this->assertDatabaseCount('user_sessions', 0);
@@ -918,15 +931,48 @@ class CustomerAuthApiTest extends TestCase
         ]);
     }
 
+    public function test_registration_phone_otp_is_sent_by_sms_and_verified_for_the_same_phone(): void
+    {
+        config(['services.iprogsms.api_token' => 'test-sms-token']);
+        Http::fake([
+            'https://www.iprogsms.com/api/v1/sms_messages' => Http::response(['success' => true]),
+        ]);
+
+        $sent = $this->postJson('/api/registration/phone-otp', ['phone' => '09123456789'])
+            ->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('message', 'A verification code was sent to your phone.');
+        $verificationId = $sent->json('verification_id');
+        $this->assertMatchesRegularExpression('/^[a-f0-9]{64}$/', $verificationId);
+
+        $smsRequest = Http::recorded()->first()[0];
+        $this->assertSame('639123456789', $smsRequest['phone_number']);
+        preg_match('/code is (\d{6})/', $smsRequest['message'], $matches);
+        $this->assertNotEmpty($matches[1] ?? null);
+
+        $this->postJson('/api/registration/phone-otp/verify', [
+            'phone' => '+639123456789',
+            'verification_id' => $verificationId,
+            'code' => $matches[1],
+        ])
+            ->assertOk()
+            ->assertJsonPath('success', true);
+
+        $this->assertDatabaseHas('customer_registration_phone_verifications', [
+            'id' => $verificationId,
+            'phone_normalized' => '09123456789',
+        ]);
+    }
+
     public function test_registration_verification_cannot_be_reused(): void
     {
-        $verificationId = $this->createVerifiedRegistrationEmail('first@example.com');
+        $verificationId = $this->createVerifiedRegistrationPhone('09123456789');
 
         $this->postJson('/api/register', [
             'name' => 'First Customer',
             'email' => 'first@example.com',
             'phone' => '09123456789',
-            'email_verification_id' => $verificationId,
+            'phone_verification_id' => $verificationId,
             'password' => 'new-password',
         ])->assertCreated();
 
@@ -934,11 +980,11 @@ class CustomerAuthApiTest extends TestCase
             'name' => 'Second Customer',
             'email' => 'second@example.com',
             'phone' => '09111111111',
-            'email_verification_id' => $verificationId,
+            'phone_verification_id' => $verificationId,
             'password' => 'new-password',
         ])
             ->assertUnprocessable()
-            ->assertJsonPath('code', 'email_verification_required');
+            ->assertJsonPath('code', 'phone_verification_required');
 
         $this->assertDatabaseCount('users', 1);
     }
@@ -1005,6 +1051,7 @@ class CustomerAuthApiTest extends TestCase
             'name' => 'Existing Admin',
             'email' => 'ADMIN@example.com',
             'phone' => '09123456789',
+            'phone_verification_id' => str_repeat('a', 64),
             'password' => 'new-password',
         ])
             ->assertForbidden()
@@ -1018,12 +1065,12 @@ class CustomerAuthApiTest extends TestCase
 
     public function test_registration_without_privacy_acceptance_does_not_subscribe_to_promotions(): void
     {
-        $verificationId = $this->createVerifiedRegistrationEmail('no-consent@example.com');
+        $verificationId = $this->createVerifiedRegistrationPhone('09123456789');
         $this->postJson('/api/register', [
             'name' => 'No Consent Customer',
             'email' => 'no-consent@example.com',
             'phone' => '09123456789',
-            'email_verification_id' => $verificationId,
+            'phone_verification_id' => $verificationId,
             'password' => 'new-password',
         ])->assertCreated();
 
@@ -1040,6 +1087,24 @@ class CustomerAuthApiTest extends TestCase
             'id' => $verificationId,
             'email' => $email,
             'email_normalized' => strtolower($email),
+            'code_hash' => Hash::make('123456'),
+            'attempts' => 0,
+            'expires_at' => now()->addMinutes(10),
+            'verified_at' => now(),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        return $verificationId;
+    }
+
+    private function createVerifiedRegistrationPhone(string $phone): string
+    {
+        $verificationId = bin2hex(random_bytes(32));
+        DB::table('customer_registration_phone_verifications')->insert([
+            'id' => $verificationId,
+            'phone' => $phone,
+            'phone_normalized' => app(\App\Services\RegistrationPhoneVerification::class)->normalizePhone($phone),
             'code_hash' => Hash::make('123456'),
             'attempts' => 0,
             'expires_at' => now()->addMinutes(10),
@@ -1129,16 +1194,16 @@ class CustomerAuthApiTest extends TestCase
             ->assertJsonPath('code', 'recaptcha_required');
     }
 
-    public function test_google_phone_completion_requires_a_valid_phone_and_email_verification_id(): void
+    public function test_google_phone_completion_requires_a_valid_phone_and_phone_verification_id(): void
     {
         $this->postJson('http://localhost/api/google-login', [
             'intent' => 'complete_phone',
             'id_token' => 'firebase-id-token',
             'phone' => 'invalid',
-            'email_verification_id' => 'invalid',
+            'phone_verification_id' => 'invalid',
         ])
             ->assertUnprocessable()
-            ->assertJsonValidationErrors(['phone', 'email_verification_id']);
+            ->assertJsonValidationErrors(['phone', 'phone_verification_id']);
 
         $this->assertDatabaseCount('users', 0);
         $this->assertDatabaseCount('user_sessions', 0);
@@ -1158,6 +1223,7 @@ class CustomerAuthApiTest extends TestCase
             'id_token' => 'not-used-with-duplicate-phone',
             'email' => 'new-google-user@example.com',
             'phone' => '09123456789',
+            'phone_verification_id' => str_repeat('a', 64),
             'agree_terms' => true,
             'agree_privacy' => true,
         ])
@@ -1182,6 +1248,7 @@ class CustomerAuthApiTest extends TestCase
             'id_token' => 'not-used-with-existing-email',
             'email' => 'EXISTING@example.com',
             'phone' => '09123456789',
+            'phone_verification_id' => str_repeat('a', 64),
             'agree_terms' => true,
             'agree_privacy' => true,
         ])
@@ -1207,6 +1274,7 @@ class CustomerAuthApiTest extends TestCase
             'id_token' => 'not-used-with-existing-admin',
             'email' => 'ADMIN@example.com',
             'phone' => '09123456789',
+            'phone_verification_id' => str_repeat('a', 64),
             'agree_terms' => true,
             'agree_privacy' => true,
         ])
