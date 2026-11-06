@@ -356,8 +356,13 @@ class StaffOrdersApiTest extends TestCase
             'payment_status' => 'paid',
         ]);
         Http::assertSentCount(1);
-        Http::assertSent(fn ($request) => $request->method() === 'GET'
-            && str_contains($request->url(), 'pay_284'));
+        Http::assertSent(function ($request) {
+            parse_str((string) parse_url($request->url(), PHP_URL_QUERY), $query);
+
+            return $request->method() === 'GET'
+                && $query['data_attributes_payment_id'] === 'pay_284'
+                && $query['data_attributes_limit'] === '100';
+        });
     }
 
     public function test_admin_order_response_includes_customer_payment_reference(): void

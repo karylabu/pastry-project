@@ -25,14 +25,13 @@ class PayMongoRefundService
         $pageCount = 0;
 
         do {
-            // PayMongo GET query parameters must be top-level.
             $query = [
-                'payment_id' => $paymentId,
-                'limit' => self::PAGE_LIMIT,
+                'data.attributes.payment_id' => $paymentId,
+                'data.attributes.limit' => (string) self::PAGE_LIMIT,
             ];
 
             if ($after !== null) {
-                $query['after'] = $after;
+                $query['data.attributes.after'] = $after;
             }
 
             $response = Http::withBasicAuth($secretKey, '')
