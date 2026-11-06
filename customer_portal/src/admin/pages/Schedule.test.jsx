@@ -1,5 +1,5 @@
 import React from "react";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import Schedule from "./Schedule";
 
 jest.mock("../../services/config", () => ({
@@ -62,5 +62,15 @@ describe("Schedule", () => {
     expect(screen.queryByText("Pending Cake")).not.toBeInTheDocument();
     expect(screen.queryByText("Payment Cake")).not.toBeInTheDocument();
     expect(screen.queryByText("Cancelled Cake")).not.toBeInTheDocument();
+  });
+
+  test("opens order details below the fixed navbar", async () => {
+    render(<Schedule />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "View order 34 for Confirmed Cake" }));
+
+    const dialog = await screen.findByRole("dialog", { name: "Confirmed Cake" });
+    expect(dialog.parentElement).toHaveClass("top-[88px]", "z-[10001]");
+    expect(dialog).toHaveClass("max-h-[calc(100vh-120px)]");
   });
 });

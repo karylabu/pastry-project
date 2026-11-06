@@ -367,8 +367,8 @@ export default function Schedule() {
         </div>
       </div>
       {selectedDay && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#241812]/55 p-4 backdrop-blur-[2px]" onMouseDown={(event) => { if (event.target === event.currentTarget) setSelectedDay(null); }}>
-          <section role="dialog" aria-modal="true" aria-labelledby="schedule-day-title" className="max-h-[80vh] w-full max-w-md overflow-y-auto rounded-lg border border-[#eadfd8] bg-[#fffdfa] shadow-[0_24px_70px_rgba(38,25,16,0.28)]">
+        <div className="fixed inset-x-0 top-[88px] bottom-0 z-[10001] flex items-center justify-center bg-[#241812]/55 px-4 py-4 backdrop-blur-[2px]" onMouseDown={(event) => { if (event.target === event.currentTarget) setSelectedDay(null); }}>
+          <section role="dialog" aria-modal="true" aria-labelledby="schedule-day-title" className="max-h-[calc(100vh-120px)] w-full max-w-md overflow-y-auto rounded-lg border border-[#eadfd8] bg-[#fffdfa] shadow-[0_24px_70px_rgba(38,25,16,0.28)]">
             <header className="flex items-center justify-between border-b border-black/10 px-5 py-4">
               <h2 id="schedule-day-title" className="font-semibold text-black">Orders for {selectedDay.date.toLocaleDateString()}</h2>
               <button type="button" onClick={() => setSelectedDay(null)} aria-label="Close scheduled orders" className="flex h-9 w-9 items-center justify-center rounded-full border border-black/10 hover:bg-black/5"><X size={18} /></button>
@@ -396,8 +396,8 @@ export default function Schedule() {
         const items = Array.isArray(selectedOrder.items) ? selectedOrder.items : [];
         const customerName = selectedOrder.name || selectedOrder.customer_name || getCustomDetails(selectedOrder).customer_name || "Customer";
         return (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#241812]/55 p-4 backdrop-blur-[2px]" onMouseDown={(event) => { if (event.target === event.currentTarget) setSelectedOrder(null); }}>
-            <section role="dialog" aria-modal="true" aria-labelledby="schedule-order-title" className="max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-lg border border-[#eadfd8] bg-[#fffdfa] shadow-[0_24px_70px_rgba(38,25,16,0.28)]">
+          <div className="fixed inset-x-0 top-[88px] bottom-0 z-[10001] flex items-center justify-center bg-[#241812]/55 px-4 py-4 backdrop-blur-[2px]" onMouseDown={(event) => { if (event.target === event.currentTarget) setSelectedOrder(null); }}>
+            <section role="dialog" aria-modal="true" aria-labelledby="schedule-order-title" className="max-h-[calc(100vh-120px)] w-full max-w-lg overflow-y-auto rounded-lg border border-[#eadfd8] bg-[#fffdfa] shadow-[0_24px_70px_rgba(38,25,16,0.28)]">
               <header className="flex items-start justify-between border-b border-black/10 px-5 py-4">
                 <div className="min-w-0">
                   <p className="text-xs font-semibold uppercase tracking-wide text-[#9a7411]">Scheduled order #{selectedOrder.id}</p>
