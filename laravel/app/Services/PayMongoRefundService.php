@@ -26,16 +26,16 @@ class PayMongoRefundService
 
         do {
             $query = [
-                'data.attributes.payment_id' => $paymentId,
-                'data.attributes.limit' => (string) self::PAGE_LIMIT,
+                'payment_id' => $paymentId,
+                'limit' => (string) self::PAGE_LIMIT,
             ];
 
             if ($after !== null) {
-                $query['data.attributes.after'] = $after;
+                $query['after'] = $after;
             }
 
             $queryString = implode('&', array_map(
-                static fn (string $key, string $value): string => str_replace('.', '%2E', rawurlencode($key)).'='.rawurlencode($value),
+                static fn (string $key, string $value): string => rawurlencode($key).'='.rawurlencode($value),
                 array_keys($query),
                 array_map('strval', array_values($query))
             ));
