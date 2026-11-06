@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Http\Controllers\OrderController;
 use App\Models\User;
+use App\Services\CustomizedCakeService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -60,6 +61,7 @@ class OrderStockoutNotificationTest extends TestCase
 
     protected function tearDown(): void
     {
+        Schema::dropIfExists('customized_cake_orders');
         Schema::dropIfExists('notifications');
         Schema::dropIfExists('products');
         Schema::dropIfExists('orders');
@@ -169,7 +171,7 @@ class OrderStockoutNotificationTest extends TestCase
             Request::create('/orders/44/status', 'PUT', ['status' => 'Pending']),
             44
         );
-        $this->assertSame(200, $response->getStatusCode());
+        $this->assertSame(200, $response->getStatusCode(), json_encode($response->getData(true)));
         $this->assertDatabaseHas('orders', [
             'id' => 44,
             'status' => 'Pending',
@@ -188,6 +190,56 @@ class OrderStockoutNotificationTest extends TestCase
             'status' => 'Awaiting Balance Payment',
             'payment_status' => 'downpayment_paid',
         ]);
+    }
+
+    public function test_custom_cake_inventory_is_consumed_when_downpayment_is_accepted_not_when_preparing_starts(): void
+    {
+        Schema::create('customized_cake_orders', function ($table) {
+            $table->id();
+            $table->unsignedBigInteger('order_id')->nullable();
+            $table->string('status')->default('pending');
+        });
+        DB::table('orders')->insert([
+            'id' => 46,
+            'user_id' => 7,
+            'items' => '[]',
+            'total' => 1000,
+            'downpayment_amount' => 500,
+            'method' => 'Pickup',
+            'payment' => 'QRPh',
+            'payment_status' => 'proof_submitted',
+            'is_customized' => true,
+            'order_type' => 'Customized',
+            'status' => 'Awaiting Payment',
+        ]);
+        DB::table('customized_cake_orders')->insert(['id' => 1, 'order_id' => 46]);
+
+        $inventory = \Mockery::mock(CustomizedCakeService::class);
+        $inventory->shouldReceive('consumeOrderInventory')
+            ->once()
+            ->with(1, 46, 99)
+            ->andReturn(['success' => true]);
+        $this->app->instance(CustomizedCakeService::class, $inventory);
+
+        $admin = new User();
+        $admin->id = 99;
+        $admin->role = 'admin';
+        $admin->status = 'active';
+        $this->actingAs($admin);
+
+        $acceptResponse = app(OrderController::class)->updateStatus(
+            Request::create('/orders/46/status', 'PUT', ['status' => 'Pending']),
+            46
+        );
+        $this->assertSame(200, $acceptResponse->getStatusCode(), json_encode($acceptResponse->getData(true)));
+        $this->assertDatabaseHas('orders', ['id' => 46, 'status' => 'Pending', 'payment_status' => 'paid']);
+
+        $preparingResponse = app(OrderController::class)->updateStatus(
+            Request::create('/orders/46/status', 'PUT', ['status' => 'Preparing']),
+            46
+        );
+        $this->assertSame(200, $preparingResponse->getStatusCode(), json_encode($preparingResponse->getData(true)));
+        $this->assertDatabaseHas('orders', ['id' => 46, 'status' => 'Preparing']);
     }
 
     public function test_order_with_unpaid_downpayment_balance_cannot_skip_to_ready(): void

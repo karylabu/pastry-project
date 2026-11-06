@@ -746,14 +746,20 @@ export default function CustomCakes() {
     setUpdatingId(id);
     try {
       const preparingCustomOrder = status === "Preparing";
-      const response = await (preparingCustomOrder ? laravelStaffFetch : staffFetch)(
-        preparingCustomOrder
+      const acceptingDownpayment = status === "Pending" && orders.some((order) =>
+        Number(order.id) === Number(id)
+        && order.status === "Awaiting Payment"
+        && String(order.payment_status || "").toLowerCase() === "proof_submitted"
+      );
+      const useLaravelStatusApi = preparingCustomOrder || acceptingDownpayment;
+      const response = await (useLaravelStatusApi ? laravelStaffFetch : staffFetch)(
+        useLaravelStatusApi
           ? `${LARAVEL_BASE}/api/staff/orders/${id}/status`
           : `${STAFF_BASE}/api_update_order_status.php`,
         {
-          method: preparingCustomOrder ? "PUT" : "POST",
+          method: useLaravelStatusApi ? "PUT" : "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(preparingCustomOrder ? { status } : { id, status, ...extraData }),
+          body: JSON.stringify(useLaravelStatusApi ? { status } : { id, status, ...extraData }),
         },
       );
       const data = await response.json().catch(() => ({}));

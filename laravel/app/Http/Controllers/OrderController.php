@@ -1898,6 +1898,9 @@ class OrderController extends Controller
 
                 $approvedStatuses = ['confirmed', 'approved', 'preparing'];
                 $isApproved = in_array(strtolower(trim($newStatus)), $approvedStatuses, true);
+                $isDownpaymentAccepted = $normalizedOldStatus === 'awaiting payment'
+                    && strtolower(trim($newStatus)) === 'pending'
+                    && in_array($paymentStatus, ['proof_submitted', 'paid', 'downpayment_paid'], true);
                 $hasDeductedStock = $this->orderHasActiveStockDeduction((int) $order->id);
 
                 $refundResult = null;
@@ -1916,7 +1919,10 @@ class OrderController extends Controller
                     $this->restoreOrderProductStock($order, (int) $user->id);
                 }
 
-                if (in_array(strtolower($newStatus), ['confirmed', 'approved', 'preparing'], true)) {
+                if (
+                    (in_array(strtolower($newStatus), ['confirmed', 'approved'], true) || $isDownpaymentAccepted)
+                    && Schema::hasTable('customized_cake_orders')
+                ) {
                     $customizedCakeOrder = DB::table('customized_cake_orders')
                         ->where('order_id', $order->id)
                         ->first();

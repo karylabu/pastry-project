@@ -196,7 +196,7 @@ describe("CustomCakes", () => {
     expect(screen.getByText("ABC 1234")).toBeInTheDocument();
   });
 
-  test("uses Laravel preparing transition so custom cake recipe ingredients are consumed", async () => {
+  test("uses the Laravel status transition when starting custom cake preparation", async () => {
     const paidOrder = {
       id: 32,
       status: "Pending",
@@ -234,6 +234,47 @@ describe("CustomCakes", () => {
       );
     });
     expect(await screen.findByText("Order #32 → Preparing")).toBeInTheDocument();
+  });
+
+  test("accepts a custom cake downpayment through Laravel before preparation", async () => {
+    const awaitingPaymentOrder = {
+      id: 33,
+      status: "Awaiting Payment",
+      payment_status: "proof_submitted",
+      has_payment_proof: true,
+      customer: "Mila Customer",
+      total: 1200,
+      custom_details: {},
+    };
+    global.fetch.mockImplementation((url, options = {}) => {
+      if (url.includes("/customized-cakes/request-status")) {
+        return Promise.resolve({ ok: true, json: async () => ({ success: true, enabled: true }) });
+      }
+      if (url.includes("/api/staff/orders/33/status")) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({ success: true, status: "Pending", payment_status: "paid" }),
+        });
+      }
+      return Promise.resolve({
+        ok: true,
+        json: async () => ({ success: true, orders: [awaitingPaymentOrder] }),
+      });
+    });
+
+    render(<CustomCakes />);
+    fireEvent.click((await screen.findAllByRole("button", { name: "Accept downpayment" }))[0]);
+
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith(
+        "https://example.test/laravel/public/api/staff/orders/33/status",
+        expect.objectContaining({
+          method: "PUT",
+          body: JSON.stringify({ status: "Pending" }),
+        }),
+      );
+    });
+    expect(await screen.findByText("Order #33 downpayment accepted")).toBeInTheDocument();
   });
 
   test("admin can turn customer custom cake requests off", async () => {
