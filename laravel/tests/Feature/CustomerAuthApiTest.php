@@ -1345,6 +1345,27 @@ class CustomerAuthApiTest extends TestCase
         $this->assertDatabaseMissing('user_sessions', ['user_id' => 7]);
     }
 
+    public function test_moving_customer_to_recycle_bin_revokes_their_active_api_session(): void
+    {
+        $this->seedCustomer();
+
+        $this->withHeader('Authorization', 'Bearer test-customer-token')
+            ->getJson('/api/auth/status')
+            ->assertOk()
+            ->assertJsonPath('success', true);
+
+        app(\App\Services\AdminRecycleBinService::class)->trashUser(7);
+
+        $this->getJson('/api/auth/status')
+            ->assertUnauthorized()
+            ->assertJsonPath('success', false);
+
+        $this->assertDatabaseMissing('user_sessions', [
+            'user_id' => 7,
+            'token' => 'test-customer-token',
+        ]);
+    }
+
     public function test_password_reset_uses_the_laravel_api_flow(): void
     {
         $this->seedCustomer();

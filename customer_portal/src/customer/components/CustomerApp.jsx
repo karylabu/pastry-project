@@ -7,6 +7,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import Navbar from './Navbar';
 import Footer from './Footer';
 import ScrollToTop from './ScrollToTop';
+import CustomerSessionMonitor from './CustomerSessionMonitor';
 
 import Dashboard from '../pages/Dashboard';
 import CareersPage from '../pages/CareersPage';
@@ -518,6 +519,7 @@ export default function CustomerApp() {
 
   return (
     <div className="min-h-screen bg-white font-['DM_Sans']">
+      <CustomerSessionMonitor />
       <ScrollToTop />
       {shouldShowNavbar && <Navbar cartCount={cartQuantity} onCartClick={() => setIsCartOpen(true)} />}
 
