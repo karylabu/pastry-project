@@ -71,4 +71,35 @@ describe("Settings Recycle Bin", () => {
     });
     expect(await screen.findByText("Blueberry Cake permanently deleted.")).toBeInTheDocument();
   });
+
+  test("shows the specific validation error when settings cannot be saved", async () => {
+    global.fetch.mockImplementation(async (url, options = {}) => {
+      if (url.endsWith("/api/admin/settings") && options.method === "PUT") {
+        return {
+          ok: false,
+          status: 422,
+          json: async () => ({
+            success: false,
+            message: "Please check the settings and try again.",
+            errors: {
+              "settings.openingHours": ["The settings.openingHours field format is invalid."],
+            },
+          }),
+        };
+      }
+      if (url.endsWith("/api/admin/settings")) {
+        return {
+          ok: true,
+          json: async () => ({ success: true, settings: {}, notification_preferences: {} }),
+        };
+      }
+      throw new Error(`Unexpected request: ${options.method || "GET"} ${url}`);
+    });
+
+    render(<Settings />);
+    fireEvent.click(await screen.findByRole("button", { name: "Save settings" }));
+
+    expect(await screen.findByText("The settings.openingHours field format is invalid.")).toBeInTheDocument();
+    expect(screen.queryByText("Please check the settings and try again.")).not.toBeInTheDocument();
+  });
 });

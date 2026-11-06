@@ -158,7 +158,14 @@ export default function Settings() {
         }),
       });
       const data = await response.json().catch(() => ({}));
-      if (!response.ok || !data.success) throw new Error(data.message || "Unable to save settings.");
+      if (!response.ok || !data.success) {
+        const validationErrors = Object.values(data.errors || {})
+          .flat()
+          .filter((message) => typeof message === "string");
+        throw new Error(validationErrors.length
+          ? validationErrors.join(" ")
+          : data.message || "Unable to save settings.");
+      }
       setPreferences({
         ...defaultPreferences,
         ...data.settings,
