@@ -125,9 +125,8 @@ try {
     }
 
     $refundStatus = strtolower((string) ($refundResult['status'] ?? ''));
-    $refundPending = $refundStatus === 'pending';
     $refundSucceeded = in_array($refundStatus, ['succeeded', 'refunded'], true);
-    $nextStatus = $refundPending || in_array($refundStatus, ['failed', 'manual_required'], true) ? 'Cancellation Pending' : 'Cancelled';
+    $nextStatus = 'Cancelled';
     $nextPaymentStatus = $refundSucceeded ? 'refunded' : (string) ($row['payment_status'] ?? '');
     $refundReference = $refundResult['reference'] ?? $row['refund_reference'];
     $refundAmount = $refundResult['amount'] ?? $row['refund_amount'];
@@ -145,19 +144,9 @@ try {
         if (!$customerNotification) {
             throw new Exception('Failed to prepare customer cancellation notification.');
         }
-        $title = $refundPending
-            ? 'Refund Processing'
-            : (in_array($refundStatus, ['failed', 'manual_required'], true) ? 'Refund Requires Attention' : 'Order Cancelled');
-        $message = match ($refundStatus) {
-            'pending' => !empty($refundResult['transfer_link'])
-                ? "Your cancellation for order #{$order_id} is awaiting your QR Ph refund claim. Claim it within 3 days: {$refundResult['transfer_link']}"
-                : "Your cancellation for order #{$order_id} is awaiting PayMongo refund confirmation.",
-            'succeeded', 'refunded' => "Your order #{$order_id} was cancelled and the refund was confirmed.",
-            'failed' => "PayMongo could not process the refund for order #{$order_id}. You can retry the cancellation.",
-            'manual_required' => "Your cancellation for order #{$order_id} is waiting for the shop to process your refund.",
-            default => 'Your order was cancelled.',
-        };
-        $type = $refundPending || $refundStatus === 'failed' || $refundStatus === 'manual_required' ? 'Warning' : 'Success';
+        $title = 'Order Cancelled';
+        $message = "Your order #{$order_id} was cancelled.";
+        $type = 'Success';
         $actionUrl = '/customer/orders';
         $customerNotification->bind_param('issss', $userId, $title, $message, $type, $actionUrl);
         if (!$customerNotification->execute()) {
@@ -176,12 +165,8 @@ try {
                 $admins->free();
                 throw new Exception('Failed to prepare admin cancellation notification.');
             }
-            $title = $refundPending ? 'Refund Requested' : 'Order Cancelled';
-            $message = $refundPending
-                ? "Order #{$order_id} cancellation is awaiting PayMongo refund confirmation."
-                : (in_array($refundStatus, ['failed', 'manual_required'], true)
-                    ? "Order #{$order_id} cancellation needs refund follow-up."
-                    : "Order #{$order_id} was cancelled by the customer.");
+            $title = 'Order Cancelled';
+            $message = "Order #{$order_id} was cancelled by the customer.";
             $type = 'Warning';
             $actionUrl = '/admin/orders';
             $adminId = (int) $admin['id'];
@@ -219,18 +204,9 @@ try {
         publishRealtimeEvent($conn, 'order.updated', $userId, $order_id);
         publishRealtimeEvent($conn, 'notification.updated', $userId);
         sendPayMongoOrderRefundSms($row['phone'] ?? null, $order_id, $refundResult);
-        $message = match ($refundResult['status']) {
-            'pending' => !empty($refundResult['transfer_link'])
-                ? 'Your QR Ph refund is ready to claim. Use the link in your notification or SMS within 3 days.'
-                : 'Your cancellation is awaiting PayMongo refund confirmation.',
-            'succeeded', 'refunded' => 'Order cancelled. PayMongo confirmed the refund.',
-            'failed' => 'PayMongo could not process the refund. Please retry the cancellation or contact support.',
-            'manual_required' => 'Order cancelled. The shop will process your refund manually.',
-            default => 'Order cancelled successfully.',
-        };
         echo json_encode([
             'success' => true,
-            'message' => $message,
+            'message' => 'Order cancelled successfully.',
             'refund_status' => $refundResult['status'],
             'refund_amount' => $refundResult['amount'],
             'refund_transfer_link' => $refundTransferLink,

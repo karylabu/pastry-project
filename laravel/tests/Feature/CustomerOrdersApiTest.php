@@ -210,7 +210,7 @@ class CustomerOrdersApiTest extends TestCase
         $this->assertDatabaseHas('notifications', [
             'user_id' => 7,
             'title' => 'Order Cancelled',
-            'message' => 'Your order was cancelled.',
+            'message' => 'Your order #10 was cancelled.',
         ]);
         $this->assertDatabaseHas('notifications', [
             'user_id' => 8,
@@ -219,7 +219,7 @@ class CustomerOrdersApiTest extends TestCase
         ]);
     }
 
-    public function test_cancellation_waits_when_paymongo_payment_is_still_processing(): void
+    public function test_customer_cancellation_is_immediate_while_paymongo_payment_is_still_processing(): void
     {
         config(['services.paymongo.secret' => 'sk_test_refund']);
         Http::fake([
@@ -248,13 +248,13 @@ class CustomerOrdersApiTest extends TestCase
 
         $this->assertSame(200, $response->getStatusCode());
         $this->assertSame('awaiting_payment', $response->getData(true)['refund_status']);
-        $this->assertSame('Cancellation Pending', $order->status);
+        $this->assertSame('Cancelled', $order->status);
         $this->assertSame('processing', $order->payment_status);
         $this->assertSame('awaiting_payment', $order->refund_status);
-        $this->assertNull($order->cancelled_at);
+        $this->assertNotNull($order->cancelled_at);
         $this->assertDatabaseHas('notifications', [
             'user_id' => 7,
-            'title' => 'Payment Confirmation Pending',
+            'title' => 'Order Cancelled',
         ]);
         Http::assertSentCount(1);
     }
@@ -335,7 +335,7 @@ class CustomerOrdersApiTest extends TestCase
 
         $this->assertDatabaseHas('orders', [
             'id' => 14,
-            'status' => 'Cancellation Pending',
+            'status' => 'Cancelled',
             'payment_status' => 'paid',
         ]);
     }
@@ -383,7 +383,7 @@ class CustomerOrdersApiTest extends TestCase
         $this->assertSame('pending', $response->getData(true)['refund_status']);
         $this->assertDatabaseHas('orders', [
             'id' => 16,
-            'status' => 'Cancellation Pending',
+            'status' => 'Cancelled',
             'payment_status' => 'paid',
             'refund_reference' => 're_16',
             'refund_status' => 'pending',
@@ -440,7 +440,7 @@ class CustomerOrdersApiTest extends TestCase
         $this->assertSame('https://refunds-api.paymongo.com/v1/refunds', $refundRequest->url());
         $this->assertDatabaseHas('orders', [
             'id' => 17,
-            'status' => 'Cancellation Pending',
+            'status' => 'Cancelled',
             'payment_status' => 'paid',
             'refund_reference' => 're_17',
             'refund_status' => 'pending',
@@ -711,14 +711,14 @@ class CustomerOrdersApiTest extends TestCase
         $this->assertSame('requesting', $response->getData(true)['refund_status']);
         $this->assertDatabaseHas('orders', [
             'id' => 33,
-            'status' => 'Cancellation Pending',
+            'status' => 'Cancelled',
             'refund_status' => 'requesting',
             'payment_status' => 'paid',
         ]);
         Http::assertSentCount(2);
     }
 
-    public function test_staff_cancellation_keeps_paid_order_pending_until_refund_is_confirmed(): void
+    public function test_staff_cancellation_marks_order_cancelled_while_refund_is_pending(): void
     {
         config(['services.paymongo.secret' => 'sk_test_refund']);
         Http::fake(function ($request) {
@@ -762,7 +762,7 @@ class CustomerOrdersApiTest extends TestCase
         $this->assertSame(200, $response->getStatusCode(), $response->getContent());
         $this->assertDatabaseHas('orders', [
             'id' => 34,
-            'status' => 'Cancellation Pending',
+            'status' => 'Cancelled',
             'payment_status' => 'paid',
             'refund_reference' => 'ref_pending_34',
             'refund_status' => 'pending',
@@ -793,7 +793,7 @@ class CustomerOrdersApiTest extends TestCase
         $this->assertSame('failed', $response->getData(true)['refund_status']);
         $this->assertDatabaseHas('orders', [
             'id' => 15,
-            'status' => 'Cancellation Pending',
+            'status' => 'Cancelled',
             'payment_status' => 'paid',
             'refund_status' => 'failed',
         ]);

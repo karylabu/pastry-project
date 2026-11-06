@@ -451,7 +451,9 @@ test('hides refund details and claim links from customers', async () => {
 
   render(<Orders />);
 
-  expect((await screen.findAllByText('Cancellation pending')).length).toBeGreaterThan(0);
+  expect((await screen.findAllByText('Cancelled')).length).toBeGreaterThan(0);
+  expect(screen.queryByText(/cancellation pending/i)).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: /Cancellation Pending/i })).not.toBeInTheDocument();
   expect(screen.queryByText(/refund/i)).not.toBeInTheDocument();
   expect(screen.queryByRole('link', { name: /claim qr ph refund/i })).not.toBeInTheDocument();
   expect(screen.queryByRole('button', { name: /retry refund/i })).not.toBeInTheDocument();

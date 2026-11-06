@@ -152,6 +152,8 @@ test("hides refund details and status controls from admins", async () => {
   await screen.findAllByText("Customer 107");
 
   const orderCard = Array.from(container.querySelectorAll("article")).find((card) => card.textContent.includes("#107"));
+  expect(orderCard).toHaveTextContent("Cancelled");
+  expect(orderCard).not.toHaveTextContent("Cancellation Pending");
   fireEvent.click(within(orderCard).getByRole("button", { name: /View details for order 107/i }));
 
   expect(orderCard).not.toHaveTextContent(/refund/i);

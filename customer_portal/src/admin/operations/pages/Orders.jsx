@@ -163,13 +163,12 @@ export default function Orders() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [paymentProofLightboxOrderId]);
 
-  const statusFilterOptions = ["All", "Awaiting Payment", "Pending", "Preparing", "Awaiting Balance Payment", "Ready for Pickup", "Cancellation Pending", "Completed", "Cancelled"];
+  const statusFilterOptions = ["All", "Awaiting Payment", "Pending", "Preparing", "Awaiting Balance Payment", "Ready for Pickup", "Completed", "Cancelled"];
   const statusLabel = (status) => status === "Awaiting Balance Payment" ? "Pay Balance Before Ready" : status;
 
   const statusColors = {
     "Awaiting Payment": "bg-amber-50 text-amber-800 border border-amber-200",
     "Awaiting Balance Payment": "bg-amber-50 text-amber-800 border border-amber-200",
-    "Cancellation Pending": "bg-amber-50 text-amber-900 border border-amber-300",
     Pending: "bg-[#D4AF37]/15 text-black border border-[#D4AF37]/30",
     Preparing: "bg-[#edf5eb] text-[#4f7654] border border-[#d8e8d4]",
     "Ready for Pickup": "bg-[#e8f1ff] text-[#3563a8] border border-[#cbdcf5]",
@@ -184,7 +183,6 @@ export default function Orders() {
     "Awaiting Balance Payment": 2,
     "Ready for Pickup": 3,
     Completed: 4,
-    "Cancellation Pending": 5,
     Cancelled: 6,
   };
 
@@ -285,7 +283,9 @@ export default function Orders() {
     (Array.isArray(items) ? items : []).map((order) => ({
       ...order,
       source,
-      status: order.status === "Return/Refund" ? "Ready for Pickup" : order.status,
+      status: order.status === "Return/Refund"
+        ? "Ready for Pickup"
+        : order.status === "Cancellation Pending" ? "Cancelled" : order.status,
       items: typeof order.items === "string" ? JSON.parse(order.items) : order.items || [],
     }));
 

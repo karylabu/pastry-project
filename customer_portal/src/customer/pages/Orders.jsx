@@ -538,6 +538,7 @@ export default function Orders() {
 
         return {
           ...order,
+          status: order.status === "Cancellation Pending" ? "Cancelled" : order.status,
           is_customized: isCustomized,
           custom_details: order.custom_details || order.custom_cake_details || order.customized_cake_details || {},
           items: normalizeOrderItems(order),
@@ -645,7 +646,7 @@ export default function Orders() {
       });
       const data = await safeParseJson(res);
       if (data.success) {
-        const orderStatus = data.order_status || (data.refund_status ? "Cancellation Pending" : "Cancelled");
+        const orderStatus = data.order_status || "Cancelled";
         setCancellationNotice(`Cancellation update received for order #${cancelTarget.id}.`);
         updateLocalStatus(cancelTarget.id, orderStatus, {
           cancelled_at: data.cancelled_at,
@@ -1180,7 +1181,7 @@ export default function Orders() {
   }
 
   // ── Helpers ─────────────────────────────────────────────────────────────────
-  const statusOptions = ["All", "Pending", "Cancellation Pending", "Awaiting Payment", "Preparing", "Awaiting Balance Payment", "Ready for Pickup", "Completed", "Cancelled"];
+  const statusOptions = ["All", "Pending", "Awaiting Payment", "Preparing", "Awaiting Balance Payment", "Ready for Pickup", "Completed", "Cancelled"];
 
   const statusCounts = statusOptions.reduce((acc, s) => {
     acc[s] = s === 'All' ? orders.length : orders.filter((o) => (
@@ -1244,7 +1245,6 @@ export default function Orders() {
       case "Cancelled":  return "bg-slate-100 text-slate-700";
       case "Awaiting Balance Payment": return "bg-amber-50 text-amber-800";
       default:           return "bg-gray-100 text-gray-600";
-      case "Cancellation Pending": return "bg-amber-100 text-amber-800";
     }
   };
 
@@ -1398,7 +1398,6 @@ export default function Orders() {
             <div className="divide-y divide-gray-100">
               {sortedOrders.map((order, idx) => {
                 const isCancelled  = order.status === "Cancelled";
-                const isCancellationPending = order.status === "Cancellation Pending";
                 const paymentMethodKey = String(order.payment || '').toLowerCase().replace(/[^a-z0-9]/g, '');
                 const supportsPaymentProof = ['gcash', 'qrph'].includes(paymentMethodKey)
                   || (Boolean(order.is_customized)
@@ -1495,9 +1494,7 @@ export default function Orders() {
                   && isPickupDownpaymentPaid
                   && remainingBalanceAmount > 0;
                 const primaryProductImage = getProductThumbnail(order, primaryItem);
-                const paymentHint = isCancellationPending
-                  ? 'Cancellation pending'
-                  : isCancelled
+                const paymentHint = isCancelled
                   ? 'Order cancelled'
                   : isPaymentConfirmed
                   && paymentStatusKey === 'paid'
@@ -1788,10 +1785,10 @@ export default function Orders() {
                         </button>
                       )}
 
-                      {(isCancelled || isCancellationPending) && (
+                      {isCancelled && (
                         <div className="flex flex-col items-start gap-1">
                           <span className="text-[12px] font-semibold text-slate-500">
-                            {isCancellationPending ? 'Cancellation pending' : 'Cancelled'}
+                            Cancelled
                           </span>
                         </div>
                       )}
