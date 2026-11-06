@@ -14,11 +14,22 @@ describe("CakeRecipes ingredient pagination", () => {
       text: async () => JSON.stringify({
         success: true,
         flavors: [{ id: 1, name: "Carrot", active: true }],
-        sizes: [],
-        ingredients: [],
+        sizes: [
+          { id: 11, code: "4x2", label: "4 x 2 inch", active: true },
+          { id: 12, code: "6x3", label: "6 x 3 inch", active: true },
+          { id: 13, code: "6x5", label: "6 x 5 inch", active: true },
+          { id: 14, code: "8x5", label: "8 x 5 inch", active: true },
+          { id: 15, code: "10x5", label: "10 x 5 inch", active: true },
+        ],
+        ingredients: Array.from({ length: 12 }, (_, index) => ({
+          id: index + 1,
+          name: `Ingredient ${index + 1}`,
+          unit: "g",
+        })),
         recipes: [{
           id: 21,
           flavor_id: 1,
+          base_size_id: 12,
           ingredients: Array.from({ length: 12 }, (_, index) => ({
             ingredient_id: index + 1,
             quantity: index + 1,
@@ -37,6 +48,8 @@ describe("CakeRecipes ingredient pagination", () => {
   test("shows ten ingredients per page and lets the user reach the rest", async () => {
     render(<CakeRecipes />);
 
+    await waitFor(() => expect(screen.getByLabelText("Change flavor")).toHaveValue("1"));
+    expect(await screen.findByText("Showing 1-10 of 12 ingredients")).toBeInTheDocument();
     expect(await screen.findByRole("button", { name: "Remove ingredient 10" })).toBeInTheDocument();
     expect(screen.getByText("Recipe editor")).toBeInTheDocument();
     expect(screen.getByRole("heading", { level: 1, name: "Carrot" })).toBeInTheDocument();
@@ -75,6 +88,54 @@ describe("CakeRecipes ingredient pagination", () => {
     expect(screen.getByRole("button", { name: "Save recipe" })).toBeDisabled();
   });
 
+  test("lets the admin change and save a single-tier recipe base size", async () => {
+    global.fetch.mockImplementation((url, options = {}) => {
+      if (String(url).includes("/catalog")) {
+        return Promise.resolve({
+          ok: true,
+          text: async () => JSON.stringify({
+            success: true,
+            flavors: [{ id: 1, name: "Carrot", active: true }],
+            sizes: [
+              { id: 11, code: "4x2", label: "4 x 2 inch", active: true },
+              { id: 12, code: "6x3", label: "6 x 3 inch", active: true },
+              { id: 13, code: "6x5", label: "6 x 5 inch", active: true },
+              { id: 14, code: "8x5", label: "8 x 5 inch", active: true },
+              { id: 15, code: "10x5", label: "10 x 5 inch", active: true },
+            ],
+            ingredients: [],
+            recipes: [{ id: 21, flavor_id: 1, base_size_id: 12, ingredients: [] }],
+          }),
+        });
+      }
+      if (options.method === "PUT") {
+        return Promise.resolve({ ok: true, text: async () => JSON.stringify({ success: true }) });
+      }
+      return Promise.resolve({ ok: true, text: async () => JSON.stringify({ success: true }) });
+    });
+
+    render(<CakeRecipes />);
+    await screen.findByRole("option", { name: "10 x 5 inch" });
+    const baseSize = await screen.findByLabelText("Recipe base size");
+    await waitFor(() => expect(screen.getByLabelText("Change flavor")).toHaveValue("1"));
+    expect(baseSize).toHaveValue("12");
+    fireEvent.change(baseSize, { target: { value: "15" } });
+    await waitFor(() => expect(baseSize).toHaveValue("15"));
+    fireEvent.click(screen.getByRole("button", { name: "Save recipe" }));
+
+    await waitFor(() => {
+      const saveCall = global.fetch.mock.calls.find(
+        ([url, options]) => String(url).endsWith("/api/staff/customized-cakes/recipes") && options.method === "PUT",
+      );
+      expect(saveCall).toBeDefined();
+      expect(JSON.parse(saveCall[1].body)).toEqual({
+        flavor_id: "1",
+        base_size_id: "15",
+        ingredients: [],
+      });
+    });
+  });
+
   test("previews two-tier recipes with one flavor and only a supported size preset", async () => {
     global.fetch.mockImplementation((url, options = {}) => {
       if (String(url).includes("/catalog")) {
@@ -108,8 +169,13 @@ describe("CakeRecipes ingredient pagination", () => {
     });
 
     render(<CakeRecipes />);
+    await waitFor(() => expect(
+      screen.getByLabelText("Flavor for both tiers").querySelector('option[value="2"]'),
+    ).toBeInTheDocument());
     fireEvent.change(await screen.findByLabelText("Flavor for both tiers"), { target: { value: "2" } });
+    await waitFor(() => expect(screen.getByLabelText("Flavor for both tiers")).toHaveValue("2"));
     fireEvent.change(screen.getByLabelText("Two-tier size configuration"), { target: { value: "large" } });
+    await waitFor(() => expect(screen.getByLabelText("Two-tier size configuration")).toHaveValue("large"));
     fireEvent.click(screen.getByRole("button", { name: "Calculate requirements" }));
 
     await waitFor(() => {
@@ -139,12 +205,12 @@ describe("CakeRecipes ingredient pagination", () => {
           text: async () => JSON.stringify({
             success: true,
             flavors: [{ id: 1, name: "Carrot", active: true }],
-            sizes: [],
+            sizes: [{ id: 12, code: "6x3", label: "6 x 3 inch", active: true }],
             ingredients: [
               { id: 1, name: "All-purpose Flour", unit: "g" },
               { id: 2, name: "Butter", unit: "g" },
             ],
-            recipes: [{ id: 21, flavor_id: 1, ingredients: savedIngredients }],
+            recipes: [{ id: 21, flavor_id: 1, base_size_id: 12, ingredients: savedIngredients }],
           }),
         });
       }
@@ -180,6 +246,7 @@ describe("CakeRecipes ingredient pagination", () => {
       expect(JSON.parse(saveCall[1].body).ingredients).toEqual([
         { ingredient_id: "2", quantity: "113", unit: "g" },
       ]);
+      expect(JSON.parse(saveCall[1].body).base_size_id).toBe("12");
     });
     expect(await screen.findByRole("status")).toHaveTextContent("All-purpose Flour removed from the Carrot recipe.");
     await waitFor(() => expect(screen.getAllByRole("spinbutton")).toHaveLength(1));
@@ -197,9 +264,9 @@ describe("CakeRecipes ingredient pagination", () => {
           text: async () => JSON.stringify({
             success: true,
             flavors: [{ id: 1, name: "Carrot", active: true }],
-            sizes: [],
+            sizes: [{ id: 12, code: "6x3", label: "6 x 3 inch", active: true }],
             ingredients: [{ id: 1, name: "All-purpose Flour", unit: "g" }],
-            recipes: [{ id: 21, flavor_id: 1, ingredients: [{ ingredient_id: 1, quantity: 240, unit: "g" }] }],
+            recipes: [{ id: 21, flavor_id: 1, base_size_id: 12, ingredients: [{ ingredient_id: 1, quantity: 240, unit: "g" }] }],
           }),
         });
       }

@@ -571,6 +571,7 @@ class AdminActivityLogCategoryFilterTest extends TestCase
     {
         $request = Request::create('http://localhost/api/staff/customized-cakes/recipes', 'PUT', [
             'flavor_id' => 1,
+            'base_size_id' => 1,
             'ingredients' => [['ingredient_id' => 1, 'quantity' => 2.5, 'unit' => 'kg']],
         ]);
         $request->setRouteResolver(static fn () => new class {

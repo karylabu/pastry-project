@@ -15,6 +15,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Validation\Rule;
 use RuntimeException;
 
 class CustomizedCakeController extends Controller
@@ -145,6 +146,7 @@ class CustomizedCakeController extends Controller
         if ($response = $this->authorizeAdmin($request)) return $response;
         $data = $request->validate([
             'flavor_id' => 'required|integer|exists:cake_flavors,id',
+            'base_size_id' => ['required', 'integer', Rule::exists('cake_sizes', 'id')->where('active', true)],
             'ingredients' => 'array',
             'ingredients.*.ingredient_id' => 'required|integer|exists:ingredients,id',
             'ingredients.*.quantity' => 'required|numeric|min:0',
@@ -152,9 +154,10 @@ class CustomizedCakeController extends Controller
         ]);
 
         DB::transaction(function () use ($data) {
-            $baseSizeId = CakeSize::query()->where('code', '6x3')->value('id');
-            if (!$baseSizeId) throw new RuntimeException('Base size 6x3 is not configured.');
-            $recipe = CakeRecipe::query()->firstOrCreate(['flavor_id' => $data['flavor_id'], 'base_size_id' => $baseSizeId], ['active' => true]);
+            $recipe = CakeRecipe::query()->firstOrNew(['flavor_id' => $data['flavor_id']]);
+            $recipe->base_size_id = $data['base_size_id'];
+            $recipe->active = true;
+            $recipe->save();
             $recipe->ingredients()->delete();
             foreach ($data['ingredients'] ?? [] as $line) {
                 CakeRecipeIngredient::query()->create([

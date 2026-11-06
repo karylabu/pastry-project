@@ -25,6 +25,7 @@ const getFlavorThumbnail = (name) => {
 export default function CakeRecipes() {
   const [catalog, setCatalog] = useState({ flavors: [], sizes: [], recipes: [], ingredients: [] });
   const [selectedFlavorId, setSelectedFlavorId] = useState("");
+  const [baseSizeId, setBaseSizeId] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [recipeLines, setRecipeLines] = useState([emptyLine]);
   const [ingredientPage, setIngredientPage] = useState(1);
@@ -95,6 +96,8 @@ export default function CakeRecipes() {
   useEffect(() => {
     setIngredientPage(1);
     const selectedRecipe = catalog.recipes.find((recipe) => String(recipe.flavor_id) === String(selectedFlavorId));
+    const defaultBaseSize = catalog.sizes.find((size) => size.code === "6x3" && size.active);
+    setBaseSizeId(String(selectedRecipe?.base_size_id || defaultBaseSize?.id || ""));
     if (selectedRecipe) {
       setRecipeLines(selectedRecipe.ingredients.map((line) => ({
         ingredient_id: String(line.ingredient_id),
@@ -104,7 +107,7 @@ export default function CakeRecipes() {
     } else {
       setRecipeLines([]);
     }
-  }, [selectedFlavorId, catalog.recipes]);
+  }, [selectedFlavorId, catalog.recipes, catalog.sizes]);
 
   const saveFlavor = async (event) => {
     event.preventDefault();
@@ -129,7 +132,15 @@ export default function CakeRecipes() {
   const saveRecipe = async (event) => {
     event.preventDefault();
     try {
-      await request("/api/staff/customized-cakes/recipes", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ flavor_id: selectedFlavorId, ingredients: recipeLines.filter((line) => line.ingredient_id && Number(line.quantity) > 0) }) });
+      await request("/api/staff/customized-cakes/recipes", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          flavor_id: selectedFlavorId,
+          base_size_id: baseSizeId,
+          ingredients: recipeLines.filter((line) => line.ingredient_id && Number(line.quantity) > 0),
+        }),
+      });
       showStatus("Base recipe saved.");
       await loadCatalog();
     } catch (error) { showStatus(error.message, "error"); }
@@ -184,7 +195,7 @@ export default function CakeRecipes() {
           await request("/api/staff/customized-cakes/recipes", {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ flavor_id: selectedFlavorId, ingredients }),
+            body: JSON.stringify({ flavor_id: selectedFlavorId, base_size_id: baseSizeId, ingredients }),
           });
           showStatus(`${ingredientName} removed from the ${flavorName} recipe.`);
           await loadCatalog();
@@ -326,6 +337,8 @@ export default function CakeRecipes() {
     .slice(firstIngredientIndex, firstIngredientIndex + INGREDIENTS_PER_PAGE)
     .map((line, index) => ({ line, index: firstIngredientIndex + index }));
   const discardRecipeChanges = () => {
+    const defaultBaseSize = catalog.sizes.find((size) => size.code === "6x3" && size.active);
+    setBaseSizeId(String(selectedRecipe?.base_size_id || defaultBaseSize?.id || ""));
     setRecipeLines((selectedRecipe?.ingredients || []).map((line) => ({
       ingredient_id: String(line.ingredient_id),
       quantity: String(line.quantity),
@@ -419,7 +432,21 @@ export default function CakeRecipes() {
                 </div>
               </div>
               <div className="flex flex-wrap items-center gap-2">
-                <span className="inline-flex h-9 items-center gap-1.5 rounded-full bg-[#fff4cd] px-3 text-[10px] font-semibold text-[#80600a]"><Package size={14} /> Base 6x3</span>
+                <label className="inline-flex h-9 items-center gap-1.5 rounded-md bg-[#fff4cd] px-3 text-[10px] font-semibold text-[#80600a]">
+                  <Package size={14} />
+                  Base size
+                  <select
+                    aria-label="Recipe base size"
+                    value={baseSizeId}
+                    onChange={(event) => setBaseSizeId(event.target.value)}
+                    disabled={!selectedFlavor}
+                    className="max-w-36 bg-transparent text-[10px] font-semibold outline-none"
+                  >
+                    {catalog.sizes.filter((size) => size.active).map((size) => (
+                      <option key={size.id} value={size.id}>{size.label}</option>
+                    ))}
+                  </select>
+                </label>
                 <label title="Import recipe from CSV or Excel" className={`inline-flex h-9 items-center gap-1.5 rounded-md border border-[#33251e] bg-[#33251e] px-3 text-[11px] font-semibold text-white transition hover:bg-[#5b4540] focus-within:ring-2 focus-within:ring-[#d4af37] ${selectedFlavor ? "cursor-pointer" : "cursor-not-allowed opacity-50"}`}>
                   <Upload size={14} /> Import recipe
                   <input type="file" accept=".csv,.xlsx,.xls" onChange={importRecipeFile} disabled={!selectedFlavor} className="sr-only" />
