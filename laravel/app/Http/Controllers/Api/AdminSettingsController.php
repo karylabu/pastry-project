@@ -43,9 +43,9 @@ class AdminSettingsController extends Controller
             'settings.openingHours' => [
                 'required',
                 'string',
-                'regex:/^(?:[01]\d|2[0-3]):[0-5]\d\s*-\s*(?:[01]\d|2[0-3]):[0-5]\d$/',
                 function (string $attribute, mixed $value, \Closure $fail): void {
                     if (! is_string($value) || ! preg_match('/^(?:[01]\d|2[0-3]):[0-5]\d\s*-\s*(?:[01]\d|2[0-3]):[0-5]\d$/', $value)) {
+                        $fail("The {$attribute} field format is invalid.");
                         return;
                     }
                     [$opens, $closes] = preg_split('/\s*-\s*/', $value);
