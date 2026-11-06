@@ -2,6 +2,7 @@
 require_once __DIR__ . '/cors.php';
 require_once __DIR__ . '/../includes/realtime_events.php';
 require_once __DIR__ . '/../includes/paymongo_order_refund.php';
+require_once __DIR__ . '/../includes/paymongo_webhook_event.php';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     http_response_code(405);
@@ -249,16 +250,13 @@ if ($timestamp === '' || $providedSignature === '' || !hash_equals($expectedSign
 }
 
 $data = json_decode($payload, true);
-$eventType = strtolower((string)($data['data']['attributes']['type'] ?? $data['type'] ?? ''));
-$refundEventStatus = match ($eventType) {
-    'refund.succeeded' => 'succeeded',
-    'refund.failed' => 'failed',
-    'refund.updated' => strtolower((string) ($data['data']['attributes']['status'] ?? '')),
-    default => '',
-};
+$event = parsePayMongoWebhookEvent(is_array($data) ? $data : []);
+$eventType = $event['type'];
+$eventResource = $event['resource'];
+$refundEventStatus = $event['refund_status'];
 
 if (in_array($refundEventStatus, ['succeeded', 'refunded', 'failed'], true)) {
-    $refundId = trim((string) ($data['data']['id'] ?? ''));
+    $refundId = trim((string) ($eventResource['id'] ?? ''));
     if ($refundId === '') {
         http_response_code(400);
         echo json_encode(['status' => 'error', 'message' => 'Refund reference not found.']);
@@ -285,7 +283,7 @@ if (in_array($refundEventStatus, ['succeeded', 'refunded', 'failed'], true)) {
         }
         $refundOrder = $stmt->get_result()->fetch_assoc();
         $stmt->close();
-        $refundPaymentId = $data['data']['attributes']['payment_id'] ?? '';
+        $refundPaymentId = $eventResource['attributes']['payment_id'] ?? '';
         if (is_array($refundPaymentId)) {
             $refundPaymentId = $refundPaymentId['id'] ?? '';
         }
