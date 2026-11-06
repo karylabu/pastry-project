@@ -223,7 +223,7 @@ export default function ForgotPassword({ onBack }) {
       subtitle: "Choose a strong new password for your account.",
     },
     done: {
-      icon: <span className="text-xl">✅</span>,
+      icon: null,
       title: "All Done!",
       subtitle: "Your password has been updated. You can now log in.",
     },
@@ -242,9 +242,11 @@ export default function ForgotPassword({ onBack }) {
         className="w-full"
       >
         <div className="mb-4">
-          <div className="w-10 h-10 rounded-full bg-[#F0B94D]/15 flex items-center justify-center mb-3">
-            {current.icon}
-          </div>
+          {current.icon && (
+            <div className="w-10 h-10 rounded-full bg-[#F0B94D]/15 flex items-center justify-center mb-3">
+              {current.icon}
+            </div>
+          )}
           <p className="text-[10px] tracking-[0.2em] uppercase text-black/70 mb-2 font-semibold">
             Recover Access
           </p>
