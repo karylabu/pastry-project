@@ -196,11 +196,51 @@ describe("CustomCakes", () => {
     expect(screen.getByText("ABC 1234")).toBeInTheDocument();
   });
 
+  test("uses Laravel preparing transition so custom cake recipe ingredients are consumed", async () => {
+    const paidOrder = {
+      id: 32,
+      status: "Pending",
+      payment_status: "paid",
+      customer: "Mila Customer",
+      total: 1200,
+      custom_details: {},
+    };
+    global.fetch.mockImplementation((url, options = {}) => {
+      if (url.includes("/customized-cakes/request-status")) {
+        return Promise.resolve({ ok: true, json: async () => ({ success: true, enabled: true }) });
+      }
+      if (url.includes("/api/staff/orders/32/status")) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({ success: true, status: "Preparing", payment_status: "paid" }),
+        });
+      }
+      return Promise.resolve({
+        ok: true,
+        json: async () => ({ success: true, orders: [paidOrder] }),
+      });
+    });
+
+    render(<CustomCakes />);
+    fireEvent.click((await screen.findAllByRole("button", { name: "Start preparing" }))[0]);
+
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith(
+        "https://example.test/laravel/public/api/staff/orders/32/status",
+        expect.objectContaining({
+          method: "PUT",
+          body: JSON.stringify({ status: "Preparing" }),
+        }),
+      );
+    });
+    expect(await screen.findByText("Order #32 → Preparing")).toBeInTheDocument();
+  });
+
   test("admin can turn customer custom cake requests off", async () => {
     render(<CustomCakes />);
 
     const toggle = await screen.findByRole("switch", { name: "Allow customer custom cake requests" });
-    expect(toggle).toHaveAttribute("aria-checked", "true");
+    await waitFor(() => expect(toggle).toHaveAttribute("aria-checked", "true"));
 
     fireEvent.click(toggle);
 

@@ -745,11 +745,17 @@ export default function CustomCakes() {
   const updateStatus = async (id, status, extraData = {}) => {
     setUpdatingId(id);
     try {
-      const response = await staffFetch(`${STAFF_BASE}/api_update_order_status.php`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id, status, ...extraData }),
-      });
+      const preparingCustomOrder = status === "Preparing";
+      const response = await (preparingCustomOrder ? laravelStaffFetch : staffFetch)(
+        preparingCustomOrder
+          ? `${LARAVEL_BASE}/api/staff/orders/${id}/status`
+          : `${STAFF_BASE}/api_update_order_status.php`,
+        {
+          method: preparingCustomOrder ? "PUT" : "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(preparingCustomOrder ? { status } : { id, status, ...extraData }),
+        },
+      );
       const data = await response.json().catch(() => ({}));
       if (!response.ok || !data.success) {
         throw new Error(data.message || `Request failed (${response.status})`);
