@@ -295,7 +295,11 @@ export default function Dashboard() {
   }, [analyticsPreset, analyticsRefreshVersion]);
 
   const orders = useMemo(() => (Array.isArray(dashboardData?.live_orders) ? dashboardData.live_orders : [])
-    .map((order) => ({ ...order, items: Array.isArray(order.items) ? order.items : [] })), [dashboardData]);
+    .map((order) => ({
+      ...order,
+      status: order.status === "Cancellation Pending" ? "Cancelled" : order.status,
+      items: Array.isArray(order.items) ? order.items : [],
+    })), [dashboardData]);
   const dashboardSummary = dashboardData?.summary || {};
   const orderStatusBreakdown = Array.isArray(dashboardData?.order_status_breakdown)
     ? dashboardData.order_status_breakdown
