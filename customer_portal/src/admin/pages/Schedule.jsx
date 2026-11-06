@@ -16,7 +16,11 @@ function getDateKey(date) {
 }
 
 function isAcceptedOrder(order) {
-  return ACCEPTED_ORDER_STATUSES.has(String(order?.status || "").trim().toLowerCase());
+  const status = String(order?.status || "").trim().toLowerCase();
+  const paymentStatus = String(order?.payment_status || "").trim().toLowerCase();
+
+  return ACCEPTED_ORDER_STATUSES.has(status)
+    || (status === "pending" && ["paid", "downpayment_paid"].includes(paymentStatus));
 }
 
 function getDaysUntil(date, todayKey) {

@@ -28,6 +28,7 @@ describe("Schedule", () => {
           { id: 31, status: "Pending", custom_details: { pickup_date: dateFromToday(1) }, name: "Pending Cake" },
           { id: 32, status: "Awaiting Payment", custom_details: { pickup_date: dateFromToday(1) }, name: "Payment Cake" },
           { id: 33, status: "Cancelled", custom_details: { pickup_date: dateFromToday(1) }, name: "Cancelled Cake" },
+          { id: 39, status: "Pending", payment_status: "paid", custom_details: { pickup_date: dateFromToday(1), pickup_time: "10:00" }, name: "Downpayment Accepted Cake" },
           { id: 34, status: "Confirmed", custom_details: { pickup_date: dateFromToday(1) }, name: "Confirmed Cake" },
           { id: 35, status: "Preparing", custom_details: { pickup_date: dateFromToday(1) }, name: "Preparing Cake" },
           { id: 36, status: "Ready for Pickup", custom_details: { pickup_date: dateFromToday(1) }, name: "Ready Cake" },
@@ -47,6 +48,7 @@ describe("Schedule", () => {
     render(<Schedule />);
 
     expect((await screen.findAllByText("Confirmed Cake")).length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Downpayment Accepted Cake").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Preparing Cake").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Ready Cake").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Completed Cake").length).toBeGreaterThan(0);
