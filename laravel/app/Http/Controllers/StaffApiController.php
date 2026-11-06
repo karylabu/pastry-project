@@ -472,6 +472,16 @@ public function syncOrderRefundStatus(Request $request, int $orderId)
             );
 
             $refundData = $refundService->mostRelevant($refunds);
+
+            if (
+                (! is_array($refundData) || empty($refundData))
+                && $refundReference !== ''
+            ) {
+                $refundData = $refundService->retrieve(
+                    $secretKey,
+                    $refundReference
+                );
+            }
         } else {
             $refundData = $refundService->retrieve(
                 $secretKey,

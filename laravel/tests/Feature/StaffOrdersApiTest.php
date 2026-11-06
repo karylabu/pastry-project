@@ -366,6 +366,53 @@ class StaffOrdersApiTest extends TestCase
         });
     }
 
+    public function test_admin_refund_sync_retrieves_saved_reference_when_payment_history_list_is_empty(): void
+    {
+        config(['services.paymongo.secret' => 'sk_test_refund']);
+        Http::fake([
+            'https://api.paymongo.com/v1/refunds?*' => Http::response([
+                'data' => [],
+                'has_more' => false,
+            ]),
+            'https://api.paymongo.com/v1/refunds/ref_saved_285' => Http::response([
+                'data' => [
+                    'id' => 'ref_saved_285',
+                    'attributes' => [
+                        'status' => 'succeeded',
+                        'payment_id' => 'pay_285',
+                        'amount' => 100,
+                    ],
+                ],
+            ]),
+        ]);
+        DB::table('orders')->insert([
+            'id' => 285,
+            'user_id' => 7,
+            'payment_status' => 'paid',
+            'paymongo_payment_id' => 'pay_285',
+            'refund_reference' => 'ref_saved_285',
+            'refund_status' => 'requesting',
+            'status' => 'Cancellation Pending',
+        ]);
+
+        $this->withHeader('X-Auth-Token', 'test-admin-token')
+            ->postJson('/api/staff/orders/285/refund/status')
+            ->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('refund_status', 'succeeded');
+
+        $this->assertDatabaseHas('orders', [
+            'id' => 285,
+            'refund_reference' => 'ref_saved_285',
+            'refund_status' => 'succeeded',
+            'payment_status' => 'refunded',
+            'status' => 'Cancelled',
+        ]);
+        Http::assertSentCount(2);
+        Http::assertSent(fn ($request) => $request->method() === 'GET'
+            && $request->url() === 'https://api.paymongo.com/v1/refunds/ref_saved_285');
+    }
+
     public function test_admin_order_response_includes_customer_payment_reference(): void
     {
         DB::table('orders')->insert([
