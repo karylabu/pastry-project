@@ -160,6 +160,54 @@ test("shows refund status, amount, and PayMongo reference for admins", async () 
   expect(within(orderCard).getByText("ref_107")).toBeInTheDocument();
 });
 
+test("lets admins check a pending refund status with PayMongo", async () => {
+  let refundStatus = "pending";
+  global.fetch = jest.fn((url) => {
+    if (String(url).includes("/refund/status")) {
+      refundStatus = "failed";
+      return Promise.resolve({
+        ok: true,
+        json: async () => ({
+          success: true,
+          refund_status: "failed",
+          message: "PayMongo confirmed the refund failed. You can now retry the refund.",
+        }),
+      });
+    }
+
+    if (String(url).includes("/inventory/ingredients")) {
+      return Promise.resolve({ ok: true, json: async () => ({ ingredients: [] }) });
+    }
+
+    return Promise.resolve({
+      ok: true,
+      json: async () => ({
+        success: true,
+        orders: [orderFixture(282, "Cancellation Pending", 1, {
+          payment: "QRPh",
+          payment_status: "paid",
+          refund_status: refundStatus,
+          refund_reference: "ref_282",
+        })],
+      }),
+    });
+  });
+
+  const { container } = renderOrders();
+  await screen.findAllByText("Customer 282");
+  const orderCard = Array.from(container.querySelectorAll("article")).find((card) => card.textContent.includes("#282"));
+  fireEvent.click(within(orderCard).getByRole("button", { name: /View details for order 282/i }));
+  fireEvent.click(within(orderCard).getAllByRole("button", { name: "Check PayMongo status" })[0]);
+
+  await waitFor(() => {
+    expect(global.fetch).toHaveBeenCalledWith(
+      "https://example.test/laravel/api/staff/orders/282/refund/status",
+      expect.objectContaining({ method: "POST" })
+    );
+  });
+  expect((await within(orderCard).findAllByText("Refund failed")).length).toBeGreaterThan(0);
+});
+
 test("does not show waste actions for completed orders", async () => {
   const { container } = renderOrders();
   await screen.findAllByText("Customer 104");

@@ -150,6 +150,7 @@ export default function Orders() {
   const [discountIdLoading, setDiscountIdLoading] = useState(null);
   const [paymentProofPreviews, setPaymentProofPreviews] = useState({});
   const [paymentProofLoading, setPaymentProofLoading] = useState(null);
+  const [refundStatusLoadingId, setRefundStatusLoadingId] = useState(null);
   const [paymentProofLightboxOrderId, setPaymentProofLightboxOrderId] = useState(null);
   const [connectionIssue, setConnectionIssue] = useState(false);
   const [rejectModalOrderId, setRejectModalOrderId] = useState(null);
@@ -488,6 +489,27 @@ export default function Orders() {
       addToast(`Update failed: ${error.message || "Network error — could not update order."}`, "error");
     } finally {
       setUpdatingId(null);
+    }
+  };
+
+  const syncRefundStatus = async (order) => {
+    setRefundStatusLoadingId(order.id);
+    try {
+      const response = await laravelStaffFetch(`${LARAVEL_BASE}/api/staff/orders/${order.id}/refund/status`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+      const data = await response.json();
+      if (!response.ok || !data?.success) {
+        throw new Error(data?.message || "Unable to check the PayMongo refund status.");
+      }
+
+      fetchOrders(true);
+      addToast(data.message || `PayMongo refund status: ${getRefundStatusLabel(data.refund_status) || data.refund_status}.`);
+    } catch (error) {
+      addToast(error.message || "Unable to check the PayMongo refund status.", "error");
+    } finally {
+      setRefundStatusLoadingId(null);
     }
   };
 
@@ -841,6 +863,20 @@ export default function Orders() {
                                 <dd className="break-all text-right text-[#65574d]">{order.refund_reference}</dd>
                               </>}
                             </>}
+                            {order.status === "Cancellation Pending"
+                              && ["pending", "processing", "refunding", "requesting"].includes(String(order.refund_status || "").toLowerCase())
+                              && order.refund_reference && (
+                                <div className="col-span-2 flex justify-end">
+                                  <button
+                                    type="button"
+                                    onClick={() => syncRefundStatus(order)}
+                                    disabled={refundStatusLoadingId === order.id}
+                                    className="rounded-lg border border-[#d8c6a5] px-3 py-1.5 text-[10px] font-semibold text-[#6b4f1d] hover:bg-[#fffaf0] disabled:cursor-not-allowed disabled:opacity-50"
+                                  >
+                                    {refundStatusLoadingId === order.id ? "Checking PayMongo…" : "Check PayMongo status"}
+                                  </button>
+                                </div>
+                              )}
                             {order.status === "Cancelled" && <><dt className="text-[#9b8c83]">Cancelled</dt><dd className="text-right text-[#65574d]">{formatOrderDateTime(order.cancelled_at)}</dd></>}
                           </dl>
                         </section>
@@ -1046,6 +1082,20 @@ export default function Orders() {
                                         <dd className="break-all text-right text-black/70">{order.refund_reference}</dd>
                                       </>}
                                     </>}
+                                    {order.status === "Cancellation Pending"
+                                      && ["pending", "processing", "refunding", "requesting"].includes(String(order.refund_status || "").toLowerCase())
+                                      && order.refund_reference && (
+                                        <div className="col-span-2 flex justify-end">
+                                          <button
+                                            type="button"
+                                            onClick={() => syncRefundStatus(order)}
+                                            disabled={refundStatusLoadingId === order.id}
+                                            className="rounded-lg border border-[#d8c6a5] px-3 py-1.5 text-[10px] font-semibold text-[#6b4f1d] hover:bg-[#fffaf0] disabled:cursor-not-allowed disabled:opacity-50"
+                                          >
+                                            {refundStatusLoadingId === order.id ? "Checking PayMongo…" : "Check PayMongo status"}
+                                          </button>
+                                        </div>
+                                      )}
                                     {order.status === "Cancelled" && <><dt className="text-black/45">Cancelled</dt><dd className="text-right text-black/70">{formatOrderDateTime(order.cancelled_at)}</dd></>}
                                   </dl>
                                 </section>
