@@ -11,6 +11,10 @@ jest.mock("react-router-dom", () => ({
   useNavigate: () => jest.fn(),
 }));
 
+jest.mock("../../services/realtime", () => ({
+  subscribeRealtime: () => jest.fn(),
+}));
+
 function dateFromToday(daysAhead) {
   const date = new Date();
   date.setDate(date.getDate() + daysAhead);
@@ -34,6 +38,7 @@ describe("Schedule", () => {
           { id: 36, status: "Ready for Pickup", custom_details: { pickup_date: dateFromToday(1) }, name: "Ready Cake" },
           { id: 37, status: "Completed", custom_details: { pickup_date: dateFromToday(1) }, name: "Completed Cake" },
           { id: 38, status: "Confirmed", delivery_date: dateFromToday(1), name: "Standard Pickup" },
+          { id: 40, status: "Pending", payment_status: "paid", delivery_date: "0000-00-00", custom_details: { pickup_date: dateFromToday(1) }, name: "Fallback Date Cake" },
         ],
       }),
     });
@@ -49,6 +54,7 @@ describe("Schedule", () => {
 
     expect((await screen.findAllByText("Confirmed Cake")).length).toBeGreaterThan(0);
     expect(screen.getAllByText("Downpayment Accepted Cake").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Fallback Date Cake").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Preparing Cake").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Ready Cake").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Completed Cake").length).toBeGreaterThan(0);

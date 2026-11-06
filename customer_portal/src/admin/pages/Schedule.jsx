@@ -3,7 +3,9 @@ import { ChevronLeft, ChevronRight, ArrowLeft, X, CalendarDays } from "lucide-re
 import { useNavigate } from "react-router-dom";
 import { LARAVEL_BASE, STAFF_BASE } from "../../services/config";
 import { getAuthHeaders } from "../../services/api";
+import { subscribeRealtime } from "../../services/realtime";
 
+const POLL_INTERVAL = 15000;
 const staffFetch = (url, options = {}) => fetch(url, {
   credentials: "include",
   ...options,
@@ -32,9 +34,17 @@ function getSchedule(order) {
   const details = typeof order?.custom_details === "string"
     ? (() => { try { return JSON.parse(order.custom_details); } catch { return {}; } })()
     : (order?.custom_details || {});
+  const date = [
+    order?.delivery_date,
+    order?.pickup_date,
+    details.delivery_date,
+    details.pickup_date,
+  ].map((value) => String(value || "").slice(0, 10))
+    .find((value) => /^\d{4}-\d{2}-\d{2}$/.test(value) && value !== "0000-00-00") || "";
+
   return {
-    date: String(order?.delivery_date || order?.pickup_date || details.pickup_date || "").slice(0, 10),
-    time: String(order?.pickup_time || details.pickup_time || ""),
+    date,
+    time: String(order?.delivery_time || order?.pickup_time || details.delivery_time || details.pickup_time || ""),
   };
 }
 
@@ -103,20 +113,41 @@ export default function Schedule() {
   }, []);
 
   useEffect(() => {
-    staffFetch(`${LARAVEL_BASE}/api/staff/orders?custom=1`)
+    let active = true;
+    const fetchOrders = (silent = false) => {
+      staffFetch(`${LARAVEL_BASE}/api/staff/orders?custom=1`)
       .then(async (response) => {
         const data = await response.json().catch(() => ({}));
         if (!response.ok || !data?.success || !Array.isArray(data.orders)) {
           throw new Error(data?.message || "Unable to load scheduled orders.");
         }
-        setOrders(data.orders);
-        setLoadError("");
+        if (active) {
+          setOrders(data.orders);
+          setLoadError("");
+        }
       })
       .catch((error) => {
-        setOrders([]);
-        setLoadError(error.message || "Unable to load scheduled orders.");
+        if (active && !silent) {
+          setOrders([]);
+          setLoadError(error.message || "Unable to load scheduled orders.");
+        }
       })
-      .finally(() => setLoading(false));
+      .finally(() => {
+        if (active && !silent) setLoading(false);
+      });
+    };
+
+    fetchOrders();
+    const unsubscribe = subscribeRealtime((event) => {
+      if (event.type === "order.updated") fetchOrders(true);
+    });
+    const intervalId = window.setInterval(() => fetchOrders(true), POLL_INTERVAL);
+
+    return () => {
+      active = false;
+      unsubscribe();
+      window.clearInterval(intervalId);
+    };
   }, []);
 
   const scheduledOrders = useMemo(() => orders.filter((order) => {
