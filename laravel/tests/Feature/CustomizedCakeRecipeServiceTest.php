@@ -66,15 +66,6 @@ class CustomizedCakeRecipeServiceTest extends TestCase
                 $table->unsignedBigInteger('size_id');
                 $table->timestamps();
             },
-            'customized_cake_inventory_consumptions' => function ($table) {
-                $table->id();
-                $table->unsignedBigInteger('customized_cake_order_id');
-                $table->unsignedBigInteger('order_id')->nullable();
-                $table->string('status')->default('pending');
-                $table->text('summary')->nullable();
-                $table->timestamps();
-                $table->unique('customized_cake_order_id');
-            },
             'ingredients' => function ($table) {
                 $table->id();
                 $table->string('name');
