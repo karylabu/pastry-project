@@ -407,7 +407,7 @@ class StaffApiController extends Controller
         }
     }
 
-    
+
 public function syncOrderRefundStatus(Request $request, int $orderId)
 {
     $admin = $this->requireRole($request, 'admin');
