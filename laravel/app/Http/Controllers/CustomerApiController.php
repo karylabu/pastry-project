@@ -289,14 +289,17 @@ class CustomerApiController extends Controller
                 return $this->corsResponse(['success' => false, 'message' => 'User not found.']);
             }
 
-            if (Schema::hasColumn('users', 'deleted_at') && $user->deleted_at !== null) {
+            $role = strtolower((string) $user->role);
+            if (Schema::hasColumn('users', 'deleted_at')
+                && $user->deleted_at !== null
+                && $role !== 'customer') {
                 return $this->corsResponse([
                     'success' => false,
                     'message' => 'This account is in the Recycle Bin and cannot log in.',
                 ], 403);
             }
 
-            if (strtolower((string) $user->role) !== 'customer' && !$user->isAdmin()) {
+            if ($role !== 'customer' && !User::isAdminRole($role)) {
                 return $this->corsResponse(['success' => false, 'message' => 'This account is not eligible for access.'], 403);
             }
             if (strtolower(trim((string) ($user->status ?? 'active'))) !== 'active') {

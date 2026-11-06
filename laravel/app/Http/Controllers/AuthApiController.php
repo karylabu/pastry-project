@@ -339,13 +339,24 @@ class AuthApiController extends Controller
             return $response;
         }
 
-        $user = User::whereRaw('LOWER(email) = ?', [$email])->first();
+        $user = User::withoutGlobalScope('not_trashed')
+            ->whereRaw('LOWER(email) = ?', [$email])
+            ->first();
 
         if (!$user) {
             return response()->json([
                 'success' => false,
                 'message' => 'Account not found. Please register first.'
             ], 200);
+        }
+
+        if (Schema::hasColumn('users', 'deleted_at')
+            && $user->deleted_at !== null
+            && strtolower((string) $user->role) !== 'customer') {
+            return response()->json([
+                'success' => false,
+                'message' => 'This account is in the Recycle Bin and cannot log in.',
+            ], 403);
         }
 
         if (strtolower((string) $user->role) !== 'customer' && !$user->isAdmin()) {

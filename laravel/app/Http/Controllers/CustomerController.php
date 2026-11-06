@@ -48,10 +48,27 @@ class CustomerController extends Controller
 
         $sessionUser = session('user') ?? ($_SESSION['user'] ?? null);
         $userId = is_array($sessionUser) ? (int) ($sessionUser['id'] ?? 0) : 0;
-        if ($userId > 0 && !User::find($userId)) {
-            unset($_SESSION['user'], $_SESSION['auth_token']);
-            session()->forget(['user', 'auth_token']);
-            return redirect('/login.php');
+        if ($userId > 0) {
+            $user = User::withoutGlobalScope('not_trashed')->find($userId);
+            $isTrashed = $user
+                && \Illuminate\Support\Facades\Schema::hasColumn('users', 'deleted_at')
+                && $user->deleted_at !== null;
+            $token = trim((string) (session('auth_token') ?? ($_SESSION['auth_token'] ?? '')));
+            $hasActiveSession = $token !== ''
+                && \Illuminate\Support\Facades\Schema::hasTable('user_sessions')
+                && \Illuminate\Support\Facades\DB::table('user_sessions')
+                    ->where('user_id', $userId)
+                    ->where('token', $token)
+                    ->where(function ($query) {
+                        $query->whereNull('expires_at')->orWhere('expires_at', '>', now());
+                    })
+                    ->exists();
+
+            if (!$user || ($isTrashed && ($user->role !== 'customer' || !$hasActiveSession))) {
+                unset($_SESSION['user'], $_SESSION['auth_token']);
+                session()->forget(['user', 'auth_token']);
+                return redirect('/login.php');
+            }
         }
 
         return null;

@@ -172,7 +172,7 @@ class CustomerAuthApiTest extends TestCase
         $this->assertDatabaseHas('user_sessions', ['user_id' => 7]);
     }
 
-    public function test_soft_deleted_customer_cannot_sign_in_through_current_or_legacy_login_routes(): void
+    public function test_soft_deleted_customer_can_sign_in_and_use_a_new_api_session(): void
     {
         DB::table('users')->insert([
             'id' => 7,
@@ -184,37 +184,42 @@ class CustomerAuthApiTest extends TestCase
             'deleted_at' => now(),
         ]);
 
-        $this->postJson('/api/login', [
+        $currentLogin = $this->postJson('/api/login', [
             'email' => 'deleted@example.com',
             'password' => 'current-password',
         ])
             ->assertOk()
-            ->assertJsonPath('success', false);
+            ->assertJsonPath('success', true);
 
-        $this->postJson('/api_login.php', [
+        $currentToken = $currentLogin->json('token');
+        $this->assertNotEmpty($currentToken);
+        $this->withToken($currentToken)
+            ->getJson('/api/auth/status')
+            ->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('user.id', 7);
+
+        $legacyLogin = $this->postJson('/api_login.php', [
             'email' => 'deleted@example.com',
             'password' => 'current-password',
         ])
-            ->assertForbidden()
-            ->assertJsonPath('success', false);
+            ->assertOk()
+            ->assertJsonPath('success', true);
+
+        $this->withToken($legacyLogin->json('token'))
+            ->getJson('/api/auth/status')
+            ->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('user.id', 7);
 
         $this->post('/login.php', [
             'email' => 'deleted@example.com',
             'password' => 'current-password',
         ])
             ->assertRedirect()
-            ->assertSessionHas('error', 'This account is in the Recycle Bin and cannot log in.');
+            ->assertRedirect('http://127.0.0.1:3000/customer');
 
-        $this->withSession(['user' => [
-            'id' => 7,
-            'name' => 'Deleted Customer',
-            'email' => 'deleted@example.com',
-            'role' => 'customer',
-        ]])
-            ->get('/dashboard.php')
-            ->assertRedirect('/login.php');
-
-        $this->assertDatabaseMissing('user_sessions', ['user_id' => 7]);
+        $this->assertDatabaseHas('user_sessions', ['user_id' => 7]);
     }
 
     public function test_soft_deleted_admin_cannot_sign_in_through_admin_routes_or_reuse_a_web_session(): void

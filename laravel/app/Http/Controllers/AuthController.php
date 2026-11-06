@@ -48,7 +48,9 @@ class AuthController extends Controller
 
             if (!$user) {
                 $error = 'User not found.';
-            } elseif (Schema::hasColumn('users', 'deleted_at') && $user->deleted_at !== null) {
+            } elseif (Schema::hasColumn('users', 'deleted_at')
+                && $user->deleted_at !== null
+                && strtolower((string) ($user->role ?? '')) !== 'customer') {
                 $error = 'This account is in the Recycle Bin and cannot log in.';
             } elseif (strtolower((string) ($user->role ?? '')) !== 'customer' && !User::isAdminRole($user->role ?? '')) {
                 $error = 'This account is not eligible for access.';

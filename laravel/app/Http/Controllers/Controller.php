@@ -105,9 +105,17 @@ abstract class Controller
             return null;
         }
 
-        $user = User::find($session->user_id);
+        $user = User::withoutGlobalScope('not_trashed')->find($session->user_id);
 
-        return $user && $this->hasActiveAccount($user) ? $user : null;
+        if (!$user || !$this->hasActiveAccount($user)) {
+            return null;
+        }
+
+        $isTrashed = Schema::hasColumn('users', 'deleted_at') && $user->deleted_at !== null;
+
+        return !$isTrashed || strtolower((string) $user->role) === 'customer'
+            ? $user
+            : null;
     }
 
     private function hasActiveAccount(User $user): bool
