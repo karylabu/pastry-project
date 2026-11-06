@@ -407,121 +407,274 @@ class StaffApiController extends Controller
         }
     }
 
-    public function syncOrderRefundStatus(Request $request, int $orderId)
-    {
-        $admin = $this->requireRole($request, 'admin');
-        if (!$admin instanceof User) {
-            return $admin;
-        }
+    
+public function syncOrderRefundStatus(Request $request, int $orderId)
+{
+    $admin = $this->requireRole($request, 'admin');
 
-        $order = DB::table('orders')
-            ->where('id', $orderId)
-            ->first(['id', 'user_id', 'status', 'refund_status', 'refund_reference', 'paymongo_payment_id']);
-        if (!$order) {
-            return $this->corsResponse(['success' => false, 'message' => 'Order not found.'], 404);
-        }
+    if (! $admin instanceof User) {
+        return $admin;
+    }
 
-        $refundReference = trim((string) ($order->refund_reference ?? ''));
-        $storedRefundReference = $refundReference;
-        $paymentId = trim((string) ($order->paymongo_payment_id ?? ''));
-        if ($refundReference === '' && $paymentId === '') {
-            return $this->corsResponse(['success' => false, 'message' => 'This order has no PayMongo refund reference to check.'], 409);
-        }
+    $order = DB::table('orders')
+        ->where('id', $orderId)
+        ->first([
+            'id',
+            'user_id',
+            'status',
+            'refund_status',
+            'refund_reference',
+            'paymongo_payment_id',
+        ]);
 
-        $secretKey = config('services.paymongo.secret');
-        if (!$secretKey) {
-            return $this->corsResponse(['success' => false, 'message' => 'PayMongo status checks are not configured.'], 503);
-        }
+    if (! $order) {
+        return $this->corsResponse([
+            'success' => false,
+            'message' => 'Order not found.',
+        ], 404);
+    }
 
-        try {
-            $refundService = app(PayMongoRefundService::class);
-            if ($paymentId !== '') {
-                $refundData = $refundService->mostRelevant($refundService->listForPayment($secretKey, $paymentId));
-            } else {
-                $refundData = $refundService->retrieve($secretKey, $refundReference);
-            }
-        } catch (\Throwable $exception) {
-            Log::warning('PayMongo refund status check failed.', [
-                'order_id' => $orderId,
-                'exception' => get_class($exception),
-            ]);
+    $refundReference = trim((string) ($order->refund_reference ?? ''));
+    $storedRefundReference = $refundReference;
+    $paymentId = trim((string) ($order->paymongo_payment_id ?? ''));
 
-            return $this->corsResponse(['success' => false, 'message' => 'Unable to reach PayMongo to check the refund status. Please try again.'], 502);
-        }
+    if ($refundReference === '' && $paymentId === '') {
+        return $this->corsResponse([
+            'success' => false,
+            'message' => 'This order has no PayMongo refund reference to check.',
+        ], 409);
+    }
 
-        if (!$refundData) {
-            return $this->corsResponse(['success' => false, 'message' => 'PayMongo has no refund record for this payment. Do not retry until the payment history has been reviewed.'], 409);
-        }
+    $secretKey = config('services.paymongo.secret');
 
-        $refundReference = (string) ($refundData['id'] ?? '');
-        $refundStatus = $refundService->status($refundData);
-        if ($refundStatus === '') {
-            $payMongoStatus = strtolower(trim((string) ($refundData['attributes']['status'] ?? '')));
-            Log::warning('PayMongo returned an unrecognized refund status.', [
-                'order_id' => $orderId,
-                'refund_status' => $payMongoStatus,
-            ]);
-
-            return $this->corsResponse(['success' => false, 'message' => 'PayMongo returned an unrecognized refund status. Please contact support.'], 502);
-        }
-
-        $transferLink = $refundStatus === 'pending'
-            ? ($refundData['attributes']['transfer_link'] ?? null)
-            : null;
-        $refundAmount = array_key_exists('amount', $refundData['attributes'] ?? [])
-            ? ((int) $refundData['attributes']['amount']) / 100
-            : null;
-
-        try {
-            DB::transaction(function () use ($orderId, $storedRefundReference, $refundReference, $refundStatus, $transferLink, $refundAmount) {
-                $lockedOrder = DB::table('orders')->where('id', $orderId)->lockForUpdate()->first();
-                if (!$lockedOrder) {
-                    throw new \RuntimeException('The order no longer exists.');
-                }
-                if ((string) ($lockedOrder->refund_reference ?? '') !== $storedRefundReference) {
-                    throw new \RuntimeException('The refund reference changed while checking PayMongo.');
-                }
-
-                $updates = [
-                    'refund_reference' => $refundReference,
-                    'refund_status' => $refundStatus,
-                    'refund_transfer_link' => $transferLink,
-                ];
-                if ($refundAmount !== null) {
-                    $updates['refund_amount'] = $refundAmount;
-                }
-                if ($refundStatus === 'succeeded') {
-                    $updates += [
-                        'payment_status' => 'refunded',
-                        'status' => 'Cancelled',
-                        'cancelled_at' => $lockedOrder->cancelled_at ?? now(),
-                    ];
-                }
-
-                DB::table('orders')->where('id', $orderId)->update($updates);
-            });
-        } catch (\Throwable $exception) {
-            Log::warning('PayMongo refund status could not be saved.', [
-                'order_id' => $orderId,
-                'exception' => get_class($exception),
-            ]);
-
-            return $this->corsResponse(['success' => false, 'message' => 'The PayMongo status was checked but could not be saved. Refresh the orders list and try again.'], 500);
-        }
-
-        app(\App\Services\RealtimeEventPublisher::class)->orderUpdated((int) ($order->user_id ?? 0), $orderId);
+    if (! is_string($secretKey) || trim($secretKey) === '') {
+        Log::error('PayMongo refund status check is not configured.', [
+            'order_id' => $orderId,
+        ]);
 
         return $this->corsResponse([
-            'success' => true,
+            'success' => false,
+            'message' => 'PayMongo status checks are not configured.',
+        ], 503);
+    }
+
+    /*
+     * Retrieve existing refund records.
+     * This method MUST NOT create a new refund.
+     */
+    try {
+        $refundService = app(PayMongoRefundService::class);
+
+        if ($paymentId !== '') {
+            $refunds = $refundService->listForPayment(
+                $secretKey,
+                $paymentId
+            );
+
+            $refundData = $refundService->mostRelevant($refunds);
+        } else {
+            $refundData = $refundService->retrieve(
+                $secretKey,
+                $refundReference
+            );
+        }
+    } catch (\Throwable $exception) {
+        Log::warning('PayMongo refund status check failed.', [
+            'order_id' => $orderId,
+            'payment_id' => $paymentId ?: null,
+            'refund_reference' => $refundReference ?: null,
+            'exception' => get_class($exception),
+            'message' => $exception->getMessage(),
+            'file' => $exception->getFile(),
+            'line' => $exception->getLine(),
+            'previous_exception' => $exception->getPrevious()?->getMessage(),
+        ]);
+
+        return $this->corsResponse([
+            'success' => false,
+            'message' => 'Unable to verify the PayMongo refund status. Please check the server logs.',
+        ], 502);
+    }
+
+    /*
+     * No refund found.
+     * Do not automatically issue another refund.
+     */
+    if (! is_array($refundData) || empty($refundData)) {
+        return $this->corsResponse([
+            'success' => false,
+            'message' => 'PayMongo has no refund record for this payment. Do not retry until the payment history has been reviewed.',
+        ], 409);
+    }
+
+    $refundReference = (string) ($refundData['id'] ?? '');
+
+    if ($refundReference === '') {
+        Log::warning('PayMongo returned a refund without an ID.', [
+            'order_id' => $orderId,
+        ]);
+
+        return $this->corsResponse([
+            'success' => false,
+            'message' => 'PayMongo returned an invalid refund record.',
+        ], 502);
+    }
+
+    /*
+     * Verify that the refund belongs to this payment.
+     */
+    $refundPaymentId = (string) (
+        $refundData['attributes']['payment_id'] ?? ''
+    );
+
+    if ($paymentId !== '' && $refundPaymentId !== $paymentId) {
+        Log::warning('PayMongo refund payment ID mismatch.', [
+            'order_id' => $orderId,
+            'refund_reference' => $refundReference,
+        ]);
+
+        return $this->corsResponse([
+            'success' => false,
+            'message' => 'The refund does not match this order payment.',
+        ], 502);
+    }
+
+    $refundStatus = $refundService->status($refundData);
+
+    if ($refundStatus === '') {
+        $payMongoStatus = strtolower(trim((string) (
+            $refundData['attributes']['status'] ?? ''
+        )));
+
+        Log::warning('PayMongo returned an unrecognized refund status.', [
+            'order_id' => $orderId,
+            'refund_reference' => $refundReference,
+            'refund_status' => $payMongoStatus,
+        ]);
+
+        return $this->corsResponse([
+            'success' => false,
+            'message' => 'PayMongo returned an unrecognized refund status. Please contact support.',
+        ], 502);
+    }
+
+    $transferLink = $refundStatus === 'pending'
+        ? ($refundData['attributes']['transfer_link'] ?? null)
+        : null;
+
+    $refundAmount = array_key_exists(
+        'amount',
+        $refundData['attributes'] ?? []
+    )
+        ? ((int) $refundData['attributes']['amount']) / 100
+        : null;
+
+    /*
+     * Save the verified refund status.
+     */
+    try {
+        DB::transaction(function () use (
+            $orderId,
+            $storedRefundReference,
+            $refundReference,
+            $refundStatus,
+            $transferLink,
+            $refundAmount
+        ) {
+            $lockedOrder = DB::table('orders')
+                ->where('id', $orderId)
+                ->lockForUpdate()
+                ->first();
+
+            if (! $lockedOrder) {
+                throw new \RuntimeException(
+                    'The order no longer exists.'
+                );
+            }
+
+            /*
+             * Prevent overwriting a refund reference changed
+             * by another request while this check was running.
+             */
+            if (
+                (string) ($lockedOrder->refund_reference ?? '')
+                !== $storedRefundReference
+            ) {
+                throw new \RuntimeException(
+                    'The refund reference changed while checking PayMongo.'
+                );
+            }
+
+            $updates = [
+                'refund_reference' => $refundReference,
+                'refund_status' => $refundStatus,
+                'refund_transfer_link' => $transferLink,
+            ];
+
+            if ($refundAmount !== null) {
+                $updates['refund_amount'] = $refundAmount;
+            }
+
+            /*
+             * Only mark the order refunded when PayMongo
+             * explicitly confirms succeeded.
+             */
+            if ($refundStatus === 'succeeded') {
+                $updates['payment_status'] = 'refunded';
+                $updates['status'] = 'Cancelled';
+                $updates['cancelled_at'] = $lockedOrder->cancelled_at ?? now();
+            }
+
+            DB::table('orders')
+                ->where('id', $orderId)
+                ->update($updates);
+        });
+    } catch (\Throwable $exception) {
+        Log::warning('PayMongo refund status could not be saved.', [
+            'order_id' => $orderId,
+            'refund_reference' => $refundReference,
             'refund_status' => $refundStatus,
-            'refund_transfer_link' => $transferLink,
-            'message' => match ($refundStatus) {
-                'failed' => 'PayMongo confirmed the refund failed. You can now retry the refund.',
-                'succeeded' => 'PayMongo confirmed the refund succeeded.',
-                default => 'PayMongo still reports the refund as pending. No new refund was created.',
-            },
+            'exception' => get_class($exception),
+            'message' => $exception->getMessage(),
+            'file' => $exception->getFile(),
+            'line' => $exception->getLine(),
+        ]);
+
+        return $this->corsResponse([
+            'success' => false,
+            'message' => 'The PayMongo status was checked but could not be saved. Refresh the orders list and try again.',
+        ], 500);
+    }
+
+    /*
+     * Notify the customer-facing application.
+     */
+    try {
+        app(\App\Services\RealtimeEventPublisher::class)
+            ->orderUpdated(
+                (int) ($order->user_id ?? 0),
+                $orderId
+            );
+    } catch (\Throwable $exception) {
+        Log::warning('Order refund status realtime notification failed.', [
+            'order_id' => $orderId,
+            'exception' => get_class($exception),
+            'message' => $exception->getMessage(),
         ]);
     }
+
+    return $this->corsResponse([
+        'success' => true,
+        'refund_status' => $refundStatus,
+        'refund_transfer_link' => $transferLink,
+        'message' => match ($refundStatus) {
+            'failed' => 'PayMongo confirmed the refund failed. Review the failure before attempting another refund.',
+            'succeeded' => 'PayMongo confirmed the refund succeeded.',
+            default => 'PayMongo still reports the refund as pending. No new refund was created.',
+        },
+    ]);
+}
+
 
     private function resolveOrderItemSize(array $item, Collection $productSizesById): ?string
     {
