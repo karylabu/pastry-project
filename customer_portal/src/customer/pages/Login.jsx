@@ -601,7 +601,7 @@ export default function Login() {
             position: absolute;
             z-index: 2;
             top: 11%;
-            left: 20%;
+            left: 17%;
             display: block;
             width: 44px;
             height: 44px;
