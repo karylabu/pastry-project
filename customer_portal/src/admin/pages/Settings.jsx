@@ -305,7 +305,6 @@ export default function Settings() {
               <div className="flex flex-wrap gap-2">
                 <button type="button" onClick={() => navigate("/admin/backups")} className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-[#e8dfd4] bg-white px-3 text-[11px] font-semibold text-[#65574d] transition hover:border-[#c9a94f] hover:bg-[#fffaf0]"><Database size={14} /> Backup Management</button>
                 <button type="button" onClick={openRecycleBin} className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-[#efd8d4] bg-white px-3 text-[11px] font-semibold text-[#8d5357] transition hover:bg-[#fff0f0]"><Trash2 size={14} /> Recycle Bin</button>
-                <button type="button" onClick={savePreferences} disabled={settingsLoading || !settingsLoaded || savingPreferences} className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-[#33251e] px-4 text-[12px] font-semibold text-white transition hover:bg-[#5b4540] disabled:cursor-not-allowed disabled:opacity-60"><Save size={15} /> {settingsLoading ? "Loading settings..." : savingPreferences ? "Saving..." : settingsLoaded ? "Save settings" : "Settings unavailable"}</button>
               </div>
             </div>
           </div>
@@ -395,6 +394,9 @@ export default function Settings() {
                 <p className="text-[10px] leading-4 text-[#8f8076] sm:col-span-2 xl:col-span-4">The minimum applies to the cart subtotal before discounts. Product low-stock alerts use this shared threshold; ingredients keep their individual thresholds.</p>
               </div>
             </Section>
+          </div>
+          <div className="mt-4 flex justify-end">
+            <button type="button" onClick={savePreferences} disabled={settingsLoading || !settingsLoaded || savingPreferences} className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-[#33251e] px-4 text-[12px] font-semibold text-white transition hover:bg-[#5b4540] disabled:cursor-not-allowed disabled:opacity-60"><Save size={15} /> {settingsLoading ? "Loading settings..." : savingPreferences ? "Saving..." : settingsLoaded ? "Save settings" : "Settings unavailable"}</button>
           </div>
         </main>
       </div>

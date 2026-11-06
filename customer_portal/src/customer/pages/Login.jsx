@@ -579,6 +579,7 @@ export default function Login() {
           .pastry-login .hero-panel {
             position: relative;
             overflow: hidden;
+            border-radius: 25px;
             display: flex;
             flex: 0 0 45%;
             width: 45%;
@@ -593,7 +594,7 @@ export default function Login() {
             display: block;
             width: 100%;
             height: 100%;
-            border-radius: 25px 0 0 25px;
+            border-radius: 25px;
             object-fit: cover;
             object-position: left center;
           }
