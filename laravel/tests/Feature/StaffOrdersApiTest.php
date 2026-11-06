@@ -43,8 +43,10 @@ class StaffOrdersApiTest extends TestCase
             $table->string('method')->nullable();
             $table->string('payment')->nullable();
             $table->string('payment_status')->nullable();
+            $table->string('paymongo_payment_id')->nullable();
             $table->string('refund_reference')->nullable();
             $table->string('refund_status')->nullable();
+            $table->decimal('refund_amount', 10, 2)->nullable();
             $table->text('refund_transfer_link')->nullable();
             $table->string('status')->nullable();
             $table->string('order_type')->default('Standard');
@@ -299,6 +301,62 @@ class StaffOrdersApiTest extends TestCase
             'refund_transfer_link' => 'https://transfer.paymongo.com/claim-283',
         ]);
         Http::assertSentCount(1);
+    }
+
+    public function test_admin_refund_sync_checks_all_refunds_for_the_payment(): void
+    {
+        config(['services.paymongo.secret' => 'sk_test_refund']);
+        Http::fake([
+            'https://api.paymongo.com/v1/refunds*' => Http::response([
+                'data' => [
+                    [
+                        'id' => 'ref_latest_pending',
+                        'attributes' => [
+                            'status' => 'processing',
+                            'created_at' => 20,
+                            'amount' => 103,
+                            'transfer_link' => 'https://transfer.paymongo.com/claim-latest',
+                        ],
+                    ],
+                    [
+                        'id' => 'ref_failed',
+                        'attributes' => ['status' => 'failed', 'created_at' => 10],
+                    ],
+                    [
+                        'id' => 'ref_succeeded',
+                        'attributes' => ['status' => 'succeeded', 'created_at' => 15],
+                    ],
+                ],
+                'has_more' => false,
+            ]),
+        ]);
+        DB::table('orders')->insert([
+            'id' => 284,
+            'user_id' => 7,
+            'payment_status' => 'paid',
+            'paymongo_payment_id' => 'pay_284',
+            'refund_reference' => 'ref_failed',
+            'refund_status' => 'failed',
+            'status' => 'Cancellation Pending',
+        ]);
+
+        $response = $this->withHeader('X-Auth-Token', 'test-admin-token')
+            ->postJson('/api/staff/orders/284/refund/status');
+        $this->assertSame(200, $response->status(), $response->getContent());
+        $response->assertJsonPath('refund_status', 'pending')
+            ->assertJsonPath('refund_transfer_link', 'https://transfer.paymongo.com/claim-latest');
+
+        $this->assertDatabaseHas('orders', [
+            'id' => 284,
+            'refund_reference' => 'ref_latest_pending',
+            'refund_status' => 'pending',
+            'refund_amount' => 1.03,
+            'refund_transfer_link' => 'https://transfer.paymongo.com/claim-latest',
+            'payment_status' => 'paid',
+        ]);
+        Http::assertSentCount(1);
+        Http::assertSent(fn ($request) => $request->method() === 'GET'
+            && str_contains($request->url(), 'pay_284'));
     }
 
     public function test_admin_order_response_includes_customer_payment_reference(): void

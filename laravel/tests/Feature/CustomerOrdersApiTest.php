@@ -343,20 +343,27 @@ class CustomerOrdersApiTest extends TestCase
     public function test_paymongo_refund_stays_pending_until_webhook_confirms_success(): void
     {
         config(['services.paymongo.secret' => 'sk_test_refund']);
-        Http::fake([
-            'https://api.paymongo.com/v1/payment_links/payment-link-16/payments' => Http::response([
+        Http::fake(function ($request) {
+            if ($request->url() === 'https://api.paymongo.com/v1/payment_links/payment-link-16/payments') {
+                return Http::response([
                 'data' => [[
                     'id' => 'pay_16',
                     'attributes' => ['status' => 'paid', 'amount' => 50000],
                 ]],
-            ]),
-            'https://api.paymongo.com/v1/refunds' => Http::response([
-                'data' => [
+                ]);
+            }
+            if ($request->method() === 'GET' && str_starts_with($request->url(), 'https://api.paymongo.com/v1/refunds')) {
+                return Http::response(['data' => [], 'has_more' => false]);
+            }
+            if ($request->method() === 'POST' && $request->url() === 'https://api.paymongo.com/v1/refunds') {
+                return Http::response([
+                    'data' => [
                     'id' => 're_16',
                     'attributes' => ['status' => 'pending'],
-                ],
-            ]),
-        ]);
+                    ],
+                ]);
+            }
+        });
         DB::table('orders')->insert([
             'id' => 16,
             'user_id' => 7,
@@ -381,29 +388,36 @@ class CustomerOrdersApiTest extends TestCase
             'refund_reference' => 're_16',
             'refund_status' => 'pending',
         ]);
-        Http::assertSentCount(2);
+        Http::assertSentCount(3);
     }
 
     public function test_qrph_refund_uses_qrph_api_and_returns_the_claim_link(): void
     {
         config(['services.paymongo.secret' => 'sk_test_refund']);
-        Http::fake([
-            'https://api.paymongo.com/v1/payment_links/payment-link-17/payments' => Http::response([
+        Http::fake(function ($request) {
+            if ($request->url() === 'https://api.paymongo.com/v1/payment_links/payment-link-17/payments') {
+                return Http::response([
                 'data' => [[
                     'id' => 'pay_17',
                     'attributes' => ['status' => 'paid', 'amount' => 190],
                 ]],
-            ]),
-            'https://refunds-api.paymongo.com/v1/refunds' => Http::response([
-                'data' => [
+                ]);
+            }
+            if ($request->method() === 'GET' && str_starts_with($request->url(), 'https://api.paymongo.com/v1/refunds')) {
+                return Http::response(['data' => [], 'has_more' => false]);
+            }
+            if ($request->method() === 'POST' && $request->url() === 'https://refunds-api.paymongo.com/v1/refunds') {
+                return Http::response([
+                    'data' => [
                     'id' => 're_17',
                     'attributes' => [
                         'status' => 'processing',
                         'transfer_link' => 'https://transfer.paymongo.com/claim-17',
                     ],
-                ],
-            ]),
-        ]);
+                    ],
+                ]);
+            }
+        });
         DB::table('orders')->insert([
             'id' => 17,
             'user_id' => 7,
@@ -437,20 +451,27 @@ class CustomerOrdersApiTest extends TestCase
     public function test_refund_uses_the_saved_paymongo_payment_id(): void
     {
         config(['services.paymongo.secret' => 'sk_test_refund']);
-        Http::fake([
-            'https://api.paymongo.com/v1/payments/pay_saved_18' => Http::response([
+        Http::fake(function ($request) {
+            if ($request->url() === 'https://api.paymongo.com/v1/payments/pay_saved_18') {
+                return Http::response([
                 'data' => [
                     'id' => 'pay_saved_18',
                     'attributes' => ['status' => 'paid', 'amount' => 25000],
                 ],
-            ]),
-            'https://api.paymongo.com/v1/refunds' => Http::response([
-                'data' => [
+                ]);
+            }
+            if ($request->method() === 'GET' && str_starts_with($request->url(), 'https://api.paymongo.com/v1/refunds')) {
+                return Http::response(['data' => [], 'has_more' => false]);
+            }
+            if ($request->method() === 'POST' && $request->url() === 'https://api.paymongo.com/v1/refunds') {
+                return Http::response([
+                    'data' => [
                     'id' => 're_18',
                     'attributes' => ['status' => 'pending'],
-                ],
-            ]),
-        ]);
+                    ],
+                ]);
+            }
+        });
         DB::table('orders')->insert([
             'id' => 18,
             'user_id' => 7,
@@ -473,26 +494,33 @@ class CustomerOrdersApiTest extends TestCase
             'https://api.paymongo.com/v1/payments/pay_saved_18',
             Http::recorded()->first()[0]->url()
         );
-        Http::assertSentCount(2);
+        Http::assertSentCount(3);
     }
 
     public function test_refund_can_resolve_a_checkout_session_payment_when_no_payment_id_was_saved(): void
     {
         config(['services.paymongo.secret' => 'sk_test_refund']);
-        Http::fake([
-            'https://api.paymongo.com/v2/checkout_sessions/cs_test_19/payments' => Http::response([
+        Http::fake(function ($request) {
+            if ($request->url() === 'https://api.paymongo.com/v2/checkout_sessions/cs_test_19/payments') {
+                return Http::response([
                 'data' => [[
                     'id' => 'pay_19',
                     'attributes' => ['status' => 'paid', 'amount' => 32000],
                 ]],
-            ]),
-            'https://api.paymongo.com/v1/refunds' => Http::response([
-                'data' => [
+                ]);
+            }
+            if ($request->method() === 'GET' && str_starts_with($request->url(), 'https://api.paymongo.com/v1/refunds')) {
+                return Http::response(['data' => [], 'has_more' => false]);
+            }
+            if ($request->method() === 'POST' && $request->url() === 'https://api.paymongo.com/v1/refunds') {
+                return Http::response([
+                    'data' => [
                     'id' => 're_19',
                     'attributes' => ['status' => 'pending'],
-                ],
-            ]),
-        ]);
+                    ],
+                ]);
+            }
+        });
         DB::table('orders')->insert([
             'id' => 19,
             'user_id' => 7,
@@ -514,7 +542,232 @@ class CustomerOrdersApiTest extends TestCase
             'https://api.paymongo.com/v1/refunds',
             Http::recorded()->last()[0]->url()
         );
+        Http::assertSentCount(3);
+    }
+
+    public function test_existing_pending_refund_prevents_a_duplicate_refund_request(): void
+    {
+        config(['services.paymongo.secret' => 'sk_test_refund']);
+        Http::fake(function ($request) {
+            if ($request->url() === 'https://api.paymongo.com/v1/payments/pay_30') {
+                return Http::response(['data' => [
+                    'id' => 'pay_30',
+                    'attributes' => ['status' => 'paid', 'amount' => 10000],
+                ]]);
+            }
+            if ($request->method() === 'GET' && str_starts_with($request->url(), 'https://api.paymongo.com/v1/refunds')) {
+                return Http::response(['data' => [[
+                    'id' => 'ref_pending_30',
+                    'attributes' => [
+                        'status' => 'processing',
+                        'amount' => 10000,
+                        'transfer_link' => 'https://transfer.paymongo.com/claim-30',
+                    ],
+                ]], 'has_more' => false]);
+            }
+        });
+        DB::table('orders')->insert([
+            'id' => 30,
+            'user_id' => 7,
+            'payment' => 'QRPh',
+            'payment_status' => 'paid',
+            'paymongo_payment_id' => 'pay_30',
+            'total' => 100,
+            'status' => 'Pending',
+        ]);
+
+        $request = Request::create('/api/orders/30/cancel', 'POST', [], [], [], [
+            'HTTP_X_AUTH_TOKEN' => 'test-customer-token',
+        ]);
+        $response = app(OrderController::class)->cancel($request, 30);
+
+        $this->assertSame('pending', $response->getData(true)['refund_status']);
+        $this->assertSame('ref_pending_30', DB::table('orders')->where('id', 30)->value('refund_reference'));
         Http::assertSentCount(2);
+        Http::assertNotSent(fn ($request) => $request->method() === 'POST'
+            && str_contains($request->url(), '/refunds'));
+    }
+
+    public function test_existing_successful_refund_is_saved_without_creating_another(): void
+    {
+        config(['services.paymongo.secret' => 'sk_test_refund']);
+        Http::fake(function ($request) {
+            if ($request->url() === 'https://api.paymongo.com/v1/payments/pay_31') {
+                return Http::response(['data' => [
+                    'id' => 'pay_31',
+                    'attributes' => ['status' => 'paid', 'amount' => 10000],
+                ]]);
+            }
+            if ($request->method() === 'GET' && str_starts_with($request->url(), 'https://api.paymongo.com/v1/refunds')) {
+                return Http::response(['data' => [[
+                    'id' => 'ref_succeeded_31',
+                    'attributes' => ['status' => 'succeeded', 'amount' => 10000],
+                ]], 'has_more' => false]);
+            }
+        });
+        DB::table('orders')->insert([
+            'id' => 31,
+            'user_id' => 7,
+            'payment' => 'GCash',
+            'payment_status' => 'paid',
+            'paymongo_payment_id' => 'pay_31',
+            'total' => 100,
+            'status' => 'Pending',
+        ]);
+
+        $request = Request::create('/api/orders/31/cancel', 'POST', [], [], [], [
+            'HTTP_X_AUTH_TOKEN' => 'test-customer-token',
+        ]);
+        $response = app(OrderController::class)->cancel($request, 31);
+
+        $this->assertSame('succeeded', $response->getData(true)['refund_status']);
+        $this->assertDatabaseHas('orders', [
+            'id' => 31,
+            'status' => 'Cancelled',
+            'payment_status' => 'refunded',
+            'refund_reference' => 'ref_succeeded_31',
+            'refund_status' => 'succeeded',
+        ]);
+        Http::assertSentCount(2);
+        Http::assertNotSent(fn ($request) => $request->method() === 'POST'
+            && str_contains($request->url(), '/refunds'));
+    }
+
+    public function test_failed_refund_history_allows_one_new_refund_attempt(): void
+    {
+        config(['services.paymongo.secret' => 'sk_test_refund']);
+        Http::fake(function ($request) {
+            if ($request->url() === 'https://api.paymongo.com/v1/payments/pay_32') {
+                return Http::response(['data' => [
+                    'id' => 'pay_32',
+                    'attributes' => ['status' => 'paid', 'amount' => 10000],
+                ]]);
+            }
+            if ($request->method() === 'GET' && str_starts_with($request->url(), 'https://api.paymongo.com/v1/refunds')) {
+                return Http::response(['data' => [[
+                    'id' => 'ref_failed_32',
+                    'attributes' => ['status' => 'failed', 'amount' => 10000],
+                ]], 'has_more' => false]);
+            }
+            if ($request->method() === 'POST' && str_contains($request->url(), '/refunds')) {
+                return Http::response(['data' => [
+                    'id' => 'ref_retry_32',
+                    'attributes' => ['status' => 'pending', 'amount' => 10000],
+                ]]);
+            }
+        });
+        DB::table('orders')->insert([
+            'id' => 32,
+            'user_id' => 7,
+            'payment' => 'GCash',
+            'payment_status' => 'paid',
+            'paymongo_payment_id' => 'pay_32',
+            'total' => 100,
+            'status' => 'Pending',
+        ]);
+
+        $request = Request::create('/api/orders/32/cancel', 'POST', [], [], [], [
+            'HTTP_X_AUTH_TOKEN' => 'test-customer-token',
+        ]);
+        $response = app(OrderController::class)->cancel($request, 32);
+
+        $this->assertSame('pending', $response->getData(true)['refund_status']);
+        $this->assertSame('ref_retry_32', DB::table('orders')->where('id', 32)->value('refund_reference'));
+        Http::assertSentCount(3);
+    }
+
+    public function test_ambiguous_refund_request_outcome_stays_requesting_and_blocks_retry(): void
+    {
+        config(['services.paymongo.secret' => 'sk_test_refund']);
+        Http::fake(function ($request) {
+            if ($request->url() === 'https://api.paymongo.com/v1/payments/pay_33') {
+                return Http::response(['data' => [
+                    'id' => 'pay_33',
+                    'attributes' => ['status' => 'paid', 'amount' => 10000],
+                ]]);
+            }
+            if ($request->method() === 'GET' && str_starts_with($request->url(), 'https://api.paymongo.com/v1/refunds')) {
+                return Http::response(['data' => [], 'has_more' => false]);
+            }
+            if ($request->method() === 'POST' && str_contains($request->url(), '/refunds')) {
+                throw new \Illuminate\Http\Client\ConnectionException('Timed out');
+            }
+        });
+        DB::table('orders')->insert([
+            'id' => 33,
+            'user_id' => 7,
+            'payment' => 'GCash',
+            'payment_status' => 'paid',
+            'paymongo_payment_id' => 'pay_33',
+            'total' => 100,
+            'status' => 'Pending',
+        ]);
+
+        $request = Request::create('/api/orders/33/cancel', 'POST', [], [], [], [
+            'HTTP_X_AUTH_TOKEN' => 'test-customer-token',
+        ]);
+        $response = app(OrderController::class)->cancel($request, 33);
+
+        $this->assertSame('requesting', $response->getData(true)['refund_status']);
+        $this->assertDatabaseHas('orders', [
+            'id' => 33,
+            'status' => 'Cancellation Pending',
+            'refund_status' => 'requesting',
+            'payment_status' => 'paid',
+        ]);
+        Http::assertSentCount(2);
+    }
+
+    public function test_staff_cancellation_keeps_paid_order_pending_until_refund_is_confirmed(): void
+    {
+        config(['services.paymongo.secret' => 'sk_test_refund']);
+        Http::fake(function ($request) {
+            if ($request->url() === 'https://api.paymongo.com/v1/payments/pay_34') {
+                return Http::response(['data' => [
+                    'id' => 'pay_34',
+                    'attributes' => ['status' => 'paid', 'amount' => 10000],
+                ]]);
+            }
+            if ($request->method() === 'GET' && str_starts_with($request->url(), 'https://api.paymongo.com/v1/refunds')) {
+                return Http::response(['data' => [], 'has_more' => false]);
+            }
+            if ($request->method() === 'POST' && str_contains($request->url(), '/refunds')) {
+                return Http::response(['data' => [
+                    'id' => 'ref_pending_34',
+                    'attributes' => ['status' => 'processing', 'amount' => 10000],
+                ]]);
+            }
+        });
+        DB::table('user_sessions')->insert([
+            'user_id' => 8,
+            'token' => 'test-admin-token',
+            'expires_at' => now()->addHour(),
+        ]);
+        DB::table('orders')->insert([
+            'id' => 34,
+            'user_id' => 7,
+            'payment' => 'GCash',
+            'payment_status' => 'paid',
+            'payment_reference' => 'checkout-session-34',
+            'paymongo_payment_id' => 'pay_34',
+            'total' => 100,
+            'status' => 'Pending',
+        ]);
+
+        $request = Request::create('/api/orders/34/status', 'PUT', ['status' => 'Cancelled'], [], [], [
+            'HTTP_X_AUTH_TOKEN' => 'test-admin-token',
+        ]);
+        $response = app(OrderController::class)->updateStatus($request, 34);
+
+        $this->assertSame(200, $response->getStatusCode(), $response->getContent());
+        $this->assertDatabaseHas('orders', [
+            'id' => 34,
+            'status' => 'Cancellation Pending',
+            'payment_status' => 'paid',
+            'refund_reference' => 'ref_pending_34',
+            'refund_status' => 'pending',
+        ]);
+        Http::assertSentCount(3);
     }
 
     public function test_customer_cancellation_does_not_mark_payment_refunded_when_paymongo_credentials_are_missing(): void

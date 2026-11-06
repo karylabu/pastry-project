@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Services\InventoryService;
 use App\Models\User;
 use App\Services\AdminSessionGuard;
+use App\Services\PayMongoRefundService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
@@ -415,24 +416,16 @@ class StaffApiController extends Controller
 
         $order = DB::table('orders')
             ->where('id', $orderId)
-            ->first(['id', 'user_id', 'status', 'refund_status', 'refund_reference']);
+            ->first(['id', 'user_id', 'status', 'refund_status', 'refund_reference', 'paymongo_payment_id']);
         if (!$order) {
             return $this->corsResponse(['success' => false, 'message' => 'Order not found.'], 404);
         }
 
         $refundReference = trim((string) ($order->refund_reference ?? ''));
-        if ($refundReference === '') {
+        $storedRefundReference = $refundReference;
+        $paymentId = trim((string) ($order->paymongo_payment_id ?? ''));
+        if ($refundReference === '' && $paymentId === '') {
             return $this->corsResponse(['success' => false, 'message' => 'This order has no PayMongo refund reference to check.'], 409);
-        }
-
-        $currentStatus = strtolower(trim((string) ($order->refund_status ?? '')));
-        if (in_array($currentStatus, ['succeeded', 'refunded', 'failed'], true)) {
-            return $this->corsResponse([
-                'success' => true,
-                'refund_status' => $currentStatus,
-                'refund_transfer_link' => null,
-                'message' => 'The refund already has a final status.',
-            ]);
         }
 
         $secretKey = config('services.paymongo.secret');
@@ -441,10 +434,12 @@ class StaffApiController extends Controller
         }
 
         try {
-            $response = Http::withBasicAuth($secretKey, '')
-                ->acceptJson()
-                ->timeout(15)
-                ->get('https://api.paymongo.com/v1/refunds/' . rawurlencode($refundReference));
+            $refundService = app(PayMongoRefundService::class);
+            if ($paymentId !== '') {
+                $refundData = $refundService->mostRelevant($refundService->listForPayment($secretKey, $paymentId));
+            } else {
+                $refundData = $refundService->retrieve($secretKey, $refundReference);
+            }
         } catch (\Throwable $exception) {
             Log::warning('PayMongo refund status check failed.', [
                 'order_id' => $orderId,
@@ -454,30 +449,14 @@ class StaffApiController extends Controller
             return $this->corsResponse(['success' => false, 'message' => 'Unable to reach PayMongo to check the refund status. Please try again.'], 502);
         }
 
-        if (!$response->successful()) {
-            Log::warning('PayMongo rejected a refund status check.', [
-                'order_id' => $orderId,
-                'http_status' => $response->status(),
-                'error_code' => $response->json('errors.0.code'),
-            ]);
-
-            return $this->corsResponse(['success' => false, 'message' => 'PayMongo could not verify this refund. Please check the refund reference in the PayMongo Dashboard.'], 502);
+        if (!$refundData) {
+            return $this->corsResponse(['success' => false, 'message' => 'PayMongo has no refund record for this payment. Do not retry until the payment history has been reviewed.'], 409);
         }
 
-        $refundData = $response->json('data');
-        if (!is_array($refundData) || (string) ($refundData['id'] ?? '') !== $refundReference) {
-            return $this->corsResponse(['success' => false, 'message' => 'PayMongo returned an unexpected refund record.'], 502);
-        }
-
-        $payMongoStatus = strtolower(trim((string) ($refundData['attributes']['status'] ?? '')));
-        $refundStatus = match ($payMongoStatus) {
-            'processing', 'refunding' => 'pending',
-            'pending' => 'pending',
-            'succeeded', 'refunded' => 'succeeded',
-            'failed' => 'failed',
-            default => '',
-        };
+        $refundReference = (string) ($refundData['id'] ?? '');
+        $refundStatus = $refundService->status($refundData);
         if ($refundStatus === '') {
+            $payMongoStatus = strtolower(trim((string) ($refundData['attributes']['status'] ?? '')));
             Log::warning('PayMongo returned an unrecognized refund status.', [
                 'order_id' => $orderId,
                 'refund_status' => $payMongoStatus,
@@ -489,23 +468,28 @@ class StaffApiController extends Controller
         $transferLink = $refundStatus === 'pending'
             ? ($refundData['attributes']['transfer_link'] ?? null)
             : null;
+        $refundAmount = array_key_exists('amount', $refundData['attributes'] ?? [])
+            ? ((int) $refundData['attributes']['amount']) / 100
+            : null;
 
         try {
-            DB::transaction(function () use ($orderId, $refundReference, $refundStatus, $transferLink) {
+            DB::transaction(function () use ($orderId, $storedRefundReference, $refundReference, $refundStatus, $transferLink, $refundAmount) {
                 $lockedOrder = DB::table('orders')->where('id', $orderId)->lockForUpdate()->first();
-                if (!$lockedOrder || (string) ($lockedOrder->refund_reference ?? '') !== $refundReference) {
+                if (!$lockedOrder) {
+                    throw new \RuntimeException('The order no longer exists.');
+                }
+                if ((string) ($lockedOrder->refund_reference ?? '') !== $storedRefundReference) {
                     throw new \RuntimeException('The refund reference changed while checking PayMongo.');
                 }
 
-                $lockedStatus = strtolower(trim((string) ($lockedOrder->refund_status ?? '')));
-                if (in_array($lockedStatus, ['succeeded', 'refunded', 'failed'], true)) {
-                    return;
-                }
-
                 $updates = [
+                    'refund_reference' => $refundReference,
                     'refund_status' => $refundStatus,
                     'refund_transfer_link' => $transferLink,
                 ];
+                if ($refundAmount !== null) {
+                    $updates['refund_amount'] = $refundAmount;
+                }
                 if ($refundStatus === 'succeeded') {
                     $updates += [
                         'payment_status' => 'refunded',
