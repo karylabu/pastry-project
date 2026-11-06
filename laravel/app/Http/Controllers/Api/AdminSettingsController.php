@@ -34,6 +34,7 @@ class AdminSettingsController extends Controller
             return $user;
         }
 
+        $openingHoursPattern = '/^\s*([01]?\d|2[0-3]):([0-5]\d)\s*[-–—]\s*([01]?\d|2[0-3]):([0-5]\d)\s*$/u';
         $validator = Validator::make($request->all(), [
             'settings' => 'required|array',
             'settings.shopName' => 'required|string|max:150',
@@ -43,12 +44,13 @@ class AdminSettingsController extends Controller
             'settings.openingHours' => [
                 'required',
                 'string',
-                function (string $attribute, mixed $value, \Closure $fail): void {
-                    if (! is_string($value) || ! preg_match('/^(?:[01]\d|2[0-3]):[0-5]\d\s*-\s*(?:[01]\d|2[0-3]):[0-5]\d$/', $value)) {
-                        $fail("The {$attribute} field format is invalid.");
+                function (string $attribute, mixed $value, \Closure $fail) use ($openingHoursPattern): void {
+                    if (! is_string($value) || preg_match($openingHoursPattern, $value, $matches) !== 1) {
+                        $fail("Enter opening hours as HH:MM - HH:MM using 24-hour time.");
                         return;
                     }
-                    [$opens, $closes] = preg_split('/\s*-\s*/', $value);
+                    $opens = sprintf('%02d:%02d', (int) $matches[1], (int) $matches[2]);
+                    $closes = sprintf('%02d:%02d', (int) $matches[3], (int) $matches[4]);
                     $openMinutes = ((int) substr($opens, 0, 2) * 60) + (int) substr($opens, 3, 2);
                     $closeMinutes = ((int) substr($closes, 0, 2) * 60) + (int) substr($closes, 3, 2);
                     $durationMinutes = ($closeMinutes - $openMinutes + 1440) % 1440;
@@ -77,6 +79,14 @@ class AdminSettingsController extends Controller
 
         $validated = $validator->validated();
         $settings = $validated['settings'];
+        preg_match($openingHoursPattern, $settings['openingHours'], $openingHours);
+        $settings['openingHours'] = sprintf(
+            '%02d:%02d - %02d:%02d',
+            (int) $openingHours[1],
+            (int) $openingHours[2],
+            (int) $openingHours[3],
+            (int) $openingHours[4]
+        );
         $settings['shopEmail'] = strtolower(trim((string) ($settings['shopEmail'] ?? '')));
         $settings['minimumOrder'] = (string) $settings['minimumOrder'];
         $settings['preparationTime'] = (string) $settings['preparationTime'];

@@ -272,6 +272,37 @@ class AdminSettingsTest extends TestCase
             ->assertJsonPath('notification_preferences.orderAlerts', true);
     }
 
+    public function test_admin_settings_normalize_single_digit_opening_hours(): void
+    {
+        $admin = (new User())->forceFill([
+            'id' => 12,
+            'name' => 'Shop Admin',
+            'email' => 'admin@example.com',
+            'role' => 'admin',
+            'status' => 'active',
+        ]);
+
+        $this->actingAs($admin)->putJson('/api/admin/settings', [
+            'settings' => [
+                'shopName' => 'Sweet Shop',
+                'shopEmail' => '',
+                'shopPhone' => '',
+                'shopAddress' => '',
+                'openingHours' => '8:00 - 20:00',
+                'minimumOrder' => '0',
+                'preparationTime' => '30',
+                'lowStockThreshold' => '5',
+            ],
+            'notification_preferences' => [
+                'orderAlerts' => true,
+                'lowStockAlerts' => true,
+                'messageAlerts' => true,
+                'promotionAlerts' => true,
+            ],
+        ])->assertOk()
+            ->assertJsonPath('settings.openingHours', '08:00 - 20:00');
+    }
+
     public function test_admin_cannot_save_invalid_shop_hours_or_order_rules(): void
     {
         $admin = (new User())->forceFill([
