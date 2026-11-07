@@ -62,7 +62,9 @@ export default function AccountSettings() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [activeSection, setActiveSection] = useState(() => (
-    searchParams.get('section') === 'profile' ? 'profile' : 'overview'
+    ['profile', 'security', 'privacy'].includes(searchParams.get('section'))
+      ? searchParams.get('section')
+      : 'profile'
   ));
   const [searchQuery, setSearchQuery] = useState('');
   const [passwordFormOpen, setPasswordFormOpen] = useState(true);
