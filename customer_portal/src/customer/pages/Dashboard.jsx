@@ -176,7 +176,7 @@ function SecondaryBanner({ onOrderNow }) {
         <button
           type="button"
           onClick={onOrderNow}
-          className="absolute bottom-[3%] left-[28%] z-10 inline-flex items-center gap-0.5 whitespace-nowrap rounded-full bg-[#73785c] px-1 py-0 font-serif text-[7px] font-medium text-white shadow-sm transition hover:bg-[#5f654a] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 lg:bottom-[6%] lg:left-[30%] lg:gap-3 lg:px-5 lg:py-2.5 lg:text-sm"
+          className="absolute bottom-[3%] left-[23%] z-10 inline-flex items-center gap-0.5 whitespace-nowrap rounded-full bg-[#73785c] px-1 py-0 font-serif text-[7px] font-medium text-white shadow-sm transition hover:bg-[#5f654a] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 lg:bottom-[6%] lg:left-[25%] lg:gap-3 lg:px-5 lg:py-2.5 lg:text-sm"
         >
           Order Now <ArrowRight size={8} className="lg:h-[15px] lg:w-[15px]" strokeWidth={1.8} />
         </button>
