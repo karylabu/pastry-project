@@ -1518,12 +1518,6 @@ export default function Login() {
                       </a>
                     </p>
 
-                    <Link
-                      to="/customer/menu"
-                      className="mt-4 block text-center text-sm font-bold text-[#171717] underline decoration-[#F0B94D] decoration-2 underline-offset-4 transition hover:text-[#F0B94D]"
-                    >
-                      Browse products first
-                    </Link>
                   </motion.div>
                 )}
               </AnimatePresence>
