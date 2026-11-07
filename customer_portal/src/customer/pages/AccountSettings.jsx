@@ -1125,7 +1125,7 @@ export default function AccountSettings() {
             <>
               <Link
                 to="/customer"
-                className="flex items-center gap-2 rounded-full border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-600 transition hover:border-[#a06a2c] hover:text-[#a06a2c]"
+                className="flex items-center gap-2 rounded-full px-1 py-2 text-sm font-semibold text-gray-600 transition hover:text-[#a06a2c]"
               >
                 <ArrowLeft size={16} /> Back
               </Link>
