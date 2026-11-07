@@ -1,6 +1,6 @@
 import React, { useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, Mail, KeyRound, Lock, Eye, EyeOff } from "lucide-react";
+import { ArrowLeft, KeyRound, Lock, Eye, EyeOff } from "lucide-react";
 import { LARAVEL_BASE } from "../../services/config";
 import { safeParseJson } from '../../services/api';
 
@@ -208,7 +208,7 @@ export default function ForgotPassword({ onBack }) {
   // ── Step configs ───────────────────────────────────────────────────────────
   const steps = {
     email: {
-      icon: <Mail size={20} className="text-[#6B4A3A]" strokeWidth={1.5} />,
+      icon: null,
       title: "Forgot Password",
       subtitle: "Enter your registered email and we’ll send you a 6-digit reset code.",
     },
