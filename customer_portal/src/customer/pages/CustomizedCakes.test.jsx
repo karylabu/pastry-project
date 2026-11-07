@@ -11,7 +11,6 @@ jest.mock('react-router-dom', () => ({
 }));
 
 jest.mock('../components/PageShell', () => ({ children }) => <div>{children}</div>);
-jest.mock('../components/DesignCategoryCards', () => () => null);
 
 jest.mock('../../services/config', () => ({
   CUSTOMER_BASE: 'https://example.test/customer',
@@ -168,6 +167,15 @@ describe('CustomizedCakes availability', () => {
     expect(dateInput).toHaveAttribute('type', 'date');
     expect(dateInput).not.toHaveClass('opacity-0');
     expect(dateInput).toHaveAttribute('min');
+  });
+
+  it('includes every design category in the occasion options', async () => {
+    render(<CustomizedCakes />);
+
+    const occasion = screen.getByLabelText('Occasion');
+    for (const category of ['Birthday', 'Cutesy', 'Holidays', 'Kids Themes', 'Wedding', 'Floral Designs']) {
+      expect(within(occasion).getByRole('option', { name: category })).toBeInTheDocument();
+    }
   });
 
   it('disables elapsed time slots for today but leaves them available for future dates', async () => {

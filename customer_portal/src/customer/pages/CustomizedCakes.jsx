@@ -4,7 +4,7 @@ import PageShell from '../components/PageShell';
 import { CUSTOMER_BASE, LARAVEL_BASE, ROOT_BASE } from '../../services/config';
 import { getAuthHeaders, safeParseJson } from '../../services/api';
 import { buildCustomizedCakeSubmissionPayload, buildTierSelections } from './customizedCakePayload';
-import DesignCategoryCards from '../components/DesignCategoryCards';
+import DesignCategoryCards, { DESIGN_CATEGORIES } from '../components/DesignCategoryCards';
 const CUSTOM_CAKE_DRAFT_KEY = 'customCakeRequestDraft';
 const MAX_REFERENCE_IMAGES = 5;
 const FULFILLMENT_TIME_SLOTS = Array.from({ length: 29 }, (_, index) => {
@@ -1258,8 +1258,7 @@ export default function CustomizedCakes() {
                 <div className="block text-xs font-semibold text-[#6b4f1d]">
                   <label htmlFor="custom-cake-occasion">Occasion</label>
                   <select id="custom-cake-occasion" value={occasion} onChange={(event) => setOccasion(event.target.value)} className="mt-1.5 min-h-11 w-full rounded-lg border border-[#eadfd8] bg-white px-3 py-2 text-sm text-[#33251e] outline-none focus:border-[#c9972d] focus:ring-2 focus:ring-[#fff1bd]">
-                    <option>Birthday</option>
-                    <option>Wedding</option>
+                    {DESIGN_CATEGORIES.map(({ label }) => <option key={label}>{label}</option>)}
                     <option>Anniversary</option>
                     <option>Graduation</option>
                     <option>Baby Shower</option>
