@@ -1,6 +1,6 @@
 import React, { useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, KeyRound, Lock, Eye, EyeOff } from "lucide-react";
+import { ArrowLeft, Lock, Eye, EyeOff } from "lucide-react";
 import { LARAVEL_BASE } from "../../services/config";
 import { safeParseJson } from '../../services/api';
 
@@ -213,7 +213,7 @@ export default function ForgotPassword({ onBack }) {
       subtitle: "Enter your registered email and we’ll send you a 6-digit reset code.",
     },
     code: {
-      icon: <KeyRound size={20} className="text-[#6B4A3A]" strokeWidth={1.5} />,
+      icon: null,
       title: "Enter Code",
       subtitle: `We sent a code to ${email}. It expires in 15 minutes.`,
     },
