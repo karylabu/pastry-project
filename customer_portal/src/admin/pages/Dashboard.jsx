@@ -400,7 +400,7 @@ export default function Dashboard() {
     <div className="min-h-screen bg-[#fbfaf5] font-['DM_Sans'] text-[#33251e]">
       <div className="pt-[88px] lg:pl-[260px]">
         <div className="mx-auto max-w-[1400px] px-4 py-5 sm:px-6 md:px-8">
-          <div className="mb-5 flex min-h-[72px] flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div className="mb-5 flex min-h-[72px] flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex min-w-0 items-center gap-3">
               <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#fff4cd] text-[#a57c38]"><Sun size={18} strokeWidth={1.8} /></span>
               <div className="min-w-0">
@@ -408,6 +408,24 @@ export default function Dashboard() {
                 <h1 className="truncate font-serif text-[27px] leading-tight text-[#33251e]">Good {greeting}, {adminName}!</h1>
                 <p className="truncate text-[11px] text-[#8f8076]">Here's what's happening with your pastry business today.</p>
               </div>
+            </div>
+            <div className="flex shrink-0 rounded-lg border border-[#eadfd8] bg-white p-1 shadow-sm" role="group" aria-label="Dashboard order category">
+              <button
+                type="button"
+                onClick={() => setOrderCategory("live")}
+                aria-pressed={orderCategory === "live"}
+                className={`rounded-md px-3 py-2 text-[10px] font-semibold transition-colors sm:px-4 ${orderCategory === "live" ? "bg-[#33251e] text-white" : "text-[#765d50] hover:bg-[#fbf7f2]"}`}
+              >
+                Live Orders
+              </button>
+              <button
+                type="button"
+                onClick={() => setOrderCategory("customized")}
+                aria-pressed={orderCategory === "customized"}
+                className={`rounded-md px-3 py-2 text-[10px] font-semibold transition-colors sm:px-4 ${orderCategory === "customized" ? "bg-[#33251e] text-white" : "text-[#765d50] hover:bg-[#fbf7f2]"}`}
+              >
+                Customized
+              </button>
             </div>
           </div>
 
@@ -427,29 +445,9 @@ export default function Dashboard() {
               eyebrow="Order Management"
               title={orderCategory === "customized" ? "Customized orders" : "Live orders"}
               action={
-                <div className="flex flex-wrap items-center justify-end gap-2">
-                  <div className="flex rounded-lg border border-[#eadfd8] bg-[#fbf7f2] p-1" role="group" aria-label="Order category">
-                    <button
-                      type="button"
-                      onClick={() => setOrderCategory("live")}
-                      aria-pressed={orderCategory === "live"}
-                      className={`rounded-md px-3 py-1.5 text-[10px] font-semibold transition-colors ${orderCategory === "live" ? "bg-[#33251e] text-white" : "text-[#765d50] hover:bg-white"}`}
-                    >
-                      Live Orders
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setOrderCategory("customized")}
-                      aria-pressed={orderCategory === "customized"}
-                      className={`rounded-md px-3 py-1.5 text-[10px] font-semibold transition-colors ${orderCategory === "customized" ? "bg-[#33251e] text-white" : "text-[#765d50] hover:bg-white"}`}
-                    >
-                      Customized
-                    </button>
-                  </div>
-                  <Link to={orderCategory === "customized" ? "/admin/custom-cakes" : "/admin/orders"} className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.15em] text-[#765d50] transition-colors hover:text-[#9b7810]">
-                    View all <ArrowRight size={13} />
-                  </Link>
-                </div>
+                <Link to={orderCategory === "customized" ? "/admin/custom-cakes" : "/admin/orders"} className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.15em] text-[#765d50] transition-colors hover:text-[#9b7810]">
+                  View all <ArrowRight size={13} />
+                </Link>
               }
             >
               <div className="overflow-x-auto">

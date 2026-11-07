@@ -128,9 +128,12 @@ test("switches between live and customized orders and links each order to its de
   const liveOrdersButton = screen.getByRole("button", { name: "Live Orders" });
   const customizedButton = screen.getByRole("button", { name: "Customized" });
   expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-  const ordersSection = liveOrdersButton.closest("section");
+  const categoryGroup = screen.getByRole("group", { name: "Dashboard order category" });
+  const dashboardHeading = screen.getByRole("heading", { name: /Good .*Shop Owner!/ });
   const analyticsHeading = screen.getByRole("heading", { name: "Cake Sales Analytics" });
-  expect(ordersSection.compareDocumentPosition(analyticsHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(dashboardHeading.compareDocumentPosition(categoryGroup) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(categoryGroup.compareDocumentPosition(analyticsHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(categoryGroup.closest("section")).toBeNull();
   const liveOrderLink = await screen.findByRole("link", { name: "#401" });
   expect(liveOrderLink).toHaveAttribute("href", "/admin/orders?order_id=401");
   expect(screen.queryByText("Completed Customer")).not.toBeInTheDocument();
