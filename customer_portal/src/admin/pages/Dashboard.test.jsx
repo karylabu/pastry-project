@@ -93,6 +93,7 @@ beforeEach(() => {
               customer: "Completed Customer",
               total: 650,
               status: "Completed",
+              created_at: new Date().toISOString(),
               items: [{ name: "Red Velvet Cake", quantity: 1 }],
             },
           ],
@@ -134,8 +135,17 @@ test("switches between live and customized orders and links each order to its de
   expect(dashboardHeading.compareDocumentPosition(categoryGroup) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   expect(categoryGroup.compareDocumentPosition(analyticsHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   expect(categoryGroup.closest("section")).toBeNull();
+  const orderManagementSection = screen.getByRole("heading", { name: "Live orders" }).closest("section");
+  const analyticsSection = (await screen.findByRole("heading", { name: "Cake sales trend" })).closest("section");
+  expect(analyticsSection.compareDocumentPosition(orderManagementSection) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  const statValue = (label) => screen.getByText(label, { selector: "p" }).parentElement.querySelectorAll("p")[1];
   const liveOrderLink = await screen.findByRole("link", { name: "#401" });
   expect(liveOrderLink).toHaveAttribute("href", "/admin/orders?order_id=401");
+  expect(statValue("Orders Today")).toHaveTextContent("2");
+  expect(statValue("Pending")).toHaveTextContent("1");
+  expect(statValue("Completed")).toHaveTextContent("1");
+  expect(statValue("Sales Today")).toHaveTextContent("₱650");
+  expect(screen.getByText("Live orders placed today")).toBeInTheDocument();
   expect(screen.queryByText("Completed Customer")).not.toBeInTheDocument();
   expect(screen.queryByText("Custom Customer")).not.toBeInTheDocument();
 
@@ -144,6 +154,11 @@ test("switches between live and customized orders and links each order to its de
   expect(await screen.findByRole("heading", { name: "Customized orders" })).toBeInTheDocument();
   const customOrderLink = await screen.findByRole("link", { name: "#402" });
   expect(customOrderLink).toHaveAttribute("href", "/admin/custom-cakes?order_id=402");
+  expect(statValue("Orders Today")).toHaveTextContent("1");
+  expect(statValue("Pending")).toHaveTextContent("1");
+  expect(statValue("Completed")).toHaveTextContent("0");
+  expect(statValue("Sales Today")).toHaveTextContent("₱0");
+  expect(screen.getByText("Customized orders placed today")).toBeInTheDocument();
   expect(screen.queryByText("Live Customer")).not.toBeInTheDocument();
 
   fireEvent.click(liveOrdersButton);

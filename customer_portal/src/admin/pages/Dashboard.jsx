@@ -225,7 +225,6 @@ function TrendChart({ rows, metric }) {
 
 export default function Dashboard() {
   const [dashboardData, setDashboardData] = useState(null);
-  const [dashboardLoading, setDashboardLoading] = useState(true);
   const [dashboardError, setDashboardError] = useState("");
   const [orderCategory, setOrderCategory] = useState("live");
   const [categoryOrders, setCategoryOrders] = useState([]);
@@ -240,7 +239,6 @@ export default function Dashboard() {
   const [analyticsRefreshVersion, setAnalyticsRefreshVersion] = useState(0);
 
   const fetchDashboardData = useCallback(async () => {
-    setDashboardLoading(true);
     setDashboardError("");
     try {
       const response = await fetch(`${LARAVEL_BASE}/api/staff/dashboard`, {
@@ -256,8 +254,6 @@ export default function Dashboard() {
       console.error("Admin dashboard data load failed:", error);
       setDashboardError(error.message || "Unable to load dashboard data.");
       setDashboardData(null);
-    } finally {
-      setDashboardLoading(false);
     }
   }, []);
 
@@ -293,16 +289,7 @@ export default function Dashboard() {
             ...order,
             items: Array.isArray(order.items) ? order.items : [],
           }));
-          const visibleOrders = orderCategory === "customized"
-            ? loadedOrders
-            : loadedOrders.filter((order) => {
-              const status = String(order.status || "").toLowerCase();
-              const paymentMethod = String(order.payment || "").toLowerCase().replace(/[^a-z0-9]/g, "");
-              const paymentStatus = String(order.payment_status || "").toLowerCase();
-              return !["completed", "cancelled", "canceled"].includes(status)
-                && (!["gcash", "qrph"].includes(paymentMethod) || paymentStatus === "paid");
-            });
-          setCategoryOrders(visibleOrders);
+          setCategoryOrders(loadedOrders);
         }
       } catch (error) {
         console.error(`Admin dashboard ${orderCategory} orders load failed:`, error);
@@ -353,24 +340,52 @@ export default function Dashboard() {
     ? dashboardData.order_status_breakdown
     : [];
 
-  const displayedCategoryOrders = categoryOrders;
+  const displayedCategoryOrders = orderCategory === "customized"
+    ? categoryOrders
+    : categoryOrders.filter((order) => {
+      const status = String(order.status || "").toLowerCase();
+      const paymentMethod = String(order.payment || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+      const paymentStatus = String(order.payment_status || "").toLowerCase();
+      return !["completed", "cancelled", "canceled"].includes(status)
+        && (!["gcash", "qrph"].includes(paymentMethod) || paymentStatus === "paid");
+    });
 
   const mostSoldItems = Array.isArray(analytics?.topSellingCakes) ? analytics.topSellingCakes : [];
 
   const analyticsSummary = analytics?.summary || {};
-  const totalSalesToday = Number(dashboardSummary.sales_today || 0);
-  const allTimeSalesSelected = analyticsPreset === "all";
-  const completedCount = allTimeSalesSelected
-    ? analyticsSummary.total_cake_sales
-    : dashboardSummary.completed_orders_total;
-  const completedLoading = dashboardLoading || (allTimeSalesSelected && analyticsLoading);
-  const completedError = dashboardError || (allTimeSalesSelected && analyticsError);
+  const orderCategorySummary = useMemo(() => {
+    const today = new Date().toDateString();
+    const ordersToday = categoryOrders.filter((order) => {
+      const createdAt = order.created_at ? new Date(order.created_at) : null;
+      return createdAt && !Number.isNaN(createdAt.getTime()) && createdAt.toDateString() === today;
+    });
+    const countStatus = (orders, status) => orders.filter(
+      (order) => String(order.status || "").trim().toLowerCase() === status,
+    ).length;
+    const completedToday = ordersToday.filter(
+      (order) => String(order.status || "").trim().toLowerCase() === "completed",
+    );
+
+    return {
+      ordersToday: ordersToday.length,
+      pending: countStatus(categoryOrders, "pending"),
+      preparing: countStatus(categoryOrders, "preparing"),
+      completed: countStatus(categoryOrders, "completed"),
+      salesToday: completedToday.reduce((sum, order) => sum + (Number(order.total) || 0), 0),
+    };
+  }, [categoryOrders]);
+  const categoryStatValue = (value) => categoryOrdersLoading
+    ? "…"
+    : categoryOrdersError
+      ? "—"
+      : value;
+  const categoryName = orderCategory === "customized" ? "Customized" : "Live";
   const stats = [
-    { label: "Orders Today", value: dashboardLoading ? "…" : dashboardError ? "—" : Number(dashboardSummary.orders_today || 0).toLocaleString(), hint: "Orders placed today", icon: ShoppingCart, iconTone: "bg-[#fff4cd] text-[#9b7810]", tone: "text-[#33251e]", accent: "#d4af37", to: "/admin/orders?date=today" },
-    { label: "Pending", value: dashboardLoading ? "…" : dashboardError ? "—" : Number(dashboardSummary.pending_orders_total || 0).toLocaleString(), hint: "Awaiting confirmation", icon: Clock3, iconTone: "bg-[#fff4cd] text-[#9b7810]", tone: "text-[#33251e]", accent: "#c87954", to: "/admin/orders" },
-    { label: "Preparing", value: dashboardLoading ? "…" : dashboardError ? "—" : Number(dashboardSummary.preparing_orders_total || 0).toLocaleString(), hint: "In production", icon: ChefHat, iconTone: "bg-[#fff4cd] text-[#9b7810]", tone: "text-[#33251e]", accent: "#c9a94f", to: "/admin/orders" },
-    { label: "Completed", value: completedLoading ? "…" : completedError ? "—" : Number(completedCount || 0).toLocaleString(), hint: allTimeSalesSelected ? "Completed cake sales · incl. history" : "Delivered / picked up", icon: CircleCheck, iconTone: "bg-[#eef5e9] text-[#68815d]", tone: "text-[#33251e]", accent: "#81906c", to: "/admin/orders/history" },
-    { label: "Sales Today", value: dashboardLoading ? "…" : dashboardError ? "—" : `₱${totalSalesToday.toLocaleString()}`, hint: "Completed revenue today", icon: TrendingUp, iconTone: "bg-[#fff4cd] text-[#9b7810]", tone: "text-[#33251e]", accent: "#d4af37", to: "/admin/reports" },
+    { label: "Orders Today", value: categoryStatValue(orderCategorySummary.ordersToday.toLocaleString()), hint: `${categoryName} orders placed today`, icon: ShoppingCart, iconTone: "bg-[#fff4cd] text-[#9b7810]", tone: "text-[#33251e]", accent: "#d4af37", to: "/admin/orders?date=today" },
+    { label: "Pending", value: categoryStatValue(orderCategorySummary.pending.toLocaleString()), hint: `${categoryName} awaiting confirmation`, icon: Clock3, iconTone: "bg-[#fff4cd] text-[#9b7810]", tone: "text-[#33251e]", accent: "#c87954", to: "/admin/orders" },
+    { label: "Preparing", value: categoryStatValue(orderCategorySummary.preparing.toLocaleString()), hint: `${categoryName} in production`, icon: ChefHat, iconTone: "bg-[#fff4cd] text-[#9b7810]", tone: "text-[#33251e]", accent: "#c9a94f", to: "/admin/orders" },
+    { label: "Completed", value: categoryStatValue(orderCategorySummary.completed.toLocaleString()), hint: `${categoryName} delivered / picked up`, icon: CircleCheck, iconTone: "bg-[#eef5e9] text-[#68815d]", tone: "text-[#33251e]", accent: "#81906c", to: "/admin/orders/history" },
+    { label: "Sales Today", value: categoryStatValue(`₱${orderCategorySummary.salesToday.toLocaleString()}`), hint: `${categoryName} completed revenue today`, icon: TrendingUp, iconTone: "bg-[#fff4cd] text-[#9b7810]", tone: "text-[#33251e]", accent: "#d4af37", to: "/admin/reports" },
   ];
 
   const reviewAnalytics = analytics?.reviewAnalytics || {};
@@ -438,79 +453,6 @@ export default function Dashboard() {
 
           <div className="mb-5">
             <StatsStrip stats={stats} />
-          </div>
-
-          <div className="mb-8">
-            <Panel
-              eyebrow="Order Management"
-              title={orderCategory === "customized" ? "Customized orders" : "Live orders"}
-              action={
-                <Link to={orderCategory === "customized" ? "/admin/custom-cakes" : "/admin/orders"} className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.15em] text-[#765d50] transition-colors hover:text-[#9b7810]">
-                  View all <ArrowRight size={13} />
-                </Link>
-              }
-            >
-              <div className="overflow-x-auto">
-                <table className="w-full border-collapse text-left">
-                  <thead>
-                    <tr className="border-b border-[#f0e7e0] text-[10px] uppercase tracking-[0.2em] text-[#9b8c83]">
-                      <th className="px-6 py-3 font-semibold">Order</th>
-                      <th className="px-4 py-3 font-semibold">Customer</th>
-                      <th className="px-4 py-3 font-semibold">Items</th>
-                      <th className="px-4 py-3 font-semibold">Total</th>
-                      <th className="px-4 py-3 font-semibold">Status</th>
-                      <th className="px-4 py-3 font-semibold">Placed</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {categoryOrdersLoading ? (
-                      <tr>
-                        <td colSpan={6} className="px-6 py-10 text-center text-[13px] text-[#9b8c83]">
-                          Loading {orderCategory === "customized" ? "customized" : "live"} orders…
-                        </td>
-                      </tr>
-                    ) : categoryOrdersError ? (
-                      <tr>
-                        <td colSpan={6} className="px-6 py-6 text-center text-[13px] text-[#8d5357]" role="alert">
-                          Unable to load {orderCategory === "customized" ? "customized" : "live"} orders: {categoryOrdersError}
-                        </td>
-                      </tr>
-                    ) : displayedCategoryOrders.length === 0 ? (
-                      <tr>
-                        <td colSpan={6} className="px-6 py-10 text-center text-[13px] text-[#9b8c83]">
-                          No {orderCategory === "customized" ? "customized" : "live"} orders yet.
-                        </td>
-                      </tr>
-                    ) : (
-                      displayedCategoryOrders.slice(0, 8).map((order) => {
-                        const orderDetailsUrl = orderCategory === "customized"
-                          ? `/admin/custom-cakes?order_id=${encodeURIComponent(order.id)}`
-                          : `/admin/orders?order_id=${encodeURIComponent(order.id)}`;
-                        return (
-                          <tr key={order.id} className="border-b border-[#f0e7e0] transition-colors last:border-0 hover:bg-[#faf8f5]">
-                            <td className="px-6 py-4 text-[13px] font-semibold text-[#33251e]"><Link to={orderDetailsUrl} className="rounded-sm hover:text-[#9b7810] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d4af37]">#{order.order_number ?? order.id}</Link></td>
-                            <td className="px-4 py-4 text-[13px] text-[#5f514a]">{order.customer || order.name || order.customer_name || order.email || "—"}</td>
-                            <td className="px-4 py-4 text-[12px] text-[#74675f]">
-                              {order.items?.[0]?.name || (orderCategory === "customized" ? "Customized Cake" : "—")}
-                              {order.items?.length > 1 && ` +${order.items.length - 1} more`}
-                            </td>
-                            <td className="px-4 py-4 text-[13px] font-semibold text-[#33251e]">₱{Number(order.total || 0).toLocaleString()}</td>
-                            <td className="px-4 py-4">
-                              <span className={`inline-block rounded-full px-2.5 py-1 text-[10px] font-semibold ${STATUS_STYLES[order.status] || "bg-[#D4AF37]/10 text-black"}`}>
-                                {order.status}
-                              </span>
-                            </td>
-                            <td className="px-4 py-4 text-[12px] text-[#9b8c83]">
-                              {order.created_at ? new Date(order.created_at).toLocaleDateString([], { month: "short", day: "numeric" }) : "—"}
-                            </td>
-                          </tr>
-                        );
-                      })
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </Panel>
           </div>
 
           <div className="mb-6 space-y-4">
@@ -755,6 +697,79 @@ export default function Dashboard() {
 
               </>
             )}
+          </div>
+
+          <div className="mb-8">
+            <Panel
+              eyebrow="Order Management"
+              title={orderCategory === "customized" ? "Customized orders" : "Live orders"}
+              action={
+                <Link to={orderCategory === "customized" ? "/admin/custom-cakes" : "/admin/orders"} className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.15em] text-[#765d50] transition-colors hover:text-[#9b7810]">
+                  View all <ArrowRight size={13} />
+                </Link>
+              }
+            >
+              <div className="overflow-x-auto">
+                <table className="w-full border-collapse text-left">
+                  <thead>
+                    <tr className="border-b border-[#f0e7e0] text-[10px] uppercase tracking-[0.2em] text-[#9b8c83]">
+                      <th className="px-6 py-3 font-semibold">Order</th>
+                      <th className="px-4 py-3 font-semibold">Customer</th>
+                      <th className="px-4 py-3 font-semibold">Items</th>
+                      <th className="px-4 py-3 font-semibold">Total</th>
+                      <th className="px-4 py-3 font-semibold">Status</th>
+                      <th className="px-4 py-3 font-semibold">Placed</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {categoryOrdersLoading ? (
+                      <tr>
+                        <td colSpan={6} className="px-6 py-10 text-center text-[13px] text-[#9b8c83]">
+                          Loading {orderCategory === "customized" ? "customized" : "live"} orders…
+                        </td>
+                      </tr>
+                    ) : categoryOrdersError ? (
+                      <tr>
+                        <td colSpan={6} className="px-6 py-6 text-center text-[13px] text-[#8d5357]" role="alert">
+                          Unable to load {orderCategory === "customized" ? "customized" : "live"} orders: {categoryOrdersError}
+                        </td>
+                      </tr>
+                    ) : displayedCategoryOrders.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} className="px-6 py-10 text-center text-[13px] text-[#9b8c83]">
+                          No {orderCategory === "customized" ? "customized" : "live"} orders yet.
+                        </td>
+                      </tr>
+                    ) : (
+                      displayedCategoryOrders.slice(0, 8).map((order) => {
+                        const orderDetailsUrl = orderCategory === "customized"
+                          ? `/admin/custom-cakes?order_id=${encodeURIComponent(order.id)}`
+                          : `/admin/orders?order_id=${encodeURIComponent(order.id)}`;
+                        return (
+                          <tr key={order.id} className="border-b border-[#f0e7e0] transition-colors last:border-0 hover:bg-[#faf8f5]">
+                            <td className="px-6 py-4 text-[13px] font-semibold text-[#33251e]"><Link to={orderDetailsUrl} className="rounded-sm hover:text-[#9b7810] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d4af37]">#{order.order_number ?? order.id}</Link></td>
+                            <td className="px-4 py-4 text-[13px] text-[#5f514a]">{order.customer || order.name || order.customer_name || order.email || "—"}</td>
+                            <td className="px-4 py-4 text-[12px] text-[#74675f]">
+                              {order.items?.[0]?.name || (orderCategory === "customized" ? "Customized Cake" : "—")}
+                              {order.items?.length > 1 && ` +${order.items.length - 1} more`}
+                            </td>
+                            <td className="px-4 py-4 text-[13px] font-semibold text-[#33251e]">₱{Number(order.total || 0).toLocaleString()}</td>
+                            <td className="px-4 py-4">
+                              <span className={`inline-block rounded-full px-2.5 py-1 text-[10px] font-semibold ${STATUS_STYLES[order.status] || "bg-[#D4AF37]/10 text-black"}`}>
+                                {order.status}
+                              </span>
+                            </td>
+                            <td className="px-4 py-4 text-[12px] text-[#9b8c83]">
+                              {order.created_at ? new Date(order.created_at).toLocaleDateString([], { month: "short", day: "numeric" }) : "—"}
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </Panel>
           </div>
 
         </div>
