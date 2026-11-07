@@ -422,6 +422,99 @@ export default function Dashboard() {
             <StatsStrip stats={stats} />
           </div>
 
+          <div className="mb-8">
+            <Panel
+              eyebrow="Order Management"
+              title={orderCategory === "customized" ? "Customized orders" : "Live orders"}
+              action={
+                <div className="flex flex-wrap items-center justify-end gap-2">
+                  <div className="flex rounded-lg border border-[#eadfd8] bg-[#fbf7f2] p-1" role="group" aria-label="Order category">
+                    <button
+                      type="button"
+                      onClick={() => setOrderCategory("live")}
+                      aria-pressed={orderCategory === "live"}
+                      className={`rounded-md px-3 py-1.5 text-[10px] font-semibold transition-colors ${orderCategory === "live" ? "bg-[#33251e] text-white" : "text-[#765d50] hover:bg-white"}`}
+                    >
+                      Live Orders
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setOrderCategory("customized")}
+                      aria-pressed={orderCategory === "customized"}
+                      className={`rounded-md px-3 py-1.5 text-[10px] font-semibold transition-colors ${orderCategory === "customized" ? "bg-[#33251e] text-white" : "text-[#765d50] hover:bg-white"}`}
+                    >
+                      Customized
+                    </button>
+                  </div>
+                  <Link to={orderCategory === "customized" ? "/admin/custom-cakes" : "/admin/orders"} className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.15em] text-[#765d50] transition-colors hover:text-[#9b7810]">
+                    View all <ArrowRight size={13} />
+                  </Link>
+                </div>
+              }
+            >
+              <div className="overflow-x-auto">
+                <table className="w-full border-collapse text-left">
+                  <thead>
+                    <tr className="border-b border-[#f0e7e0] text-[10px] uppercase tracking-[0.2em] text-[#9b8c83]">
+                      <th className="px-6 py-3 font-semibold">Order</th>
+                      <th className="px-4 py-3 font-semibold">Customer</th>
+                      <th className="px-4 py-3 font-semibold">Items</th>
+                      <th className="px-4 py-3 font-semibold">Total</th>
+                      <th className="px-4 py-3 font-semibold">Status</th>
+                      <th className="px-4 py-3 font-semibold">Placed</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {categoryOrdersLoading ? (
+                      <tr>
+                        <td colSpan={6} className="px-6 py-10 text-center text-[13px] text-[#9b8c83]">
+                          Loading {orderCategory === "customized" ? "customized" : "live"} orders…
+                        </td>
+                      </tr>
+                    ) : categoryOrdersError ? (
+                      <tr>
+                        <td colSpan={6} className="px-6 py-6 text-center text-[13px] text-[#8d5357]" role="alert">
+                          Unable to load {orderCategory === "customized" ? "customized" : "live"} orders: {categoryOrdersError}
+                        </td>
+                      </tr>
+                    ) : displayedCategoryOrders.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} className="px-6 py-10 text-center text-[13px] text-[#9b8c83]">
+                          No {orderCategory === "customized" ? "customized" : "live"} orders yet.
+                        </td>
+                      </tr>
+                    ) : (
+                      displayedCategoryOrders.slice(0, 8).map((order) => {
+                        const orderDetailsUrl = orderCategory === "customized"
+                          ? `/admin/custom-cakes?order_id=${encodeURIComponent(order.id)}`
+                          : `/admin/orders?order_id=${encodeURIComponent(order.id)}`;
+                        return (
+                          <tr key={order.id} className="border-b border-[#f0e7e0] transition-colors last:border-0 hover:bg-[#faf8f5]">
+                            <td className="px-6 py-4 text-[13px] font-semibold text-[#33251e]"><Link to={orderDetailsUrl} className="rounded-sm hover:text-[#9b7810] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d4af37]">#{order.order_number ?? order.id}</Link></td>
+                            <td className="px-4 py-4 text-[13px] text-[#5f514a]">{order.customer || order.name || order.customer_name || order.email || "—"}</td>
+                            <td className="px-4 py-4 text-[12px] text-[#74675f]">
+                              {order.items?.[0]?.name || (orderCategory === "customized" ? "Customized Cake" : "—")}
+                              {order.items?.length > 1 && ` +${order.items.length - 1} more`}
+                            </td>
+                            <td className="px-4 py-4 text-[13px] font-semibold text-[#33251e]">₱{Number(order.total || 0).toLocaleString()}</td>
+                            <td className="px-4 py-4">
+                              <span className={`inline-block rounded-full px-2.5 py-1 text-[10px] font-semibold ${STATUS_STYLES[order.status] || "bg-[#D4AF37]/10 text-black"}`}>
+                                {order.status}
+                              </span>
+                            </td>
+                            <td className="px-4 py-4 text-[12px] text-[#9b8c83]">
+                              {order.created_at ? new Date(order.created_at).toLocaleDateString([], { month: "short", day: "numeric" }) : "—"}
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </Panel>
+          </div>
+
           <div className="mb-6 space-y-4">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
               <div>
@@ -664,99 +757,6 @@ export default function Dashboard() {
 
               </>
             )}
-          </div>
-
-          <div className="mb-8">
-            <Panel
-              eyebrow="Order Management"
-              title={orderCategory === "customized" ? "Customized orders" : "Live orders"}
-              action={
-                <div className="flex flex-wrap items-center justify-end gap-2">
-                  <div className="flex rounded-lg border border-[#eadfd8] bg-[#fbf7f2] p-1" role="group" aria-label="Order category">
-                    <button
-                      type="button"
-                      onClick={() => setOrderCategory("live")}
-                      aria-pressed={orderCategory === "live"}
-                      className={`rounded-md px-3 py-1.5 text-[10px] font-semibold transition-colors ${orderCategory === "live" ? "bg-[#33251e] text-white" : "text-[#765d50] hover:bg-white"}`}
-                    >
-                      Live Orders
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setOrderCategory("customized")}
-                      aria-pressed={orderCategory === "customized"}
-                      className={`rounded-md px-3 py-1.5 text-[10px] font-semibold transition-colors ${orderCategory === "customized" ? "bg-[#33251e] text-white" : "text-[#765d50] hover:bg-white"}`}
-                    >
-                      Customized
-                    </button>
-                  </div>
-                  <Link to={orderCategory === "customized" ? "/admin/custom-cakes" : "/admin/orders"} className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.15em] text-[#765d50] transition-colors hover:text-[#9b7810]">
-                    View all <ArrowRight size={13} />
-                  </Link>
-                </div>
-              }
-            >
-              <div className="overflow-x-auto">
-                <table className="w-full border-collapse text-left">
-                  <thead>
-                    <tr className="border-b border-[#f0e7e0] text-[10px] uppercase tracking-[0.2em] text-[#9b8c83]">
-                      <th className="px-6 py-3 font-semibold">Order</th>
-                      <th className="px-4 py-3 font-semibold">Customer</th>
-                      <th className="px-4 py-3 font-semibold">Items</th>
-                      <th className="px-4 py-3 font-semibold">Total</th>
-                      <th className="px-4 py-3 font-semibold">Status</th>
-                      <th className="px-4 py-3 font-semibold">Placed</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {categoryOrdersLoading ? (
-                      <tr>
-                        <td colSpan={6} className="px-6 py-10 text-center text-[13px] text-[#9b8c83]">
-                          Loading {orderCategory === "customized" ? "customized" : "live"} orders…
-                        </td>
-                      </tr>
-                    ) : categoryOrdersError ? (
-                      <tr>
-                        <td colSpan={6} className="px-6 py-6 text-center text-[13px] text-[#8d5357]" role="alert">
-                          Unable to load {orderCategory === "customized" ? "customized" : "live"} orders: {categoryOrdersError}
-                        </td>
-                      </tr>
-                    ) : displayedCategoryOrders.length === 0 ? (
-                      <tr>
-                        <td colSpan={6} className="px-6 py-10 text-center text-[13px] text-[#9b8c83]">
-                          No {orderCategory === "customized" ? "customized" : "live"} orders yet.
-                        </td>
-                      </tr>
-                    ) : (
-                      displayedCategoryOrders.slice(0, 8).map((order) => {
-                        const orderDetailsUrl = orderCategory === "customized"
-                          ? `/admin/custom-cakes?order_id=${encodeURIComponent(order.id)}`
-                          : `/admin/orders?order_id=${encodeURIComponent(order.id)}`;
-                        return (
-                          <tr key={order.id} className="border-b border-[#f0e7e0] transition-colors last:border-0 hover:bg-[#faf8f5]">
-                            <td className="px-6 py-4 text-[13px] font-semibold text-[#33251e]"><Link to={orderDetailsUrl} className="rounded-sm hover:text-[#9b7810] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d4af37]">#{order.order_number ?? order.id}</Link></td>
-                            <td className="px-4 py-4 text-[13px] text-[#5f514a]">{order.customer || order.name || order.customer_name || order.email || "—"}</td>
-                            <td className="px-4 py-4 text-[12px] text-[#74675f]">
-                              {order.items?.[0]?.name || (orderCategory === "customized" ? "Customized Cake" : "—")}
-                              {order.items?.length > 1 && ` +${order.items.length - 1} more`}
-                            </td>
-                            <td className="px-4 py-4 text-[13px] font-semibold text-[#33251e]">₱{Number(order.total || 0).toLocaleString()}</td>
-                            <td className="px-4 py-4">
-                              <span className={`inline-block rounded-full px-2.5 py-1 text-[10px] font-semibold ${STATUS_STYLES[order.status] || "bg-[#D4AF37]/10 text-black"}`}>
-                                {order.status}
-                              </span>
-                            </td>
-                            <td className="px-4 py-4 text-[12px] text-[#9b8c83]">
-                              {order.created_at ? new Date(order.created_at).toLocaleDateString([], { month: "short", day: "numeric" }) : "—"}
-                            </td>
-                          </tr>
-                        );
-                      })
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </Panel>
           </div>
 
         </div>
