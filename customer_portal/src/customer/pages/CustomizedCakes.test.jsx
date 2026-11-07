@@ -1,11 +1,13 @@
 import React from 'react';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { buildCustomizedCakeSubmissionPayload, buildTierSelections } from './customizedCakePayload';
 import CustomizedCakes from './CustomizedCakes';
 
+const mockNavigate = jest.fn();
+
 jest.mock('react-router-dom', () => ({
   useLocation: () => ({ pathname: '/customized-cakes', state: null }),
-  useNavigate: () => jest.fn(),
+  useNavigate: () => mockNavigate,
 }));
 
 jest.mock('../components/PageShell', () => ({ children }) => <div>{children}</div>);
@@ -122,6 +124,8 @@ describe('CustomizedCakes availability', () => {
 
   afterEach(() => {
     window.localStorage.clear();
+    window.sessionStorage.clear();
+    mockNavigate.mockReset();
     jest.restoreAllMocks();
   });
 
@@ -193,5 +197,43 @@ describe('CustomizedCakes availability', () => {
       'https://example.test/laravel/api/customized-cakes/order',
       expect.anything(),
     );
+  });
+
+  it('resets the form and returns to the customer dashboard after a successful request', async () => {
+    global.fetch.mockImplementation(async (url) => {
+      let data = {};
+      if (url.includes('/customized-cakes/request-status')) data = { enabled: true };
+      if (url.includes('/customized-cakes/flavors')) data = { flavors: [] };
+      if (url.includes('/customized-cakes/sizes')) data = { sizes: [] };
+      if (url.includes('/api/addresses')) data = { status: 'success', addresses: [] };
+      if (url.includes('/api/user')) data = { id: 5, name: 'Customer', email: 'customer@example.com' };
+      if (url.includes('/customized-cakes/order')) data = { success: true };
+      return { ok: true, text: async () => JSON.stringify(data) };
+    });
+    window.sessionStorage.setItem('customCakeRequestDraft:5', JSON.stringify({ customMessage: 'Happy birthday' }));
+    window.sessionStorage.setItem('customCakeReferenceImage', JSON.stringify({ url: '/cake.jpg' }));
+
+    render(<CustomizedCakes />);
+
+    const sendButton = screen.getByRole('button', { name: 'Send Request' });
+    const form = sendButton.closest('form');
+    await waitFor(() => expect(sendButton).toBeEnabled());
+    fireEvent.change(screen.getByPlaceholderText('Enter full name'), { target: { value: 'Updated Customer' } });
+    fireEvent.change(screen.getByLabelText('Pickup date'), { target: { value: '2030-01-02' } });
+    fireEvent.change(form.querySelector('select'), { target: { value: '10:00' } });
+    fireEvent.change(screen.getByLabelText('Special Instructions'), { target: { value: 'Extra decorations' } });
+    fireEvent.submit(form);
+
+    await waitFor(() => expect(mockNavigate).toHaveBeenCalledWith('/customer', { replace: true }));
+    expect(screen.getByPlaceholderText('Enter full name')).toHaveValue('Customer');
+    expect(screen.getByLabelText('Pickup date')).toHaveValue('');
+    expect(form.querySelector('select')).toHaveValue('');
+    expect(screen.getByLabelText('Special Instructions')).toHaveValue('');
+    expect(screen.getByRole('button', { name: 'Pickup' })).toHaveAttribute('aria-pressed', 'true');
+    expect(global.fetch).toHaveBeenCalledWith(
+      'https://example.test/laravel/api/customized-cakes/order',
+      expect.objectContaining({ method: 'POST' }),
+    );
+    expect(window.sessionStorage.getItem('customCakeReferenceImage')).toBeNull();
   });
 });

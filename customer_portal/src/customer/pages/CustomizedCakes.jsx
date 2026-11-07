@@ -452,6 +452,60 @@ export default function CustomizedCakes() {
     }
   };
 
+  const resetCustomCakeForm = () => {
+    setName(storedUser?.name || storedUser?.full_name || '');
+    setEmail(storedUser?.email || '');
+    setContactNumber(storedUser?.phone || storedUser?.phone_number || storedUser?.contact_number || '');
+    setPickupDate('');
+    setPickupTime('');
+    setDeliveryMethod('Pickup');
+    setDeliveryService('');
+    setDeliveryAddress('');
+    setCakeType('single');
+    setSingleSizeId(sizeCatalog[0] ? String(sizeCatalog[0].id) : '');
+    setTwoTierPreset('standard');
+    setFlavorId(flavorCatalog[0] ? String(flavorCatalog[0].id) : '');
+    setOccasion('Birthday');
+    setCustomOccasion('');
+    setCakeStyle('');
+    setPackaging('Standard');
+    setCustomTheme('');
+    setCakeColor('');
+    setCustomMessage('');
+    setSpecialInstructions('');
+    setAddons([]);
+    setCupcakeQuantity(12);
+    setBudget('');
+    setQuantity(1);
+    setFiles([]);
+    setGalleryReferences([]);
+    setReferenceImage(null);
+    setFeaturedPreview(null);
+    setIsReferencePreviewOpen(false);
+    setShowSavedAddressSuggestions(false);
+    setMessage('');
+    setShowLoginPrompt(false);
+    const fileInput = document.getElementById('custom-cake-reference-files');
+    if (fileInput) fileInput.value = '';
+    try {
+      window.sessionStorage.removeItem('customCakeReferenceImage');
+      window.sessionStorage.removeItem(referenceStorageKey);
+    } catch (error) {
+      console.warn('Could not clear custom cake reference images:', error);
+    }
+  };
+
+  const completeRequestSubmission = () => {
+    resetCustomCakeForm();
+    try {
+      window.sessionStorage.removeItem(`${CUSTOM_CAKE_DRAFT_KEY}:${storedUser?.id || 'guest'}`);
+      window.sessionStorage.removeItem(CUSTOM_CAKE_DRAFT_KEY);
+    } catch (error) {
+      console.warn('Could not clear submitted custom cake form details:', error);
+    }
+    navigate('/customer', { replace: true });
+  };
+
   const openReferenceGallery = () => {
     try {
       if (galleryReferences.length > 0) {
@@ -636,10 +690,7 @@ export default function CustomizedCakes() {
 
       const laravelData = await safeParseJson(laravelRes);
       if (laravelRes.ok && laravelData?.success) {
-        setMessage('Request submitted. Admin will review it within 24 hours, then send the final price and inform you whether it is accepted or declined.');
-        window.sessionStorage.removeItem(CUSTOM_CAKE_DRAFT_KEY);
-        window.sessionStorage.removeItem('customCakeReferenceImage');
-        window.sessionStorage.removeItem(referenceStorageKey);
+        completeRequestSubmission();
         return;
       }
       if (![404, 405].includes(laravelRes.status)) {
@@ -696,10 +747,7 @@ export default function CustomizedCakes() {
       }
 
       if (data && data.success) {
-        setMessage('Request submitted. Admin will review it within 24 hours, then send the final price and inform you whether it is accepted or declined.');
-        window.sessionStorage.removeItem(CUSTOM_CAKE_DRAFT_KEY);
-        window.sessionStorage.removeItem('customCakeReferenceImage');
-        window.sessionStorage.removeItem(referenceStorageKey);
+        completeRequestSubmission();
       } else {
         setMessage(data?.message || 'Failed to send request. Please try again.');
       }
@@ -1288,7 +1336,7 @@ export default function CustomizedCakes() {
                 </div>
               )}
               <div className="mt-4 flex flex-wrap justify-end gap-2 border-t border-[#f3ece6] pt-3">
-                <button type="button" onClick={() => { setCakeType('single'); setSingleSizeId(sizeCatalog[0] ? String(sizeCatalog[0].id) : ''); setTwoTierPreset('standard'); setFlavorId(flavorCatalog[0] ? String(flavorCatalog[0].id) : ''); setCakeStyle(''); setPackaging('Standard'); setAddons([]); setCupcakeQuantity(12); setBudget(''); setFiles([]); setGalleryReferences([]); setReferenceImage(null); window.sessionStorage.removeItem(referenceStorageKey); window.sessionStorage.removeItem('customCakeReferenceImage'); setMessage(''); setShowLoginPrompt(false); }} className="min-h-9 rounded-lg border border-[#f0d98a] bg-white px-3 py-1.5 text-xs font-semibold text-[#6b4f1d] transition hover:border-[#e5bd45] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#b89646]">
+                <button type="button" onClick={resetCustomCakeForm} className="min-h-9 rounded-lg border border-[#f0d98a] bg-white px-3 py-1.5 text-xs font-semibold text-[#6b4f1d] transition hover:border-[#e5bd45] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#b89646]">
                   Reset
                 </button>
                 <button disabled={requestFormDisabled} type="submit" className="min-h-9 rounded-lg border border-[#e5bd45] bg-[#ffe89a] px-3 py-1.5 text-xs font-semibold text-[#6b4f1d] transition hover:bg-[#ffedb5] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#b89646] disabled:cursor-not-allowed disabled:opacity-50">
