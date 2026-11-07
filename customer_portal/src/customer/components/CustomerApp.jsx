@@ -529,6 +529,7 @@ export default function CustomerApp() {
           <Route index element={<Dashboard onAddToCart={addToCart} onEnsureShopOpen={ensureShopIsOpen} hideFloating={hideDashboardFloaters} />} />
           <Route path="menu" element={<Menu onAddToCart={addToCart} onEnsureShopOpen={ensureShopIsOpen} />} />
           <Route path="orders" element={hasCustomerAccount() ? <Orders /> : <Navigate to="/customer/menu" replace />} />
+          <Route path="orders/customized" element={hasCustomerAccount() ? <Orders customizedOnly /> : <Navigate to="/customer/menu" replace />} />
           <Route path="customized-cakes" element={<CustomizedCakes />} />
           <Route path="birthday-designs" element={<BirthdayDesigns />} />
           <Route path="cutesy-designs" element={<CutesyDesigns />} />

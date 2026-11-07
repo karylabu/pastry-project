@@ -714,9 +714,9 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
                     </Link>
                   )}
                   <Link
-                    to="/customer/customized-cakes"
+                    to="/customer/orders/customized"
                     onClick={() => setOpenAccount(false)}
-                    className={accountLinkClass('/customer/customized-cakes')}
+                    className={accountLinkClass('/customer/orders/customized')}
                   >
                     Customized Cake Orders
                   </Link>

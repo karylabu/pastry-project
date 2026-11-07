@@ -201,6 +201,45 @@ test('shows Awaiting Payment only for customized orders in the customer status f
   expect(screen.queryByText('Blueberry Cheesecake')).not.toBeInTheDocument();
 });
 
+test('shows only customized orders on the customized orders page', async () => {
+  global.fetch = jest.fn((url) => {
+    if (String(url).includes('/api/customer/products')) {
+      return Promise.resolve({ ok: true, json: async () => [] });
+    }
+
+    return Promise.resolve({
+      ok: true,
+      json: async () => ({
+        success: true,
+        orders: [
+          {
+            id: 605,
+            user_id: 7,
+            customer: 'Customer',
+            status: 'Pending',
+            items: [{ name: 'Customized Cake', qty: 1, price: 1800 }],
+            custom_cake_details: { cake_flavor: 'Vanilla' },
+          },
+          {
+            id: 606,
+            user_id: 7,
+            customer: 'Customer',
+            status: 'Pending',
+            items: [{ name: 'Blueberry Cheesecake', qty: 1, price: 500 }],
+          },
+        ],
+      }),
+    });
+  });
+
+  render(<Orders customizedOnly />);
+
+  expect(await screen.findByRole('heading', { name: 'Customized Cake Orders' })).toBeInTheDocument();
+  expect(await screen.findByRole('button', { name: /^All order \(1\)$/ })).toBeInTheDocument();
+  expect(screen.getByText('Customized Cake')).toBeInTheDocument();
+  expect(screen.queryByText('Blueberry Cheesecake')).not.toBeInTheDocument();
+});
+
 test('shows the bakery logo for custom cake orders without a reference image', async () => {
   global.fetch = jest.fn((url) => {
     if (String(url).includes('/api/customer/products')) {

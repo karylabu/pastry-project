@@ -362,7 +362,7 @@ function FeedbackDialog({ order, onSubmit, onDismiss, isLoading }) {
 }
 
 // ── Main Component ────────────────────────────────────────────────────────────
-export default function Orders() {
+export default function Orders({ customizedOnly = false }) {
   const [orders, setOrders]           = useState([]);
   const [ordersLoadError, setOrdersLoadError] = useState(false);
   const [user, setUser]               = useState(null);
@@ -1182,9 +1182,10 @@ export default function Orders() {
 
   // ── Helpers ─────────────────────────────────────────────────────────────────
   const statusOptions = ["All", "Pending", "Awaiting Payment", "Preparing", "Awaiting Balance Payment", "Ready for Pickup", "Completed", "Cancelled"];
+  const displayOrders = customizedOnly ? orders.filter(isCustomCakeOrder) : orders;
 
   const statusCounts = statusOptions.reduce((acc, s) => {
-    acc[s] = s === 'All' ? orders.length : orders.filter((o) => (
+    acc[s] = s === 'All' ? displayOrders.length : displayOrders.filter((o) => (
       String(o.status || '').toLowerCase() === s.toLowerCase()
       && (s !== 'Awaiting Payment' || o.is_customized)
     )).length;
@@ -1200,7 +1201,7 @@ export default function Orders() {
   };
 
   // Filter and sort orders for display
-  const filteredOrders = orders.filter((o) => {
+  const filteredOrders = displayOrders.filter((o) => {
     const matchesStatus = !statusFilter || statusFilter === 'All'
       ? true
       : String(o.status || '').toLowerCase() === String(statusFilter || '').toLowerCase()
@@ -1279,8 +1280,12 @@ export default function Orders() {
         <div className="mb-6 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
           <div>
             <p className="text-[9px] font-black uppercase tracking-[0.28em] text-[#9b7b3d]">Your orders</p>
-            <h1 className="mt-1 font-serif text-2xl font-bold tracking-tight text-[#33251e] sm:text-3xl">All Orders</h1>
-            <p className="mt-1 text-xs text-[#9b8c83]">Check all your orders in one place. It's easy to manage.</p>
+            <h1 className="mt-1 font-serif text-2xl font-bold tracking-tight text-[#33251e] sm:text-3xl">
+              {customizedOnly ? 'Customized Cake Orders' : 'All Orders'}
+            </h1>
+            <p className="mt-1 text-xs text-[#9b8c83]">
+              {customizedOnly ? 'Check your customized cake orders in one place.' : "Check all your orders in one place. It's easy to manage."}
+            </p>
           </div>
         </div>
 
