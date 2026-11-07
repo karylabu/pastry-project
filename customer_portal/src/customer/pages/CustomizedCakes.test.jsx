@@ -176,6 +176,10 @@ describe('CustomizedCakes availability', () => {
     for (const category of ['Birthday', 'Cutesy', 'Holidays', 'Kids Themes', 'Wedding', 'Floral Designs']) {
       expect(within(occasion).getByRole('option', { name: category })).toBeInTheDocument();
     }
+    for (const nonCategory of ['Anniversary', 'Graduation', 'Baby Shower']) {
+      expect(within(occasion).queryByRole('option', { name: nonCategory })).not.toBeInTheDocument();
+    }
+    expect(within(occasion).getByRole('option', { name: 'Other' })).toBeInTheDocument();
   });
 
   it('disables elapsed time slots for today but leaves them available for future dates', async () => {
