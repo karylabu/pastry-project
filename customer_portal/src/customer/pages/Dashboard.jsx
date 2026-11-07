@@ -155,7 +155,7 @@ function SecondaryBanner({ onOrderNow }) {
       <div className="relative aspect-[5/2] w-full overflow-hidden md:aspect-auto md:h-[340px]">
         {secondaryBanner.type === "video" ? (
           <video
-            className="h-full w-full object-contain md:scale-[1.08] md:object-cover"
+            className="h-full w-full object-contain"
             src={secondaryBanner.src}
             autoPlay
             muted
@@ -166,7 +166,7 @@ function SecondaryBanner({ onOrderNow }) {
           <img
             src={secondaryBanner.src}
             alt="Pastry Project banner"
-            className="h-full w-full object-contain md:scale-[1.08] md:object-cover"
+            className="h-full w-full object-contain"
           />
         )}
         <button
