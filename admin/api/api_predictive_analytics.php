@@ -75,20 +75,28 @@ function getProductAliasMap(mysqli $conn): array {
 
 function getSalesHistory(mysqli $conn): array {
     $history = [];
+    $productAliases = getProductAliasMap($conn);
 
     $tables = mysqli_query($conn, "SHOW TABLES LIKE 'order_items'");
     $hasOrderItems = $tables && mysqli_num_rows($tables) > 0;
     if ($tables) mysqli_free_result($tables);
 
     if ($hasOrderItems) {
+        $productIdColumn = mysqli_query($conn, "SHOW COLUMNS FROM order_items LIKE 'product_id'");
+        $hasProductId = $productIdColumn && mysqli_num_rows($productIdColumn) > 0;
+        if ($productIdColumn) mysqli_free_result($productIdColumn);
+        $productName = $hasProductId ? 'COALESCE(products.name, oi.product)' : 'oi.product';
+        $productJoin = $hasProductId ? 'LEFT JOIN products ON products.id = oi.product_id' : '';
         $sql = "
-            SELECT DATE(o.created_at) AS order_date, oi.product, SUM(oi.qty) AS quantity, COUNT(*) AS record_count
+            SELECT DATE(o.created_at) AS order_date, {$productName} AS product,
+                   SUM(oi.qty) AS quantity, COUNT(*) AS record_count
             FROM orders o
             INNER JOIN order_items oi ON oi.order_id = o.id
+            {$productJoin}
             WHERE (o.status IS NULL OR o.status NOT IN ('Cancelled', 'cancelled'))
-            AND oi.product IS NOT NULL AND TRIM(oi.product) <> ''
-            GROUP BY DATE(o.created_at), oi.product
-            ORDER BY order_date ASC, oi.product ASC
+            AND {$productName} IS NOT NULL AND TRIM({$productName}) <> ''
+            GROUP BY DATE(o.created_at), product
+            ORDER BY order_date ASC, product ASC
         ";
     } else {
         $sql = "
@@ -109,6 +117,7 @@ function getSalesHistory(mysqli $conn): array {
         if ($hasOrderItems) {
             $orderDate = $row['order_date'] ?? '';
             $product = normalizeProductName($row['product'] ?? '');
+            $product = $productAliases[normalizeAliasKey($product)] ?? $product;
             $qty = max(0, (float) ($row['quantity'] ?? 0));
             if ($orderDate && $product && $qty > 0) {
                 $history[] = [
@@ -129,6 +138,7 @@ function getSalesHistory(mysqli $conn): array {
 
         foreach ($items as $item) {
             $product = normalizeProductName($item['name'] ?? $item['product'] ?? $item['title'] ?? '');
+            $product = $productAliases[normalizeAliasKey($product)] ?? $product;
             $qty = max(0, (float) ($item['qty'] ?? $item['quantity'] ?? 0));
             if ($orderDate && $product && $qty > 0) {
                 $date = date('Y-m-d', strtotime($orderDate));
@@ -151,7 +161,6 @@ function getSalesHistory(mysqli $conn): array {
         $seen[$h['date'] . '|' . productMatchKey($h['product'])] = true;
     }
 
-    $productAliases = getProductAliasMap($conn);
     $historyTable = mysqli_query($conn, "SHOW TABLES LIKE 'analytics_sales_history'");
     if ($historyTable && mysqli_num_rows($historyTable) > 0) {
         $overlapColumn = mysqli_query($conn, "SHOW COLUMNS FROM analytics_imports LIKE 'overlap_mode'");
