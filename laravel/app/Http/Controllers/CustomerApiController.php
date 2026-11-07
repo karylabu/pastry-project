@@ -1161,8 +1161,28 @@ class CustomerApiController extends Controller
             }
         }
 
-        if ($sender === 'customer' && $orderId <= 0 && preg_match('/\b(?:order\s*(?:#|number|no\.?|id)?\s*)?(\d{1,8})\b/i', $message, $matches)) {
-            $orderId = intval($matches[1]);
+        if ($sender === 'customer' && $orderId <= 0) {
+            if (preg_match('/^\s*(\d{1,8})\s*$/', $message, $matches)
+                || preg_match('/\border\s*(?:(?:number|no\.?|id)\s*)?(?:#|:)?\s*(\d{1,8})\b/i', $message, $matches)
+                || preg_match('/#(\d{1,8})\b/', $message, $matches)) {
+                $orderId = intval($matches[1]);
+            }
+        }
+
+        $orderNumberReply = null;
+        if ($sender === 'customer' && $orderId > 0) {
+            $customerOrder = DB::table('orders')
+                ->where('id', $orderId)
+                ->where('user_id', $user->id)
+                ->first(['id', 'status']);
+            if ($customerOrder) {
+                $orderNumberReply = $customerOrder->status
+                    ? "Your order #{$customerOrder->id} is currently {$customerOrder->status}."
+                    : "I found your order #{$customerOrder->id}, but its status is not available yet. Please contact our team for an update.";
+            } else {
+                $orderNumberReply = "I couldn't find an order matching that number in your account. Please check the number and try again.";
+                $orderId = 0;
+            }
         }
 
         $dbOrderId = ($orderId > 0) ? $orderId : null;
@@ -1251,13 +1271,31 @@ class CustomerApiController extends Controller
 
         $aiReply = null;
         $needsStaff = false;
-        if ($sender === 'customer' && !in_array(strtolower((string) $supportMode), ['staff', 'admin'], true) && !$isQuickChat) {
+        if ($orderNumberReply !== null && !in_array(strtolower((string) $supportMode), ['staff', 'admin'], true)) {
+            $aiReply = $orderNumberReply;
+            $aiMessageData = [
+                'order_id' => $dbOrderId,
+                'sender' => 'ai',
+                'message' => $aiReply,
+            ];
+            if (Schema::hasColumn('messages', 'user_id')) {
+                $aiMessageData['user_id'] = $dbUserId;
+            }
+            if ($hasConversationId) {
+                $aiMessageData['conversation_id'] = $conversationId;
+            }
+            if (Schema::hasColumn('messages', 'created_at')) {
+                $aiMessageData['created_at'] = now();
+            }
+            DB::table('messages')->insert($aiMessageData);
+        } elseif ($sender === 'customer' && !in_array(strtolower((string) $supportMode), ['staff', 'admin'], true) && !$isQuickChat) {
             $orderContext = 'No order was provided. Answer general questions about products, ordering, delivery, payment, and shop hours.';
             $order = null;
             if ($orderId > 0) {
                 $order = DB::table('orders')
                     ->select('id', 'status', 'total', 'method', 'address', 'created_at')
                     ->where('id', $orderId)
+                    ->where('user_id', $user->id)
                     ->first();
                 $orderContext = $order
                     ? "Order #{$order->id} | Status: {$order->status} | Total: PHP {$order->total} | Method: {$order->method} | Address: {$order->address} | Placed: {$order->created_at}"
@@ -1568,7 +1606,7 @@ PROMPT;
             }
         }
 
-        if ($sender === 'customer' && $isQuickChat) {
+        if ($sender === 'customer' && $isQuickChat && $orderNumberReply === null) {
             $quickChatKey = strtolower(trim((string) preg_replace('/[.!?]+$/', '', $message)));
             $quickChatReplies = [
                 'hi, i need help' => 'Hi! I’m here to help. Is your question about an order, placing an order, a customized cake, or payment?',

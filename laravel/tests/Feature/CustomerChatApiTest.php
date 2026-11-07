@@ -239,7 +239,8 @@ class CustomerChatApiTest extends TestCase
                 'conversation_id' => 'order-follow-up',
             ])
             ->assertOk()
-            ->assertJsonPath('order_id', 296);
+            ->assertJsonPath('order_id', 296)
+            ->assertJsonPath('ai_reply', 'Your order #296 is currently Processing.');
 
         $response = $this->withToken('test-admin-token')
             ->getJson('/api/staff/chat/conversations')
@@ -255,6 +256,45 @@ class CustomerChatApiTest extends TestCase
             ->assertJsonCount(4, 'messages')
             ->assertJsonPath('messages.0.message', 'Where is my order?')
             ->assertJsonPath('messages.2.message', '296');
+    }
+
+    public function test_order_number_status_reply_does_not_expose_another_customers_order(): void
+    {
+        DB::table('users')->insert([
+            'id' => 8,
+            'name' => 'Other Customer',
+            'email' => 'other@example.com',
+            'password' => 'unused',
+            'role' => 'customer',
+        ]);
+        DB::table('orders')->insert([
+            'id' => 297,
+            'user_id' => 8,
+            'status' => 'Ready for Pickup',
+        ]);
+
+        $this->withToken('test-customer-token')
+            ->postJson('/api/customer/chat/messages', [
+                'message' => '297',
+                'support_mode' => 'ai',
+                'quick_chat' => true,
+                'conversation_id' => 'private-order-status',
+            ])
+            ->assertOk()
+            ->assertJsonPath('order_id', null)
+            ->assertJsonPath('ai_reply', "I couldn't find an order matching that number in your account. Please check the number and try again.");
+
+        $this->assertDatabaseHas('messages', [
+            'user_id' => 7,
+            'sender' => 'customer',
+            'order_id' => null,
+            'message' => '297',
+        ]);
+        $this->assertDatabaseMissing('messages', [
+            'user_id' => 7,
+            'sender' => 'ai',
+            'message' => 'Your order #297 is currently Ready for Pickup.',
+        ]);
     }
 
     public function test_customer_chat_popup_marks_null_order_messages_read_only_when_opened(): void
