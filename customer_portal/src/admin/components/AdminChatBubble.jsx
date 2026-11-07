@@ -25,10 +25,8 @@ export default function AdminChatBubble() {
   const [mobilePanel, setMobilePanel] = useState("conversation");
   const [messageAlertsEnabled, setMessageAlertsEnabled] = useState(true);
   const [adminDialog, setAdminDialog] = useState(null);
-  const [chatNotice, setChatNotice] = useState(null);
   const conversationFetchInFlight = useRef(false);
   const previousUnreadCounts = useRef(null);
-  const noticeTimeout = useRef(null);
   const openRef = useRef(open);
   const messageAlertsEnabledRef = useRef(messageAlertsEnabled);
   const messageListRef = useRef(null);
@@ -91,6 +89,12 @@ export default function AdminChatBubble() {
     };
   }, [messageAlertsEnabled]);
 
+  useEffect(() => {
+    const openChat = () => setOpen(true);
+    window.addEventListener("admin-open-chat", openChat);
+    return () => window.removeEventListener("admin-open-chat", openChat);
+  }, []);
+
   const fetchConversations = useCallback(async () => {
     if (conversationFetchInFlight.current) return;
     conversationFetchInFlight.current = true;
@@ -115,9 +119,12 @@ export default function AdminChatBubble() {
         ));
         if (incoming) {
           playAdminChatMessageSound();
-          setChatNotice(`New message from ${incoming.customer_name || "a customer"}`);
-          window.clearTimeout(noticeTimeout.current);
-          noticeTimeout.current = window.setTimeout(() => setChatNotice(null), 7000);
+          window.dispatchEvent(new CustomEvent("admin-chat-message-preview", {
+            detail: {
+              title: `New message from ${incoming.customer_name || "a customer"}`,
+              message: incoming.last_message || "A customer sent a new message.",
+            },
+          }));
         }
       }
       previousUnreadCounts.current = currentUnreadCounts;
@@ -176,7 +183,6 @@ export default function AdminChatBubble() {
     return () => {
       unsubscribe();
       window.clearInterval(pollId);
-      window.clearTimeout(noticeTimeout.current);
     };
   }, [fetchConversations]);
 
@@ -268,19 +274,6 @@ export default function AdminChatBubble() {
 
   return (
     <>
-      {chatNotice && (
-        <button
-          type="button"
-          role="status"
-          onClick={() => {
-            setOpen(true);
-            setChatNotice(null);
-          }}
-          className="fixed bottom-[5.25rem] right-5 z-[10002] max-w-[calc(100vw-2.5rem)] rounded-xl border border-[#e9d8ae] bg-white px-4 py-3 text-left text-sm font-semibold text-[#33251e] shadow-xl"
-        >
-          <span className="flex items-center gap-2"><MessageCircle size={16} className="shrink-0 text-[#9b7810]" />{chatNotice}</span>
-        </button>
-      )}
       {open && (
         <div className="fixed inset-0 z-[10000] bg-[#fffaf0] p-3 font-['DM_Sans'] sm:p-5 lg:p-8">
           <div className="mx-auto flex h-full max-w-[1600px] overflow-hidden rounded-[22px] border border-[#e9d8ae] bg-white shadow-[0_20px_70px_rgba(0,0,0,0.18)]">
@@ -362,7 +355,7 @@ export default function AdminChatBubble() {
         </div>
       )}
 
-      <button type="button" onClick={() => { setOpen((value) => !value); setChatNotice(null); }} className="fixed bottom-5 right-5 z-[10001] grid h-12 w-12 place-items-center rounded-full bg-[#f0b94d] text-black shadow-xl transition hover:scale-105 hover:bg-[#e5ae3d]" title="Customer Chat" aria-label={unreadCount > 0 ? `Customer Chat, ${unreadCount} unread messages` : "Customer Chat"}><MessageCircle size={21} />{unreadCount > 0 && <span aria-hidden="true" className="absolute -right-1 -top-1 grid h-5 min-w-5 animate-pulse place-items-center rounded-full bg-black px-1 text-[10px] font-bold text-white">{unreadCount > 99 ? "99+" : unreadCount}</span>}</button>
+      <button type="button" onClick={() => setOpen((value) => !value)} className="fixed bottom-5 right-5 z-[10001] grid h-12 w-12 place-items-center rounded-full bg-[#f0b94d] text-black shadow-xl transition hover:scale-105 hover:bg-[#e5ae3d]" title="Customer Chat" aria-label={unreadCount > 0 ? `Customer Chat, ${unreadCount} unread messages` : "Customer Chat"}><MessageCircle size={21} />{unreadCount > 0 && <span aria-hidden="true" className="absolute -right-1 -top-1 grid h-5 min-w-5 animate-pulse place-items-center rounded-full bg-black px-1 text-[10px] font-bold text-white">{unreadCount > 99 ? "99+" : unreadCount}</span>}</button>
       <AdminDialog dialog={adminDialog} onClose={() => setAdminDialog(null)} />
     </>
   );

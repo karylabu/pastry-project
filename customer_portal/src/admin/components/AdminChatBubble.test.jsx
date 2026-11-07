@@ -125,9 +125,11 @@ describe("AdminChatBubble", () => {
     });
   });
 
-  test("polls for new customer messages and shows an in-app alert", async () => {
+  test("polls for new customer messages and sends a preview to the admin navbar", async () => {
     render(<AdminChatBubble />);
     await screen.findByRole("button", { name: "Customer Chat, 3 unread messages" });
+    const previewHandler = jest.fn();
+    window.addEventListener("admin-chat-message-preview", previewHandler);
 
     global.fetch.mockImplementation((url) => {
       if (String(url).includes("/api/admin/settings")) {
@@ -156,8 +158,15 @@ describe("AdminChatBubble", () => {
     await waitFor(() => {
       expect(screen.getByRole("button", { name: "Customer Chat, 1 unread messages" })).toBeInTheDocument();
     }, { timeout: 3500 });
-    expect(screen.getByRole("status")).toHaveTextContent("New message from New Customer");
+    await waitFor(() => {
+      expect(previewHandler).toHaveBeenCalled();
+    });
+    expect(previewHandler.mock.calls[0][0].detail).toEqual({
+      title: "New message from New Customer",
+      message: "A customer sent a new message.",
+    });
     expect(playAdminChatMessageSound).toHaveBeenCalledTimes(1);
+    window.removeEventListener("admin-chat-message-preview", previewHandler);
   });
 
   test("shows the most recently active chats first", async () => {
