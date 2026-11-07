@@ -146,7 +146,7 @@ export default function DesignGallery({ category, folder, backPath = '/customer/
         </p>
       )}
 
-      <nav aria-label="Browse cake categories" className="mb-5 flex flex-wrap gap-2">
+      <nav aria-label="Browse cake categories" className="mb-5 flex flex-wrap justify-end gap-2">
         {DESIGN_CATEGORIES.map(({ label, path }) => {
           const current = location.pathname === path;
           return (
