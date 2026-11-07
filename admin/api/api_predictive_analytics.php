@@ -286,15 +286,10 @@ function parseOptionalAnalyticsDate(string $value, string $label): ?string {
     return $value;
 }
 
-function getIngredientStock(mysqli $conn): array {
-    $result = mysqli_query($conn, "SELECT id, name, stock, threshold, unit FROM ingredients ORDER BY name ASC");
-    if (!$result) {
-        error_log('Predictive analytics ingredient inventory query failed: ' . mysqli_error($conn));
-        return [];
-    }
-
+function getIngredientStock(): array {
+    $result = legacy_get_pdo()->query("SELECT id, name, stock, threshold, unit FROM ingredients ORDER BY name ASC");
     $items = [];
-    while ($row = mysqli_fetch_assoc($result)) {
+    while ($row = $result->fetch(PDO::FETCH_ASSOC)) {
         $items[] = [
             'id' => (int) $row['id'],
             'name' => $row['name'],
@@ -303,17 +298,14 @@ function getIngredientStock(mysqli $conn): array {
             'unit' => $row['unit'] ?? 'unit',
         ];
     }
-    mysqli_free_result($result);
 
     return $items;
 }
 
-function getProducts(mysqli $conn): array {
-    $result = mysqli_query($conn, "SELECT id, name, category, stock, minimum_stock FROM products ORDER BY name ASC");
-    if (!$result) return [];
-
+function getProducts(): array {
+    $result = legacy_get_pdo()->query("SELECT id, name, category, stock, minimum_stock FROM products ORDER BY name ASC");
     $products = [];
-    while ($row = mysqli_fetch_assoc($result)) {
+    while ($row = $result->fetch(PDO::FETCH_ASSOC)) {
         $products[] = [
             'id' => (int) $row['id'],
             'name' => normalizeProductName($row['name'] ?? ''),
@@ -322,65 +314,57 @@ function getProducts(mysqli $conn): array {
             'minimum_stock' => (float) ($row['minimum_stock'] ?? 0),
         ];
     }
-    mysqli_free_result($result);
     return $products;
 }
 
-function getProductRecipes(mysqli $conn): array {
+function getProductRecipes(): array {
     $recipes = [];
-    $hasSizeColumn = mysqli_query($conn, "SHOW COLUMNS FROM product_recipes LIKE 'product_size_id'");
-    $hasProductSize = $hasSizeColumn && mysqli_num_rows($hasSizeColumn) > 0;
-    if ($hasSizeColumn) mysqli_free_result($hasSizeColumn);
-    $sizeSelect = $hasProductSize ? ', pr.product_size_id' : '';
-    $result = mysqli_query($conn, "
-        SELECT p.name AS product_name, i.id AS ingredient_id, i.name AS ingredient_name, pr.qty AS usage{$sizeSelect}
+    $pdo = legacy_get_pdo();
+    $result = $pdo->query("
+        SELECT p.name AS product_name, i.id AS ingredient_id, i.name AS ingredient_name, pr.qty AS usage
         FROM product_recipes pr
         INNER JOIN products p ON p.id = pr.product_id
         INNER JOIN ingredients i ON i.id = pr.ingredient_id
         WHERE pr.active = 1 AND pr.qty > 0
         ORDER BY p.name ASC, i.name ASC
     ");
-    if (!$result) {
-        error_log('Predictive analytics product recipe query failed: ' . mysqli_error($conn));
-    } else {
-        while ($row = mysqli_fetch_assoc($result)) {
-            $productName = normalizeProductName($row['product_name'] ?? '');
-            $ingredientName = trim((string) ($row['ingredient_name'] ?? ''));
-            $usage = max(0, (float) ($row['usage'] ?? 0));
-            if ($productName && $ingredientName && $usage > 0) {
-                $productKey = productMatchKey($productName);
-                $ingredientId = (int) ($row['ingredient_id'] ?? 0);
-                $recipeIndex = [];
-                foreach ($recipes[$productKey] ?? [] as $index => $existing) {
-                    $recipeIndex[(int) $existing['ingredient_id']] = $index;
-                }
-                if (!isset($recipeIndex[$ingredientId])) {
-                    $recipes[$productKey][] = [
-                        'ingredient_id' => $ingredientId,
-                        'name' => $ingredientName,
-                        'usage' => $usage,
-                    ];
-                } else {
-                    $index = $recipeIndex[$ingredientId];
-                    // Sales history does not retain the selected product size. Use the
-                    // largest configured quantity so consumption is not understated.
-                    $recipes[$productKey][$index]['usage'] = max(
-                        (float) $recipes[$productKey][$index]['usage'],
-                        $usage
-                    );
-                }
+    while ($row = $result->fetch(PDO::FETCH_ASSOC)) {
+        $productName = normalizeProductName($row['product_name'] ?? '');
+        $ingredientName = trim((string) ($row['ingredient_name'] ?? ''));
+        $usage = max(0, (float) ($row['usage'] ?? 0));
+        if ($productName && $ingredientName && $usage > 0) {
+            $productKey = productMatchKey($productName);
+            $ingredientId = (int) ($row['ingredient_id'] ?? 0);
+            $recipeIndex = [];
+            foreach ($recipes[$productKey] ?? [] as $index => $existing) {
+                $recipeIndex[(int) $existing['ingredient_id']] = $index;
+            }
+            if (!isset($recipeIndex[$ingredientId])) {
+                $recipes[$productKey][] = [
+                    'ingredient_id' => $ingredientId,
+                    'name' => $ingredientName,
+                    'usage' => $usage,
+                ];
+            } else {
+                $index = $recipeIndex[$ingredientId];
+                // Sales history does not retain the selected product size. Use the
+                // largest configured quantity so consumption is not understated.
+                $recipes[$productKey][$index]['usage'] = max(
+                    (float) $recipes[$productKey][$index]['usage'],
+                    $usage
+                );
             }
         }
-        mysqli_free_result($result);
     }
 
-    $hasCakeRecipeTable = mysqli_query($conn, "SHOW TABLES LIKE 'cake_recipes'");
-    $hasCakeRecipes = mysqli_query($conn, "SHOW TABLES LIKE 'cake_recipe_ingredients'");
-    $hasCakeCatalog = mysqli_query($conn, "SHOW TABLES LIKE 'cake_flavors'");
-    if ($hasCakeRecipeTable && mysqli_num_rows($hasCakeRecipeTable) > 0
-        && $hasCakeRecipes && mysqli_num_rows($hasCakeRecipes) > 0
-        && $hasCakeCatalog && mysqli_num_rows($hasCakeCatalog) > 0) {
-        $cakeResult = mysqli_query($conn, "
+    $cakeTables = $pdo->query("
+        SELECT table_name
+        FROM information_schema.tables
+        WHERE table_schema = DATABASE()
+          AND table_name IN ('cake_recipes', 'cake_recipe_ingredients', 'cake_flavors')
+    ")->fetchAll(PDO::FETCH_COLUMN);
+    if (count($cakeTables) === 3) {
+        $cakeResult = $pdo->query("
             SELECT flavor.name AS flavor_name, ingredient.id AS ingredient_id,
                    ingredient.name AS ingredient_name, recipe_ingredient.quantity AS usage
             FROM cake_recipes AS recipe
@@ -390,37 +374,29 @@ function getProductRecipes(mysqli $conn): array {
             WHERE recipe.active = 1 AND flavor.active = 1
             ORDER BY flavor.name ASC, ingredient.name ASC
         ");
-        if (!$cakeResult) {
-            error_log('Predictive analytics cake recipe query failed: ' . mysqli_error($conn));
-        } else {
-            $productByFlavor = [
-                'moist chocolate' => 'Chocolate Ganache Cake',
-                'red velvet' => 'Red Velvet Cake',
-                'carrot' => 'Carrot Cake',
-            ];
-            $cakeRecipes = [];
-            while ($row = mysqli_fetch_assoc($cakeResult)) {
-                $flavor = strtolower(trim((string) ($row['flavor_name'] ?? '')));
-                $productName = $productByFlavor[$flavor] ?? '';
-                $ingredientName = trim((string) ($row['ingredient_name'] ?? ''));
-                if ($productName !== '' && $ingredientName !== '') {
-                    $cakeRecipes[productMatchKey($productName)][] = [
-                        'ingredient_id' => (int) ($row['ingredient_id'] ?? 0),
-                        'name' => $ingredientName,
-                        'usage' => max(0, (float) ($row['usage'] ?? 0)),
-                    ];
-                }
-            }
-            mysqli_free_result($cakeResult);
-            foreach ($cakeRecipes as $productKey => $recipe) {
-                if (empty($recipes[$productKey])) {
-                    $recipes[$productKey] = $recipe;
-                }
+        $productByFlavor = [
+            'moist chocolate' => 'Chocolate Ganache Cake',
+            'red velvet' => 'Red Velvet Cake',
+            'carrot' => 'Carrot Cake',
+        ];
+        $cakeRecipes = [];
+        while ($row = $cakeResult->fetch(PDO::FETCH_ASSOC)) {
+            $flavor = strtolower(trim((string) ($row['flavor_name'] ?? '')));
+            $productName = $productByFlavor[$flavor] ?? '';
+            $ingredientName = trim((string) ($row['ingredient_name'] ?? ''));
+            if ($productName !== '' && $ingredientName !== '') {
+                $cakeRecipes[productMatchKey($productName)][] = [
+                    'ingredient_id' => (int) ($row['ingredient_id'] ?? 0),
+                    'name' => $ingredientName,
+                    'usage' => max(0, (float) ($row['usage'] ?? 0)),
+                ];
             }
         }
-    }
-    foreach ([$hasCakeRecipeTable, $hasCakeRecipes, $hasCakeCatalog] as $check) {
-        if ($check) mysqli_free_result($check);
+        foreach ($cakeRecipes as $productKey => $recipe) {
+            if (empty($recipes[$productKey])) {
+                $recipes[$productKey] = $recipe;
+            }
+        }
     }
 
     return $recipes;
@@ -898,9 +874,9 @@ try {
         )));
     }
     $period = (int) ($_GET['period'] ?? 7);
-    $products = getProducts($conn);
-    $ingredientStock = getIngredientStock($conn);
-    $recipes = getProductRecipes($conn);
+    $products = getProducts();
+    $ingredientStock = getIngredientStock();
+    $recipes = getProductRecipes();
     $forecastPayload = buildDetailedForecastPayload($history, $products, $ingredientStock, $recipes, $coverageIntervals, $period);
 
     if ($method === 'POST' && $action === 'refresh') {
