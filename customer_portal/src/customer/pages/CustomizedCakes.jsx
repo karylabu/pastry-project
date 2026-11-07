@@ -125,6 +125,7 @@ export default function CustomizedCakes() {
   const [isReferencePreviewOpen, setIsReferencePreviewOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
+  const [showSubmissionConfirmation, setShowSubmissionConfirmation] = useState(false);
   const [showLoginPrompt, setShowLoginPrompt] = useState(false);
   const [userId, setUserId] = useState(() => Number(storedUser?.id) || 0);
   const [savedAddresses, setSavedAddresses] = useState([]);
@@ -499,7 +500,7 @@ export default function CustomizedCakes() {
     } catch (error) {
       console.warn('Could not clear submitted custom cake form details:', error);
     }
-    navigate('/customer', { replace: true });
+    setShowSubmissionConfirmation(true);
   };
 
   const openReferenceGallery = () => {
@@ -1270,6 +1271,33 @@ export default function CustomizedCakes() {
               <button type="button" onClick={() => setIsReferencePreviewOpen(false)} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#fff8df] text-xl font-bold leading-none text-[#6b4f1d] hover:bg-[#ffe89a]" aria-label="Close image preview">×</button>
             </div>
             <img src={referenceImage.url} alt={referenceImage.name} className="max-h-[65vh] w-full rounded-xl border border-[#f0d98a] bg-[#fbfaf5] object-contain" />
+          </div>
+        </div>
+      )}
+      {showSubmissionConfirmation && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 px-4" role="presentation">
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="custom-order-submitted-title"
+            className="w-full max-w-md rounded-2xl border border-[#eadfd8] bg-[#fffdf9] p-6 text-center shadow-2xl sm:p-8"
+          >
+            <h2 id="custom-order-submitted-title" className="font-serif text-xl font-bold text-[#33251e] sm:text-2xl">
+              Customized order submitted
+            </h2>
+            <p className="mt-3 text-sm leading-6 text-[#765f3d]">
+              Your customized order has been submitted. Please wait for it to be accepted.
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                setShowSubmissionConfirmation(false);
+                navigate('/customer', { replace: true });
+              }}
+              className="mt-6 min-w-24 rounded-full bg-[#e7c875] px-6 py-2.5 text-sm font-bold text-[#33251e] transition hover:bg-[#d9b354] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#b89646] focus-visible:ring-offset-2"
+            >
+              Okay
+            </button>
           </div>
         </div>
       )}

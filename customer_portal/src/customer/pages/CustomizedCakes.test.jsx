@@ -272,7 +272,7 @@ describe('CustomizedCakes availability', () => {
     );
   });
 
-  it('resets the form and returns to the customer dashboard after a successful request', async () => {
+  it('shows a submission confirmation and returns home when acknowledged', async () => {
     global.fetch.mockImplementation(async (url) => {
       let data = {};
       if (url.includes('/customized-cakes/request-status')) data = { enabled: true };
@@ -297,7 +297,10 @@ describe('CustomizedCakes availability', () => {
     fireEvent.change(screen.getByLabelText('Special Instructions'), { target: { value: 'Extra decorations' } });
     fireEvent.submit(form);
 
-    await waitFor(() => expect(mockNavigate).toHaveBeenCalledWith('/customer', { replace: true }));
+    expect(await screen.findByRole('dialog', { name: 'Customized order submitted' })).toHaveTextContent(
+      'Your customized order has been submitted. Please wait for it to be accepted.',
+    );
+    expect(mockNavigate).not.toHaveBeenCalled();
     expect(screen.getByPlaceholderText('Enter full name')).toHaveValue('Customer');
     expect(screen.getByLabelText('Pickup date')).toHaveValue('');
     expect(form.querySelector('select')).toHaveValue('');
@@ -308,5 +311,8 @@ describe('CustomizedCakes availability', () => {
       expect.objectContaining({ method: 'POST' }),
     );
     expect(window.sessionStorage.getItem('customCakeReferenceImage')).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Okay' }));
+    await waitFor(() => expect(mockNavigate).toHaveBeenCalledWith('/customer', { replace: true }));
   });
 });
