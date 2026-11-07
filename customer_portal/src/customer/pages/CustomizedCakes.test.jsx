@@ -170,6 +170,46 @@ describe('CustomizedCakes availability', () => {
     expect(dateInput).toHaveAttribute('min');
   });
 
+  it('disables elapsed time slots for today but leaves them available for future dates', async () => {
+    jest.spyOn(Date.prototype, 'getHours').mockReturnValue(13);
+    jest.spyOn(Date.prototype, 'getMinutes').mockReturnValue(0);
+    global.fetch.mockImplementation(async (url) => ({
+      ok: true,
+      text: async () => JSON.stringify((() => {
+        if (url.includes('/customized-cakes/request-status')) return { enabled: true };
+        if (url.includes('/customized-cakes/flavors')) return { flavors: [] };
+        if (url.includes('/customized-cakes/sizes')) return { sizes: [] };
+        if (url.includes('/api/addresses')) return { status: 'success', addresses: [] };
+        if (url.includes('/api/user')) return { id: 5, name: 'Customer' };
+        return {};
+      })()),
+    }));
+
+    render(<CustomizedCakes />);
+
+    const dateInput = await screen.findByLabelText('Pickup date');
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Send Request' })).toBeEnabled());
+    const form = dateInput.closest('form');
+    const timeSelect = form.querySelector('select');
+    fireEvent.change(dateInput, { target: { value: dateInput.min } });
+
+    expect(within(timeSelect).getByRole('option', { name: '12:30 PM' })).toBeDisabled();
+    expect(within(timeSelect).getByRole('option', { name: '1:00 PM' })).toBeDisabled();
+    expect(within(timeSelect).getByRole('option', { name: '1:30 PM' })).toBeEnabled();
+
+    const tomorrow = new Date(`${dateInput.min}T00:00:00`);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const tomorrowString = [
+      tomorrow.getFullYear(),
+      String(tomorrow.getMonth() + 1).padStart(2, '0'),
+      String(tomorrow.getDate()).padStart(2, '0'),
+    ].join('-');
+    fireEvent.change(dateInput, { target: { value: tomorrowString } });
+
+    expect(within(timeSelect).getByRole('option', { name: '8:00 AM' })).toBeEnabled();
+    expect(within(timeSelect).getByRole('option', { name: '12:30 PM' })).toBeEnabled();
+  });
+
   it('disables the request form and asks guests to log in', async () => {
     window.localStorage.removeItem('user');
     global.fetch.mockImplementation(async (url) => ({

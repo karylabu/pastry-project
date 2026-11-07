@@ -27,6 +27,12 @@ const getLocalDateString = (date = new Date()) => {
   return `${year}-${month}-${day}`;
 };
 
+const isTimeSlotPast = (time, date, now = new Date()) => {
+  if (!time || date !== getLocalDateString(now)) return false;
+  const [hours, minutes] = time.split(':').map(Number);
+  return hours * 60 + minutes <= now.getHours() * 60 + now.getMinutes();
+};
+
 const readCustomCakeDraft = () => {
   if (typeof window === 'undefined') return null;
   try {
@@ -84,6 +90,7 @@ export default function CustomizedCakes() {
   const [contactNumber, setContactNumber] = useState(() => storedUser?.phone || storedUser?.phone_number || storedUser?.contact_number || '');
   const [pickupDate, setPickupDate] = useState(() => formDraft?.pickupDate || '');
   const [pickupTime, setPickupTime] = useState(() => formDraft?.pickupTime || '');
+  const [currentTime, setCurrentTime] = useState(() => new Date());
   const [deliveryMethod, setDeliveryMethod] = useState(() => formDraft?.deliveryMethod || 'Pickup');
   const [deliveryService, setDeliveryService] = useState(() => formDraft?.deliveryService || '');
   const [deliveryAddress, setDeliveryAddress] = useState(() => formDraft?.deliveryAddress || '');
@@ -129,6 +136,15 @@ export default function CustomizedCakes() {
   const [customCakeRequestsEnabled, setCustomCakeRequestsEnabled] = useState(null);
   const [customCakeStatusUnavailable, setCustomCakeStatusUnavailable] = useState(false);
   const requestFormDisabled = !userId || customCakeRequestsEnabled !== true || loading;
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setCurrentTime(new Date()), 30000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    if (isTimeSlotPast(pickupTime, pickupDate, currentTime)) setPickupTime('');
+  }, [currentTime, pickupDate, pickupTime]);
 
   useEffect(() => {
     let isActive = true;
@@ -589,6 +605,10 @@ export default function CustomizedCakes() {
       setMessage('Please choose today or a future date.');
       return;
     }
+    if (isTimeSlotPast(pickupTime, pickupDate)) {
+      setMessage('Please choose a future pickup or delivery time.');
+      return;
+    }
     if (deliveryMethod === 'Delivery' && !deliveryService) {
       setMessage('Choose Lalamove or GrabCar for delivery.');
       return;
@@ -1026,7 +1046,11 @@ export default function CustomizedCakes() {
                   {deliveryMethod === 'Delivery' ? 'Delivery time' : 'Pickup time'} <span aria-hidden="true" className="text-red-600">*</span>
                   <select required value={pickupTime} onChange={(event) => setPickupTime(event.target.value)} className="mt-1.5 box-border min-h-11 w-full min-w-0 max-w-full rounded-lg border border-[#eadfd8] bg-white px-3 py-2.5 text-sm text-[#33251e] outline-none transition focus:border-[#c9972d] focus:ring-2 focus:ring-[#fff1bd]">
                     <option value="" disabled>Select a {deliveryMethod === 'Delivery' ? 'delivery' : 'pickup'} time</option>
-                    {FULFILLMENT_TIME_SLOTS.map((slot) => <option key={slot.value} value={slot.value}>{slot.label}</option>)}
+                    {FULFILLMENT_TIME_SLOTS.map((slot) => (
+                      <option key={slot.value} value={slot.value} disabled={isTimeSlotPast(slot.value, pickupDate, currentTime)}>
+                        {slot.label}
+                      </option>
+                    ))}
                   </select>
                 </label>
                 {deliveryMethod === 'Delivery' && (
