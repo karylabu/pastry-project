@@ -169,10 +169,14 @@ function SecondaryBanner({ onOrderNow }) {
             className="h-full w-full scale-[1.03] object-cover"
           />
         )}
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute left-[34.5%] top-[71.8%] h-[12.5%] w-[3.5%] bg-[#f6f1e5]"
+        />
         <button
           type="button"
           onClick={onOrderNow}
-          className="absolute right-[3%] top-[86%] z-10 inline-flex -translate-y-1/2 items-center gap-1 rounded-full bg-[#73785c] px-2.5 py-1 font-serif text-[10px] font-medium text-white shadow-sm transition hover:bg-[#5f654a] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 sm:left-[50%] sm:right-auto sm:top-[70%] sm:-translate-x-1/2 sm:gap-3 sm:px-5 sm:py-2.5 sm:text-sm md:bottom-[6%] md:left-auto md:right-[3%] md:top-auto md:translate-x-0 md:translate-y-0"
+          className="absolute bottom-[10%] left-[18%] z-10 inline-flex items-center gap-1 rounded-full bg-[#73785c] px-2 py-1 font-serif text-[9px] font-medium text-white shadow-sm transition hover:bg-[#5f654a] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 sm:left-[27%] sm:gap-3 sm:px-5 sm:py-2.5 sm:text-sm"
         >
           Order Now <ArrowRight size={12} className="sm:h-[15px] sm:w-[15px]" strokeWidth={1.8} />
         </button>
