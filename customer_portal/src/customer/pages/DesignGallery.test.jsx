@@ -44,6 +44,11 @@ describe('DesignGallery reference selection', () => {
   it('switches categories while preserving selected references for continued browsing', () => {
     render(<DesignGallery category="Birthday" folder="birthday" />);
 
+    const heading = screen.getByRole('heading', { name: 'Birthday Designs' });
+    const categoryNavigation = screen.getByRole('navigation', { name: 'Browse cake categories' });
+    expect(heading.parentElement.parentElement).toBe(categoryNavigation.parentElement);
+    expect(categoryNavigation.parentElement).toHaveClass('md:flex-row', 'md:justify-between');
+
     fireEvent.click(screen.getAllByRole('button', { name: 'Add as Reference' })[0]);
     const savedReferences = JSON.parse(window.sessionStorage.getItem('customCakeReferenceImages'));
 
