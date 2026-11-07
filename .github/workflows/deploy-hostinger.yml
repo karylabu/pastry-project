@@ -39,11 +39,10 @@ jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
     env:
-      SSH_HOST: ${{ secrets.HOSTINGER_SSH_HOST }}
-      SSH_PORT: ${{ secrets.HOSTINGER_SSH_PORT }}
+      SSH_HOST: 145.79.30.228
+      SSH_PORT: "65002"
       SSH_USERNAME: ${{ secrets.HOSTINGER_SSH_USERNAME }}
       SSH_PRIVATE_KEY: ${{ secrets.HOSTINGER_SSH_PRIVATE_KEY }}
-      SSH_KNOWN_HOSTS: ${{ secrets.HOSTINGER_SSH_KNOWN_HOSTS }}
       REMOTE_ROOT: domains/pastryproject.shop/public_html
 
     steps:
@@ -129,11 +128,10 @@ jobs:
       - name: Configure SSH
         run: |
           set -eu
-          : "${SSH_HOST:?Missing HOSTINGER_SSH_HOST secret}"
-          : "${SSH_PORT:?Missing HOSTINGER_SSH_PORT secret}"
+          : "${SSH_HOST:?Missing Hostinger SSH host}"
+          : "${SSH_PORT:?Missing Hostinger SSH port}"
           : "${SSH_USERNAME:?Missing HOSTINGER_SSH_USERNAME secret}"
           : "${SSH_PRIVATE_KEY:?Missing HOSTINGER_SSH_PRIVATE_KEY secret}"
-          : "${SSH_KNOWN_HOSTS:?Missing HOSTINGER_SSH_KNOWN_HOSTS secret}"
           case "$SSH_HOST" in
             *[!A-Za-z0-9.-]*)
               echo "HOSTINGER_SSH_HOST must contain only a hostname or IP address."
@@ -149,8 +147,13 @@ jobs:
           install -m 700 -d ~/.ssh
           printf '%s' "$SSH_PRIVATE_KEY" | tr -d '\r' > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
-          printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          ssh-keyscan -T 10 -p "$SSH_PORT" -t ed25519 "$SSH_HOST" > ~/.ssh/known_hosts
           chmod 600 ~/.ssh/known_hosts
+          fingerprint=$(ssh-keygen -lf ~/.ssh/known_hosts | awk '{print $2}')
+          if [ "$fingerprint" != "SHA256:tm1j5aeeG0LueMukm6xQRM04SRuwlbzp+sP1uCcI4u8" ]; then
+            echo "Hostinger ED25519 fingerprint did not match the verified server key."
+            exit 1
+          fi
           if ! ssh-keygen -y -f ~/.ssh/id_ed25519 >/dev/null; then
             echo "HOSTINGER_SSH_PRIVATE_KEY is invalid. Replace it with the complete unencrypted OpenSSH private key file."
             exit 1
