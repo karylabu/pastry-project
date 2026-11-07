@@ -151,7 +151,7 @@ function SecondaryBanner({ onOrderNow }) {
   };
 
   return (
-    <section className="mb-4 mt-2 overflow-hidden rounded-xl border border-[#eadfd8] bg-transparent shadow-[0_5px_18px_rgba(91,64,39,0.05)]">
+    <section className="mb-4 mt-2 -mx-3 overflow-hidden rounded-xl border border-[#eadfd8] bg-transparent shadow-[0_5px_18px_rgba(91,64,39,0.05)] sm:mx-0">
       <div className="relative aspect-[3.91/1] w-full overflow-hidden">
         {secondaryBanner.type === "video" ? (
           <video
@@ -176,9 +176,9 @@ function SecondaryBanner({ onOrderNow }) {
         <button
           type="button"
           onClick={onOrderNow}
-          className="absolute bottom-[10%] left-[10%] z-10 inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-[#73785c] px-2 py-1 font-serif text-[9px] font-medium text-white shadow-sm transition hover:bg-[#5f654a] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 sm:left-[18%] sm:gap-3 sm:px-5 sm:py-2.5 sm:text-sm"
+          className="absolute bottom-[10%] left-[10%] z-10 inline-flex items-center gap-0.5 whitespace-nowrap rounded-full bg-[#73785c] px-1.5 py-0.5 font-serif text-[8px] font-medium text-white shadow-sm transition hover:bg-[#5f654a] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 sm:bottom-[6%] sm:left-[22%] sm:gap-3 sm:px-5 sm:py-2.5 sm:text-sm"
         >
-          Order Now <ArrowRight size={12} className="sm:h-[15px] sm:w-[15px]" strokeWidth={1.8} />
+          Order Now <ArrowRight size={10} className="sm:h-[15px] sm:w-[15px]" strokeWidth={1.8} />
         </button>
       </div>
     </section>
