@@ -46,8 +46,12 @@ describe('DesignGallery reference selection', () => {
 
     const heading = screen.getByRole('heading', { name: 'Birthday Designs' });
     const categoryNavigation = screen.getByRole('navigation', { name: 'Browse cake categories' });
-    expect(heading.parentElement.parentElement).toBe(categoryNavigation.parentElement);
-    expect(categoryNavigation.parentElement).toHaveClass('md:flex-row', 'md:justify-between');
+    const headerRow = categoryNavigation.parentElement;
+    const headingGroup = heading.parentElement.parentElement.parentElement;
+    expect(headingGroup.parentElement).toBe(headerRow);
+    expect(screen.getByRole('button', { name: 'Back to customize' }).parentElement).toBe(headingGroup);
+    expect(screen.getByText('10 designs')).toBeInTheDocument();
+    expect(headerRow).toHaveClass('md:flex-row', 'md:justify-between');
 
     fireEvent.click(screen.getAllByRole('button', { name: 'Add as Reference' })[0]);
     const savedReferences = JSON.parse(window.sessionStorage.getItem('customCakeReferenceImages'));

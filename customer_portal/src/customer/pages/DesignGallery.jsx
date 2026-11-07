@@ -127,31 +127,19 @@ export default function DesignGallery({ category, folder, backPath = '/customer/
 
   return (
     <PageShell background="bg-[#fffaf3]" padding="px-4 py-6 md:px-10" innerClassName="max-w-6xl">
-      <button type="button" onClick={returnToCustomize} title="Back to customize" aria-label="Back to customize" className="mb-5 inline-flex h-9 w-9 items-center justify-center rounded-full border border-[#eadfd8] bg-white text-[#765d50] transition hover:bg-[#fff8df] hover:text-[#8d6a2e]">
-        <ArrowLeft size={16} aria-hidden="true" />
-      </button>
-      {selectedReferenceIds.length > 0 && (
-        <button
-          type="button"
-          onClick={returnToCustomize}
-          className="mb-5 ml-3 rounded-lg bg-[#ffe89a] px-4 py-2 text-xs font-bold text-[#6b4f1d] transition hover:bg-[#ffedb5]"
-        >
-          Use {selectedReferenceIds.length} Reference{selectedReferenceIds.length === 1 ? '' : 's'}
-        </button>
-      )}
-
-      {selectedReferenceIds.length + uploadedReferenceCount >= MAX_REFERENCE_IMAGES && (
-        <p className="mb-4 rounded-lg border border-[#f0d98a] bg-[#fff9df] px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-[#7a5b20]">
-          Up to {MAX_REFERENCE_IMAGES} reference images per request.
-        </p>
-      )}
-
       <section>
-        <div className="mb-4 flex flex-col gap-3 px-1 md:flex-row md:items-end md:justify-between">
-          <div>
-            <p className="text-[9px] font-black uppercase tracking-[0.28em] text-[#9b7b3d]">Made for special moments</p>
-            <h2 className="mt-1 font-serif text-2xl font-bold text-[#33251e]">{displayCategory} Designs</h2>
-            <span className="text-[10px] font-semibold text-[#9b8c83]">{images.length} designs</span>
+        <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div className="flex items-center gap-3">
+            <button type="button" onClick={returnToCustomize} title="Back to customize" aria-label="Back to customize" className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[#eadfd8] bg-white text-[#765d50] transition hover:bg-[#fff8df] hover:text-[#8d6a2e]">
+              <ArrowLeft size={16} aria-hidden="true" />
+            </button>
+            <div>
+              <p className="text-[9px] font-black uppercase tracking-[0.28em] text-[#9b7b3d]">Made for special moments</p>
+              <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                <h2 className="mt-1 font-serif text-2xl font-bold text-[#33251e]">{displayCategory} Designs</h2>
+                <span className="text-[10px] font-semibold text-[#9b8c83]">{images.length} designs</span>
+              </div>
+            </div>
           </div>
           <nav aria-label="Browse cake categories" className="flex flex-wrap justify-start gap-2 md:justify-end">
             {DESIGN_CATEGORIES.map(({ label, path }) => {
@@ -174,6 +162,22 @@ export default function DesignGallery({ category, folder, backPath = '/customer/
             })}
           </nav>
         </div>
+      {selectedReferenceIds.length > 0 && (
+        <button
+          type="button"
+          onClick={returnToCustomize}
+          className="mb-5 rounded-lg bg-[#ffe89a] px-4 py-2 text-xs font-bold text-[#6b4f1d] transition hover:bg-[#ffedb5]"
+        >
+          Use {selectedReferenceIds.length} Reference{selectedReferenceIds.length === 1 ? '' : 's'}
+        </button>
+      )}
+
+      {selectedReferenceIds.length + uploadedReferenceCount >= MAX_REFERENCE_IMAGES && (
+        <p className="mb-4 rounded-lg border border-[#f0d98a] bg-[#fff9df] px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-[#7a5b20]">
+          Up to {MAX_REFERENCE_IMAGES} reference images per request.
+        </p>
+      )}
+
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-5">
           {images.map((image) => (
             <article key={image.id} className="group overflow-hidden rounded-xl border border-[#eadfd8] bg-white shadow-[0_6px_16px_rgba(91,64,39,0.06)] transition hover:-translate-y-0.5 hover:border-[#e7c875] hover:shadow-[0_10px_20px_rgba(91,64,39,0.1)]">
