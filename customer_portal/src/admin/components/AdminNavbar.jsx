@@ -24,10 +24,19 @@ import {
   AlertTriangle,
   Gift,
   History,
+  Volume2,
+  VolumeX,
 } from "lucide-react";
 import { BASE, LARAVEL_BASE } from "../../services/config";
 import { getAuthHeaders } from "../../services/api";
 import { getAdminNotificationTarget } from "./notificationNavigation";
+import {
+  getNewUnreadNotifications,
+  getNotificationSoundEnabled,
+  playNotificationSound,
+  setNotificationSoundEnabled,
+  unlockNotificationSound,
+} from "./notificationSound";
 import AdminDialog from "./AdminDialog";
 
 const NAV_GROUPS = [
@@ -101,6 +110,7 @@ export default function AdminNavbar({ onSidebarChange }) {
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [notificationsLoading, setNotificationsLoading] = useState(false);
+  const [notificationSoundEnabled, setNotificationSoundEnabledState] = useState(getNotificationSoundEnabled);
   const [notifFilter, setNotifFilter] = useState("All");
   const [accountOpen, setAccountOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState(() => getStoredUser());
@@ -113,6 +123,7 @@ export default function AdminNavbar({ onSidebarChange }) {
     : NAV_GROUPS;
   const notificationsRef = useRef(null);
   const accountRef = useRef(null);
+  const seenNotificationIdsRef = useRef(null);
 
   useEffect(() => {
     const syncUser = () => setCurrentUser(getStoredUser());
@@ -160,7 +171,18 @@ export default function AdminNavbar({ onSidebarChange }) {
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok || !data.success) throw new Error(data.message || "Unable to load notifications.");
-      setNotifications(Array.isArray(data.data) ? data.data : []);
+      const nextNotifications = Array.isArray(data.data) ? data.data : [];
+      const seenIds = seenNotificationIdsRef.current;
+      if (seenIds) {
+        const newUnreadNotifications = getNewUnreadNotifications(nextNotifications, seenIds);
+        if (notificationSoundEnabled && newUnreadNotifications.length > 0) {
+          playNotificationSound();
+        }
+        nextNotifications.forEach((notification) => seenIds.add(String(notification.id)));
+      } else {
+        seenNotificationIdsRef.current = new Set(nextNotifications.map((notification) => String(notification.id)));
+      }
+      setNotifications(nextNotifications);
       setUnreadCount(Number(data.meta?.unread_count || 0));
     } catch {
       setNotifications([]);
@@ -168,7 +190,14 @@ export default function AdminNavbar({ onSidebarChange }) {
     } finally {
       setNotificationsLoading(false);
     }
-  }, [currentUser?.id]);
+  }, [currentUser?.id, notificationSoundEnabled]);
+
+  const toggleNotificationSound = () => {
+    const enabled = !notificationSoundEnabled;
+    setNotificationSoundEnabledState(enabled);
+    setNotificationSoundEnabled(enabled);
+    if (enabled) unlockNotificationSound().then(playNotificationSound);
+  };
 
   useEffect(() => {
     if (!currentUser?.id) return undefined;
@@ -176,6 +205,21 @@ export default function AdminNavbar({ onSidebarChange }) {
     const interval = window.setInterval(fetchNotifications, 60000);
     return () => window.clearInterval(interval);
   }, [currentUser?.id, fetchNotifications]);
+
+  useEffect(() => {
+    seenNotificationIdsRef.current = null;
+  }, [currentUser?.id]);
+
+  useEffect(() => {
+    if (!notificationSoundEnabled) return undefined;
+    const unlockSound = () => unlockNotificationSound();
+    window.addEventListener("pointerdown", unlockSound, { once: true });
+    window.addEventListener("keydown", unlockSound, { once: true });
+    return () => {
+      window.removeEventListener("pointerdown", unlockSound);
+      window.removeEventListener("keydown", unlockSound);
+    };
+  }, [notificationSoundEnabled]);
 
   const markNotificationRead = async (id) => {
     try {
@@ -361,7 +405,18 @@ export default function AdminNavbar({ onSidebarChange }) {
                       <h2 className="text-[13px] font-semibold text-[#33251e]">Notifications</h2>
                       <p className="text-[10px] text-[#8f8076]">{unreadCount} unread</p>
                     </div>
-                    {unreadCount > 0 && <button type="button" onClick={markAllNotificationsRead} className="shrink-0 text-[10px] font-semibold text-[#80600a] hover:underline">Mark all read</button>}
+                    <div className="flex items-center gap-3">
+                      <button
+                        type="button"
+                        onClick={toggleNotificationSound}
+                        aria-label={`Turn notification sound ${notificationSoundEnabled ? "off" : "on"}`}
+                        title={`Notification sound ${notificationSoundEnabled ? "on" : "off"}`}
+                        className="flex h-7 w-7 items-center justify-center rounded-full text-[#765d50] hover:bg-[#fff8df]"
+                      >
+                        {notificationSoundEnabled ? <Volume2 size={15} /> : <VolumeX size={15} />}
+                      </button>
+                      {unreadCount > 0 && <button type="button" onClick={markAllNotificationsRead} className="shrink-0 text-[10px] font-semibold text-[#80600a] hover:underline">Mark all read</button>}
+                    </div>
                   </div>
                   <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="Filter notifications">
                     {['All','Orders','Inventory','Analytics','System'].map((f) => (
