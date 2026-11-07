@@ -121,7 +121,6 @@ export default function CustomizedCakes() {
       file: location.state.referenceFiles[0],
     } : null)
   ));
-  const [featuredPreview, setFeaturedPreview] = useState(null);
   const [filePreviewUrls, setFilePreviewUrls] = useState([]);
   const [isReferencePreviewOpen, setIsReferencePreviewOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -282,24 +281,6 @@ export default function CustomizedCakes() {
     if (!singleSizeId && sizeCatalog.length > 0) setSingleSizeId(String(sizeCatalog[0].id));
     if (!flavorId && flavorCatalog.length > 0) setFlavorId(String(flavorCatalog[0].id));
   }, [sizeCatalog, flavorCatalog, singleSizeId, flavorId]);
-
-  const sampleImages = [
-    { src: `${ROOT_BASE}/uploads/birthday(1).jpg?v=birthday-featured-1`, label: 'Birthday' },
-    { src: `${ROOT_BASE}/uploads/floral(1).jpg?v=floral-featured-1`, label: 'Floral' },
-    { src: `${ROOT_BASE}/uploads/wedding(1).jpg?v=wedding-featured-1`, label: 'Wedding' },
-    { src: `${ROOT_BASE}/uploads/holiday(1).jpg?v=holiday-featured-1`, label: 'Holiday' },
-    { src: `${ROOT_BASE}/uploads/kids(8).jpg?v=kids-featured-8`, label: 'Kids' },
-    { src: `${ROOT_BASE}/uploads/cutesy(5).jpg?v=cutesy-featured-5`, label: 'Cutesy' },
-  ];
-
-  const featuredImagePositions = {
-    Birthday: 'center 60%',
-    Floral: 'center 28%',
-    Wedding: 'center 55%',
-    Holiday: 'center 64%',
-    Kids: 'center 48%',
-    Cutesy: 'center 42%',
-  };
 
   const twoTierPresets = {
     mini: { label: 'Mini two tier cake', top: '4x2', bottom: '6x3' },
@@ -496,7 +477,6 @@ export default function CustomizedCakes() {
     setFiles([]);
     setGalleryReferences([]);
     setReferenceImage(null);
-    setFeaturedPreview(null);
     setIsReferencePreviewOpen(false);
     setShowSavedAddressSuggestions(false);
     setMessage('');
@@ -815,97 +795,6 @@ export default function CustomizedCakes() {
         onSelectCategory={navigate}
         className="mb-5"
       />
-
-      <div className="mb-6">
-        <div className="grid w-full grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
-          {sampleImages.map((item, index) => {
-            const isWedding = item.label === 'Wedding';
-            const isKids = item.label === 'Kids';
-            const isCutesy = item.label === 'Cutesy';
-
-            return (
-              <article key={index} className="group relative aspect-[3/4] min-h-[180px] overflow-hidden rounded-[14px] border border-[#eadfd8] bg-[#f8eee8] shadow-[0_6px_16px_rgba(91,64,39,0.06)] md:aspect-auto md:h-52">
-                <button
-                  type="button"
-                  onClick={() => setFeaturedPreview({ type: 'example', id: `featured-${index + 1}`, url: item.src, name: item.label })}
-                  aria-label={`Preview ${item.label} featured design`}
-                  className="absolute inset-0 z-0 h-full w-full"
-                >
-                  <img
-                    src={item.src}
-                    alt=""
-                    style={{ objectPosition: featuredImagePositions[item.label] }}
-                    className={`block h-full w-full object-cover transition-transform duration-300 ${
-                      isWedding ? 'scale-[1.5] group-hover:scale-[1.6]' : isKids ? 'scale-[1.5] group-hover:scale-[1.55]' : isCutesy ? 'scale-[1.85] group-hover:scale-[1.9]' : 'group-hover:scale-[1.02]'
-                    }`}
-                  />
-                </button>
-                <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/55 via-transparent to-transparent" />
-                <div className="absolute inset-x-0 top-0 z-10 flex items-center justify-start px-3 pt-3">
-                  <button
-                    type="button"
-                    onClick={() => addGalleryReferenceImage({ type: 'example', id: `featured-${index + 1}`, url: item.src, name: item.label })}
-                    className={`inline-flex max-w-full items-center justify-center rounded-md border border-white/60 px-2 py-1 text-[7px] font-bold uppercase tracking-[0.08em] whitespace-nowrap transition ${
-                      referenceImage?.id === `featured-${index + 1}`
-                        ? 'bg-[#6f9d67] text-white opacity-100'
-                        : 'bg-[#fff8df]/90 text-[#8d6a2e] opacity-100 group-hover:opacity-100 focus:opacity-100'
-                    }`}
-                  >
-                    {referenceImage?.id === `featured-${index + 1}` ? '✓ Using as Reference' : 'Use as Reference'}
-                  </button>
-                </div>
-                <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 px-3 pb-3">
-                  <span className="inline-block rounded-md bg-white/90 px-2.5 py-1.5 text-[9px] font-black uppercase tracking-[0.1em] text-[#8d6a2e]">
-                    {item.label}
-                  </span>
-                </div>
-              </article>
-            );
-          })}
-        </div>
-      </div>
-
-      {featuredPreview && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-[#1f1a17]/60 p-4 backdrop-blur-sm"
-          role="dialog"
-          aria-modal="true"
-          aria-label="Featured design preview"
-          onClick={() => setFeaturedPreview(null)}
-        >
-          <div className="w-full max-w-md overflow-hidden rounded-2xl border border-[#eadfd8] bg-white shadow-[0_18px_40px_rgba(0,0,0,0.18)]" onClick={(event) => event.stopPropagation()}>
-            <div className="flex items-center justify-between border-b border-[#f2e8dc] px-4 py-3">
-              <span className="text-[10px] font-black uppercase tracking-[0.2em] text-[#9b7b3d]">Reference preview</span>
-              <button type="button" onClick={() => setFeaturedPreview(null)} aria-label="Close preview" className="text-lg font-semibold text-[#6b4f1d]">×</button>
-            </div>
-            <div className="p-4">
-              <div className="h-72 overflow-hidden rounded-xl border border-[#f0d98a]">
-                <img
-                  src={featuredPreview.url}
-                  alt={featuredPreview.name}
-                  style={{
-                    objectPosition: featuredImagePositions[featuredPreview.name],
-                    transform: featuredPreview.name === 'Wedding'
-                      ? 'scale(1.8)'
-                      : featuredPreview.name === 'Kids'
-                        ? 'scale(1.5)'
-                        : featuredPreview.name === 'Cutesy'
-                          ? 'scale(1.85)'
-                          : undefined,
-                    transformOrigin: featuredPreview.name === 'Wedding' ? 'center 55%' : 'center center',
-                  }}
-                  className="h-full w-full object-cover"
-                />
-              </div>
-              <p className="mt-3 text-center text-sm font-semibold text-[#4b3b33]">{featuredPreview.name}</p>
-              <div className="mt-4 flex gap-2">
-                <button type="button" onClick={() => setFeaturedPreview(null)} className="flex-1 rounded-lg border border-[#f0d98a] bg-white px-3 py-1.5 text-xs font-semibold text-[#6b4f1d]">Cancel</button>
-                <button type="button" onClick={() => { void addGalleryReferenceImage(featuredPreview); setFeaturedPreview(null); }} className="flex-1 rounded-lg border border-[#e5bd45] bg-[#ffe89a] px-3 py-1.5 text-xs font-semibold text-[#6b4f1d]">Use this image</button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       <form
         id="custom-cake-request-form"
