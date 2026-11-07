@@ -182,6 +182,27 @@ describe('CustomizedCakes availability', () => {
     expect(within(occasion).getByRole('option', { name: 'Other' })).toBeInTheDocument();
   });
 
+  it.each([
+    ['Birthday', '/customer/birthday-designs'],
+    ['Cutesy', '/customer/cutesy-designs'],
+    ['Holidays', '/customer/holiday-designs'],
+    ['Kids Themes', '/customer/kids-designs'],
+    ['Wedding', '/customer/wedding-designs'],
+    ['Floral Designs', '/customer/floral-designs'],
+  ])('opens the %s examples when browsing from that occasion', (occasion, path) => {
+    render(<CustomizedCakes />);
+
+    fireEvent.change(screen.getByLabelText('Occasion'), { target: { value: occasion } });
+    fireEvent.click(screen.getByRole('button', { name: 'Browse Examples' }));
+
+    expect(mockNavigate).toHaveBeenCalledWith(path, {
+      state: {
+        referenceFiles: [],
+        selectedReferenceImages: [],
+      },
+    });
+  });
+
   it('disables elapsed time slots for today but leaves them available for future dates', async () => {
     jest.spyOn(Date.prototype, 'getHours').mockReturnValue(13);
     jest.spyOn(Date.prototype, 'getMinutes').mockReturnValue(0);

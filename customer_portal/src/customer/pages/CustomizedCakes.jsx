@@ -523,6 +523,7 @@ export default function CustomizedCakes() {
   };
 
   const openReferenceGallery = () => {
+    const category = DESIGN_CATEGORIES.find(({ label }) => label === occasion) || DESIGN_CATEGORIES[0];
     try {
       if (galleryReferences.length > 0) {
         window.sessionStorage.setItem(referenceStorageKey, JSON.stringify(galleryReferences));
@@ -533,7 +534,7 @@ export default function CustomizedCakes() {
     } catch (error) {
       console.warn('Could not preserve reference images before opening the gallery:', error);
     }
-    navigate('/customer/birthday-designs', {
+    navigate(category.path, {
       state: {
         referenceFiles: files,
         selectedReferenceImages: galleryReferences,
