@@ -1065,6 +1065,151 @@ export default function Login() {
             width: 894px;
           }
         }
+        .pastry-login > .relative.z-10 {
+          height: 100vh;
+          height: 100dvh;
+          min-height: 0;
+          overflow-y: auto;
+          padding-top: clamp(8px, 2vh, 24px);
+          padding-bottom: clamp(8px, 2vh, 24px);
+        }
+        .pastry-login main {
+          min-height: 0;
+        }
+        .pastry-login .login-phone-cake {
+          display: none;
+        }
+        .pastry-login .login-footer {
+          flex: 0 0 auto;
+          min-height: 0;
+          margin-top: 4px;
+          padding-top: 4px;
+          padding-bottom: 4px;
+        }
+        @media (min-width: 1200px) {
+          .pastry-login > .relative.z-10 {
+            padding-right: clamp(12px, 4vw, 32px);
+            padding-left: clamp(12px, 4vw, 32px);
+          }
+          .pastry-login main {
+            flex: 1 1 auto;
+            height: auto;
+            max-height: calc(100% - 42px);
+          }
+          .pastry-login .login-cake-section img {
+            height: min(300px, 38vh);
+          }
+          .pastry-login main > div:not(.hero-panel) {
+            padding-top: clamp(16px, 3vh, 36px);
+            padding-bottom: clamp(16px, 3vh, 36px);
+          }
+          .pastry-login .login-card > .mb-4 {
+            margin-bottom: clamp(12px, 2.5vh, 30px);
+          }
+          .pastry-login .login-footer {
+            margin-top: 4px;
+          }
+        }
+        @media (max-width: 1199px) {
+          .pastry-login > .relative.z-10 {
+            align-items: center;
+            padding-right: 12px;
+            padding-left: 12px;
+          }
+          .pastry-login main {
+            flex: 1 1 auto;
+            justify-content: center;
+            width: min(100%, 560px);
+            overflow: visible;
+          }
+          .pastry-login main > div:not(.hero-panel) {
+            padding: 0 12px;
+          }
+          .pastry-login .login-card {
+            padding: 16px clamp(18px, 5vw, 32px) 12px;
+          }
+          .pastry-login .login-phone-brand {
+            margin-bottom: 8px;
+          }
+          .pastry-login .login-card > .mb-4 {
+            margin-bottom: 8px;
+          }
+          .pastry-login .login-card > .mb-4 h2.login-welcome {
+            font-size: 34px;
+          }
+          .pastry-login .login-card > .mb-4 p {
+            font-size: 13px;
+          }
+          .pastry-login .login-card form.space-y-4 > :not([hidden]) ~ :not([hidden]) {
+            margin-top: 8px;
+          }
+          .pastry-login .login-card form .space-y-2 > :not([hidden]) ~ :not([hidden]) {
+            margin-top: 2px;
+          }
+          .pastry-login .login-card form label {
+            font-size: 12px;
+          }
+          .pastry-login .login-input {
+            height: 42px;
+          }
+          .pastry-login .btn-primary,
+          .pastry-login .btn-secondary {
+            height: 42px;
+          }
+          .pastry-login .login-card form > .flex.items-center.gap-4.py-2 {
+            padding-top: 0;
+            padding-bottom: 0;
+          }
+          .pastry-login .login-card form.space-y-4 > :not([hidden]) ~ :not([hidden]).flex.items-center.gap-4.py-2 {
+            margin-top: 8px;
+          }
+          .pastry-login .login-card form + p {
+            margin-top: 8px;
+          }
+          .pastry-login .login-card a.mt-4 {
+            margin-top: 6px;
+          }
+          .pastry-login .login-footer > div:first-child {
+            display: none;
+          }
+          .pastry-login .login-footer-links {
+            margin-top: 0;
+            margin-bottom: 0;
+            gap: 6px 12px;
+          }
+          .pastry-login .login-footer-links a,
+          .pastry-login .login-footer-links button {
+            font-size: 10px;
+          }
+        }
+        @media (max-width: 399px) {
+          .pastry-login .login-card {
+            padding-right: 16px;
+            padding-left: 16px;
+          }
+          .pastry-login .login-footer-links {
+            gap: 4px 9px;
+          }
+        }
+        @media (max-height: 620px) {
+          .pastry-login > .relative.z-10 {
+            padding-top: 6px;
+            padding-bottom: 6px;
+          }
+          .pastry-login .login-card {
+            padding-top: 10px;
+            padding-bottom: 8px;
+          }
+          .pastry-login .login-phone-brand {
+            margin-bottom: 4px;
+          }
+          .pastry-login .login-card > .mb-4 {
+            margin-bottom: 4px;
+          }
+          .pastry-login .login-card > .mb-4 h2.login-welcome {
+            font-size: 30px;
+          }
+        }
       `}</style>
 
       {/* Background Decorations */}
