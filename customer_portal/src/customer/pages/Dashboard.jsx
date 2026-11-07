@@ -151,11 +151,11 @@ function SecondaryBanner({ onOrderNow }) {
   };
 
   return (
-    <section className="mb-4 mt-2 overflow-hidden rounded-xl border border-[#eadfd8] bg-white shadow-[0_5px_18px_rgba(91,64,39,0.05)]">
-      <div className="relative aspect-[5/2] w-full overflow-hidden md:aspect-auto md:h-[340px]">
+    <section className="mb-4 mt-2 overflow-hidden rounded-xl border border-[#eadfd8] bg-transparent shadow-[0_5px_18px_rgba(91,64,39,0.05)]">
+      <div className="relative aspect-[3.91/1] w-full overflow-hidden">
         {secondaryBanner.type === "video" ? (
           <video
-            className="h-full w-full object-contain"
+            className="h-full w-full scale-[1.03] object-cover"
             src={secondaryBanner.src}
             autoPlay
             muted
@@ -166,7 +166,7 @@ function SecondaryBanner({ onOrderNow }) {
           <img
             src={secondaryBanner.src}
             alt="Pastry Project banner"
-            className="h-full w-full object-contain"
+            className="h-full w-full scale-[1.03] object-cover"
           />
         )}
         <button
