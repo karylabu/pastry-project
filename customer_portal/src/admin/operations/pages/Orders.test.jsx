@@ -156,10 +156,12 @@ test("opens live order details by clicking the card summary or table row", async
   await screen.findAllByText("Customer 101");
 
   const orderCard = Array.from(container.querySelectorAll("article")).find((card) => card.textContent.includes("#101"));
+  expect(within(orderCard).queryByRole("button", { name: /^(View|Hide)$/ })).not.toBeInTheDocument();
   fireEvent.click(within(orderCard).getByText("Customer 101"));
   expect(within(orderCard).getByText("Order summary")).toBeInTheDocument();
 
   const orderRow = Array.from(container.querySelectorAll("tr[aria-label]")).find((row) => row.getAttribute("aria-label").includes("Order 101"));
+  expect(within(orderRow).queryByRole("button", { name: /^(View|Hide)$/ })).not.toBeInTheDocument();
   expect(orderRow).toHaveAttribute("aria-expanded", "true");
   fireEvent.click(orderRow);
   expect(orderRow).toHaveAttribute("aria-expanded", "false");
@@ -196,7 +198,7 @@ test("hides refund details and status controls from admins", async () => {
   const orderCard = Array.from(container.querySelectorAll("article")).find((card) => card.textContent.includes("#107"));
   expect(orderCard).toHaveTextContent("Cancelled");
   expect(orderCard).not.toHaveTextContent("Cancellation Pending");
-  fireEvent.click(within(orderCard).getByRole("button", { name: /View details for order 107/i }));
+  fireEvent.click(within(orderCard).getByText("Customer 107"));
 
   expect(orderCard).not.toHaveTextContent(/refund/i);
   expect(within(orderCard).queryByText("ref_107")).not.toBeInTheDocument();
@@ -225,7 +227,7 @@ test("opens an enlarged payment proof from live order details", async () => {
   renderOrders();
   const orderCard = (await screen.findAllByText("Customer 103"))[0].closest("article");
 
-  fireEvent.click(within(orderCard).getByRole("button", { name: /View details for order 103/i }));
+  fireEvent.click(within(orderCard).getByText("Customer 103"));
 
   fireEvent.click(within(orderCard).getByRole("button", { name: "View payment proof" }));
   const enlargeButton = await within(orderCard).findByRole("button", { name: "Enlarge payment proof for order 103" });
@@ -271,7 +273,7 @@ test("shows balance amount and payment proof after balance is confirmed paid", a
 
   renderOrders();
   const orderCard = (await screen.findAllByText("Customer 111"))[0].closest("article");
-  fireEvent.click(within(orderCard).getByRole("button", { name: "View details for order 111" }));
+  fireEvent.click(within(orderCard).getByText("Customer 111"));
 
   expect(within(orderCard).getByText("Balance payment proof")).toBeInTheDocument();
   expect(within(orderCard).getByText("Balance paid · ₱500")).toBeInTheDocument();
@@ -314,7 +316,8 @@ test("hides balance proof and amount until the balance is paid", async () => {
 
   renderOrders();
   const orderCard = (await screen.findAllByText("Customer 109"))[0].closest("article");
-  fireEvent.click(within(orderCard).getByRole("button", { name: "View details for order 109" }));
+
+  fireEvent.click(within(orderCard).getByText("Customer 109"));
 
   expect(screen.queryByRole("dialog", { name: "Payment proof for order 109" })).not.toBeInTheDocument();
   expect(within(orderCard).queryByText("Balance payment proof")).not.toBeInTheDocument();
@@ -355,7 +358,7 @@ test("does not allow opening a balance proof before the customer submits it", as
 
   renderOrders();
   const orderCard = (await screen.findAllByText("Customer 110"))[0].closest("article");
-  fireEvent.click(within(orderCard).getByRole("button", { name: "View details for order 110" }));
+  fireEvent.click(within(orderCard).getByText("Customer 110"));
 
   const balanceCard = within(orderCard).queryByRole("button", {
     name: "View balance payment proof for order 110",
@@ -401,7 +404,7 @@ test("lets admin verify a submitted balance before marking an order ready", asyn
   const orderCard = (await screen.findAllByText("Customer 107"))[0].closest("article");
   expect(screen.getByRole("button", { name: /Pay Balance Before Ready/ })).toBeInTheDocument();
   expect(within(orderCard).getByText("Pay Balance Before Ready")).toBeInTheDocument();
-  fireEvent.click(within(orderCard).getByRole("button", { name: "View details for order 107" }));
+  fireEvent.click(within(orderCard).getByText("Customer 107"));
   expect(within(orderCard).getByText("Order summary")).toBeInTheDocument();
   expect(within(orderCard).getByText("Deposit received")).toBeInTheDocument();
   expect(within(orderCard).queryByText("Balance payment proof")).not.toBeInTheDocument();
@@ -553,7 +556,7 @@ test("shows placed and cancelled timestamps in cancelled order details", async (
   const { container } = renderOrders();
   const orderCard = (await screen.findAllByText("Customer 105"))[0].closest("article");
 
-  fireEvent.click(within(orderCard).getByRole("button", { name: /View details for order 105/i }));
+  fireEvent.click(within(orderCard).getByText("Customer 105"));
 
   expect(within(orderCard).getByText("Placed")).toBeInTheDocument();
   expect(within(orderCard).getByText("Cancelled", { selector: "dt" })).toBeInTheDocument();
@@ -585,7 +588,7 @@ test("removes view, approval, and cancel actions after an order is counted as wa
   const orderCard = (await screen.findAllByText("Customer 106"))[0].closest("article");
   expect(within(orderCard).getByRole("button", { name: "Accept" })).toBeInTheDocument();
   expect(within(orderCard).getByRole("button", { name: "Cancel" })).toBeInTheDocument();
-  expect(within(orderCard).getByRole("button", { name: /View details for order/ })).toBeInTheDocument();
+  expect(within(orderCard).getByRole("button", { name: "Order 106 summary" })).toBeInTheDocument();
 
   fireEvent.click(within(orderCard).getByRole("button", { name: "Waste" }));
 
@@ -593,7 +596,7 @@ test("removes view, approval, and cancel actions after an order is counted as wa
     expect(within(orderCard).getByRole("button", { name: "Counted as waste" })).toBeDisabled();
     expect(within(orderCard).queryByRole("button", { name: "Accept" })).not.toBeInTheDocument();
     expect(within(orderCard).queryByRole("button", { name: "Cancel" })).not.toBeInTheDocument();
-    expect(within(orderCard).queryByRole("button", { name: /View details for order/ })).not.toBeInTheDocument();
+    expect(within(orderCard).queryByRole("button", { name: /^(View|Hide)$/ })).not.toBeInTheDocument();
   });
 
   const orderRow = Array.from(container.querySelectorAll("tr")).find((row) => row.textContent.includes("#106"));
@@ -601,7 +604,7 @@ test("removes view, approval, and cancel actions after an order is counted as wa
   expect(within(orderRow).getByRole("button", { name: "Counted as waste" })).toBeDisabled();
   expect(within(orderRow).queryByRole("button", { name: "Accept" })).not.toBeInTheDocument();
   expect(within(orderRow).queryByRole("button", { name: "Cancel" })).not.toBeInTheDocument();
-  expect(within(orderRow).queryByRole("button", { name: "View" })).not.toBeInTheDocument();
+  expect(within(orderRow).queryByRole("button", { name: /^(View|Hide)$/ })).not.toBeInTheDocument();
 });
 
 test("dashboard cards filter live orders and toggle off when clicked again", async () => {

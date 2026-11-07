@@ -750,7 +750,7 @@ export default function Orders() {
                         type="button"
                         onClick={() => toggleOrderDetails(order, isExpanded)}
                         aria-expanded={isExpanded}
-                        aria-label={`${isExpanded ? "Hide" : "Show"} details for order ${order.order_number || order.id}`}
+                        aria-label={`Order ${order.order_number || order.id} summary`}
                         className="block w-full rounded text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#b89646]"
                       >
                         <div className="flex items-start justify-between gap-3">
@@ -774,7 +774,6 @@ export default function Orders() {
                       </button>
                       <div className="mt-3 flex flex-wrap gap-1.5">
                         {!order.is_wasted && <>
-                          <button type="button" onClick={() => toggleOrderDetails(order, isExpanded)} title={`${isExpanded ? "Hide" : "View"} details for order ${order.order_number || order.id}`} aria-label={`${isExpanded ? "Hide" : "View"} details for order ${order.order_number || order.id}`} className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-[#e8dfd4] bg-white text-[#65574d] transition hover:bg-[#faf7f2]">{isExpanded ? <ChevronUp size={15} aria-hidden="true" /> : <ChevronDown size={15} aria-hidden="true" />}</button>
                           {canAdvance && <button type="button" onClick={() => advanceOrder(order)} disabled={updatingId === order.id} className="rounded-md bg-black px-2.5 py-1.5 text-[10px] font-semibold text-white disabled:opacity-50">{updatingId === order.id ? "Updating..." : needsPaymentReview ? "Review payment" : paymentIsConfirmed ? "Accept" : needsBalancePaymentReview ? "Verify balance" : order.status === "Pending" ? "Accept" : order.status === "Preparing" ? needsBalancePayment ? "Pay Balance" : "Ready" : "Complete"}</button>}
                           {order.return_refund_request?.status === "Pending Review"
                             ? <button type="button" onClick={() => { setRejectModalOrderId(order.id); setRejectReason(""); }} disabled={updatingId === order.id} className="rounded-md border border-red-200 bg-red-50 px-2.5 py-1.5 text-[10px] font-semibold text-red-700 disabled:opacity-50">Reject</button>
@@ -968,7 +967,6 @@ export default function Orders() {
                           <td className="px-4 py-4">
                             <div className="flex min-w-[210px] flex-wrap justify-end gap-1.5">
                               {!order.is_wasted && <>
-                                <button type="button" onClick={() => toggleOrderDetails(order, isExpanded)} className="rounded-md border border-[#e8dfd4] bg-white px-2.5 py-1.5 text-[10px] font-semibold text-[#65574d] transition hover:border-[#c9b895] hover:bg-[#faf7f2]">{isExpanded ? "Hide" : "View"}</button>
                                 {(!(order.status === "Completed" || order.status === "Cancelled") && (order.status !== 'Awaiting Payment' || needsPaymentReview || paymentIsConfirmed) && (order.status !== 'Awaiting Balance Payment' || needsBalancePaymentReview)) && <button type="button" onClick={() => advanceOrder(order)} disabled={updatingId === order.id} className="rounded-md bg-[#33251e] px-2.5 py-1.5 text-[10px] font-semibold text-white transition hover:bg-black disabled:opacity-50">{needsPaymentReview ? "Verify payment" : paymentIsConfirmed ? "Accept" : needsBalancePaymentReview ? "Verify balance" : order.status === "Pending" ? "Accept" : order.status === "Preparing" ? needsBalancePayment ? "Pay Balance" : "Ready" : "Complete"}</button>}
                                 {order.return_refund_request?.status === "Pending Review"
                                   ? <button type="button" onClick={() => { setRejectModalOrderId(order.id); setRejectReason(""); }} disabled={updatingId === order.id || rejectSubmitting} className="rounded-md border border-red-200 bg-red-50 px-2.5 py-1.5 text-[10px] font-semibold text-red-700 transition hover:bg-red-100 disabled:opacity-50">Reject</button>
@@ -1207,13 +1205,6 @@ export default function Orders() {
 
                               <div className="mt-3 flex flex-wrap gap-2">
                                 {!order.is_wasted && <>
-                                  <button
-                                    type="button"
-                                    onClick={() => setExpandedOrderId(isExpanded ? null : order.id)}
-                                    className="rounded-full border border-black/10 bg-white px-3 py-2 text-[12px] font-semibold text-black transition hover:bg-black hover:text-white"
-                                  >
-                                    {isExpanded ? "Hide" : "View"}
-                                  </button>
                                   {!(["Completed", "Cancelled"].includes(order.status)) && (
                                     <button
                                       type="button"
