@@ -140,6 +140,44 @@ describe("AdminActivityLog", () => {
     expect(await screen.findByText("ORD-100 status changed from Preparing to Ready for Pickup")).toBeInTheDocument();
   });
 
+  test("formats nested audit changes as readable details instead of JSON", async () => {
+    global.fetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        success: true,
+        data: [{
+          id: 17,
+          action: "Updated recipe",
+          category: "Recipe",
+          actor_name: "Shop Owner",
+          actor_email: "owner@example.com",
+          actor_role: "super_admin",
+          details: {
+            Record: "Chocolate Cake",
+            Changes: {
+              recipe_lines: {
+                Before: [{ ingredient: "Flour", quantity: 2 }],
+                After: [{ ingredient: "Flour", quantity: 3 }],
+              },
+            },
+          },
+          response_status: 200,
+          created_at: "2026-10-31T04:30:00Z",
+        }],
+        pagination: { current_page: 1, last_page: 1, total: 1 },
+      }),
+    });
+
+    render(<AdminActivityLog />);
+
+    const activity = await screen.findByText("Updated recipe");
+    const row = activity.closest("tr");
+    expect(row).toHaveTextContent(
+      "Recipe Lines changed from Ingredient: Flour; Quantity: 2 to Ingredient: Flour; Quantity: 3"
+    );
+    expect(row).not.toHaveTextContent(/\{"ingredient"/);
+  });
+
   test("summarizes Recycle Bin changes without internal IDs or timestamps", async () => {
     global.fetch.mockResolvedValueOnce({
       ok: true,

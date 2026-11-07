@@ -47,7 +47,15 @@ function formatDetailLabel(value) {
 function formatDetailValue(value) {
   if (value === null || value === undefined || value === "") return "—";
   if (typeof value === "boolean") return value ? "Yes" : "No";
-  if (typeof value === "object") return JSON.stringify(value);
+  if (Array.isArray(value)) {
+    return value.length ? value.map(formatDetailValue).join(", ") : "—";
+  }
+  if (typeof value === "object") {
+    const entries = Object.entries(value);
+    return entries.length
+      ? entries.map(([key, nestedValue]) => `${formatDetailLabel(key)}: ${formatDetailValue(nestedValue)}`).join("; ")
+      : "—";
+  }
   return String(value);
 }
 
