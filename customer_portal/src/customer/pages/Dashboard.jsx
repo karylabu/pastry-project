@@ -146,8 +146,8 @@ function Banner({ onShopNow, onCustomizeNow }) {
 
 function SecondaryBanner({ onOrderNow }) {
   const secondaryBanner = {
-    type: "image",
-    src: `${ROOT_BASE}/uploads/banner(2).png`,
+    type: "video",
+    src: `${ROOT_BASE}/uploads/banner(2).mp4`,
   };
 
   return (
