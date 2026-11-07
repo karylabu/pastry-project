@@ -388,6 +388,7 @@ export function ChatBubble({ aiMode = false, fullPage = false, hideFloating = fa
   const [chatError, setChatError] = useState("");
   const [staffMode, setStaffMode] = useState(false);
   const [unread, setUnread]       = useState(0);
+  const [messagePreview, setMessagePreview] = useState(null);
   const [selectedImage, setSelectedImage] = useState(null);
   const [showStoreNumber, setShowStoreNumber] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
@@ -494,12 +495,18 @@ export function ChatBubble({ aiMode = false, fullPage = false, hideFloating = fa
       setChatError("");
       if (openRef.current) {
         setUnread(0);
+        setMessagePreview(null);
       } else {
-        const newStaff = fetchedMessages.filter(message => (
-          ["admin", "staff"].includes(String(message.sender).toLowerCase()) &&
+        const newIncomingMessages = fetchedMessages.filter(message => (
+          ["admin", "staff", "ai"].includes(String(message.sender).toLowerCase()) &&
           Number(message.is_read) === 0
-        )).length;
-        setUnread(newStaff);
+        ));
+        setUnread(newIncomingMessages.length);
+        const latestIncoming = newIncomingMessages[newIncomingMessages.length - 1];
+        setMessagePreview(latestIncoming ? {
+          text: latestIncoming.message || (latestIncoming.image_path ? "Sent you an image." : "New message"),
+          sender: latestIncoming.sender,
+        } : null);
       }
     } catch (e) {
       if (fetchId !== messageFetchIdRef.current) return;
@@ -621,7 +628,26 @@ export function ChatBubble({ aiMode = false, fullPage = false, hideFloating = fa
     <>
       {/* FLOAT BUTTON */}
       {!fullPage && !hideFloating && <div className="fixed bottom-6 right-6 z-[60000] flex items-end">
-        {!open && (
+        {!open && messagePreview && (
+          <button
+            type="button"
+            onClick={() => {
+              openRef.current = true;
+              setOpen(true);
+              setUnread(0);
+              setMessagePreview(null);
+            }}
+            className="absolute bottom-full right-0 mb-2 w-64 rounded-2xl rounded-br-md border border-[#f0e6db] bg-white px-3 py-2 text-left shadow-lg"
+            aria-label={`New message from ${String(messagePreview.sender).toLowerCase() === "ai" ? "Chat Bot" : "Admin"}: ${messagePreview.text}`}
+            title={messagePreview.text}
+          >
+            <p className="text-[10px] font-semibold text-[#80600a]">
+              {String(messagePreview.sender).toLowerCase() === "ai" ? "Chat Bot" : "New message"}
+            </p>
+            <p className="mt-0.5 line-clamp-2 break-words text-xs text-gray-800">{messagePreview.text}</p>
+          </button>
+        )}
+        {!open && !messagePreview && (
           <motion.div
             initial={{ opacity: 0, x: 12 }}
             animate={{ opacity: 1, x: 0 }}
@@ -640,7 +666,10 @@ export function ChatBubble({ aiMode = false, fullPage = false, hideFloating = fa
               const nextOpen = !openRef.current;
               openRef.current = nextOpen;
               setOpen(nextOpen);
-              if (nextOpen) setUnread(0);
+              if (nextOpen) {
+                setUnread(0);
+                setMessagePreview(null);
+              }
             }}
             className="flex h-14 w-14 items-center justify-center rounded-full bg-[#f0b94d] text-black shadow-xl transition-colors hover:bg-[#e5ae3d]"
           >
