@@ -100,6 +100,46 @@ describe("CustomCakes", () => {
     });
   });
 
+  test("filters custom cake requests from the summary cards", async () => {
+    const orders = [
+      { id: 41, status: "Pending", payment_status: "pending", name: "Needs Review Customer", total: 1000, items: [] },
+      { id: 42, status: "Awaiting Payment", payment_status: "pending", name: "Awaiting Payment Customer", total: 1200, items: [] },
+      { id: 43, status: "Preparing", payment_status: "paid", name: "Production Customer", total: 1400, items: [] },
+      { id: 44, status: "Ready for Pickup", payment_status: "paid", name: "Pickup Customer", total: 1600, items: [] },
+      { id: 45, status: "Completed", payment_status: "paid", name: "Completed Customer", total: 1800, items: [] },
+    ];
+    global.fetch.mockImplementation((url) => Promise.resolve({
+      ok: true,
+      json: async () => url.includes("/customized-cakes/request-status")
+        ? { success: true, enabled: true }
+        : { success: true, orders },
+    }));
+
+    render(<CustomCakes />);
+    await screen.findAllByText("Needs Review Customer");
+
+    const filters = [
+      ["Needs review", "Needs Review Customer"],
+      ["Awaiting payment", "Awaiting Payment Customer"],
+      ["In production", "Production Customer"],
+      ["Ready for pickup", "Pickup Customer"],
+    ];
+
+    for (const [label, expectedCustomer] of filters) {
+      fireEvent.click(screen.getByRole("button", { name: `Filter requests: ${label}` }));
+      expect(screen.getByRole("button", { name: `Filter requests: ${label}` })).toHaveAttribute("aria-pressed", "true");
+      expect(screen.getAllByText(expectedCustomer).length).toBeGreaterThan(0);
+      for (const [, otherCustomer] of filters) {
+        if (otherCustomer !== expectedCustomer) {
+          expect(screen.queryAllByText(otherCustomer)).toHaveLength(0);
+        }
+      }
+    }
+
+    fireEvent.click(screen.getByRole("button", { name: "Filter requests: Ready for pickup" }));
+    expect(await screen.findAllByText("Completed Customer")).toHaveLength(2);
+  });
+
   test("replaces a broken custom cake reference image with the bakery logo", async () => {
     global.fetch.mockImplementation((url, options = {}) => {
       if (url.includes("/customized-cakes/request-status")) {

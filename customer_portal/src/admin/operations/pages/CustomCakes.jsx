@@ -795,10 +795,10 @@ export default function CustomCakes() {
   };
 
   const requestMetrics = [
-    { label: "Needs review", value: orders.filter((order) => isPendingRequest(order.status, order.payment_status)).length, icon: Clock3, accent: "#c87954" },
-    { label: "Awaiting payment", value: orders.filter((order) => order.status === "Awaiting Payment").length, icon: CreditCard, accent: "#c9a94f" },
-    { label: "In production", value: orders.filter((order) => order.status === "Preparing").length, icon: PackageCheck, accent: "#d4af37" },
-    { label: "Ready for pickup", value: orders.filter((order) => order.status === "Ready for Pickup").length, icon: CircleCheck, accent: "#81906c" },
+    { label: "Needs review", filter: "To Review", value: orders.filter((order) => isPendingRequest(order.status, order.payment_status)).length, icon: Clock3, accent: "#c87954" },
+    { label: "Awaiting payment", filter: "Awaiting Payment", value: orders.filter((order) => order.status === "Awaiting Payment").length, icon: CreditCard, accent: "#c9a94f" },
+    { label: "In production", filter: "Preparing", value: orders.filter((order) => order.status === "Preparing").length, icon: PackageCheck, accent: "#d4af37" },
+    { label: "Ready for pickup", filter: "Ready for Pickup", value: orders.filter((order) => order.status === "Ready for Pickup").length, icon: CircleCheck, accent: "#81906c" },
   ];
   const statusCounts = Object.fromEntries(statusFilterOptions.map((status) => [
     status,
@@ -852,11 +852,24 @@ export default function CustomCakes() {
           </div>
 
           <div className="admin-operations-metrics mb-5 grid grid-cols-2 gap-2.5 lg:grid-cols-4 lg:gap-3">
-            {requestMetrics.map(({ label, value, icon: Icon, accent }) => (
-              <div key={label} style={{ borderTopColor: accent }} className="admin-static-card rounded-lg border border-t-[3px] border-[#e9e1d9] bg-white px-3.5 py-3 shadow-[0_3px_12px_rgba(60,42,28,0.035)] sm:px-4">
+            {requestMetrics.map(({ label, filter, value, icon: Icon, accent }) => (
+              <button
+                key={label}
+                type="button"
+                onClick={() => {
+                  setStatusFilter(statusFilter === filter ? "All" : filter);
+                  setSearchId("");
+                }}
+                aria-pressed={statusFilter === filter}
+                aria-label={`Filter requests: ${label}`}
+                style={{ borderTopColor: accent }}
+                className={`admin-static-card w-full rounded-lg border border-t-[3px] border-[#e9e1d9] px-3.5 py-3 text-left shadow-[0_3px_12px_rgba(60,42,28,0.035)] transition hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#b89646] sm:px-4 ${
+                  statusFilter === filter ? "bg-[#fff8e8] ring-2 ring-[#d4af37]/35" : "bg-white"
+                }`}
+              >
                 <div className="flex items-center justify-between gap-2"><p className="text-[10px] font-semibold uppercase tracking-[0.13em] text-[#74675f]">{label}</p><Icon size={15} className="shrink-0 text-[#8f7750]" aria-hidden="true" /></div>
                 <p className="mt-2 text-[23px] font-bold leading-none text-[#33251e]">{value}</p>
-              </div>
+              </button>
             ))}
           </div>
 
