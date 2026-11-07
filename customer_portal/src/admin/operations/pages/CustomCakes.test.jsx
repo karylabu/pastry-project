@@ -100,6 +100,14 @@ describe("CustomCakes", () => {
     });
   });
 
+  test("opens with the status passed by a dashboard summary card", async () => {
+    window.history.pushState({}, "", "/admin/custom-cakes?status=Preparing");
+
+    render(<CustomCakes />);
+
+    expect(await screen.findByRole("button", { name: /^Preparing/ })).toHaveAttribute("aria-pressed", "true");
+  });
+
   test("filters custom cake requests from the summary cards", async () => {
     const orders = [
       { id: 41, status: "Pending", payment_status: "pending", name: "Needs Review Customer", total: 1000, items: [] },

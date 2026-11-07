@@ -146,6 +146,11 @@ test("switches between live and customized orders and links each order to its de
   expect(statValue("Completed")).toHaveTextContent("1");
   expect(statValue("Sales Today")).toHaveTextContent("₱650");
   expect(screen.getByText("Live orders placed today")).toBeInTheDocument();
+  expect(screen.getByRole("link", { name: /Orders Today/ })).toHaveAttribute("href", "/admin/orders?date=today");
+  expect(screen.getByRole("link", { name: /^Pending/ })).toHaveAttribute("href", "/admin/orders?status=Pending");
+  expect(screen.getByRole("link", { name: /^Preparing/ })).toHaveAttribute("href", "/admin/orders?status=Preparing");
+  expect(screen.getByRole("link", { name: /^Completed/ })).toHaveAttribute("href", "/admin/orders?status=Completed");
+  expect(screen.getByRole("link", { name: /Sales Today/ })).toHaveAttribute("href", "/admin/orders?date=today&status=Completed");
   expect(screen.queryByText("Completed Customer")).not.toBeInTheDocument();
   expect(screen.queryByText("Custom Customer")).not.toBeInTheDocument();
 
@@ -154,11 +159,15 @@ test("switches between live and customized orders and links each order to its de
   expect(await screen.findByRole("heading", { name: "Customized orders" })).toBeInTheDocument();
   const customOrderLink = await screen.findByRole("link", { name: "#402" });
   expect(customOrderLink).toHaveAttribute("href", "/admin/custom-cakes?order_id=402");
-  expect(statValue("Orders Today")).toHaveTextContent("1");
-  expect(statValue("Pending")).toHaveTextContent("1");
-  expect(statValue("Completed")).toHaveTextContent("0");
-  expect(statValue("Sales Today")).toHaveTextContent("₱0");
-  expect(screen.getByText("Customized orders placed today")).toBeInTheDocument();
+  expect(statValue("Needs Review")).toHaveTextContent("1");
+  expect(statValue("Awaiting Payment")).toHaveTextContent("0");
+  expect(statValue("In Production")).toHaveTextContent("0");
+  expect(statValue("Ready for Pickup")).toHaveTextContent("0");
+  expect(screen.getByRole("link", { name: /Needs Review/ })).toHaveAttribute("href", "/admin/custom-cakes?status=To%20Review");
+  expect(screen.getByRole("link", { name: /Awaiting Payment/ })).toHaveAttribute("href", "/admin/custom-cakes?status=Awaiting%20Payment");
+  expect(screen.getByRole("link", { name: /In Production/ })).toHaveAttribute("href", "/admin/custom-cakes?status=Preparing");
+  expect(screen.getByRole("link", { name: /Ready for Pickup/ })).toHaveAttribute("href", "/admin/custom-cakes?status=Ready%20for%20Pickup");
+  expect(screen.queryByText("Orders Today", { selector: "p" })).not.toBeInTheDocument();
   expect(screen.queryByText("Live Customer")).not.toBeInTheDocument();
 
   fireEvent.click(liveOrdersButton);

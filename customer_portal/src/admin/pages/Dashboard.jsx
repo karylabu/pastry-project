@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { AlertTriangle, ArrowRight, BarChart3, ShoppingCart, TrendingUp, CakeSlice, Package, Sparkles, Sun, Clock3, ChefHat, CircleCheck, ChevronRight, Star, MessageSquare } from "lucide-react";
+import { AlertTriangle, ArrowRight, BarChart3, ShoppingCart, TrendingUp, CakeSlice, Package, PackageCheck, Sparkles, Sun, Clock3, ChefHat, CircleCheck, ChevronRight, Star, MessageSquare, CreditCard } from "lucide-react";
 import { Area, Bar, CartesianGrid, Cell, ComposedChart, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Link } from "react-router-dom";
 import { LARAVEL_BASE, ROOT_BASE } from "../../services/config";
@@ -17,7 +17,7 @@ const STATUS_STYLES = {
 
 function StatsStrip({ stats }) {
   return (
-    <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-5">
+    <div className={`grid grid-cols-2 gap-2.5 sm:grid-cols-3 ${stats.length === 4 ? "lg:grid-cols-4" : "lg:grid-cols-5"}`}>
       {stats.map((stat, index) => {
         const Icon = stat.icon;
         return (
@@ -365,6 +365,11 @@ export default function Dashboard() {
     const completedToday = ordersToday.filter(
       (order) => String(order.status || "").trim().toLowerCase() === "completed",
     );
+    const isPendingRequest = (order) => (
+      (order.status === "Pending" && String(order.payment_status || "").toLowerCase() !== "paid")
+      || order.status === "Pending Quote"
+      || order.status === "To Review"
+    );
 
     return {
       ordersToday: ordersToday.length,
@@ -372,6 +377,10 @@ export default function Dashboard() {
       preparing: countStatus(categoryOrders, "preparing"),
       completed: countStatus(categoryOrders, "completed"),
       salesToday: completedToday.reduce((sum, order) => sum + (Number(order.total) || 0), 0),
+      needsReview: categoryOrders.filter(isPendingRequest).length,
+      awaitingPayment: categoryOrders.filter((order) => order.status === "Awaiting Payment").length,
+      inProduction: categoryOrders.filter((order) => order.status === "Preparing").length,
+      readyForPickup: categoryOrders.filter((order) => order.status === "Ready for Pickup").length,
     };
   }, [categoryOrders]);
   const categoryStatValue = (value) => categoryOrdersLoading
@@ -380,13 +389,20 @@ export default function Dashboard() {
       ? "—"
       : value;
   const categoryName = orderCategory === "customized" ? "Customized" : "Live";
-  const stats = [
-    { label: "Orders Today", value: categoryStatValue(orderCategorySummary.ordersToday.toLocaleString()), hint: `${categoryName} orders placed today`, icon: ShoppingCart, iconTone: "bg-[#fff4cd] text-[#9b7810]", tone: "text-[#33251e]", accent: "#d4af37", to: "/admin/orders?date=today" },
-    { label: "Pending", value: categoryStatValue(orderCategorySummary.pending.toLocaleString()), hint: `${categoryName} awaiting confirmation`, icon: Clock3, iconTone: "bg-[#fff4cd] text-[#9b7810]", tone: "text-[#33251e]", accent: "#c87954", to: "/admin/orders" },
-    { label: "Preparing", value: categoryStatValue(orderCategorySummary.preparing.toLocaleString()), hint: `${categoryName} in production`, icon: ChefHat, iconTone: "bg-[#fff4cd] text-[#9b7810]", tone: "text-[#33251e]", accent: "#c9a94f", to: "/admin/orders" },
-    { label: "Completed", value: categoryStatValue(orderCategorySummary.completed.toLocaleString()), hint: `${categoryName} delivered / picked up`, icon: CircleCheck, iconTone: "bg-[#eef5e9] text-[#68815d]", tone: "text-[#33251e]", accent: "#81906c", to: "/admin/orders/history" },
-    { label: "Sales Today", value: categoryStatValue(`₱${orderCategorySummary.salesToday.toLocaleString()}`), hint: `${categoryName} completed revenue today`, icon: TrendingUp, iconTone: "bg-[#fff4cd] text-[#9b7810]", tone: "text-[#33251e]", accent: "#d4af37", to: "/admin/reports" },
-  ];
+  const stats = orderCategory === "customized"
+    ? [
+      { label: "Needs Review", value: categoryStatValue(orderCategorySummary.needsReview.toLocaleString()), hint: "Custom requests to review", icon: Clock3, iconTone: "bg-[#fff4cd] text-[#9b7810]", tone: "text-[#33251e]", accent: "#c87954", to: "/admin/custom-cakes?status=To%20Review" },
+      { label: "Awaiting Payment", value: categoryStatValue(orderCategorySummary.awaitingPayment.toLocaleString()), hint: "Custom requests awaiting payment", icon: CreditCard, iconTone: "bg-[#fff4cd] text-[#9b7810]", tone: "text-[#33251e]", accent: "#c9a94f", to: "/admin/custom-cakes?status=Awaiting%20Payment" },
+      { label: "In Production", value: categoryStatValue(orderCategorySummary.inProduction.toLocaleString()), hint: "Custom requests in production", icon: PackageCheck, iconTone: "bg-[#fff4cd] text-[#9b7810]", tone: "text-[#33251e]", accent: "#d4af37", to: "/admin/custom-cakes?status=Preparing" },
+      { label: "Ready for Pickup", value: categoryStatValue(orderCategorySummary.readyForPickup.toLocaleString()), hint: "Custom requests ready for pickup", icon: CircleCheck, iconTone: "bg-[#eef5e9] text-[#68815d]", tone: "text-[#33251e]", accent: "#81906c", to: "/admin/custom-cakes?status=Ready%20for%20Pickup" },
+    ]
+    : [
+      { label: "Orders Today", value: categoryStatValue(orderCategorySummary.ordersToday.toLocaleString()), hint: `${categoryName} orders placed today`, icon: ShoppingCart, iconTone: "bg-[#fff4cd] text-[#9b7810]", tone: "text-[#33251e]", accent: "#d4af37", to: "/admin/orders?date=today" },
+      { label: "Pending", value: categoryStatValue(orderCategorySummary.pending.toLocaleString()), hint: `${categoryName} awaiting confirmation`, icon: Clock3, iconTone: "bg-[#fff4cd] text-[#9b7810]", tone: "text-[#33251e]", accent: "#c87954", to: "/admin/orders?status=Pending" },
+      { label: "Preparing", value: categoryStatValue(orderCategorySummary.preparing.toLocaleString()), hint: `${categoryName} in production`, icon: ChefHat, iconTone: "bg-[#fff4cd] text-[#9b7810]", tone: "text-[#33251e]", accent: "#c9a94f", to: "/admin/orders?status=Preparing" },
+      { label: "Completed", value: categoryStatValue(orderCategorySummary.completed.toLocaleString()), hint: `${categoryName} delivered / picked up`, icon: CircleCheck, iconTone: "bg-[#eef5e9] text-[#68815d]", tone: "text-[#33251e]", accent: "#81906c", to: "/admin/orders?status=Completed" },
+      { label: "Sales Today", value: categoryStatValue(`₱${orderCategorySummary.salesToday.toLocaleString()}`), hint: `${categoryName} completed revenue today`, icon: TrendingUp, iconTone: "bg-[#fff4cd] text-[#9b7810]", tone: "text-[#33251e]", accent: "#d4af37", to: "/admin/orders?date=today&status=Completed" },
+    ];
 
   const reviewAnalytics = analytics?.reviewAnalytics || {};
   const trendRows = analyticsPreset === "all"

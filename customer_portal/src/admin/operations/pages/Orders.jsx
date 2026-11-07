@@ -21,6 +21,7 @@ const laravelStaffFetch = (url, options = {}) => {
 const POLL_INTERVAL = 15000;
 const DEFAULT_SORT_BY = "date";
 const DEFAULT_SORT_DIRECTION = "desc";
+const STATUS_FILTER_OPTIONS = ["All", "Awaiting Payment", "Pending", "Preparing", "Awaiting Balance Payment", "Ready for Pickup", "Completed", "Cancelled"];
 
 const isQrPayment = (payment) => ['gcash', 'qrph'].includes(
   String(payment || '').toLowerCase().replace(/[^a-z0-9]/g, '')
@@ -149,6 +150,7 @@ export default function Orders() {
   const discountIdPreviewUrlsRef = useRef({});
   const paymentProofPreviewUrlsRef = useRef({});
   const dateFilter = new URLSearchParams(location.search).get("date");
+  const requestedStatus = new URLSearchParams(location.search).get("status");
 
   useEffect(() => () => {
     Object.values(discountIdPreviewUrlsRef.current).forEach((url) => URL.revokeObjectURL(url));
@@ -180,8 +182,15 @@ export default function Orders() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [paymentProofLightboxOrderId]);
 
-  const statusFilterOptions = ["All", "Awaiting Payment", "Pending", "Preparing", "Awaiting Balance Payment", "Ready for Pickup", "Completed", "Cancelled"];
   const statusLabel = (status) => status === "Awaiting Balance Payment" ? "Pay Balance Before Ready" : status;
+
+  useEffect(() => {
+    if (new URLSearchParams(location.search).has("order_id")) return;
+    setStatusFilter(STATUS_FILTER_OPTIONS.includes(requestedStatus) ? requestedStatus : "All");
+    setDashboardFilter(null);
+    setSearchQuery("");
+    setCurrentPage(1);
+  }, [location.search]);
 
   const statusColors = {
     "Awaiting Payment": "bg-amber-50 text-amber-800 border border-amber-200",
@@ -433,7 +442,7 @@ export default function Orders() {
   const pageOrders = displayedOrders.slice((currentPage - 1) * pageSize, currentPage * pageSize);
   const firstVisibleOrder = displayedOrders.length ? (currentPage - 1) * pageSize + 1 : 0;
   const lastVisibleOrder = Math.min(currentPage * pageSize, displayedOrders.length);
-  const filterCounts = Object.fromEntries(statusFilterOptions.map((status) => [
+  const filterCounts = Object.fromEntries(STATUS_FILTER_OPTIONS.map((status) => [
     status,
     status === "All" ? orders.length : orders.filter((order) => order.status === status).length,
   ]));
@@ -668,7 +677,7 @@ export default function Orders() {
               </div>
             </div>
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 xl:grid-cols-8" role="group" aria-label="Filter orders by status">
-              {statusFilterOptions.map((option) => (
+              {STATUS_FILTER_OPTIONS.map((option) => (
                 <button
                   key={option}
                   type="button"

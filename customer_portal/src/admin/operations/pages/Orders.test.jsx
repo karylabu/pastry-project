@@ -157,6 +157,33 @@ test("filters to only today's orders when the dashboard date filter is present",
   expect(screen.getByText("1 matching order")).toBeInTheDocument();
 });
 
+test("applies the order status passed by a dashboard summary card", async () => {
+  window.history.replaceState({}, "", "/admin/orders?status=Preparing");
+  global.fetch = jest.fn((url) => {
+    if (String(url).includes("/inventory/ingredients")) {
+      return Promise.resolve({ ok: true, json: async () => ({ ingredients: [] }) });
+    }
+
+    return Promise.resolve({
+      ok: true,
+      json: async () => ({
+        success: true,
+        orders: [
+          orderFixture(311, "Preparing", 10),
+          orderFixture(312, "Pending", 9),
+        ],
+      }),
+    });
+  });
+
+  renderOrders();
+
+  expect(await screen.findAllByText("Customer 311")).not.toHaveLength(0);
+  expect(screen.queryAllByText("Customer 312")).toHaveLength(0);
+  expect(screen.getByRole("button", { name: /Preparing/ })).toHaveAttribute("aria-pressed", "true");
+  expect(screen.getByText("1 matching order")).toBeInTheDocument();
+});
+
 test("shows rider details in live order details for delivery orders", async () => {
   global.fetch = jest.fn((url) => Promise.resolve({
     ok: true,

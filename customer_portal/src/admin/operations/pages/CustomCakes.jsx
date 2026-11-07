@@ -28,6 +28,7 @@ const laravelStaffFetch = (url, options = {}) => {
 };
 
 const ACTION_BUTTON_BASE = "inline-flex h-8 w-full min-w-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-md px-2.5 text-[10px] font-semibold transition disabled:cursor-not-allowed disabled:opacity-50";
+const STATUS_FILTER_OPTIONS = ["All", "Awaiting Payment", "To Review", "Pending", "Preparing", "Awaiting Balance Payment", "Ready for Pickup", "Completed", "Cancelled"];
 const ACTION_BUTTON_PRIMARY = `${ACTION_BUTTON_BASE} bg-[#33251e] text-white hover:bg-[#5b4540]`;
 const ACTION_BUTTON_SECONDARY = `${ACTION_BUTTON_BASE} bg-[#33251e] text-white hover:bg-[#5b4540]`;
 const ACTION_BUTTON_DANGER = `${ACTION_BUTTON_BASE} border border-red-200 bg-red-50 text-red-700 hover:bg-red-100`;
@@ -102,8 +103,6 @@ export default function CustomCakes() {
   useEffect(() => () => {
     if (paymentProofPreviewUrlRef.current) URL.revokeObjectURL(paymentProofPreviewUrlRef.current);
   }, []);
-
-  const statusFilterOptions = ["All", "Awaiting Payment", "To Review", "Pending", "Preparing", "Awaiting Balance Payment", "Ready for Pickup", "Completed", "Cancelled"];
 
   const statusColors = {
     "Awaiting Payment": "bg-amber-50 text-amber-800 border border-amber-200",
@@ -356,6 +355,14 @@ export default function CustomCakes() {
       if (event.type === "order.updated") fetchOrders(true);
     });
   }, []);
+
+  useEffect(() => {
+    const requestedStatus = new URLSearchParams(location.search).get("status");
+    if (!STATUS_FILTER_OPTIONS.includes(requestedStatus)) return;
+    setStatusFilter(requestedStatus);
+    setSearchId("");
+    setCurrentPage(1);
+  }, [location.search]);
 
   useEffect(() => {
     const orderId = new URLSearchParams(location.search).get("order_id");
@@ -800,7 +807,7 @@ export default function CustomCakes() {
     { label: "In production", filter: "Preparing", value: orders.filter((order) => order.status === "Preparing").length, icon: PackageCheck, accent: "#d4af37" },
     { label: "Ready for pickup", filter: "Ready for Pickup", value: orders.filter((order) => order.status === "Ready for Pickup").length, icon: CircleCheck, accent: "#81906c" },
   ];
-  const statusCounts = Object.fromEntries(statusFilterOptions.map((status) => [
+  const statusCounts = Object.fromEntries(STATUS_FILTER_OPTIONS.map((status) => [
     status,
     status === "All" ? orders.length : orders.filter((order) => getStatusLabel(order.status, order.payment_status) === status).length,
   ]));
@@ -883,7 +890,7 @@ export default function CustomCakes() {
               </label>
             </div>
             <div className="flex min-w-0 flex-nowrap gap-1 overflow-x-auto pb-1 lg:overflow-visible" role="group" aria-label="Filter requests by status">
-              {statusFilterOptions.map((option) => (
+              {STATUS_FILTER_OPTIONS.map((option) => (
                 <button key={option} type="button" onClick={() => setStatusFilter(option)} aria-pressed={statusFilter === option} className={`inline-flex min-h-10 shrink-0 items-center justify-between gap-1 rounded-md border px-2 py-2 text-left text-[9px] font-medium transition lg:min-w-0 lg:flex-1 ${statusFilter === option ? "border-[#33251e] bg-[#33251e] text-white" : "border-transparent bg-[#f7f4ef] text-[#65574d] hover:bg-[#fffaf0]"}`}>
                   <span className="min-w-0 whitespace-nowrap lg:whitespace-normal lg:leading-tight">{option}</span><span className={`min-w-5 shrink-0 rounded px-1 text-center text-[9px] ${statusFilter === option ? "bg-white/15 text-white" : "bg-white text-[#806f61]"}`}>{statusCounts[option]}</span>
                 </button>
