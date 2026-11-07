@@ -21,23 +21,31 @@ describe('DesignGallery reference selection', () => {
     });
   });
 
-  it('stores multiple example references and returns them to the customize form together', () => {
+  it('returns to customize immediately after adding a reference', () => {
     render(<DesignGallery category="Birthday Designs" folder="birthday" />);
 
     const addButtons = screen.getAllByRole('button', { name: 'Add as Reference' });
     fireEvent.click(addButtons[0]);
-    fireEvent.click(addButtons[1]);
 
     const savedReferences = JSON.parse(window.sessionStorage.getItem('customCakeReferenceImages'));
-    expect(savedReferences).toHaveLength(2);
-    expect(screen.getByRole('button', { name: 'Use 2 References' })).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole('button', { name: 'Use 2 References' }));
+    expect(savedReferences).toHaveLength(1);
     expect(navigate).toHaveBeenCalledWith('/customer/customized-cakes', {
       state: expect.objectContaining({
         scrollToRequestForm: true,
         selectedReferenceImages: savedReferences,
       }),
+    });
+  });
+
+  it('returns to customize immediately after confirming the image preview', () => {
+    render(<DesignGallery category="Birthday Designs" folder="birthday" />);
+
+    fireEvent.click(screen.getByRole('img', { name: 'Birthday Designs Cake 1' }).closest('button'));
+    fireEvent.click(screen.getByRole('button', { name: 'Add this reference' }));
+
+    expect(JSON.parse(window.sessionStorage.getItem('customCakeReferenceImages'))).toHaveLength(1);
+    expect(navigate).toHaveBeenCalledWith('/customer/customized-cakes', {
+      state: expect.objectContaining({ scrollToRequestForm: true }),
     });
   });
 
@@ -74,7 +82,6 @@ describe('DesignGallery reference selection', () => {
     addButtons.slice(0, 5).forEach((button) => fireEvent.click(button));
 
     expect(JSON.parse(window.sessionStorage.getItem('customCakeReferenceImages'))).toHaveLength(5);
-    expect(screen.getByRole('button', { name: 'Use 5 References' })).toBeInTheDocument();
     expect(screen.getAllByRole('button', { name: 'Max Reached' })).toHaveLength(5);
   });
 
@@ -88,7 +95,9 @@ describe('DesignGallery reference selection', () => {
     fireEvent.click(screen.getAllByRole('button', { name: 'Add as Reference' })[0]);
 
     expect(JSON.parse(window.sessionStorage.getItem('customCakeReferenceImages'))).toHaveLength(1);
-    expect(screen.getByRole('button', { name: 'Use 1 Reference' })).toBeInTheDocument();
+    expect(navigate).toHaveBeenCalledWith('/customer/customized-cakes', {
+      state: expect.objectContaining({ scrollToRequestForm: true }),
+    });
     expect(screen.getAllByRole('button', { name: 'Max Reached' })).toHaveLength(9);
   });
 });

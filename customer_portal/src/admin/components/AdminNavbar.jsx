@@ -400,10 +400,32 @@ export default function AdminNavbar({ onSidebarChange }) {
 
         <div className="flex shrink-0 items-center gap-1 sm:gap-2">
           <div ref={notificationsRef} className="relative">
-            <button type="button" onClick={() => { setNotificationsOpen((open) => !open); fetchNotifications(); }} aria-label={`Notifications${unreadCount ? `, ${unreadCount} unread` : ""}`} title="Notifications" className="relative flex h-10 w-10 items-center justify-center rounded-full text-[#765d50] transition hover:bg-[#fff8df] hover:text-[#33251e]">
+            <button type="button" onClick={() => { setNotificationsOpen((open) => !open); setNotificationToast(null); fetchNotifications(); }} aria-label={`Notifications${unreadCount ? `, ${unreadCount} unread` : ""}`} title="Notifications" className="relative flex h-10 w-10 items-center justify-center rounded-full text-[#765d50] transition hover:bg-[#fff8df] hover:text-[#33251e]">
               <Bell size={18} />
               {unreadCount > 0 && <span className="absolute right-2 top-2 h-2.5 w-2.5 rounded-full bg-[#c36b77] shadow-sm" />}
             </button>
+            {notificationToast && !notificationsOpen && (
+              <button
+                type="button"
+                role="status"
+                aria-live="polite"
+                onClick={() => {
+                  setNotificationToast(null);
+                  setNotificationsOpen(true);
+                }}
+                className="absolute right-0 top-[48px] z-[10002] w-[min(320px,calc(100vw-2rem))] rounded-lg border border-[#e9e1d9] bg-white px-4 py-3 text-left shadow-xl transition hover:bg-[#fffaf0]"
+              >
+                <span className="block text-[12px] font-semibold text-[#33251e]">
+                  {notificationToast.title || "New notification"}
+                </span>
+                <span className="mt-1 block truncate text-[11px] text-[#74675f]">
+                  {notificationToast.message || "You have a new notification."}
+                </span>
+                <span className="mt-1 block text-[10px] font-semibold text-[#80600a]">
+                  Click to view
+                </span>
+              </button>
+            )}
             {notificationsOpen && (
               <section className="absolute right-0 top-[48px] z-[10001] max-h-[70vh] w-[min(420px,calc(100vw-2rem))] overflow-hidden rounded-lg border border-[#e9e1d9] bg-white shadow-xl" aria-label="Notifications">
                 <div className="flex flex-col gap-2 border-b border-[#f0e9e2] px-4 py-3">
@@ -471,29 +493,6 @@ export default function AdminNavbar({ onSidebarChange }) {
               </section>
             )}
           </div>
-
-          {notificationToast && (
-            <button
-              type="button"
-              role="status"
-              aria-live="polite"
-              onClick={() => {
-                setNotificationToast(null);
-                setNotificationsOpen(true);
-              }}
-              className="fixed bottom-5 right-5 z-[10002] w-[min(320px,calc(100vw-2.5rem))] rounded-lg border border-[#e9e1d9] bg-white px-4 py-3 text-left shadow-xl transition hover:bg-[#fffaf0]"
-            >
-              <span className="block text-[12px] font-semibold text-[#33251e]">
-                {notificationToast.title || "New notification"}
-              </span>
-              <span className="mt-1 block truncate text-[11px] text-[#74675f]">
-                {notificationToast.message || "You have a new notification."}
-              </span>
-              <span className="mt-1 block text-[10px] font-semibold text-[#80600a]">
-                Click to view
-              </span>
-            </button>
-          )}
 
           <div ref={accountRef} className="relative">
             <button type="button" onClick={() => setAccountOpen((open) => !open)} aria-label="Profile menu" title="Profile" className="flex h-10 w-10 items-center justify-center rounded-full bg-[#fff4cd] text-[#9b7810] transition hover:bg-[#f3e3b0]">

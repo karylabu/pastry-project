@@ -82,7 +82,7 @@ export default function DesignGallery({ category, folder, backPath = '/customer/
       : [...selectedReferenceIds, image.id];
 
     if (!alreadySelected && combinedIds.length > maxGalleryReferences) {
-      return;
+      return false;
     }
 
     const selectedReferences = combinedIds
@@ -110,6 +110,7 @@ export default function DesignGallery({ category, folder, backPath = '/customer/
     }
     setSelectedReferenceIds(combinedIds);
     setPreviewImage(null);
+    return true;
   };
 
   React.useEffect(() => {
@@ -117,7 +118,7 @@ export default function DesignGallery({ category, folder, backPath = '/customer/
   }, []);
 
   const handleUseAsReference = (image) => {
-    selectReference(image);
+    if (selectReference(image)) returnToCustomize();
   };
 
   const confirmPreview = () => {
@@ -162,16 +163,6 @@ export default function DesignGallery({ category, folder, backPath = '/customer/
             })}
           </nav>
         </div>
-      {selectedReferenceIds.length > 0 && (
-        <button
-          type="button"
-          onClick={returnToCustomize}
-          className="mb-5 rounded-lg bg-[#ffe89a] px-4 py-2 text-xs font-bold text-[#6b4f1d] transition hover:bg-[#ffedb5]"
-        >
-          Use {selectedReferenceIds.length} Reference{selectedReferenceIds.length === 1 ? '' : 's'}
-        </button>
-      )}
-
       {selectedReferenceIds.length + uploadedReferenceCount >= MAX_REFERENCE_IMAGES && (
         <p className="mb-4 rounded-lg border border-[#f0d98a] bg-[#fff9df] px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-[#7a5b20]">
           Up to {MAX_REFERENCE_IMAGES} reference images per request.

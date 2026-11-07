@@ -2,38 +2,14 @@ import notificationSoundUrl from "./confirmation-tone.wav";
 
 const SOUND_PREFERENCE_KEY = "adminNotificationSoundEnabled";
 
-let audioContext = null;
-let notificationSoundBuffer = null;
-let notificationSoundBufferPromise = null;
+let audio = null;
+let audioUnlocked = false;
 
-function getAudioContext() {
-  const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-  if (!AudioContextClass) return null;
-
-  audioContext = audioContext || new AudioContextClass();
-  return audioContext;
-}
-
-function getNotificationSoundBuffer(context) {
-  if (notificationSoundBuffer) return Promise.resolve(notificationSoundBuffer);
-  if (notificationSoundBufferPromise) return notificationSoundBufferPromise;
-
-  notificationSoundBufferPromise = fetch(notificationSoundUrl)
-    .then((response) => {
-      if (!response.ok) throw new Error("Unable to load the notification sound file.");
-      return response.arrayBuffer();
-    })
-    .then((data) => context.decodeAudioData(data))
-    .then((buffer) => {
-      notificationSoundBuffer = buffer;
-      return buffer;
-    })
-    .catch((error) => {
-      notificationSoundBufferPromise = null;
-      throw error;
-    });
-
-  return notificationSoundBufferPromise;
+function getAudio() {
+  if (typeof Audio === "undefined") return null;
+  audio = audio || new Audio(notificationSoundUrl);
+  audio.preload = "auto";
+  return audio;
 }
 
 export function getNotificationSoundEnabled() {
@@ -44,15 +20,22 @@ export function getNotificationSoundEnabled() {
   }
 }
 
-export async function unlockNotificationSound() {
-  try {
-    const context = getAudioContext();
-    if (!context) return;
-    if (context.state === "suspended") await context.resume();
-    await getNotificationSoundBuffer(context);
-  } catch (error) {
-    console.error("Unable to enable the admin notification sound.", error);
-  }
+export function unlockNotificationSound() {
+  const sound = getAudio();
+  if (!sound) return Promise.resolve();
+
+  sound.muted = true;
+  return sound.play()
+    .then(() => {
+      sound.pause();
+      sound.currentTime = 0;
+      sound.muted = false;
+      audioUnlocked = true;
+    })
+    .catch((error) => {
+      sound.muted = false;
+      console.warn("Unable to enable the admin notification sound:", error);
+    });
 }
 
 export function setNotificationSoundEnabled(enabled) {
@@ -69,17 +52,17 @@ export function getNewUnreadNotifications(notifications, seenIds) {
   ));
 }
 
-export async function playNotificationSound() {
-  try {
-    const context = getAudioContext();
-    if (!context) return;
+export function playNotificationSound() {
+  const sound = getAudio();
+  if (!sound || !audioUnlocked) return;
 
-    if (context.state !== "running") return;
-    const source = context.createBufferSource();
-    source.buffer = await getNotificationSoundBuffer(context);
-    source.connect(context.destination);
-    source.start();
+  try {
+    sound.pause();
+    sound.currentTime = 0;
+    sound.play().catch((error) => {
+      console.warn("Unable to play the admin notification sound:", error);
+    });
   } catch (error) {
-    console.error("Unable to play the admin notification sound.", error);
+    console.warn("Unable to play the admin notification sound:", error);
   }
 }

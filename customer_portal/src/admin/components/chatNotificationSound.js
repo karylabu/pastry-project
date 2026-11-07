@@ -1,6 +1,7 @@
 import chatNotificationSoundUrl from "./message.mp3";
 
 let audio = null;
+let audioUnlocked = false;
 
 function getAudio() {
   if (typeof Audio === "undefined") return null;
@@ -11,14 +12,15 @@ function getAudio() {
 
 export function unlockAdminChatMessageSound() {
   const sound = getAudio();
-  if (!sound) return;
+  if (!sound) return Promise.resolve();
 
   sound.muted = true;
-  sound.play()
+  return sound.play()
     .then(() => {
       sound.pause();
       sound.currentTime = 0;
       sound.muted = false;
+      audioUnlocked = true;
     })
     .catch((error) => {
       sound.muted = false;
@@ -28,10 +30,15 @@ export function unlockAdminChatMessageSound() {
 
 export function playAdminChatMessageSound() {
   const sound = getAudio();
-  if (!sound) return;
+  if (!sound || !audioUnlocked) return;
 
-  sound.currentTime = 0;
-  sound.play().catch((error) => {
+  try {
+    sound.pause();
+    sound.currentTime = 0;
+    sound.play().catch((error) => {
+      console.warn("Unable to play the admin chat message sound:", error);
+    });
+  } catch (error) {
     console.warn("Unable to play the admin chat message sound:", error);
-  });
+  }
 }
