@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { ArrowLeft } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import PageShell from '../components/PageShell';
+import { DESIGN_CATEGORIES } from '../components/DesignCategoryCards';
 import { ROOT_BASE } from '../../services/config';
 
 const MAX_REFERENCE_IMAGES = 5;
@@ -51,6 +52,15 @@ export default function DesignGallery({ category, folder, backPath = '/customer/
     navigate(backPath, {
       state: {
         scrollToRequestForm: true,
+        referenceFiles: location.state?.referenceFiles || [],
+        selectedReferenceImages: getStoredReferences(),
+      },
+    });
+  };
+
+  const browseCategory = (path) => {
+    navigate(path, {
+      state: {
         referenceFiles: location.state?.referenceFiles || [],
         selectedReferenceImages: getStoredReferences(),
       },
@@ -135,6 +145,27 @@ export default function DesignGallery({ category, folder, backPath = '/customer/
           Up to {MAX_REFERENCE_IMAGES} reference images per request.
         </p>
       )}
+
+      <nav aria-label="Browse cake categories" className="mb-5 flex flex-wrap gap-2">
+        {DESIGN_CATEGORIES.map(({ label, path }) => {
+          const current = location.pathname === path;
+          return (
+            <button
+              key={path}
+              type="button"
+              aria-current={current ? 'page' : undefined}
+              onClick={() => browseCategory(path)}
+              className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
+                current
+                  ? 'border-[#c9972d] bg-[#fff1bd] text-[#5f4715]'
+                  : 'border-[#eadfd8] bg-white text-[#65574d] hover:border-[#d4af37] hover:bg-[#fffaf0]'
+              }`}
+            >
+              {label}
+            </button>
+          );
+        })}
+      </nav>
 
       <section>
         <div className="mb-4 flex items-end justify-between px-1"><div><p className="text-[9px] font-black uppercase tracking-[0.28em] text-[#9b7b3d]">Made for special moments</p><h2 className="mt-1 font-serif text-2xl font-bold text-[#33251e]">{displayCategory} Designs</h2></div><span className="text-[10px] font-semibold text-[#9b8c83]">{images.length} designs</span></div>

@@ -41,6 +41,23 @@ describe('DesignGallery reference selection', () => {
     });
   });
 
+  it('switches categories while preserving selected references for continued browsing', () => {
+    render(<DesignGallery category="Birthday" folder="birthday" />);
+
+    fireEvent.click(screen.getAllByRole('button', { name: 'Add as Reference' })[0]);
+    const savedReferences = JSON.parse(window.sessionStorage.getItem('customCakeReferenceImages'));
+
+    fireEvent.click(screen.getByRole('button', { name: 'Cutesy' }));
+
+    expect(navigate).toHaveBeenCalledWith('/customer/cutesy-designs', {
+      state: {
+        referenceFiles: [],
+        selectedReferenceImages: savedReferences,
+      },
+    });
+    expect(screen.getByRole('button', { name: 'Birthday' })).toHaveAttribute('aria-current', 'page');
+  });
+
   it('caps gallery references at five images', () => {
     render(<DesignGallery category="Birthday Designs" folder="birthday" />);
 
