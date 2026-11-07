@@ -143,11 +143,29 @@ test("shows rider details in live order details for delivery orders", async () =
   }));
 
   renderOrders();
-  fireEvent.click(await screen.findByRole("button", { name: /view details for order 201/i }));
+  const customerNames = await screen.findAllByText("Customer 201");
+  fireEvent.click(customerNames[0]);
 
   expect((await screen.findAllByText("Juan Dela Cruz")).length).toBeGreaterThan(0);
   expect(screen.getAllByText("09171234567").length).toBeGreaterThan(0);
   expect(screen.getAllByText("ABC 1234").length).toBeGreaterThan(0);
+});
+
+test("opens live order details by clicking the card summary or table row", async () => {
+  const { container } = renderOrders();
+  await screen.findAllByText("Customer 101");
+
+  const orderCard = Array.from(container.querySelectorAll("article")).find((card) => card.textContent.includes("#101"));
+  fireEvent.click(within(orderCard).getByText("Customer 101"));
+  expect(within(orderCard).getByText("Order summary")).toBeInTheDocument();
+
+  const orderRow = Array.from(container.querySelectorAll("tr[aria-label]")).find((row) => row.getAttribute("aria-label").includes("Order 101"));
+  expect(orderRow).toHaveAttribute("aria-expanded", "true");
+  fireEvent.click(orderRow);
+  expect(orderRow).toHaveAttribute("aria-expanded", "false");
+
+  fireEvent.keyDown(orderRow, { key: "Enter" });
+  expect(orderRow).toHaveAttribute("aria-expanded", "true");
 });
 
 test("hides refund details and status controls from admins", async () => {
