@@ -321,7 +321,7 @@ function getProductRecipes(): array {
     $recipes = [];
     $pdo = legacy_get_pdo();
     $result = $pdo->query("
-        SELECT p.name AS product_name, i.id AS ingredient_id, i.name AS ingredient_name, pr.qty AS usage
+        SELECT p.name AS product_name, i.id AS ingredient_id, i.name AS ingredient_name, pr.qty AS ingredient_usage
         FROM product_recipes pr
         INNER JOIN products p ON p.id = pr.product_id
         INNER JOIN ingredients i ON i.id = pr.ingredient_id
@@ -331,7 +331,7 @@ function getProductRecipes(): array {
     while ($row = $result->fetch(PDO::FETCH_ASSOC)) {
         $productName = normalizeProductName($row['product_name'] ?? '');
         $ingredientName = trim((string) ($row['ingredient_name'] ?? ''));
-        $usage = max(0, (float) ($row['usage'] ?? 0));
+        $usage = max(0, (float) ($row['ingredient_usage'] ?? 0));
         if ($productName && $ingredientName && $usage > 0) {
             $productKey = productMatchKey($productName);
             $ingredientId = (int) ($row['ingredient_id'] ?? 0);
@@ -366,7 +366,7 @@ function getProductRecipes(): array {
     if (count($cakeTables) === 3) {
         $cakeResult = $pdo->query("
             SELECT flavor.name AS flavor_name, ingredient.id AS ingredient_id,
-                   ingredient.name AS ingredient_name, recipe_ingredient.quantity AS usage
+                   ingredient.name AS ingredient_name, recipe_ingredient.quantity AS ingredient_usage
             FROM cake_recipes AS recipe
             INNER JOIN cake_flavors AS flavor ON flavor.id = recipe.flavor_id
             INNER JOIN cake_recipe_ingredients AS recipe_ingredient ON recipe_ingredient.recipe_id = recipe.id
@@ -388,7 +388,7 @@ function getProductRecipes(): array {
                 $cakeRecipes[productMatchKey($productName)][] = [
                     'ingredient_id' => (int) ($row['ingredient_id'] ?? 0),
                     'name' => $ingredientName,
-                    'usage' => max(0, (float) ($row['usage'] ?? 0)),
+                    'usage' => max(0, (float) ($row['ingredient_usage'] ?? 0)),
                 ];
             }
         }
