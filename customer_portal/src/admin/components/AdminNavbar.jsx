@@ -110,6 +110,7 @@ export default function AdminNavbar({ onSidebarChange }) {
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [notificationsLoading, setNotificationsLoading] = useState(false);
+  const [notificationToast, setNotificationToast] = useState(null);
   const [notificationSoundEnabled, setNotificationSoundEnabledState] = useState(getNotificationSoundEnabled);
   const [notifFilter, setNotifFilter] = useState("All");
   const [accountOpen, setAccountOpen] = useState(false);
@@ -124,6 +125,7 @@ export default function AdminNavbar({ onSidebarChange }) {
   const notificationsRef = useRef(null);
   const accountRef = useRef(null);
   const seenNotificationIdsRef = useRef(null);
+  const notificationToastTimerRef = useRef(null);
 
   useEffect(() => {
     const syncUser = () => setCurrentUser(getStoredUser());
@@ -175,8 +177,11 @@ export default function AdminNavbar({ onSidebarChange }) {
       const seenIds = seenNotificationIdsRef.current;
       if (seenIds) {
         const newUnreadNotifications = getNewUnreadNotifications(nextNotifications, seenIds);
-        if (notificationSoundEnabled && newUnreadNotifications.length > 0) {
-          playNotificationSound();
+        if (newUnreadNotifications.length > 0) {
+          if (notificationSoundEnabled) playNotificationSound();
+          setNotificationToast(newUnreadNotifications[0]);
+          window.clearTimeout(notificationToastTimerRef.current);
+          notificationToastTimerRef.current = window.setTimeout(() => setNotificationToast(null), 6000);
         }
         nextNotifications.forEach((notification) => seenIds.add(String(notification.id)));
       } else {
@@ -205,6 +210,8 @@ export default function AdminNavbar({ onSidebarChange }) {
     const interval = window.setInterval(fetchNotifications, 60000);
     return () => window.clearInterval(interval);
   }, [currentUser?.id, fetchNotifications]);
+
+  useEffect(() => () => window.clearTimeout(notificationToastTimerRef.current), []);
 
   useEffect(() => {
     seenNotificationIdsRef.current = null;
@@ -464,6 +471,29 @@ export default function AdminNavbar({ onSidebarChange }) {
               </section>
             )}
           </div>
+
+          {notificationToast && (
+            <button
+              type="button"
+              role="status"
+              aria-live="polite"
+              onClick={() => {
+                setNotificationToast(null);
+                setNotificationsOpen(true);
+              }}
+              className="fixed bottom-5 right-5 z-[10002] w-[min(320px,calc(100vw-2.5rem))] rounded-lg border border-[#e9e1d9] bg-white px-4 py-3 text-left shadow-xl transition hover:bg-[#fffaf0]"
+            >
+              <span className="block text-[12px] font-semibold text-[#33251e]">
+                {notificationToast.title || "New notification"}
+              </span>
+              <span className="mt-1 block truncate text-[11px] text-[#74675f]">
+                {notificationToast.message || "You have a new notification."}
+              </span>
+              <span className="mt-1 block text-[10px] font-semibold text-[#80600a]">
+                Click to view
+              </span>
+            </button>
+          )}
 
           <div ref={accountRef} className="relative">
             <button type="button" onClick={() => setAccountOpen((open) => !open)} aria-label="Profile menu" title="Profile" className="flex h-10 w-10 items-center justify-center rounded-full bg-[#fff4cd] text-[#9b7810] transition hover:bg-[#f3e3b0]">

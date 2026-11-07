@@ -1,6 +1,7 @@
 import React from "react";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import AdminChatBubble from "./AdminChatBubble";
+import { playAdminChatMessageSound } from "./chatNotificationSound";
 
 let mockRealtimeListener;
 let originalScrollHeightDescriptor;
@@ -25,9 +26,15 @@ jest.mock("../../services/realtime", () => ({
 
 jest.mock("./AdminDialog", () => () => null);
 
+jest.mock("./chatNotificationSound", () => ({
+  playAdminChatMessageSound: jest.fn(),
+  unlockAdminChatMessageSound: jest.fn(),
+}));
+
 describe("AdminChatBubble", () => {
   beforeEach(() => {
     mockRealtimeListener = null;
+    playAdminChatMessageSound.mockClear();
     originalScrollHeightDescriptor = Object.getOwnPropertyDescriptor(HTMLElement.prototype, "scrollHeight");
     originalClientHeightDescriptor = Object.getOwnPropertyDescriptor(HTMLElement.prototype, "clientHeight");
     global.fetch = jest.fn((url) => {
@@ -150,6 +157,7 @@ describe("AdminChatBubble", () => {
       expect(screen.getByRole("button", { name: "Customer Chat, 1 unread messages" })).toBeInTheDocument();
     }, { timeout: 3500 });
     expect(screen.getByRole("status")).toHaveTextContent("New message from New Customer");
+    expect(playAdminChatMessageSound).toHaveBeenCalledTimes(1);
   });
 
   test("shows the most recently active chats first", async () => {

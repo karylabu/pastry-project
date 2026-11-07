@@ -3,6 +3,7 @@ import { Bot, Menu, MessageCircle, Paperclip, RefreshCw, Search, Send, UserRound
 import { CUSTOMER_BASE, LARAVEL_BASE } from "../../services/config";
 import { getAuthHeaders, safeParseJson } from "../../services/api";
 import { subscribeRealtime } from "../../services/realtime";
+import { playAdminChatMessageSound, unlockAdminChatMessageSound } from "./chatNotificationSound";
 import AdminDialog from "./AdminDialog";
 
 const getImageUrl = (value) => {
@@ -79,6 +80,17 @@ export default function AdminChatBubble() {
     };
   }, []);
 
+  useEffect(() => {
+    if (!messageAlertsEnabled) return undefined;
+    const unlockSound = () => unlockAdminChatMessageSound();
+    window.addEventListener("pointerdown", unlockSound, { once: true });
+    window.addEventListener("keydown", unlockSound, { once: true });
+    return () => {
+      window.removeEventListener("pointerdown", unlockSound);
+      window.removeEventListener("keydown", unlockSound);
+    };
+  }, [messageAlertsEnabled]);
+
   const fetchConversations = useCallback(async () => {
     if (conversationFetchInFlight.current) return;
     conversationFetchInFlight.current = true;
@@ -102,6 +114,7 @@ export default function AdminChatBubble() {
           Number(item.unread_count || 0) > (previousCounts.get(String(item.conversation_key)) || 0)
         ));
         if (incoming) {
+          playAdminChatMessageSound();
           setChatNotice(`New message from ${incoming.customer_name || "a customer"}`);
           window.clearTimeout(noticeTimeout.current);
           noticeTimeout.current = window.setTimeout(() => setChatNotice(null), 7000);

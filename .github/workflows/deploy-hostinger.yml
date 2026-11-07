@@ -72,6 +72,9 @@ jobs:
               customer_portal/src/admin/components/AdminNavbar.jsx|customer_portal/src/admin/components/notificationSound.js|customer_portal/src/admin/components/notificationSound.test.js|customer_portal/src/admin/components/confirmation-tone.wav)
                 ui_files=$((ui_files + 1))
                 ;;
+              customer_portal/src/admin/components/AdminChatBubble.jsx|customer_portal/src/admin/components/AdminChatBubble.test.jsx|customer_portal/src/admin/components/chatNotificationSound.js|customer_portal/src/admin/components/message.mp3)
+                ui_files=$((ui_files + 1))
+                ;;
               customer_portal/src/admin/pages/AdminActivityLog.jsx|customer_portal/src/admin/pages/AdminActivityLog.test.jsx)
                 ui_files=$((ui_files + 1))
                 ;;
