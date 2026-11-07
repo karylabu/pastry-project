@@ -12,9 +12,7 @@ import {
   UserCircle2,
   ChevronRight,
   ChevronDown,
-  ArrowLeft,
   Search,
-  Settings as SettingsIcon,
   KeyRound,
   Monitor,
   Camera,
@@ -49,7 +47,7 @@ function findLocation(options, name) {
 
 export default function AccountSettings() {
   const location = useLocation();
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -143,12 +141,6 @@ export default function AccountSettings() {
     const frame = window.requestAnimationFrame(() => {
       document.getElementById(targetId)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
     });
-    return () => window.cancelAnimationFrame(frame);
-  }, [activeSection, location.hash]);
-
-  useEffect(() => {
-    if (activeSection === 'profile' && location.hash) return undefined;
-    const frame = window.requestAnimationFrame(() => window.scrollTo({ top: 0, behavior: 'smooth' }));
     return () => window.cancelAnimationFrame(frame);
   }, [activeSection, location.hash]);
 
@@ -1078,111 +1070,66 @@ export default function AccountSettings() {
 
   return (
     <PageShell background="bg-[#fffaf3]" padding="px-3 py-5 sm:px-5 sm:py-6 md:px-6 md:py-7" innerClassName="mx-auto flex w-full max-w-none gap-5">
-        {activeSection !== 'overview' && (
-          <aside className="hidden w-[280px] shrink-0 md:block">
-            <h1 className="text-[28px] font-bold text-[#4a2b20]">Settings &amp; privacy</h1>
+      <div className="min-w-0 w-full space-y-5">
+        {message && (
+          <div className={`rounded-xl border px-4 py-3 text-sm ${messageType === 'error' ? 'border-red-200 bg-red-50 text-red-700' : 'border-green-200 bg-green-50 text-green-700'}`}>
+            {message}
+          </div>
+        )}
 
-            <div className="mt-4 flex items-center gap-2 rounded-full border border-[#ead8c5] bg-white px-4 py-2.5">
-              <Search size={16} className="text-gray-400" />
+        {loading ? (
+          <div className="rounded-2xl border border-gray-200 bg-white p-8 text-sm text-gray-600">Loading your account...</div>
+        ) : (
+          <>
+            <label className="flex items-center gap-3 rounded-xl border border-[#ead8c5] bg-white px-4 py-3 shadow-sm">
+              <Search size={18} className="shrink-0 text-gray-400" />
               <input
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                onChange={(event) => setSearchQuery(event.target.value)}
                 placeholder="Search settings"
                 className="w-full bg-transparent text-sm text-gray-900 placeholder-gray-500 outline-none"
               />
-            </div>
+            </label>
 
-            <button
-              onClick={() => {
-                setActiveSection('overview');
-                setSearchParams({});
-                setSearchQuery('');
-                setMessage('');
-              }}
-              className="mt-6 flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-lg font-bold text-[#4a2b20]"
-            >
-              <SettingsIcon size={18} /> Your account
-            </button>
+            {filteredSections.length === 0 ? (
+              <p className="text-sm text-gray-500">No settings match "{searchQuery}".</p>
+            ) : (
+              <div className="space-y-3">
+                {filteredSections.map((item) => {
+                  const isExpanded = activeSection === item.key;
+                  const panelId = `settings-${item.key}-panel`;
 
-            <nav className="mt-2 space-y-1">
-              {sectionOptions.map((item) => (
-                <button
-                  key={item.key}
-                  onClick={() => {
-                    setActiveSection(item.key);
-                    setMessage('');
-                  }}
-                  className={`flex w-full items-center gap-3 rounded-lg px-3.5 py-3.5 text-left text-[15px] font-semibold transition ${
-                    activeSection === item.key ? 'bg-[#fff1d8] text-[#4a2b20]' : 'text-gray-600 hover:bg-[#fff7df]'
-                  }`}
-                >
-                  <span className={`rounded-lg p-2 ${item.accent}`}>{item.icon}</span>
-                  {item.title}
-                </button>
-              ))}
-            </nav>
-          </aside>
-        )}
-
-        {/* Main content */}
-        <div className="min-w-0 flex-1 space-y-5">
-          {message && (
-            <div className={`rounded-xl border px-4 py-3 text-sm ${messageType === 'error' ? 'border-red-200 bg-red-50 text-red-700' : 'border-green-200 bg-green-50 text-green-700'}`}>
-              {message}
-            </div>
-          )}
-
-          {loading ? (
-            <div className="rounded-2xl border border-gray-200 bg-white p-8 text-sm text-gray-600">Loading your account...</div>
-          ) : activeSection === 'overview' ? (
-            <>
-              <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-[0_10px_28px_rgba(126,82,35,0.05)] sm:p-6 md:p-8">
-                <h2 className="text-xl font-bold text-gray-900 sm:text-[26px]">Find the setting you need</h2>
-              </div>
-
-              <div>
-                <h3 className="mb-3 text-xl font-bold text-gray-900 sm:mb-5 sm:text-2xl">Most visited settings</h3>
-                {filteredSections.length === 0 ? (
-                  <p className="text-sm text-gray-500">No settings match "{searchQuery}".</p>
-                ) : (
-                  <div className="grid gap-3 sm:grid-cols-2 sm:gap-4 md:grid-cols-3">
-                    {filteredSections.map((item) => (
+                  return (
+                    <section key={item.key} className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-[0_5px_18px_rgba(91,64,39,0.04)]">
                       <button
-                        key={item.key}
+                        type="button"
+                        aria-expanded={isExpanded}
+                        aria-controls={panelId}
                         onClick={() => {
-                          setActiveSection(item.key);
+                          setActiveSection(isExpanded ? 'overview' : item.key);
                           setMessage('');
                         }}
-                        className="rounded-2xl border border-gray-200 bg-white p-4 text-left transition hover:border-[#e7b866] sm:p-6"
+                        className="flex w-full items-center gap-3 p-4 text-left transition hover:bg-[#fffaf3] sm:p-5"
                       >
-                        <div className={`inline-flex rounded-full p-2.5 sm:p-3 ${item.accent}`}>{item.icon}</div>
-                        <h4 className="mt-3 text-base font-bold text-gray-900 sm:mt-4 sm:text-lg">{item.title}</h4>
-                        <p className="mt-1.5 text-sm leading-5 text-gray-600 sm:text-[15px] sm:leading-6">{item.description}</p>
+                        <span className={`shrink-0 rounded-xl p-2.5 ${item.accent}`}>{item.icon}</span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block font-bold text-gray-900">{item.title}</span>
+                          <span className="mt-1 block text-sm leading-5 text-gray-600">{item.description}</span>
+                        </span>
+                        <ChevronDown size={20} className={`shrink-0 text-gray-500 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
                       </button>
-                    ))}
-                  </div>
-                )}
+                      <div id={panelId} hidden={!isExpanded} className="border-t border-gray-100 p-3 sm:p-5">
+                        {isExpanded && item.key === 'profile' && renderProfileSection()}
+                        {isExpanded && item.key === 'security' && renderSecuritySection()}
+                        {isExpanded && item.key === 'privacy' && renderPrivacySection()}
+                      </div>
+                    </section>
+                  );
+                })}
               </div>
-            </>
-          ) : (
-            <>
-              <button
-                onClick={() => {
-                  setActiveSection('overview');
-                  setSearchParams({});
-                  setSearchQuery('');
-                  setMessage('');
-                }}
-                className="flex items-center gap-2 rounded-full border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-600 transition hover:border-[#a06a2c] hover:text-[#a06a2c]"
-              >
-                <ArrowLeft size={16} /> Back
-              </button>
-
-              {activeSection === 'profile' && renderProfileSection()}
-              {activeSection === 'security' && renderSecuritySection()}
-              {activeSection === 'privacy' && renderPrivacySection()}
-            </>
-          )}
+            )}
+          </>
+        )}
         </div>
 
       {toast && (
