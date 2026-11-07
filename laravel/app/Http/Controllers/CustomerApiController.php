@@ -1271,7 +1271,7 @@ class CustomerApiController extends Controller
 
         $aiReply = null;
         $needsStaff = false;
-        if ($orderNumberReply !== null && !in_array(strtolower((string) $supportMode), ['staff', 'admin'], true)) {
+        if ($orderNumberReply !== null) {
             $aiReply = $orderNumberReply;
             $aiMessageData = [
                 'order_id' => $dbOrderId,

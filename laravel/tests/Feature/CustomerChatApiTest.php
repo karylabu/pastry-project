@@ -234,8 +234,7 @@ class CustomerChatApiTest extends TestCase
             ->postJson('/api/customer/chat/messages', [
                 'order_id' => 0,
                 'message' => '296',
-                'support_mode' => 'ai',
-                'quick_chat' => true,
+                'support_mode' => 'admin',
                 'conversation_id' => 'order-follow-up',
             ])
             ->assertOk()
