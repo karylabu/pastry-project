@@ -817,12 +817,6 @@ export default function CustomizedCakes() {
       />
 
       <div className="mb-6">
-        <div className="mb-3 flex items-end justify-between px-1">
-          <div>
-            <p className="text-[9px] font-black uppercase tracking-[0.28em] text-[#9b7b3d]">Featured designs</p>
-            <h2 className="mt-1 font-serif text-2xl font-bold text-[#33251e]">Featured Designs</h2>
-          </div>
-        </div>
         <div className="grid w-full grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
           {sampleImages.map((item, index) => {
             const isWedding = item.label === 'Wedding';
