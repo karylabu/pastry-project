@@ -1,6 +1,5 @@
 import React, { useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, Lock, Eye, EyeOff } from "lucide-react";
 import { LARAVEL_BASE } from "../../services/config";
 import { safeParseJson } from '../../services/api';
 
@@ -25,16 +24,16 @@ function Input({ type = "text", placeholder, value, onChange, maxLength, inputMo
           onChange={onChange}
           maxLength={maxLength}
           inputMode={inputMode}
-          className={`w-full h-[34px] bg-white border rounded-lg px-3 ${onTogglePassword ? "password-toggle-input pr-9" : ""} text-[10px] text-black outline-none focus:border-[#F0B94D] focus:ring-2 focus:ring-[#F0B94D]/30 transition-all ${error ? "border-[#A8354A]" : "border-black/15"}`}
+          className={`w-full h-[34px] bg-white border rounded-lg px-3 ${onTogglePassword ? "password-toggle-input pr-12" : ""} text-[10px] text-black outline-none focus:border-[#F0B94D] focus:ring-2 focus:ring-[#F0B94D]/30 transition-all ${error ? "border-[#A8354A]" : "border-black/15"}`}
         />
         {onTogglePassword && (
           <button
             type="button"
             onClick={onTogglePassword}
             aria-label={showPassword ? "Hide password" : "Show password"}
-            className="absolute right-2 top-1/2 -translate-y-1/2 text-black/50 hover:text-black"
+            className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-black/50 hover:text-black"
           >
-            {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
+            {showPassword ? "Hide" : "Show"}
           </button>
         )}
       </div>
@@ -218,7 +217,6 @@ export default function ForgotPassword({ onBack }) {
       subtitle: `We sent a code to ${email}. It expires in 15 minutes.`,
     },
     password: {
-      icon: <Lock size={20} className="text-[#6B4A3A]" strokeWidth={1.5} />,
       title: "New Password",
       subtitle: "Choose a strong new password for your account.",
     },
@@ -242,11 +240,6 @@ export default function ForgotPassword({ onBack }) {
         className="w-full"
       >
         <div className="mb-4">
-          {current.icon && (
-            <div className="w-10 h-10 rounded-full bg-[#F0B94D]/15 flex items-center justify-center mb-3">
-              {current.icon}
-            </div>
-          )}
           <p className="text-[10px] tracking-[0.2em] uppercase text-black/70 mb-2 font-semibold">
             Recover Access
           </p>
@@ -366,9 +359,9 @@ export default function ForgotPassword({ onBack }) {
         {step !== "done" && (
           <button
             onClick={onBack}
-            className="flex items-center gap-2 mt-4 text-[10px] text-black/60 hover:text-black transition"
+            className="mt-4 text-[10px] text-black/60 hover:text-black transition"
           >
-            <ArrowLeft size={14} /> Back to Login
+            Back to Login
           </button>
         )}
       </motion.div>
