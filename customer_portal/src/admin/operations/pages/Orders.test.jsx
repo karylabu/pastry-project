@@ -3,7 +3,7 @@ import { fireEvent, render, screen, waitFor, within } from "@testing-library/rea
 import Orders from "./Orders";
 
 jest.mock("react-router-dom", () => ({
-  useLocation: () => ({ search: "" }),
+  useLocation: () => ({ search: globalThis.location.search }),
   useNavigate: () => jest.fn(),
 }));
 
@@ -86,6 +86,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  window.history.replaceState({}, "", "/");
   jest.clearAllMocks();
 });
 
@@ -124,6 +125,36 @@ test("shows the newest order number first when timestamps are identical", async 
   await screen.findAllByText("Customer 107");
 
   expect(container.querySelector("article")).toHaveTextContent("#108");
+});
+
+test("filters to only today's orders when the dashboard date filter is present", async () => {
+  const today = new Date();
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+  window.history.replaceState({}, "", "/admin/orders?date=today");
+  global.fetch = jest.fn((url) => {
+    if (String(url).includes("/inventory/ingredients")) {
+      return Promise.resolve({ ok: true, json: async () => ({ ingredients: [] }) });
+    }
+
+    return Promise.resolve({
+      ok: true,
+      json: async () => ({
+        success: true,
+        orders: [
+          orderFixture(301, "Pending", 10, { created_at: today.toISOString() }),
+          orderFixture(302, "Pending", 24 * 60, { created_at: yesterday.toISOString() }),
+        ],
+      }),
+    });
+  });
+
+  renderOrders();
+
+  expect(await screen.findAllByText("Customer 301")).not.toHaveLength(0);
+  expect(screen.queryAllByText("Customer 302")).toHaveLength(0);
+  expect(screen.getByText("Showing orders placed today.")).toBeInTheDocument();
+  expect(screen.getByText("1 matching order")).toBeInTheDocument();
 });
 
 test("shows rider details in live order details for delivery orders", async () => {
@@ -168,6 +199,38 @@ test("opens live order details by clicking the card summary or table row", async
 
   fireEvent.keyDown(orderRow, { key: "Enter" });
   expect(orderRow).toHaveAttribute("aria-expanded", "true");
+});
+
+test("scrolls to the expanded details after clicking a live order row", async () => {
+  const originalMatchMedia = window.matchMedia;
+  const originalScrollIntoView = HTMLElement.prototype.scrollIntoView;
+  let scrolledPanel = null;
+  const scrollIntoView = jest.fn(function () {
+    scrolledPanel = this;
+  });
+  window.matchMedia = jest.fn(() => ({ matches: true }));
+  HTMLElement.prototype.scrollIntoView = scrollIntoView;
+
+  try {
+    const { container } = renderOrders();
+    await screen.findAllByText("Customer 101");
+
+    const orderRow = Array.from(container.querySelectorAll("tr[aria-label]"))
+      .find((row) => row.getAttribute("aria-label").includes("Order 101"));
+    fireEvent.click(orderRow);
+
+    await waitFor(() => {
+      const detailsPanels = container.querySelectorAll('[data-order-details="101"]');
+      expect(detailsPanels).toHaveLength(2);
+      expect(scrollIntoView).toHaveBeenCalledWith({ behavior: "smooth", block: "start" });
+      expect(scrolledPanel).toBe(detailsPanels[1]);
+    });
+  } finally {
+    if (originalMatchMedia) window.matchMedia = originalMatchMedia;
+    else delete window.matchMedia;
+    if (originalScrollIntoView) HTMLElement.prototype.scrollIntoView = originalScrollIntoView;
+    else delete HTMLElement.prototype.scrollIntoView;
+  }
 });
 
 test("hides refund details and status controls from admins", async () => {

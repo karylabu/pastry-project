@@ -148,11 +148,28 @@ export default function Orders() {
   const pollRef = useRef(null);
   const discountIdPreviewUrlsRef = useRef({});
   const paymentProofPreviewUrlsRef = useRef({});
+  const dateFilter = new URLSearchParams(location.search).get("date");
 
   useEffect(() => () => {
     Object.values(discountIdPreviewUrlsRef.current).forEach((url) => URL.revokeObjectURL(url));
     Object.values(paymentProofPreviewUrlsRef.current).forEach((url) => URL.revokeObjectURL(url));
   }, []);
+
+  useEffect(() => {
+    if (expandedOrderId === null) return undefined;
+
+    const frame = window.requestAnimationFrame(() => {
+      const detailsPanels = Array.from(document.querySelectorAll(`[data-order-details="${expandedOrderId}"]`));
+      const visiblePanel = detailsPanels.find((panel) => panel.getClientRects().length > 0);
+      const isDesktop = window.matchMedia && window.matchMedia("(min-width: 1280px)").matches;
+      const panel = visiblePanel || detailsPanels[isDesktop ? 1 : 0];
+      if (panel && typeof panel.scrollIntoView === "function") {
+        panel.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, [expandedOrderId]);
 
   useEffect(() => {
     if (paymentProofLightboxOrderId === null) return undefined;
@@ -348,6 +365,14 @@ export default function Orders() {
   const displayedOrders = orders
     .filter((order) => {
       const matchesFilter = statusFilter === "All" || order.status === statusFilter;
+      const createdAt = order.created_at ? new Date(order.created_at) : null;
+      const today = new Date();
+      const matchesDateFilter = dateFilter !== "today"
+        || (createdAt
+          && Number.isFinite(createdAt.getTime())
+          && createdAt.getFullYear() === today.getFullYear()
+          && createdAt.getMonth() === today.getMonth()
+          && createdAt.getDate() === today.getDate());
       const matchesDashboardFilter = dashboardFilter === null
         || (dashboardFilter === "open" && !["Completed", "Cancelled"].includes(order.status))
         || (dashboardFilter === "rush" && getOrderTiming(order).isRushOrder)
@@ -370,7 +395,7 @@ export default function Orders() {
         ...(order.items || []).flatMap((item) => [item.name, item.qty]),
       ].join(" ").toLowerCase();
       const matchesSearch = !query || searchableText.includes(query);
-      return matchesFilter && matchesDashboardFilter && matchesSearch;
+      return matchesFilter && matchesDateFilter && matchesDashboardFilter && matchesSearch;
     })
     .sort((a, b) => {
       const valueFor = (order) => {
@@ -539,7 +564,7 @@ export default function Orders() {
             <div>
               <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.24em] text-[#92701e]">Order management</p>
               <h1 className="mt-1 font-serif text-[27px] leading-tight text-[#33251e]">Live Orders</h1>
-              <p className="mt-1 text-[12px] text-[#74675f]">Review incoming orders and keep production moving.</p>
+              <p className="mt-1 text-[12px] text-[#74675f]">{dateFilter === "today" ? "Showing orders placed today." : "Review incoming orders and keep production moving."}</p>
             </div>
             <div className="flex w-full flex-col gap-2 lg:w-[420px]">
               <div className={`flex items-center gap-2 text-[11px] font-medium ${connectionIssue ? "text-red-700" : "text-[#61734f]"}`} role="status" aria-live="polite">
@@ -782,7 +807,7 @@ export default function Orders() {
                         {order.status !== "Completed" && <button type="button" onClick={() => markOrderAsWaste(order)} disabled={order.is_wasted} className="rounded-md border border-[#e8dfd4] bg-[#faf7f2] px-2.5 py-1.5 text-[10px] font-semibold text-[#65574d] disabled:cursor-not-allowed disabled:opacity-50">{order.is_wasted ? "Counted as waste" : "Waste"}</button>}
                       </div>
                     </div>
-                    {isExpanded && <div className="border-t border-[#eee6de] bg-[#fffdfa] p-3.5 text-[11px] text-[#65574d]">
+                    {isExpanded && <div data-order-details={order.id} className="scroll-mt-24 border-t border-[#eee6de] bg-[#fffdfa] p-3.5 text-[11px] text-[#65574d]">
                       {order.return_refund_request && (
                         <div className="mb-3 rounded-md border border-amber-200 bg-amber-50 p-3">
                           <p className="text-[9px] font-semibold uppercase tracking-[0.14em] text-amber-800">Customer request · {order.return_refund_request.status}</p>
@@ -977,7 +1002,7 @@ export default function Orders() {
                           </td>
                         </tr>
                         {isExpanded && (
-                          <tr className="border-b border-[#eee8df] bg-[#fcfaf6]">
+                          <tr data-order-details={order.id} className="scroll-mt-24 border-b border-[#eee8df] bg-[#fcfaf6]">
                             <td colSpan="7" className="px-6 py-5 text-[11px] leading-5 text-[#65574d]">
                               {order.return_refund_request && (
                                 <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-3">
