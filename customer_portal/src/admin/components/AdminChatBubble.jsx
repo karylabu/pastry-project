@@ -201,8 +201,11 @@ export default function AdminChatBubble() {
     const refreshMessages = () => fetchMessages(selectedConversationRef.current);
     refreshMessages();
     const unsubscribe = subscribeRealtime((event) => {
-      if (event.type === "chat.updated" &&
-          Number(event.order_id || 0) === Number(selectedConversationRef.current?.order_id || 0)) {
+      const activeConversation = selectedConversationRef.current;
+      if (event.type === "chat.updated" && (
+        String(event.conversation_id || "") === String(activeConversation?.conversation_id || "") ||
+        Number(event.order_id || 0) === Number(activeConversation?.order_id || 0)
+      )) {
         refreshMessages();
       }
     });

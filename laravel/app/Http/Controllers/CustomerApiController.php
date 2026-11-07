@@ -857,8 +857,25 @@ class CustomerApiController extends Controller
             return $this->corsResponse(['success' => false, 'messages' => []], 403);
         }
 
-        // Mark messages as read depending on role
-        if ($orderId > 0) {
+        $hasConversationScope = $hasConversationId && $conversationId !== '' && $userId > 0;
+
+        // A chat thread can contain both general questions and order-specific messages.
+        if ($hasConversationScope) {
+            $readQuery = DB::table('messages')
+                ->where('user_id', $userId);
+            if ($conversationId === 'legacy') {
+                $readQuery->where(function ($query) {
+                    $query->whereNull('conversation_id')->orWhere('conversation_id', 'legacy');
+                });
+            } else {
+                $readQuery->where('conversation_id', $conversationId);
+            }
+            $readSenders = $role === 'admin'
+                ? ['customer']
+                : ['admin', 'staff', 'ai'];
+            $readQuery->whereIn('sender', $readSenders)->update(['is_read' => 1]);
+        } elseif ($orderId > 0) {
+            // Legacy order conversations without an explicit thread identity.
             if ($role === 'admin') {
                 $readQuery = DB::table('messages')
                     ->where('order_id', $orderId)
@@ -943,7 +960,17 @@ class CustomerApiController extends Controller
         }
         $query->select($selectedColumns);
 
-        if ($orderId > 0) {
+        if ($hasConversationScope) {
+            $messageQuery = $query->where('m1.user_id', $userId);
+            if ($conversationId === 'legacy') {
+                $messageQuery->where(function ($query) {
+                    $query->whereNull('m1.conversation_id')->orWhere('m1.conversation_id', 'legacy');
+                });
+            } else {
+                $messageQuery->where('m1.conversation_id', $conversationId);
+            }
+            $messages = $messageQuery->orderBy('m1.created_at')->orderBy('m1.id')->get();
+        } elseif ($orderId > 0) {
             $messageQuery = $query->where('m1.order_id', $orderId);
             if ($hasConversationId && $conversationId && $conversationId !== 'legacy') {
                 $messageQuery->where('m1.conversation_id', $conversationId);
@@ -952,7 +979,7 @@ class CustomerApiController extends Controller
                     $query->whereNull('m1.conversation_id')->orWhere('m1.conversation_id', 'legacy');
                 });
             }
-            $messages = $messageQuery->orderBy('m1.created_at')->get();
+            $messages = $messageQuery->orderBy('m1.created_at')->orderBy('m1.id')->get();
         } else {
             $messageQuery = $query->where(function($q) use ($userId) {
                 $q->where('m1.user_id', $userId)
@@ -967,7 +994,7 @@ class CustomerApiController extends Controller
                     $query->whereNull('m1.conversation_id')->orWhere('m1.conversation_id', 'legacy');
                 });
             }
-            $messages = $messageQuery->orderBy('m1.created_at')->get();
+            $messages = $messageQuery->orderBy('m1.created_at')->orderBy('m1.id')->get();
         }
 
         // cast fields
@@ -1011,9 +1038,9 @@ class CustomerApiController extends Controller
             $conversationId = $hasConversationId
                 ? trim((string) ($message->conversation_id ?? ''))
                 : '';
-            $key = $orderId > 0
-                ? 'order:' . $orderId
-                : 'user:' . $userId . ':' . ($conversationId !== '' ? $conversationId : 'legacy');
+            $key = $userId > 0
+                ? 'user:' . $userId . ':' . ($conversationId !== '' ? $conversationId : 'legacy')
+                : 'order:' . $orderId;
 
             if (!isset($conversations[$key])) {
                 $customerName = $hasCustomerName && ($message->sender ?? '') === 'customer'
@@ -1237,27 +1264,31 @@ class CustomerApiController extends Controller
                     : "Order number {$orderId} was provided, but no matching order was found. Do not invent its status or details.";
             }
 
-            $conversationQuery = DB::table('messages')
-                ->where(function ($query) use ($orderId, $userId) {
-                    if ($orderId > 0) {
-                        $query->where('order_id', $orderId);
-                    } else {
-                        $query->where(function ($generalQuery) {
-                            $generalQuery->where('order_id', 0)->orWhereNull('order_id');
-                        })->where('user_id', $userId);
-                    }
-                });
-            if ($hasConversationId) {
-                $conversationQuery->where('conversation_id', $conversationId);
+            $conversationQuery = DB::table('messages')->where('user_id', $userId);
+            if ($hasConversationId && $conversationId !== '') {
+                if ($conversationId === 'legacy') {
+                    $conversationQuery->where(function ($query) {
+                        $query->whereNull('conversation_id')->orWhere('conversation_id', 'legacy');
+                    });
+                } else {
+                    $conversationQuery->where('conversation_id', $conversationId);
+                }
+            } elseif ($orderId > 0) {
+                $conversationQuery->where('order_id', $orderId);
+            } else {
+                $conversationQuery
+                    ->where(function ($generalQuery) {
+                        $generalQuery->where('order_id', 0)->orWhereNull('order_id');
+                    });
             }
-            $conversationQuery
+            $conversationMessages = $conversationQuery
                 ->where('id', '<>', $insertedId)
                 ->orderByDesc('created_at')
                 ->limit(10)
                 ->get(['sender', 'message'])
                 ->reverse();
 
-            $conversation = $conversationQuery->map(function ($chatMessage) {
+            $conversation = $conversationMessages->map(function ($chatMessage) {
                 return [
                     'role' => $chatMessage->sender === 'customer' ? 'user' : 'assistant',
                     'content' => $chatMessage->message,

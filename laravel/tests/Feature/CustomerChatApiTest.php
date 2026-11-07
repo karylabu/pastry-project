@@ -35,6 +35,7 @@ class CustomerChatApiTest extends TestCase
         });
         Schema::create('orders', function ($table) {
             $table->id();
+            $table->unsignedBigInteger('user_id')->nullable();
             $table->string('status')->nullable();
             $table->decimal('total', 10, 2)->default(0);
             $table->string('method')->nullable();
@@ -207,6 +208,53 @@ class CustomerChatApiTest extends TestCase
             'sender' => 'ai',
             'message' => 'You can check your current order status on the My Orders page. If you need more help, please send your order number.',
         ]);
+    }
+
+    public function test_order_number_follow_up_stays_in_the_same_chat_conversation(): void
+    {
+        DB::table('orders')->insert([
+            'id' => 296,
+            'user_id' => 7,
+            'status' => 'Processing',
+            'total' => 500,
+            'method' => 'Pickup',
+        ]);
+
+        $this->withToken('test-customer-token')
+            ->postJson('/api/customer/chat/messages', [
+                'order_id' => 0,
+                'message' => 'Where is my order?',
+                'support_mode' => 'ai',
+                'quick_chat' => true,
+                'conversation_id' => 'order-follow-up',
+            ])
+            ->assertOk();
+
+        $this->withToken('test-customer-token')
+            ->postJson('/api/customer/chat/messages', [
+                'order_id' => 0,
+                'message' => '296',
+                'support_mode' => 'ai',
+                'quick_chat' => true,
+                'conversation_id' => 'order-follow-up',
+            ])
+            ->assertOk()
+            ->assertJsonPath('order_id', 296);
+
+        $response = $this->withToken('test-admin-token')
+            ->getJson('/api/staff/chat/conversations')
+            ->assertOk();
+
+        $this->assertCount(1, $response->json('conversations'));
+        $this->assertSame('order-follow-up', $response->json('conversations.0.conversation_id'));
+        $this->assertSame('Order #296', $response->json('conversations.0.order_label'));
+
+        $this->withToken('test-admin-token')
+            ->getJson('/api/staff/chat/messages?order_id=296&user_id=7&conversation_id=order-follow-up')
+            ->assertOk()
+            ->assertJsonCount(4, 'messages')
+            ->assertJsonPath('messages.0.message', 'Where is my order?')
+            ->assertJsonPath('messages.2.message', '296');
     }
 
     public function test_customer_chat_popup_marks_null_order_messages_read_only_when_opened(): void
