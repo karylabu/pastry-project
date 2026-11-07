@@ -136,6 +136,7 @@ class CustomizedCakeService
 
         $result = [];
         foreach ($totals as $entry) {
+            $entry['quantity'] = round($entry['quantity'], 3);
             $result[$entry['name']] = $entry;
         }
 
@@ -248,11 +249,11 @@ class CustomizedCakeService
                 foreach ($validation['shortages'] as $shortage) {
                     $details[] = sprintf('%s: required %s %s, available %s %s, shortage %s %s',
                         $shortage['ingredient'],
-                        number_format($shortage['required'], 1),
+                        number_format($shortage['required'], 3),
                         $shortage['unit'],
-                        number_format($shortage['available'], 1),
+                        number_format($shortage['available'], 3),
                         $shortage['unit'],
-                        number_format($shortage['shortage'], 1),
+                        number_format($shortage['shortage'], 3),
                         $shortage['unit']
                     );
                 }

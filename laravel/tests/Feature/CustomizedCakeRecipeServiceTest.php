@@ -275,6 +275,29 @@ class CustomizedCakeRecipeServiceTest extends TestCase
         $this->assertEqualsWithDelta(110.67, (float) $result['Cocoa powder']['quantity'], 0.1);
     }
 
+    public function test_calculated_recipe_quantities_are_rounded_to_three_decimals_after_combining_tiers(): void
+    {
+        $flavor = DB::table('cake_flavors')->where('slug', 'moist-chocolate')->first();
+        $recipe = DB::table('cake_recipes')->where('flavor_id', $flavor->id)->first();
+        $flour = DB::table('ingredients')->where('name', 'All-purpose flour')->first();
+        $baseSize = DB::table('cake_sizes')->where('id', $recipe->base_size_id)->first();
+        $smallSize = DB::table('cake_sizes')->where('code', '4x2')->first();
+
+        DB::table('cake_recipe_ingredients')
+            ->where('recipe_id', $recipe->id)
+            ->where('ingredient_id', $flour->id)
+            ->update(['quantity' => 1]);
+        DB::table('cake_sizes')->where('id', $baseSize->id)->update(['multiplier' => 3]);
+        DB::table('cake_sizes')->where('id', $smallSize->id)->update(['multiplier' => 1]);
+
+        $result = $this->service->calculateRequirementsForTiers([
+            ['flavor_id' => $flavor->id, 'size_id' => $smallSize->id],
+            ['flavor_id' => $flavor->id, 'size_id' => $smallSize->id],
+        ]);
+
+        $this->assertSame(0.667, $result['All-purpose flour']['quantity']);
+    }
+
     public function test_insufficient_stock_prevents_consumption(): void
     {
         $flour = DB::table('ingredients')->where('name', 'All-purpose flour')->first();
