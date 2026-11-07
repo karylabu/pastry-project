@@ -1078,49 +1078,51 @@ export default function AccountSettings() {
 
   return (
     <PageShell background="bg-[#fffaf3]" padding="px-3 py-5 sm:px-5 sm:py-6 md:px-6 md:py-7" innerClassName="mx-auto flex w-full max-w-none gap-5">
-        {/* Sidebar */}
-        <aside className="hidden w-[280px] shrink-0 md:block">
-          <h1 className="text-[28px] font-bold text-[#4a2b20]">Settings &amp; privacy</h1>
+        {activeSection !== 'overview' && (
+          <aside className="hidden w-[280px] shrink-0 md:block">
+            <h1 className="text-[28px] font-bold text-[#4a2b20]">Settings &amp; privacy</h1>
 
-          <div className="mt-4 flex items-center gap-2 rounded-full border border-[#ead8c5] bg-white px-4 py-2.5">
-            <Search size={16} className="text-gray-400" />
-            <input
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search settings"
-              className="w-full bg-transparent text-sm text-gray-900 placeholder-gray-500 outline-none"
-            />
-          </div>
+            <div className="mt-4 flex items-center gap-2 rounded-full border border-[#ead8c5] bg-white px-4 py-2.5">
+              <Search size={16} className="text-gray-400" />
+              <input
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search settings"
+                className="w-full bg-transparent text-sm text-gray-900 placeholder-gray-500 outline-none"
+              />
+            </div>
 
-          <button
-            onClick={() => {
-              setActiveSection('overview');
-              setSearchParams({});
-              setMessage('');
-            }}
-            className={`mt-6 flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-lg font-bold ${activeSection === 'overview' ? 'text-[#a06a2c]' : 'text-[#4a2b20]'}`}
-          >
-            <SettingsIcon size={18} /> Your account
-          </button>
+            <button
+              onClick={() => {
+                setActiveSection('overview');
+                setSearchParams({});
+                setSearchQuery('');
+                setMessage('');
+              }}
+              className="mt-6 flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-lg font-bold text-[#4a2b20]"
+            >
+              <SettingsIcon size={18} /> Your account
+            </button>
 
-          <nav className="mt-2 space-y-1">
-            {sectionOptions.map((item) => (
-              <button
-                key={item.key}
-                onClick={() => {
-                  setActiveSection(item.key);
-                  setMessage('');
-                }}
-                className={`flex w-full items-center gap-3 rounded-lg px-3.5 py-3.5 text-left text-[15px] font-semibold transition ${
-                  activeSection === item.key ? 'bg-[#fff1d8] text-[#4a2b20]' : 'text-gray-600 hover:bg-[#fff7df]'
-                }`}
-              >
-                <span className={`rounded-lg p-2 ${item.accent}`}>{item.icon}</span>
-                {item.title}
-              </button>
-            ))}
-          </nav>
-        </aside>
+            <nav className="mt-2 space-y-1">
+              {sectionOptions.map((item) => (
+                <button
+                  key={item.key}
+                  onClick={() => {
+                    setActiveSection(item.key);
+                    setMessage('');
+                  }}
+                  className={`flex w-full items-center gap-3 rounded-lg px-3.5 py-3.5 text-left text-[15px] font-semibold transition ${
+                    activeSection === item.key ? 'bg-[#fff1d8] text-[#4a2b20]' : 'text-gray-600 hover:bg-[#fff7df]'
+                  }`}
+                >
+                  <span className={`rounded-lg p-2 ${item.accent}`}>{item.icon}</span>
+                  {item.title}
+                </button>
+              ))}
+            </nav>
+          </aside>
+        )}
 
         {/* Main content */}
         <div className="min-w-0 flex-1 space-y-5">
@@ -1136,15 +1138,6 @@ export default function AccountSettings() {
             <>
               <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-[0_10px_28px_rgba(126,82,35,0.05)] sm:p-6 md:p-8">
                 <h2 className="text-xl font-bold text-gray-900 sm:text-[26px]">Find the setting you need</h2>
-                <div className="mt-3 flex items-center gap-3 rounded-full border border-[#ead8c5] bg-[#fffaf3] px-3 py-2.5 sm:px-4 sm:py-3">
-                  <Search size={18} className="text-gray-400" />
-                  <input
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Search settings"
-                    className="w-full bg-transparent text-sm text-gray-900 placeholder-gray-500 outline-none"
-                  />
-                </div>
               </div>
 
               <div>
@@ -1177,9 +1170,10 @@ export default function AccountSettings() {
                 onClick={() => {
                   setActiveSection('overview');
                   setSearchParams({});
+                  setSearchQuery('');
                   setMessage('');
                 }}
-                className="flex items-center gap-2 rounded-full border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-600 transition hover:border-blue-600 hover:text-blue-600 md:hidden"
+                className="flex items-center gap-2 rounded-full border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-600 transition hover:border-[#a06a2c] hover:text-[#a06a2c]"
               >
                 <ArrowLeft size={16} /> Back
               </button>
