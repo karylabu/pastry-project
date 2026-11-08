@@ -98,10 +98,10 @@ export default function CreditsModal({ isOpen, onClose }) {
 
         <div className="px-3 py-2 sm:px-7 sm:py-2 md:py-3">
           <section>
-            <SectionHeading icon={Cake} className="md:translate-x-2 md:translate-y-1">About the project</SectionHeading>
+            <SectionHeading icon={Cake} className="md:translate-x-2 md:translate-y-1">About the shop</SectionHeading>
             <p className="ml-8 max-w-[640px] text-[10px] leading-[1.2] text-[#66564a] md:ml-11 md:text-xs md:leading-5">
-              Pastry Project is an online pastry platform for browsing products, placing orders, requesting custom cakes,
-              and managing customer accounts. Our team brought the experience together from design to development.
+              Pastry Project is a bakeshop in Tanauan City, Batangas, creating pastries and cakes for everyday treats
+              and special occasions. We also offer custom cake orders made to help make every celebration memorable.
             </p>
           </section>
 
