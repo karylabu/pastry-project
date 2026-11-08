@@ -794,18 +794,18 @@ export default function CustomizedCakes() {
 
       <DesignCategoryCards
         onSelectCategory={navigate}
-        className="mb-5"
+        className="mb-3"
       />
 
       <form
         id="custom-cake-request-form"
         onSubmit={handleSubmit}
-        className="rounded-2xl border border-[#eadfd8] bg-[#fffdf9] p-4 shadow-[0_8px_22px_rgba(91,64,39,0.05)] sm:rounded-3xl sm:p-6"
+        className="rounded-2xl border border-[#eadfd8] bg-[#fffdf9] p-3 shadow-[0_8px_22px_rgba(91,64,39,0.05)] sm:rounded-3xl sm:p-4"
       >
         {!userId && (
           <div
             role="alert"
-            className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900"
+            className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900"
           >
             <span>Please log in to your account before filling out the custom cake request form.</span>
             <button
@@ -821,7 +821,7 @@ export default function CustomizedCakes() {
           <div
             role="status"
             aria-live="polite"
-            className="mb-4 rounded-xl border border-[#d8d1c8] bg-[#efede9] px-4 py-3 text-sm text-[#655f58]"
+            className="mb-3 rounded-xl border border-[#d8d1c8] bg-[#efede9] px-3 py-2 text-sm text-[#655f58]"
           >
             {customCakeStatusUnavailable
               ? 'Custom cake requests are temporarily unavailable. The form is disabled; please try again later.'
@@ -830,7 +830,7 @@ export default function CustomizedCakes() {
                 : 'Custom cake requests are currently closed. The form is disabled.'}
           </div>
         )}
-        <div className="mb-4 border-b border-[#f0e6dc] pb-3 sm:mb-5">
+        <div className="mb-3 border-b border-[#f0e6dc] pb-2">
           <div>
             <p className="text-[9px] font-black uppercase tracking-[0.24em] text-[#9b7b3d]">Your custom order</p>
             <h2 className="mt-1 font-serif text-xl font-bold text-[#33251e] sm:text-2xl">Cake Customization Details</h2>
@@ -840,14 +840,14 @@ export default function CustomizedCakes() {
         </div>
 
         <fieldset disabled={requestFormDisabled} className="min-w-0 border-0 p-0 disabled:opacity-50">
-        <div className="grid grid-cols-1 gap-3 md:grid-flow-col md:grid-cols-2 md:grid-rows-[repeat(4,auto)] md:items-start md:gap-4">
+        <div className="grid grid-cols-1 gap-2 md:grid-flow-col md:grid-cols-2 md:grid-rows-[repeat(4,auto)] md:items-start md:gap-3">
           <div className="contents">
-            <div data-custom-card="1" style={{ order: 1 }} className="rounded-2xl border border-[#eee4de] bg-white p-4 shadow-[0_3px_12px_rgba(91,64,39,0.04)] sm:p-5">
-              <p className="mb-4 flex items-center gap-2 border-b border-[#f3ece6] pb-3 text-sm font-bold text-[#6b4f1d]">
+            <div data-custom-card="1" style={{ order: 1 }} className="rounded-2xl border border-[#eee4de] bg-white p-3 shadow-[0_3px_12px_rgba(91,64,39,0.04)] sm:p-4">
+              <p className="mb-2 flex items-center gap-2 border-b border-[#f3ece6] pb-2 text-sm font-bold text-[#6b4f1d]">
                 <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#fff3c8] text-[11px]">1</span>
                 Customer Information
               </p>
-              <div className="grid min-w-0 gap-3 sm:grid-cols-2">
+              <div className="grid min-w-0 gap-2 sm:grid-cols-2">
                 <label className="block text-xs font-semibold text-[#6b4f1d]">
                   Full Name <span aria-hidden="true" className="text-red-600">*</span>
                   <input required value={name} onChange={(event) => setName(event.target.value)} placeholder="Enter full name" className="mt-1.5 min-h-11 w-full rounded-lg border border-[#eadfd8] bg-white px-3 py-2.5 text-sm font-normal text-[#33251e] outline-none transition placeholder:text-[#a99a8e] focus:border-[#c9972d] focus:ring-2 focus:ring-[#fff1bd]" />
@@ -863,12 +863,12 @@ export default function CustomizedCakes() {
               </div>
             </div>
 
-            <div data-custom-card="2" style={{ order: 2 }} className="rounded-2xl border border-[#eee4de] bg-white p-4 shadow-[0_3px_12px_rgba(91,64,39,0.04)] sm:p-5">
-              <p className="mb-4 flex items-center gap-2 border-b border-[#f3ece6] pb-3 text-sm font-bold text-[#6b4f1d]">
+            <div data-custom-card="2" style={{ order: 2 }} className="rounded-2xl border border-[#eee4de] bg-white p-3 shadow-[0_3px_12px_rgba(91,64,39,0.04)] sm:p-4">
+              <p className="mb-2 flex items-center gap-2 border-b border-[#f3ece6] pb-2 text-sm font-bold text-[#6b4f1d]">
                 <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#fff3c8] text-[11px]">2</span>
                 Order Information
               </p>
-              <div className="grid min-w-0 gap-3 md:grid-cols-2">
+              <div className="grid min-w-0 gap-2 md:grid-cols-2">
                 <div className="grid grid-cols-2 gap-2 sm:col-span-2">
                   {['Pickup', 'Delivery'].map((option) => (
                     <button
@@ -891,7 +891,7 @@ export default function CustomizedCakes() {
                 </div>
 
                 {deliveryMethod === 'Delivery' && (
-                  <div className="space-y-3 sm:col-span-2">
+                  <div className="space-y-2 sm:col-span-2">
                     <div className="text-sm text-[#6b4f1d]">
                       <p className="font-semibold">You will book the delivery rider yourself.</p>
                       <p className="mt-0.5 text-xs leading-5 text-[#8d7a6e]">Choose a service and arrange the booking directly.</p>
@@ -985,12 +985,12 @@ export default function CustomizedCakes() {
               </div>
             </div>
 
-            <div data-custom-card="3" style={{ order: 3 }} className="rounded-2xl border border-[#eee4de] bg-white p-4 shadow-[0_3px_12px_rgba(91,64,39,0.04)] sm:p-5">
-              <p className="mb-4 flex items-center gap-2 border-b border-[#f3ece6] pb-3 text-sm font-bold text-[#6b4f1d]">
+            <div data-custom-card="3" style={{ order: 3 }} className="rounded-2xl border border-[#eee4de] bg-white p-3 shadow-[0_3px_12px_rgba(91,64,39,0.04)] sm:p-4">
+              <p className="mb-2 flex items-center gap-2 border-b border-[#f3ece6] pb-2 text-sm font-bold text-[#6b4f1d]">
                 <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#fff3c8] text-[11px]">3</span>
                 Cake Details
               </p>
-              <div className="space-y-3">
+              <div className="space-y-2">
                 <div className="grid grid-cols-2 gap-3">
                   {['single', 'two-tier'].map((value) => (
                     <button
@@ -1061,8 +1061,8 @@ export default function CustomizedCakes() {
               </div>
             </div>
 
-            <div data-custom-card="5" style={{ order: 5 }} className="rounded-2xl border border-[#eee4de] bg-white p-4 shadow-[0_3px_12px_rgba(91,64,39,0.04)] sm:p-5">
-              <p className="mb-4 flex items-center gap-2 border-b border-[#f3ece6] pb-3 text-sm font-bold text-[#6b4f1d]">
+            <div data-custom-card="5" style={{ order: 5 }} className="rounded-2xl border border-[#eee4de] bg-white p-3 shadow-[0_3px_12px_rgba(91,64,39,0.04)] sm:p-4">
+              <p className="mb-2 flex items-center gap-2 border-b border-[#f3ece6] pb-2 text-sm font-bold text-[#6b4f1d]">
                 <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#fff3c8] text-[11px]">5</span>
                 Reference Images
               </p>
@@ -1073,7 +1073,7 @@ export default function CustomizedCakes() {
                   {files.length > 0 ? `Add Images (${files.length + galleryReferences.length} selected)` : 'Choose Images'}
                 </label>
                 <button type="button" onClick={openReferenceGallery} className="min-h-9 rounded-lg border border-[#eadfd8] bg-white px-3 py-1.5 text-[11px] font-bold text-[#8d6a2e] hover:bg-[#fffaf0]">Browse Examples</button>
-                {!referenceImage && <div className="grid min-h-28 flex-1 place-items-center rounded-lg border border-dashed border-[#eadfd8] bg-white px-3 py-4 text-center text-xs text-[#9b8060]">No reference selected</div>}
+                {!referenceImage && <div className="rounded-lg border border-dashed border-[#eadfd8] bg-white px-3 py-2 text-xs text-[#9b8060]">No reference selected</div>}
               </div>
 
               {referenceImage && (
@@ -1109,8 +1109,8 @@ export default function CustomizedCakes() {
 
           </div>
           <div className="contents">
-            <section data-custom-card="7" style={{ order: 7 }} className="rounded-2xl border border-[#eee4de] bg-white p-4 shadow-[0_3px_12px_rgba(91,64,39,0.04)] sm:p-5">
-              <p className="mb-4 flex items-center gap-2 border-b border-[#f3ece6] pb-3 text-sm font-bold text-[#6b4f1d]">
+            <section data-custom-card="7" style={{ order: 7 }} className="rounded-2xl border border-[#eee4de] bg-white p-3 shadow-[0_3px_12px_rgba(91,64,39,0.04)] sm:p-4">
+              <p className="mb-2 flex items-center gap-2 border-b border-[#f3ece6] pb-2 text-sm font-bold text-[#6b4f1d]">
                 <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#fff3c8] text-[11px]">7</span>
                 Add-ons <span className="font-normal text-[#9b8c83]">(optional)</span>
               </p>
@@ -1134,12 +1134,12 @@ export default function CustomizedCakes() {
                 )}
               </fieldset>
             </section>
-            <div data-custom-card="4" style={{ order: 4 }} className="rounded-2xl border border-[#eee4de] bg-white p-4 shadow-[0_3px_12px_rgba(91,64,39,0.04)] sm:p-5">
-              <p className="mb-4 flex items-center gap-2 border-b border-[#f3ece6] pb-3 text-sm font-bold text-[#6b4f1d]">
+            <div data-custom-card="4" style={{ order: 4 }} className="rounded-2xl border border-[#eee4de] bg-white p-3 shadow-[0_3px_12px_rgba(91,64,39,0.04)] sm:p-4">
+              <p className="mb-2 flex items-center gap-2 border-b border-[#f3ece6] pb-2 text-sm font-bold text-[#6b4f1d]">
                 <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#fff3c8] text-[11px]">4</span>
                 Customization Details
               </p>
-              <div className="grid gap-3 sm:grid-cols-2">
+              <div className="grid gap-2 sm:grid-cols-2">
                 <div className="block text-xs font-semibold text-[#6b4f1d]">
                   <label htmlFor="custom-cake-occasion">Occasion</label>
                   <select id="custom-cake-occasion" value={occasion} onChange={(event) => setOccasion(event.target.value)} className="mt-1.5 min-h-11 w-full rounded-lg border border-[#eadfd8] bg-white px-3 py-2 text-sm text-[#33251e] outline-none focus:border-[#c9972d] focus:ring-2 focus:ring-[#fff1bd]">
@@ -1169,7 +1169,7 @@ export default function CustomizedCakes() {
                     <option value="Other">Other</option>
                   </select>
                 </label>
-                <label className="block h-full min-h-[90px] text-xs font-semibold text-[#6b4f1d] sm:col-start-2 sm:row-start-3">
+                <label className="block text-xs font-semibold text-[#6b4f1d]">
                   Packaging <span className="font-normal text-[#9b8c83]">(optional)</span>
                   <select value={packaging} onChange={(event) => setPackaging(event.target.value)} className="mt-1.5 h-16 w-full rounded-lg border border-[#eadfd8] bg-white px-3 py-2 text-sm font-normal text-[#33251e] outline-none focus:border-[#c9972d] focus:ring-2 focus:ring-[#fff1bd]">
                     <option value="Standard">Standard</option>
@@ -1177,25 +1177,25 @@ export default function CustomizedCakes() {
                     <option value="Acetate box">Acetate box</option>
                   </select>
                 </label>
-                <label className="block h-full min-h-[90px] text-xs font-semibold text-[#6b4f1d]">Preferred Cake Color <span className="font-normal text-[#9b8c83]">(optional)</span>
+                <label className="block text-xs font-semibold text-[#6b4f1d]">Preferred Cake Color <span className="font-normal text-[#9b8c83]">(optional)</span>
                   <textarea rows={2} value={cakeColor} onChange={(event) => setCakeColor(event.target.value)} placeholder="e.g. blush pink and white" className="mt-1.5 min-h-16 w-full resize-y rounded-lg border border-[#eadfd8] bg-white px-3 py-2 text-sm font-normal text-[#33251e] outline-none placeholder:text-[#a99a8e] focus:border-[#c9972d] focus:ring-2 focus:ring-[#fff1bd]" />
                 </label>
-                <label className="block h-full min-h-[90px] text-xs font-semibold text-[#6b4f1d] sm:col-start-1 sm:row-start-3">Cake Message <span className="font-normal text-[#9b8c83]">(optional)</span>
+                <label className="block text-xs font-semibold text-[#6b4f1d]">Cake Message <span className="font-normal text-[#9b8c83]">(optional)</span>
                   <textarea rows={2} value={customMessage} onChange={(event) => setCustomMessage(event.target.value)} placeholder="Message to write on the cake" className="mt-1.5 min-h-16 w-full resize-y rounded-lg border border-[#eadfd8] bg-white px-3 py-2 text-sm font-normal text-[#33251e] outline-none placeholder:text-[#a99a8e] focus:border-[#c9972d] focus:ring-2 focus:ring-[#fff1bd]" />
                 </label>
-                <label className="block h-full min-h-[90px] text-xs font-semibold text-[#6b4f1d]">
+                <label className="block text-xs font-semibold text-[#6b4f1d]">
                   Specific Design or Theme <span className="font-normal text-[#9b8c83]">(optional)</span>
                   <input value={customTheme} onChange={(event) => setCustomTheme(event.target.value)} placeholder="e.g. Kuromi, daisy flowers, or a name" className="mt-1.5 h-16 w-full rounded-lg border border-[#eadfd8] bg-white px-3 py-2 text-sm font-normal text-[#33251e] outline-none placeholder:text-[#a99a8e] focus:border-[#c9972d] focus:ring-2 focus:ring-[#fff1bd]" />
                 </label>
               </div>
             </div>
 
-            <div data-custom-card="8" style={{ order: 8 }} className="rounded-2xl border border-[#eee4de] bg-white p-4 shadow-[0_3px_12px_rgba(91,64,39,0.04)] sm:p-5">
-              <p className="mb-4 flex items-center gap-2 border-b border-[#f3ece6] pb-3 text-sm font-bold text-[#6b4f1d]">
+            <div data-custom-card="8" style={{ order: 8 }} className="rounded-2xl border border-[#eee4de] bg-white p-3 shadow-[0_3px_12px_rgba(91,64,39,0.04)] sm:p-4">
+              <p className="mb-2 flex items-center gap-2 border-b border-[#f3ece6] pb-2 text-sm font-bold text-[#6b4f1d]">
                 <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#fff3c8] text-[11px]">8</span>
                 Order Summary
               </p>
-              <div className="space-y-3">
+              <div className="space-y-2">
                 <div>
                   <label className="mb-1 block text-xs font-semibold text-[#6b4f1d]" htmlFor="custom-cake-budget">Your Budget (₱)</label>
                   <input id="custom-cake-budget" value={budget} onChange={(event) => setBudget(event.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="Enter budget" type="text" inputMode="numeric" maxLength={6} pattern="[0-9]{0,6}" className="w-full rounded-lg border border-[#eadfd8] bg-white px-3 py-2.5 text-[13px] text-[#6b4f1d] outline-none focus:border-[#e5bd45] focus:ring-2 focus:ring-[#fff1bd]" />
@@ -1240,7 +1240,7 @@ export default function CustomizedCakes() {
                   )}
                 </div>
               )}
-              <div className="mt-4 flex flex-wrap justify-end gap-2 border-t border-[#f3ece6] pt-3">
+              <div className="mt-3 flex flex-wrap justify-end gap-2 border-t border-[#f3ece6] pt-2">
                 <button type="button" onClick={resetCustomCakeForm} className="min-h-9 rounded-lg border border-[#f0d98a] bg-white px-3 py-1.5 text-xs font-semibold text-[#6b4f1d] transition hover:border-[#e5bd45] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#b89646]">
                   Reset
                 </button>
@@ -1250,12 +1250,12 @@ export default function CustomizedCakes() {
               </div>
             </div>
 
-            <section data-custom-card="6" style={{ order: 6 }} className="rounded-2xl border border-[#eee4de] bg-white p-4 shadow-[0_3px_12px_rgba(91,64,39,0.04)] sm:p-5">
-              <p className="mb-4 flex items-center gap-2 border-b border-[#f3ece6] pb-3 text-sm font-bold text-[#6b4f1d]">
+            <section data-custom-card="6" style={{ order: 6 }} className="rounded-2xl border border-[#eee4de] bg-white p-3 shadow-[0_3px_12px_rgba(91,64,39,0.04)] sm:p-4">
+              <p className="mb-2 flex items-center gap-2 border-b border-[#f3ece6] pb-2 text-sm font-bold text-[#6b4f1d]">
                 <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#fff3c8] text-[11px]">6</span>
                 Special Instructions <span className="font-normal text-[#9b8c83]">(optional)</span>
               </p>
-              <textarea aria-label="Special Instructions" value={specialInstructions} onChange={(event) => setSpecialInstructions(event.target.value)} placeholder="Share any other details" rows={5} className="min-h-28 w-full resize-y rounded-lg border border-[#eadfd8] bg-white px-3 py-2 text-sm font-normal text-[#33251e] outline-none placeholder:text-[#a99a8e] focus:border-[#c9972d] focus:ring-2 focus:ring-[#fff1bd]" />
+              <textarea aria-label="Special Instructions" value={specialInstructions} onChange={(event) => setSpecialInstructions(event.target.value)} placeholder="Share any other details" rows={3} className="min-h-20 w-full resize-y rounded-lg border border-[#eadfd8] bg-white px-3 py-2 text-sm font-normal text-[#33251e] outline-none placeholder:text-[#a99a8e] focus:border-[#c9972d] focus:ring-2 focus:ring-[#fff1bd]" />
             </section>
           </div>
 
