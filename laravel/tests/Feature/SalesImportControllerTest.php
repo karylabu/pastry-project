@@ -642,6 +642,37 @@ class SalesImportControllerTest extends TestCase
         ]);
     }
 
+    public function test_csv_job_detects_semicolon_delimited_headers_and_common_column_names(): void
+    {
+        Storage::fake('local');
+        $importId = DB::table('analytics_imports')->insertGetId([
+            'file_name' => 'semicolon-sales.csv',
+            'source_name' => 'POS CSV',
+            'uploaded_at' => now(),
+            'status' => 'queued',
+        ]);
+        Storage::disk('local')->put(
+            'sales-imports/semicolon-sales.csv',
+            "Monthly Sales Report\nProduct Name;Sale Date;Qty;Unit Price;Sales Amount\nChocolate Cake;2026-11-08;2;500;1000\n"
+        );
+
+        (new ProcessSalesCsvImport($importId, 'sales-imports/semicolon-sales.csv'))->handle();
+
+        $this->assertDatabaseHas('analytics_imports', [
+            'id' => $importId,
+            'status' => 'completed',
+            'rows_received' => 1,
+            'rows_processed' => 1,
+        ]);
+        $this->assertDatabaseHas('analytics_sales_history', [
+            'import_id' => $importId,
+            'product_name' => 'Chocolate Cake',
+            'sale_date' => '2026-11-08',
+            'units_sold' => 2,
+            'revenue' => 1000,
+        ]);
+    }
+
     public function test_csv_job_uses_dimensions_in_product_name_when_size_is_missing(): void
     {
         Storage::fake('local');

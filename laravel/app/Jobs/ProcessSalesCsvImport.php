@@ -105,15 +105,37 @@ class ProcessSalesCsvImport implements ShouldQueue
             ];
             $cakeProductCatalog = SalesImportCleaner::cakeProductCatalog();
             $aliases = $cakeProductCatalog['cake_aliases'];
-            $headers = fgetcsv($handle);
-            if (!is_array($headers)) {
-                throw new RuntimeException('The uploaded CSV file is empty.');
+            $headers = null;
+            $delimiter = ',';
+            $detectedHeaders = [];
+            for ($headerRow = 0; $headerRow < 10; $headerRow++) {
+                $headerLine = fgets($handle);
+                if ($headerLine === false) {
+                    break;
+                }
+
+                [$candidateHeaders, $candidateDelimiter] = $this->parseHeaders($headerLine);
+                $candidateColumns = $this->mapHeaders($candidateHeaders);
+                $detectedHeaders = $candidateHeaders;
+                if (isset($candidateColumns['name']) && (isset($candidateColumns['total']) || isset($candidateColumns['price']))) {
+                    $headers = $candidateHeaders;
+                    $delimiter = $candidateDelimiter;
+                    break;
+                }
+            }
+            if ($headers === null) {
+                $detectedHeaders = implode(', ', array_map(
+                    static fn ($header) => trim((string) $header),
+                    $detectedHeaders
+                ));
+                throw new RuntimeException(
+                    'CSV needs a product name and either a total amount or a price column. '
+                    . 'Checked the first 10 rows. Detected columns: '
+                    . ($detectedHeaders !== '' ? $detectedHeaders : '(none)')
+                );
             }
 
             $columns = $this->mapHeaders($headers);
-            if (!isset($columns['name']) || (!isset($columns['total']) && !isset($columns['price']))) {
-                throw new RuntimeException('CSV needs a product name and either a total amount or a price column.');
-            }
 
             $batch = [];
             $rowsReceived = 0;
@@ -124,7 +146,7 @@ class ProcessSalesCsvImport implements ShouldQueue
             $coverageStartDate = null;
             $coverageEndDate = null;
 
-            while (($values = fgetcsv($handle)) !== false) {
+            while (($values = fgetcsv($handle, 0, $delimiter)) !== false) {
                 if ($values === [null] || $values === []) continue;
                 $rowsReceived++;
                 if ($rowsReceived > self::MAX_ROWS) {
@@ -419,11 +441,11 @@ class ProcessSalesCsvImport implements ShouldQueue
     private function mapHeaders(array $headers): array
     {
         $aliases = [
-            'name' => ['item_name', 'product_name', 'product', 'item', 'name', 'design'],
+            'name' => ['item_name', 'product_name', 'product', 'item', 'name', 'design', 'cake_name', 'product_description', 'item_description'],
             'size' => ['size', 'cake_size', 'product_size', 'variant_size', 'variant'],
             'quantity' => ['quantity', 'qty', 'units', 'units_sold'],
-            'price' => ['price', 'unit_price', 'unit_cost'],
-            'total' => ['total_amount', 'total', 'amount', 'line_total', 'gross_amount'],
+            'price' => ['price', 'unit_price', 'unit_cost', 'selling_price'],
+            'total' => ['total_amount', 'total', 'amount', 'line_total', 'gross_amount', 'sales_amount', 'net_sales', 'total_sales', 'subtotal'],
             'date' => ['sale_date', 'date', 'sold_at', 'transaction_date', 'timestamp'],
         ];
         $normalized = array_map(static fn ($header) => strtolower(trim(preg_replace('/\s+/', '_', trim(preg_replace('/^\xEF\xBB\xBF/', '', (string) $header), " \t\n\r\0\x0B\"'")))), $headers);
@@ -439,6 +461,27 @@ class ProcessSalesCsvImport implements ShouldQueue
         }
 
         return $columns;
+    }
+
+    private function parseHeaders(string $headerLine): array
+    {
+        $headerLine = rtrim($headerLine, "\r\n");
+        $delimiters = [',', ';', "\t", '|'];
+        $selectedHeaders = [];
+        $selectedScore = -1;
+        $selectedDelimiter = ',';
+
+        foreach ($delimiters as $delimiter) {
+            $headers = str_getcsv($headerLine, $delimiter);
+            $score = count($this->mapHeaders($headers));
+            if ($score > $selectedScore) {
+                $selectedHeaders = $headers;
+                $selectedScore = $score;
+                $selectedDelimiter = $delimiter;
+            }
+        }
+
+        return [$selectedHeaders, $selectedDelimiter];
     }
 
     private function normalizeRow(array $row, array $aliases): array
