@@ -384,6 +384,39 @@ class SalesImportControllerTest extends TestCase
         DB::table('jobs')->where('id', $import->queue_job_id)->delete();
     }
 
+    public function test_import_status_skips_sales_totals_until_processing_is_complete(): void
+    {
+        $admin = User::factory()->createOne(['role' => 'admin']);
+        $importId = DB::table('analytics_imports')->insertGetId([
+            'file_name' => 'processing.csv',
+            'source_name' => 'POS CSV',
+            'uploaded_at' => now(),
+            'status' => 'processing',
+            'rows_received' => 1,
+            'rows_processed' => 1,
+        ]);
+        DB::table('analytics_sales_history')->insert([
+            'import_id' => $importId,
+            'product_name' => 'Chocolate Cake',
+            'sale_date' => '2026-11-08',
+            'units_sold' => 2,
+            'revenue' => 1000,
+        ]);
+
+        $this->actingAs($admin)
+            ->getJson("/api/sales/import/{$importId}/status")
+            ->assertOk()
+            ->assertJsonPath('import.items_sold', 0)
+            ->assertJsonPath('import.revenue', 0);
+
+        DB::table('analytics_imports')->where('id', $importId)->update(['status' => 'completed']);
+
+        $this->getJson("/api/sales/import/{$importId}/status")
+            ->assertOk()
+            ->assertJsonPath('import.items_sold', 2)
+            ->assertJsonPath('import.revenue', 1000);
+    }
+
     public function test_completed_duplicate_csv_can_be_reprocessed_under_a_new_sales_type(): void
     {
         Queue::fake();

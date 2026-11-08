@@ -349,10 +349,16 @@ class SalesImportController extends Controller
             return response()->json(['success' => false, 'message' => 'Import not found.'], 404);
         }
 
-        $totals = DB::table('analytics_sales_history')
-            ->where('import_id', $importId)
-            ->selectRaw('COALESCE(SUM(units_sold), 0) AS items_sold, COALESCE(SUM(revenue), 0) AS revenue')
-            ->first();
+        $itemsSold = 0.0;
+        $revenue = 0.0;
+        if ($import->status === 'completed') {
+            $totals = DB::table('analytics_sales_history')
+                ->where('import_id', $importId)
+                ->selectRaw('COALESCE(SUM(units_sold), 0) AS items_sold, COALESCE(SUM(revenue), 0) AS revenue')
+                ->first();
+            $itemsSold = (float) $totals->items_sold;
+            $revenue = (float) $totals->revenue;
+        }
 
         return response()->json([
             'success' => true,
@@ -366,8 +372,8 @@ class SalesImportController extends Controller
                 'cleaning_report' => $import->cleaning_report
                     ? json_decode((string) $import->cleaning_report, true)
                     : null,
-                'items_sold' => (float) $totals->items_sold,
-                'revenue' => (float) $totals->revenue,
+                'items_sold' => $itemsSold,
+                'revenue' => $revenue,
                 'message' => $import->error_message,
             ],
         ]);
