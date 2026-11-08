@@ -58,10 +58,7 @@ describe('ProductCard cake stock options', () => {
     render(<ProductCard product={makeCake(0, 3)} />);
 
     expect(screen.getByRole('button', { name: 'Small, out of stock' })).toBeDisabled();
-    const ribbon = screen.getByText('OUT OF STOCK');
-    expect(ribbon).toHaveClass('mt-0.5', 'rounded-sm', 'bg-[#d93045]');
-    expect(ribbon).not.toHaveClass('absolute', 'rotate-45', 'w-20');
-    expect(ribbon.previousSibling).toHaveTextContent('Small');
+    expect(screen.queryByText('OUT OF STOCK')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Big' })).toBeEnabled();
   });
 
@@ -70,7 +67,7 @@ describe('ProductCard cake stock options', () => {
 
     expect(screen.getByRole('button', { name: 'Small, out of stock' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Big, out of stock' })).toBeDisabled();
-    expect(screen.getAllByText('OUT OF STOCK')).toHaveLength(2);
+    expect(screen.queryByText('OUT OF STOCK')).not.toBeInTheDocument();
     const ribbon = screen.getByText('Out of Stock');
     expect(ribbon).toHaveClass('absolute', 'right-2', 'top-2', 'rounded-full', 'bg-[#8f432d]');
     expect(ribbon.parentElement).toHaveClass('relative');

@@ -376,11 +376,6 @@ export default function ProductCard({
                     }`}
                   >
                     {variant.size}
-                    {disabled && (
-                      <span className="mt-0.5 inline-flex rounded-sm bg-[#d93045] px-1 py-0.5 text-[5px] font-bold leading-none tracking-normal text-white shadow-sm">
-                        OUT OF STOCK
-                      </span>
-                    )}
                   </button>
                 );
               })}
