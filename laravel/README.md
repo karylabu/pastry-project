@@ -62,16 +62,15 @@ The Laravel framework is open-sourced software licensed under the [MIT license](
 
 CSV sales reports are stored privately and processed by the database queue in batches of 1,000 rows. `analytics_sales_history.import_id` references `analytics_imports.id` with `ON DELETE CASCADE`; legacy sales with a null `import_id` are unaffected. Queued jobs are removed when cancelled; active imports are marked for cancellation and stop at the next batch checkpoint. Deleting a failed or completed import removes only sales-history rows associated with that import ID. Exact file retries are rejected by a SHA-256 fingerprint. Each file is limited to 50 MB and 250,000 data rows; split larger reports before uploading. The import status endpoint reports queued/processing/completed/failed/cancellation-requested state and row progress.
 
-Run migrations, configure `QUEUE_CONNECTION=database`, and keep a queue worker running:
+Run migrations and configure `QUEUE_CONNECTION=database`:
 
 ```powershell
 php artisan migrate --force
-php artisan queue:work database --queue=default --timeout=900 --tries=3
 ```
 
-The database queue's `retry_after` must remain higher than the worker timeout (the application default is 1,200 seconds). Configure PHP's `upload_max_filesize` and `post_max_size` to at least 50 MB. The queue worker must use the same database and local storage volume as the web application. In production, supervise the worker so it restarts after failures and deployments.
+The Laravel scheduler starts a database queue worker every minute and stops it when the queue is empty. Configure the scheduler to run once per minute; this also runs scheduled backups and order maintenance. The database queue's `retry_after` must remain higher than the worker timeout (the application default is 1,200 seconds). Configure PHP's `upload_max_filesize` and `post_max_size` to at least 50 MB. The worker must use the same database and local storage volume as the web application.
 
-On shared hosting without a process supervisor, configure the hosting panel's cron manager to run `flock -n /tmp/pastry-sales-queue.lock php /full/path/to/laravel/artisan queue:work database --queue=default --timeout=900 --tries=3 --stop-when-empty` once per minute. The lock prevents overlapping cron workers. Do not launch multiple unmanaged long-running workers for the same queue.
+On shared hosting, the scheduler cron is sufficient; do not add a separate queue-worker cron. Deployments using a persistent queue-worker supervisor can keep it running alongside the scheduled worker.
 
 When a supervised long-running worker needs a graceful restart after deployment, run `php artisan queue:restart` and let the process supervisor start its replacement.
 

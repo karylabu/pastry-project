@@ -1,6 +1,6 @@
 # Hostinger Backup Scheduler
 
-Laravel runs the daily backup command through its scheduler. Hostinger's shell does not provide `crontab`, so configure the Laravel scheduler in hPanel.
+Laravel runs the daily backup command, order maintenance, and the database queue worker through its scheduler. The queue worker processes sales CSV imports and exits when the queue is empty. Hostinger's shell does not provide `crontab`, so configure the Laravel scheduler in hPanel.
 
 1. Open **Websites → Manage → Advanced → Cron Jobs**.
 2. Set the schedule to every minute (`* * * * *`).
@@ -11,6 +11,8 @@ Laravel runs the daily backup command through its scheduler. Hostinger's shell d
 ```
 
 The saved daily time in Backup Management is in Philippine time. The page's **Automatic Schedule** status should change to **Running** after the cron has invoked Laravel. At the configured time, the scheduler creates a verified database backup and a full-system ZIP.
+
+This scheduler cron also starts the queue worker every minute, so no separate queue-worker cron is needed for sales imports.
 
 ## Full system ZIP
 
