@@ -415,7 +415,22 @@ export function ChatBubble({ aiMode = false, fullPage = false, hideFloating = fa
   const messageFetchIdRef         = useRef(0);
   const messageFetchesInFlightRef = useRef(new Set());
   const knownMessageIdsByConversationRef = useRef(new Map());
+  const dismissedMessagePreviewIdsRef = useRef(new Set());
   const imageInputRef             = useRef(null);
+
+  useEffect(() => {
+    if (!messagePreview) return undefined;
+
+    const previewId = String(messagePreview.id);
+    const timer = window.setTimeout(() => {
+      dismissedMessagePreviewIdsRef.current.add(previewId);
+      setMessagePreview(currentPreview => (
+        String(currentPreview?.id) === previewId ? null : currentPreview
+      ));
+    }, 5000);
+
+    return () => window.clearTimeout(timer);
+  }, [messagePreview?.id]);
 
   useEffect(() => {
     const unlockSounds = () => unlockCustomerNotificationSounds();
@@ -530,7 +545,8 @@ export function ChatBubble({ aiMode = false, fullPage = false, hideFloating = fa
         ));
         setUnread(newIncomingMessages.length);
         const latestIncoming = newIncomingMessages[newIncomingMessages.length - 1];
-        setMessagePreview(latestIncoming ? {
+        setMessagePreview(latestIncoming && !dismissedMessagePreviewIdsRef.current.has(String(latestIncoming.id)) ? {
+          id: latestIncoming.id,
           text: latestIncoming.message || (latestIncoming.image_path ? "Sent you an image." : "New message"),
           sender: latestIncoming.sender,
         } : null);
@@ -662,6 +678,7 @@ export function ChatBubble({ aiMode = false, fullPage = false, hideFloating = fa
               openRef.current = true;
               setOpen(true);
               setUnread(0);
+              dismissedMessagePreviewIdsRef.current.add(String(messagePreview.id));
               setMessagePreview(null);
             }}
             className="absolute bottom-full right-0 mb-2 w-64 rounded-2xl rounded-br-md border border-[#f0e6db] bg-white px-3 py-2 text-left shadow-lg"

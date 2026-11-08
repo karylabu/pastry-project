@@ -44,6 +44,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  jest.useRealTimers();
   localStorage.clear();
   jest.clearAllMocks();
 });
@@ -111,4 +112,47 @@ test("plays a sound for an unread admin reply in the initial chat fetch", async 
     name: "New message from Admin: Thanks for your order.",
   })).toBeInTheDocument();
   expect(playCustomerChatMessageSound).toHaveBeenCalledTimes(1);
+});
+
+test("hides the customer new-message preview after five seconds", async () => {
+  jest.useFakeTimers();
+  global.fetch.mockResolvedValueOnce({
+    ok: true,
+    json: async () => ({
+      success: true,
+      messages: [{
+        id: 27,
+        sender: "admin",
+        message: "Your order is ready.",
+        is_read: 0,
+        created_at: new Date().toISOString(),
+      }],
+    }),
+  });
+
+  render(
+    <MemoryRouter>
+      <ChatBubble />
+    </MemoryRouter>,
+  );
+
+  await act(async () => {
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+  expect(screen.getByRole("button", {
+    name: "New message from Admin: Your order is ready.",
+  })).toBeInTheDocument();
+
+  act(() => jest.advanceTimersByTime(4999));
+  expect(screen.getByRole("button", {
+    name: "New message from Admin: Your order is ready.",
+  })).toBeInTheDocument();
+
+  act(() => jest.advanceTimersByTime(1));
+  expect(screen.queryByRole("button", {
+    name: "New message from Admin: Your order is ready.",
+  })).not.toBeInTheDocument();
+
+  jest.useRealTimers();
 });
