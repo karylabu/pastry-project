@@ -1035,7 +1035,7 @@ class SalesImportControllerTest extends TestCase
             'file_name' => 'processing.csv',
             'source_name' => 'POS CSV',
             'uploaded_at' => now(),
-            'status' => 'processing',
+            'status' => 'Processing',
             'rows_received' => 1,
             'rows_processed' => 0,
             'stored_path' => $storedPath,

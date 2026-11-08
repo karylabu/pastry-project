@@ -409,8 +409,9 @@ class SalesImportController extends Controller
             if ($import->source_name !== 'POS CSV' || strtolower(pathinfo($import->file_name, PATHINFO_EXTENSION)) !== 'csv') {
                 return ['response' => response()->json(['success' => false, 'message' => 'Only imported CSV files can be deleted here.'], 422)];
             }
-            if (in_array($import->status, ['processing', 'cancellation_requested'], true)) {
-                if ($import->status === 'processing') {
+            $importStatus = strtolower(trim((string) $import->status));
+            if (in_array($importStatus, ['processing', 'cancellation_requested'], true)) {
+                if ($importStatus === 'processing') {
                     DB::table('analytics_imports')->where('id', $importId)->update([
                         'status' => 'cancellation_requested',
                     ]);
@@ -427,14 +428,14 @@ class SalesImportController extends Controller
 
             $storedPath = $import->stored_path;
             $queuedJob = null;
-            if ($import->status === 'queued') {
+            if ($importStatus === 'queued') {
                 $queuedJob = $this->findQueuedImportJob($importId);
                 $storedPath = $storedPath ?: ($queuedJob['stored_path'] ?? null);
             }
 
-            if ($import->status === 'queued') {
+            if ($importStatus === 'queued') {
                 $this->removeQueuedImportJob($queuedJob, $import->queue_job_id);
-            } elseif ($import->status === 'failed') {
+            } elseif ($importStatus === 'failed') {
                 $this->removeFailedImportJobs($importId);
             }
 

@@ -793,8 +793,10 @@ export default function Reports() {
   useEffect(() => {
     const importId = new URLSearchParams(location.search).get('import_id');
     if (!importId || !/^\d+$/.test(importId)) return;
-    const importFile = historicalImports.find((item) => String(item.id) === importId);
-    if (!importFile || importFile.status !== 'completed') return;
+    const importFile = historicalImports.find((item) => (
+      String(item.id) === importId && String(item.status).toLowerCase() === 'completed'
+    ));
+    if (!importFile) return;
     setPreviewImport(importFile);
     setPreviewPage(1);
     setPreviewSales([]);
@@ -802,7 +804,7 @@ export default function Reports() {
   }, [historicalImports, location.search]);
 
   useEffect(() => {
-    if (!historicalImports.some((item) => item.status === 'cancellation_requested')) return undefined;
+    if (!historicalImports.some((item) => String(item.status).toLowerCase() === 'cancellation_requested')) return undefined;
 
     const intervalId = window.setInterval(() => {
       setAnalyticsRefreshKey((current) => current + 1);
@@ -860,14 +862,15 @@ export default function Reports() {
   }, [previewImport, previewPage]);
 
   const deleteCsvImport = (importFile) => {
-    const confirmation = importFile.status === 'processing'
-      ? `Cancel "${importFile.file_name}" and remove any rows imported from this file? The worker will stop at its next safe checkpoint.`
+    const isProcessing = String(importFile.status).toLowerCase() === 'processing';
+    const confirmation = isProcessing
+      ? `"${importFile.file_name}" is still processing. Request deletion now; the worker will stop at its next safe checkpoint, then move the import and its rows to the Recycle Bin.`
       : `Move "${importFile.file_name}" and its associated imported sales records to the Recycle Bin? They can be restored for 30 days.`;
     setAdminDialog({
       kind: "confirm",
-      title: importFile.status === 'processing' ? "Cancel this import?" : "Move import to Recycle Bin?",
+      title: isProcessing ? "Delete this import?" : "Move import to Recycle Bin?",
       message: confirmation,
-      confirmLabel: importFile.status === 'processing' ? "Cancel import" : "Move to bin",
+      confirmLabel: isProcessing ? "Request deletion" : "Move to bin",
       onConfirm: () => executeDeleteCsvImport(importFile),
     });
   };
@@ -1897,18 +1900,18 @@ export default function Reports() {
                               {importFile.file_name}
                             </button>
                             <p className="mt-0.5 text-[10px] text-black/55">
-                              {String(importFile.sales_type || 'other').replace(/_/g, ' ')} · {Number(importFile.records).toLocaleString()} rows · {peso(importFile.revenue)} · {importFile.status === 'cancellation_requested' ? 'cancellation pending' : importFile.status}
+                              {String(importFile.sales_type || 'other').replace(/_/g, ' ')} · {Number(importFile.records).toLocaleString()} rows · {peso(importFile.revenue)} · {String(importFile.status).toLowerCase() === 'cancellation_requested' ? 'deletion pending' : importFile.status}
                             </p>
                           </div>
                           <button
                             type="button"
                             onClick={() => deleteCsvImport(importFile)}
-                            disabled={deletingImportId !== null || importFile.status === 'cancellation_requested'}
+                            disabled={deletingImportId !== null || String(importFile.status).toLowerCase() === 'cancellation_requested'}
                             className="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-red-200 px-2.5 py-1.5 text-[10px] font-semibold text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
                             aria-label={`Delete imported CSV ${importFile.file_name}`}
-                            title={importFile.status === 'cancellation_requested' ? 'Cancellation pending; waiting for the worker to stop safely.' : 'Delete this import and its imported sales records'}
+                            title={String(importFile.status).toLowerCase() === 'cancellation_requested' ? 'Deletion pending; waiting for the worker to stop safely.' : 'Delete this import and its imported sales records'}
                           >
-                            {deletingImportId === importFile.id ? 'Deleting…' : importFile.status === 'cancellation_requested' ? 'Cancelling…' : <><Trash2 size={12} /> Delete</>}
+                            {deletingImportId === importFile.id ? 'Deleting…' : String(importFile.status).toLowerCase() === 'cancellation_requested' ? 'Deleting…' : <><Trash2 size={12} /> Delete</>}
                           </button>
                         </div>
                       ))}
