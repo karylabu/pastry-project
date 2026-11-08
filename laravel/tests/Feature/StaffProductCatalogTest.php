@@ -41,6 +41,7 @@ class StaffProductCatalogTest extends TestCase
             $table->decimal('price', 10, 2)->default(0);
             $table->unsignedInteger('stock_quantity')->default(0);
             $table->boolean('available')->default(true);
+            $table->boolean('is_archived')->default(false);
             $table->timestamps();
         });
         Schema::create('orders', function ($table) {
@@ -218,6 +219,42 @@ class StaffProductCatalogTest extends TestCase
             ->assertOk()
             ->assertJsonCount(1)
             ->assertJsonPath('0.id', 1);
+    }
+
+    public function test_admin_can_archive_one_cake_size_without_hiding_other_sizes(): void
+    {
+        $admin = new User();
+        $admin->role = 'admin';
+        $admin->status = 'active';
+
+        $this->actingAs($admin)
+            ->patchJson('/api/staff/products/1/sizes/2/archive', ['is_archived' => true])
+            ->assertOk()
+            ->assertJsonPath('product_size_id', 2)
+            ->assertJsonPath('is_archived', true);
+
+        $this->assertDatabaseHas('product_sizes', ['id' => 1, 'is_archived' => false]);
+        $this->assertDatabaseHas('product_sizes', ['id' => 2, 'is_archived' => true]);
+        $this->assertDatabaseHas('products', ['id' => 1, 'is_archived' => false]);
+
+        $customerProducts = $this->getJson('/api/customer/products?action=list')
+            ->assertOk()
+            ->json();
+        $customerCake = collect($customerProducts)->firstWhere('id', 1);
+        $this->assertNotNull($customerCake);
+        $this->assertSame(['Big'], array_column($customerCake['sizes'], 'size'));
+
+        $this->actingAs($admin)
+            ->getJson('/api/staff/products?action=list')
+            ->assertOk()
+            ->assertJsonPath('0.sizes.1.is_archived', true);
+
+        $this->actingAs($admin)
+            ->patchJson('/api/staff/products/1/sizes/2/archive', ['is_archived' => false])
+            ->assertOk()
+            ->assertJsonPath('is_archived', false);
+        $this->assertDatabaseHas('product_sizes', ['id' => 1, 'is_archived' => false]);
+        $this->assertDatabaseHas('product_sizes', ['id' => 2, 'is_archived' => false]);
     }
 
     public function test_admin_can_create_a_cake_that_is_visible_in_the_customer_catalog(): void

@@ -38,6 +38,7 @@ class CustomerProductsApiTest extends TestCase
             $table->decimal('price', 10, 2);
             $table->unsignedInteger('stock_quantity')->default(0);
             $table->boolean('available')->default(true);
+            $table->boolean('is_archived')->default(false);
         });
         Schema::create('orders', function ($table) {
             $table->id();

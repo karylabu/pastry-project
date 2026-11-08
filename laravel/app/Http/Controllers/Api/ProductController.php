@@ -507,6 +507,43 @@ class ProductController extends Controller
         ]);
     }
 
+    public function updateSizeArchiveStaff(Request $request, Product $product, int $size): JsonResponse
+    {
+        $admin = $this->requireRole($request, 'admin');
+        if (!$admin instanceof \App\Models\User) {
+            return $admin;
+        }
+
+        $data = $request->validate([
+            'is_archived' => ['required', 'boolean'],
+        ]);
+        $productSize = DB::table('product_sizes')
+            ->where('product_id', $product->id)
+            ->where('id', $size)
+            ->first();
+
+        if (!$productSize) {
+            return response()->json(['success' => false, 'message' => 'This size was not found for the selected cake.'], 404);
+        }
+
+        DB::table('product_sizes')
+            ->where('product_id', $product->id)
+            ->where('id', $size)
+            ->update([
+                'is_archived' => (bool) $data['is_archived'],
+                'updated_at' => now(),
+            ]);
+
+        app(\App\Services\RealtimeEventPublisher::class)->inventoryUpdated();
+
+        return response()->json([
+            'success' => true,
+            'product_id' => (int) $product->id,
+            'product_size_id' => (int) $productSize->id,
+            'is_archived' => (bool) $data['is_archived'],
+        ]);
+    }
+
     public function updateArchiveStaff(Request $request, Product $product): JsonResponse
     {
         $admin = $this->requireRole($request, 'admin');
@@ -555,7 +592,7 @@ class ProductController extends Controller
     {
         $filterCategory = strtolower(trim((string) $request->query('category', 'cakes')));
 
-        $query = Product::with(['sizes'])
+        $query = Product::query()
             ->where('available', true)
             ->where('is_archived', false)
             ->whereRaw('LOWER(category) IN (?, ?)', ['cake', 'cakes']);
@@ -564,7 +601,11 @@ class ProductController extends Controller
             return response()->json(['success' => true, 'data' => []]);
         }
 
-        $products = $query->get()->map(function (Product $product) {
+        $products = $query->with(['sizes' => function ($sizes) {
+            if (Schema::hasColumn('product_sizes', 'is_archived')) {
+                $sizes->where('is_archived', false);
+            }
+        }])->get()->map(function (Product $product) {
             return [
                 'id' => $product->id,
                 'name' => $product->name,
@@ -584,7 +625,7 @@ class ProductController extends Controller
                     ];
                 }),
             ];
-        });
+        })->filter(fn (array $product) => $product['sizes']->isNotEmpty());
 
         return response()->json([
             'success' => true,

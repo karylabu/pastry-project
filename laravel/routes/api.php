@@ -48,6 +48,7 @@ Route::get('staff/products', [ProductController::class, 'staffIndex']);
 Route::post('staff/products', [ProductController::class, 'storeStaff']);
 Route::post('staff/products/{product}', [ProductController::class, 'updateStaff']);
 Route::post('staff/products/{product}/sizes', [ProductController::class, 'storeSizeStaff']);
+Route::patch('staff/products/{product}/sizes/{size}/archive', [ProductController::class, 'updateSizeArchiveStaff']);
 Route::delete('staff/products/{product}/sizes/{size}', [ProductController::class, 'destroySizeStaff']);
 Route::delete('staff/products/{product}', [ProductController::class, 'destroyStaff']);
 Route::patch('staff/products/{product}/archive', [ProductController::class, 'updateArchiveStaff']);

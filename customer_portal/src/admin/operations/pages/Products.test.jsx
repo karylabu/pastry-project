@@ -16,6 +16,7 @@ describe('Products admin catalog', () => {
     mockLocationSearch = '';
     localStorage.setItem('user', JSON.stringify({ role: 'admin', token: 'test-admin-token' }));
     const archivedProductIds = new Set();
+    const archivedProductSizeIds = new Set();
     mockCatalogProducts = [
       {
         id: 1,
@@ -68,6 +69,14 @@ describe('Products admin catalog', () => {
 
     global.fetch = jest.fn((url, options = {}) => {
       if (String(url).includes('/archive') && options.method === 'PATCH') {
+        const sizeArchiveMatch = String(url).match(/products\/\d+\/sizes\/(\d+)\/archive$/);
+        if (sizeArchiveMatch) {
+          const sizeId = Number(sizeArchiveMatch[1]);
+          const { is_archived: isArchived } = JSON.parse(options.body);
+          if (isArchived) archivedProductSizeIds.add(sizeId);
+          else archivedProductSizeIds.delete(sizeId);
+          return Promise.resolve({ ok: true, json: async () => ({ success: true, is_archived: isArchived }) });
+        }
         const { is_archived: isArchived } = JSON.parse(options.body);
         if (isArchived) archivedProductIds.add(1);
         else archivedProductIds.delete(1);
@@ -80,6 +89,10 @@ describe('Products admin catalog', () => {
           json: async () => mockCatalogProducts.map((product) => ({
             ...product,
             is_archived: product.id === 1 ? archivedProductIds.has(1) : product.is_archived,
+            sizes: (product.sizes || []).map((size) => ({
+              ...size,
+              is_archived: archivedProductSizeIds.has(size.id),
+            })),
           })),
         });
       }
@@ -547,6 +560,62 @@ describe('Products admin catalog', () => {
         }),
       );
       expect(screen.queryByText('Archived')).not.toBeInTheDocument();
+    });
+  });
+
+  test('archives and restores only the selected cake size', async () => {
+    render(<Products allowCatalogManagement />);
+    await screen.findByText('Strawberry Cake');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Big size for Strawberry Cake' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Archive Big size for Strawberry Cake' }));
+    expect(screen.getByRole('alertdialog', { name: 'Archive this cake size?' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Archive size' }));
+
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringContaining('/api/staff/products/1/sizes/12/archive'),
+        expect.objectContaining({
+          method: 'PATCH',
+          body: JSON.stringify({ is_archived: true }),
+        }),
+      );
+      expect(screen.getByRole('button', { name: 'Restore Big size for Strawberry Cake' })).toBeInTheDocument();
+    });
+
+    expect(screen.getByRole('button', { name: 'Hide Strawberry Cake from customers' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Restore Big size for Strawberry Cake' }));
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringContaining('/api/staff/products/1/sizes/12/archive'),
+        expect.objectContaining({
+          method: 'PATCH',
+          body: JSON.stringify({ is_archived: false }),
+        }),
+      );
+      expect(screen.getByRole('button', { name: 'Archive Big size for Strawberry Cake' })).toBeInTheDocument();
+    });
+  });
+
+  test('selects and archives a specific size from the table view', async () => {
+    render(<Products allowCatalogManagement />);
+    await screen.findByText('Strawberry Cake');
+    fireEvent.click(screen.getByRole('button', { name: /table/i }));
+
+    fireEvent.change(screen.getByRole('combobox', { name: 'Select size for Strawberry Cake' }), {
+      target: { value: 'big' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Archive Big size for Strawberry Cake' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Archive size' }));
+
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringContaining('/api/staff/products/1/sizes/12/archive'),
+        expect.objectContaining({
+          method: 'PATCH',
+          body: JSON.stringify({ is_archived: true }),
+        }),
+      );
     });
   });
 

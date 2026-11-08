@@ -15,11 +15,13 @@ class ProductSize extends Model
         'size',
         'price',
         'available',
+        'is_archived',
     ];
 
     protected $casts = [
         'price' => 'decimal:2',
         'available' => 'boolean',
+        'is_archived' => 'boolean',
     ];
 
     public function product(): BelongsTo

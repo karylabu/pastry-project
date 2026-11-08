@@ -305,6 +305,19 @@ class OrderController extends Controller
 
                         if (
                             $productSize &&
+                            Schema::hasColumn('product_sizes', 'is_archived') &&
+                            $productSize->is_archived
+                        ) {
+                            $message = 'This cake size is no longer available.';
+                            return response()->json([
+                                'success' => false,
+                                'message' => $message,
+                                'errors' => ['items' => [$message]],
+                            ], 422);
+                        }
+
+                        if (
+                            $productSize &&
                             $productSize->available &&
                             Schema::hasColumn('product_sizes', 'stock_quantity') &&
                             $inventory['quantity'] > (int) $productSize->stock_quantity

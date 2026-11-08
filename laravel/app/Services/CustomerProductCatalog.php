@@ -19,6 +19,8 @@ class CustomerProductCatalog
 
         return $query->get()
             ->map(fn ($product) => $this->formatProduct((array) $product))
+            ->filter(fn (array $product) => !empty($product['sizes']))
+            ->values()
             ->all();
     }
 
@@ -76,6 +78,14 @@ class CustomerProductCatalog
         return $products->map(function (array $product) {
             $formatted = $this->formatProduct($product);
             if (empty($formatted['sizes'])) {
+                $hasSizeRows = DB::table('product_sizes')
+                    ->where('product_id', (int) $product['id'])
+                    ->whereRaw("LOWER(size) <> 'slice'")
+                    ->exists();
+                if ($hasSizeRows) {
+                    return null;
+                }
+
                 $formatted['price'] = max(
                     (float) ($product['price'] ?? 0),
                     (float) ($product['small_price'] ?? 0),
@@ -95,7 +105,7 @@ class CustomerProductCatalog
             $formatted['total_sold'] = (int) $product['total_sold'];
 
             return $formatted;
-        })->all();
+        })->filter()->values()->all();
     }
 
     public function recommendations(int $userId, string $email): array
@@ -251,6 +261,9 @@ class CustomerProductCatalog
             }
 
             $formatted = $this->formatProduct($product);
+            if (empty($formatted['sizes'])) {
+                continue;
+            }
             $formatted['price'] = !empty($formatted['sizes'])
                 ? (float) $formatted['sizes'][0]['price']
                 : (float) ($product['price'] ?? 0);
@@ -266,6 +279,9 @@ class CustomerProductCatalog
                     continue;
                 }
                 $formatted = $this->formatProduct($product);
+                if (empty($formatted['sizes'])) {
+                    continue;
+                }
                 $formatted['price'] = !empty($formatted['sizes'])
                     ? (float) $formatted['sizes'][0]['price']
                     : (float) ($product['price'] ?? 0);
@@ -291,12 +307,20 @@ class CustomerProductCatalog
     private function sizeOptions(array $product): array
     {
         $hasSizeStock = Schema::hasColumn('product_sizes', 'stock_quantity');
+        $hasSizeArchive = Schema::hasColumn('product_sizes', 'is_archived');
         $rows = DB::table('product_sizes')
             ->where('product_id', (int) ($product['id'] ?? 0))
             ->whereRaw("LOWER(size) <> 'slice'")
             ->orderByRaw("CASE LOWER(size) WHEN 'small' THEN 1 WHEN 'big' THEN 2 WHEN 'regular' THEN 3 WHEN 'meal' THEN 4 WHEN 'combo' THEN 5 WHEN 'solo' THEN 6 WHEN 'sharing' THEN 7 ELSE 99 END")
             ->orderBy('id')
             ->get();
+
+        if ($rows->isNotEmpty() && $hasSizeArchive) {
+            $rows = $rows->reject(fn ($row) => (bool) ($row->is_archived ?? false));
+            if ($rows->isEmpty()) {
+                return [];
+            }
+        }
 
         $sizes = [];
         $seenSizes = [];
