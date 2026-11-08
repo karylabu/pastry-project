@@ -357,7 +357,7 @@ class SalesImportControllerTest extends TestCase
         $admin = User::factory()->createOne(['role' => 'admin']);
         $file = UploadedFile::fake()->createWithContent(
             'normal.csv',
-            "sale_date,product,quantity,price,total\n2026-10-01,Croissant,2,50,100\n",
+            "sale_date,product,quantity,price,total\n2026-10-01,Chocolate Cake,2,50,100\n",
         );
         $request = Request::create(
             '/api/sales/import-csv',
@@ -380,7 +380,7 @@ class SalesImportControllerTest extends TestCase
         (new ProcessSalesCsvImport((int) $import->id, $import->stored_path))->handle();
 
         $this->assertDatabaseHas('analytics_imports', ['id' => $import->id, 'status' => 'completed', 'rows_processed' => 1]);
-        $this->assertDatabaseHas('analytics_sales_history', ['import_id' => $import->id, 'product_name' => 'Croissant']);
+        $this->assertDatabaseHas('analytics_sales_history', ['import_id' => $import->id, 'product_name' => 'Chocolate Cake']);
         DB::table('jobs')->where('id', $import->queue_job_id)->delete();
     }
 
@@ -510,7 +510,7 @@ class SalesImportControllerTest extends TestCase
         for ($day = 0; $day < 1825; $day++) {
             $date = $start->copy()->addDays($day)->toDateString();
             for ($product = 1; $product <= 20; $product++) {
-                $lines[] = "{$date},Product {$product},1,10,10";
+                $lines[] = "{$date},Product {$product} Cake,1,10,10";
             }
         }
         Storage::disk('local')->put('sales-imports/five-years.csv', implode("\n", $lines));
@@ -595,7 +595,7 @@ class SalesImportControllerTest extends TestCase
         ]);
         Storage::disk('local')->put(
             'sales-imports/zero-sales-day.csv',
-            "sale_date,product,quantity,price,total\n2026-09-30,Croissant,0,10,0\n2026-10-01,Croissant,1,10,10\n"
+            "sale_date,product,quantity,price,total\n2026-09-30,Chocolate Cake,0,10,0\n2026-10-01,Chocolate Cake,1,10,10\n"
         );
 
         (new ProcessSalesCsvImport($importId, 'sales-imports/zero-sales-day.csv'))->handle();
@@ -646,12 +646,12 @@ class SalesImportControllerTest extends TestCase
         Storage::fake('local');
         $admin = User::factory()->createOne(['role' => 'admin']);
         $productId = DB::table('products')->insertGetId([
-            'name' => 'Butter Croissant',
-            'category' => 'Finished Products',
+            'name' => 'Chocolate Cake',
+            'category' => 'Cakes',
         ]);
         DB::table('analytics_product_aliases')->insert([
-            'alias_name' => 'Croissant',
-            'normalized_alias' => 'croissant',
+            'alias_name' => 'Choco Cake',
+            'normalized_alias' => 'choco cake',
             'product_id' => $productId,
             'created_at' => now(),
             'updated_at' => now(),
@@ -665,17 +665,17 @@ class SalesImportControllerTest extends TestCase
         Storage::disk('local')->put(
             'sales-imports/cleaning.csv',
             "sale_date,product,quantity,price,total\n"
-                . "2026-10-01,  Croissant   ,2,50,120\n"
-                . "2026-10-01,Croissant,2,50,120\n"
-                . ",Croissant,1,50,50\n"
-                . "10/11/2026,Croissant,1,50,50\n"
+                . "2026-10-01,  Choco Cake   ,2,50,120\n"
+                . "2026-10-01,Choco Cake,2,50,120\n"
+                . ",Choco Cake,1,50,50\n"
+                . "10/11/2026,Choco Cake,1,50,50\n"
         );
 
         (new ProcessSalesCsvImport($importId, 'sales-imports/cleaning.csv'))->handle();
 
         $this->assertDatabaseCount('analytics_sales_history', 2);
         $this->assertSame(
-            ['Butter Croissant'],
+            ['Chocolate Cake'],
             DB::table('analytics_sales_history')->pluck('product_name')->unique()->all()
         );
 
@@ -694,6 +694,104 @@ class SalesImportControllerTest extends TestCase
             ->assertJsonPath('import.cleaning_report.issue_counts.invalid_sale_date', 1);
     }
 
+    public function test_csv_import_keeps_cake_sales_and_skips_other_catalog_products(): void
+    {
+        Storage::fake('local');
+        $admin = User::factory()->createOne(['role' => 'admin']);
+        $cakeId = DB::table('products')->insertGetId([
+            'name' => 'Chocolate Cake',
+            'category' => 'Cakes',
+        ]);
+        DB::table('products')->insert([
+            'name' => 'Butter Croissant',
+            'category' => 'Finished Products',
+        ]);
+        DB::table('products')->insert([
+            'name' => 'Cake Topper',
+            'category' => 'Accessories',
+        ]);
+        DB::table('analytics_product_aliases')->insert([
+            'alias_name' => 'Floral Special',
+            'normalized_alias' => 'floral special',
+            'product_id' => $cakeId,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $importId = DB::table('analytics_imports')->insertGetId([
+            'file_name' => 'mixed-sales.csv',
+            'source_name' => 'POS CSV',
+            'sales_type' => 'other',
+            'uploaded_at' => now(),
+            'status' => 'queued',
+        ]);
+        Storage::disk('local')->put(
+            'sales-imports/mixed-sales.csv',
+            "sale_date,product,quantity,price,total\n"
+                . "2026-10-01,CHOCOLATE CAKE,2,500,1000\n"
+                . "2026-10-02,Floral Special,1,700,700\n"
+                . "2026-09-30,Butter Croissant,5,50,250\n"
+                . "2026-09-29,Cake Topper,1,100,100\n"
+        );
+
+        (new ProcessSalesCsvImport($importId, 'sales-imports/mixed-sales.csv'))->handle();
+
+        $this->assertDatabaseCount('analytics_sales_history', 2);
+        $this->assertDatabaseHas('analytics_sales_history', [
+            'import_id' => $importId,
+            'product_name' => 'Chocolate Cake',
+            'units_sold' => 2,
+            'revenue' => 1000,
+        ]);
+        $this->assertDatabaseHas('analytics_sales_history', [
+            'import_id' => $importId,
+            'product_name' => 'Chocolate Cake',
+            'units_sold' => 1,
+            'revenue' => 700,
+        ]);
+
+        $this->actingAs($admin)
+            ->getJson("/api/sales/import/{$importId}/status")
+            ->assertOk()
+            ->assertJsonPath('import.rows_received', 4)
+            ->assertJsonPath('import.rows_processed', 2)
+            ->assertJsonPath('import.rows_skipped', 2)
+            ->assertJsonPath('import.cleaning_report.aliases_mapped', 1)
+            ->assertJsonPath('import.cleaning_report.issue_counts.non_cake_product', 2);
+        $this->assertDatabaseHas('analytics_imports', [
+            'id' => $importId,
+            'coverage_start_date' => '2026-10-01',
+            'coverage_end_date' => '2026-10-02',
+        ]);
+    }
+
+    public function test_direct_sales_rows_import_filters_non_cake_products(): void
+    {
+        $admin = User::factory()->createOne(['role' => 'admin']);
+        DB::table('products')->insert([
+            ['name' => 'Vanilla Cake', 'category' => 'Cakes'],
+            ['name' => 'Butter Croissant', 'category' => 'Finished Products'],
+        ]);
+
+        $this->actingAs($admin)
+            ->postJson('/api/sales/import', [
+                'file_name' => 'manual-rows.csv',
+                'rows' => [
+                    ['name' => 'Vanilla Cake', 'quantity' => 2, 'total' => 800, 'sale_date' => '2026-10-01'],
+                    ['name' => 'Butter Croissant', 'quantity' => 3, 'total' => 180, 'sale_date' => '2026-10-01'],
+                ],
+            ])
+            ->assertCreated()
+            ->assertJsonPath('rows_processed', 1)
+            ->assertJsonPath('rows_skipped', 1);
+
+        $this->assertDatabaseCount('analytics_sales_history', 1);
+        $this->assertDatabaseHas('analytics_sales_history', [
+            'product_name' => 'Vanilla Cake',
+            'units_sold' => 2,
+            'revenue' => 800,
+        ]);
+    }
+
     public function test_pdf_cleaning_requires_a_report_date_and_preserves_possible_duplicates(): void
     {
         $this->assertSame('2026-10-26', SalesImportCleaner::extractReportDate("Sales Date: 26/10/2026\n"));
@@ -701,18 +799,20 @@ class SalesImportControllerTest extends TestCase
 
         $parseLines = new \ReflectionMethod(SalesImportController::class, 'parseLines');
         $parseLines->setAccessible(true);
-        $text = "Chocolate Croissant x2   ₱100.00\nChocolate Croissant x2   ₱100.00";
+        $text = "Chocolate Cake x2   ₱100.00\nChocolate Cake x2   ₱100.00\nButter Croissant x1   ₱50.00";
         [$rows, $report] = $parseLines->invoke(app(SalesImportController::class), $text, '2026-10-26');
 
         $this->assertCount(2, $rows);
         $this->assertSame(1, $report['possible_duplicates']);
-        $this->assertSame(2, $report['rows_received']);
+        $this->assertSame(3, $report['rows_received']);
+        $this->assertSame(1, $report['rows_skipped']);
+        $this->assertSame(1, $report['issue_counts']['non_cake_product']);
         $this->assertSame('2026-10-26', $rows[0]['sale_date']);
 
         [$undatedRows, $undatedReport] = $parseLines->invoke(app(SalesImportController::class), $text, null);
         $this->assertCount(0, $undatedRows);
-        $this->assertSame(2, $undatedReport['rows_skipped']);
-        $this->assertSame(2, $undatedReport['issue_counts']['missing_sale_date']);
+        $this->assertSame(3, $undatedReport['rows_skipped']);
+        $this->assertSame(3, $undatedReport['issue_counts']['missing_sale_date']);
     }
 
     public function test_history_infers_dimensions_for_existing_imported_rows_without_a_size(): void

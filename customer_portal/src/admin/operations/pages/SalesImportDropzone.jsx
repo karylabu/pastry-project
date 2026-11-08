@@ -326,7 +326,7 @@ export default function SalesImportDropzone({
           )}
         </div>
         <p className="col-span-full text-[10px] leading-relaxed text-black/55">
-          CSV and PDF reports are cleaned automatically. Review the import summary for cleaned rows, skipped rows, and warnings.
+          CSV and PDF reports keep cake sales only; non-cake products are skipped automatically. Review the import summary for cleaned rows, skipped rows, and warnings.
         </p>
         <AnimatePresence>
           {toast && (
@@ -346,7 +346,7 @@ export default function SalesImportDropzone({
       <div className="flex items-center justify-between mb-4">
         <div>
           <h3 className="text-base font-bold" style={{ color: C.ink }}>Import External Sales Report</h3>
-          <p className="text-xs mt-0.5" style={{ color: C.sub }}>Upload a CSV or PDF report to add dated sales to shared reports and forecasts.</p>
+          <p className="text-xs mt-0.5" style={{ color: C.sub }}>Upload a CSV or PDF report to add cake sales to shared reports and forecasts. Non-cake products are skipped automatically.</p>
         </div>
         <button
           onClick={() => downloadCsvTemplate(range, dateFilterStart, dateFilterEnd)}

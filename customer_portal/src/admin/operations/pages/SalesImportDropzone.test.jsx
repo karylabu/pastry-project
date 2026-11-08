@@ -70,7 +70,7 @@ describe('compact sales report import', () => {
     expect(screen.getByRole('button', { name: 'Import Sales Report' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Import Customized Cake Sales' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Import Finished Product Sales' })).not.toBeInTheDocument();
-    expect(screen.getByText(/reports are cleaned automatically/i)).toBeInTheDocument();
+    expect(screen.getByText(/reports keep cake sales only/i)).toBeInTheDocument();
     expect(screen.queryByLabelText('CSV overlap handling')).not.toBeInTheDocument();
     const importButton = screen.getByRole('button', { name: 'Import Sales Report' });
     const csvButton = screen.getByRole('button', { name: 'Download CSV Report' });

@@ -42,19 +42,19 @@ class ProcessSalesCsvImport implements ShouldQueue
             $import = DB::table('analytics_imports')
                 ->where('id', $this->importId)
                 ->lockForUpdate()
-                ->first(['status', 'stored_path']);
+                ->first(['status', 'stored_path', 'sales_type']);
 
             if (!$import) {
-                return 'missing';
+                return ['status' => 'missing', 'sales_type' => 'other'];
             }
 
             if ($import->status === 'cancellation_requested') {
                 $this->deleteImportDataAndRecord();
 
-                return 'cancelled';
+                return ['status' => 'cancelled', 'sales_type' => $import->sales_type ?? 'other'];
             }
             if ($import->status !== 'queued') {
-                return 'ignored';
+                return ['status' => 'ignored', 'sales_type' => $import->sales_type ?? 'other'];
             }
 
             DB::table('analytics_sales_history')->where('import_id', $this->importId)->delete();
@@ -74,12 +74,16 @@ class ProcessSalesCsvImport implements ShouldQueue
                 ->where('status', 'queued')
                 ->update($claimFields) === 1;
 
-            return $claimed ? 'claimed' : 'ignored';
+            return [
+                'status' => $claimed ? 'claimed' : 'ignored',
+                'sales_type' => $import->sales_type ?? 'other',
+            ];
         });
 
-        if ($claim !== 'claimed') {
+        if ($claim['status'] !== 'claimed') {
             return;
         }
+        $salesType = (string) $claim['sales_type'];
 
         $handle = Storage::disk('local')->readStream($this->storedPath);
         if (!is_resource($handle)) {
@@ -99,13 +103,8 @@ class ProcessSalesCsvImport implements ShouldQueue
                 'warnings' => [],
                 '_last_warning_row' => null,
             ];
-            $aliases = Schema::hasTable('analytics_product_aliases') && Schema::hasTable('products')
-                ? DB::table('analytics_product_aliases as aliases')
-                    ->join('products', 'products.id', '=', 'aliases.product_id')
-                    ->pluck('products.name', 'aliases.normalized_alias')
-                    ->mapWithKeys(static fn ($name, $alias) => [(string) $alias => (string) $name])
-                    ->all()
-                : [];
+            $cakeProductCatalog = SalesImportCleaner::cakeProductCatalog();
+            $aliases = $cakeProductCatalog['cake_aliases'];
             $headers = fgetcsv($handle);
             if (!is_array($headers)) {
                 throw new RuntimeException('The uploaded CSV file is empty.');
@@ -140,17 +139,43 @@ class ProcessSalesCsvImport implements ShouldQueue
                 foreach ($columns as $field => $index) {
                     $row[$field] = trim((string) ($values[$index] ?? ''));
                 }
-                $coverageDate = SalesImportCleaner::parseSaleDate((string) ($row['date'] ?? ''));
-                if ($coverageDate !== null) {
-                    $coverageStartDate = $coverageStartDate === null || $coverageDate < $coverageStartDate
-                        ? $coverageDate
-                        : $coverageStartDate;
-                    $coverageEndDate = $coverageEndDate === null || $coverageDate > $coverageEndDate
-                        ? $coverageDate
-                        : $coverageEndDate;
-                }
                 $rowNumber = $rowsReceived + 1;
+                $cakeProduct = null;
+                $productName = SalesImportCleaner::normalizeProductName((string) ($row['name'] ?? ''));
+                if ($productName !== '') {
+                    $cakeProduct = SalesImportCleaner::resolveCakeProductName(
+                        $productName,
+                        $cakeProductCatalog,
+                        $salesType === 'customized_cake'
+                    );
+                    if ($cakeProduct === null) {
+                        $this->addIssue(
+                            $cleaningReport,
+                            $rowNumber,
+                            'non_cake_product',
+                            'Non-cake product was excluded from cake sales.',
+                            true
+                        );
+                        continue;
+                    }
+
+                    $coverageDate = SalesImportCleaner::parseSaleDate((string) ($row['date'] ?? ''));
+                    if ($coverageDate !== null) {
+                        $coverageStartDate = $coverageStartDate === null || $coverageDate < $coverageStartDate
+                            ? $coverageDate
+                            : $coverageStartDate;
+                        $coverageEndDate = $coverageEndDate === null || $coverageDate > $coverageEndDate
+                            ? $coverageDate
+                            : $coverageEndDate;
+                    }
+                }
                 $normalized = $this->normalizeRow($row, $aliases);
+                if ($normalized['row'] !== null && $cakeProduct !== null) {
+                    if ($cakeProduct['name'] !== $normalized['row']['name']) {
+                        $normalized['cleaned'] = true;
+                        $normalized['row']['name'] = $cakeProduct['name'];
+                    }
+                }
                 foreach ($normalized['issues'] as $issue) {
                     $this->addIssue(
                         $cleaningReport,

@@ -63,19 +63,6 @@ class SalesImportController extends Controller
         });
     }
 
-    private function productAliasMap(): array
-    {
-        if (!Schema::hasTable('analytics_product_aliases') || !Schema::hasTable('products')) {
-            return [];
-        }
-
-        return DB::table('analytics_product_aliases as aliases')
-            ->join('products', 'products.id', '=', 'aliases.product_id')
-            ->pluck('products.name', 'aliases.normalized_alias')
-            ->mapWithKeys(static fn ($name, $alias) => [(string) $alias => (string) $name])
-            ->all();
-    }
-
     public function productAliases(Request $request)
     {
         $user = $this->requireRole($request, 'admin');
@@ -597,14 +584,17 @@ class SalesImportController extends Controller
         }
 
         $reportDate = SalesImportCleaner::extractReportDate($text);
-        [$rows, $cleaningReport] = $this->parseLines($text, $reportDate);
+        $salesType = (string) $request->input('sales_type', 'other');
+        [$rows, $cleaningReport] = $this->parseLines($text, $reportDate, $salesType);
 
         if (empty($rows)) {
             return response()->json([
                 'success' => false,
                 'message' => $reportDate === null
                     ? 'No unambiguous sale date was found in the PDF. Add a clearly labeled report date or upload a CSV with a sale_date column.'
-                    : 'No valid dated sales line items were found in that PDF. Check the row warnings and the expected receipt format.',
+                    : (!empty($cleaningReport['issue_counts']['non_cake_product'])
+                        ? 'No cake sales were found in that PDF. Check that the cake products are in the product catalog or have a product alias.'
+                        : 'No valid dated cake sales line items were found in that PDF. Check the row warnings and the expected receipt format.'),
                 'cleaning_report' => $cleaningReport,
             ], 422);
         }
@@ -624,7 +614,7 @@ class SalesImportController extends Controller
             'POS PDF',
             $cleaningReport['rows_received'],
             $sourceHash,
-            (string) $request->input('sales_type', 'other'),
+            $salesType,
             $cleaningReport
         );
 
@@ -657,6 +647,7 @@ class SalesImportController extends Controller
             'rows.*.sale_date' => ['nullable', 'date_format:Y-m-d'],
         ]);
 
+        $salesType = (string) ($validated['sales_type'] ?? 'other');
         $rows = array_map(static fn (array $row) => [
             'name' => trim($row['name']),
             'size' => isset($row['size']) ? trim((string) $row['size']) : null,
@@ -664,6 +655,30 @@ class SalesImportController extends Controller
             'total' => round((float) $row['total'], 2),
             'sale_date' => $row['sale_date'] ?? now()->toDateString(),
         ], $validated['rows']);
+        $cakeProductCatalog = SalesImportCleaner::cakeProductCatalog();
+        $cakeRows = [];
+        $rowsSkipped = 0;
+        foreach ($rows as $row) {
+            $cakeProduct = SalesImportCleaner::resolveCakeProductName(
+                $row['name'],
+                $cakeProductCatalog,
+                $salesType === 'customized_cake'
+            );
+            if ($cakeProduct === null) {
+                $rowsSkipped++;
+                continue;
+            }
+            $row['name'] = $cakeProduct['name'];
+            $cakeRows[] = $row;
+        }
+        $rows = $cakeRows;
+        if (!$rows) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No cake sales were found in the uploaded rows. Check that the cake products are in the product catalog or have a product alias.',
+                'rows_skipped' => $rowsSkipped,
+            ], 422);
+        }
         $sourceHash = hash('sha256', json_encode($rows, JSON_THROW_ON_ERROR));
         $duplicateImport = DB::table('analytics_imports')->where('source_hash', $sourceHash)->first();
         if ($duplicateImport) {
@@ -674,7 +689,7 @@ class SalesImportController extends Controller
                 'message' => 'These exact sales rows have already been imported.',
             ], 409);
         }
-        $importId = $this->persistRows($rows, $validated['file_name'], 'POS CSV', count($rows), $sourceHash, (string) ($validated['sales_type'] ?? 'other'));
+        $importId = $this->persistRows($rows, $validated['file_name'], 'POS CSV', count($rows), $sourceHash, $salesType);
 
         return response()->json([
             'success' => true,
@@ -682,6 +697,7 @@ class SalesImportController extends Controller
             'items_sold' => array_sum(array_column($rows, 'quantity')),
             'revenue' => round(array_sum(array_column($rows, 'total')), 2),
             'rows_processed' => count($rows),
+            'rows_skipped' => $rowsSkipped,
         ], 201);
     }
 
@@ -895,7 +911,7 @@ class SalesImportController extends Controller
      * lines (headers, totals, footers) are expected and collected as
      * warnings for transparency rather than crashing the request.
      */
-    private function parseLines(string $text, ?string $saleDate): array
+    private function parseLines(string $text, ?string $saleDate, string $salesType = 'other'): array
     {
         $lines = preg_split('/\r\n|\r|\n/', $text);
         $rows = [];
@@ -912,7 +928,7 @@ class SalesImportController extends Controller
             '_last_warning_row' => null,
         ];
         $seenRows = [];
-        $aliases = $this->productAliasMap();
+        $cakeProductCatalog = SalesImportCleaner::cakeProductCatalog();
 
         foreach ($lines as $lineIndex => $rawLine) {
             $line = trim($rawLine);
@@ -943,26 +959,41 @@ class SalesImportController extends Controller
                         break;
                     }
 
+                    $cakeProduct = SalesImportCleaner::resolveCakeProductName(
+                        $name,
+                        $cakeProductCatalog,
+                        $salesType === 'customized_cake'
+                    );
+                    if ($cakeProduct === null) {
+                        $this->recordPdfIssue(
+                            $report,
+                            $lineIndex + 1,
+                            'non_cake_product',
+                            'Non-cake product was excluded from cake sales.',
+                            true
+                        );
+                        $matched = true;
+                        break;
+                    }
+
                     $row = [
-                        'name' => $name,
+                        'name' => $cakeProduct['name'],
                         'quantity' => $qty,
                         'total' => round($total, 2),
                         'sale_date' => $saleDate,
                     ];
                     $rowCleaned = false;
-                    if ($name !== trim((string) $m['name'])) {
+                    if ($cakeProduct['name'] !== trim((string) $m['name'])) {
                         $rowCleaned = true;
                     }
-                    $normalizedAlias = mb_strtolower($name, 'UTF-8');
-                    if (isset($aliases[$normalizedAlias])) {
-                        $row['name'] = $aliases[$normalizedAlias];
+                    if ($cakeProduct['alias_mapped']) {
                         $report['aliases_mapped']++;
                         $rowCleaned = true;
                         $this->recordPdfIssue(
                             $report,
                             $lineIndex + 1,
                             'product_alias_mapped',
-                            'Product alias was mapped to ' . $row['name'] . '.'
+                            'Product alias was mapped to ' . $cakeProduct['name'] . '.'
                         );
                     }
                     $price = (float) str_replace(',', '', (string) ($m['price'] ?? '0'));
