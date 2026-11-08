@@ -148,6 +148,19 @@ describe('CustomizedCakes availability', () => {
     ));
   });
 
+  it('places customization details before reference images in the form', async () => {
+    render(<CustomizedCakes />);
+
+    await screen.findByText('Customization Details');
+    const form = screen.getByRole('button', { name: 'Send Request' }).closest('form');
+    const cards = Array.from(form.querySelectorAll('[data-custom-card]'))
+      .sort((left, right) => Number(left.style.order) - Number(right.style.order));
+
+    expect(cards.slice(3, 5).map((card) => card.dataset.customCard)).toEqual(['4', '5']);
+    expect(within(cards[3]).getByText('Customization Details')).toBeInTheDocument();
+    expect(within(cards[4]).getByText('Reference Images')).toBeInTheDocument();
+  });
+
   it('uses a visible native date input for the custom cake delivery date', async () => {
     global.fetch.mockImplementation(async (url) => ({
       ok: true,

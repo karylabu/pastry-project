@@ -840,8 +840,8 @@ export default function CustomizedCakes() {
         </div>
 
         <fieldset disabled={requestFormDisabled} className="min-w-0 border-0 p-0 disabled:opacity-50">
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 md:items-start md:gap-4">
-          <div className="contents md:flex md:flex-col md:gap-3">
+        <div className="grid grid-cols-1 gap-3 md:grid-flow-col md:grid-cols-2 md:grid-rows-[repeat(4,auto)] md:items-start md:gap-4">
+          <div className="contents">
             <div data-custom-card="1" style={{ order: 1 }} className="rounded-2xl border border-[#eee4de] bg-white p-4 shadow-[0_3px_12px_rgba(91,64,39,0.04)] sm:p-5">
               <p className="mb-4 flex items-center gap-2 border-b border-[#f3ece6] pb-3 text-sm font-bold text-[#6b4f1d]">
                 <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#fff3c8] text-[11px]">1</span>
@@ -1061,9 +1061,9 @@ export default function CustomizedCakes() {
               </div>
             </div>
 
-            <div data-custom-card="4" style={{ order: 4 }} className="rounded-2xl border border-[#eee4de] bg-white p-4 shadow-[0_3px_12px_rgba(91,64,39,0.04)] sm:p-5">
+            <div data-custom-card="5" style={{ order: 5 }} className="rounded-2xl border border-[#eee4de] bg-white p-4 shadow-[0_3px_12px_rgba(91,64,39,0.04)] sm:p-5">
               <p className="mb-4 flex items-center gap-2 border-b border-[#f3ece6] pb-3 text-sm font-bold text-[#6b4f1d]">
-                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#fff3c8] text-[11px]">4</span>
+                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#fff3c8] text-[11px]">5</span>
                 Reference Images
               </p>
               <p className="mb-2 text-[11px] text-[#9b8c83]">Add an example or upload as many images as you need.</p>
@@ -1108,7 +1108,7 @@ export default function CustomizedCakes() {
             </div>
 
           </div>
-          <div className="contents md:flex md:flex-col md:gap-3">
+          <div className="contents">
             <section data-custom-card="7" style={{ order: 7 }} className="rounded-2xl border border-[#eee4de] bg-white p-4 shadow-[0_3px_12px_rgba(91,64,39,0.04)] sm:p-5">
               <p className="mb-4 flex items-center gap-2 border-b border-[#f3ece6] pb-3 text-sm font-bold text-[#6b4f1d]">
                 <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#fff3c8] text-[11px]">7</span>
@@ -1134,9 +1134,9 @@ export default function CustomizedCakes() {
                 )}
               </fieldset>
             </section>
-            <div data-custom-card="5" style={{ order: 5 }} className="rounded-2xl border border-[#eee4de] bg-white p-4 shadow-[0_3px_12px_rgba(91,64,39,0.04)] sm:p-5">
+            <div data-custom-card="4" style={{ order: 4 }} className="rounded-2xl border border-[#eee4de] bg-white p-4 shadow-[0_3px_12px_rgba(91,64,39,0.04)] sm:p-5">
               <p className="mb-4 flex items-center gap-2 border-b border-[#f3ece6] pb-3 text-sm font-bold text-[#6b4f1d]">
-                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#fff3c8] text-[11px]">5</span>
+                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#fff3c8] text-[11px]">4</span>
                 Customization Details
               </p>
               <div className="grid gap-3 sm:grid-cols-2">
