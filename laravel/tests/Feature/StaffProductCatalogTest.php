@@ -425,7 +425,7 @@ class StaffProductCatalogTest extends TestCase
         $this->assertDatabaseHas('product_sizes', ['product_id' => 1, 'size' => 'Small', 'price' => 350]);
     }
 
-    public function test_admin_can_add_missing_cake_size_with_price_and_starting_stock(): void
+    public function test_admin_can_add_custom_cake_size_with_price_and_starting_stock(): void
     {
         DB::table('product_sizes')->where('product_id', 1)->where('size', 'Big')->delete();
 
@@ -435,7 +435,7 @@ class StaffProductCatalogTest extends TestCase
 
         $this->actingAs($admin)
             ->postJson('/api/staff/products/1/sizes', [
-                'size' => 'Big',
+                'size' => '9 inches',
                 'price' => 550,
                 'stock' => 4,
             ])
@@ -444,27 +444,72 @@ class StaffProductCatalogTest extends TestCase
 
         $this->assertDatabaseHas('product_sizes', [
             'product_id' => 1,
-            'size' => 'Big',
+            'size' => '9 inches',
             'price' => 550,
             'stock_quantity' => 4,
             'available' => true,
         ]);
-        $this->assertDatabaseHas('products', [
-            'id' => 1,
-            'name' => 'Chocolate Cake',
-            'price' => 550,
-            'stock' => 6,
-            'description' => null,
-        ]);
+        $this->assertDatabaseHas('products', ['id' => 1, 'price' => 450, 'stock' => 6]);
 
         $this->actingAs($admin)
             ->postJson('/api/staff/products/1/sizes', [
-                'size' => 'Big',
+                'size' => '9 INCHES',
                 'price' => 600,
                 'stock' => 2,
             ])
             ->assertUnprocessable()
             ->assertJsonPath('success', false);
+    }
+
+    public function test_admin_can_reuse_a_recorded_price_for_a_custom_size(): void
+    {
+        DB::table('products')->where('id', 2)->update(['category' => 'Cakes']);
+        DB::table('product_sizes')->insert([
+            'product_id' => 2,
+            'size' => '8 inches',
+            'price' => 700,
+            'stock_quantity' => 0,
+            'available' => true,
+        ]);
+
+        $admin = new User();
+        $admin->role = 'admin';
+        $admin->status = 'active';
+
+        $this->actingAs($admin)
+            ->postJson('/api/staff/products/1/sizes', [
+                'size' => '  8 INCHES ',
+                'stock' => 3,
+            ])
+            ->assertCreated()
+            ->assertJsonPath('size', '8 INCHES');
+
+        $this->assertDatabaseHas('product_sizes', [
+            'product_id' => 1,
+            'size' => '8 INCHES',
+            'price' => 700,
+            'stock_quantity' => 3,
+        ]);
+    }
+
+    public function test_admin_must_enter_a_price_when_custom_size_has_no_recorded_price(): void
+    {
+        $admin = new User();
+        $admin->role = 'admin';
+        $admin->status = 'active';
+
+        $this->actingAs($admin)
+            ->postJson('/api/staff/products/1/sizes', [
+                'size' => '9 inches',
+                'stock' => 3,
+            ])
+            ->assertUnprocessable()
+            ->assertJsonPath('success', false);
+
+        $this->assertDatabaseMissing('product_sizes', [
+            'product_id' => 1,
+            'size' => '9 inches',
+        ]);
     }
 
     public function test_product_update_requires_admin_authorization(): void

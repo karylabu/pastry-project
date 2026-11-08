@@ -341,25 +341,51 @@ class ProductController extends Controller
         }
 
         $data = $request->validate([
-            'size' => ['required', 'in:Small,Big'],
-            'price' => ['required', 'numeric', 'gt:0'],
+            'size' => ['required', 'string', 'max:100'],
+            'price' => ['nullable', 'numeric', 'gt:0'],
             'stock' => ['required', 'integer', 'min:0'],
         ]);
+        $sizeName = trim($data['size']);
+        if ($sizeName === '') {
+            return response()->json(['success' => false, 'message' => 'Enter a cake size.'], 422);
+        }
 
         try {
-            DB::transaction(function () use ($data, $product) {
+            DB::transaction(function () use ($data, $product, $sizeName) {
                 $existingSize = DB::table('product_sizes')
                     ->where('product_id', $product->id)
-                    ->whereRaw('LOWER(TRIM(size)) = ?', [strtolower($data['size'])])
+                    ->whereRaw('LOWER(TRIM(size)) = ?', [strtolower($sizeName)])
                     ->exists();
                 if ($existingSize) {
-                    throw new \InvalidArgumentException("The {$data['size']} Cake size already exists.");
+                    throw new \InvalidArgumentException("The {$sizeName} size already exists for this cake.");
+                }
+
+                $price = $data['price'] ?? null;
+                if ($price === null) {
+                    $recordedPrices = DB::table('product_sizes')
+                        ->join('products', 'products.id', '=', 'product_sizes.product_id')
+                        ->whereRaw('LOWER(TRIM(products.category)) IN (?, ?)', ['cake', 'cakes'])
+                        ->whereRaw('LOWER(TRIM(product_sizes.size)) = ?', [strtolower($sizeName)])
+                        ->distinct()
+                        ->pluck('product_sizes.price')
+                        ->map(fn ($recordedPrice) => number_format((float) $recordedPrice, 2, '.', ''))
+                        ->unique()
+                        ->values();
+
+                    if ($recordedPrices->count() !== 1) {
+                        throw new \InvalidArgumentException(
+                            $recordedPrices->isEmpty()
+                                ? 'Enter a price for this size; no recorded price was found.'
+                                : 'Enter a price for this size; recorded prices are not consistent.'
+                        );
+                    }
+                    $price = $recordedPrices->first();
                 }
 
                 $sizeAttributes = [
                     'product_id' => $product->id,
-                    'size' => $data['size'],
-                    'price' => $data['price'],
+                    'size' => $sizeName,
+                    'price' => $price,
                     'stock_quantity' => (int) $data['stock'],
                     'available' => true,
                     'created_at' => now(),
@@ -372,8 +398,8 @@ class ProductController extends Controller
                 );
                 DB::table('product_sizes')->insert($sizeAttributes);
 
-                if ($data['size'] === 'Big') {
-                    $product->price = $data['price'];
+                if (strtolower($sizeName) === 'big') {
+                    $product->price = $price;
                 }
                 if (Schema::hasColumn('products', 'stock')) {
                     $product->stock = (int) DB::table('product_sizes')
@@ -395,7 +421,7 @@ class ProductController extends Controller
         return response()->json([
             'success' => true,
             'product_id' => (int) $product->id,
-            'size' => $data['size'],
+            'size' => $sizeName,
         ], 201);
     }
 

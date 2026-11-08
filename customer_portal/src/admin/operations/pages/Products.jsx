@@ -40,13 +40,6 @@ const getProductSizeOptions = (product) => (
     : []
   ).filter((size) => Number(size?.id) > 0 && String(size?.size || size?.variant_size || '').trim().toLowerCase() !== 'slice');
 
-const getMissingCakeSizes = (product) => {
-  const existingSizes = new Set(getProductSizeOptions(product).map((size) =>
-    String(size?.size || size?.variant_size || '').trim().toLowerCase()
-  ));
-  return ["Big", "Small"].filter((size) => !existingSizes.has(size.toLowerCase()));
-};
-
 const getDefaultProductionSize = (product) => {
   const sizes = getProductSizeOptions(product);
   return sizes.find((size) => String(size?.size || size?.variant_size || '').trim().toLowerCase() === 'big' && size.available !== false)
@@ -198,12 +191,23 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
   const canEditCatalog = Boolean(allowCatalogManagement);
   const editRecipeSize = editProduct ? getProductSizeByName(editProduct, editSize) : null;
   const editRecipeSizeId = editRecipeSize?.id ? String(editRecipeSize.id) : "";
-  const productsAvailableForNewSize = products.filter((product) =>
+  const cakeProducts = products.filter((product) =>
     ["cake", "cakes"].includes(String(product.category || "").trim().toLowerCase())
-      && getMissingCakeSizes(product).length > 0
   );
-  const addSizeProduct = productsAvailableForNewSize.find((product) => String(product.id) === addSizeProductId) || null;
-  const addSizeAvailableOptions = addSizeProduct ? getMissingCakeSizes(addSizeProduct) : [];
+  const addSizeProduct = cakeProducts.find((product) => String(product.id) === addSizeProductId) || null;
+  const addSizeAlreadyExists = Boolean(addSizeProduct && getProductSizeOptions(addSizeProduct).some((size) =>
+    String(size?.size || size?.variant_size || "").trim().toLowerCase() === addSizeName.trim().toLowerCase()
+  ));
+  const recordedSizePrices = addSizeName.trim()
+    ? [...new Set(cakeProducts.flatMap((product) =>
+      getProductSizeOptions(product)
+        .filter((size) => String(size?.size || size?.variant_size || "").trim().toLowerCase() === addSizeName.trim().toLowerCase())
+        .map((size) => Number(size.price))
+        .filter((price) => Number.isFinite(price) && price > 0)
+        .map((price) => price.toFixed(2))
+    ))]
+    : [];
+  const addSizeRecordedPrice = recordedSizePrices.length === 1 ? Number(recordedSizePrices[0]) : null;
 
   const openEditProductModal = (product, selectedSizeName = getCardSizeName(product)) => {
     const sizeName = String(selectedSizeName || "").toLowerCase() === "small" ? "small" : "big";
@@ -436,9 +440,9 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
   };
 
   const openAddSizeModal = () => {
-    const firstProduct = productsAvailableForNewSize[0] || null;
+    const firstProduct = cakeProducts[0] || null;
     setAddSizeProductId(firstProduct ? String(firstProduct.id) : "");
-    setAddSizeName(firstProduct ? getMissingCakeSizes(firstProduct)[0] : "");
+    setAddSizeName("");
     setAddSizePrice("");
     setAddSizeStock("0");
     setAddSizeError("");
@@ -451,13 +455,14 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
   };
 
   const submitNewSize = async () => {
-    const price = Number(addSizePrice);
+    const size = addSizeName.trim();
+    const price = addSizeRecordedPrice ?? Number(addSizePrice);
     const stock = Number(addSizeStock);
-    if (!addSizeProduct || !addSizeAvailableOptions.includes(addSizeName)) {
-      setAddSizeError("Select a cake and a size that has not been added yet.");
+    if (!addSizeProduct || !size || size.length > 100 || addSizeAlreadyExists) {
+      setAddSizeError("Select a cake and enter a new cake size (up to 100 characters).");
       return;
     }
-    if (!Number.isFinite(price) || price <= 0) {
+    if (addSizeRecordedPrice === null && (!Number.isFinite(price) || price <= 0)) {
       setAddSizeError("Enter a valid price for the new cake size.");
       return;
     }
@@ -474,7 +479,7 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
         {
           method: "POST",
           headers: { Accept: "application/json", "Content-Type": "application/json" },
-          body: JSON.stringify({ size: addSizeName, price, stock }),
+          body: JSON.stringify({ size, price: addSizeRecordedPrice === null ? price : undefined, stock }),
         }
       );
       const data = await response.json().catch(() => null);
@@ -483,7 +488,7 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
       }
 
       await fetchProducts();
-      setFeedback({ type: "success", text: `${addSizeProduct.name} ${addSizeName} Cake size added.` });
+      setFeedback({ type: "success", text: `${addSizeProduct.name} ${size} size added.` });
       closeAddSizeModal();
     } catch (error) {
       setAddSizeError(error.message || "We couldn’t connect to add the cake size. Please try again.");
@@ -1558,7 +1563,7 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
                   <div>
                     <p className="text-[10px] font-bold uppercase tracking-[0.24em] text-[#9b7810]">Product catalog</p>
                     <h2 id="add-size-title" className="mt-1 font-serif text-[24px] text-[#33251e]">Add New Size</h2>
-                    <p className="mt-1 text-[12px] text-[#74675f]">Choose a cake and add a size, price, and starting stock.</p>
+                    <p className="mt-1 text-[12px] text-[#74675f]">Choose a cake and enter its new size and starting stock.</p>
                   </div>
                   <button
                     type="button"
@@ -1572,7 +1577,7 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
                 </div>
 
                 <div className="space-y-5 px-5 py-5 sm:px-7 sm:py-6">
-                  {productsAvailableForNewSize.length > 0 ? (
+                  {cakeProducts.length > 0 ? (
                     <>
                       <div className="space-y-2">
                         <label htmlFor="add-size-product" className="block text-[10px] font-bold uppercase tracking-[0.15em] text-[#8f8076]">Select Cake</label>
@@ -1581,92 +1586,77 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
                           aria-label="Select Cake"
                           value={addSizeProductId}
                           onChange={(event) => {
-                            const nextProduct = productsAvailableForNewSize.find((product) => String(product.id) === event.target.value);
                             setAddSizeProductId(event.target.value);
-                            setAddSizeName(nextProduct ? getMissingCakeSizes(nextProduct)[0] : "");
-                            setAddSizePrice("");
                             setAddSizeStock("0");
                             setAddSizeError("");
                           }}
                           className="w-full rounded-xl border border-[#eadfd8] bg-white px-3.5 py-3 text-[13px] text-[#33251e] outline-none transition focus:border-[#d4af37] focus:ring-2 focus:ring-[#d4af37]/15"
                         >
-                          {productsAvailableForNewSize.map((product) => (
+                          {cakeProducts.map((product) => (
                             <option key={product.id} value={String(product.id)}>{product.name}</option>
                           ))}
                         </select>
                       </div>
 
                       <div className="space-y-2">
-                        <p className="block text-[10px] font-bold uppercase tracking-[0.15em] text-[#8f8076]">Choose Size</p>
-                        <div className="grid gap-3 sm:grid-cols-2">
-                          {["Big", "Small"].map((size) => {
-                            const available = addSizeAvailableOptions.includes(size);
-                            const selected = addSizeName === size;
-                            return (
-                              <button
-                                key={size}
-                                type="button"
-                                disabled={!available}
-                                onClick={() => {
-                                  setAddSizeName(size);
-                                  setAddSizePrice("");
-                                  setAddSizeStock("0");
-                                  setAddSizeError("");
-                                }}
-                                aria-pressed={selected}
-                                className={`rounded-xl border p-4 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d4af37] ${
-                                  !available
-                                    ? "cursor-not-allowed border-[#eadfd8] bg-[#f7f3ef] text-[#a99c93]"
-                                    : selected
-                                      ? "border-[#d4af37] bg-[#fff8e9] shadow-sm"
-                                      : "border-[#eadfd8] bg-white hover:border-[#d4af37] hover:bg-[#fffdfa]"
-                                }`}
-                              >
-                                <span className="block font-serif text-[18px] text-[#33251e]">{size} Cake</span>
-                                <span className="mt-1 block text-[11px] text-[#74675f]">{available ? (selected ? "Selected size" : "Click to select") : "Already added"}</span>
-                              </button>
-                            );
-                          })}
-                        </div>
+                        <label htmlFor="add-size-name" className="block text-[10px] font-bold uppercase tracking-[0.15em] text-[#8f8076]">Cake Size</label>
+                        <input
+                          id="add-size-name"
+                          type="text"
+                          maxLength={100}
+                          value={addSizeName}
+                          onChange={(event) => {
+                            setAddSizeName(event.target.value);
+                            setAddSizePrice("");
+                            setAddSizeError("");
+                          }}
+                          className="w-full rounded-xl border border-[#eadfd8] bg-white px-3.5 py-3 text-[13px] text-[#33251e] outline-none transition placeholder:text-[#b7a69c] focus:border-[#d4af37] focus:ring-2 focus:ring-[#d4af37]/15"
+                          placeholder="e.g. 6 inches"
+                          required
+                        />
+                        {addSizeAlreadyExists && <p className="text-[11px] text-[#9a5947]" role="alert">This cake already has that size.</p>}
                       </div>
 
-                      {addSizeName && addSizeAvailableOptions.includes(addSizeName) && (
-                        <div className="rounded-xl border border-[#eadfd8] bg-[#fbf7f2] p-4">
-                          <p className="mb-3 font-serif text-[17px] text-[#33251e]">{addSizeName} Cake details</p>
-                          <div className="grid gap-3 sm:grid-cols-2">
-                            <div className="space-y-2">
-                              <label htmlFor="add-size-price" className="block text-[10px] font-bold uppercase tracking-[0.15em] text-[#8f8076]">Price</label>
-                              <input
-                                id="add-size-price"
-                                type="number"
-                                min="0.01"
-                                step="0.01"
-                                value={addSizePrice}
-                                onChange={(event) => setAddSizePrice(event.target.value)}
-                                className="w-full rounded-xl border border-[#eadfd8] bg-white px-3.5 py-3 text-[13px] text-[#33251e] outline-none transition focus:border-[#d4af37] focus:ring-2 focus:ring-[#d4af37]/15"
-                                required
-                              />
-                            </div>
-                            <div className="space-y-2">
-                              <label htmlFor="add-size-stock" className="block text-[10px] font-bold uppercase tracking-[0.15em] text-[#8f8076]">Starting Stock</label>
-                              <input
-                                id="add-size-stock"
-                                type="number"
-                                min="0"
-                                step="1"
-                                value={addSizeStock}
-                                onChange={(event) => setAddSizeStock(event.target.value)}
-                                className="w-full rounded-xl border border-[#eadfd8] bg-white px-3.5 py-3 text-[13px] text-[#33251e] outline-none transition focus:border-[#d4af37] focus:ring-2 focus:ring-[#d4af37]/15"
-                                required
-                              />
-                            </div>
-                          </div>
-                        </div>
-                      )}
+                      <div className="space-y-2">
+                        {addSizeRecordedPrice !== null ? (
+                          <p className="text-[12px] text-[#74675f]" role="status">
+                            Recorded price for this size: <strong className="text-[#33251e]">₱{addSizeRecordedPrice.toLocaleString("en-PH", { minimumFractionDigits: 2 })}</strong>
+                          </p>
+                        ) : (
+                          <>
+                            <label htmlFor="add-size-price" className="block text-[10px] font-bold uppercase tracking-[0.15em] text-[#8f8076]">Price</label>
+                            <input
+                              id="add-size-price"
+                              type="number"
+                              min="0.01"
+                              step="0.01"
+                              value={addSizePrice}
+                              onChange={(event) => setAddSizePrice(event.target.value)}
+                              className="w-full rounded-xl border border-[#eadfd8] bg-white px-3.5 py-3 text-[13px] text-[#33251e] outline-none transition focus:border-[#d4af37] focus:ring-2 focus:ring-[#d4af37]/15"
+                              placeholder="Enter price"
+                              required
+                            />
+                          </>
+                        )}
+                      </div>
+
+                      <div className="space-y-2">
+                        <label htmlFor="add-size-stock" className="block text-[10px] font-bold uppercase tracking-[0.15em] text-[#8f8076]">Starting Stock</label>
+                        <input
+                          id="add-size-stock"
+                          type="number"
+                          min="0"
+                          step="1"
+                          value={addSizeStock}
+                          onChange={(event) => setAddSizeStock(event.target.value)}
+                          className="w-full rounded-xl border border-[#eadfd8] bg-white px-3.5 py-3 text-[13px] text-[#33251e] outline-none transition focus:border-[#d4af37] focus:ring-2 focus:ring-[#d4af37]/15"
+                          required
+                        />
+                      </div>
                     </>
                   ) : (
                     <p className="rounded-xl border border-[#eadfd8] bg-[#fbf7f2] p-4 text-[13px] text-[#74675f]">
-                      All cakes already have Big and Small sizes.
+                      No cake products are available.
                     </p>
                   )}
 
@@ -1683,7 +1673,7 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
                     <button
                       type="button"
                       onClick={submitNewSize}
-                      disabled={addSizeSaving || !addSizeProduct || !addSizeName || !addSizeAvailableOptions.includes(addSizeName)}
+                      disabled={addSizeSaving || !addSizeProduct || !addSizeName.trim() || addSizeAlreadyExists}
                       className="rounded-xl bg-[#33251e] px-5 py-2.5 text-[12px] font-semibold text-white transition hover:bg-[#5b4540] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d4af37] disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       {addSizeSaving ? "Adding size…" : "Add Size"}

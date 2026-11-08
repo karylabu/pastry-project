@@ -36,6 +36,7 @@ describe('Products admin catalog', () => {
               sizes: [
                 { id: 11, size: 'small', price: 320, stock_quantity: 2, is_producible: true },
                 { id: 12, size: 'big', price: 480, stock_quantity: 7, is_producible: true },
+                { id: 13, size: '8 inches', price: 600, stock_quantity: 0, is_producible: true },
               ],
               stock: 10,
               minimum_stock: 5,
@@ -203,7 +204,7 @@ describe('Products admin catalog', () => {
     expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:product-preview');
   });
 
-  test('adds a missing cake size from its own modal and leaves configured sizes unavailable', async () => {
+  test('adds a custom cake size and requests its price when no matching price is recorded', async () => {
     render(<Products allowCatalogManagement />);
 
     await waitFor(() => {
@@ -216,9 +217,10 @@ describe('Products admin catalog', () => {
     expect(screen.getByRole('dialog', { name: 'Add New Size' })).toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText('Select Cake'), { target: { value: '4' } });
-    expect(screen.getByRole('button', { name: /Small Cake.*Already added/ })).toBeDisabled();
-    expect(screen.getByRole('button', { name: /Big Cake.*Selected size/ })).toHaveAttribute('aria-pressed', 'true');
-    fireEvent.change(screen.getByLabelText('Price'), { target: { value: '520' } });
+    expect(screen.queryByRole('button', { name: /Big Cake|Small Cake/ })).not.toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Cake Size'), { target: { value: '9 inches' } });
+    expect(screen.getByLabelText('Price')).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Price'), { target: { value: '720' } });
     fireEvent.change(screen.getByLabelText('Starting Stock'), { target: { value: '3' } });
     fireEvent.click(screen.getByRole('button', { name: 'Add Size', exact: true }));
 
@@ -227,10 +229,35 @@ describe('Products admin catalog', () => {
         expect.stringContaining('/api/staff/products/4/sizes'),
         expect.objectContaining({
           method: 'POST',
-          body: JSON.stringify({ size: 'Big', price: 520, stock: 3 }),
+          body: JSON.stringify({ size: '9 inches', price: 720, stock: 3 }),
         }),
       );
       expect(screen.queryByRole('dialog', { name: 'Add New Size' })).not.toBeInTheDocument();
+    });
+  });
+
+  test('uses the recorded price for a custom size when adding it to another cake', async () => {
+    render(<Products allowCatalogManagement />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Strawberry Cake')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add New Size' }));
+    fireEvent.change(screen.getByLabelText('Select Cake'), { target: { value: '4' } });
+    fireEvent.change(screen.getByLabelText('Cake Size'), { target: { value: '8 inches' } });
+    expect(screen.queryByLabelText('Price')).not.toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveTextContent(/Recorded price for this size:.*600/);
+    fireEvent.click(screen.getByRole('button', { name: 'Add Size', exact: true }));
+
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringContaining('/api/staff/products/4/sizes'),
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify({ size: '8 inches', stock: 0 }),
+        }),
+      );
     });
   });
 
