@@ -425,6 +425,37 @@ class StaffProductCatalogTest extends TestCase
         $this->assertDatabaseHas('product_sizes', ['product_id' => 1, 'size' => 'Small', 'price' => 350]);
     }
 
+    public function test_admin_can_add_missing_cake_size_with_price_and_zero_stock(): void
+    {
+        DB::table('product_sizes')->where('product_id', 1)->where('size', 'Big')->delete();
+
+        $admin = new User();
+        $admin->role = 'admin';
+        $admin->status = 'active';
+
+        $this->actingAs($admin)
+            ->postJson('/api/staff/products/1', [
+                'name' => 'Strawberry Cake',
+                'category' => 'Cakes',
+                'description' => 'Sweet and fruity',
+                'price_size' => 'small',
+                'price' => 320,
+                'add_sizes' => ['Big'],
+                'add_prices' => ['Big' => 550],
+            ])
+            ->assertOk()
+            ->assertJsonPath('success', true);
+
+        $this->assertDatabaseHas('product_sizes', [
+            'product_id' => 1,
+            'size' => 'Big',
+            'price' => 550,
+            'stock_quantity' => 0,
+            'available' => true,
+        ]);
+        $this->assertDatabaseHas('products', ['id' => 1, 'price' => 550, 'stock' => 5]);
+    }
+
     public function test_product_update_requires_admin_authorization(): void
     {
         $this->postJson('/api/staff/products/1', [

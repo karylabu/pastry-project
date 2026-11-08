@@ -101,6 +101,8 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
   const [editImage, setEditImage] = useState(null);
   const [editImagePreview, setEditImagePreview] = useState("");
   const [editSaving, setEditSaving] = useState(false);
+  const [editAddSizes, setEditAddSizes] = useState([]);
+  const [editAddPrices, setEditAddPrices] = useState({ Big: "", Small: "" });
   const [recipeDeleting, setRecipeDeleting] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [recipeLines, setRecipeLines] = useState([]);
@@ -174,6 +176,10 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
   const canEditCatalog = Boolean(allowCatalogManagement);
   const editRecipeSize = editProduct ? getProductSizeByName(editProduct, editSize) : null;
   const editRecipeSizeId = editRecipeSize?.id ? String(editRecipeSize.id) : "";
+  const editExistingSizeNames = new Set(getProductSizeOptions(editProduct).map((size) =>
+    String(size?.size || size?.variant_size || "").trim().toLowerCase()
+  ));
+  const editAddableSizes = ["Big", "Small"].filter((size) => !editExistingSizeNames.has(size.toLowerCase()));
 
   const openEditProductModal = (product, selectedSizeName = getCardSizeName(product)) => {
     const sizeName = String(selectedSizeName || "").toLowerCase() === "small" ? "small" : "big";
@@ -189,6 +195,8 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
       image: product.image || "",
     });
     setEditImage(null);
+    setEditAddSizes([]);
+    setEditAddPrices({ Big: "", Small: "" });
     setRecipeRows([{ ingredient_id: "", qty: "" }]);
     setEditOpen(true);
   };
@@ -1778,6 +1786,48 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
                   </div>
                 </div>
 
+                {canManageCatalog && editAddableSizes.length > 0 && (
+                  <fieldset className="mt-4 space-y-3 rounded-xl border border-[#eadfd8] bg-[#fbf7f2] p-4">
+                    <legend className="px-1 text-[10px] font-bold uppercase tracking-[0.16em] text-[#8f8076]">Add Cake Size</legend>
+                    <div className="flex flex-wrap gap-3">
+                      {editAddableSizes.map((size) => (
+                        <label key={size} className="flex items-center gap-2 rounded-lg border border-[#eadfd8] bg-white px-3 py-2 text-[12px] text-[#33251e]">
+                          <input
+                            type="checkbox"
+                            aria-label={`Add ${size} Cake Size`}
+                            checked={editAddSizes.includes(size)}
+                            onChange={(event) => {
+                              setEditAddSizes((sizes) => event.target.checked
+                                ? [...sizes, size]
+                                : sizes.filter((selectedSize) => selectedSize !== size));
+                            }}
+                            className="h-4 w-4 accent-[#9b7810]"
+                          />
+                          {size} Cake
+                        </label>
+                      ))}
+                    </div>
+                    {editAddSizes.map((size) => (
+                      <div key={size} className="space-y-2">
+                        <label htmlFor={`edit-new-size-price-${size.toLowerCase()}`} className="block text-[10px] font-bold uppercase tracking-[0.15em] text-[#8f8076]">
+                          New {size} Cake Price
+                        </label>
+                        <input
+                          id={`edit-new-size-price-${size.toLowerCase()}`}
+                          type="number"
+                          min="0.01"
+                          step="0.01"
+                          value={editAddPrices[size]}
+                          onChange={(event) => setEditAddPrices((prices) => ({ ...prices, [size]: event.target.value }))}
+                          className="w-full rounded-xl border border-[#eadfd8] bg-white px-3 py-2.5 text-[12px] text-[#33251e] outline-none transition focus:border-[#d4af37] focus:ring-2 focus:ring-[#d4af37]/15"
+                          required
+                        />
+                        <p className="text-[10px] text-[#8f8076]">The new size starts with 0 stock. Add inventory after saving.</p>
+                      </div>
+                    ))}
+                  </fieldset>
+                )}
+
                 <div className="mt-4 space-y-2">
                   <label className="block text-[10px] font-bold uppercase tracking-[0.16em] text-[#8f8076]">Description</label>
                   <textarea
@@ -1868,6 +1918,14 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
                 <div className="mt-4 flex gap-2">
                   <button
                     onClick={async () => {
+                      if (editAddSizes.some((size) => !Number.isFinite(Number(editAddPrices[size])) || Number(editAddPrices[size]) <= 0)) {
+                        setAdminDialog({
+                          title: "Product not updated",
+                          message: "Enter a valid price for every new cake size.",
+                        });
+                        return;
+                      }
+
                       setEditSaving(true);
                       try {
                         const formData = new FormData();
@@ -1877,6 +1935,10 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
                         if (canManageCatalog) formData.append('price_size', editSize);
                         formData.append('price', Number(editProduct.price) || 0);
                         formData.append('description', (editProduct.description || '').toString());
+                        editAddSizes.forEach((size) => {
+                          formData.append('add_sizes[]', size);
+                          formData.append(`add_prices[${size}]`, Number(editAddPrices[size]));
+                        });
                         if (editImage) formData.append('image', editImage);
 
                         const res = await laravelStaffFetch(`${LARAVEL_BASE}/api/staff/products/${editProduct.id}`, {
