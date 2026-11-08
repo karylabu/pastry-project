@@ -840,8 +840,8 @@ export default function CustomizedCakes() {
         </div>
 
         <fieldset disabled={requestFormDisabled} className="min-w-0 border-0 p-0 disabled:opacity-50">
-        <div className="grid grid-cols-1 gap-2 md:grid-flow-col md:grid-cols-2 md:grid-rows-[repeat(4,auto)] md:items-start md:gap-3">
-          <div className="contents">
+        <div className="grid grid-cols-1 gap-2 md:grid-cols-2 md:items-start md:gap-3">
+          <div className="contents md:flex md:flex-col md:gap-2">
             <div data-custom-card="1" style={{ order: 1 }} className="rounded-2xl border border-[#eee4de] bg-white p-3 shadow-[0_3px_12px_rgba(91,64,39,0.04)] sm:p-4">
               <p className="mb-2 flex items-center gap-2 border-b border-[#f3ece6] pb-2 text-sm font-bold text-[#6b4f1d]">
                 <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#fff3c8] text-[11px]">1</span>
@@ -1061,79 +1061,6 @@ export default function CustomizedCakes() {
               </div>
             </div>
 
-            <div data-custom-card="5" style={{ order: 5 }} className="rounded-2xl border border-[#eee4de] bg-white p-3 shadow-[0_3px_12px_rgba(91,64,39,0.04)] sm:p-4">
-              <p className="mb-2 flex items-center gap-2 border-b border-[#f3ece6] pb-2 text-sm font-bold text-[#6b4f1d]">
-                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#fff3c8] text-[11px]">5</span>
-                Reference Images
-              </p>
-              <p className="mb-2 text-[11px] text-[#9b8c83]">Add an example or upload as many images as you need.</p>
-              <input id="custom-cake-reference-files" type="file" multiple accept="image/*" onChange={handleFiles} className="sr-only" />
-              <div className="flex flex-wrap items-center gap-2">
-                <label htmlFor="custom-cake-reference-files" className="inline-flex min-h-9 cursor-pointer items-center rounded-lg border border-[#e5bd45] bg-[#ffe89a] px-3 py-1.5 text-[11px] font-bold text-[#6b4f1d] transition hover:bg-[#ffedb5]">
-                  {files.length > 0 ? `Add Images (${files.length + galleryReferences.length} selected)` : 'Choose Images'}
-                </label>
-                <button type="button" onClick={openReferenceGallery} className="min-h-9 rounded-lg border border-[#eadfd8] bg-white px-3 py-1.5 text-[11px] font-bold text-[#8d6a2e] hover:bg-[#fffaf0]">Browse Examples</button>
-                {!referenceImage && <div className="rounded-lg border border-dashed border-[#eadfd8] bg-white px-3 py-2 text-xs text-[#9b8060]">No reference selected</div>}
-              </div>
-
-              {referenceImage && (
-                <div className="mt-3 space-y-2">
-                  <div className="inline-flex rounded-full border border-[#e5bd45] bg-[#fff8df] px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-[#8d6a2e]">
-                    {files.length + galleryReferences.length} reference{files.length + galleryReferences.length === 1 ? '' : 's'} selected: {referenceImage.name}
-                  </div>
-                  <div className="grid grid-cols-3 gap-2">
-                    {[...filePreviewUrls, ...galleryReferences].map((preview) => (
-                      <div key={preview.id} className="group relative overflow-hidden rounded-lg border border-[#eadfd8] bg-white">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const file = files.find((item) => `${item.name}-${item.size}-${item.lastModified}` === preview.id);
-                            setReferenceImage({ ...(file ? { type: 'upload', file } : preview), id: preview.id, url: preview.url, name: preview.name });
-                            setIsReferencePreviewOpen(true);
-                          }}
-                          className="block w-full"
-                        >
-                          <img src={preview.url} alt={preview.name} className="h-20 w-full object-cover transition group-hover:opacity-80" />
-                          <span className="absolute inset-x-0 bottom-0 truncate bg-black/55 px-1 py-1 text-[8px] text-white">View full</span>
-                        </button>
-                        <button type="button" onClick={() => handleRemoveReference(preview.id)} className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-white/90 text-xs font-bold text-[#6b4f1d] shadow" aria-label={`Remove ${preview.name}`}>×</button>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="flex flex-wrap gap-3">
-                    <button type="button" onClick={() => { setFiles([]); setGalleryReferences([]); setReferenceImage(null); window.sessionStorage.removeItem('customCakeReferenceImage'); window.sessionStorage.removeItem(referenceStorageKey); }} className="text-xs font-bold text-[#8d6a2e] underline">Clear References</button>
-                  </div>
-                </div>
-              )}
-            </div>
-
-          </div>
-          <div className="contents">
-            <section data-custom-card="7" style={{ order: 7 }} className="rounded-2xl border border-[#eee4de] bg-white p-3 shadow-[0_3px_12px_rgba(91,64,39,0.04)] sm:p-4">
-              <p className="mb-2 flex items-center gap-2 border-b border-[#f3ece6] pb-2 text-sm font-bold text-[#6b4f1d]">
-                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#fff3c8] text-[11px]">7</span>
-                Add-ons <span className="font-normal text-[#9b8c83]">(optional)</span>
-              </p>
-              <fieldset>
-                <legend className="mb-2 text-xs font-semibold text-[#6b4f1d]">Choose add-ons</legend>
-                <div className="grid gap-2 sm:grid-cols-2 md:grid-cols-1">
-                  <label className="flex min-h-11 items-center gap-2 rounded-lg border border-[#eadfd8] bg-white px-3 py-2 text-sm text-[#33251e]">
-                    <input type="checkbox" checked={addons.includes('Cake topper')} onChange={() => handleAddonChange('Cake topper')} className="accent-[#c9972d]" />
-                    Cake topper
-                  </label>
-                  <label className="flex min-h-11 items-center gap-2 rounded-lg border border-[#eadfd8] bg-white px-3 py-2 text-sm text-[#33251e]">
-                    <input type="checkbox" checked={addons.includes('Cupcakes')} onChange={() => handleAddonChange('Cupcakes')} className="accent-[#c9972d]" />
-                    Cupcakes
-                  </label>
-                </div>
-                {addons.includes('Cupcakes') && (
-                  <label className="mt-2 block text-xs font-semibold text-[#6b4f1d]">
-                    Number of cupcakes
-                    <input type="number" min={1} max={100} value={cupcakeQuantity} onChange={(event) => setCupcakeQuantity(Math.min(100, Math.max(1, Number(event.target.value) || 1)))} className="mt-1.5 min-h-11 w-full rounded-lg border border-[#eadfd8] bg-white px-3 py-2 text-sm font-normal text-[#33251e] outline-none focus:border-[#c9972d] focus:ring-2 focus:ring-[#fff1bd] sm:max-w-40" />
-                  </label>
-                )}
-              </fieldset>
-            </section>
             <div data-custom-card="4" style={{ order: 4 }} className="rounded-2xl border border-[#eee4de] bg-white p-3 shadow-[0_3px_12px_rgba(91,64,39,0.04)] sm:p-4">
               <p className="mb-2 flex items-center gap-2 border-b border-[#f3ece6] pb-2 text-sm font-bold text-[#6b4f1d]">
                 <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#fff3c8] text-[11px]">4</span>
@@ -1189,7 +1116,79 @@ export default function CustomizedCakes() {
                 </label>
               </div>
             </div>
+          </div>
 
+          <div className="contents md:flex md:flex-col md:gap-2">
+            <div data-custom-card="5" style={{ order: 5 }} className="rounded-2xl border border-[#eee4de] bg-white p-3 shadow-[0_3px_12px_rgba(91,64,39,0.04)] sm:p-4">
+              <p className="mb-2 flex items-center gap-2 border-b border-[#f3ece6] pb-2 text-sm font-bold text-[#6b4f1d]">
+                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#fff3c8] text-[11px]">5</span>
+                Reference Images
+              </p>
+              <p className="mb-2 text-[11px] text-[#9b8c83]">Add an example or upload as many images as you need.</p>
+              <input id="custom-cake-reference-files" type="file" multiple accept="image/*" onChange={handleFiles} className="sr-only" />
+              <div className="flex flex-wrap items-center gap-2">
+                <label htmlFor="custom-cake-reference-files" className="inline-flex min-h-9 cursor-pointer items-center rounded-lg border border-[#e5bd45] bg-[#ffe89a] px-3 py-1.5 text-[11px] font-bold text-[#6b4f1d] transition hover:bg-[#ffedb5]">
+                  {files.length > 0 ? `Add Images (${files.length + galleryReferences.length} selected)` : 'Choose Images'}
+                </label>
+                <button type="button" onClick={openReferenceGallery} className="min-h-9 rounded-lg border border-[#eadfd8] bg-white px-3 py-1.5 text-[11px] font-bold text-[#8d6a2e] hover:bg-[#fffaf0]">Browse Examples</button>
+                {!referenceImage && <div className="rounded-lg border border-dashed border-[#eadfd8] bg-white px-3 py-2 text-xs text-[#9b8060]">No reference selected</div>}
+              </div>
+
+              {referenceImage && (
+                <div className="mt-3 space-y-2">
+                  <div className="inline-flex rounded-full border border-[#e5bd45] bg-[#fff8df] px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-[#8d6a2e]">
+                    {files.length + galleryReferences.length} reference{files.length + galleryReferences.length === 1 ? '' : 's'} selected: {referenceImage.name}
+                  </div>
+                  <div className="grid grid-cols-3 gap-2">
+                    {[...filePreviewUrls, ...galleryReferences].map((preview) => (
+                      <div key={preview.id} className="group relative overflow-hidden rounded-lg border border-[#eadfd8] bg-white">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const file = files.find((item) => `${item.name}-${item.size}-${item.lastModified}` === preview.id);
+                            setReferenceImage({ ...(file ? { type: 'upload', file } : preview), id: preview.id, url: preview.url, name: preview.name });
+                            setIsReferencePreviewOpen(true);
+                          }}
+                          className="block w-full"
+                        >
+                          <img src={preview.url} alt={preview.name} className="h-20 w-full object-cover transition group-hover:opacity-80" />
+                          <span className="absolute inset-x-0 bottom-0 truncate bg-black/55 px-1 py-1 text-[8px] text-white">View full</span>
+                        </button>
+                        <button type="button" onClick={() => handleRemoveReference(preview.id)} className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-white/90 text-xs font-bold text-[#6b4f1d] shadow" aria-label={`Remove ${preview.name}`}>×</button>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="flex flex-wrap gap-3">
+                    <button type="button" onClick={() => { setFiles([]); setGalleryReferences([]); setReferenceImage(null); window.sessionStorage.removeItem('customCakeReferenceImage'); window.sessionStorage.removeItem(referenceStorageKey); }} className="text-xs font-bold text-[#8d6a2e] underline">Clear References</button>
+                  </div>
+                </div>
+              )}
+            </div>
+            <section data-custom-card="7" style={{ order: 7 }} className="rounded-2xl border border-[#eee4de] bg-white p-3 shadow-[0_3px_12px_rgba(91,64,39,0.04)] sm:p-4">
+              <p className="mb-2 flex items-center gap-2 border-b border-[#f3ece6] pb-2 text-sm font-bold text-[#6b4f1d]">
+                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#fff3c8] text-[11px]">7</span>
+                Add-ons <span className="font-normal text-[#9b8c83]">(optional)</span>
+              </p>
+              <fieldset>
+                <legend className="mb-2 text-xs font-semibold text-[#6b4f1d]">Choose add-ons</legend>
+                <div className="grid gap-2 sm:grid-cols-2 md:grid-cols-1">
+                  <label className="flex min-h-11 items-center gap-2 rounded-lg border border-[#eadfd8] bg-white px-3 py-2 text-sm text-[#33251e]">
+                    <input type="checkbox" checked={addons.includes('Cake topper')} onChange={() => handleAddonChange('Cake topper')} className="accent-[#c9972d]" />
+                    Cake topper
+                  </label>
+                  <label className="flex min-h-11 items-center gap-2 rounded-lg border border-[#eadfd8] bg-white px-3 py-2 text-sm text-[#33251e]">
+                    <input type="checkbox" checked={addons.includes('Cupcakes')} onChange={() => handleAddonChange('Cupcakes')} className="accent-[#c9972d]" />
+                    Cupcakes
+                  </label>
+                </div>
+                {addons.includes('Cupcakes') && (
+                  <label className="mt-2 block text-xs font-semibold text-[#6b4f1d]">
+                    Number of cupcakes
+                    <input type="number" min={1} max={100} value={cupcakeQuantity} onChange={(event) => setCupcakeQuantity(Math.min(100, Math.max(1, Number(event.target.value) || 1)))} className="mt-1.5 min-h-11 w-full rounded-lg border border-[#eadfd8] bg-white px-3 py-2 text-sm font-normal text-[#33251e] outline-none focus:border-[#c9972d] focus:ring-2 focus:ring-[#fff1bd] sm:max-w-40" />
+                  </label>
+                )}
+              </fieldset>
+            </section>
             <div data-custom-card="8" style={{ order: 8 }} className="rounded-2xl border border-[#eee4de] bg-white p-3 shadow-[0_3px_12px_rgba(91,64,39,0.04)] sm:p-4">
               <p className="mb-2 flex items-center gap-2 border-b border-[#f3ece6] pb-2 text-sm font-bold text-[#6b4f1d]">
                 <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#fff3c8] text-[11px]">8</span>
