@@ -33,6 +33,11 @@ import DesignCategoryCards from "../components/DesignCategoryCards";
 import { CUSTOMER_BASE, LARAVEL_BASE, ROOT_BASE } from "../../services/config";
 import { getAuthHeaders, safeFetchJson, safeParseJson } from "../../services/api";
 import { subscribeRealtime } from "../../services/realtime";
+import {
+  getNewIncomingCustomerMessages,
+  playCustomerChatMessageSound,
+  unlockCustomerNotificationSounds,
+} from "../components/customerNotificationSounds";
 
 /* =========================
    HERO BANNER SLIDES
@@ -409,7 +414,18 @@ export function ChatBubble({ aiMode = false, fullPage = false, hideFloating = fa
   const pollRef                   = useRef(null);
   const messageFetchIdRef         = useRef(0);
   const messageFetchesInFlightRef = useRef(new Set());
+  const knownMessageIdsByConversationRef = useRef(new Map());
   const imageInputRef             = useRef(null);
+
+  useEffect(() => {
+    const unlockSounds = () => unlockCustomerNotificationSounds();
+    window.addEventListener("pointerdown", unlockSounds, { once: true });
+    window.addEventListener("keydown", unlockSounds, { once: true });
+    return () => {
+      window.removeEventListener("pointerdown", unlockSounds);
+      window.removeEventListener("keydown", unlockSounds);
+    };
+  }, []);
 
   const savedUser = typeof window !== 'undefined'
     ? (() => {
@@ -479,6 +495,16 @@ export function ChatBubble({ aiMode = false, fullPage = false, hideFloating = fa
       }
       if (fetchId !== messageFetchIdRef.current) return;
       const fetchedMessages = Array.isArray(data.messages) ? data.messages : [];
+      let knownMessageIds = knownMessageIdsByConversationRef.current.get(fetchKey);
+      if (!knownMessageIds) {
+        knownMessageIds = new Set(fetchedMessages.map((message) => String(message.id)));
+        knownMessageIdsByConversationRef.current.set(fetchKey, knownMessageIds);
+      } else {
+        if (getNewIncomingCustomerMessages(fetchedMessages, knownMessageIds).length) {
+          playCustomerChatMessageSound();
+        }
+        fetchedMessages.forEach((message) => knownMessageIds.add(String(message.id)));
+      }
       setMessages(previousMessages => {
         if (!mergeWithCurrent) return fetchedMessages;
 

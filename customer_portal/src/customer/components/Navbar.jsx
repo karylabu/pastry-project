@@ -17,6 +17,11 @@ import {
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { BASE, CUSTOMER_BASE } from '../../services/config';
 import { getAuthHeaders, safeParseJson } from '../../services/api';
+import {
+  getNewUnreadCustomerNotifications,
+  playCustomerNotificationSound,
+  unlockCustomerNotificationSounds,
+} from "./customerNotificationSounds";
 
 const getNotificationCategory = (notification) => {
   const type = String(notification.type || 'account').toLowerCase();
@@ -71,6 +76,8 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
   const searchRef = useRef(null);
   const notifRef = useRef(null);
   const accountRef = useRef(null);
+  const seenNotificationIdsRef = useRef(null);
+  const notificationUserIdRef = useRef(null);
 
   // use imported BASE and CUSTOMER_BASE from config
 
@@ -131,21 +138,43 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
   const fetchNotifications = () => {
     try {
       const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
-      console.log("Stored user:", storedUser);
-      
+      const userId = String(storedUser?.id || storedUser?.token || localStorage.getItem('auth_token') || "");
+      if (!userId) {
+        notificationUserIdRef.current = null;
+        seenNotificationIdsRef.current = null;
+        setNotifications([]);
+        return;
+      }
+
+      if (notificationUserIdRef.current !== userId) {
+        notificationUserIdRef.current = userId;
+        seenNotificationIdsRef.current = null;
+      }
+
       if (storedUser?.id || storedUser?.token || localStorage.getItem('auth_token')) {
         const url = `${CUSTOMER_BASE}/api/customer/notifications`;
-        console.log("Fetching notifications from:", url);
-        
         fetch(url, { credentials: 'include', headers: getAuthHeaders() })
           .then(safeParseJson)
           .then(data => {
-            console.log("Notifications data:", data);
             const notificationList = Array.isArray(data)
               ? data
               : data && typeof data === 'object'
                 ? Object.values(data).filter((item) => item && typeof item === 'object' && item.id)
                 : [];
+            if (seenNotificationIdsRef.current) {
+              const newNotifications = getNewUnreadCustomerNotifications(
+                notificationList,
+                seenNotificationIdsRef.current,
+              );
+              if (newNotifications.length) playCustomerNotificationSound();
+              notificationList.forEach((notification) => {
+                seenNotificationIdsRef.current.add(String(notification.id));
+              });
+            } else {
+              seenNotificationIdsRef.current = new Set(
+                notificationList.map((notification) => String(notification.id)),
+              );
+            }
             setNotifications(notificationList);
           })
           .catch(err => {
@@ -171,6 +200,16 @@ export default function Navbar({ cartCount = 0, onCartClick }) {
     return () => {
       window.clearInterval(interval);
       window.removeEventListener('focus', handleWindowFocus);
+    };
+  }, []);
+
+  useEffect(() => {
+    const unlockSounds = () => unlockCustomerNotificationSounds();
+    window.addEventListener("pointerdown", unlockSounds, { once: true });
+    window.addEventListener("keydown", unlockSounds, { once: true });
+    return () => {
+      window.removeEventListener("pointerdown", unlockSounds);
+      window.removeEventListener("keydown", unlockSounds);
     };
   }, []);
 
