@@ -189,6 +189,39 @@ class CustomerChatApiTest extends TestCase
             ->assertJsonPath('conversations.0.customer_name', 'Test Customer');
     }
 
+    public function test_customer_chat_poll_does_not_mark_staff_replies_read_until_chat_is_open(): void
+    {
+        DB::table('messages')->insert([
+            'order_id' => null,
+            'user_id' => 7,
+            'sender' => 'admin',
+            'message' => 'Your order is ready.',
+            'is_read' => 0,
+            'customer_name' => 'Test Customer',
+            'customer_email' => 'customer@example.com',
+            'conversation_id' => 'popup-thread',
+            'created_at' => now(),
+        ]);
+
+        $this->withToken('test-customer-token')
+            ->getJson('/api/customer/chat/messages?order_id=0&conversation_id=popup-thread&mark_read=0')
+            ->assertOk()
+            ->assertJsonPath('messages.0.message', 'Your order is ready.')
+            ->assertJsonPath('messages.0.is_read', 0);
+
+        $this->assertDatabaseHas('messages', [
+            'user_id' => 7,
+            'conversation_id' => 'popup-thread',
+            'sender' => 'admin',
+            'is_read' => 0,
+        ]);
+
+        $this->withToken('test-customer-token')
+            ->getJson('/api/customer/chat/messages?order_id=0&conversation_id=popup-thread&mark_read=1')
+            ->assertOk()
+            ->assertJsonPath('messages.0.is_read', 1);
+    }
+
     public function test_quick_chat_receives_a_canned_reply_when_ai_is_unavailable(): void
     {
         $this->withToken('test-customer-token')

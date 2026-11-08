@@ -873,7 +873,9 @@ class CustomerApiController extends Controller
             $readSenders = $role === 'admin'
                 ? ['customer']
                 : ['admin', 'staff', 'ai'];
-            $readQuery->whereIn('sender', $readSenders)->update(['is_read' => 1]);
+            if ($role === 'admin' || $markRead) {
+                $readQuery->whereIn('sender', $readSenders)->update(['is_read' => 1]);
+            }
         } elseif ($orderId > 0) {
             // Legacy order conversations without an explicit thread identity.
             if ($role === 'admin') {
@@ -888,7 +890,7 @@ class CustomerApiController extends Controller
                     });
                 }
                 $readQuery->update(['is_read' => 1]);
-            } else {
+            } elseif ($markRead) {
                 $readQuery = DB::table('messages')->where('order_id', $orderId)->whereIn('sender', ['admin', 'staff', 'ai']);
                 if ($hasConversationId && $conversationId && $conversationId !== 'legacy') {
                     $readQuery->where('conversation_id', $conversationId);
