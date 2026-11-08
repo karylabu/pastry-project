@@ -5,7 +5,6 @@ import {
   ChevronLeft,
   ChevronRight,
   FileText,
-  Package2,
   TrendingUp,
 } from "lucide-react";
 import { Link } from "react-router-dom";
@@ -1231,7 +1230,6 @@ export default function PredictiveAnalytics() {
               <Card
                 title="Exact ingredient quantities needed"
                 description="Reorder recommendations, highest priority first."
-                action={<Package2 size={18} className="text-[#D4AF37]" />}
               >
                 <div className="grid grid-cols-[1.2fr_1.2fr_80px_80px] gap-3 border-b border-[#e8dfd4] pb-3 text-xs text-[#74675f]">
                   <span>Product</span><span>Ingredient</span><span className="text-right">Qty</span><span className="text-right">Priority</span>
