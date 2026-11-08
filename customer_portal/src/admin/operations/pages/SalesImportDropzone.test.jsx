@@ -64,17 +64,20 @@ describe('compact sales report import', () => {
     jest.restoreAllMocks();
   });
 
-  test('shows one sales report import button and explains automatic data cleaning', () => {
-    render(<SalesImportDropzone compact />);
+  test('shows the import and download buttons together in one row', () => {
+    render(<SalesImportDropzone compact onDownloadCsvReport={jest.fn()} onDownloadPdfReport={jest.fn()} />);
 
     expect(screen.getByRole('button', { name: 'Import Sales Report' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Import Customized Cake Sales' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Import Finished Product Sales' })).not.toBeInTheDocument();
     expect(screen.getByText(/reports are cleaned automatically/i)).toBeInTheDocument();
     expect(screen.queryByLabelText('CSV overlap handling')).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Import Sales Report' }).parentElement).toContainElement(
-      screen.getByText(/reports are cleaned automatically/i),
-    );
+    const importButton = screen.getByRole('button', { name: 'Import Sales Report' });
+    const csvButton = screen.getByRole('button', { name: 'Download CSV Report' });
+    const pdfButton = screen.getByRole('button', { name: 'Download PDF Report' });
+    expect(importButton.parentElement).toHaveClass('grid-cols-3');
+    expect(csvButton.parentElement).toBe(importButton.parentElement);
+    expect(pdfButton.parentElement).toBe(importButton.parentElement);
   });
 
   test('notifies the reports page as soon as a CSV is queued so it can be cancelled', async () => {

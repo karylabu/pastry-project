@@ -301,33 +301,33 @@ export default function SalesImportDropzone({
     return (
       <div className="admin-sales-import-buttons grid grid-cols-1 gap-2 min-[400px]:grid-cols-2 min-[1024px]:grid-cols-4">
         <input ref={inputRef} type="file" accept=".csv,.pdf" className="hidden" onChange={onInputChange} />
-        <div className="col-span-full flex min-w-0 items-center gap-2">
-          <button type="button" onClick={() => { chooseSalesType('other'); inputRef.current?.click(); }} disabled={isProcessing} className="inline-flex h-auto min-h-10 shrink-0 items-center justify-center gap-2 rounded-md bg-black px-3 py-2 text-center text-[10px] font-semibold leading-tight text-white transition hover:bg-black/85 disabled:cursor-wait disabled:opacity-60 sm:text-[11px]">
+        <div className="col-span-full grid min-w-0 grid-cols-3 gap-2">
+          <button type="button" onClick={() => { chooseSalesType('other'); inputRef.current?.click(); }} disabled={isProcessing} className="inline-flex h-auto min-h-10 min-w-0 items-center justify-center gap-1 rounded-md bg-black px-2 py-2 text-center text-[9px] font-semibold leading-tight text-white transition hover:bg-black/85 disabled:cursor-wait disabled:opacity-60 min-[500px]:gap-2 min-[500px]:px-3 min-[500px]:text-[10px] sm:text-[11px]">
             {isProcessing ? <Loader2 size={14} className="animate-spin" /> : <UploadCloud size={14} />}
             {isProcessing ? 'Importing report...' : 'Import Sales Report'}
           </button>
-          <p className="min-w-0 flex-1 text-[10px] leading-relaxed text-black/55">
-            CSV and PDF reports are cleaned automatically. Review the import summary for cleaned rows, skipped rows, and warnings.
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={onDownloadCsvReport || (() => downloadCsvTemplate(range, dateFilterStart, dateFilterEnd))}
-          className="inline-flex h-auto min-h-10 min-w-0 items-center justify-center gap-2 rounded-md bg-black px-3 py-2 text-center text-[10px] font-semibold leading-tight text-white transition hover:bg-black/85 sm:text-[11px]"
-        >
-          <Download size={14} />
-          {onDownloadCsvReport ? 'Download CSV Report' : 'Download CSV template'}
-        </button>
-        {onDownloadPdfReport && (
           <button
             type="button"
-            onClick={onDownloadPdfReport}
-            className="admin-sales-report-pdf-button inline-flex h-auto min-h-10 min-w-0 items-center justify-center gap-2 rounded-md bg-black px-3 py-2 text-center text-[10px] font-semibold leading-tight text-white transition hover:bg-black/85 sm:text-[11px]"
+            onClick={onDownloadCsvReport || (() => downloadCsvTemplate(range, dateFilterStart, dateFilterEnd))}
+            className="inline-flex h-auto min-h-10 min-w-0 items-center justify-center gap-1 rounded-md bg-black px-2 py-2 text-center text-[9px] font-semibold leading-tight text-white transition hover:bg-black/85 min-[500px]:gap-2 min-[500px]:px-3 min-[500px]:text-[10px] sm:text-[11px]"
           >
-            <Download size={15} />
-            Download PDF Report
+            <Download size={14} />
+            {onDownloadCsvReport ? 'Download CSV Report' : 'Download CSV template'}
           </button>
-        )}
+          {onDownloadPdfReport && (
+            <button
+              type="button"
+              onClick={onDownloadPdfReport}
+              className="admin-sales-report-pdf-button inline-flex h-auto min-h-10 min-w-0 items-center justify-center gap-1 rounded-md bg-black px-2 py-2 text-center text-[9px] font-semibold leading-tight text-white transition hover:bg-black/85 min-[500px]:gap-2 min-[500px]:px-3 min-[500px]:text-[10px] sm:text-[11px]"
+            >
+              <Download size={15} />
+              Download PDF Report
+            </button>
+          )}
+        </div>
+        <p className="col-span-full text-[10px] leading-relaxed text-black/55">
+          CSV and PDF reports are cleaned automatically. Review the import summary for cleaned rows, skipped rows, and warnings.
+        </p>
         <AnimatePresence>
           {toast && (
             <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} className="admin-sales-import-toast col-span-full flex items-start gap-2 rounded-md px-3 py-2 text-[10px]" style={{ background: toast.type === 'success' ? C.emeraldSoft : C.redSoft, color: '#000000' }}>
