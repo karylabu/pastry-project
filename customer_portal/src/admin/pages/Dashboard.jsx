@@ -249,8 +249,8 @@ export default function Dashboard() {
   const [analyticsError, setAnalyticsError] = useState("");
   const [analyticsPreset, setAnalyticsPreset] = useState("last_7_days");
   const [trendMetric, setTrendMetric] = useState("revenue");
-  const [salesMixType, setSalesMixType] = useState(null);
   const [customizedDesignPage, setCustomizedDesignPage] = useState(1);
+  const [customizedSizePage, setCustomizedSizePage] = useState(1);
   const [analyticsRefreshVersion, setAnalyticsRefreshVersion] = useState(0);
 
   const fetchDashboardData = useCallback(async () => {
@@ -352,6 +352,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     setCustomizedDesignPage(1);
+    setCustomizedSizePage(1);
   }, [analyticsPreset, analyticsRefreshVersion]);
 
   const dashboardSummary = dashboardData?.summary || {};
@@ -431,6 +432,9 @@ export default function Dashboard() {
   const customizedDesigns = analytics?.designs || [];
   const customizedDesignPageCount = Math.max(1, Math.ceil(customizedDesigns.length / 5));
   const visibleCustomizedDesigns = customizedDesigns.slice((customizedDesignPage - 1) * 5, customizedDesignPage * 5);
+  const customizedSizes = regularVsCustomized.customized?.sizes || [];
+  const customizedSizePageCount = Math.max(1, Math.ceil(customizedSizes.length / 5));
+  const visibleCustomizedSizes = customizedSizes.slice((customizedSizePage - 1) * 5, customizedSizePage * 5);
   const lowStockIngredients = analytics?.ingredientAnalytics?.low_stock || [];
   const actualIngredientConsumption = Array.isArray(analytics?.ingredientAnalytics?.actual_consumption)
     ? analytics.ingredientAnalytics.actual_consumption
@@ -592,60 +596,38 @@ export default function Dashboard() {
                   </Panel>
                   <Panel eyebrow="Regular" title="Best-selling sizes" compact className="flex h-full min-w-0 flex-col overflow-hidden"><div className="min-h-0 flex-1 overflow-y-auto"><RankedList rows={analytics.sizes} compact /></div></Panel>
                   <Panel
-                    eyebrow="Sales Mix"
-                    title="Regular vs. customized cakes"
+                    eyebrow={null}
+                    title="Customize Best Selling Sizes"
                     compact
                     className="flex h-full min-w-0 flex-col overflow-hidden"
                   >
                     <div className="min-h-0 flex-1 overflow-y-auto p-3">
-                      <div className="mb-3 inline-flex rounded-lg bg-[#f7f2eb] p-1" role="group" aria-label="Filter sales mix by cake type">
-                        {["regular", "customized"].map((type) => (
-                          <button
-                            key={type}
-                            type="button"
-                            aria-pressed={salesMixType === type}
-                            onClick={() => setSalesMixType((current) => current === type ? null : type)}
-                            className={`rounded-md px-3 py-1.5 text-[10px] font-semibold capitalize transition-colors ${salesMixType === type ? "bg-[#33251e] text-white shadow-sm" : "text-[#765d50] hover:bg-white hover:text-[#33251e]"}`}
-                          >
-                            {type}
-                          </button>
-                        ))}
-                      </div>
-                      {salesMixType ? (
-                        <div>
-                          <p className="mb-2 text-[10px] font-semibold capitalize text-[#5f514a]">
-                            Popular {salesMixType} cake sizes
-                          </p>
-                          {Array.isArray(regularVsCustomized[salesMixType]?.sizes) && regularVsCustomized[salesMixType].sizes.length > 0 ? (
-                            <div className="space-y-2">
-                              {regularVsCustomized[salesMixType].sizes.map((size) => (
-                                <div key={size.name}>
-                                  <div className="mb-1 flex items-center justify-between gap-2 text-[10px]">
-                                    <span className="truncate font-medium text-[#5f514a]">{size.name}</span>
-                                    <span className="shrink-0 text-[#74675f]">
-                                      {Number(size.quantity || 0).toLocaleString()} sold · {Number(size.percentage || 0).toFixed(1)}%
-                                    </span>
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          ) : (
-                            <p className="text-[10px] text-[#9b8c83]">No size sales recorded for this cake type.</p>
-                          )}
-                        </div>
-                      ) : (
-                        <div className="space-y-2">
-                          {Object.entries(regularVsCustomized).map(([type, row]) => (
-                            <div key={type} className="rounded-lg px-2.5 py-2 transition-colors hover:bg-[#fff8df]">
-                              <div className="mb-1 flex items-center justify-between gap-2">
-                                <span className="text-[11px] font-medium capitalize text-[#5f514a]">{type} cakes</span>
-                                <span className="shrink-0 text-[10px] font-semibold text-[#33251e]">{Number(row.quantity || 0).toLocaleString()} sold · {Number(row.percentage || 0).toFixed(0)}%</span>
-                              </div>
+                      {visibleCustomizedSizes.length ? (
+                        <div className="space-y-0.5">
+                          {visibleCustomizedSizes.map((size, index) => (
+                            <div key={size.name} className="flex items-center gap-2 rounded-md px-1.5 py-1 hover:bg-[#fff8df]">
+                              <span className="w-5 text-[10px] font-semibold text-[#b7a69c]">{String((customizedSizePage - 1) * 5 + index + 1).padStart(2, "0")}</span>
+                              <span className="min-w-0 flex-1 truncate text-[11px] font-medium text-[#5f514a]">{size.name}</span>
+                              <span className="shrink-0 text-[10px] font-semibold text-[#33251e]">{Number(size.quantity || 0).toLocaleString()} sold</span>
+                              <span className="w-8 shrink-0 text-right text-[10px] text-[#9b8c83]">{Number(size.percentage || 0).toFixed(0)}%</span>
                             </div>
                           ))}
                         </div>
+                      ) : (
+                        <p className="px-1.5 py-2 text-[10px] text-[#9b8c83]">No customized cake size sales recorded.</p>
                       )}
                     </div>
+                    {customizedSizePageCount > 1 && (
+                      <div className="flex items-center justify-between border-t border-[#f0e7e0] px-3 py-2">
+                        <span className="text-[10px] text-[#74675f]">
+                          {(customizedSizePage - 1) * 5 + 1}–{Math.min(customizedSizePage * 5, customizedSizes.length)} of {customizedSizes.length}
+                        </span>
+                        <div className="flex gap-1">
+                          <button type="button" aria-label="Previous customized sizes" disabled={customizedSizePage === 1} onClick={() => setCustomizedSizePage((page) => page - 1)} className="rounded-md border border-[#eadfd8] p-1 text-[#765d50] hover:bg-[#fff8df] disabled:cursor-not-allowed disabled:opacity-40"><ChevronLeft size={14} /></button>
+                          <button type="button" aria-label="Next customized sizes" disabled={customizedSizePage === customizedSizePageCount} onClick={() => setCustomizedSizePage((page) => page + 1)} className="rounded-md border border-[#eadfd8] p-1 text-[#765d50] hover:bg-[#fff8df] disabled:cursor-not-allowed disabled:opacity-40"><ChevronRight size={14} /></button>
+                        </div>
+                      </div>
+                    )}
                   </Panel>
                 </div>
 

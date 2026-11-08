@@ -107,7 +107,15 @@ beforeEach(() => {
         success: true,
         cakeTypeBreakdown: {
           regular: { quantity: 18084, percentage: 97, sizes: [{ name: "Small", quantity: 10000, percentage: 60 }] },
-          customized: { quantity: 592, percentage: 3, sizes: [{ name: "Big", quantity: 300, percentage: 50 }] },
+          customized: {
+            quantity: 592,
+            percentage: 3,
+            sizes: Array.from({ length: 7 }, (_, index) => ({
+              name: `Custom Size ${index + 1}`,
+              quantity: 70 - index,
+              percentage: 15 - index,
+            })),
+          },
         },
         designs: Array.from({ length: 7 }, (_, index) => ({
           name: `Design ${index + 1}`,
@@ -208,7 +216,7 @@ test("shows the four best-selling panels in a compact horizontal layout", async 
     "Best-selling flavors",
     "Best-selling cake designs",
     "Best-selling sizes",
-    "Regular vs. customized cakes",
+    "Customize Best Selling Sizes",
   ].map((title) => screen.findByRole("heading", { name: title })));
   const panels = headings.map((heading) => heading.closest("section"));
   const layout = panels[0].parentElement;
@@ -220,26 +228,25 @@ test("shows the four best-selling panels in a compact horizontal layout", async 
   }
 
   const salesMix = panels[3];
-  const filterGroup = screen.getByRole("group", { name: "Filter sales mix by cake type" });
   expect(salesMix.querySelector(".border-b")).toContainElement(headings[3]);
-  expect(filterGroup).toHaveClass("inline-flex", "rounded-lg");
   expect(screen.getByText("Regular", { selector: "p" })).toBeInTheDocument();
   expect(screen.getByText("Customize", { selector: "p" })).toBeInTheDocument();
-  expect(screen.getByText("regular cakes")).toBeInTheDocument();
-  expect(screen.getByText("18,084 sold · 97%")).toBeInTheDocument();
-  expect(screen.getByText("customized cakes")).toBeInTheDocument();
-  expect(screen.getByText("592 sold · 3%")).toBeInTheDocument();
+  expect(screen.queryByRole("group", { name: "Filter sales mix by cake type" })).not.toBeInTheDocument();
+  expect(screen.getByText("Custom Size 1")).toBeInTheDocument();
+  expect(screen.getByText("Custom Size 5")).toBeInTheDocument();
+  expect(screen.queryByText("Custom Size 6")).not.toBeInTheDocument();
   expect(salesMix.querySelector(".h-1\\.5")).not.toBeInTheDocument();
   expect(screen.getByText("Design 1")).toBeInTheDocument();
   expect(screen.getByText("Design 5")).toBeInTheDocument();
   expect(screen.queryByText("Design 6")).not.toBeInTheDocument();
 
+  fireEvent.click(screen.getByRole("button", { name: "Next customized sizes" }));
+  expect(screen.getByText("Custom Size 6")).toBeInTheDocument();
+  expect(screen.getByText("Custom Size 7")).toBeInTheDocument();
+  expect(screen.queryByText("Custom Size 1")).not.toBeInTheDocument();
+
   fireEvent.click(screen.getByRole("button", { name: "Next customized designs" }));
   expect(screen.getByText("Design 6")).toBeInTheDocument();
   expect(screen.getByText("Design 7")).toBeInTheDocument();
   expect(screen.queryByText("Design 1")).not.toBeInTheDocument();
-
-  fireEvent.click(screen.getByRole("button", { name: "regular" }));
-  expect(await screen.findByText("Popular regular cake sizes")).toBeInTheDocument();
-  expect(screen.getByText("Small")).toBeInTheDocument();
 });
