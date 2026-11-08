@@ -512,6 +512,57 @@ class StaffProductCatalogTest extends TestCase
         ]);
     }
 
+    public function test_admin_can_remove_unused_custom_size_and_product_stock_is_recalculated(): void
+    {
+        $sizeId = DB::table('product_sizes')->insertGetId([
+            'product_id' => 1,
+            'size' => '9 inches',
+            'price' => 700,
+            'stock_quantity' => 0,
+            'available' => true,
+        ]);
+        DB::table('products')->where('id', 1)->update(['stock' => 999]);
+
+        $admin = new User();
+        $admin->role = 'admin';
+        $admin->status = 'active';
+
+        $this->actingAs($admin)
+            ->deleteJson("/api/staff/products/1/sizes/{$sizeId}")
+            ->assertOk()
+            ->assertJsonPath('success', true);
+
+        $this->assertDatabaseMissing('product_sizes', ['id' => $sizeId]);
+        $this->assertDatabaseHas('products', ['id' => 1, 'stock' => 6, 'price' => 450]);
+    }
+
+    public function test_admin_cannot_remove_a_size_used_by_a_recipe_or_with_stock(): void
+    {
+        $admin = new User();
+        $admin->role = 'admin';
+        $admin->status = 'active';
+
+        $this->actingAs($admin)
+            ->deleteJson('/api/staff/products/1/sizes/1')
+            ->assertConflict()
+            ->assertJsonPath('success', false);
+        $this->assertDatabaseHas('product_sizes', ['id' => 1, 'size' => 'Big']);
+
+        $sizeId = DB::table('product_sizes')->insertGetId([
+            'product_id' => 1,
+            'size' => '9 inches',
+            'price' => 700,
+            'stock_quantity' => 2,
+            'available' => true,
+        ]);
+
+        $this->actingAs($admin)
+            ->deleteJson("/api/staff/products/1/sizes/{$sizeId}")
+            ->assertConflict()
+            ->assertJsonPath('message', 'This size still has stock. Adjust its stock to zero before removing it.');
+        $this->assertDatabaseHas('product_sizes', ['id' => $sizeId, 'size' => '9 inches']);
+    }
+
     public function test_product_update_requires_admin_authorization(): void
     {
         $this->postJson('/api/staff/products/1', [

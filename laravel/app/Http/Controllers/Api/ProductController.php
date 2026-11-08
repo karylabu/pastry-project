@@ -425,6 +425,88 @@ class ProductController extends Controller
         ], 201);
     }
 
+    public function destroySizeStaff(Request $request, Product $product, int $size): JsonResponse
+    {
+        $admin = $this->requireRole($request, 'admin');
+        if (!$admin instanceof \App\Models\User) {
+            return $admin;
+        }
+
+        $productSize = DB::table('product_sizes')
+            ->where('product_id', $product->id)
+            ->where('id', $size)
+            ->first();
+        if (!$productSize) {
+            return response()->json(['success' => false, 'message' => 'This size was not found for the selected cake.'], 404);
+        }
+        if ((int) ($productSize->stock_quantity ?? 0) > 0) {
+            return response()->json([
+                'success' => false,
+                'message' => 'This size still has stock. Adjust its stock to zero before removing it.',
+            ], 409);
+        }
+
+        try {
+            DB::transaction(function () use ($product, $productSize) {
+                $references = [
+                    ['product_recipes', 'product_size_id', 'a saved recipe'],
+                    ['order_items', 'product_size_id', 'an order'],
+                    ['product_inventory_movements', 'product_size_id', 'stock history'],
+                    ['production_transactions', 'product_size_id', 'production history'],
+                ];
+                foreach ($references as [$table, $column, $description]) {
+                    if (Schema::hasTable($table)
+                        && Schema::hasColumn($table, $column)
+                        && DB::table($table)->where($column, $productSize->id)->exists()) {
+                        throw new \InvalidArgumentException("This size is used by {$description} and cannot be removed.");
+                    }
+                }
+
+                $remainingSizes = DB::table('product_sizes')
+                    ->where('product_id', $product->id)
+                    ->where('id', '<>', $productSize->id)
+                    ->orderBy('id')
+                    ->get();
+                if ($remainingSizes->isEmpty()) {
+                    throw new \InvalidArgumentException('A cake must keep at least one size.');
+                }
+
+                DB::table('product_sizes')->where('id', $productSize->id)->delete();
+
+                if (strtolower(trim((string) $productSize->size)) === 'big') {
+                    $replacementBigSize = $remainingSizes->first(
+                        fn ($remainingSize) => strtolower(trim((string) $remainingSize->size)) === 'big'
+                    ) ?? $remainingSizes->first();
+                    $product->price = $replacementBigSize->price;
+                }
+                if (Schema::hasColumn('products', 'stock')) {
+                    $product->stock = (int) DB::table('product_sizes')
+                        ->where('product_id', $product->id)
+                        ->whereRaw('LOWER(TRIM(size)) <> ?', ['slice'])
+                        ->sum('stock_quantity');
+                }
+                $product->save();
+            });
+        } catch (\InvalidArgumentException $exception) {
+            return response()->json(['success' => false, 'message' => $exception->getMessage()], 409);
+        } catch (Throwable $exception) {
+            Log::error('Cake size could not be removed.', [
+                'product_id' => $product->id,
+                'product_size_id' => $productSize->id,
+                'exception' => $exception,
+            ]);
+            return response()->json(['success' => false, 'message' => 'Unable to remove the cake size.'], 500);
+        }
+
+        app(\App\Services\RealtimeEventPublisher::class)->inventoryUpdated();
+
+        return response()->json([
+            'success' => true,
+            'product_id' => (int) $product->id,
+            'product_size_id' => (int) $productSize->id,
+        ]);
+    }
+
     public function updateArchiveStaff(Request $request, Product $product): JsonResponse
     {
         $admin = $this->requireRole($request, 'admin');

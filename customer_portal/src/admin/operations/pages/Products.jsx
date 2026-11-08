@@ -108,6 +108,7 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
   const [addSizeStock, setAddSizeStock] = useState("0");
   const [addSizeSaving, setAddSizeSaving] = useState(false);
   const [addSizeError, setAddSizeError] = useState("");
+  const [deletingSizeId, setDeletingSizeId] = useState(null);
   const [recipeDeleting, setRecipeDeleting] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [recipeLines, setRecipeLines] = useState([]);
@@ -364,6 +365,45 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
       message: `${product.name} will be hidden from customers and moved to the Recycle Bin. You can Undo for 5 seconds or restore it from Settings within 30 days.`,
       confirmLabel: deletingProductId === product.id ? "Moving..." : "Move to Recycle Bin",
       onConfirm: () => deleteProduct(product),
+    });
+  };
+
+  const deleteProductSize = async (product, sizeOption) => {
+    setDeletingSizeId(sizeOption.id);
+    try {
+      const response = await laravelStaffFetch(
+        `${LARAVEL_BASE}/api/staff/products/${encodeURIComponent(product.id)}/sizes/${encodeURIComponent(sizeOption.id)}`,
+        { method: "DELETE", headers: { Accept: "application/json" } }
+      );
+      const data = await response.json().catch(() => null);
+      if (!response.ok || !data?.success) {
+        throw new Error(data?.message || "Unable to remove this cake size.");
+      }
+
+      setAdminDialog(null);
+      setCardSizeSelections((current) => {
+        if (String(current[product.id] || "").toLowerCase() !== String(sizeOption.size).toLowerCase()) return current;
+        const next = { ...current };
+        delete next[product.id];
+        return next;
+      });
+      await fetchProducts();
+      setFeedback({ type: "success", text: `${sizeOption.size} size removed from ${product.name}.` });
+    } catch (error) {
+      setAdminDialog(null);
+      setFeedback({ type: "error", text: error.message || "Unable to remove this cake size." });
+    } finally {
+      setDeletingSizeId(null);
+    }
+  };
+
+  const confirmDeleteProductSize = (product, sizeOption) => {
+    setAdminDialog({
+      kind: "confirm",
+      title: "Remove this cake size?",
+      message: `${sizeOption.size} will be removed from ${product.name}. Sizes with stock, recipes, orders, or history cannot be removed.`,
+      confirmLabel: deletingSizeId === sizeOption.id ? "Removing..." : "Remove size",
+      onConfirm: () => deleteProductSize(product, sizeOption),
     });
   };
 
@@ -1203,20 +1243,33 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
                       const selected = cardSizeName.toLowerCase() === sizeName.toLowerCase();
 
                       return (
-                        <button
-                          key={sizeOption.id}
-                          type="button"
-                          onClick={() => setCardSizeSelections((current) => ({ ...current, [product.id]: sizeName }))}
-                          aria-label={`${sizeLabel} size for ${product.name}`}
-                          aria-pressed={selected}
-                          className={`flex min-w-0 flex-1 items-center justify-center rounded-xl border px-1.5 py-1 text-[8px] font-semibold uppercase tracking-[0.08em] whitespace-nowrap transition-all ${
-                            selected
-                              ? 'border-[#e7c875] bg-[#fff8df] text-[#8d6a2e] shadow-sm'
-                              : 'border-[#eadfd8] bg-white text-[#765d50] hover:border-[#e7c875] hover:bg-[#fff8df] hover:text-[#8d6a2e]'
-                          }`}
-                        >
-                          {sizeLabel}
-                        </button>
+                        <div key={sizeOption.id} className="inline-flex min-w-0 flex-1 items-center justify-center gap-0.5">
+                          <button
+                            type="button"
+                            onClick={() => setCardSizeSelections((current) => ({ ...current, [product.id]: sizeName }))}
+                            aria-label={`${sizeLabel} size for ${product.name}`}
+                            aria-pressed={selected}
+                            className={`flex min-w-0 flex-1 items-center justify-center rounded-xl border px-1.5 py-1 text-[8px] font-semibold uppercase tracking-[0.08em] whitespace-nowrap transition-all ${
+                              selected
+                                ? 'border-[#e7c875] bg-[#fff8df] text-[#8d6a2e] shadow-sm'
+                                : 'border-[#eadfd8] bg-white text-[#765d50] hover:border-[#e7c875] hover:bg-[#fff8df] hover:text-[#8d6a2e]'
+                            }`}
+                          >
+                            {sizeLabel}
+                          </button>
+                          {canManageCatalog && (
+                            <button
+                              type="button"
+                              onClick={() => confirmDeleteProductSize(product, sizeOption)}
+                              disabled={deletingSizeId === sizeOption.id}
+                              aria-label={`Remove ${sizeLabel} size from ${product.name}`}
+                              title={`Remove ${sizeLabel} size`}
+                              className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[#9a5947] transition hover:bg-[#fff0eb] disabled:opacity-50"
+                            >
+                              <X size={11} aria-hidden="true" />
+                            </button>
+                          )}
+                        </div>
                       );
                     })}
                   </div>

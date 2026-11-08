@@ -100,6 +100,15 @@ describe('Products admin catalog', () => {
         return Promise.resolve({ ok: true, status: 201, json: async () => ({ success: true }) });
       }
 
+      if (String(url).includes('/api/staff/products/') && options.method === 'DELETE') {
+        const match = String(url).match(/products\/(\d+)\/sizes\/(\d+)$/);
+        const product = mockCatalogProducts.find((item) => item.id === Number(match?.[1]));
+        if (product) {
+          product.sizes = product.sizes.filter((size) => size.id !== Number(match?.[2]));
+        }
+        return Promise.resolve({ ok: true, json: async () => ({ success: true }) });
+      }
+
       if (String(url).includes('/api/staff/production/availability/')) {
         return Promise.resolve({
           ok: true,
@@ -294,6 +303,27 @@ describe('Products admin catalog', () => {
       expect.anything(),
     );
     expect(screen.queryByRole('button', { name: '10 inches size for Strawberry Cake' })).not.toBeInTheDocument();
+  });
+
+  test('confirms before removing a custom size and refreshes the product card', async () => {
+    render(<Products allowCatalogManagement />);
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: '8 inches size for Strawberry Cake' })).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Remove 8 inches size from Strawberry Cake' }));
+    expect(screen.getByRole('alertdialog', { name: 'Remove this cake size?' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Remove size' }));
+
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringContaining('/api/staff/products/1/sizes/13'),
+        expect.objectContaining({ method: 'DELETE' }),
+      );
+      expect(screen.queryByRole('button', { name: '8 inches size for Strawberry Cake' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+    });
   });
 
   test('uses the recorded price for a custom size when adding it to another cake', async () => {
