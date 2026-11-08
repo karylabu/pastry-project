@@ -131,15 +131,15 @@ function TopSellingTable({ rows }) {
   );
 }
 
-function Panel({ eyebrow, title, action, children, className = "" }) {
+function Panel({ eyebrow, title, action, children, className = "", compact = false }) {
   return (
-    <section className={`rounded-xl border border-[#eadfd8] bg-white shadow-[0_5px_18px_rgba(91,64,39,0.04)] transition hover:border-[#c9a94f] hover:ring-1 hover:ring-[#d4af37]/20 ${className}`}>
-      <div className="flex items-center justify-between gap-4 border-b border-[#f0e7e0] px-6 py-5">
+    <section className={`rounded-xl border border-[#eadfd8] bg-white shadow-[0_5px_18px_rgba(91,64,39,0.04)] transition hover:border-[#c9a94f] hover:ring-1 hover:ring-[#d4af37]/20 ${compact ? "admin-dashboard-compact-panel" : ""} ${className}`}>
+      <div className={`flex items-center justify-between border-b border-[#f0e7e0] ${compact ? "gap-2 px-3 py-3" : "gap-4 px-6 py-5"}`}>
         <div>
           {eyebrow && (
-            <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.3em] text-[#9b7810]">{eyebrow}</p>
+            <p className={`font-bold uppercase text-[#9b7810] ${compact ? "mb-0.5 text-[9px] tracking-[0.2em]" : "mb-1 text-[10px] tracking-[0.3em]"}`}>{eyebrow}</p>
           )}
-          <h2 className="font-serif text-[17px] text-[#33251e]">{title}</h2>
+          <h2 className={`font-serif text-[#33251e] ${compact ? "text-[14px]" : "text-[17px]"}`}>{title}</h2>
         </div>
         {action}
       </div>
@@ -176,8 +176,22 @@ function AnalyticsCard({ label, value, icon: Icon, accent = "gold" }) {
   );
 }
 
-function RankedList({ rows, quantityLabel = "sold", quantityUnitKey = "", emptyState }) {
+function RankedList({ rows, quantityLabel = "sold", quantityUnitKey = "", emptyState, compact = false }) {
   if (!rows?.length) return <AnalyticsEmpty {...emptyState} />;
+  if (compact) {
+    return (
+      <div className="space-y-0.5 p-2">
+        {rows.slice(0, 5).map((row, index) => (
+          <div key={`${row.name}-${index}`} className="flex items-center gap-2 rounded-md px-1.5 py-1 hover:bg-[#fff8df]">
+            <span className="w-5 text-[10px] font-semibold text-[#b7a69c]">{String(index + 1).padStart(2, "0")}</span>
+            <span className="min-w-0 flex-1 truncate text-[11px] font-medium text-[#5f514a]">{row.name}</span>
+            <span className="shrink-0 text-[10px] font-semibold text-[#33251e]">{Number(row.quantity || 0).toLocaleString()} {quantityUnitKey ? `${row[quantityUnitKey] || ""} ` : ""}{quantityLabel}</span>
+            <span className="w-8 shrink-0 text-right text-[10px] text-[#9b8c83]">{Number(row.percentage || 0).toFixed(0)}%</span>
+          </div>
+        ))}
+      </div>
+    );
+  }
   return (
     <div className="space-y-2 p-4">
       {rows.slice(0, 5).map((row, index) => (
@@ -550,17 +564,15 @@ export default function Dashboard() {
                   </Panel>
                 </div>
 
-                <div className="grid items-stretch gap-3 lg:grid-cols-2">
-                  <Panel eyebrow="Best Sellers" title="Best-selling flavors" className="flex h-full min-h-[190px] flex-col overflow-hidden lg:h-[190px]"><div className="lg:max-h-[110px] lg:overflow-y-auto"><RankedList rows={analytics.flavors} /></div></Panel>
-                  <Panel eyebrow="Best Sellers" title="Best-selling sizes" className="flex h-full min-h-[190px] flex-col overflow-hidden lg:h-[190px]"><div className="lg:max-h-[110px] lg:overflow-y-auto"><RankedList rows={analytics.sizes} /></div></Panel>
-                </div>
-
-                <div className="grid items-stretch gap-3 lg:grid-cols-2">
-                  <Panel eyebrow="Customized Cakes" title="Best-selling cake designs" className="flex h-full min-h-[190px] min-w-0 flex-col overflow-hidden lg:h-[190px]"><div className="lg:max-h-[110px] lg:overflow-y-auto"><RankedList rows={analytics.designs} /></div></Panel>
+                <div className="grid items-stretch gap-3 lg:grid-cols-2 xl:grid-cols-4">
+                  <Panel eyebrow="Best Sellers" title="Best-selling flavors" compact className="flex h-full min-w-0 flex-col overflow-hidden"><div className="min-h-0 flex-1 overflow-y-auto"><RankedList rows={analytics.flavors} compact /></div></Panel>
+                  <Panel eyebrow="Customized Cakes" title="Best-selling cake designs" compact className="flex h-full min-w-0 flex-col overflow-hidden"><div className="min-h-0 flex-1 overflow-y-auto"><RankedList rows={analytics.designs} compact /></div></Panel>
+                  <Panel eyebrow="Best Sellers" title="Best-selling sizes" compact className="flex h-full min-w-0 flex-col overflow-hidden"><div className="min-h-0 flex-1 overflow-y-auto"><RankedList rows={analytics.sizes} compact /></div></Panel>
                   <Panel
                     eyebrow="Sales Mix"
                     title="Regular vs. customized cakes"
-                    className="flex h-full min-h-[190px] min-w-0 flex-col overflow-hidden lg:h-[190px]"
+                    compact
+                    className="flex h-full min-w-0 flex-col overflow-hidden"
                     action={
                       <div className="flex shrink-0 gap-1.5" role="group" aria-label="Filter sales mix by cake type">
                         {["regular", "customized"].map((type) => (
@@ -577,41 +589,41 @@ export default function Dashboard() {
                       </div>
                     }
                   >
-                    <div className="min-h-0 flex-1 overflow-y-auto p-5 lg:p-4">
+                    <div className="min-h-0 flex-1 overflow-y-auto p-3">
                       {salesMixType ? (
                         <div>
-                          <p className="mb-3 text-[11px] font-semibold capitalize text-[#5f514a]">
+                          <p className="mb-2 text-[10px] font-semibold capitalize text-[#5f514a]">
                             Popular {salesMixType} cake sizes
                           </p>
                           {Array.isArray(regularVsCustomized[salesMixType]?.sizes) && regularVsCustomized[salesMixType].sizes.length > 0 ? (
-                            <div className="space-y-3">
+                            <div className="space-y-2">
                               {regularVsCustomized[salesMixType].sizes.map((size) => (
                                 <div key={size.name}>
-                                  <div className="mb-1 flex items-center justify-between gap-3 text-[11px]">
+                                  <div className="mb-1 flex items-center justify-between gap-2 text-[10px]">
                                     <span className="truncate font-medium text-[#5f514a]">{size.name}</span>
                                     <span className="shrink-0 text-[#74675f]">
                                       {Number(size.quantity || 0).toLocaleString()} sold · {Number(size.percentage || 0).toFixed(1)}%
                                     </span>
                                   </div>
-                                  <div className="h-2 overflow-hidden rounded-full bg-[#f4ece6]">
+                                  <div className="h-1.5 overflow-hidden rounded-full bg-[#f4ece6]">
                                     <div className={`h-full rounded-full ${salesMixType === "regular" ? "bg-[#a57c38]" : "bg-[#d6c66f]"}`} style={{ width: `${Math.min(100, Number(size.percentage || 0))}%` }} />
                                   </div>
                                 </div>
                               ))}
                             </div>
                           ) : (
-                            <p className="text-[11px] text-[#9b8c83]">No size sales recorded for this cake type.</p>
+                            <p className="text-[10px] text-[#9b8c83]">No size sales recorded for this cake type.</p>
                           )}
                         </div>
                       ) : (
-                        <div className="space-y-4">
+                        <div className="space-y-2">
                           {Object.entries(regularVsCustomized).map(([type, row]) => (
                             <div key={type}>
-                              <div className="mb-1 flex items-center justify-between gap-3">
-                                <span className="text-[13px] font-medium capitalize text-[#5f514a]">{type} cakes</span>
-                                <span className="text-[12px] font-semibold text-[#33251e]">{Number(row.quantity || 0).toLocaleString()} sold · {Number(row.percentage || 0).toFixed(0)}%</span>
+                              <div className="mb-1 flex items-center justify-between gap-2">
+                                <span className="text-[10px] font-medium capitalize text-[#5f514a]">{type} cakes</span>
+                                <span className="text-[10px] font-semibold text-[#33251e]">{Number(row.quantity || 0).toLocaleString()} sold · {Number(row.percentage || 0).toFixed(0)}%</span>
                               </div>
-                              <div className="h-2 overflow-hidden rounded-full bg-[#f4ece6]">
+                              <div className="h-1.5 overflow-hidden rounded-full bg-[#f4ece6]">
                                 <div className={`h-full rounded-full ${type === "regular" ? "bg-[#a57c38]" : "bg-[#d6c66f]"}`} style={{ width: `${Math.min(100, Number(row.percentage || 0))}%` }} />
                               </div>
                             </div>

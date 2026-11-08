@@ -186,3 +186,26 @@ test("switches between live and customized orders and links each order to its de
     );
   });
 });
+
+test("shows the four best-selling panels in a compact horizontal layout", async () => {
+  render(
+    <MemoryRouter>
+      <Dashboard />
+    </MemoryRouter>,
+  );
+
+  const headings = await Promise.all([
+    "Best-selling flavors",
+    "Best-selling cake designs",
+    "Best-selling sizes",
+    "Regular vs. customized cakes",
+  ].map((title) => screen.findByRole("heading", { name: title })));
+  const panels = headings.map((heading) => heading.closest("section"));
+  const layout = panels[0].parentElement;
+
+  expect(layout).toHaveClass("xl:grid-cols-4");
+  panels.forEach((panel) => expect(panel).toHaveClass("admin-dashboard-compact-panel"));
+  for (let index = 0; index < panels.length - 1; index += 1) {
+    expect(panels[index].compareDocumentPosition(panels[index + 1]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  }
+});
