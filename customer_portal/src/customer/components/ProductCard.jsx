@@ -291,7 +291,7 @@ export default function ProductCard({
       className={`group relative flex h-full min-h-[292px] min-w-0 flex-col items-center rounded-xl border border-[#eadfd8] bg-[#fffaf7] p-2 text-center shadow-[0_5px_14px_rgba(91,64,39,0.06)] transition-all duration-300 ${overallOutOfStock ? 'border-gray-300 bg-gray-100 opacity-70' : 'hover:-translate-y-0.5 hover:border-[#e7c875] hover:shadow-[0_10px_20px_rgba(91,64,39,0.1)]'}`}
     >
       <div
-        className="mb-2 flex h-[130px] w-full flex-shrink-0 items-center justify-center overflow-hidden rounded-lg border border-[#f1e6df] bg-[#f8eee8] p-2"
+        className="relative mb-2 flex h-[130px] w-full flex-shrink-0 items-center justify-center overflow-hidden rounded-lg border border-[#f1e6df] bg-[#f8eee8] p-2"
       >
         <img
           src={resolveProductImage(product)}
@@ -329,6 +329,11 @@ export default function ProductCard({
               : 'h-[118px] w-auto max-w-[85%] max-h-[118px] object-contain object-center'
           }
         />
+        {overallOutOfStock && (
+          <span className="absolute right-2 top-2 inline-flex items-center rounded-full bg-[#8f432d] px-2.5 py-1 text-[9px] font-semibold text-white shadow-sm">
+            Out of Stock
+          </span>
+        )}
       </div>
 
       <div className="flex flex-col flex-grow w-full">

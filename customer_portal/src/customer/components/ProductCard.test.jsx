@@ -71,8 +71,20 @@ describe('ProductCard cake stock options', () => {
     expect(screen.getByRole('button', { name: 'Small, out of stock' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Big, out of stock' })).toBeDisabled();
     expect(screen.getAllByText('OUT OF STOCK')).toHaveLength(2);
+    const ribbon = screen.getByText('Out of Stock');
+    expect(ribbon).toHaveClass('absolute', 'right-2', 'top-2', 'rounded-full', 'bg-[#8f432d]');
+    expect(ribbon.parentElement).toHaveClass('relative');
     expect(screen.getByRole('button', { name: 'Add to Cart' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Add to Cart' }).closest('[aria-disabled="true"]')).toHaveClass('opacity-70');
+  });
+
+  test('shows the card ribbon only when the whole product is out of stock', () => {
+    const { rerender } = render(<ProductCard product={makeCake(0, 3)} />);
+
+    expect(screen.queryByText('Out of Stock')).not.toBeInTheDocument();
+
+    rerender(<ProductCard product={makeCake(0, 0)} />);
+    expect(screen.getByText('Out of Stock')).toBeInTheDocument();
   });
 
   test('keeps Big selected and passes it through the add-to-cart action', () => {
