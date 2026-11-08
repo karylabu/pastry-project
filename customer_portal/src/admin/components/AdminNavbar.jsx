@@ -158,21 +158,6 @@ export default function AdminNavbar({ onSidebarChange }) {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  useEffect(() => {
-    const handleChatMessagePreview = (event) => {
-      setNotificationToast({
-        kind: "chat",
-        title: event.detail?.title || "New chat message",
-        message: event.detail?.message || "A customer sent a message.",
-      });
-      window.clearTimeout(notificationToastTimerRef.current);
-      notificationToastTimerRef.current = window.setTimeout(() => setNotificationToast(null), 6000);
-    };
-
-    window.addEventListener("admin-chat-message-preview", handleChatMessagePreview);
-    return () => window.removeEventListener("admin-chat-message-preview", handleChatMessagePreview);
-  }, []);
-
   const fetchNotifications = useCallback(async () => {
     if (!currentUser?.id) {
       setNotifications([]);
@@ -426,11 +411,7 @@ export default function AdminNavbar({ onSidebarChange }) {
                 aria-live="polite"
                 onClick={() => {
                   setNotificationToast(null);
-                  if (notificationToast.kind === "chat") {
-                    window.dispatchEvent(new Event("admin-open-chat"));
-                  } else {
-                    setNotificationsOpen(true);
-                  }
+                  setNotificationsOpen(true);
                 }}
                 className="absolute right-0 top-[48px] z-[10002] w-[min(320px,calc(100vw-2rem))] rounded-lg border border-[#e9e1d9] bg-white px-4 py-3 text-left shadow-xl transition hover:bg-[#fffaf0]"
               >

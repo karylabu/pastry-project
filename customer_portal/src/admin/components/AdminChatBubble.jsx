@@ -24,9 +24,11 @@ export default function AdminChatBubble() {
   const [sending, setSending] = useState(false);
   const [mobilePanel, setMobilePanel] = useState("conversation");
   const [messageAlertsEnabled, setMessageAlertsEnabled] = useState(true);
+  const [messagePreview, setMessagePreview] = useState(null);
   const [adminDialog, setAdminDialog] = useState(null);
   const conversationFetchInFlight = useRef(false);
   const previousUnreadCounts = useRef(null);
+  const messagePreviewTimer = useRef(null);
   const openRef = useRef(open);
   const messageAlertsEnabledRef = useRef(messageAlertsEnabled);
   const messageListRef = useRef(null);
@@ -90,7 +92,11 @@ export default function AdminChatBubble() {
   }, [messageAlertsEnabled]);
 
   useEffect(() => {
-    const openChat = () => setOpen(true);
+    const openChat = () => {
+      setOpen(true);
+      setMessagePreview(null);
+      window.clearTimeout(messagePreviewTimer.current);
+    };
     window.addEventListener("admin-open-chat", openChat);
     return () => window.removeEventListener("admin-open-chat", openChat);
   }, []);
@@ -119,12 +125,14 @@ export default function AdminChatBubble() {
         ));
         if (incoming) {
           playAdminChatMessageSound();
-          window.dispatchEvent(new CustomEvent("admin-chat-message-preview", {
-            detail: {
+          if (!openRef.current) {
+            setMessagePreview({
               title: `New message from ${incoming.customer_name || "a customer"}`,
               message: incoming.last_message || "A customer sent a new message.",
-            },
-          }));
+            });
+            window.clearTimeout(messagePreviewTimer.current);
+            messagePreviewTimer.current = window.setTimeout(() => setMessagePreview(null), 6000);
+          }
         }
       }
       previousUnreadCounts.current = currentUnreadCounts;
@@ -185,6 +193,8 @@ export default function AdminChatBubble() {
       window.clearInterval(pollId);
     };
   }, [fetchConversations]);
+
+  useEffect(() => () => window.clearTimeout(messagePreviewTimer.current), []);
 
   useEffect(() => {
     if (open) fetchConversations();
@@ -358,7 +368,40 @@ export default function AdminChatBubble() {
         </div>
       )}
 
-      <button type="button" onClick={() => setOpen((value) => !value)} className="fixed bottom-5 right-5 z-[10001] grid h-12 w-12 place-items-center rounded-full bg-[#f0b94d] text-black shadow-xl transition hover:scale-105 hover:bg-[#e5ae3d]" title="Customer Chat" aria-label={unreadCount > 0 ? `Customer Chat, ${unreadCount} unread messages` : "Customer Chat"}><MessageCircle size={21} />{unreadCount > 0 && <span aria-hidden="true" className="absolute -right-1 -top-1 grid h-5 min-w-5 animate-pulse place-items-center rounded-full bg-black px-1 text-[10px] font-bold text-white">{unreadCount > 99 ? "99+" : unreadCount}</span>}</button>
+      {messagePreview && !open && (
+        <button
+          type="button"
+          role="status"
+          aria-live="polite"
+          onClick={() => {
+            setMessagePreview(null);
+            window.clearTimeout(messagePreviewTimer.current);
+            setOpen(true);
+          }}
+          className="fixed bottom-[76px] right-5 z-[10002] w-[min(320px,calc(100vw-2rem))] rounded-lg border border-[#e9e1d9] bg-white px-4 py-3 text-left shadow-xl transition hover:bg-[#fffaf0]"
+        >
+          <span className="block text-[12px] font-semibold text-[#33251e]">{messagePreview.title}</span>
+          <span className="mt-1 block truncate text-[11px] text-[#74675f]">{messagePreview.message}</span>
+          <span className="mt-1 block text-[10px] font-semibold text-[#80600a]">Click to view</span>
+        </button>
+      )}
+      <button
+        type="button"
+        onClick={() => {
+          const nextOpen = !openRef.current;
+          setOpen(nextOpen);
+          if (nextOpen) {
+            setMessagePreview(null);
+            window.clearTimeout(messagePreviewTimer.current);
+          }
+        }}
+        className="fixed bottom-5 right-5 z-[10001] grid h-12 w-12 place-items-center rounded-full bg-[#f0b94d] text-black shadow-xl transition hover:scale-105 hover:bg-[#e5ae3d]"
+        title="Customer Chat"
+        aria-label={unreadCount > 0 ? `Customer Chat, ${unreadCount} unread messages` : "Customer Chat"}
+      >
+        <MessageCircle size={21} />
+        {unreadCount > 0 && <span aria-hidden="true" className="absolute -right-1 -top-1 grid h-5 min-w-5 animate-pulse place-items-center rounded-full bg-black px-1 text-[10px] font-bold text-white">{unreadCount > 99 ? "99+" : unreadCount}</span>}
+      </button>
       <AdminDialog dialog={adminDialog} onClose={() => setAdminDialog(null)} />
     </>
   );
