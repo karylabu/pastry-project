@@ -934,7 +934,7 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
                 <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-black/40" />
                 <input
                   id="staff-product-search"
-                  type="search"
+                  type="text"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   placeholder="Search products"

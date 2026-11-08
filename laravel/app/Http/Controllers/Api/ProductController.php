@@ -311,7 +311,7 @@ class ProductController extends Controller
         }
 
         try {
-            DB::transaction(function () use ($data, $product, $imageName, $newSizeVariants, $admin) {
+            DB::transaction(function () use ($data, $product, $imageName, $newSizeVariants) {
                 $priceSize = strtolower((string) ($data['price_size'] ?? ''));
                 if ($priceSize !== '') {
                     $size = DB::table('product_sizes')
@@ -319,22 +319,16 @@ class ProductController extends Controller
                         ->whereRaw('LOWER(TRIM(size)) = ?', [$priceSize])
                         ->first();
 
-                    $addingSameSize = collect($newSizeVariants)->contains(
-                        fn ($variant) => strtolower($variant['size']) === $priceSize
-                    );
-                    if (!$size && !$addingSameSize) {
+                    if (!$size) {
                         throw new \InvalidArgumentException('This cake size has no saved price row.');
                     }
 
-                    if ($size) {
-                        DB::table('product_sizes')->where('id', $size->id)->update([
-                            'price' => $data['price'],
-                            'updated_at' => now(),
-                        ]);
-                    }
+                    DB::table('product_sizes')->where('id', $size->id)->update([
+                        'price' => $data['price'],
+                        'updated_at' => now(),
+                    ]);
                 }
 
-                $addedStock = 0;
                 foreach ($newSizeVariants as $variant) {
                     $existingSize = DB::table('product_sizes')
                         ->where('product_id', $product->id)
@@ -344,46 +338,21 @@ class ProductController extends Controller
                         throw new \InvalidArgumentException("The {$variant['size']} Cake size already exists.");
                     }
 
-                    $now = now();
                     $sizeAttributes = [
                         'product_id' => $product->id,
                         'size' => $variant['size'],
                         'price' => $variant['price'],
                         'stock_quantity' => $variant['stock'],
                         'available' => true,
-                        'created_at' => $now,
-                        'updated_at' => $now,
+                        'created_at' => now(),
+                        'updated_at' => now(),
                     ];
                     $sizeAttributes = array_filter(
                         $sizeAttributes,
                         fn ($value, $column) => Schema::hasColumn('product_sizes', $column),
                         ARRAY_FILTER_USE_BOTH
                     );
-                    $sizeId = (int) DB::table('product_sizes')->insertGetId($sizeAttributes);
-                    $addedStock += $variant['stock'];
-
-                    if ($variant['stock'] > 0 && Schema::hasTable('product_inventory_movements')) {
-                        $movementAttributes = [
-                            'product_id' => $product->id,
-                            'product_size_id' => $sizeId,
-                            'movement_type' => 'Product Size Added',
-                            'quantity' => $variant['stock'],
-                            'previous_stock' => 0,
-                            'new_stock' => $variant['stock'],
-                            'reason' => 'Initial stock when adding product size',
-                            'reference_type' => 'product_size',
-                            'reference_id' => $sizeId,
-                            'user_id' => $admin->id,
-                            'created_at' => $now,
-                            'updated_at' => $now,
-                        ];
-                        $movementAttributes = array_filter(
-                            $movementAttributes,
-                            fn ($value, $column) => Schema::hasColumn('product_inventory_movements', $column),
-                            ARRAY_FILTER_USE_BOTH
-                        );
-                        DB::table('product_inventory_movements')->insert($movementAttributes);
-                    }
+                    DB::table('product_sizes')->insert($sizeAttributes);
                 }
 
                 $product->name = $data['name'];
@@ -396,8 +365,11 @@ class ProductController extends Controller
                 if ($addedBigSize) {
                     $product->price = $addedBigSize['price'];
                 }
-                if ($addedStock > 0 && Schema::hasColumn('products', 'stock')) {
-                    $product->stock = (int) $product->stock + $addedStock;
+                if ($newSizeVariants && Schema::hasColumn('products', 'stock')) {
+                    $product->stock = (int) DB::table('product_sizes')
+                        ->where('product_id', $product->id)
+                        ->whereRaw('LOWER(TRIM(size)) <> ?', ['slice'])
+                        ->sum('stock_quantity');
                 }
                 if ($imageName !== null) {
                     $product->image = $imageName;

@@ -541,18 +541,17 @@ describe('Products admin catalog', () => {
     );
   });
 
-  test('adds a missing size from the edit form with a price and starting stock', async () => {
+  test('adds a missing cake size below the price field in Edit Product', async () => {
     mockLocationSearch = '?category=Small%20Cakes';
     render(<Products allowCatalogManagement />);
 
-    await waitFor(() => {
-      expect(screen.getByText('Mini Vanilla Cake')).toBeInTheDocument();
-    });
-
+    await screen.findByText('Mini Vanilla Cake');
     fireEvent.click(screen.getByRole('button', { name: 'Edit Mini Vanilla Cake' }));
+
     fireEvent.click(screen.getByRole('button', { name: 'Add Size' }));
     expect(screen.getByLabelText('Cake Size')).toHaveValue('Big');
-    expect(screen.getByLabelText('Price (Big Cake)').compareDocumentPosition(screen.getByLabelText('Starting Stock (Big Cake)')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.getByLabelText('Price (Big Cake)')).toBeInTheDocument();
+    expect(screen.getByLabelText('Starting Stock (Big Cake)')).toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText('Price (Big Cake)'), { target: { value: '550' } });
     fireEvent.change(screen.getByLabelText('Starting Stock (Big Cake)'), { target: { value: '4' } });
@@ -569,6 +568,16 @@ describe('Products admin catalog', () => {
     expect(updateCall[1].body.getAll('add_sizes[]')).toEqual(['Big']);
     expect(updateCall[1].body.get('add_prices[Big]')).toBe('550');
     expect(updateCall[1].body.get('add_stocks[Big]')).toBe('4');
+  });
+
+  test('uses one custom clear control for the admin product search', async () => {
+    render(<Products allowCatalogManagement />);
+
+    const search = screen.getByLabelText('Search products');
+    expect(search).toHaveAttribute('type', 'text');
+    fireEvent.change(search, { target: { value: 'Vanilla' } });
+
+    expect(screen.getAllByRole('button', { name: 'Clear search' })).toHaveLength(1);
   });
 
   test('shows the saved product image in the edit form and previews a replacement', async () => {

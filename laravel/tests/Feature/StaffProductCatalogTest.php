@@ -425,10 +425,9 @@ class StaffProductCatalogTest extends TestCase
         $this->assertDatabaseHas('product_sizes', ['product_id' => 1, 'size' => 'Small', 'price' => 350]);
     }
 
-    public function test_admin_can_add_missing_cake_size_with_price_and_initial_stock(): void
+    public function test_admin_can_add_missing_cake_size_with_price_and_starting_stock(): void
     {
         DB::table('product_sizes')->where('product_id', 1)->where('size', 'Big')->delete();
-        DB::table('products')->where('id', 1)->update(['stock' => 2]);
 
         $admin = new User();
         $admin->role = 'admin';
@@ -436,9 +435,9 @@ class StaffProductCatalogTest extends TestCase
 
         $this->actingAs($admin)
             ->postJson('/api/staff/products/1', [
-                'name' => 'Strawberry Cake',
+                'name' => 'Chocolate Cake',
                 'category' => 'Cakes',
-                'description' => 'Sweet and fruity',
+                'description' => 'Chocolate cake',
                 'price_size' => 'small',
                 'price' => 320,
                 'add_sizes' => ['Big'],
@@ -456,14 +455,6 @@ class StaffProductCatalogTest extends TestCase
             'available' => true,
         ]);
         $this->assertDatabaseHas('products', ['id' => 1, 'price' => 550, 'stock' => 6]);
-        $this->assertDatabaseHas('product_inventory_movements', [
-            'product_id' => 1,
-            'product_size_id' => DB::table('product_sizes')->where('product_id', 1)->where('size', 'Big')->value('id'),
-            'movement_type' => 'Product Size Added',
-            'quantity' => 4,
-            'previous_stock' => 0,
-            'new_stock' => 4,
-        ]);
     }
 
     public function test_product_update_requires_admin_authorization(): void
