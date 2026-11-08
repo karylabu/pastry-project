@@ -71,6 +71,10 @@ describe('compact sales report import', () => {
     expect(screen.queryByRole('button', { name: 'Import Customized Cake Sales' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Import Finished Product Sales' })).not.toBeInTheDocument();
     expect(screen.getByText(/reports are cleaned automatically/i)).toBeInTheDocument();
+    expect(screen.queryByLabelText('CSV overlap handling')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Import Sales Report' }).parentElement).toContainElement(
+      screen.getByText(/reports are cleaned automatically/i),
+    );
   });
 
   test('notifies the reports page as soon as a CSV is queued so it can be cancelled', async () => {

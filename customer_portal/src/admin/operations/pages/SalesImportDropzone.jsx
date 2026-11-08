@@ -301,20 +301,15 @@ export default function SalesImportDropzone({
     return (
       <div className="admin-sales-import-buttons grid grid-cols-1 gap-2 min-[400px]:grid-cols-2 min-[1024px]:grid-cols-4">
         <input ref={inputRef} type="file" accept=".csv,.pdf" className="hidden" onChange={onInputChange} />
-        <label className="col-span-full flex min-h-10 min-w-0 flex-col items-stretch justify-center gap-1 rounded-md border border-black/15 bg-white px-3 py-2 text-[10px] font-semibold leading-tight text-black/70 sm:flex-row sm:items-center sm:gap-2">
-          CSV overlap handling
-          <select aria-label="CSV overlap handling" value={overlapMode} onChange={(event) => setOverlapMode(event.target.value)} className="min-w-0 flex-1 bg-transparent text-[10px] outline-none">
-            <option value="deduplicate_live">Skip rows overlapping live orders</option>
-            <option value="supplement">Add as additional sales (e.g. walk-ins)</option>
-          </select>
-        </label>
-        <button type="button" onClick={() => { chooseSalesType('other'); inputRef.current?.click(); }} disabled={isProcessing} className="inline-flex h-auto min-h-10 min-w-0 items-center justify-center gap-2 rounded-md bg-black px-3 py-2 text-center text-[10px] font-semibold leading-tight text-white transition hover:bg-black/85 disabled:cursor-wait disabled:opacity-60 sm:text-[11px]">
-          {isProcessing ? <Loader2 size={14} className="animate-spin" /> : <UploadCloud size={14} />}
-          {isProcessing ? 'Importing report...' : 'Import Sales Report'}
-        </button>
-        <p className="col-span-full text-[10px] leading-relaxed text-black/55">
-          CSV and PDF reports are cleaned automatically. Review the import summary for cleaned rows, skipped rows, and warnings.
-        </p>
+        <div className="col-span-full flex min-w-0 items-center gap-2">
+          <button type="button" onClick={() => { chooseSalesType('other'); inputRef.current?.click(); }} disabled={isProcessing} className="inline-flex h-auto min-h-10 shrink-0 items-center justify-center gap-2 rounded-md bg-black px-3 py-2 text-center text-[10px] font-semibold leading-tight text-white transition hover:bg-black/85 disabled:cursor-wait disabled:opacity-60 sm:text-[11px]">
+            {isProcessing ? <Loader2 size={14} className="animate-spin" /> : <UploadCloud size={14} />}
+            {isProcessing ? 'Importing report...' : 'Import Sales Report'}
+          </button>
+          <p className="min-w-0 flex-1 text-[10px] leading-relaxed text-black/55">
+            CSV and PDF reports are cleaned automatically. Review the import summary for cleaned rows, skipped rows, and warnings.
+          </p>
+        </div>
         <button
           type="button"
           onClick={onDownloadCsvReport || (() => downloadCsvTemplate(range, dateFilterStart, dateFilterEnd))}
