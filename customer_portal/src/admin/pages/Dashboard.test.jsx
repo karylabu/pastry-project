@@ -223,8 +223,8 @@ test("shows the four best-selling panels in a compact horizontal layout", async 
   const filterGroup = screen.getByRole("group", { name: "Filter sales mix by cake type" });
   expect(salesMix.querySelector(".border-b")).toContainElement(headings[3]);
   expect(filterGroup).toHaveClass("inline-flex", "rounded-lg");
-  expect(screen.getByText("Regular Best Sellers")).toBeInTheDocument();
-  expect(screen.getByText("Customized", { selector: "p" })).toBeInTheDocument();
+  expect(screen.getByText("Regular", { selector: "p" })).toBeInTheDocument();
+  expect(screen.getByText("Customize", { selector: "p" })).toBeInTheDocument();
   expect(screen.getByText("regular cakes")).toBeInTheDocument();
   expect(screen.getByText("18,084 sold · 97%")).toBeInTheDocument();
   expect(screen.getByText("customized cakes")).toBeInTheDocument();

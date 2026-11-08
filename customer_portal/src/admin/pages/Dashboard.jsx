@@ -574,7 +574,7 @@ export default function Dashboard() {
 
                 <div className="grid items-stretch gap-3 lg:grid-cols-2 xl:grid-cols-4">
                   <Panel eyebrow="Best Sellers" title="Best-selling flavors" compact className="flex h-full min-w-0 flex-col overflow-hidden"><div className="min-h-0 flex-1 overflow-y-auto"><RankedList rows={analytics.flavors} compact /></div></Panel>
-                  <Panel eyebrow="Customized" title="Best-selling cake designs" compact className="flex h-full min-w-0 flex-col overflow-hidden">
+                  <Panel eyebrow="Customize" title="Best-selling cake designs" compact className="flex h-full min-w-0 flex-col overflow-hidden">
                     <div className="min-h-0 flex-1 overflow-y-auto">
                       <RankedList rows={visibleCustomizedDesigns} compact startIndex={(customizedDesignPage - 1) * 5} />
                     </div>
@@ -590,7 +590,7 @@ export default function Dashboard() {
                       </div>
                     )}
                   </Panel>
-                  <Panel eyebrow="Regular Best Sellers" title="Best-selling sizes" compact className="flex h-full min-w-0 flex-col overflow-hidden"><div className="min-h-0 flex-1 overflow-y-auto"><RankedList rows={analytics.sizes} compact /></div></Panel>
+                  <Panel eyebrow="Regular" title="Best-selling sizes" compact className="flex h-full min-w-0 flex-col overflow-hidden"><div className="min-h-0 flex-1 overflow-y-auto"><RankedList rows={analytics.sizes} compact /></div></Panel>
                   <Panel
                     eyebrow="Sales Mix"
                     title="Regular vs. customized cakes"
