@@ -147,6 +147,7 @@ describe("AdminChatBubble", () => {
             user_id: 7,
             conversation_id: "quick-chat",
             customer_name: "New Customer",
+            customer_avatar: "https://example.test/customer-avatar.png",
             unread_count: 1,
             last_message: "Hi, I need help",
           }],
@@ -159,6 +160,7 @@ describe("AdminChatBubble", () => {
       preview = screen.getByRole("status");
       expect(preview).toHaveTextContent("New message from New Customer");
       expect(preview).toHaveTextContent("Hi, I need help");
+      expect(preview.querySelector("img")).toHaveAttribute("src", "https://example.test/customer-avatar.png");
     }, { timeout: 3500 });
     expect(playAdminChatMessageSound).toHaveBeenCalledTimes(1);
     fireEvent.click(preview);

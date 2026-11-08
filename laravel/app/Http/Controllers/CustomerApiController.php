@@ -1046,6 +1046,7 @@ class CustomerApiController extends Controller
                 $customerName = $hasCustomerName && ($message->sender ?? '') === 'customer'
                     ? trim((string) ($message->customer_name ?? ''))
                     : '';
+                $customerAvatar = '';
                 $orderStatus = 'General Inquiry';
                 $orderLabel = 'General Inquiry';
 
@@ -1068,6 +1069,21 @@ class CustomerApiController extends Controller
                     $customerName = (string) (DB::table('users')->where('id', $userId)->value('name') ?: $customerName);
                 }
 
+                if ($userId > 0 && Schema::hasTable('users')) {
+                    $userColumns = ['id'];
+                    foreach (['profile_picture', 'profile_image', 'avatar'] as $column) {
+                        if (Schema::hasColumn('users', $column)) {
+                            $userColumns[] = $column;
+                        }
+                    }
+                    $customer = DB::table('users')->where('id', $userId)->first($userColumns);
+                    if ($customer) {
+                        $customerAvatar = trim((string) ($customer->profile_picture ?? ''))
+                            ?: trim((string) ($customer->profile_image ?? ''))
+                            ?: trim((string) ($customer->avatar ?? ''));
+                    }
+                }
+
                 $conversations[$key] = [
                     'conversation_key' => $key,
                     'order_id' => $orderId,
@@ -1075,6 +1091,7 @@ class CustomerApiController extends Controller
                     'conversation_id' => $conversationId !== '' ? $conversationId : 'legacy',
                     'order_status' => $orderStatus,
                     'customer_name' => $customerName !== '' ? $customerName : 'Customer',
+                    'customer_avatar' => $customerAvatar,
                     'order_label' => $orderLabel,
                     'last_message' => $message->message ?? '',
                     'last_sender' => $message->sender ?? '',

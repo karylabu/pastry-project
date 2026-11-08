@@ -365,6 +365,29 @@ class CustomerChatApiTest extends TestCase
         $this->assertSame(1, (int) $conversations['conversation-beta']['unread_count']);
     }
 
+    public function test_admin_chat_conversations_include_customer_profile_picture_when_available(): void
+    {
+        Schema::table('users', function ($table) {
+            $table->string('profile_picture')->nullable();
+        });
+        DB::table('users')->where('id', 7)->update([
+            'profile_picture' => 'https://example.test/customer-avatar.png',
+        ]);
+        DB::table('messages')->insert([
+            'order_id' => null,
+            'user_id' => 7,
+            'sender' => 'customer',
+            'message' => 'Hello',
+            'is_read' => 0,
+            'conversation_id' => 'avatar-chat',
+        ]);
+
+        $this->withToken('test-admin-token')
+            ->getJson('/api/staff/chat/conversations')
+            ->assertOk()
+            ->assertJsonPath('conversations.0.customer_avatar', 'https://example.test/customer-avatar.png');
+    }
+
     public function test_customer_can_send_an_image_without_text(): void
     {
         $response = $this->withHeaders([

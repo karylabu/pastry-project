@@ -129,6 +129,7 @@ export default function AdminChatBubble() {
             setMessagePreview({
               title: `New message from ${incoming.customer_name || "a customer"}`,
               message: incoming.last_message || "A customer sent a new message.",
+              avatar: incoming.customer_avatar || "",
             });
             window.clearTimeout(messagePreviewTimer.current);
             messagePreviewTimer.current = window.setTimeout(() => setMessagePreview(null), 6000);
@@ -378,11 +379,20 @@ export default function AdminChatBubble() {
             window.clearTimeout(messagePreviewTimer.current);
             setOpen(true);
           }}
-          className="fixed bottom-[76px] right-5 z-[10002] w-[min(320px,calc(100vw-2rem))] rounded-lg border border-[#e9e1d9] bg-white px-4 py-3 text-left shadow-xl transition hover:bg-[#fffaf0]"
+          className="fixed bottom-[76px] right-5 z-[10002] flex w-[min(320px,calc(100vw-2rem))] items-start gap-3 rounded-lg border border-[#e9e1d9] bg-white px-4 py-3 text-left shadow-xl transition hover:bg-[#fffaf0]"
         >
-          <span className="block text-[12px] font-semibold text-[#33251e]">{messagePreview.title}</span>
-          <span className="mt-1 block truncate text-[11px] text-[#74675f]">{messagePreview.message}</span>
-          <span className="mt-1 block text-[10px] font-semibold text-[#80600a]">Click to view</span>
+          {messagePreview.avatar ? (
+            <img src={messagePreview.avatar} alt="" className="h-9 w-9 shrink-0 rounded-full object-cover" />
+          ) : (
+            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[#fff4cd] text-xs font-bold text-[#80600a]">
+              {String(messagePreview.title).replace(/^New message from\s*/i, "").charAt(0).toUpperCase()}
+            </span>
+          )}
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-[12px] font-semibold text-[#33251e]">{messagePreview.title}</span>
+            <span className="mt-1 block truncate text-[11px] text-[#74675f]">{messagePreview.message}</span>
+            <span className="mt-1 block text-[10px] font-semibold text-[#80600a]">Click to view</span>
+          </span>
         </button>
       )}
       <button
