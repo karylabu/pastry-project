@@ -257,9 +257,14 @@ describe('Products admin catalog', () => {
 
     for (const productName of ['Strawberry Cake', 'Mini Vanilla Cake']) {
       const sizeButton = await screen.findByRole('button', { name: `9 inches size for ${productName}` });
-      expect(sizeButton).toHaveTextContent('₱720.00');
-      expect(sizeButton).toHaveTextContent('Stock: 3');
+      expect(sizeButton).toHaveTextContent('9 inches');
+      expect(sizeButton).not.toHaveTextContent('₱');
+      expect(sizeButton).not.toHaveTextContent('Stock:');
     }
+    expect(screen.getAllByText('₱720.00', { selector: 'p' })).toHaveLength(2);
+    expect(screen.getAllByText((_, element) =>
+      element?.textContent === 'Available stock 3'
+    )).toHaveLength(2);
   });
 
   test('allows adding a custom size to only the checked cake', async () => {
@@ -281,7 +286,8 @@ describe('Products admin catalog', () => {
         expect.stringContaining('/api/staff/products/4/sizes'),
         expect.objectContaining({ method: 'POST' }),
       );
-      expect(screen.getByRole('button', { name: '10 inches size for Mini Vanilla Cake' })).toHaveTextContent('Stock: 2');
+      expect(screen.getByRole('button', { name: '10 inches size for Mini Vanilla Cake' })).toHaveTextContent('10 inches');
+      expect(screen.getByRole('button', { name: '10 inches size for Mini Vanilla Cake' })).not.toHaveTextContent('Stock:');
     });
     expect(global.fetch).not.toHaveBeenCalledWith(
       expect.stringContaining('/api/staff/products/1/sizes'),

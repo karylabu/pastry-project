@@ -1192,7 +1192,7 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
                 </div>
 
                 {canManageCatalog && getProductSizeOptions(product).length > 0 && (
-                  <div className="mb-1 flex w-full flex-wrap justify-center gap-1 rounded-xl border border-[#f1e6df] bg-[#f8f3ee] p-1.5">
+                  <div className="mb-1 flex min-h-[25px] w-full items-center justify-center gap-1 rounded-full border border-[#f1e6df] bg-[#f8f3ee] p-1">
                     {getProductSizeOptions(product).map((sizeOption) => {
                       const sizeName = String(sizeOption.size || sizeOption.variant_size || "").trim();
                       const sizeLabel = sizeName.toLowerCase() === "small"
@@ -1209,15 +1209,13 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
                           onClick={() => setCardSizeSelections((current) => ({ ...current, [product.id]: sizeName }))}
                           aria-label={`${sizeLabel} size for ${product.name}`}
                           aria-pressed={selected}
-                          className={`flex min-w-[84px] flex-1 flex-col items-center justify-center rounded-lg border px-2 py-1.5 text-center transition-all ${
+                          className={`flex min-w-0 flex-1 items-center justify-center rounded-xl border px-1.5 py-1 text-[8px] font-semibold uppercase tracking-[0.08em] whitespace-nowrap transition-all ${
                             selected
                               ? 'border-[#e7c875] bg-[#fff8df] text-[#8d6a2e] shadow-sm'
                               : 'border-[#eadfd8] bg-white text-[#765d50] hover:border-[#e7c875] hover:bg-[#fff8df] hover:text-[#8d6a2e]'
                           }`}
                         >
-                          <span className="max-w-full truncate text-[9px] font-semibold">{sizeLabel}</span>
-                          <span className="text-[8px]">₱{Number(sizeOption.price || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                          <span className="text-[8px]">Stock: {Number(sizeOption.stock_quantity ?? 0)}</span>
+                          {sizeLabel}
                         </button>
                       );
                     })}
