@@ -596,10 +596,9 @@ export default function Dashboard() {
                   </Panel>
                   <Panel eyebrow="Regular" title="Best-selling sizes" compact className="flex h-full min-w-0 flex-col overflow-hidden"><div className="min-h-0 flex-1 overflow-y-auto"><RankedList rows={analytics.sizes} compact /></div></Panel>
                   <Panel
-                    eyebrow={null}
+                    eyebrow="Customize"
                     title="Customize Best Selling Sizes"
                     compact
-                    titleClassName="text-[13px] font-semibold"
                     className="flex h-full min-w-0 flex-col overflow-hidden"
                   >
                     <div className="min-h-0 flex-1 overflow-y-auto p-3">
