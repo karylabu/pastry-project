@@ -446,9 +446,14 @@ class ProcessSalesCsvImport implements ShouldQueue
             'quantity' => ['quantity', 'qty', 'units', 'units_sold'],
             'price' => ['price', 'unit_price', 'unit_cost', 'selling_price'],
             'total' => ['total_amount', 'total', 'amount', 'line_total', 'gross_amount', 'sales_amount', 'net_sales', 'total_sales', 'subtotal'],
-            'date' => ['sale_date', 'date', 'sold_at', 'transaction_date', 'timestamp'],
+            'date' => ['sale_date', 'order_date', 'date', 'sold_at', 'transaction_date', 'timestamp'],
         ];
-        $normalized = array_map(static fn ($header) => strtolower(trim(preg_replace('/\s+/', '_', trim(preg_replace('/^\xEF\xBB\xBF/', '', (string) $header), " \t\n\r\0\x0B\"'")))), $headers);
+        $normalized = array_map(static function ($header): string {
+            $header = trim(preg_replace('/^\xEF\xBB\xBF/', '', (string) $header), " \t\n\r\0\x0B\"'");
+            $header = preg_replace('/\s*\((?:php|peso(?:s)?)\)\s*$/iu', '', $header);
+
+            return strtolower(trim(preg_replace('/[\s-]+/', '_', (string) $header)));
+        }, $headers);
         $columns = [];
 
         foreach ($aliases as $field => $names) {

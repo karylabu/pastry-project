@@ -653,7 +653,7 @@ class SalesImportControllerTest extends TestCase
         ]);
         Storage::disk('local')->put(
             'sales-imports/semicolon-sales.csv',
-            "Monthly Sales Report\nProduct Name;Sale Date;Qty;Unit Price;Sales Amount\nChocolate Cake;2026-11-08;2;500;1000\n"
+            "Monthly Sales Report\nCake Name;Order Date;Size;Quantity;Price (PHP);Total (PHP)\nChocolate Cake;2026-11-08;Small;2;500;1000\n"
         );
 
         (new ProcessSalesCsvImport($importId, 'sales-imports/semicolon-sales.csv'))->handle();
