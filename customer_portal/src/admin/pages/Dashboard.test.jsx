@@ -105,6 +105,10 @@ beforeEach(() => {
       ok: true,
       json: async () => ({
         success: true,
+        cakeTypeBreakdown: {
+          regular: { quantity: 18084, percentage: 97, sizes: [{ name: "Small", quantity: 10000, percentage: 60 }] },
+          customized: { quantity: 592, percentage: 3, sizes: [{ name: "Big", quantity: 300, percentage: 50 }] },
+        },
         summary: {},
         salesTrend: { daily: [], monthly: [] },
         ingredientAnalytics: { low_stock: [], actual_consumption: [] },
@@ -208,4 +212,17 @@ test("shows the four best-selling panels in a compact horizontal layout", async 
   for (let index = 0; index < panels.length - 1; index += 1) {
     expect(panels[index].compareDocumentPosition(panels[index + 1]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   }
+
+  const salesMix = panels[3];
+  const filterGroup = screen.getByRole("group", { name: "Filter sales mix by cake type" });
+  expect(salesMix.querySelector(".border-b")).toContainElement(headings[3]);
+  expect(filterGroup).toHaveClass("inline-flex", "rounded-lg");
+  expect(screen.getByText("regular cakes")).toBeInTheDocument();
+  expect(screen.getByText("18,084 sold · 97%")).toBeInTheDocument();
+  expect(screen.getByText("customized cakes")).toBeInTheDocument();
+  expect(screen.getByText("592 sold · 3%")).toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole("button", { name: "regular" }));
+  expect(await screen.findByText("Popular regular cake sizes")).toBeInTheDocument();
+  expect(screen.getByText("Small")).toBeInTheDocument();
 });

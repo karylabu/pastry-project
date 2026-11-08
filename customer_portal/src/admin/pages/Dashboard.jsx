@@ -573,23 +573,21 @@ export default function Dashboard() {
                     title="Regular vs. customized cakes"
                     compact
                     className="flex h-full min-w-0 flex-col overflow-hidden"
-                    action={
-                      <div className="flex shrink-0 gap-1.5" role="group" aria-label="Filter sales mix by cake type">
+                  >
+                    <div className="min-h-0 flex-1 overflow-y-auto p-3">
+                      <div className="mb-3 inline-flex rounded-lg bg-[#f7f2eb] p-1" role="group" aria-label="Filter sales mix by cake type">
                         {["regular", "customized"].map((type) => (
                           <button
                             key={type}
                             type="button"
                             aria-pressed={salesMixType === type}
                             onClick={() => setSalesMixType((current) => current === type ? null : type)}
-                            className={`rounded-full border px-2.5 py-1.5 text-[9px] font-semibold capitalize transition-colors sm:px-3 sm:text-[10px] ${salesMixType === type ? "border-[#33251e] bg-[#33251e] text-white" : "border-[#eadfd8] bg-white text-[#765d50] hover:bg-[#fff8df]"}`}
+                            className={`rounded-md px-3 py-1.5 text-[10px] font-semibold capitalize transition-colors ${salesMixType === type ? "bg-[#33251e] text-white shadow-sm" : "text-[#765d50] hover:bg-white hover:text-[#33251e]"}`}
                           >
                             {type}
                           </button>
                         ))}
                       </div>
-                    }
-                  >
-                    <div className="min-h-0 flex-1 overflow-y-auto p-3">
                       {salesMixType ? (
                         <div>
                           <p className="mb-2 text-[10px] font-semibold capitalize text-[#5f514a]">
@@ -618,10 +616,10 @@ export default function Dashboard() {
                       ) : (
                         <div className="space-y-2">
                           {Object.entries(regularVsCustomized).map(([type, row]) => (
-                            <div key={type}>
+                            <div key={type} className="rounded-lg px-2.5 py-2 transition-colors hover:bg-[#fff8df]">
                               <div className="mb-1 flex items-center justify-between gap-2">
-                                <span className="text-[10px] font-medium capitalize text-[#5f514a]">{type} cakes</span>
-                                <span className="text-[10px] font-semibold text-[#33251e]">{Number(row.quantity || 0).toLocaleString()} sold · {Number(row.percentage || 0).toFixed(0)}%</span>
+                                <span className="text-[11px] font-medium capitalize text-[#5f514a]">{type} cakes</span>
+                                <span className="shrink-0 text-[10px] font-semibold text-[#33251e]">{Number(row.quantity || 0).toLocaleString()} sold · {Number(row.percentage || 0).toFixed(0)}%</span>
                               </div>
                               <div className="h-1.5 overflow-hidden rounded-full bg-[#f4ece6]">
                                 <div className={`h-full rounded-full ${type === "regular" ? "bg-[#a57c38]" : "bg-[#d6c66f]"}`} style={{ width: `${Math.min(100, Number(row.percentage || 0))}%` }} />
