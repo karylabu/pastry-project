@@ -262,8 +262,27 @@ class ProductController extends Controller
             'description' => ['nullable', 'string'],
             'price_size' => ['nullable', 'in:small,big'],
             'price' => ['required', 'numeric', 'gt:0'],
+            'add_sizes' => ['sometimes', 'array', 'min:1'],
+            'add_sizes.*' => ['required', 'distinct', 'in:Small,Big'],
+            'add_prices' => ['required_with:add_sizes', 'array'],
+            'add_prices.*' => ['required', 'numeric', 'gt:0'],
+            'add_stocks' => ['required_with:add_sizes', 'array'],
+            'add_stocks.*' => ['required', 'integer', 'min:0'],
             'image' => ['nullable', 'image', 'mimes:jpg,jpeg,png,gif', 'max:5120'],
         ]);
+
+        $newSizeVariants = [];
+        foreach ($data['add_sizes'] ?? [] as $size) {
+            $price = $data['add_prices'][$size] ?? null;
+            $stock = $data['add_stocks'][$size] ?? null;
+            if (!is_numeric($price) || (float) $price <= 0 || filter_var($stock, FILTER_VALIDATE_INT) === false || (int) $stock < 0) {
+                return response()->json([
+                    'success' => false,
+                    'message' => "Enter a valid price and starting stock for the {$size} Cake size.",
+                ], 422);
+            }
+            $newSizeVariants[] = ['size' => $size, 'price' => $price, 'stock' => (int) $stock];
+        }
 
         $image = $request->file('image');
         $imageName = null;
@@ -292,7 +311,7 @@ class ProductController extends Controller
         }
 
         try {
-            DB::transaction(function () use ($data, $product, $imageName) {
+            DB::transaction(function () use ($data, $product, $imageName, $newSizeVariants, $admin) {
                 $priceSize = strtolower((string) ($data['price_size'] ?? ''));
                 if ($priceSize !== '') {
                     $size = DB::table('product_sizes')
@@ -300,14 +319,71 @@ class ProductController extends Controller
                         ->whereRaw('LOWER(TRIM(size)) = ?', [$priceSize])
                         ->first();
 
-                    if (!$size) {
+                    $addingSameSize = collect($newSizeVariants)->contains(
+                        fn ($variant) => strtolower($variant['size']) === $priceSize
+                    );
+                    if (!$size && !$addingSameSize) {
                         throw new \InvalidArgumentException('This cake size has no saved price row.');
                     }
 
-                    DB::table('product_sizes')->where('id', $size->id)->update([
-                        'price' => $data['price'],
-                        'updated_at' => now(),
-                    ]);
+                    if ($size) {
+                        DB::table('product_sizes')->where('id', $size->id)->update([
+                            'price' => $data['price'],
+                            'updated_at' => now(),
+                        ]);
+                    }
+                }
+
+                $addedStock = 0;
+                foreach ($newSizeVariants as $variant) {
+                    $existingSize = DB::table('product_sizes')
+                        ->where('product_id', $product->id)
+                        ->whereRaw('LOWER(TRIM(size)) = ?', [strtolower($variant['size'])])
+                        ->exists();
+                    if ($existingSize) {
+                        throw new \InvalidArgumentException("The {$variant['size']} Cake size already exists.");
+                    }
+
+                    $now = now();
+                    $sizeAttributes = [
+                        'product_id' => $product->id,
+                        'size' => $variant['size'],
+                        'price' => $variant['price'],
+                        'stock_quantity' => $variant['stock'],
+                        'available' => true,
+                        'created_at' => $now,
+                        'updated_at' => $now,
+                    ];
+                    $sizeAttributes = array_filter(
+                        $sizeAttributes,
+                        fn ($value, $column) => Schema::hasColumn('product_sizes', $column),
+                        ARRAY_FILTER_USE_BOTH
+                    );
+                    $sizeId = (int) DB::table('product_sizes')->insertGetId($sizeAttributes);
+                    $addedStock += $variant['stock'];
+
+                    if ($variant['stock'] > 0 && Schema::hasTable('product_inventory_movements')) {
+                        $movementAttributes = [
+                            'product_id' => $product->id,
+                            'product_size_id' => $sizeId,
+                            'movement_type' => 'Product Size Added',
+                            'quantity' => $variant['stock'],
+                            'previous_stock' => 0,
+                            'new_stock' => $variant['stock'],
+                            'reason' => 'Initial stock when adding product size',
+                            'reference_type' => 'product_size',
+                            'reference_id' => $sizeId,
+                            'user_id' => $admin->id,
+                            'created_at' => $now,
+                            'updated_at' => $now,
+                        ];
+                        $movementAttributes = array_filter(
+                            $movementAttributes,
+                            fn ($value, $column) => Schema::hasColumn('product_inventory_movements', $column),
+                            ARRAY_FILTER_USE_BOTH
+                        );
+                        DB::table('product_inventory_movements')->insert($movementAttributes);
+                    }
                 }
 
                 $product->name = $data['name'];
@@ -315,6 +391,13 @@ class ProductController extends Controller
                 $product->description = $data['description'] ?? null;
                 if ($priceSize === 'big' || $priceSize === '') {
                     $product->price = $data['price'];
+                }
+                $addedBigSize = collect($newSizeVariants)->firstWhere('size', 'Big');
+                if ($addedBigSize) {
+                    $product->price = $addedBigSize['price'];
+                }
+                if ($addedStock > 0 && Schema::hasColumn('products', 'stock')) {
+                    $product->stock = (int) $product->stock + $addedStock;
                 }
                 if ($imageName !== null) {
                     $product->image = $imageName;
@@ -328,6 +411,10 @@ class ProductController extends Controller
             $this->removeFailedProductImage($imageName, (int) $product->id);
             Log::error('Product update failed.', ['product_id' => $product->id, 'exception' => $exception]);
             return response()->json(['success' => false, 'message' => 'Unable to update the product.'], 500);
+        }
+
+        if ($newSizeVariants) {
+            app(\App\Services\RealtimeEventPublisher::class)->inventoryUpdated();
         }
 
         return response()->json(['success' => true, 'product_id' => (int) $product->id]);

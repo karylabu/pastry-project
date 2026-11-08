@@ -541,6 +541,36 @@ describe('Products admin catalog', () => {
     );
   });
 
+  test('adds a missing size from the edit form with a price and starting stock', async () => {
+    mockLocationSearch = '?category=Small%20Cakes';
+    render(<Products allowCatalogManagement />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Mini Vanilla Cake')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Edit Mini Vanilla Cake' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Add Size' }));
+    expect(screen.getByLabelText('Cake Size')).toHaveValue('Big');
+    expect(screen.getByLabelText('Price (Big Cake)').compareDocumentPosition(screen.getByLabelText('Starting Stock (Big Cake)')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+
+    fireEvent.change(screen.getByLabelText('Price (Big Cake)'), { target: { value: '550' } });
+    fireEvent.change(screen.getByLabelText('Starting Stock (Big Cake)'), { target: { value: '4' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+    await waitFor(() => {
+      expect(screen.queryByRole('heading', { name: 'Edit Product' })).not.toBeInTheDocument();
+    });
+
+    const updateCall = global.fetch.mock.calls.find(([url, options]) =>
+      String(url).endsWith('/api/staff/products/4') && options?.method === 'POST'
+    );
+    expect(updateCall).toBeDefined();
+    expect(updateCall[1].body.getAll('add_sizes[]')).toEqual(['Big']);
+    expect(updateCall[1].body.get('add_prices[Big]')).toBe('550');
+    expect(updateCall[1].body.get('add_stocks[Big]')).toBe('4');
+  });
+
   test('shows the saved product image in the edit form and previews a replacement', async () => {
     URL.createObjectURL = jest.fn(() => 'blob:edit-product-preview');
     URL.revokeObjectURL = jest.fn();

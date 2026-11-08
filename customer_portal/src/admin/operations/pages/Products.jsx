@@ -101,6 +101,10 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
   const [editImage, setEditImage] = useState(null);
   const [editImagePreview, setEditImagePreview] = useState("");
   const [editSaving, setEditSaving] = useState(false);
+  const [editAddSizeOpen, setEditAddSizeOpen] = useState(false);
+  const [editAddSize, setEditAddSize] = useState("");
+  const [editAddSizePrice, setEditAddSizePrice] = useState("");
+  const [editAddSizeStock, setEditAddSizeStock] = useState("0");
   const [recipeDeleting, setRecipeDeleting] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [recipeLines, setRecipeLines] = useState([]);
@@ -184,6 +188,10 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
   const canEditCatalog = Boolean(allowCatalogManagement);
   const editRecipeSize = editProduct ? getProductSizeByName(editProduct, editSize) : null;
   const editRecipeSizeId = editRecipeSize?.id ? String(editRecipeSize.id) : "";
+  const editExistingSizeNames = new Set(getProductSizeOptions(editProduct).map((size) =>
+    String(size?.size || size?.variant_size || "").trim().toLowerCase()
+  ));
+  const editAvailableSizes = ["Big", "Small"].filter((size) => !editExistingSizeNames.has(size.toLowerCase()));
 
   const openEditProductModal = (product, selectedSizeName = getCardSizeName(product)) => {
     const sizeName = String(selectedSizeName || "").toLowerCase() === "small" ? "small" : "big";
@@ -199,6 +207,10 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
       image: product.image || "",
     });
     setEditImage(null);
+    setEditAddSizeOpen(false);
+    setEditAddSize("");
+    setEditAddSizePrice("");
+    setEditAddSizeStock("0");
     setRecipeRows([{ ingredient_id: "", qty: "" }]);
     setEditOpen(true);
   };
@@ -1742,7 +1754,22 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
                   </div>
 
                   <div className="space-y-2">
-                    <label htmlFor="edit-product-price" className="block text-[10px] font-bold uppercase tracking-[0.16em] text-[#8f8076]">{editSize === "small" ? "Small Cake Price" : "Big Cake Price"}</label>
+                    <div className="flex items-center justify-between gap-2">
+                      <label htmlFor="edit-product-price" className="block text-[10px] font-bold uppercase tracking-[0.16em] text-[#8f8076]">{editSize === "small" ? "Small Cake Price" : "Big Cake Price"}</label>
+                      {canManageCatalog && editAvailableSizes.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditAddSizeOpen((open) => !open);
+                            setEditAddSize((size) => size || editAvailableSizes[0]);
+                          }}
+                          className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-[#d8c9b5] bg-[#fff8e9] px-2 py-1 text-[10px] font-semibold text-[#5c4310] transition hover:bg-[#fff4cd]"
+                        >
+                          <Plus size={12} aria-hidden="true" />
+                          {editAddSizeOpen ? "Cancel" : "Add Size"}
+                        </button>
+                      )}
+                    </div>
                     <input
                       id="edit-product-price"
                       type="number"
@@ -1752,6 +1779,49 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
                       onChange={(e) => setEditProduct((p) => ({ ...p, price: e.target.value }))}
                       className="w-full rounded-xl border border-[#eadfd8] bg-white px-3 py-2.5 text-[12px] text-[#33251e] outline-none transition focus:border-[#d4af37] focus:ring-2 focus:ring-[#d4af37]/15"
                     />
+                    {canManageCatalog && editAddSizeOpen && editAvailableSizes.length > 0 && (
+                      <div className="space-y-3 rounded-xl border border-[#eadfd8] bg-[#fbf7f2] p-3">
+                        <div className="space-y-1.5">
+                          <label htmlFor="edit-add-size" className="block text-[10px] font-bold uppercase tracking-[0.15em] text-[#8f8076]">Cake Size</label>
+                          <select
+                            id="edit-add-size"
+                            value={editAddSize}
+                            onChange={(event) => setEditAddSize(event.target.value)}
+                            className="w-full rounded-xl border border-[#eadfd8] bg-white px-3 py-2.5 text-[12px] text-[#33251e] outline-none focus:border-[#d4af37] focus:ring-2 focus:ring-[#d4af37]/15"
+                          >
+                            {editAvailableSizes.map((size) => <option key={size} value={size}>{size} Cake</option>)}
+                          </select>
+                        </div>
+                        <div className="grid gap-3 sm:grid-cols-2">
+                          <div className="space-y-1.5">
+                            <label htmlFor="edit-add-size-price" className="block text-[10px] font-bold uppercase tracking-[0.15em] text-[#8f8076]">Price ({editAddSize} Cake)</label>
+                            <input
+                              id="edit-add-size-price"
+                              type="number"
+                              min="0.01"
+                              step="0.01"
+                              value={editAddSizePrice}
+                              onChange={(event) => setEditAddSizePrice(event.target.value)}
+                              className="w-full rounded-xl border border-[#eadfd8] bg-white px-3 py-2.5 text-[12px] text-[#33251e] outline-none focus:border-[#d4af37] focus:ring-2 focus:ring-[#d4af37]/15"
+                              required
+                            />
+                          </div>
+                          <div className="space-y-1.5">
+                            <label htmlFor="edit-add-size-stock" className="block text-[10px] font-bold uppercase tracking-[0.15em] text-[#8f8076]">Starting Stock ({editAddSize} Cake)</label>
+                            <input
+                              id="edit-add-size-stock"
+                              type="number"
+                              min="0"
+                              step="1"
+                              value={editAddSizeStock}
+                              onChange={(event) => setEditAddSizeStock(event.target.value)}
+                              className="w-full rounded-xl border border-[#eadfd8] bg-white px-3 py-2.5 text-[12px] text-[#33251e] outline-none focus:border-[#d4af37] focus:ring-2 focus:ring-[#d4af37]/15"
+                              required
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   <div className="space-y-2">
@@ -1878,6 +1948,20 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
                 <div className="mt-4 flex gap-2">
                   <button
                     onClick={async () => {
+                      if (editAddSizeOpen && (
+                        !editAddSize
+                        || !Number.isFinite(Number(editAddSizePrice))
+                        || Number(editAddSizePrice) <= 0
+                        || !Number.isInteger(Number(editAddSizeStock))
+                        || Number(editAddSizeStock) < 0
+                      )) {
+                        setAdminDialog({
+                          title: "Product not updated",
+                          message: "Enter a valid price and starting stock for the new cake size.",
+                        });
+                        return;
+                      }
+
                       setEditSaving(true);
                       try {
                         const formData = new FormData();
@@ -1887,6 +1971,11 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
                         if (canManageCatalog) formData.append('price_size', editSize);
                         formData.append('price', Number(editProduct.price) || 0);
                         formData.append('description', (editProduct.description || '').toString());
+                        if (canManageCatalog && editAddSizeOpen) {
+                          formData.append('add_sizes[]', editAddSize);
+                          formData.append(`add_prices[${editAddSize}]`, Number(editAddSizePrice));
+                          formData.append(`add_stocks[${editAddSize}]`, Number(editAddSizeStock));
+                        }
                         if (editImage) formData.append('image', editImage);
 
                         const res = await laravelStaffFetch(`${LARAVEL_BASE}/api/staff/products/${editProduct.id}`, {
