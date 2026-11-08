@@ -3,7 +3,7 @@ import chatMessageSoundUrl from "../../admin/components/message.mp3";
 
 let notificationAudio = null;
 let chatAudio = null;
-let soundsUnlocked = false;
+const unlockedSounds = new WeakSet();
 let unlockPromise = null;
 
 function getAudio(type) {
@@ -35,26 +35,26 @@ export function getNewIncomingCustomerMessages(messages, seenIds) {
 }
 
 export function unlockCustomerNotificationSounds() {
-  if (soundsUnlocked) return Promise.resolve();
   if (unlockPromise) return unlockPromise;
 
-  const sounds = [getAudio("notification"), getAudio("chat")].filter(Boolean);
+  const sounds = [getAudio("notification"), getAudio("chat")]
+    .filter((sound) => sound && !unlockedSounds.has(sound));
   if (!sounds.length) return Promise.resolve();
 
-  sounds.forEach((sound) => { sound.muted = true; });
-  unlockPromise = Promise.all(sounds.map((sound) => sound.play()))
-    .then(() => {
-      sounds.forEach((sound) => {
+  unlockPromise = Promise.all(sounds.map((sound) => {
+    sound.muted = true;
+    return sound.play()
+      .then(() => {
         sound.pause();
         sound.currentTime = 0;
         sound.muted = false;
+        unlockedSounds.add(sound);
+      })
+      .catch((error) => {
+        sound.muted = false;
+        console.warn("Unable to enable a customer notification sound:", error);
       });
-      soundsUnlocked = true;
-    })
-    .catch((error) => {
-      sounds.forEach((sound) => { sound.muted = false; });
-      console.warn("Unable to enable customer notification sounds:", error);
-    })
+  }))
     .finally(() => {
       unlockPromise = null;
     });
@@ -64,7 +64,7 @@ export function unlockCustomerNotificationSounds() {
 
 function playSound(type) {
   const sound = getAudio(type);
-  if (!sound || !soundsUnlocked) return;
+  if (!sound || !unlockedSounds.has(sound)) return;
 
   try {
     sound.pause();

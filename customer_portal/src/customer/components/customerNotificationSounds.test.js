@@ -44,4 +44,22 @@ describe("customer notification sounds", () => {
     expect(playMock).toHaveBeenCalledTimes(4);
     expect(pauseMock).toHaveBeenCalledTimes(4);
   });
+
+  test("chat sound still works if the separate notification sound cannot unlock", async () => {
+    let sounds;
+    const warnMock = jest.spyOn(console, "warn").mockImplementation(() => {});
+    jest.isolateModules(() => {
+      sounds = require("./customerNotificationSounds");
+    });
+    playMock
+      .mockRejectedValueOnce(new Error("Notification audio unavailable"))
+      .mockResolvedValueOnce()
+      .mockResolvedValueOnce();
+
+    await sounds.unlockCustomerNotificationSounds();
+    sounds.playCustomerChatMessageSound();
+
+    expect(playMock).toHaveBeenCalledTimes(3);
+    warnMock.mockRestore();
+  });
 });

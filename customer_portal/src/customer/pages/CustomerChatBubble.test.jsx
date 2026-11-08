@@ -79,6 +79,7 @@ test("shows a popup when a staff reply arrives while chat is closed", async () =
     name: "New message from Admin: Your order is ready.",
   });
   expect(messagePopup).toBeInTheDocument();
+  expect(screen.queryByText("Admin Support")).not.toBeInTheDocument();
 
   fireEvent.click(messagePopup);
   expect(await screen.findByText("Admin Support")).toBeInTheDocument();
