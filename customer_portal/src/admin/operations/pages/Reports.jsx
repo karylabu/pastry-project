@@ -804,16 +804,6 @@ export default function Reports() {
   }, [historicalImports, location.search]);
 
   useEffect(() => {
-    if (!historicalImports.some((item) => String(item.status).toLowerCase() === 'cancellation_requested')) return undefined;
-
-    const intervalId = window.setInterval(() => {
-      setAnalyticsRefreshKey((current) => current + 1);
-    }, 3000);
-
-    return () => window.clearInterval(intervalId);
-  }, [historicalImports]);
-
-  useEffect(() => {
     if (!previewImport) return undefined;
 
     const previousBodyOverflow = document.body.style.overflow;
@@ -862,15 +852,11 @@ export default function Reports() {
   }, [previewImport, previewPage]);
 
   const deleteCsvImport = (importFile) => {
-    const isProcessing = String(importFile.status).toLowerCase() === 'processing';
-    const confirmation = isProcessing
-      ? `"${importFile.file_name}" is still processing. Request deletion now; the worker will stop at its next safe checkpoint, then move the import and its rows to the Recycle Bin.`
-      : `Move "${importFile.file_name}" and its associated imported sales records to the Recycle Bin? They can be restored for 30 days.`;
     setAdminDialog({
       kind: "confirm",
-      title: isProcessing ? "Delete this import?" : "Move import to Recycle Bin?",
-      message: confirmation,
-      confirmLabel: isProcessing ? "Request deletion" : "Move to bin",
+      title: "Move import to Recycle Bin?",
+      message: `"${importFile.file_name}" and its associated imported sales records will be moved to the Recycle Bin. They can be restored for 30 days.`,
+      confirmLabel: "Move to bin",
       onConfirm: () => executeDeleteCsvImport(importFile),
     });
   };
@@ -884,14 +870,8 @@ export default function Reports() {
       if (!response.ok || !data.success) {
         throw new Error(data.message || 'Unable to delete this CSV import.');
       }
-      if (data.status === 'cancellation_requested') {
-        setHistoricalImports((imports) => imports.map((item) => (
-          item.id === importFile.id ? { ...item, status: 'cancellation_requested' } : item
-        )));
-      } else {
-        setHistoricalImports((imports) => imports.filter((item) => item.id !== importFile.id));
-        if (previewImport?.id === importFile.id) setPreviewImport(null);
-      }
+      setHistoricalImports((imports) => imports.filter((item) => item.id !== importFile.id));
+      if (previewImport?.id === importFile.id) setPreviewImport(null);
       setSalesPage(1);
       setAnalyticsRefreshKey((current) => current + 1);
     } catch (error) {
@@ -1900,18 +1880,18 @@ export default function Reports() {
                               {importFile.file_name}
                             </button>
                             <p className="mt-0.5 text-[10px] text-black/55">
-                              {String(importFile.sales_type || 'other').replace(/_/g, ' ')} · {Number(importFile.records).toLocaleString()} rows · {peso(importFile.revenue)} · {String(importFile.status).toLowerCase() === 'cancellation_requested' ? 'deletion pending' : importFile.status}
+                              {String(importFile.sales_type || 'other').replace(/_/g, ' ')} · {Number(importFile.records).toLocaleString()} rows · {peso(importFile.revenue)} · {importFile.status}
                             </p>
                           </div>
                           <button
                             type="button"
                             onClick={() => deleteCsvImport(importFile)}
-                            disabled={deletingImportId !== null || String(importFile.status).toLowerCase() === 'cancellation_requested'}
+                            disabled={deletingImportId !== null}
                             className="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-red-200 px-2.5 py-1.5 text-[10px] font-semibold text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
                             aria-label={`Delete imported CSV ${importFile.file_name}`}
-                            title={String(importFile.status).toLowerCase() === 'cancellation_requested' ? 'Deletion pending; waiting for the worker to stop safely.' : 'Delete this import and its imported sales records'}
+                            title="Move this import and its imported sales records to the Recycle Bin"
                           >
-                            {deletingImportId === importFile.id ? 'Deleting…' : String(importFile.status).toLowerCase() === 'cancellation_requested' ? 'Deleting…' : <><Trash2 size={12} /> Delete</>}
+                            {deletingImportId === importFile.id ? 'Deleting…' : <><Trash2 size={12} /> Delete</>}
                           </button>
                         </div>
                       ))}

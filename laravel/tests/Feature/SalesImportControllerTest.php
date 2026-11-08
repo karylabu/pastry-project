@@ -1025,7 +1025,7 @@ class SalesImportControllerTest extends TestCase
         $this->assertSame($firstImportId, $payload['sales'][0]['import_id']);
     }
 
-    public function test_processing_csv_import_can_be_cancelled_and_only_its_sales_rows_are_removed(): void
+    public function test_processing_csv_import_is_immediately_moved_to_recycle_bin_without_touching_other_sales(): void
     {
         Storage::fake('local');
         $admin = User::factory()->createOne(['role' => 'admin']);
@@ -1063,16 +1063,15 @@ class SalesImportControllerTest extends TestCase
             Request::create("/api/sales/import/{$importId}", 'DELETE'),
             $importId,
         );
-        $this->assertSame(202, $response->getStatusCode());
+        $this->assertSame(200, $response->getStatusCode());
         $this->assertTrue($response->getData(true)['success']);
-        $this->assertSame('cancellation_requested', $response->getData(true)['status']);
-
-        $this->assertDatabaseHas('analytics_imports', ['id' => $importId, 'status' => 'cancellation_requested']);
-        $repeatResponse = app(SalesImportController::class)->deleteImport(
-            Request::create("/api/sales/import/{$importId}", 'DELETE'),
-            $importId,
-        );
-        $this->assertSame(202, $repeatResponse->getStatusCode());
+        $this->assertSame('recycled', $response->getData(true)['status']);
+        $this->assertDatabaseMissing('analytics_imports', ['id' => $importId]);
+        $this->assertDatabaseMissing('analytics_sales_history', ['import_id' => $importId]);
+        $this->assertDatabaseHas('admin_recycle_bin', [
+            'item_type' => 'csv_import',
+            'label' => 'processing.csv',
+        ]);
 
         (new ProcessSalesCsvImport($importId, $storedPath))->handle();
 

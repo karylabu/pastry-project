@@ -411,18 +411,18 @@ class SalesImportController extends Controller
             }
             $importStatus = strtolower(trim((string) $import->status));
             if (in_array($importStatus, ['processing', 'cancellation_requested'], true)) {
-                if ($importStatus === 'processing') {
-                    DB::table('analytics_imports')->where('id', $importId)->update([
-                        'status' => 'cancellation_requested',
-                    ]);
-                }
+                DB::table('analytics_imports')->where('id', $importId)->update([
+                    'status' => 'failed',
+                    'error_message' => 'Import cancelled and moved to the Recycle Bin.',
+                ]);
+                $recycleBin->trashImport($importId);
 
                 return [
                     'response' => response()->json([
                         'success' => true,
-                        'status' => 'cancellation_requested',
-                        'message' => 'Cancellation requested. The active worker will remove this import at its next safe checkpoint.',
-                    ], 202),
+                        'status' => 'recycled',
+                        'message' => 'CSV import and associated sales records moved to the Recycle Bin for 30 days.',
+                    ]),
                 ];
             }
 
