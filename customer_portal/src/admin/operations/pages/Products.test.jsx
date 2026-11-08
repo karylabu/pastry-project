@@ -1,5 +1,5 @@
 import React from 'react';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 
 let mockLocationSearch = '';
 
@@ -360,12 +360,13 @@ describe('Products admin catalog', () => {
   });
 
   test('archives a product from the customer menu and allows restoring it', async () => {
+    jest.useFakeTimers();
     render(<Products allowCatalogManagement />);
 
     await waitFor(() => {
       expect(screen.getByText('Strawberry Cake')).toBeInTheDocument();
     });
-
+    fireEvent.click(screen.getByRole('button', { name: 'Hide Strawberry Cake from customers' }));
     fireEvent.click(screen.getByRole('button', { name: 'Hide Strawberry Cake from customers' }));
     fireEvent.click(screen.getByRole('button', { name: 'Hide product' }));
 
@@ -379,6 +380,11 @@ describe('Products admin catalog', () => {
       );
       expect(screen.getByText('Archived')).toBeInTheDocument();
     });
+    act(() => jest.advanceTimersByTime(4999));
+    expect(screen.getByText('Strawberry Cake is hidden from customers.')).toBeInTheDocument();
+    act(() => jest.advanceTimersByTime(1));
+    expect(screen.queryByText('Strawberry Cake is hidden from customers.')).not.toBeInTheDocument();
+    jest.useRealTimers();
 
     fireEvent.click(screen.getByRole('button', { name: 'Restore Strawberry Cake' }));
 

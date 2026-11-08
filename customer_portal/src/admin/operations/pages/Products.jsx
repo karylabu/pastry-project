@@ -144,6 +144,16 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
   const editImageInputRef = useRef(null);
 
   useEffect(() => {
+    if (feedback?.type !== "success") return undefined;
+
+    const timeoutId = window.setTimeout(() => {
+      setFeedback((current) => current === feedback ? null : current);
+    }, 5000);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [feedback]);
+
+  useEffect(() => {
     if (!newImage) {
       setNewImagePreview("");
       return undefined;
