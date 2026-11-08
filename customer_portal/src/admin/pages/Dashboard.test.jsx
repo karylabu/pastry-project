@@ -109,6 +109,12 @@ beforeEach(() => {
           regular: { quantity: 18084, percentage: 97, sizes: [{ name: "Small", quantity: 10000, percentage: 60 }] },
           customized: { quantity: 592, percentage: 3, sizes: [{ name: "Big", quantity: 300, percentage: 50 }] },
         },
+        designs: Array.from({ length: 7 }, (_, index) => ({
+          name: `Design ${index + 1}`,
+          quantity: 10 - index,
+          percentage: 20 - index,
+          rank: index + 1,
+        })),
         summary: {},
         salesTrend: { daily: [], monthly: [] },
         ingredientAnalytics: { low_stock: [], actual_consumption: [] },
@@ -217,10 +223,21 @@ test("shows the four best-selling panels in a compact horizontal layout", async 
   const filterGroup = screen.getByRole("group", { name: "Filter sales mix by cake type" });
   expect(salesMix.querySelector(".border-b")).toContainElement(headings[3]);
   expect(filterGroup).toHaveClass("inline-flex", "rounded-lg");
+  expect(screen.getByText("Regular Best Sellers")).toBeInTheDocument();
+  expect(screen.getByText("Customized", { selector: "p" })).toBeInTheDocument();
   expect(screen.getByText("regular cakes")).toBeInTheDocument();
   expect(screen.getByText("18,084 sold · 97%")).toBeInTheDocument();
   expect(screen.getByText("customized cakes")).toBeInTheDocument();
   expect(screen.getByText("592 sold · 3%")).toBeInTheDocument();
+  expect(salesMix.querySelector(".h-1\\.5")).not.toBeInTheDocument();
+  expect(screen.getByText("Design 1")).toBeInTheDocument();
+  expect(screen.getByText("Design 5")).toBeInTheDocument();
+  expect(screen.queryByText("Design 6")).not.toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole("button", { name: "Next customized designs" }));
+  expect(screen.getByText("Design 6")).toBeInTheDocument();
+  expect(screen.getByText("Design 7")).toBeInTheDocument();
+  expect(screen.queryByText("Design 1")).not.toBeInTheDocument();
 
   fireEvent.click(screen.getByRole("button", { name: "regular" }));
   expect(await screen.findByText("Popular regular cake sizes")).toBeInTheDocument();

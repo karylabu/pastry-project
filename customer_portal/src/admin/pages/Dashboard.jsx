@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { AlertTriangle, ArrowRight, BarChart3, ShoppingCart, TrendingUp, CakeSlice, Package, PackageCheck, Sparkles, Sun, Clock3, ChefHat, CircleCheck, ChevronRight, Star, MessageSquare, CreditCard } from "lucide-react";
+import { AlertTriangle, ArrowRight, BarChart3, ShoppingCart, TrendingUp, CakeSlice, Package, PackageCheck, Sparkles, Sun, Clock3, ChefHat, CircleCheck, ChevronLeft, ChevronRight, Star, MessageSquare, CreditCard } from "lucide-react";
 import { Area, Bar, CartesianGrid, Cell, ComposedChart, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Link } from "react-router-dom";
 import { LARAVEL_BASE, ROOT_BASE } from "../../services/config";
@@ -176,14 +176,14 @@ function AnalyticsCard({ label, value, icon: Icon, accent = "gold" }) {
   );
 }
 
-function RankedList({ rows, quantityLabel = "sold", quantityUnitKey = "", emptyState, compact = false }) {
+function RankedList({ rows, quantityLabel = "sold", quantityUnitKey = "", emptyState, compact = false, startIndex = 0 }) {
   if (!rows?.length) return <AnalyticsEmpty {...emptyState} />;
   if (compact) {
     return (
       <div className="space-y-0.5 p-2">
         {rows.slice(0, 5).map((row, index) => (
           <div key={`${row.name}-${index}`} className="flex items-center gap-2 rounded-md px-1.5 py-1 hover:bg-[#fff8df]">
-            <span className="w-5 text-[10px] font-semibold text-[#b7a69c]">{String(index + 1).padStart(2, "0")}</span>
+            <span className="w-5 text-[10px] font-semibold text-[#b7a69c]">{String(startIndex + index + 1).padStart(2, "0")}</span>
             <span className="min-w-0 flex-1 truncate text-[11px] font-medium text-[#5f514a]">{row.name}</span>
             <span className="shrink-0 text-[10px] font-semibold text-[#33251e]">{Number(row.quantity || 0).toLocaleString()} {quantityUnitKey ? `${row[quantityUnitKey] || ""} ` : ""}{quantityLabel}</span>
             <span className="w-8 shrink-0 text-right text-[10px] text-[#9b8c83]">{Number(row.percentage || 0).toFixed(0)}%</span>
@@ -250,6 +250,7 @@ export default function Dashboard() {
   const [analyticsPreset, setAnalyticsPreset] = useState("last_7_days");
   const [trendMetric, setTrendMetric] = useState("revenue");
   const [salesMixType, setSalesMixType] = useState(null);
+  const [customizedDesignPage, setCustomizedDesignPage] = useState(1);
   const [analyticsRefreshVersion, setAnalyticsRefreshVersion] = useState(0);
 
   const fetchDashboardData = useCallback(async () => {
@@ -349,6 +350,10 @@ export default function Dashboard() {
       .finally(() => setAnalyticsLoading(false));
   }, [analyticsPreset, analyticsRefreshVersion]);
 
+  useEffect(() => {
+    setCustomizedDesignPage(1);
+  }, [analyticsPreset, analyticsRefreshVersion]);
+
   const dashboardSummary = dashboardData?.summary || {};
   const orderStatusBreakdown = Array.isArray(dashboardData?.order_status_breakdown)
     ? dashboardData.order_status_breakdown
@@ -423,6 +428,9 @@ export default function Dashboard() {
     ? analytics?.salesTrend?.monthly || []
     : analytics?.salesTrend?.daily || [];
   const regularVsCustomized = analytics?.cakeTypeBreakdown || analytics?.regularVsCustomized || {};
+  const customizedDesigns = analytics?.designs || [];
+  const customizedDesignPageCount = Math.max(1, Math.ceil(customizedDesigns.length / 5));
+  const visibleCustomizedDesigns = customizedDesigns.slice((customizedDesignPage - 1) * 5, customizedDesignPage * 5);
   const lowStockIngredients = analytics?.ingredientAnalytics?.low_stock || [];
   const actualIngredientConsumption = Array.isArray(analytics?.ingredientAnalytics?.actual_consumption)
     ? analytics.ingredientAnalytics.actual_consumption
@@ -566,8 +574,23 @@ export default function Dashboard() {
 
                 <div className="grid items-stretch gap-3 lg:grid-cols-2 xl:grid-cols-4">
                   <Panel eyebrow="Best Sellers" title="Best-selling flavors" compact className="flex h-full min-w-0 flex-col overflow-hidden"><div className="min-h-0 flex-1 overflow-y-auto"><RankedList rows={analytics.flavors} compact /></div></Panel>
-                  <Panel eyebrow="Customized Cakes" title="Best-selling cake designs" compact className="flex h-full min-w-0 flex-col overflow-hidden"><div className="min-h-0 flex-1 overflow-y-auto"><RankedList rows={analytics.designs} compact /></div></Panel>
-                  <Panel eyebrow="Best Sellers" title="Best-selling sizes" compact className="flex h-full min-w-0 flex-col overflow-hidden"><div className="min-h-0 flex-1 overflow-y-auto"><RankedList rows={analytics.sizes} compact /></div></Panel>
+                  <Panel eyebrow="Customized" title="Best-selling cake designs" compact className="flex h-full min-w-0 flex-col overflow-hidden">
+                    <div className="min-h-0 flex-1 overflow-y-auto">
+                      <RankedList rows={visibleCustomizedDesigns} compact startIndex={(customizedDesignPage - 1) * 5} />
+                    </div>
+                    {customizedDesignPageCount > 1 && (
+                      <div className="flex items-center justify-between border-t border-[#f0e7e0] px-3 py-2">
+                        <span className="text-[10px] text-[#74675f]">
+                          {(customizedDesignPage - 1) * 5 + 1}–{Math.min(customizedDesignPage * 5, customizedDesigns.length)} of {customizedDesigns.length}
+                        </span>
+                        <div className="flex gap-1">
+                          <button type="button" aria-label="Previous customized designs" disabled={customizedDesignPage === 1} onClick={() => setCustomizedDesignPage((page) => page - 1)} className="rounded-md border border-[#eadfd8] p-1 text-[#765d50] hover:bg-[#fff8df] disabled:cursor-not-allowed disabled:opacity-40"><ChevronLeft size={14} /></button>
+                          <button type="button" aria-label="Next customized designs" disabled={customizedDesignPage === customizedDesignPageCount} onClick={() => setCustomizedDesignPage((page) => page + 1)} className="rounded-md border border-[#eadfd8] p-1 text-[#765d50] hover:bg-[#fff8df] disabled:cursor-not-allowed disabled:opacity-40"><ChevronRight size={14} /></button>
+                        </div>
+                      </div>
+                    )}
+                  </Panel>
+                  <Panel eyebrow="Regular Best Sellers" title="Best-selling sizes" compact className="flex h-full min-w-0 flex-col overflow-hidden"><div className="min-h-0 flex-1 overflow-y-auto"><RankedList rows={analytics.sizes} compact /></div></Panel>
                   <Panel
                     eyebrow="Sales Mix"
                     title="Regular vs. customized cakes"
@@ -603,9 +626,6 @@ export default function Dashboard() {
                                       {Number(size.quantity || 0).toLocaleString()} sold · {Number(size.percentage || 0).toFixed(1)}%
                                     </span>
                                   </div>
-                                  <div className="h-1.5 overflow-hidden rounded-full bg-[#f4ece6]">
-                                    <div className={`h-full rounded-full ${salesMixType === "regular" ? "bg-[#a57c38]" : "bg-[#d6c66f]"}`} style={{ width: `${Math.min(100, Number(size.percentage || 0))}%` }} />
-                                  </div>
                                 </div>
                               ))}
                             </div>
@@ -620,9 +640,6 @@ export default function Dashboard() {
                               <div className="mb-1 flex items-center justify-between gap-2">
                                 <span className="text-[11px] font-medium capitalize text-[#5f514a]">{type} cakes</span>
                                 <span className="shrink-0 text-[10px] font-semibold text-[#33251e]">{Number(row.quantity || 0).toLocaleString()} sold · {Number(row.percentage || 0).toFixed(0)}%</span>
-                              </div>
-                              <div className="h-1.5 overflow-hidden rounded-full bg-[#f4ece6]">
-                                <div className={`h-full rounded-full ${type === "regular" ? "bg-[#a57c38]" : "bg-[#d6c66f]"}`} style={{ width: `${Math.min(100, Number(row.percentage || 0))}%` }} />
                               </div>
                             </div>
                           ))}
