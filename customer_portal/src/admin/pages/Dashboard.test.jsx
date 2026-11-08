@@ -1,5 +1,5 @@
 import React from "react";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import Dashboard from "./Dashboard";
 
@@ -216,7 +216,7 @@ test("shows the four best-selling panels in a compact horizontal layout", async 
     "Best-selling flavors",
     "Best-selling cake designs",
     "Best-selling sizes",
-    "Customize Best Selling Sizes",
+    "Best Selling Sizes",
   ].map((title) => screen.findByRole("heading", { name: title })));
   const panels = headings.map((heading) => heading.closest("section"));
   const layout = panels[0].parentElement;
@@ -230,7 +230,8 @@ test("shows the four best-selling panels in a compact horizontal layout", async 
   const salesMix = panels[3];
   expect(salesMix.querySelector(".border-b")).toContainElement(headings[3]);
   expect(headings[3]).toHaveClass("font-serif", "text-[14px]");
-  expect(salesMix.querySelector(".border-b p")).toHaveTextContent("Customize");
+  expect(salesMix.querySelector(".border-b p")).toBeNull();
+  expect(within(salesMix).queryByText("Customize")).not.toBeInTheDocument();
   expect(screen.getByText("Regular", { selector: "p" })).toBeInTheDocument();
   expect(panels[1].querySelector(".border-b p")).toHaveTextContent("Customize");
   expect(screen.queryByRole("group", { name: "Filter sales mix by cake type" })).not.toBeInTheDocument();
