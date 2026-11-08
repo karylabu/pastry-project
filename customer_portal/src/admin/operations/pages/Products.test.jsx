@@ -69,7 +69,7 @@ describe('Products admin catalog', () => {
 
     global.fetch = jest.fn((url, options = {}) => {
       if (String(url).includes('/archive') && options.method === 'PATCH') {
-        const sizeArchiveMatch = String(url).match(/products\/\d+\/sizes\/(\d+)\/archive$/);
+        const sizeArchiveMatch = String(url).match(/\/sizes\/(\d+)\/archive/);
         if (sizeArchiveMatch) {
           const sizeId = Number(sizeArchiveMatch[1]);
           const { is_archived: isArchived } = JSON.parse(options.body);
@@ -318,25 +318,14 @@ describe('Products admin catalog', () => {
     expect(screen.queryByRole('button', { name: '10 inches size for Strawberry Cake' })).not.toBeInTheDocument();
   });
 
-  test('confirms before removing a custom size and refreshes the product card', async () => {
+  test('does not show remove controls next to cake sizes', async () => {
     render(<Products allowCatalogManagement />);
 
     await waitFor(() => {
       expect(screen.getByRole('button', { name: '8 inches size for Strawberry Cake' })).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByRole('button', { name: 'Remove 8 inches size from Strawberry Cake' }));
-    expect(screen.getByRole('alertdialog', { name: 'Remove this cake size?' })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Remove size' }));
-
-    await waitFor(() => {
-      expect(global.fetch).toHaveBeenCalledWith(
-        expect.stringContaining('/api/staff/products/1/sizes/13'),
-        expect.objectContaining({ method: 'DELETE' }),
-      );
-      expect(screen.queryByRole('button', { name: '8 inches size for Strawberry Cake' })).not.toBeInTheDocument();
-      expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
-    });
+    expect(screen.queryByRole('button', { name: 'Remove 8 inches size from Strawberry Cake' })).not.toBeInTheDocument();
   });
 
   test('uses the recorded price for a custom size when adding it to another cake', async () => {
@@ -523,13 +512,11 @@ describe('Products admin catalog', () => {
   });
 
   test('archives a product from the customer menu and allows restoring it', async () => {
-    jest.useFakeTimers();
     render(<Products allowCatalogManagement />);
 
     await waitFor(() => {
       expect(screen.getByText('Strawberry Cake')).toBeInTheDocument();
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Hide Strawberry Cake from customers' }));
     fireEvent.click(screen.getByRole('button', { name: 'Hide Strawberry Cake from customers' }));
     fireEvent.click(screen.getByRole('button', { name: 'Hide product' }));
 
@@ -541,13 +528,9 @@ describe('Products admin catalog', () => {
           body: JSON.stringify({ is_archived: true }),
         }),
       );
-      expect(screen.getByText('Archived')).toBeInTheDocument();
+      expect(screen.queryByText('Archived')).not.toBeInTheDocument();
     });
-    act(() => jest.advanceTimersByTime(4999));
-    expect(screen.getByText('Strawberry Cake is hidden from customers.')).toBeInTheDocument();
-    act(() => jest.advanceTimersByTime(1));
-    expect(screen.queryByText('Strawberry Cake is hidden from customers.')).not.toBeInTheDocument();
-    jest.useRealTimers();
+    await screen.findByRole('button', { name: 'Restore Strawberry Cake' });
 
     fireEvent.click(screen.getByRole('button', { name: 'Restore Strawberry Cake' }));
 
@@ -559,7 +542,7 @@ describe('Products admin catalog', () => {
           body: JSON.stringify({ is_archived: false }),
         }),
       );
-      expect(screen.queryByText('Archived')).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Hide Strawberry Cake from customers' })).toBeInTheDocument();
     });
   });
 
@@ -583,7 +566,6 @@ describe('Products admin catalog', () => {
       expect(screen.getByRole('button', { name: 'Restore Big size for Strawberry Cake' })).toBeInTheDocument();
     });
 
-    expect(screen.getByRole('button', { name: 'Hide Strawberry Cake from customers' })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Restore Big size for Strawberry Cake' }));
     await waitFor(() => {
       expect(global.fetch).toHaveBeenCalledWith(
@@ -597,10 +579,49 @@ describe('Products admin catalog', () => {
     });
   });
 
+  test('archives the whole product when no size is selected', async () => {
+    render(<Products allowCatalogManagement />);
+    await screen.findByText('Strawberry Cake');
+
+    expect(screen.getByRole('button', { name: 'Small size for Strawberry Cake' })).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getByRole('button', { name: 'Big size for Strawberry Cake' })).toHaveAttribute('aria-pressed', 'false');
+    fireEvent.click(screen.getByRole('button', { name: 'Hide Strawberry Cake from customers' }));
+    expect(screen.getByRole('alertdialog', { name: 'Hide this product?' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Hide product' }));
+
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringContaining('/api/staff/products/1/archive'),
+        expect.objectContaining({
+          method: 'PATCH',
+          body: JSON.stringify({ is_archived: true }),
+        }),
+      );
+    });
+  });
+
+  test('clears a selected size when clicking it again so the archive action targets the product', async () => {
+    render(<Products allowCatalogManagement />);
+    await screen.findByText('Strawberry Cake');
+    const bigSize = screen.getByRole('button', { name: 'Big size for Strawberry Cake' });
+    fireEvent.click(bigSize);
+    expect(bigSize).toHaveAttribute('aria-pressed', 'true');
+    fireEvent.click(bigSize);
+
+    expect(bigSize).toHaveAttribute('aria-pressed', 'false');
+    fireEvent.click(screen.getByRole('button', { name: 'Hide Strawberry Cake from customers' }));
+    expect(screen.getByRole('alertdialog', { name: 'Hide this product?' })).toBeInTheDocument();
+  });
+
   test('selects and archives a specific size from the table view', async () => {
     render(<Products allowCatalogManagement />);
     await screen.findByText('Strawberry Cake');
     fireEvent.click(screen.getByRole('button', { name: /table/i }));
+
+    expect(screen.getByRole('combobox', { name: 'Select size for Strawberry Cake' })).toHaveValue('');
+    fireEvent.click(screen.getByRole('button', { name: 'Hide Strawberry Cake from customers' }));
+    expect(screen.getByRole('alertdialog', { name: 'Hide this product?' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
 
     fireEvent.change(screen.getByRole('combobox', { name: 'Select size for Strawberry Cake' }), {
       target: { value: 'big' },

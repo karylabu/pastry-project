@@ -115,7 +115,6 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
   const [addSizeStock, setAddSizeStock] = useState("0");
   const [addSizeSaving, setAddSizeSaving] = useState(false);
   const [addSizeError, setAddSizeError] = useState("");
-  const [deletingSizeId, setDeletingSizeId] = useState(null);
   const [archivingSizeId, setArchivingSizeId] = useState(null);
   const [recipeDeleting, setRecipeDeleting] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -195,8 +194,13 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
   const navigate = useNavigate();
   const [activeCat, setActiveCat] = useState(allowCatalogManagement ? catalogCategory : "All");
   const canManageCatalog = Boolean(allowCatalogManagement);
-  const getCardSizeName = (product) => cardSizeSelections[product.id]
+  const getSelectedCardSizeName = (product) => cardSizeSelections[product.id] || "";
+  const getCardSizeName = (product) => getSelectedCardSizeName(product)
     || (getProductSizeByName(product, "small") ? "small" : "big");
+  const getSelectedProductSize = (product) => {
+    const selectedSizeName = getSelectedCardSizeName(product);
+    return selectedSizeName ? getProductSizeByName(product, selectedSizeName) : null;
+  };
   const canEditCatalog = Boolean(allowCatalogManagement);
   const editRecipeSize = editProduct ? getProductSizeByName(editProduct, editSize) : null;
   const editRecipeSizeId = editRecipeSize?.id ? String(editRecipeSize.id) : "";
@@ -367,6 +371,21 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
     });
   };
 
+  const handleArchiveSelection = (product) => {
+    if (product.is_archived) {
+      handleArchiveProduct(product);
+      return;
+    }
+
+    const selectedSize = getSelectedProductSize(product);
+    if (selectedSize) {
+      handleArchiveProductSize(product, selectedSize);
+      return;
+    }
+
+    handleArchiveProduct(product);
+  };
+
   const deleteProduct = async (product) => {
     try {
       setDeletingProductId(product.id);
@@ -417,45 +436,6 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
       message: `${product.name} will be hidden from customers and moved to the Recycle Bin. You can Undo for 5 seconds or restore it from Settings within 30 days.`,
       confirmLabel: deletingProductId === product.id ? "Moving..." : "Move to Recycle Bin",
       onConfirm: () => deleteProduct(product),
-    });
-  };
-
-  const deleteProductSize = async (product, sizeOption) => {
-    setDeletingSizeId(sizeOption.id);
-    try {
-      const response = await laravelStaffFetch(
-        `${LARAVEL_BASE}/api/staff/products/${encodeURIComponent(product.id)}/sizes/${encodeURIComponent(sizeOption.id)}`,
-        { method: "DELETE", headers: { Accept: "application/json" } }
-      );
-      const data = await response.json().catch(() => null);
-      if (!response.ok || !data?.success) {
-        throw new Error(data?.message || "Unable to remove this cake size.");
-      }
-
-      setAdminDialog(null);
-      setCardSizeSelections((current) => {
-        if (String(current[product.id] || "").toLowerCase() !== String(sizeOption.size).toLowerCase()) return current;
-        const next = { ...current };
-        delete next[product.id];
-        return next;
-      });
-      await fetchProducts();
-      setFeedback({ type: "success", text: `${sizeOption.size} size removed from ${product.name}.` });
-    } catch (error) {
-      setAdminDialog(null);
-      setFeedback({ type: "error", text: error.message || "Unable to remove this cake size." });
-    } finally {
-      setDeletingSizeId(null);
-    }
-  };
-
-  const confirmDeleteProductSize = (product, sizeOption) => {
-    setAdminDialog({
-      kind: "confirm",
-      title: "Remove this cake size?",
-      message: `${sizeOption.size} will be removed from ${product.name}. Sizes with stock, recipes, orders, or history cannot be removed.`,
-      confirmLabel: deletingSizeId === sizeOption.id ? "Removing..." : "Remove size",
-      onConfirm: () => deleteProductSize(product, sizeOption),
     });
   };
 
@@ -1259,9 +1239,6 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
                 <span className="absolute bottom-2 left-2 inline-flex items-center rounded-full border border-white/80 bg-white/90 px-2.5 py-1 text-[9px] font-semibold uppercase tracking-[0.12em] text-[#765d50] shadow-sm">
                   {product.category}
                 </span>
-                {product.is_archived && (
-                  <span className="absolute right-2 top-2 inline-flex items-center rounded-full bg-[#8f432d] px-2.5 py-1 text-[9px] font-semibold text-white shadow-sm">Archived</span>
-                )}
               </div>
 
               {/* CONTENT */}
@@ -1271,18 +1248,6 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
                   <h2 className={`min-w-0 flex-1 truncate whitespace-nowrap font-bold leading-tight text-[#33251e] ${productNameFontSize}`}>
                     {product.name}
                   </h2>
-                  {canEditCatalog && (
-                    <button
-                      type="button"
-                      onClick={() => handleArchiveProduct(product)}
-                      disabled={archivingProductId === product.id}
-                      title={product.is_archived ? `Restore ${product.name}` : `Hide ${product.name} from customers`}
-                      aria-label={product.is_archived ? `Restore ${product.name}` : `Hide ${product.name} from customers`}
-                      className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[#765d50] transition hover:bg-[#fff8df] disabled:opacity-50"
-                    >
-                      {product.is_archived ? <ArchiveRestore size={12} aria-hidden="true" /> : <Archive size={12} aria-hidden="true" />}
-                    </button>
-                  )}
                   <div className="admin-product-stock-details -mt-1 w-[104px] shrink-0 text-right">
                     <p className="truncate text-[8px] font-medium leading-tight text-[#766a62]">Stock alert · Min. {cardSize?.threshold ?? product.minimum_stock ?? "Not set"}</p>
                   </div>
@@ -1305,13 +1270,20 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
                         : sizeName.toLowerCase() === "big"
                           ? "Big"
                           : sizeName;
-                      const selected = cardSizeName.toLowerCase() === sizeName.toLowerCase();
+                      const selected = getSelectedCardSizeName(product).toLowerCase() === sizeName.toLowerCase();
 
                       return (
                         <div key={sizeOption.id} className="inline-flex min-w-0 flex-1 items-center justify-center gap-0.5">
                           <button
                             type="button"
-                            onClick={() => setCardSizeSelections((current) => ({ ...current, [product.id]: sizeName }))}
+                            onClick={() => setCardSizeSelections((current) => {
+                              if (String(current[product.id] || "").toLowerCase() === sizeName.toLowerCase()) {
+                                const next = { ...current };
+                                delete next[product.id];
+                                return next;
+                              }
+                              return { ...current, [product.id]: sizeName };
+                            })}
                             aria-label={`${sizeLabel} size for ${product.name}`}
                             aria-pressed={selected}
                             className={`flex min-w-0 flex-1 items-center justify-center rounded-xl border px-1.5 py-1 text-[8px] font-semibold uppercase tracking-[0.08em] whitespace-nowrap transition-all ${
@@ -1322,18 +1294,6 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
                           >
                             {sizeLabel}
                           </button>
-                          {canManageCatalog && (
-                            <button
-                              type="button"
-                              onClick={() => confirmDeleteProductSize(product, sizeOption)}
-                              disabled={deletingSizeId === sizeOption.id}
-                              aria-label={`Remove ${sizeLabel} size from ${product.name}`}
-                              title={`Remove ${sizeLabel} size`}
-                              className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[#9a5947] transition hover:bg-[#fff0eb] disabled:opacity-50"
-                            >
-                              <X size={11} aria-hidden="true" />
-                            </button>
-                          )}
                         </div>
                       );
                     })}
@@ -1380,13 +1340,25 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
                   {canEditCatalog && (
                     <button
                       type="button"
-                      onClick={() => handleArchiveProductSize(product, cardSize)}
-                      disabled={!cardSize || archivingSizeId === cardSize?.id}
-                      title={cardSize?.is_archived ? `Restore ${cardSizeLabel} size for ${product.name}` : `Archive ${cardSizeLabel} size for ${product.name}`}
-                      aria-label={`${cardSize?.is_archived ? "Restore" : "Archive"} ${cardSizeLabel} size for ${product.name}`}
+                      onClick={() => handleArchiveSelection(product)}
+                      disabled={product.is_archived
+                        ? archivingProductId === product.id
+                        : Boolean(cardSize && getSelectedProductSize(product) && archivingSizeId === cardSize.id)}
+                      title={product.is_archived
+                        ? `Restore ${product.name}`
+                        : cardSizeSelections[product.id]
+                          ? `${cardSize?.is_archived ? "Restore" : "Archive"} ${cardSizeLabel} size for ${product.name}`
+                          : `Hide ${product.name} from customers`}
+                      aria-label={product.is_archived
+                        ? `Restore ${product.name}`
+                        : cardSizeSelections[product.id]
+                          ? `${cardSize?.is_archived ? "Restore" : "Archive"} ${cardSizeLabel} size for ${product.name}`
+                          : `Hide ${product.name} from customers`}
                       className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[#eadfd8] bg-white text-[#765d50] transition hover:border-[#e7c875] hover:bg-[#fff8df] disabled:opacity-50"
                     >
-                      {cardSize?.is_archived ? <ArchiveRestore size={13} aria-hidden="true" /> : <Archive size={13} aria-hidden="true" />}
+                      {product.is_archived || cardSize?.is_archived
+                        ? <ArchiveRestore size={13} aria-hidden="true" />
+                        : <Archive size={13} aria-hidden="true" />}
                     </button>
                   )}
                   <button type="button" onClick={() => openInventoryModal(product, "history")} title={`View ${product.name} history`} aria-label={`View ${product.name} history`} className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[#eadfd8] bg-white text-[#765d50] transition hover:border-[#e7c875] hover:bg-[#fff8df]"><History size={13} aria-hidden="true" /></button>
@@ -1430,31 +1402,27 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
                     </div>
                     <div className="min-w-0">
                       <p className="truncate font-semibold text-sm text-[#33251e]">{product.name}</p>
-                      {product.is_archived && <span className="mt-1 inline-flex rounded-full bg-[#f3e8e2] px-2 py-0.5 text-[9px] font-semibold text-[#8f432d]">Archived</span>}
                       <p className="text-[11px] text-[#9b8c83]">{product.description || "No description"}</p>
                       {canManageCatalog && (
                         <div className="mt-1 flex items-center gap-2">
                           {getProductSizeOptions(product).length > 0 && (
                             <select
                               aria-label={`Select size for ${product.name}`}
-                              value={getCardSizeName(product)}
-                              onChange={(event) => setCardSizeSelections((current) => ({ ...current, [product.id]: event.target.value }))}
+                              value={getSelectedCardSizeName(product)}
+                              onChange={(event) => setCardSizeSelections((current) => {
+                                const next = { ...current };
+                                if (event.target.value) next[product.id] = event.target.value;
+                                else delete next[product.id];
+                                return next;
+                              })}
                               className="max-w-[120px] rounded-md border border-[#eadfd8] bg-white px-2 py-1 text-[10px] text-[#765d50]"
                             >
+                              <option value="">No size selected</option>
                               {getProductSizeOptions(product).map((size) => (
                                 <option key={size.id} value={size.size || size.variant_size}>{size.size || size.variant_size}</option>
                               ))}
                             </select>
                           )}
-                          <button
-                            type="button"
-                            onClick={() => handleArchiveProduct(product)}
-                            disabled={archivingProductId === product.id}
-                            aria-label={product.is_archived ? `Restore ${product.name}` : `Hide ${product.name} from customers`}
-                            className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[#765d50] transition hover:bg-[#fff8df] disabled:opacity-50"
-                          >
-                            {product.is_archived ? <ArchiveRestore size={12} aria-hidden="true" /> : <Archive size={12} aria-hidden="true" />}
-                          </button>
                         </div>
                       )}
                     </div>
@@ -1494,13 +1462,23 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
                   {canEditCatalog && (
                     <button
                       type="button"
-                      onClick={() => handleArchiveProductSize(product, getProductSizeByName(product, getCardSizeName(product)))}
-                      disabled={!getProductSizeByName(product, getCardSizeName(product)) || archivingSizeId === getProductSizeByName(product, getCardSizeName(product))?.id}
-                      title={`${getProductSizeByName(product, getCardSizeName(product))?.is_archived ? "Restore" : "Archive"} ${getProductSizeLabel(getCardSizeName(product))} size for ${product.name}`}
-                      aria-label={`${getProductSizeByName(product, getCardSizeName(product))?.is_archived ? "Restore" : "Archive"} ${getProductSizeLabel(getCardSizeName(product))} size for ${product.name}`}
+                      onClick={() => handleArchiveSelection(product)}
+                      disabled={product.is_archived
+                        ? archivingProductId === product.id
+                        : Boolean(getSelectedProductSize(product) && archivingSizeId === getSelectedProductSize(product).id)}
+                      title={product.is_archived
+                        ? `Restore ${product.name}`
+                        : getSelectedProductSize(product)
+                          ? `${getSelectedProductSize(product).is_archived ? "Restore" : "Archive"} ${getProductSizeLabel(getSelectedCardSizeName(product))} size for ${product.name}`
+                          : `Hide ${product.name} from customers`}
+                      aria-label={product.is_archived
+                        ? `Restore ${product.name}`
+                        : getSelectedProductSize(product)
+                          ? `${getSelectedProductSize(product).is_archived ? "Restore" : "Archive"} ${getProductSizeLabel(getSelectedCardSizeName(product))} size for ${product.name}`
+                          : `Hide ${product.name} from customers`}
                       className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[#eadfd8] bg-white text-[#765d50] transition hover:bg-[#fff8df] disabled:opacity-50"
                     >
-                      {getProductSizeByName(product, getCardSizeName(product))?.is_archived
+                      {product.is_archived || getSelectedProductSize(product)?.is_archived
                         ? <ArchiveRestore size={15} aria-hidden="true" />
                         : <Archive size={15} aria-hidden="true" />}
                     </button>
