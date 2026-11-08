@@ -62,4 +62,26 @@ describe("customer notification sounds", () => {
     expect(playMock).toHaveBeenCalledTimes(3);
     warnMock.mockRestore();
   });
+
+  test("retries the chat sound after it was blocked before user interaction", async () => {
+    let sounds;
+    const warnMock = jest.spyOn(console, "warn").mockImplementation(() => {});
+    jest.isolateModules(() => {
+      sounds = require("./customerNotificationSounds");
+    });
+    playMock
+      .mockResolvedValueOnce()
+      .mockRejectedValueOnce(new Error("Chat audio blocked"))
+      .mockResolvedValueOnce()
+      .mockResolvedValueOnce();
+
+    sounds.playCustomerChatMessageSound();
+    await sounds.unlockCustomerNotificationSounds();
+    expect(playMock).toHaveBeenCalledTimes(2);
+
+    await sounds.unlockCustomerNotificationSounds();
+
+    expect(playMock).toHaveBeenCalledTimes(4);
+    warnMock.mockRestore();
+  });
 });

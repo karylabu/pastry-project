@@ -5,6 +5,7 @@ let notificationAudio = null;
 let chatAudio = null;
 const unlockedSounds = new WeakSet();
 let unlockPromise = null;
+let pendingChatSound = false;
 
 function getAudio(type) {
   if (typeof Audio === "undefined") return null;
@@ -39,7 +40,13 @@ export function unlockCustomerNotificationSounds() {
 
   const sounds = [getAudio("notification"), getAudio("chat")]
     .filter((sound) => sound && !unlockedSounds.has(sound));
-  if (!sounds.length) return Promise.resolve();
+  if (!sounds.length) {
+    if (pendingChatSound) {
+      pendingChatSound = false;
+      playSound("chat");
+    }
+    return Promise.resolve(true);
+  }
 
   unlockPromise = Promise.all(sounds.map((sound) => {
     sound.muted = true;
@@ -49,12 +56,22 @@ export function unlockCustomerNotificationSounds() {
         sound.currentTime = 0;
         sound.muted = false;
         unlockedSounds.add(sound);
+        return true;
       })
       .catch((error) => {
         sound.muted = false;
         console.warn("Unable to enable a customer notification sound:", error);
+        return false;
       });
   }))
+    .then(() => {
+      const chatSound = getAudio("chat");
+      if (chatSound && unlockedSounds.has(chatSound) && pendingChatSound) {
+        pendingChatSound = false;
+        playSound("chat");
+      }
+      return sounds.every((sound) => unlockedSounds.has(sound));
+    })
     .finally(() => {
       unlockPromise = null;
     });
@@ -64,15 +81,21 @@ export function unlockCustomerNotificationSounds() {
 
 function playSound(type) {
   const sound = getAudio(type);
-  if (!sound || !unlockedSounds.has(sound)) return;
+  if (!sound) return;
+  if (!unlockedSounds.has(sound)) {
+    if (type === "chat") pendingChatSound = true;
+    return;
+  }
 
   try {
     sound.pause();
     sound.currentTime = 0;
     sound.play().catch((error) => {
+      if (type === "chat") pendingChatSound = true;
       console.warn(`Unable to play the customer ${type} sound:`, error);
     });
   } catch (error) {
+    if (type === "chat") pendingChatSound = true;
     console.warn(`Unable to play the customer ${type} sound:`, error);
   }
 }

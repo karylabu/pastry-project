@@ -433,9 +433,16 @@ export function ChatBubble({ aiMode = false, fullPage = false, hideFloating = fa
   }, [messagePreview?.id]);
 
   useEffect(() => {
-    const unlockSounds = () => unlockCustomerNotificationSounds();
-    window.addEventListener("pointerdown", unlockSounds, { once: true });
-    window.addEventListener("keydown", unlockSounds, { once: true });
+    const unlockSounds = () => {
+      unlockCustomerNotificationSounds().then((unlocked) => {
+        if (unlocked) {
+          window.removeEventListener("pointerdown", unlockSounds);
+          window.removeEventListener("keydown", unlockSounds);
+        }
+      });
+    };
+    window.addEventListener("pointerdown", unlockSounds);
+    window.addEventListener("keydown", unlockSounds);
     return () => {
       window.removeEventListener("pointerdown", unlockSounds);
       window.removeEventListener("keydown", unlockSounds);
