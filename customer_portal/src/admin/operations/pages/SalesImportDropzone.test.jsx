@@ -1,4 +1,11 @@
+import React from 'react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { buildCsvTemplate, describeCleaningReport, getCsvTemplateSampleDates } from './SalesImportDropzone';
+import SalesImportDropzone from './SalesImportDropzone';
+
+jest.mock('../../../services/config', () => ({
+  LARAVEL_BASE: 'https://example.test/laravel',
+}));
 
 describe('CSV import template date samples', () => {
   const now = new Date(2026, 9, 16, 12);
@@ -48,5 +55,60 @@ describe('CSV import template date samples', () => {
       aliases_mapped: 1,
       warnings: [{ row: 4, message: 'Sale date is blank.' }],
     })).toContain('row 4: Sale date is blank.');
+  });
+});
+
+describe('compact sales report import', () => {
+  afterEach(() => {
+    jest.useRealTimers();
+    jest.restoreAllMocks();
+  });
+
+  test('shows one sales report import button and explains automatic data cleaning', () => {
+    render(<SalesImportDropzone compact />);
+
+    expect(screen.getByRole('button', { name: 'Import Sales Report' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Import Customized Cake Sales' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Import Finished Product Sales' })).not.toBeInTheDocument();
+    expect(screen.getByText(/reports are cleaned automatically/i)).toBeInTheDocument();
+  });
+
+  test('notifies the reports page as soon as a CSV is queued so it can be cancelled', async () => {
+    jest.useFakeTimers();
+    const onImportQueued = jest.fn();
+    global.fetch = jest.fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 202,
+        json: async () => ({ success: true, import_id: 42, status: 'queued' }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ success: true, import: { id: 42, status: 'cancellation_requested' } }),
+      });
+
+    const { container } = render(<SalesImportDropzone compact onImportQueued={onImportQueued} />);
+    const file = new File(['sale_date,item_name,quantity,price\n2026-11-08,Cake,1,500'], 'sales.csv', { type: 'text/csv' });
+
+    await act(async () => {
+      fireEvent.change(container.querySelector('input[type="file"]'), { target: { files: [file] } });
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    await waitFor(() => expect(onImportQueued).toHaveBeenCalledWith({
+      source: 'csv',
+      importId: 42,
+      status: 'queued',
+      salesType: 'other',
+    }));
+
+    await act(async () => {
+      jest.advanceTimersByTime(1000);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(await screen.findByText(/Cancellation requested for sales\.csv/i)).toBeInTheDocument();
   });
 });

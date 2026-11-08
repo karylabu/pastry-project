@@ -1575,6 +1575,7 @@ export default function Reports() {
                 dateFilterEnd={dateFilterEnd}
                 onDownloadCsvReport={exportCsvReport}
                 onDownloadPdfReport={exportReport}
+                onImportQueued={refreshAnalyticsAfterImport}
                 onImportComplete={refreshAnalyticsAfterImport}
               />
             </div>

@@ -133,6 +133,7 @@ function downloadCsvTemplate(range, startDate, endDate) {
 ───────────────────────────────────────── */
 export default function SalesImportDropzone({
   onImportComplete,
+  onImportQueued,
   compact = false,
   range = 'all',
   dateFilterStart = '',
@@ -183,6 +184,7 @@ export default function SalesImportDropzone({
       }
 
       setToast({ type: 'success', message: `${file.name} uploaded; waiting for background processing...` });
+      onImportQueued?.({ source: 'csv', importId: payload.import_id, status: payload.status, salesType: salesTypeRef.current });
       let status = payload.status;
       let result;
       if (status === 'completed') {
@@ -208,6 +210,11 @@ export default function SalesImportDropzone({
         }
         result = statusPayload.import;
         status = result.status;
+        if (status === 'cancellation_requested') {
+          setIsProcessing(false);
+          showToast('success', `Cancellation requested for ${file.name}; it will be removed after processing stops.`);
+          return;
+        }
         if (status === 'processing') {
           setToast({ type: 'success', message: `Importing ${file.name}: ${result.rows_processed.toLocaleString()} rows processed...` });
         }
@@ -228,7 +235,7 @@ export default function SalesImportDropzone({
       setIsProcessing(false);
       showToast('error', error.message || 'Unable to import the CSV.');
     }
-  }, [onImportComplete, overlapMode, showToast]);
+  }, [onImportComplete, onImportQueued, overlapMode, showToast]);
 
   const handlePdfFile = useCallback(async (file) => {
     try {
@@ -301,14 +308,13 @@ export default function SalesImportDropzone({
             <option value="supplement">Add as additional sales (e.g. walk-ins)</option>
           </select>
         </label>
-        <button type="button" onClick={() => { chooseSalesType('customized_cake'); inputRef.current?.click(); }} disabled={isProcessing} className="inline-flex h-auto min-h-10 min-w-0 items-center justify-center gap-2 rounded-md bg-black px-3 py-2 text-center text-[10px] font-semibold leading-tight text-white transition hover:bg-black/85 disabled:cursor-wait disabled:opacity-60 sm:text-[11px]">
+        <button type="button" onClick={() => { chooseSalesType('other'); inputRef.current?.click(); }} disabled={isProcessing} className="inline-flex h-auto min-h-10 min-w-0 items-center justify-center gap-2 rounded-md bg-black px-3 py-2 text-center text-[10px] font-semibold leading-tight text-white transition hover:bg-black/85 disabled:cursor-wait disabled:opacity-60 sm:text-[11px]">
           {isProcessing ? <Loader2 size={14} className="animate-spin" /> : <UploadCloud size={14} />}
-          {isProcessing ? 'Importing report...' : 'Import Customized Cake Sales'}
+          {isProcessing ? 'Importing report...' : 'Import Sales Report'}
         </button>
-        <button type="button" onClick={() => { chooseSalesType('finished_product'); inputRef.current?.click(); }} disabled={isProcessing} className="inline-flex h-auto min-h-10 min-w-0 items-center justify-center gap-2 rounded-md bg-black px-3 py-2 text-center text-[10px] font-semibold leading-tight text-white transition hover:bg-black/85 disabled:cursor-wait disabled:opacity-60 sm:text-[11px]">
-          {isProcessing ? <Loader2 size={14} className="animate-spin" /> : <UploadCloud size={14} />}
-          {isProcessing ? 'Importing report...' : 'Import Finished Product Sales'}
-        </button>
+        <p className="col-span-full text-[10px] leading-relaxed text-black/55">
+          CSV and PDF reports are cleaned automatically. Review the import summary for cleaned rows, skipped rows, and warnings.
+        </p>
         <button
           type="button"
           onClick={onDownloadCsvReport || (() => downloadCsvTemplate(range, dateFilterStart, dateFilterEnd))}
