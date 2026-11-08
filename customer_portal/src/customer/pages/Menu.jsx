@@ -5,6 +5,7 @@ import { useLocation } from 'react-router-dom';
 import ProductModal from '../components/ProductModal';
 import { CUSTOMER_BASE } from '../../services/config';
 import { getAuthHeaders, safeFetchJson, safeParseJson } from '../../services/api';
+import { subscribeInventoryUpdates } from '../../services/realtime';
 import { Check, ChevronDown } from 'lucide-react';
 
 const SORT_OPTIONS = [
@@ -121,20 +122,48 @@ export default function Menu({ onAddToCart, onEnsureShopOpen }) {
   };
 
   useEffect(() => {
+    let active = true;
+    let requestId = 0;
+    let hasLoadedProducts = false;
+    let refreshTimeout;
+
     loadFavorites();
 
-    safeFetchJson(`${CUSTOMER_BASE}/api/customer/products?action=list`)
+    const loadProducts = () => {
+      const currentRequestId = ++requestId;
+      return safeFetchJson(`${CUSTOMER_BASE}/api/customer/products?action=list`)
       .then(data => {
         if (!Array.isArray(data)) throw new Error('Invalid product list response.');
         const filtered = data.filter((product) =>
           product.name?.toLowerCase() !== 'cake customization' && hasMenuImage(product)
         );
+        if (!active || currentRequestId !== requestId) return;
         setProducts(filtered);
+        setSelectedProduct((selected) => selected
+          ? filtered.find((product) => Number(product.id) === Number(selected.id)) || selected
+          : selected);
+        hasLoadedProducts = true;
       })
       .catch((error) => {
+        if (!active || currentRequestId !== requestId) return;
         console.error('Failed to load menu products:', error);
-        window.PastryLoader?.fail('We couldn’t load the menu. Please try again.');
+        if (!hasLoadedProducts) {
+          window.PastryLoader?.fail('We couldn’t load the menu. Please try again.');
+        }
       });
+    };
+
+    loadProducts();
+    const unsubscribe = subscribeInventoryUpdates(() => {
+      clearTimeout(refreshTimeout);
+      refreshTimeout = setTimeout(loadProducts, 150);
+    });
+
+    return () => {
+      active = false;
+      clearTimeout(refreshTimeout);
+      unsubscribe();
+    };
   }, [favoritesStorageKey, userId]);
 
   const toggleFavorite = async (product) => {

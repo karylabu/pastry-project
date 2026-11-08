@@ -235,6 +235,7 @@ class StockController extends Controller
         }
 
         $productSize->refresh();
+        app(\App\Services\RealtimeEventPublisher::class)->inventoryUpdated();
 
         return response()->json([
             'success' => true,

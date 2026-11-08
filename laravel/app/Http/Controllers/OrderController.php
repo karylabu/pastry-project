@@ -2143,6 +2143,8 @@ class OrderController extends Controller
                 throw new RuntimeException('Failed to record product size order movement.');
             }
         }
+
+        app(\App\Services\RealtimeEventPublisher::class)->inventoryUpdated();
     }
 
     private function restoreOrderSizeStock(Order $order, int $userId): void
@@ -2163,6 +2165,7 @@ class OrderController extends Controller
             ->groupBy('product_id', 'product_size_id')
             ->get();
 
+        $inventoryChanged = false;
         foreach ($deductions as $deduction) {
             $restoreQuantity = max(0, -(float) $deduction->net_quantity);
             if ($restoreQuantity <= 0.000001) continue;
@@ -2201,12 +2204,22 @@ class OrderController extends Controller
             if (!$inserted) {
                 throw new RuntimeException('Failed to record product size cancellation movement.');
             }
+            $inventoryChanged = true;
+        }
+
+        if ($inventoryChanged) {
+            app(\App\Services\RealtimeEventPublisher::class)->inventoryUpdated();
         }
     }
 
     private function deductOrderProductStock(Order $order, int $userId): void
     {
-        foreach ($this->orderProductLines($order) as $productId => $quantity) {
+        $productLines = $this->orderProductLines($order);
+        if (!$productLines) {
+            return;
+        }
+
+        foreach ($productLines as $productId => $quantity) {
             $product = Product::query()->whereKey($productId)->lockForUpdate()->first();
             if (!$product) throw new RuntimeException('Product not found for order.');
 
@@ -2231,6 +2244,8 @@ class OrderController extends Controller
             ]);
             if (!$inserted) throw new RuntimeException('Failed to record product order movement.');
         }
+
+        app(\App\Services\RealtimeEventPublisher::class)->inventoryUpdated();
     }
 
     private function restoreOrderProductStock(Order $order, int $userId): void
@@ -2248,6 +2263,7 @@ class OrderController extends Controller
             ->groupBy('product_id')
             ->get();
 
+        $inventoryChanged = false;
         foreach ($deductions as $deduction) {
             $restoreQuantity = max(0, -(float) $deduction->net_quantity);
             if ($restoreQuantity <= 0.000001) continue;
@@ -2274,6 +2290,11 @@ class OrderController extends Controller
                 'created_at' => now(),
             ]);
             if (!$inserted) throw new RuntimeException('Failed to record product cancellation movement.');
+            $inventoryChanged = true;
+        }
+
+        if ($inventoryChanged) {
+            app(\App\Services\RealtimeEventPublisher::class)->inventoryUpdated();
         }
     }
 

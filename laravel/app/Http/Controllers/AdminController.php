@@ -141,9 +141,12 @@ class AdminController extends Controller
         }
 
         if ($type === 'IN') {
-            DB::table('products')->where('id', $id)->increment('stock', $qty);
+            $updated = DB::table('products')->where('id', $id)->increment('stock', $qty);
         } else {
-            DB::table('products')->where('id', $id)->decrement('stock', $qty);
+            $updated = DB::table('products')->where('id', $id)->decrement('stock', $qty);
+        }
+        if ($updated > 0) {
+            app(\App\Services\RealtimeEventPublisher::class)->inventoryUpdated();
         }
 
         return redirect('/staff/inventory.php');

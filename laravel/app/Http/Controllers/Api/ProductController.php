@@ -240,6 +240,8 @@ class ProductController extends Controller
             ], 500);
         }
 
+        app(\App\Services\RealtimeEventPublisher::class)->inventoryUpdated();
+
         return response()->json([
             'success' => true,
             'product_id' => $productId,
