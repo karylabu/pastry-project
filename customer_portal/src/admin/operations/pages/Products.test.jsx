@@ -203,6 +203,37 @@ describe('Products admin catalog', () => {
     expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:product-preview');
   });
 
+  test('adds a missing cake size from its own modal and leaves configured sizes unavailable', async () => {
+    render(<Products allowCatalogManagement />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Strawberry Cake')).toBeInTheDocument();
+    });
+
+    const addNewButton = screen.getByRole('button', { name: 'Add New', exact: true });
+    expect(addNewButton.querySelector('svg')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Add New Size' }));
+    expect(screen.getByRole('dialog', { name: 'Add New Size' })).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText('Select Cake'), { target: { value: '4' } });
+    expect(screen.getByRole('button', { name: /Small Cake.*Already added/ })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /Big Cake.*Selected size/ })).toHaveAttribute('aria-pressed', 'true');
+    fireEvent.change(screen.getByLabelText('Price'), { target: { value: '520' } });
+    fireEvent.change(screen.getByLabelText('Starting Stock'), { target: { value: '3' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Add Size', exact: true }));
+
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringContaining('/api/staff/products/4/sizes'),
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify({ size: 'Big', price: 520, stock: 3 }),
+        }),
+      );
+      expect(screen.queryByRole('dialog', { name: 'Add New Size' })).not.toBeInTheDocument();
+    });
+  });
+
   test('creates a small cake when Small Cake is selected', async () => {
     const { container } = render(<Products allowCatalogManagement />);
 
@@ -541,33 +572,17 @@ describe('Products admin catalog', () => {
     );
   });
 
-  test('adds a missing cake size below the price field in Edit Product', async () => {
+  test('keeps adding a size out of the Edit Product modal', async () => {
     mockLocationSearch = '?category=Small%20Cakes';
-    render(<Products allowCatalogManagement />);
+    render(<Products allowCatalogManagement />)
 
     await screen.findByText('Mini Vanilla Cake');
     fireEvent.click(screen.getByRole('button', { name: 'Edit Mini Vanilla Cake' }));
 
-    fireEvent.click(screen.getByRole('button', { name: 'Add Size' }));
-    expect(screen.getByLabelText('Cake Size')).toHaveValue('Big');
-    expect(screen.getByLabelText('Price (Big Cake)')).toBeInTheDocument();
-    expect(screen.getByLabelText('Starting Stock (Big Cake)')).toBeInTheDocument();
-
-    fireEvent.change(screen.getByLabelText('Price (Big Cake)'), { target: { value: '550' } });
-    fireEvent.change(screen.getByLabelText('Starting Stock (Big Cake)'), { target: { value: '4' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
-
-    await waitFor(() => {
-      expect(screen.queryByRole('heading', { name: 'Edit Product' })).not.toBeInTheDocument();
-    });
-
-    const updateCall = global.fetch.mock.calls.find(([url, options]) =>
-      String(url).endsWith('/api/staff/products/4') && options?.method === 'POST'
-    );
-    expect(updateCall).toBeDefined();
-    expect(updateCall[1].body.getAll('add_sizes[]')).toEqual(['Big']);
-    expect(updateCall[1].body.get('add_prices[Big]')).toBe('550');
-    expect(updateCall[1].body.get('add_stocks[Big]')).toBe('4');
+    expect(screen.getByRole('heading', { name: 'Edit Product' })).toBeInTheDocument();
+    expect(screen.queryByLabelText('Cake Size')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Starting Stock (Big Cake)')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Add New Size' })).toBeInTheDocument();
   });
 
   test('uses one custom clear control for the admin product search', async () => {

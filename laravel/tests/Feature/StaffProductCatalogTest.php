@@ -434,17 +434,12 @@ class StaffProductCatalogTest extends TestCase
         $admin->status = 'active';
 
         $this->actingAs($admin)
-            ->postJson('/api/staff/products/1', [
-                'name' => 'Chocolate Cake',
-                'category' => 'Cakes',
-                'description' => 'Chocolate cake',
-                'price_size' => 'small',
-                'price' => 320,
-                'add_sizes' => ['Big'],
-                'add_prices' => ['Big' => 550],
-                'add_stocks' => ['Big' => 4],
+            ->postJson('/api/staff/products/1/sizes', [
+                'size' => 'Big',
+                'price' => 550,
+                'stock' => 4,
             ])
-            ->assertOk()
+            ->assertCreated()
             ->assertJsonPath('success', true);
 
         $this->assertDatabaseHas('product_sizes', [
@@ -454,7 +449,22 @@ class StaffProductCatalogTest extends TestCase
             'stock_quantity' => 4,
             'available' => true,
         ]);
-        $this->assertDatabaseHas('products', ['id' => 1, 'price' => 550, 'stock' => 6]);
+        $this->assertDatabaseHas('products', [
+            'id' => 1,
+            'name' => 'Chocolate Cake',
+            'price' => 550,
+            'stock' => 6,
+            'description' => null,
+        ]);
+
+        $this->actingAs($admin)
+            ->postJson('/api/staff/products/1/sizes', [
+                'size' => 'Big',
+                'price' => 600,
+                'stock' => 2,
+            ])
+            ->assertUnprocessable()
+            ->assertJsonPath('success', false);
     }
 
     public function test_product_update_requires_admin_authorization(): void

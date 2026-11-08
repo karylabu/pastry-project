@@ -262,27 +262,8 @@ class ProductController extends Controller
             'description' => ['nullable', 'string'],
             'price_size' => ['nullable', 'in:small,big'],
             'price' => ['required', 'numeric', 'gt:0'],
-            'add_sizes' => ['sometimes', 'array', 'min:1'],
-            'add_sizes.*' => ['required', 'distinct', 'in:Small,Big'],
-            'add_prices' => ['required_with:add_sizes', 'array'],
-            'add_prices.*' => ['required', 'numeric', 'gt:0'],
-            'add_stocks' => ['required_with:add_sizes', 'array'],
-            'add_stocks.*' => ['required', 'integer', 'min:0'],
             'image' => ['nullable', 'image', 'mimes:jpg,jpeg,png,gif', 'max:5120'],
         ]);
-
-        $newSizeVariants = [];
-        foreach ($data['add_sizes'] ?? [] as $size) {
-            $price = $data['add_prices'][$size] ?? null;
-            $stock = $data['add_stocks'][$size] ?? null;
-            if (!is_numeric($price) || (float) $price <= 0 || filter_var($stock, FILTER_VALIDATE_INT) === false || (int) $stock < 0) {
-                return response()->json([
-                    'success' => false,
-                    'message' => "Enter a valid price and starting stock for the {$size} Cake size.",
-                ], 422);
-            }
-            $newSizeVariants[] = ['size' => $size, 'price' => $price, 'stock' => (int) $stock];
-        }
 
         $image = $request->file('image');
         $imageName = null;
@@ -311,7 +292,7 @@ class ProductController extends Controller
         }
 
         try {
-            DB::transaction(function () use ($data, $product, $imageName, $newSizeVariants) {
+            DB::transaction(function () use ($data, $product, $imageName) {
                 $priceSize = strtolower((string) ($data['price_size'] ?? ''));
                 if ($priceSize !== '') {
                     $size = DB::table('product_sizes')
@@ -329,47 +310,11 @@ class ProductController extends Controller
                     ]);
                 }
 
-                foreach ($newSizeVariants as $variant) {
-                    $existingSize = DB::table('product_sizes')
-                        ->where('product_id', $product->id)
-                        ->whereRaw('LOWER(TRIM(size)) = ?', [strtolower($variant['size'])])
-                        ->exists();
-                    if ($existingSize) {
-                        throw new \InvalidArgumentException("The {$variant['size']} Cake size already exists.");
-                    }
-
-                    $sizeAttributes = [
-                        'product_id' => $product->id,
-                        'size' => $variant['size'],
-                        'price' => $variant['price'],
-                        'stock_quantity' => $variant['stock'],
-                        'available' => true,
-                        'created_at' => now(),
-                        'updated_at' => now(),
-                    ];
-                    $sizeAttributes = array_filter(
-                        $sizeAttributes,
-                        fn ($value, $column) => Schema::hasColumn('product_sizes', $column),
-                        ARRAY_FILTER_USE_BOTH
-                    );
-                    DB::table('product_sizes')->insert($sizeAttributes);
-                }
-
                 $product->name = $data['name'];
                 $product->category = $data['category'];
                 $product->description = $data['description'] ?? null;
                 if ($priceSize === 'big' || $priceSize === '') {
                     $product->price = $data['price'];
-                }
-                $addedBigSize = collect($newSizeVariants)->firstWhere('size', 'Big');
-                if ($addedBigSize) {
-                    $product->price = $addedBigSize['price'];
-                }
-                if ($newSizeVariants && Schema::hasColumn('products', 'stock')) {
-                    $product->stock = (int) DB::table('product_sizes')
-                        ->where('product_id', $product->id)
-                        ->whereRaw('LOWER(TRIM(size)) <> ?', ['slice'])
-                        ->sum('stock_quantity');
                 }
                 if ($imageName !== null) {
                     $product->image = $imageName;
@@ -385,11 +330,73 @@ class ProductController extends Controller
             return response()->json(['success' => false, 'message' => 'Unable to update the product.'], 500);
         }
 
-        if ($newSizeVariants) {
-            app(\App\Services\RealtimeEventPublisher::class)->inventoryUpdated();
+        return response()->json(['success' => true, 'product_id' => (int) $product->id]);
+    }
+
+    public function storeSizeStaff(Request $request, Product $product): JsonResponse
+    {
+        $admin = $this->requireRole($request, 'admin');
+        if (!$admin instanceof \App\Models\User) {
+            return $admin;
         }
 
-        return response()->json(['success' => true, 'product_id' => (int) $product->id]);
+        $data = $request->validate([
+            'size' => ['required', 'in:Small,Big'],
+            'price' => ['required', 'numeric', 'gt:0'],
+            'stock' => ['required', 'integer', 'min:0'],
+        ]);
+
+        try {
+            DB::transaction(function () use ($data, $product) {
+                $existingSize = DB::table('product_sizes')
+                    ->where('product_id', $product->id)
+                    ->whereRaw('LOWER(TRIM(size)) = ?', [strtolower($data['size'])])
+                    ->exists();
+                if ($existingSize) {
+                    throw new \InvalidArgumentException("The {$data['size']} Cake size already exists.");
+                }
+
+                $sizeAttributes = [
+                    'product_id' => $product->id,
+                    'size' => $data['size'],
+                    'price' => $data['price'],
+                    'stock_quantity' => (int) $data['stock'],
+                    'available' => true,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ];
+                $sizeAttributes = array_filter(
+                    $sizeAttributes,
+                    fn ($value, $column) => Schema::hasColumn('product_sizes', $column),
+                    ARRAY_FILTER_USE_BOTH
+                );
+                DB::table('product_sizes')->insert($sizeAttributes);
+
+                if ($data['size'] === 'Big') {
+                    $product->price = $data['price'];
+                }
+                if (Schema::hasColumn('products', 'stock')) {
+                    $product->stock = (int) DB::table('product_sizes')
+                        ->where('product_id', $product->id)
+                        ->whereRaw('LOWER(TRIM(size)) <> ?', ['slice'])
+                        ->sum('stock_quantity');
+                }
+                $product->save();
+            });
+        } catch (\InvalidArgumentException $exception) {
+            return response()->json(['success' => false, 'message' => $exception->getMessage()], 422);
+        } catch (Throwable $exception) {
+            Log::error('Cake size could not be added.', ['product_id' => $product->id, 'exception' => $exception]);
+            return response()->json(['success' => false, 'message' => 'Unable to add the cake size.'], 500);
+        }
+
+        app(\App\Services\RealtimeEventPublisher::class)->inventoryUpdated();
+
+        return response()->json([
+            'success' => true,
+            'product_id' => (int) $product->id,
+            'size' => $data['size'],
+        ], 201);
     }
 
     public function updateArchiveStaff(Request $request, Product $product): JsonResponse
