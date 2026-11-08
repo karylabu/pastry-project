@@ -132,7 +132,7 @@ export default function AdminChatBubble() {
               avatar: incoming.customer_avatar || "",
             });
             window.clearTimeout(messagePreviewTimer.current);
-            messagePreviewTimer.current = window.setTimeout(() => setMessagePreview(null), 6000);
+            messagePreviewTimer.current = window.setTimeout(() => setMessagePreview(null), 5000);
           }
         }
       }

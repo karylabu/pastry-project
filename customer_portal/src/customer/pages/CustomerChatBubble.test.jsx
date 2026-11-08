@@ -2,6 +2,7 @@ import React from "react";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { ChatBubble } from "./Dashboard";
+import { playCustomerChatMessageSound } from "../components/customerNotificationSounds";
 
 let mockRealtimeHandler;
 
@@ -83,4 +84,31 @@ test("shows a popup when a staff reply arrives while chat is closed", async () =
 
   fireEvent.click(messagePopup);
   expect(await screen.findByText("Admin Support")).toBeInTheDocument();
+});
+
+test("plays a sound for an unread admin reply in the initial chat fetch", async () => {
+  global.fetch.mockResolvedValueOnce({
+    ok: true,
+    json: async () => ({
+      success: true,
+      messages: [{
+        id: 26,
+        sender: "admin",
+        message: "Thanks for your order.",
+        is_read: 0,
+        created_at: new Date().toISOString(),
+      }],
+    }),
+  });
+
+  render(
+    <MemoryRouter>
+      <ChatBubble />
+    </MemoryRouter>,
+  );
+
+  expect(await screen.findByRole("button", {
+    name: "New message from Admin: Thanks for your order.",
+  })).toBeInTheDocument();
+  expect(playCustomerChatMessageSound).toHaveBeenCalledTimes(1);
 });

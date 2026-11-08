@@ -494,15 +494,18 @@ export function ChatBubble({ aiMode = false, fullPage = false, hideFloating = fa
       if (fetchId !== messageFetchIdRef.current) return;
       const fetchedMessages = Array.isArray(data.messages) ? data.messages : [];
       let knownMessageIds = knownMessageIdsByConversationRef.current.get(fetchKey);
+      const newIncomingMessages = knownMessageIds
+        ? getNewIncomingCustomerMessages(fetchedMessages, knownMessageIds)
+        : fetchedMessages.filter((message) => (
+            ["admin", "staff", "ai"].includes(String(message.sender).toLowerCase()) &&
+            Number(message.is_read) === 0
+          ));
+      if (newIncomingMessages.length) playCustomerChatMessageSound();
       if (!knownMessageIds) {
-        knownMessageIds = new Set(fetchedMessages.map((message) => String(message.id)));
+        knownMessageIds = new Set();
         knownMessageIdsByConversationRef.current.set(fetchKey, knownMessageIds);
-      } else {
-        if (getNewIncomingCustomerMessages(fetchedMessages, knownMessageIds).length) {
-          playCustomerChatMessageSound();
-        }
-        fetchedMessages.forEach((message) => knownMessageIds.add(String(message.id)));
       }
+      fetchedMessages.forEach((message) => knownMessageIds.add(String(message.id)));
       setMessages(previousMessages => {
         if (!mergeWithCurrent) return fetchedMessages;
 
