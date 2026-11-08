@@ -69,9 +69,9 @@ const getProductBasePrice = (product) => {
 
 const getProductPriceForSize = (product, category) => {
   const normalized = String(category || "").trim().toLowerCase();
-  const sizeName = normalized === "small" || normalized === "small cakes" ? "small" : "big";
+  const sizeName = normalized === "small cakes" ? "small" : normalized;
   const sizeOption = getProductSizeByName(product, sizeName);
-  const sizePrice = [sizeOption?.price, product?.[`${sizeName}_price`]]
+  const sizePrice = [sizeOption?.price, product?.[`${sizeName}_price`], ...(sizeName === "small" || sizeName === "big" ? [product?.price] : [])]
     .map(Number)
     .find((value) => Number.isFinite(value) && value > 0);
 
@@ -102,7 +102,7 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
   const [editImagePreview, setEditImagePreview] = useState("");
   const [editSaving, setEditSaving] = useState(false);
   const [addSizeOpen, setAddSizeOpen] = useState(false);
-  const [addSizeProductId, setAddSizeProductId] = useState("");
+  const [addSizeProductIds, setAddSizeProductIds] = useState([]);
   const [addSizeName, setAddSizeName] = useState("");
   const [addSizePrice, setAddSizePrice] = useState("");
   const [addSizeStock, setAddSizeStock] = useState("0");
@@ -194,10 +194,12 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
   const cakeProducts = products.filter((product) =>
     ["cake", "cakes"].includes(String(product.category || "").trim().toLowerCase())
   );
-  const addSizeProduct = cakeProducts.find((product) => String(product.id) === addSizeProductId) || null;
-  const addSizeAlreadyExists = Boolean(addSizeProduct && getProductSizeOptions(addSizeProduct).some((size) =>
+  const selectedSizeProducts = cakeProducts.filter((product) => addSizeProductIds.includes(String(product.id)));
+  const addSizeAlreadyExistsFor = (product) => getProductSizeOptions(product).some((size) =>
     String(size?.size || size?.variant_size || "").trim().toLowerCase() === addSizeName.trim().toLowerCase()
-  ));
+  );
+  const addSizeEligibleProducts = selectedSizeProducts.filter((product) => !addSizeAlreadyExistsFor(product));
+  const addSizeDuplicateProducts = selectedSizeProducts.filter(addSizeAlreadyExistsFor);
   const recordedSizePrices = addSizeName.trim()
     ? [...new Set(cakeProducts.flatMap((product) =>
       getProductSizeOptions(product)
@@ -208,6 +210,9 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
     ))]
     : [];
   const addSizeRecordedPrice = recordedSizePrices.length === 1 ? Number(recordedSizePrices[0]) : null;
+  const allEligibleCakesSelected = cakeProducts.some((product) => !addSizeAlreadyExistsFor(product))
+    && cakeProducts.filter((product) => !addSizeAlreadyExistsFor(product))
+      .every((product) => addSizeProductIds.includes(String(product.id)));
 
   const openEditProductModal = (product, selectedSizeName = getCardSizeName(product)) => {
     const sizeName = String(selectedSizeName || "").toLowerCase() === "small" ? "small" : "big";
@@ -235,7 +240,7 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
     setLoading(true);
     setFetchError(null);
 
-    laravelStaffFetch(`${LARAVEL_BASE}/api/staff/products?action=list`)
+    return laravelStaffFetch(`${LARAVEL_BASE}/api/staff/products?action=list`)
       .then((res) => {
         if (!res.ok) throw new Error(`Products API returned ${res.status}`);
         return res.json();
@@ -251,15 +256,18 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
             ...product,
             price: getProductBasePrice(product),
           })));
+          return true;
         } else {
           setFetchError("Invalid server response.");
           setProducts([]);
+          return false;
         }
 
       })
       .catch(() => {
         setFetchError("Cannot connect to server.");
         setProducts([]);
+        return false;
       })
       .finally(() => setLoading(false));
 
@@ -440,8 +448,7 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
   };
 
   const openAddSizeModal = () => {
-    const firstProduct = cakeProducts[0] || null;
-    setAddSizeProductId(firstProduct ? String(firstProduct.id) : "");
+    setAddSizeProductIds([]);
     setAddSizeName("");
     setAddSizePrice("");
     setAddSizeStock("0");
@@ -456,10 +463,10 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
 
   const submitNewSize = async () => {
     const size = addSizeName.trim();
-    const price = addSizeRecordedPrice ?? Number(addSizePrice);
+    const price = Number(addSizePrice);
     const stock = Number(addSizeStock);
-    if (!addSizeProduct || !size || size.length > 100 || addSizeAlreadyExists) {
-      setAddSizeError("Select a cake and enter a new cake size (up to 100 characters).");
+    if (!size || size.length > 100 || addSizeEligibleProducts.length === 0) {
+      setAddSizeError("Select at least one cake that does not already have this size, then enter the size name.");
       return;
     }
     if (addSizeRecordedPrice === null && (!Number.isFinite(price) || price <= 0)) {
@@ -474,21 +481,48 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
     setAddSizeSaving(true);
     setAddSizeError("");
     try {
-      const response = await laravelStaffFetch(
-        `${LARAVEL_BASE}/api/staff/products/${encodeURIComponent(addSizeProduct.id)}/sizes`,
-        {
-          method: "POST",
-          headers: { Accept: "application/json", "Content-Type": "application/json" },
-          body: JSON.stringify({ size, price: addSizeRecordedPrice === null ? price : undefined, stock }),
+      const attempts = await Promise.allSettled(addSizeEligibleProducts.map(async (product) => {
+        const response = await laravelStaffFetch(
+          `${LARAVEL_BASE}/api/staff/products/${encodeURIComponent(product.id)}/sizes`,
+          {
+            method: "POST",
+            headers: { Accept: "application/json", "Content-Type": "application/json" },
+            body: JSON.stringify({ size, ...(addSizeRecordedPrice === null ? { price } : {}), stock }),
+          }
+        );
+        const data = await response.json().catch(() => null);
+        if (!response.ok || !data?.success) {
+          throw new Error(`${product.name}: ${data?.message || "Unable to add size."}`);
         }
-      );
-      const data = await response.json().catch(() => null);
-      if (!response.ok || !data?.success) {
-        throw new Error(data?.message || "We couldn’t add the cake size. Please try again.");
+        return product;
+      }));
+
+      const succeededProducts = attempts
+        .filter((attempt) => attempt.status === "fulfilled")
+        .map((attempt) => attempt.value);
+      const failures = attempts
+        .filter((attempt) => attempt.status === "rejected")
+        .map((attempt) => attempt.reason?.message || "Unable to add size.");
+      if (succeededProducts.length === 0) {
+        setAddSizeError(failures.join(" "));
+        return;
       }
 
-      await fetchProducts();
-      setFeedback({ type: "success", text: `${addSizeProduct.name} ${size} size added.` });
+      setCardSizeSelections((current) => ({
+        ...current,
+        ...Object.fromEntries(succeededProducts.map((product) => [product.id, size])),
+      }));
+      const productsRefreshed = await fetchProducts();
+      const addedNames = succeededProducts.map((product) => product.name).join(", ");
+      const skippedMessage = addSizeDuplicateProducts.length
+        ? ` Skipped ${addSizeDuplicateProducts.map((product) => product.name).join(", ")} because this size already exists.`
+        : "";
+      const failedMessage = failures.length ? ` Could not add it to: ${failures.join(" ")}` : "";
+      const refreshMessage = productsRefreshed === false ? " The product list did not refresh; use Retry to reload it." : "";
+      setFeedback({
+        type: failures.length || productsRefreshed === false ? "error" : "success",
+        text: `Added ${size} size to ${addedNames}.${skippedMessage}${failedMessage}${refreshMessage}`,
+      });
       closeAddSizeModal();
     } catch (error) {
       setAddSizeError(error.message || "We couldn’t connect to add the cake size. Please try again.");
@@ -920,7 +954,12 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
   const filteredProducts = products.filter((p) => {
     const matchesCategory = canManageCatalog
       ? ["cake", "cakes"].includes(p.category?.trim().toLowerCase())
-        && Boolean(getProductSizeForCategory(p, activeCat))
+        && (
+          Boolean(getProductSizeForCategory(p, activeCat))
+          || getProductSizeOptions(p).some((size) =>
+            !["big", "small"].includes(String(size?.size || size?.variant_size || "").trim().toLowerCase())
+          )
+        )
       : activeCat === "All" || p.category?.toLowerCase() === activeCat.toLowerCase();
 
     const query = searchTerm.trim().toLowerCase();
@@ -1063,7 +1102,7 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
                   <button
                     type="button"
                     onClick={openAddSizeModal}
-                    className="whitespace-nowrap rounded-lg border border-[#d8c9b5] bg-white px-4 py-2 text-[11px] font-semibold text-[#5c4310] transition hover:bg-[#fff8e9]"
+                    className="whitespace-nowrap rounded-lg bg-[#f5c451] px-4 py-2 text-[11px] font-semibold text-[#5c4310] transition hover:bg-[#eab63d]"
                   >
                     Add New Size
                   </button>
@@ -1104,7 +1143,7 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
               (() => {
                 const cardSizeName = getCardSizeName(product);
                 const cardSize = getProductSizeByName(product, cardSizeName);
-                const cardCategory = cardSizeName === "small" ? "Small Cakes" : "Cakes";
+                const cardCategory = cardSizeName;
                 const stockStatus = getStockStatus(product, cardSizeName);
                 const productionStatus = getProductionStatus(product, cardSizeName);
                 const productNameLength = String(product.name || "").trim().length;
@@ -1152,28 +1191,33 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
                   <p className="text-[20px] font-bold leading-none tracking-tight text-[#6f541d]">₱{formatProductPrice(product, canManageCatalog ? cardCategory : activeCat)}</p>
                 </div>
 
-                {canManageCatalog && (
-                  <div className="mb-1 flex min-h-[25px] w-full items-center justify-center gap-1 rounded-full border border-[#f1e6df] bg-[#f8f3ee] p-1">
-                    {['small', 'big'].map((sizeName) => {
-                      const sizeOption = getProductSizeByName(product, sizeName);
-                      const selected = cardSizeName === sizeName;
+                {canManageCatalog && getProductSizeOptions(product).length > 0 && (
+                  <div className="mb-1 flex w-full flex-wrap justify-center gap-1 rounded-xl border border-[#f1e6df] bg-[#f8f3ee] p-1.5">
+                    {getProductSizeOptions(product).map((sizeOption) => {
+                      const sizeName = String(sizeOption.size || sizeOption.variant_size || "").trim();
+                      const sizeLabel = sizeName.toLowerCase() === "small"
+                        ? "Small"
+                        : sizeName.toLowerCase() === "big"
+                          ? "Big"
+                          : sizeName;
+                      const selected = cardSizeName.toLowerCase() === sizeName.toLowerCase();
 
                       return (
                         <button
-                          key={sizeName}
+                          key={sizeOption.id}
                           type="button"
-                          disabled={!sizeOption}
                           onClick={() => setCardSizeSelections((current) => ({ ...current, [product.id]: sizeName }))}
-                          aria-label={`${sizeName === 'small' ? 'Small' : 'Big'} size for ${product.name}`}
-                          className={`flex min-w-0 flex-1 items-center justify-center rounded-xl border px-1.5 py-1 text-[8px] font-semibold uppercase tracking-[0.08em] whitespace-nowrap transition-all ${
-                            !sizeOption
-                              ? 'cursor-not-allowed border-stone-200 bg-stone-100 text-stone-400'
-                              : selected
+                          aria-label={`${sizeLabel} size for ${product.name}`}
+                          aria-pressed={selected}
+                          className={`flex min-w-[84px] flex-1 flex-col items-center justify-center rounded-lg border px-2 py-1.5 text-center transition-all ${
+                            selected
                               ? 'border-[#e7c875] bg-[#fff8df] text-[#8d6a2e] shadow-sm'
                               : 'border-[#eadfd8] bg-white text-[#765d50] hover:border-[#e7c875] hover:bg-[#fff8df] hover:text-[#8d6a2e]'
                           }`}
                         >
-                          {sizeName}
+                          <span className="max-w-full truncate text-[9px] font-semibold">{sizeLabel}</span>
+                          <span className="text-[8px]">₱{Number(sizeOption.price || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                          <span className="text-[8px]">Stock: {Number(sizeOption.stock_quantity ?? 0)}</span>
                         </button>
                       );
                     })}
@@ -1580,22 +1624,61 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
                   {cakeProducts.length > 0 ? (
                     <>
                       <div className="space-y-2">
-                        <label htmlFor="add-size-product" className="block text-[10px] font-bold uppercase tracking-[0.15em] text-[#8f8076]">Select Cake</label>
-                        <select
-                          id="add-size-product"
-                          aria-label="Select Cake"
-                          value={addSizeProductId}
-                          onChange={(event) => {
-                            setAddSizeProductId(event.target.value);
-                            setAddSizeStock("0");
-                            setAddSizeError("");
-                          }}
-                          className="w-full rounded-xl border border-[#eadfd8] bg-white px-3.5 py-3 text-[13px] text-[#33251e] outline-none transition focus:border-[#d4af37] focus:ring-2 focus:ring-[#d4af37]/15"
-                        >
-                          {cakeProducts.map((product) => (
-                            <option key={product.id} value={String(product.id)}>{product.name}</option>
-                          ))}
-                        </select>
+                        <div className="flex items-center justify-between gap-3">
+                          <span className="block text-[10px] font-bold uppercase tracking-[0.15em] text-[#8f8076]">Select Cakes</span>
+                          <label className="inline-flex items-center gap-2 text-[11px] font-semibold text-[#5c4310]">
+                            <input
+                              type="checkbox"
+                              aria-label="Select all cakes"
+                              checked={allEligibleCakesSelected}
+                              onChange={(event) => {
+                                const eligibleIds = cakeProducts
+                                  .filter((product) => !addSizeAlreadyExistsFor(product))
+                                  .map((product) => String(product.id));
+                                setAddSizeProductIds(event.target.checked ? eligibleIds : []);
+                                setAddSizeError("");
+                              }}
+                              className="h-4 w-4 rounded border-[#d8c9b5] accent-[#9b7810]"
+                            />
+                            Select all
+                          </label>
+                        </div>
+                        <div className="max-h-48 space-y-1 overflow-y-auto rounded-xl border border-[#eadfd8] bg-white p-2">
+                          {cakeProducts.map((product) => {
+                            const alreadyAdded = addSizeAlreadyExistsFor(product);
+                            const selected = addSizeProductIds.includes(String(product.id));
+                            return (
+                              <label
+                                key={product.id}
+                                className={`flex items-center gap-3 rounded-lg px-3 py-2 text-[12px] transition ${
+                                  alreadyAdded ? "cursor-not-allowed bg-[#f7f3ef] text-[#a99c93]" : "cursor-pointer text-[#33251e] hover:bg-[#fff8e9]"
+                                }`}
+                              >
+                                <input
+                                  type="checkbox"
+                                  aria-label={`Select ${product.name}`}
+                                  checked={selected}
+                                  disabled={alreadyAdded}
+                                  onChange={(event) => {
+                                    setAddSizeProductIds((current) => event.target.checked
+                                      ? [...current, String(product.id)]
+                                      : current.filter((id) => id !== String(product.id))
+                                    );
+                                    setAddSizeError("");
+                                  }}
+                                  className="h-4 w-4 rounded border-[#d8c9b5] accent-[#9b7810]"
+                                />
+                                <span className="min-w-0 flex-1 truncate">{product.name}</span>
+                                {alreadyAdded && <span className="text-[10px]">Size exists</span>}
+                              </label>
+                            );
+                          })}
+                        </div>
+                        {addSizeProductIds.length > 0 && (
+                          <p className="text-[11px] text-[#74675f]" role="status">
+                            {addSizeEligibleProducts.length} selected{addSizeDuplicateProducts.length ? ` · ${addSizeDuplicateProducts.length} already have this size` : ""}
+                          </p>
+                        )}
                       </div>
 
                       <div className="space-y-2">
@@ -1614,7 +1697,7 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
                           placeholder="e.g. 6 inches"
                           required
                         />
-                        {addSizeAlreadyExists && <p className="text-[11px] text-[#9a5947]" role="alert">This cake already has that size.</p>}
+                        {addSizeDuplicateProducts.length > 0 && <p className="text-[11px] text-[#9a5947]" role="alert">Some selected cakes already have this size and will be skipped.</p>}
                       </div>
 
                       <div className="space-y-2">
@@ -1673,7 +1756,7 @@ export default function Products({ allowCatalogManagement = false, catalogCatego
                     <button
                       type="button"
                       onClick={submitNewSize}
-                      disabled={addSizeSaving || !addSizeProduct || !addSizeName.trim() || addSizeAlreadyExists}
+                      disabled={addSizeSaving || addSizeEligibleProducts.length === 0 || !addSizeName.trim()}
                       className="rounded-xl bg-[#33251e] px-5 py-2.5 text-[12px] font-semibold text-white transition hover:bg-[#5b4540] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d4af37] disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       {addSizeSaving ? "Adding size…" : "Add Size"}

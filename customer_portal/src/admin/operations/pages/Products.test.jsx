@@ -2,6 +2,7 @@ import React from 'react';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 
 let mockLocationSearch = '';
+let mockCatalogProducts = [];
 
 jest.mock('react-router-dom', () => ({
   useLocation: () => ({ search: mockLocationSearch }),
@@ -15,6 +16,55 @@ describe('Products admin catalog', () => {
     mockLocationSearch = '';
     localStorage.setItem('user', JSON.stringify({ role: 'admin', token: 'test-admin-token' }));
     const archivedProductIds = new Set();
+    mockCatalogProducts = [
+      {
+        id: 1,
+        name: 'Strawberry Cake',
+        category: 'Cakes',
+        price: 0,
+        sizes: [
+          { id: 11, size: 'small', price: 320, stock_quantity: 2, is_producible: true },
+          { id: 12, size: 'big', price: 480, stock_quantity: 7, is_producible: true },
+          { id: 13, size: '8 inches', price: 600, stock_quantity: 0, is_producible: true },
+        ],
+        stock: 10,
+        minimum_stock: 5,
+        image: 'cake.jpg',
+        description: 'Sweet and fruity',
+        is_archived: false,
+      },
+      {
+        id: 2,
+        name: 'Chicken Meal',
+        category: 'Meals',
+        price: 180,
+        stock: 8,
+        minimum_stock: 3,
+        image: 'meal.jpg',
+        description: 'Savory meal',
+      },
+      {
+        id: 3,
+        name: 'Mini Chocolate Cake',
+        category: 'Small Cakes',
+        base_price: 95,
+        stock: 6,
+        minimum_stock: 2,
+        image: 'mini-cake.jpg',
+        description: 'Small chocolate cake',
+      },
+      {
+        id: 4,
+        name: 'Mini Vanilla Cake',
+        category: 'Cakes',
+        price: 320,
+        sizes: [{ id: 14, size: 'Small', price: 320, stock_quantity: 6, available: true }],
+        stock: 6,
+        minimum_stock: 2,
+        image: 'mini-vanilla.jpg',
+        description: 'Small vanilla cake',
+      },
+    ];
 
     global.fetch = jest.fn((url, options = {}) => {
       if (String(url).includes('/archive') && options.method === 'PATCH') {
@@ -27,56 +77,27 @@ describe('Products admin catalog', () => {
       if (String(url).includes('action=list')) {
         return Promise.resolve({
           ok: true,
-          json: async () => [
-            {
-              id: 1,
-              name: 'Strawberry Cake',
-              category: 'Cakes',
-              price: 0,
-              sizes: [
-                { id: 11, size: 'small', price: 320, stock_quantity: 2, is_producible: true },
-                { id: 12, size: 'big', price: 480, stock_quantity: 7, is_producible: true },
-                { id: 13, size: '8 inches', price: 600, stock_quantity: 0, is_producible: true },
-              ],
-              stock: 10,
-              minimum_stock: 5,
-              image: 'cake.jpg',
-              description: 'Sweet and fruity',
-              is_archived: archivedProductIds.has(1),
-            },
-            {
-              id: 2,
-              name: 'Chicken Meal',
-              category: 'Meals',
-              price: 180,
-              stock: 8,
-              minimum_stock: 3,
-              image: 'meal.jpg',
-              description: 'Savory meal',
-            },
-            {
-              id: 3,
-              name: 'Mini Chocolate Cake',
-              category: 'Small Cakes',
-              base_price: 95,
-              stock: 6,
-              minimum_stock: 2,
-              image: 'mini-cake.jpg',
-              description: 'Small chocolate cake',
-            },
-            {
-              id: 4,
-              name: 'Mini Vanilla Cake',
-              category: 'Cakes',
-              price: 320,
-              sizes: [{ id: 14, size: 'Small', price: 320, stock_quantity: 6, available: true }],
-              stock: 6,
-              minimum_stock: 2,
-              image: 'mini-vanilla.jpg',
-              description: 'Small vanilla cake',
-            },
-          ],
+          json: async () => mockCatalogProducts.map((product) => ({
+            ...product,
+            is_archived: product.id === 1 ? archivedProductIds.has(1) : product.is_archived,
+          })),
         });
+      }
+
+      if (String(url).includes('/api/staff/products/') && String(url).endsWith('/sizes') && options.method === 'POST') {
+        const productId = Number(String(url).match(/products\/(\d+)\/sizes$/)?.[1]);
+        const product = mockCatalogProducts.find((item) => item.id === productId);
+        const { size, price, stock } = JSON.parse(options.body);
+        if (product) {
+          product.sizes = [...(product.sizes || []), {
+            id: Math.max(0, ...mockCatalogProducts.flatMap((item) => item.sizes || []).map((item) => Number(item.id))) + 1,
+            size,
+            price: price ?? 600,
+            stock_quantity: stock,
+            available: true,
+          }];
+        }
+        return Promise.resolve({ ok: true, status: 201, json: async () => ({ success: true }) });
       }
 
       if (String(url).includes('/api/staff/production/availability/')) {
@@ -147,10 +168,10 @@ describe('Products admin catalog', () => {
     expect(screen.queryByText('Cards', { exact: true })).not.toBeInTheDocument();
     expect(screen.queryByText('Table', { exact: true })).not.toBeInTheDocument();
     expect(screen.getByText('Strawberry Cake')).toHaveClass('truncate', 'whitespace-nowrap');
-    expect(screen.getByText('₱480.00')).toBeInTheDocument();
-    expect(screen.getByText('₱480.00').compareDocumentPosition(screen.getByRole('button', { name: 'Small size for Strawberry Cake' })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.getByText('₱480.00', { selector: 'p' })).toBeInTheDocument();
+    expect(screen.getByText('₱480.00', { selector: 'p' }).compareDocumentPosition(screen.getByRole('button', { name: 'Small size for Strawberry Cake' })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(screen.queryByText(/^big cake$/i)).not.toBeInTheDocument();
-    expect(screen.getByText('Sweet and fruity').compareDocumentPosition(screen.getByText('₱480.00')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.getByText('Sweet and fruity').compareDocumentPosition(screen.getByText('₱480.00', { selector: 'p' })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Produce Strawberry Cake' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Adjust Strawberry Cake stock' })).toBeInTheDocument();
     const availableStock = screen.getByText(/Available stock/);
@@ -204,7 +225,7 @@ describe('Products admin catalog', () => {
     expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:product-preview');
   });
 
-  test('adds a custom cake size and requests its price when no matching price is recorded', async () => {
+  test('adds a custom cake size to multiple selected cakes and shows its price and stock on their cards', async () => {
     render(<Products allowCatalogManagement />);
 
     await waitFor(() => {
@@ -213,27 +234,60 @@ describe('Products admin catalog', () => {
 
     const addNewButton = screen.getByRole('button', { name: 'Add New', exact: true });
     expect(addNewButton.querySelector('svg')).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Add New Size' }));
+    const addSizeButton = screen.getByRole('button', { name: 'Add New Size' });
+    expect(addSizeButton).toHaveClass('bg-[#f5c451]');
+    expect(addSizeButton).toHaveClass('hover:bg-[#eab63d]');
+    fireEvent.click(addSizeButton);
     expect(screen.getByRole('dialog', { name: 'Add New Size' })).toBeInTheDocument();
 
-    fireEvent.change(screen.getByLabelText('Select Cake'), { target: { value: '4' } });
-    expect(screen.queryByRole('button', { name: /Big Cake|Small Cake/ })).not.toBeInTheDocument();
     fireEvent.change(screen.getByLabelText('Cake Size'), { target: { value: '9 inches' } });
     expect(screen.getByLabelText('Price')).toBeInTheDocument();
+    fireEvent.click(screen.getByLabelText('Select all cakes'));
+    expect(screen.getByLabelText('Select Strawberry Cake')).toBeChecked();
+    expect(screen.getByLabelText('Select Mini Vanilla Cake')).toBeChecked();
     fireEvent.change(screen.getByLabelText('Price'), { target: { value: '720' } });
     fireEvent.change(screen.getByLabelText('Starting Stock'), { target: { value: '3' } });
     fireEvent.click(screen.getByRole('button', { name: 'Add Size', exact: true }));
 
     await waitFor(() => {
-      expect(global.fetch).toHaveBeenCalledWith(
-        expect.stringContaining('/api/staff/products/4/sizes'),
-        expect.objectContaining({
-          method: 'POST',
-          body: JSON.stringify({ size: '9 inches', price: 720, stock: 3 }),
-        }),
-      );
+      expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('/api/staff/products/1/sizes'), expect.objectContaining({ method: 'POST' }));
+      expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('/api/staff/products/4/sizes'), expect.objectContaining({ method: 'POST' }));
       expect(screen.queryByRole('dialog', { name: 'Add New Size' })).not.toBeInTheDocument();
     });
+
+    for (const productName of ['Strawberry Cake', 'Mini Vanilla Cake']) {
+      const sizeButton = await screen.findByRole('button', { name: `9 inches size for ${productName}` });
+      expect(sizeButton).toHaveTextContent('₱720.00');
+      expect(sizeButton).toHaveTextContent('Stock: 3');
+    }
+  });
+
+  test('allows adding a custom size to only the checked cake', async () => {
+    render(<Products allowCatalogManagement />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Strawberry Cake')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add New Size' }));
+    fireEvent.change(screen.getByLabelText('Cake Size'), { target: { value: '10 inches' } });
+    fireEvent.click(screen.getByLabelText('Select Mini Vanilla Cake'));
+    fireEvent.change(screen.getByLabelText('Price'), { target: { value: '850' } });
+    fireEvent.change(screen.getByLabelText('Starting Stock'), { target: { value: '2' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Add Size', exact: true }));
+
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringContaining('/api/staff/products/4/sizes'),
+        expect.objectContaining({ method: 'POST' }),
+      );
+      expect(screen.getByRole('button', { name: '10 inches size for Mini Vanilla Cake' })).toHaveTextContent('Stock: 2');
+    });
+    expect(global.fetch).not.toHaveBeenCalledWith(
+      expect.stringContaining('/api/staff/products/1/sizes'),
+      expect.anything(),
+    );
+    expect(screen.queryByRole('button', { name: '10 inches size for Strawberry Cake' })).not.toBeInTheDocument();
   });
 
   test('uses the recorded price for a custom size when adding it to another cake', async () => {
@@ -244,10 +298,12 @@ describe('Products admin catalog', () => {
     });
 
     fireEvent.click(screen.getByRole('button', { name: 'Add New Size' }));
-    fireEvent.change(screen.getByLabelText('Select Cake'), { target: { value: '4' } });
     fireEvent.change(screen.getByLabelText('Cake Size'), { target: { value: '8 inches' } });
+    fireEvent.click(screen.getByLabelText('Select Mini Vanilla Cake'));
     expect(screen.queryByLabelText('Price')).not.toBeInTheDocument();
-    expect(screen.getByRole('status')).toHaveTextContent(/Recorded price for this size:.*600/);
+    expect(screen.getAllByRole('status').some((status) =>
+      /Recorded price for this size:.*600/.test(status.textContent)
+    )).toBe(true);
     fireEvent.click(screen.getByRole('button', { name: 'Add Size', exact: true }));
 
     await waitFor(() => {
@@ -330,7 +386,7 @@ describe('Products admin catalog', () => {
 
     expect(screen.getByText('Strawberry Cake')).toBeInTheDocument();
     expect(screen.getByText('Mini Vanilla Cake')).toBeInTheDocument();
-    expect(screen.getAllByText('₱320.00')).toHaveLength(2);
+    expect(screen.getAllByText('₱320.00', { selector: 'p' })).toHaveLength(2);
     expect(screen.queryByText('Mini Chocolate Cake')).not.toBeInTheDocument();
   });
 
@@ -341,11 +397,11 @@ describe('Products admin catalog', () => {
       expect(screen.getByText('Strawberry Cake')).toBeInTheDocument();
     });
 
-    expect(screen.getByText('₱320.00')).toBeInTheDocument();
+    expect(screen.getByText('₱320.00', { selector: 'p' })).toBeInTheDocument();
     expect(screen.getByText(/Available stock/).textContent).toBe('Available stock 2');
-    expect(screen.getByText('₱320.00').parentElement).toHaveClass('-mt-1');
+    expect(screen.getByText('₱320.00', { selector: 'p' }).parentElement).toHaveClass('-mt-1');
     fireEvent.click(screen.getByRole('button', { name: 'Big size for Strawberry Cake' }));
-    expect(screen.getByText('₱480.00')).toBeInTheDocument();
+    expect(screen.getByText('₱480.00', { selector: 'p' })).toBeInTheDocument();
     expect(screen.getByText(/Available stock/).textContent).toBe('Available stock 7');
     fireEvent.click(screen.getByRole('button', { name: 'Small size for Strawberry Cake' }));
 
