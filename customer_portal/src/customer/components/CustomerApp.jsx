@@ -9,7 +9,7 @@ import Footer from './Footer';
 import ScrollToTop from './ScrollToTop';
 import CustomerSessionMonitor from './CustomerSessionMonitor';
 
-import Dashboard from '../pages/Dashboard';
+import Dashboard, { ChatBubble } from '../pages/Dashboard';
 import CareersPage from '../pages/CareersPage';
 import AboutUsPage from '../pages/AboutUsPage';
 import TermsPage from '../pages/TermsPage';
@@ -522,11 +522,12 @@ export default function CustomerApp() {
       <CustomerSessionMonitor />
       <ScrollToTop />
       {shouldShowNavbar && <Navbar cartCount={cartQuantity} onCartClick={() => setIsCartOpen(true)} />}
+      <ChatBubble hideFloating={hideDashboardFloaters} />
 
       {/* ROUTES */}
       <div onTouchStart={handleRouteSwipeStart} onTouchEnd={handleRouteSwipeEnd}>
         <Routes>
-          <Route index element={<Dashboard onAddToCart={addToCart} onEnsureShopOpen={ensureShopIsOpen} hideFloating={hideDashboardFloaters} />} />
+          <Route index element={<Dashboard onAddToCart={addToCart} onEnsureShopOpen={ensureShopIsOpen} />} />
           <Route path="menu" element={<Menu onAddToCart={addToCart} onEnsureShopOpen={ensureShopIsOpen} />} />
           <Route path="orders" element={hasCustomerAccount() ? <Orders /> : <Navigate to="/customer/menu" replace />} />
           <Route path="orders/customized" element={hasCustomerAccount() ? <Orders customizedOnly /> : <Navigate to="/customer/menu" replace />} />

@@ -463,13 +463,11 @@ export function ChatBubble({ aiMode = false, fullPage = false, hideFloating = fa
       // the active thread even if an older message has a missing/different ID.
       if (event.type === "chat.updated") fetchMessages(true);
     });
-    const pollId = open
-      ? window.setInterval(() => fetchMessages(true), 1000)
-      : null;
+    const pollId = window.setInterval(() => fetchMessages(true), open ? 1000 : 5000);
 
     return () => {
       unsubscribe();
-      if (pollId !== null) window.clearInterval(pollId);
+      window.clearInterval(pollId);
     };
   }, [step, conversationId, showHistory, open]);
 
@@ -653,7 +651,7 @@ export function ChatBubble({ aiMode = false, fullPage = false, hideFloating = fa
   return (
     <>
       {/* FLOAT BUTTON */}
-      {!fullPage && !hideFloating && <div className="fixed bottom-6 right-6 z-[60000] flex items-end">
+      {!fullPage && <div className="fixed bottom-6 right-6 z-[60000] flex items-end">
         {!open && messagePreview && (
           <button
             type="button"
@@ -673,7 +671,7 @@ export function ChatBubble({ aiMode = false, fullPage = false, hideFloating = fa
             <p className="mt-0.5 line-clamp-2 break-words text-xs text-gray-800">{messagePreview.text}</p>
           </button>
         )}
-        {!open && !messagePreview && (
+        {!hideFloating && !open && !messagePreview && (
           <motion.div
             initial={{ opacity: 0, x: 12 }}
             animate={{ opacity: 1, x: 0 }}
@@ -682,7 +680,7 @@ export function ChatBubble({ aiMode = false, fullPage = false, hideFloating = fa
             <p className="text-xs font-semibold text-gray-800">Chat with us!</p>
           </motion.div>
         )}
-        <div className="relative">
+        {!hideFloating && <div className="relative">
           <button
             onClick={() => {
               if (!hasCustomerAccount) {
@@ -706,12 +704,12 @@ export function ChatBubble({ aiMode = false, fullPage = false, hideFloating = fa
               {unread}
             </span>
           )}
-        </div>
+        </div>}
       </div>}
 
       {/* CHAT PANEL */}
       <AnimatePresence>
-        {open && !hideFloating && (
+        {open && (
           <motion.div
             initial={{ opacity: 0, y: 20, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -1058,7 +1056,7 @@ export function buildMustTryList(products = []) {
 /* =========================
    MAIN DASHBOARD
 ========================= */
-export default function Dashboard({ onAddToCart, onEnsureShopOpen, hideFloating = false }) {
+export default function Dashboard({ onAddToCart, onEnsureShopOpen }) {
   const navigate = useNavigate();
   const savedUser = typeof window !== 'undefined'
     ? (() => {
@@ -1398,9 +1396,6 @@ export default function Dashboard({ onAddToCart, onEnsureShopOpen, hideFloating 
       </main>
 
       <TestimonialsSection />
-
-      {/* STAFF-CUSTOMER CHAT */}
-      <ChatBubble hideFloating={hideFloating} />
 
       {/* MODALS */}
       <ProductModal
