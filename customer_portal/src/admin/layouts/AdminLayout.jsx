@@ -1,10 +1,16 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useLocation } from "react-router-dom";
 import AdminNavbar from "../components/AdminNavbar";
 import AdminChatBubble from "../components/AdminChatBubble";
 import { ROOT_BASE } from "../../services/config";
 
 export default function AdminLayout({ children }) {
   const [sidebarOpen, setSidebarOpen] = useState(() => window.matchMedia("(min-width: 1024px)").matches);
+  const { pathname } = useLocation();
+
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [pathname]);
 
   return (
     <div className={`admin-shell min-h-screen bg-[#fbfaf5] font-['DM_Sans'] text-[#33251e] ${sidebarOpen ? "admin-sidebar-open" : "admin-sidebar-closed"}`}>
