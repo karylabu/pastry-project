@@ -131,7 +131,7 @@ function TopSellingTable({ rows }) {
   );
 }
 
-function Panel({ eyebrow, title, action, children, className = "", compact = false }) {
+function Panel({ eyebrow, title, action, children, className = "", titleClassName = "", compact = false }) {
   return (
     <section className={`rounded-xl border border-[#eadfd8] bg-white shadow-[0_5px_18px_rgba(91,64,39,0.04)] transition hover:border-[#c9a94f] hover:ring-1 hover:ring-[#d4af37]/20 ${compact ? "admin-dashboard-compact-panel" : ""} ${className}`}>
       <div className={`flex items-center justify-between border-b border-[#f0e7e0] ${compact ? "gap-2 px-3 py-3" : "gap-4 px-6 py-5"}`}>
@@ -139,7 +139,7 @@ function Panel({ eyebrow, title, action, children, className = "", compact = fal
           {eyebrow && (
             <p className={`font-bold uppercase text-[#9b7810] ${compact ? "mb-0.5 text-[9px] tracking-[0.2em]" : "mb-1 text-[10px] tracking-[0.3em]"}`}>{eyebrow}</p>
           )}
-          <h2 className={`font-serif text-[#33251e] ${compact ? "text-[14px]" : "text-[17px]"}`}>{title}</h2>
+          <h2 className={`${titleClassName || `font-serif ${compact ? "text-[14px]" : "text-[17px]"}`} text-[#33251e]`}>{title}</h2>
         </div>
         {action}
       </div>
@@ -599,6 +599,7 @@ export default function Dashboard() {
                     eyebrow={null}
                     title="Customize Best Selling Sizes"
                     compact
+                    titleClassName="text-[13px] font-semibold"
                     className="flex h-full min-w-0 flex-col overflow-hidden"
                   >
                     <div className="min-h-0 flex-1 overflow-y-auto p-3">

@@ -229,6 +229,8 @@ test("shows the four best-selling panels in a compact horizontal layout", async 
 
   const salesMix = panels[3];
   expect(salesMix.querySelector(".border-b")).toContainElement(headings[3]);
+  expect(headings[3]).toHaveClass("text-[13px]", "font-semibold");
+  expect(headings[3]).not.toHaveClass("font-serif");
   expect(screen.getByText("Regular", { selector: "p" })).toBeInTheDocument();
   expect(screen.getByText("Customize", { selector: "p" })).toBeInTheDocument();
   expect(screen.queryByRole("group", { name: "Filter sales mix by cake type" })).not.toBeInTheDocument();
