@@ -1720,15 +1720,18 @@ export default function Orders({ customizedOnly = false }) {
                         </>
                       )}
                       {isPendingQrPayment && (
-                        hasPaymentSubmission
-                          ? <span className="text-right text-[11px] font-semibold text-amber-700">Payment details submitted</span>
-                          : <button
+                        <>
+                          {hasPaymentSubmission && (
+                            <span className="text-right text-[11px] font-semibold text-amber-700">Payment details submitted</span>
+                          )}
+                          <button
                             type="button"
                             onClick={() => { setPaymentProofError(''); setPaymentProofTarget(order); }}
                             className="inline-flex h-9 w-[126px] shrink-0 items-center justify-center gap-1.5 rounded-lg bg-slate-900 px-3 py-2 text-center text-[11px] font-semibold leading-4 text-white transition-colors hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-700 focus-visible:ring-offset-2"
                           >
                             Send proof
                           </button>
+                        </>
                       )}
                       {canSubmitConfirmedPaymentProof && (
                         <button

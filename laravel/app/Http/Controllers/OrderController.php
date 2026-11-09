@@ -725,14 +725,14 @@ class OrderController extends Controller
         $supportedPaymentMethod = $isCustomCake
             ? in_array($paymentMethodKey, ['gcash', 'maya', 'qrph', 'maribank', 'visamastercard', 'onlinebanking'], true)
             : in_array($paymentMethodKey, ['gcash', 'qrph'], true);
-        $canResubmitBalanceProof = $order->status === 'Awaiting Balance Payment'
-            && strtolower((string) $order->payment_status) === 'proof_submitted';
         $paymentStatusKey = strtolower((string) $order->payment_status);
+        $canResubmitProof = in_array($order->status, ['Pending', 'Awaiting Balance Payment'], true)
+            && $paymentStatusKey === 'proof_submitted';
 
         if (!$supportedPaymentMethod
             || !in_array($order->status, ['Pending', 'Awaiting Payment', 'Awaiting Balance Payment'], true)
             || $paymentStatusKey === 'failed'
-            || ($paymentStatusKey === 'proof_submitted' && !$canResubmitBalanceProof)) {
+            || ($paymentStatusKey === 'proof_submitted' && !$canResubmitProof)) {
             return response()->json(['success' => false, 'message' => 'This order is not awaiting a QR payment.'], 409);
         }
 

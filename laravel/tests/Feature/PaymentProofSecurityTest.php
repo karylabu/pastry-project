@@ -153,6 +153,29 @@ class PaymentProofSecurityTest extends TestCase
         ]);
     }
 
+    public function test_customer_can_resubmit_payment_proof_for_a_pending_order(): void
+    {
+        DB::table('orders')->where('id', 7)->update([
+            'payment_status' => 'proof_submitted',
+            'customer_payment_reference' => 'OLD_QRPH_REFERENCE',
+        ]);
+        RateLimiter::clear('payment-proof:' . hash('sha256', '9:7'));
+
+        $this->withHeader('X-Auth-Token', 'proof-customer-token')
+            ->postJson('/api/orders/7/payment-proof', [
+                'customer_payment_reference' => 'NEW_QRPH_REFERENCE',
+            ])
+            ->assertOk()
+            ->assertJsonPath('payment_status', 'proof_submitted');
+
+        $this->assertDatabaseHas('orders', [
+            'id' => 7,
+            'status' => 'Pending',
+            'payment_status' => 'proof_submitted',
+            'customer_payment_reference' => 'NEW_QRPH_REFERENCE',
+        ]);
+    }
+
     public function test_customer_can_attach_proof_to_a_paid_order_without_changing_its_status(): void
     {
         DB::table('orders')->insert([

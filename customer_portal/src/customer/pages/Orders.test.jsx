@@ -118,6 +118,39 @@ test('keeps balance payment and proof actions available after a proof was submit
   expect(screen.queryByText('Payment submitted — balance not confirmed')).not.toBeInTheDocument();
 });
 
+test('keeps the send proof action available for pending QRPh orders after a proof was submitted', async () => {
+  global.fetch = jest.fn((url) => {
+    if (String(url).includes('/api/customer/products')) {
+      return Promise.resolve({ ok: true, json: async () => [] });
+    }
+
+    return Promise.resolve({
+      ok: true,
+      json: async () => ({
+        success: true,
+        orders: [{
+          id: 502,
+          user_id: 7,
+          customer: 'Customer',
+          status: 'Pending',
+          payment: 'QRPh',
+          payment_status: 'proof_submitted',
+          customer_payment_reference: 'QRPH-502',
+          method: 'Pickup',
+          total: 1000,
+          items: [{ name: 'Blueberry Cheesecake', qty: 1, price: 1000 }],
+        }],
+      }),
+    });
+  });
+
+  render(<Orders />);
+
+  expect(await screen.findByText('Payment details submitted — awaiting Admin review')).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Send proof' }));
+  expect(await screen.findByRole('heading', { name: 'Send payment proof' })).toBeInTheDocument();
+});
+
 test('uses matching dimensions for rider info and confirm receipt actions', async () => {
   global.fetch = jest.fn((url) => {
     if (String(url).includes('/api/customer/products')) {
