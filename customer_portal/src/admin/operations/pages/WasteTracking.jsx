@@ -91,6 +91,11 @@ function enrich(entry, catalogue) {
   return { ...entry, unit: entry.unit || meta.unit, type, unitCost, cost };
 }
 
+function createWasteLine() {
+  const key = window.crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`;
+  return { id: key, idempotencyKey: key, item: "", qty: "", reason: "expired" };
+}
+
 /* ------------------------------------------------------------------ */
 /*  Component                                                          */
 /* ------------------------------------------------------------------ */
@@ -105,12 +110,9 @@ export default function WasteTracking() {
   const [auditPage, setAuditPage] = useState(1);
   const [showModal, setShowModal] = useState(false);
   const [adminDialog, setAdminDialog] = useState(null);
-  const [form, setForm] = useState({
-    item: "",
-    qty: "",
-    reason: "expired",
-    datetime: "",
-  });
+  const [form, setForm] = useState(() => [createWasteLine()]);
+  const [formDatetime, setFormDatetime] = useState("");
+  const [savingWaste, setSavingWaste] = useState(false);
 
   // Pull the real inventory catalogue for the entry form.
   useEffect(() => {
@@ -326,48 +328,69 @@ export default function WasteTracking() {
   /* ---------------- Modal / new entry handling ---------------- */
 
   const openModal = () => {
-    setForm({
-      item: "",
-      qty: "",
-      reason: "expired",
-      datetime: new Date().toISOString().slice(0, 16),
-    });
+    setForm([createWasteLine()]);
+    setFormDatetime(new Date().toISOString().slice(0, 16));
     setShowModal(true);
   };
 
   const submitEntry = async (e) => {
     e.preventDefault();
-    if (!form.item || !form.qty) return;
-    const selectedItem = catalogue.find((c) => c.key === form.item);
-    if (!selectedItem) return;
-    const newEntry = {
-      datetime: form.datetime || new Date().toISOString().slice(0, 16),
-      item: selectedItem.name,
-      qty: Number(form.qty),
-      reason: form.reason,
-      idempotency_key: window.crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`,
-      ingredient_id: selectedItem.id,
-      ingredient_batch_id: selectedItem.batchId,
-      item_type: "Raw Material",
-    };
-    try {
-      const response = await laravelStaffFetch(`${LARAVEL_BASE}/api/staff/inventory/waste`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(newEntry),
-      });
-      const data = await response.json();
-      if (!response.ok || !data?.success) throw new Error(data?.message || "Waste log failed.");
-      setEntries((prev) => [data.entry, ...prev]);
-      setShowModal(false);
-    } catch (error) {
+    if (!form.length) return;
+    const newEntries = form.map((line) => {
+      const selectedItem = catalogue.find((item) => item.key === line.item);
+      if (!selectedItem) return null;
+      return {
+        datetime: formDatetime || new Date().toISOString().slice(0, 16),
+        quantity: Number(line.qty),
+        reason: line.reason,
+        idempotency_key: line.idempotencyKey,
+        ingredient_id: selectedItem.id,
+        ingredient_batch_id: selectedItem.batchId,
+      };
+    });
+    if (newEntries.some((entry) => !entry)) {
       setAdminDialog({
-        title: "Waste entry not saved",
-        message: error.message || "Waste log failed. Please check the details and try again.",
+        title: "Waste entries not saved",
+        message: "One of the selected inventory batches is no longer available. Refresh the page and try again.",
       });
       return;
     }
 
+    setSavingWaste(true);
+    const savedEntries = [];
+    try {
+      for (let index = 0; index < newEntries.length; index += 1) {
+        const response = await laravelStaffFetch(`${LARAVEL_BASE}/api/staff/inventory/waste`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(newEntries[index]),
+        });
+        const data = await response.json();
+        if (!response.ok || !data?.success) {
+          const error = new Error(data?.message || "Waste log failed.");
+          error.failedIndex = index;
+          throw error;
+        }
+        savedEntries.push(data.entry);
+      }
+
+      setEntries((previous) => [...savedEntries.reverse(), ...previous]);
+      setShowModal(false);
+    } catch (error) {
+      const failedIndex = Number.isInteger(error.failedIndex) ? error.failedIndex : savedEntries.length;
+      if (savedEntries.length) {
+        setEntries((previous) => [...savedEntries.reverse(), ...previous]);
+      }
+      setForm((previous) => previous.slice(failedIndex));
+      setAdminDialog({
+        title: savedEntries.length ? "Some waste entries were saved" : "Waste entries not saved",
+        message: savedEntries.length
+          ? `${savedEntries.length} ${savedEntries.length === 1 ? "entry was" : "entries were"} saved. The remaining entries are still in the form. ${error.message || "Please try again."}`
+          : error.message || "Waste log failed. Please check the details and try again.",
+      });
+    } finally {
+      setSavingWaste(false);
+    }
   };
 
   return (
@@ -613,74 +636,108 @@ export default function WasteTracking() {
       {/* ---------- Log New Waste Entry modal ---------- */}
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#241812]/55 px-4 py-5 backdrop-blur-[2px]">
-          <div role="dialog" aria-modal="true" aria-labelledby="waste-entry-title" className="w-full max-w-md rounded-lg border border-[#eadfd8] bg-[#fffdfa] p-6 shadow-[0_24px_70px_rgba(38,25,16,0.28)]">
+          <div role="dialog" aria-modal="true" aria-labelledby="waste-entry-title" className="max-h-[calc(100vh-2.5rem)] w-full max-w-xl overflow-y-auto rounded-lg border border-[#eadfd8] bg-[#fffdfa] p-6 shadow-[0_24px_70px_rgba(38,25,16,0.28)]">
             <div className="flex items-center justify-between mb-5">
-              <h3 id="waste-entry-title" className="text-[17px] font-bold" style={{ color: C.ink }}>Log New Waste Entry</h3>
-              <button onClick={() => setShowModal(false)} style={{ color: C.sub }}>
+              <div>
+                <h3 id="waste-entry-title" className="text-[17px] font-bold" style={{ color: C.ink }}>Log New Waste Entries</h3>
+                <p className="mt-1 text-[11px]" style={{ color: C.sub }}>Add all items from this waste event before saving.</p>
+              </div>
+              <button type="button" onClick={() => setShowModal(false)} disabled={savingWaste} aria-label="Close waste entry dialog" style={{ color: C.sub }}>
                 <X size={18} />
               </button>
             </div>
             <form onSubmit={submitEntry} className="space-y-4">
-              <div>
-                <label className="block text-[12px] font-semibold mb-1.5" style={{ color: C.sub }}>Item</label>
-                <select
-                  value={form.item}
-                  onChange={(e) => setForm((f) => ({ ...f, item: e.target.value }))}
-                  required
-                  className="w-full rounded-2xl border px-4 py-2.5 text-sm outline-none"
-                  style={{ borderColor: C.border }}
+              <fieldset disabled={savingWaste} className="space-y-4">
+                {form.map((line, index) => {
+                  const selectedItem = catalogue.find((item) => item.key === line.item);
+                  return (
+                    <section key={line.id} className="space-y-3 rounded-xl border p-4" style={{ borderColor: C.border }}>
+                      <div className="flex items-center justify-between">
+                        <h4 className="text-[12px] font-bold" style={{ color: C.ink }}>Item {index + 1}</h4>
+                        {form.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => setForm((previous) => previous.filter((entry) => entry.id !== line.id))}
+                            aria-label={`Remove item ${index + 1}`}
+                            className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#b55f52]"
+                          >
+                            <Trash2 size={13} /> Remove
+                          </button>
+                        )}
+                      </div>
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <label className="block text-[12px] font-semibold sm:col-span-2" style={{ color: C.sub }}>
+                          Item
+                          <select
+                            value={line.item}
+                            onChange={(event) => setForm((previous) => previous.map((entry) => entry.id === line.id ? { ...entry, item: event.target.value } : entry))}
+                            required
+                            className="mt-1.5 w-full rounded-2xl border px-4 py-2.5 text-sm outline-none"
+                            style={{ borderColor: C.border }}
+                          >
+                            <option value="" disabled>{catalogue.length ? "Select an item" : "Loading items..."}</option>
+                            {catalogue.map((item) => (
+                              <option key={item.key} value={item.key}>{item.name} · {item.batchNumber}</option>
+                            ))}
+                          </select>
+                        </label>
+                        <label className="block text-[12px] font-semibold" style={{ color: C.sub }}>
+                          Quantity {selectedItem ? `(${selectedItem.unit})` : ""}
+                          <input
+                            type="number"
+                            step="0.1"
+                            min="0.1"
+                            value={line.qty}
+                            onChange={(event) => setForm((previous) => previous.map((entry) => entry.id === line.id ? { ...entry, qty: event.target.value } : entry))}
+                            required
+                            placeholder="0.0"
+                            className="mt-1.5 w-full rounded-2xl border px-4 py-2.5 text-sm outline-none"
+                            style={{ borderColor: C.border }}
+                          />
+                        </label>
+                        <label className="block text-[12px] font-semibold" style={{ color: C.sub }}>
+                          Reason code
+                          <select
+                            value={line.reason}
+                            onChange={(event) => setForm((previous) => previous.map((entry) => entry.id === line.id ? { ...entry, reason: event.target.value } : entry))}
+                            className="mt-1.5 w-full rounded-2xl border px-4 py-2.5 text-sm outline-none"
+                            style={{ borderColor: C.border }}
+                          >
+                            {REASON_CODES.map((reason) => (
+                              <option key={reason.key} value={reason.key}>{reason.label}</option>
+                            ))}
+                          </select>
+                        </label>
+                      </div>
+                    </section>
+                  );
+                })}
+                <button
+                  type="button"
+                  onClick={() => setForm((previous) => [...previous, createWasteLine()])}
+                  className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-[12px] font-semibold transition hover:bg-[#fff8df]"
+                  style={{ borderColor: C.border, color: C.ink }}
                 >
-                  <option value="" disabled>{catalogue.length ? "Select an item" : "Loading items..."}</option>
-                  {catalogue.map((c) => (
-                    <option key={c.key} value={c.key}>{c.name} · {c.batchNumber}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-[12px] font-semibold mb-1.5" style={{ color: C.sub }}>
-                  Quantity {form.item ? `(${catalogue.find((c) => c.key === form.item)?.unit || ""})` : ""}
+                  <Plus size={14} /> Add another item
+                </button>
+                <label className="block text-[12px] font-semibold" style={{ color: C.sub }}>
+                  Date &amp; time
+                  <input
+                    type="datetime-local"
+                    value={formDatetime}
+                    onChange={(event) => setFormDatetime(event.target.value)}
+                    className="mt-1.5 w-full rounded-2xl border px-4 py-2.5 text-sm outline-none"
+                    style={{ borderColor: C.border }}
+                  />
                 </label>
-                <input
-                  type="number"
-                  step="0.1"
-                  min="0"
-                  value={form.qty}
-                  onChange={(e) => setForm((f) => ({ ...f, qty: e.target.value }))}
-                  required
-                  placeholder="0.0"
-                  className="w-full rounded-2xl border px-4 py-2.5 text-sm outline-none"
-                  style={{ borderColor: C.border }}
-                />
-              </div>
-              <div>
-                <label className="block text-[12px] font-semibold mb-1.5" style={{ color: C.sub }}>Reason code</label>
-                <select
-                  value={form.reason}
-                  onChange={(e) => setForm((f) => ({ ...f, reason: e.target.value }))}
-                  className="w-full rounded-2xl border px-4 py-2.5 text-sm outline-none"
-                  style={{ borderColor: C.border }}
-                >
-                  {REASON_CODES.map((r) => (
-                    <option key={r.key} value={r.key}>{r.label}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-[12px] font-semibold mb-1.5" style={{ color: C.sub }}>Date &amp; time</label>
-                <input
-                  type="datetime-local"
-                  value={form.datetime}
-                  onChange={(e) => setForm((f) => ({ ...f, datetime: e.target.value }))}
-                  className="w-full rounded-2xl border px-4 py-2.5 text-sm outline-none"
-                  style={{ borderColor: C.border }}
-                />
-              </div>
+              </fieldset>
               <button
                 type="submit"
-                className="w-full rounded-full py-3 text-sm font-semibold text-white transition"
+                disabled={savingWaste}
+                className="w-full rounded-full py-3 text-sm font-semibold text-white transition disabled:cursor-wait disabled:opacity-60"
                 style={{ background: C.ink }}
               >
-                Save entry
+                {savingWaste ? "Saving entries..." : `Save ${form.length} ${form.length === 1 ? "entry" : "entries"}`}
               </button>
             </form>
           </div>

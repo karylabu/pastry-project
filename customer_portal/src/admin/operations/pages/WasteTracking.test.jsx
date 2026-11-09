@@ -1,5 +1,5 @@
 import React from "react";
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import WasteTracking from "./WasteTracking";
 
 jest.mock("../../../services/config", () => ({
@@ -105,4 +105,63 @@ test("custom date range filters waste reporting totals inclusively", async () =>
 
   expect(await screen.findAllByText("No waste logged for this period.")).toHaveLength(2);
   expect(screen.queryByText("₱120.00")).not.toBeInTheDocument();
+});
+
+test("saves multiple waste items in one form submission", async () => {
+  global.fetch = jest.fn((url, options = {}) => {
+    if (url.endsWith("/api/staff/inventory/waste/catalogue")) {
+      return Promise.resolve({
+        ok: true,
+        json: async () => ({
+          success: true,
+          items: [
+            { id: 1, batch_id: 11, name: "Flour", unit: "kg", unit_cost: 20, batch_number: "FLOUR-1", status: "Usable" },
+            { id: 2, batch_id: 22, name: "Sugar", unit: "kg", unit_cost: 15, batch_number: "SUGAR-1", status: "Usable" },
+          ],
+        }),
+      });
+    }
+    if (url.endsWith("/api/staff/inventory/waste") && options.method === "POST") {
+      return Promise.resolve({
+        ok: true,
+        json: async () => ({ success: true, entry: JSON.parse(options.body) }),
+      });
+    }
+    if (url.endsWith("/api/staff/inventory/waste")) {
+      return Promise.resolve({ ok: true, json: async () => ({ success: true, entries: [] }) });
+    }
+    return Promise.resolve({ ok: true, json: async () => [] });
+  });
+
+  render(<WasteTracking />);
+  await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(3));
+  fireEvent.click(screen.getAllByRole("button", { name: /log new waste entry/i })[0]);
+
+  const dialog = screen.getByRole("dialog");
+  await screen.findByRole("option", { name: "Flour · FLOUR-1" });
+  const itemSelects = within(dialog).getAllByLabelText("Item");
+  fireEvent.change(itemSelects[0], { target: { value: "1:11" } });
+  fireEvent.change(within(dialog).getByRole("spinbutton"), { target: { value: "0.5" } });
+  fireEvent.click(within(dialog).getByRole("button", { name: /add another item/i }));
+
+  const updatedItemSelects = within(dialog).getAllByLabelText("Item");
+  fireEvent.change(updatedItemSelects[1], { target: { value: "2:22" } });
+  fireEvent.change(within(dialog).getAllByRole("spinbutton")[1], { target: { value: "1.5" } });
+  fireEvent.click(within(dialog).getByRole("button", { name: "Save 2 entries" }));
+
+  await waitFor(() => {
+    const posts = global.fetch.mock.calls.filter(([, options]) => options?.method === "POST");
+    expect(posts).toHaveLength(2);
+    expect(JSON.parse(posts[0][1].body)).toMatchObject({
+      ingredient_id: 1,
+      ingredient_batch_id: 11,
+      quantity: 0.5,
+    });
+    expect(JSON.parse(posts[1][1].body)).toMatchObject({
+      ingredient_id: 2,
+      ingredient_batch_id: 22,
+      quantity: 1.5,
+    });
+  });
+  await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
 });
