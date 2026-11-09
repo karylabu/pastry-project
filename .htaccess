@@ -1,4 +1,8 @@
 # React UI with Laravel API and legacy PHP endpoints.
+<IfModule mod_headers.c>
+    Header always set Strict-Transport-Security "max-age=300"
+</IfModule>
+
 <IfModule mod_rewrite.c>
     RewriteEngine On
 
