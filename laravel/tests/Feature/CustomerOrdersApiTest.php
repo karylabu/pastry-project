@@ -154,6 +154,30 @@ class CustomerOrdersApiTest extends TestCase
             ->assertJsonPath('orders.0.items.0.name', 'Vanilla Cake');
     }
 
+    public function test_payment_below_one_peso_returns_minimum_amount_error_even_without_gateway_credentials(): void
+    {
+        config(['services.paymongo.secret' => null]);
+        DB::table('orders')->insert([
+            'id' => 209,
+            'user_id' => 7,
+            'email' => 'customer@example.com',
+            'total' => 0.99,
+            'payment' => 'QRPh',
+            'status' => 'Awaiting Payment',
+            'payment_status' => 'pending',
+        ]);
+
+        $this->withToken('test-customer-token')
+            ->postJson('/api/customer/payments', [
+                'order_id' => 209,
+                'amount' => 0.99,
+                'payment_type' => 'full',
+                'payment_method' => 'QRPh',
+            ])
+            ->assertBadRequest()
+            ->assertJsonPath('error', 'Payment amount must be at least PHP 1.00.');
+    }
+
     public function test_customer_sees_custom_cake_awaiting_payment_but_not_standard_unpaid_orders(): void
     {
         DB::table('orders')->insert([

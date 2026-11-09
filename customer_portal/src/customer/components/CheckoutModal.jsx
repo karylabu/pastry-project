@@ -56,6 +56,7 @@ const PICKUP_LOCATION = {
   address: '30 Bagumbayan Road, Tanauan, Calabarzon 4232',
 };
 const PENDING_PAYMONGO_CHECKOUT_KEY = 'pendingPaymongoCheckout';
+const MINIMUM_PAYMENT_AMOUNT_ERROR = 'Payment amount must be at least PHP 1.00.';
 const isStockAvailabilityError = (message) =>
   typeof message === 'string' && message.toLowerCase().includes('stock available');
 
@@ -671,6 +672,14 @@ export default function CheckoutModal({
 
     if (belowMinimumOrder) {
       alert(`The minimum order subtotal is ₱${minimumOrder.toLocaleString()}.`);
+      return;
+    }
+
+    const paymentAmount = checkoutData.method === "Pickup" && checkoutData.pickupPaymentType === "downpayment"
+      ? total * 0.5
+      : total;
+    if (checkoutData.payment === "QRPh" && paymentAmount < 1) {
+      alert(MINIMUM_PAYMENT_AMOUNT_ERROR);
       return;
     }
 

@@ -1770,14 +1770,14 @@ PROMPT;
             }
         }
 
+        $amountCents = (int) round($amount * 100);
+        if ($amount < 1 || $amountCents < 100) {
+            return $this->corsResponse(['error' => 'Payment amount must be at least PHP 1.00.'], 400);
+        }
+
         $secretKey = config('services.paymongo.secret');
         if (!$secretKey) {
             return $this->corsResponse(['error' => 'Payment gateway secret is not configured. Please set PAYMONGO_SECRET.'], 500);
-        }
-
-        $amountCents = (int) round($amount * 100);
-        if ($amountCents < 100) {
-            return $this->corsResponse(['error' => 'Payment amount must be at least PHP 1.00.'], 400);
         }
 
         $checkoutAmountCents = $amountCents;

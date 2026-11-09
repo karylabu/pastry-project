@@ -158,6 +158,26 @@ describe("CheckoutModal", () => {
     expect(screen.queryByText("Total to pay now with QR Ph")).not.toBeInTheDocument();
   });
 
+  test("alerts and does not place a QR Ph order below PHP 1.00", async () => {
+    render(
+      <CheckoutModal
+        isOpen
+        onClose={jest.fn()}
+        cartItems={[{ product_id: 7, name: "Strawberry Cake", price: 0.99 }]}
+        fullCartItems={[{ product_id: 7, name: "Strawberry Cake", price: 0.99 }]}
+        onOrderPlaced={jest.fn()}
+      />,
+    );
+
+    fireEvent.click(await screen.findByRole("button", { name: "PLACE ORDER" }));
+
+    expect(window.alert).toHaveBeenCalledWith("Payment amount must be at least PHP 1.00.");
+    expect(global.fetch).not.toHaveBeenCalledWith(
+      expect.stringMatching(/\/api\/orders$/),
+      expect.anything(),
+    );
+  });
+
   test("shows insufficient stock in checkout instead of a browser alert", async () => {
     render(
       <CheckoutModal
