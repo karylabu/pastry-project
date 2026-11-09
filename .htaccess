@@ -1,6 +1,8 @@
 # React UI with Laravel API and legacy PHP endpoints.
 <IfModule mod_headers.c>
     Header always set Strict-Transport-Security "max-age=300"
+    Header always set X-Frame-Options "SAMEORIGIN"
+    Header always set Content-Security-Policy "upgrade-insecure-requests; frame-ancestors 'self'"
 </IfModule>
 
 <IfModule mod_rewrite.c>
