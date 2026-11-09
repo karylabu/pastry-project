@@ -4,6 +4,7 @@ const origin = typeof window !== "undefined" ? window.location.origin : "";
 export function resolveProjectBase(baseOrigin = origin, suffix = "") {
   const detectedProjectPath = typeof window !== "undefined"
     ? [
+        "/pastry-project",
         "/GitHub/pastry-project",
         "/GitHub/Capstone--Development",
         "/GitHub/Capstone--Development - Copy"
@@ -23,8 +24,8 @@ function normalizeLocalProjectBase(baseUrl = "") {
   return baseUrl.replace(/\/$/, "");
 }
 
-// Development: XAMPP is running on localhost:80 (Apache) and the project is mounted
-// under C:\xampp\htdocs\GitHub\pastry-project.
+// Development: XAMPP serves this project from its URL path. The historical GitHub
+// paths remain supported for existing installations.
 const xamppWithProject = resolveProjectBase("http://localhost");
 const configuredDevBase = process.env.REACT_APP_API_BASE || "";
 const devBase = normalizeLocalProjectBase(configuredDevBase || xamppWithProject);
