@@ -135,9 +135,18 @@ test("saves multiple waste items in one form submission", async () => {
 
   render(<WasteTracking />);
   await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(3));
+  const localDateGetters = [
+    jest.spyOn(Date.prototype, "getFullYear").mockReturnValue(2026),
+    jest.spyOn(Date.prototype, "getMonth").mockReturnValue(10),
+    jest.spyOn(Date.prototype, "getDate").mockReturnValue(9),
+    jest.spyOn(Date.prototype, "getHours").mockReturnValue(10),
+    jest.spyOn(Date.prototype, "getMinutes").mockReturnValue(27),
+  ];
   fireEvent.click(screen.getAllByRole("button", { name: /log new waste entry/i })[0]);
 
   const dialog = screen.getByRole("dialog");
+  expect(within(dialog).getByLabelText("Date & time")).toHaveValue("2026-11-09T10:27");
+  localDateGetters.forEach((getter) => getter.mockRestore());
   await screen.findByRole("option", { name: "Flour · FLOUR-1" });
   const itemSelects = within(dialog).getAllByLabelText("Item");
   fireEvent.change(itemSelects[0], { target: { value: "1:11" } });

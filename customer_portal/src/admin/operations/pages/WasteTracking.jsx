@@ -96,6 +96,11 @@ function createWasteLine() {
   return { id: key, idempotencyKey: key, item: "", qty: "", reason: "expired" };
 }
 
+function formatLocalDateTime(date) {
+  const pad = (value) => String(value).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
 /* ------------------------------------------------------------------ */
 /*  Component                                                          */
 /* ------------------------------------------------------------------ */
@@ -329,7 +334,7 @@ export default function WasteTracking() {
 
   const openModal = () => {
     setForm([createWasteLine()]);
-    setFormDatetime(new Date().toISOString().slice(0, 16));
+    setFormDatetime(formatLocalDateTime(new Date()));
     setShowModal(true);
   };
 
@@ -340,7 +345,7 @@ export default function WasteTracking() {
       const selectedItem = catalogue.find((item) => item.key === line.item);
       if (!selectedItem) return null;
       return {
-        datetime: formDatetime || new Date().toISOString().slice(0, 16),
+        datetime: formDatetime || formatLocalDateTime(new Date()),
         quantity: Number(line.qty),
         reason: line.reason,
         idempotency_key: line.idempotencyKey,
