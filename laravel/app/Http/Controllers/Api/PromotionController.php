@@ -17,6 +17,7 @@ use Illuminate\Support\Str;
 
 class PromotionController extends Controller
 {
+    // Admin promotion campaigns are emailed to opted-in customers and active newsletter subscribers.
     protected function resolveAdminUser(Request $request): ?User
     {
         $user = $this->getAuthenticatedUser($request);
@@ -151,6 +152,7 @@ class PromotionController extends Controller
 
     private function sendToSubscribers(Promotion $promotion): array
     {
+        // Use email as the key to avoid sending duplicate messages to registered newsletter subscribers.
         $recipients = [];
 
         User::where('role', 'customer')
@@ -171,6 +173,30 @@ class PromotionController extends Controller
                     $recipients[$email] = $subscriber;
                 }
             });
+
+        $configurationError = $recipients === [] ? null : $this->nonDeliveringMailerError();
+        if ($configurationError !== null) {
+            foreach ($recipients as $email => $_subscriber) {
+                PromotionEmailLog::create([
+                    'promotion_id' => $promotion->id,
+                    'email' => $email,
+                    'status' => 'failed',
+                    'error_message' => $configurationError,
+                ]);
+            }
+
+            $promotion->sent_count = 0;
+            $promotion->failed_count = count($recipients);
+            $promotion->status = 'failed';
+            $promotion->save();
+
+            return [
+                'recipient_count' => count($recipients),
+                'sent_count' => 0,
+                'failed_count' => count($recipients),
+                'configuration_error' => $configurationError,
+            ];
+        }
 
         $sentCount = 0;
         $failedCount = 0;
@@ -210,8 +236,49 @@ class PromotionController extends Controller
         ];
     }
 
+    private function nonDeliveringMailerError(): ?string
+    {
+        $mailerName = (string) config('mail.default');
+        if ($this->mailerCanUseNonDeliveringTransport($mailerName)) {
+            return "Promotions were not sent because the \"{$mailerName}\" mail configuration uses a log/array transport or fallback. Configure a real email provider such as SMTP and a verified sender before retrying.";
+        }
+
+        return null;
+    }
+
+    private function mailerCanUseNonDeliveringTransport(string $mailerName, array $checked = []): bool
+    {
+        if (in_array($mailerName, $checked, true)) {
+            return false;
+        }
+        $checked[] = $mailerName;
+
+        $mailer = config("mail.mailers.{$mailerName}", []);
+        $transport = is_array($mailer) ? ($mailer['transport'] ?? $mailerName) : $mailerName;
+        if ($transport === 'array' && app()->environment('testing')) {
+            return false;
+        }
+        if (in_array($transport, ['log', 'array'], true)) {
+            return true;
+        }
+
+        if (in_array($transport, ['failover', 'roundrobin'], true)) {
+            foreach (($mailer['mailers'] ?? []) as $fallbackMailer) {
+                if ($this->mailerCanUseNonDeliveringTransport((string) $fallbackMailer, $checked)) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
     private function deliveryMessage(array $delivery): string
     {
+        if (! empty($delivery['configuration_error'])) {
+            return $delivery['configuration_error'];
+        }
+
         if ($delivery['recipient_count'] === 0) {
             return 'No subscribed customers were found. No email was sent; the promotion remains a draft.';
         }

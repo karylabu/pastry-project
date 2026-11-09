@@ -16,6 +16,7 @@ class PromotionDraftEditingTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        config()->set('app.key', 'base64:' . base64_encode(str_repeat('k', 32)));
         config()->set('app.url', 'http://localhost');
         URL::forceRootUrl('http://localhost');
 
@@ -300,6 +301,44 @@ class PromotionDraftEditingTest extends TestCase
             'email' => 'customer@example.com',
             'status' => 'failed',
             'error_message' => 'SMTP unavailable',
+        ]);
+    }
+
+    public function test_log_mailer_does_not_report_promotion_emails_as_sent(): void
+    {
+        config(['mail.default' => 'log']);
+        Mail::fake();
+        $promotionId = $this->createPromotion('draft');
+        DB::table('users')->insert([
+            'id' => 2,
+            'name' => 'Subscribed Customer',
+            'email' => 'customer@example.com',
+            'password' => 'unused',
+            'role' => 'customer',
+            'subscribed_promo' => true,
+        ]);
+
+        $this->withHeader('X-Auth-Token', 'admin-token')
+            ->postJson("http://localhost/api/admin/promotions/{$promotionId}/send")
+            ->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.sent_count', 0)
+            ->assertJsonPath('data.failed_count', 1)
+            ->assertJsonPath('data.promotion.status', 'failed')
+            ->assertJsonPath('data.configuration_error', 'Promotions were not sent because the "log" mail configuration uses a log/array transport or fallback. Configure a real email provider such as SMTP and a verified sender before retrying.');
+
+        Mail::assertNothingSent();
+        $this->assertDatabaseHas('promotion_email_logs', [
+            'promotion_id' => $promotionId,
+            'email' => 'customer@example.com',
+            'status' => 'failed',
+            'error_message' => 'Promotions were not sent because the "log" mail configuration uses a log/array transport or fallback. Configure a real email provider such as SMTP and a verified sender before retrying.',
+        ]);
+        $this->assertDatabaseHas('promotions', [
+            'id' => $promotionId,
+            'status' => 'failed',
+            'sent_count' => 0,
+            'failed_count' => 1,
         ]);
     }
 

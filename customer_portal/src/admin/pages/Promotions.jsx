@@ -58,6 +58,9 @@ function getDeliveryOutcome(delivery = {}) {
   const sentCount = Number(delivery.sent_count || 0);
   const failedCount = Number(delivery.failed_count || 0);
 
+  if (delivery.configuration_error) {
+    return { type: "error", message: delivery.configuration_error };
+  }
   if (recipientCount === 0) {
     return { type: "error", message: "No subscribed customers were found. No email was sent; the promotion remains a draft." };
   }
