@@ -115,6 +115,7 @@ export default function CheckoutModal({
   const [loading, setLoading] = useState(false);
   const [fieldErrors, setFieldErrors] = useState({});
   const [orderError, setOrderError] = useState('');
+  const [minimumPaymentAlertOpen, setMinimumPaymentAlertOpen] = useState(false);
   const [shopOpen, setShopOpen] = useState(null);
   const [shopStatusError, setShopStatusError] = useState(false);
   const [shopSettings, setShopSettings] = useState(DEFAULT_SHOP_SETTINGS);
@@ -679,7 +680,7 @@ export default function CheckoutModal({
       ? total * 0.5
       : total;
     if (checkoutData.payment === "QRPh" && paymentAmount < 1) {
-      alert(MINIMUM_PAYMENT_AMOUNT_ERROR);
+      setMinimumPaymentAlertOpen(true);
       return;
     }
 
@@ -1757,6 +1758,40 @@ export default function CheckoutModal({
           </div>
 
         </motion.div>
+
+        {minimumPaymentAlertOpen && (
+          <motion.div
+            className="fixed inset-0 z-[60001] flex items-center justify-center bg-black/40 p-6 backdrop-blur-sm"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            onClick={() => setMinimumPaymentAlertOpen(false)}
+          >
+            <motion.section
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="minimum-payment-title"
+              aria-describedby="minimum-payment-message"
+              initial={{ opacity: 0, y: 12, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              onClick={(event) => event.stopPropagation()}
+              className="w-full max-w-sm rounded-[28px] bg-white p-8 text-center shadow-2xl"
+            >
+              <h2 id="minimum-payment-title" className="text-xl font-black text-gray-900">
+                Minimum payment required
+              </h2>
+              <p id="minimum-payment-message" className="mt-3 text-sm leading-6 text-gray-500">
+                {MINIMUM_PAYMENT_AMOUNT_ERROR}
+              </p>
+              <button
+                type="button"
+                onClick={() => setMinimumPaymentAlertOpen(false)}
+                className="mt-6 w-full rounded-xl bg-black px-4 py-3 text-xs font-bold uppercase tracking-[0.12em] text-white hover:bg-gray-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e7c875]"
+              >
+                Okay
+              </button>
+            </motion.section>
+          </motion.div>
+        )}
 
       </motion.div>
 

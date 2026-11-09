@@ -158,7 +158,7 @@ describe("CheckoutModal", () => {
     expect(screen.queryByText("Total to pay now with QR Ph")).not.toBeInTheDocument();
   });
 
-  test("alerts and does not place a QR Ph order below PHP 1.00", async () => {
+  test("shows the customer-style minimum payment modal and does not place an order below PHP 1.00", async () => {
     render(
       <CheckoutModal
         isOpen
@@ -171,11 +171,16 @@ describe("CheckoutModal", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: "PLACE ORDER" }));
 
-    expect(window.alert).toHaveBeenCalledWith("Payment amount must be at least PHP 1.00.");
+    const alertDialog = await screen.findByRole("dialog", { name: "Minimum payment required" });
+    expect(alertDialog).toHaveTextContent("Payment amount must be at least PHP 1.00.");
+    expect(window.alert).not.toHaveBeenCalled();
     expect(global.fetch).not.toHaveBeenCalledWith(
       expect.stringMatching(/\/api\/orders$/),
       expect.anything(),
     );
+
+    fireEvent.click(screen.getByRole("button", { name: "Okay" }));
+    expect(screen.queryByRole("dialog", { name: "Minimum payment required" })).not.toBeInTheDocument();
   });
 
   test("shows insufficient stock in checkout instead of a browser alert", async () => {
