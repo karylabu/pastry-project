@@ -222,6 +222,52 @@ class SalesImportControllerTest extends TestCase
         $this->assertEquals(420, $payload['sales'][0]['price']);
     }
 
+    public function test_admin_can_export_the_normalized_rows_for_one_completed_csv_import(): void
+    {
+        $admin = User::factory()->createOne(['role' => 'admin']);
+        $importId = DB::table('analytics_imports')->insertGetId([
+            'file_name' => 'cake_design_sales_clean.csv',
+            'source_name' => 'POS CSV',
+            'uploaded_at' => now(),
+            'status' => 'completed',
+        ]);
+        $otherImportId = DB::table('analytics_imports')->insertGetId([
+            'file_name' => 'other.csv',
+            'source_name' => 'POS CSV',
+            'uploaded_at' => now(),
+            'status' => 'completed',
+        ]);
+        DB::table('analytics_sales_history')->insert([
+            ['import_id' => $importId, 'product_name' => 'Chocolate Cake', 'size' => '8 inch', 'sale_date' => '2026-10-01', 'units_sold' => 2, 'revenue' => 700],
+            ['import_id' => $importId, 'product_name' => 'Vanilla Cake', 'size' => null, 'sale_date' => '2026-10-02', 'units_sold' => 1, 'revenue' => 350],
+            ['import_id' => $otherImportId, 'product_name' => 'Excluded Cake', 'size' => null, 'sale_date' => '2026-10-03', 'units_sold' => 1, 'revenue' => 100],
+        ]);
+
+        $response = $this->actingAs($admin)->get("/api/sales/import/{$importId}/export");
+
+        $response->assertOk()->assertDownload('cake_design_sales_clean.csv');
+        $csv = $response->streamedContent();
+        $this->assertStringContainsString('sale_date,product_name,size,units_sold,revenue', $csv);
+        $this->assertStringContainsString('Chocolate Cake', $csv);
+        $this->assertStringContainsString('Vanilla Cake', $csv);
+        $this->assertStringNotContainsString('Excluded Cake', $csv);
+    }
+
+    public function test_only_admins_can_export_imported_sales_csvs(): void
+    {
+        $customer = User::factory()->createOne(['role' => 'customer']);
+        $importId = DB::table('analytics_imports')->insertGetId([
+            'file_name' => 'sales.csv',
+            'source_name' => 'POS CSV',
+            'uploaded_at' => now(),
+            'status' => 'completed',
+        ]);
+
+        $this->actingAs($customer)
+            ->getJson("/api/sales/import/{$importId}/export")
+            ->assertForbidden();
+    }
+
     public function test_finished_products_history_excludes_custom_imports_and_legacy_sales(): void
     {
         $admin = User::factory()->createOne(['role' => 'admin']);

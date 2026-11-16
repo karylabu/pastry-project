@@ -111,6 +111,7 @@ Route::get('admin/sales/product-aliases', [SalesImportController::class, 'produc
 Route::post('admin/sales/product-aliases', [SalesImportController::class, 'storeProductAlias']);
 Route::delete('admin/sales/product-aliases/{aliasId}', [SalesImportController::class, 'deleteProductAlias'])->whereNumber('aliasId');
 Route::get('sales/import/history', [SalesImportController::class, 'history']);
+Route::get('sales/import/{importId}/export', [SalesImportController::class, 'exportImport'])->whereNumber('importId');
 Route::delete('sales/import/{importId}', [SalesImportController::class, 'deleteImport'])->whereNumber('importId');
 Route::get('sales/import/{importId}/status', [SalesImportController::class, 'importStatus'])->whereNumber('importId');
 Route::post('newsletter/subscribe', [NewsletterController::class, 'subscribe']);

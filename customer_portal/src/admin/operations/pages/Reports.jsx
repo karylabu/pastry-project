@@ -306,6 +306,21 @@ function csvCell(value) {
   return `"${safeText.replace(/"/g, '""')}"`;
 }
 
+export function buildImportedSalesCsv(sales) {
+  const rows = [
+    ['sale_date', 'product_name', 'size', 'units_sold', 'revenue'],
+    ...sales.map((sale) => [
+      sale.sale_date,
+      sale.cake_name,
+      sale.size,
+      sale.units_sold,
+      sale.price,
+    ]),
+  ];
+
+  return `\uFEFF${rows.map((row) => row.map(csvCell).join(',')).join('\r\n')}`;
+}
+
 export function buildBusinessAnalyticsCsv({
   period,
   generatedAt,
@@ -607,7 +622,9 @@ export default function Reports() {
   const [historicalSalesSummary, setHistoricalSalesSummary] = useState({ total_sales: 0, total_down_payments: 0, total_remaining_balance: 0, records: 0 });
   const [historicalSalesError, setHistoricalSalesError] = useState('');
   const [importDeleteError, setImportDeleteError] = useState('');
+  const [importExportError, setImportExportError] = useState('');
   const [deletingImportId, setDeletingImportId] = useState(null);
+  const [exportingImportId, setExportingImportId] = useState(null);
   const [previewImport, setPreviewImport] = useState(null);
   const [previewSales, setPreviewSales] = useState([]);
   const [previewPage, setPreviewPage] = useState(1);
@@ -878,6 +895,51 @@ export default function Reports() {
       setImportDeleteError(error.message || 'Unable to delete this CSV import.');
     } finally {
       setDeletingImportId(null);
+    }
+  };
+
+  const exportCsvImport = async (importFile) => {
+    setExportingImportId(importFile.id);
+    setImportExportError('');
+    try {
+      const response = await laravelStaffFetch(`${LARAVEL_BASE}/api/sales/import/${importFile.id}/export`);
+      let blob;
+      const contentType = response.headers.get('content-type') || '';
+      if (response.status === 404 || (response.ok && !contentType.toLowerCase().includes('text/csv'))) {
+        const sales = await fetchAllReportHistory(async (page) => {
+          const params = new URLSearchParams({
+            source: 'imported',
+            import_id: String(importFile.id),
+            page: String(page),
+            per_page: '100',
+          });
+          const historyResponse = await laravelStaffFetch(`${LARAVEL_BASE}/api/sales/import/history?${params.toString()}`);
+          const data = await historyResponse.json().catch(() => ({}));
+          if (!historyResponse.ok || !data.success) {
+            throw new Error(data.message || `Unable to load imported sales (HTTP ${historyResponse.status}).`);
+          }
+          return data;
+        });
+        blob = new Blob([buildImportedSalesCsv(sales)], { type: 'text/csv;charset=utf-8;' });
+      } else if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.message || `Unable to export this CSV import (HTTP ${response.status}).`);
+      } else {
+        blob = await response.blob();
+      }
+
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = importFile.file_name;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (error) {
+      setImportExportError(error.message || 'Unable to export this CSV import.');
+    } finally {
+      setExportingImportId(null);
     }
   };
 
@@ -1855,6 +1917,7 @@ export default function Reports() {
                 {catalogLoadError && <p className="mb-3 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-800" role="alert">Some sales filters may be incomplete: {catalogLoadError}</p>}
                 {historicalSalesError && <p className="mb-3 rounded-md bg-red-50 px-3 py-2 text-xs text-red-800" role="alert">{historicalSalesError}</p>}
                 {importDeleteError && <p className="mb-3 rounded-md bg-red-50 px-3 py-2 text-xs text-red-800" role="alert">{importDeleteError}</p>}
+                {importExportError && <p className="mb-3 rounded-md bg-red-50 px-3 py-2 text-xs text-red-800" role="alert">{importExportError}</p>}
                 <div className="admin-static-card mb-4 rounded-md border border-black/10 bg-[#fffdf8] p-4">
                   <h4 className="mb-2 text-xs font-bold uppercase tracking-wide text-black/70">Imported CSV files</h4>
                   {historicalImports.length === 0 ? (
@@ -1885,8 +1948,18 @@ export default function Reports() {
                           </div>
                           <button
                             type="button"
+                            onClick={() => exportCsvImport(importFile)}
+                            disabled={importFile.status !== 'completed' || exportingImportId !== null || deletingImportId !== null}
+                            className="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-black/15 px-2.5 py-1.5 text-[10px] font-semibold text-black/75 hover:bg-black/5 disabled:cursor-not-allowed disabled:opacity-50"
+                            aria-label={`Export imported CSV ${importFile.file_name}`}
+                            title={importFile.status === 'completed' ? 'Download the imported sales records as CSV' : 'Export is available after this import completes'}
+                          >
+                            {exportingImportId === importFile.id ? 'Exporting…' : <><Download size={12} /> Export CSV</>}
+                          </button>
+                          <button
+                            type="button"
                             onClick={() => deleteCsvImport(importFile)}
-                            disabled={deletingImportId !== null}
+                            disabled={deletingImportId !== null || exportingImportId !== null}
                             className="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-red-200 px-2.5 py-1.5 text-[10px] font-semibold text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
                             aria-label={`Delete imported CSV ${importFile.file_name}`}
                             title="Move this import and its imported sales records to the Recycle Bin"

@@ -855,6 +855,67 @@ class SalesImportController extends Controller
         ]);
     }
 
+    public function exportImport(Request $request, int $importId)
+    {
+        $user = $this->requireRole($request, 'admin');
+        if (!$user instanceof User) {
+            return $user;
+        }
+
+        $import = DB::table('analytics_imports')
+            ->where('id', $importId)
+            ->where('source_name', 'POS CSV')
+            ->whereRaw('LOWER(file_name) LIKE ?', ['%.csv'])
+            ->first(['file_name', 'status']);
+
+        if (!$import) {
+            return response()->json(['success' => false, 'message' => 'CSV import not found.'], 404);
+        }
+        if ($import->status !== 'completed') {
+            return response()->json(['success' => false, 'message' => 'Only completed CSV imports can be exported.'], 409);
+        }
+
+        $filename = preg_replace('/[^A-Za-z0-9._-]+/', '_', basename((string) $import->file_name));
+        if (!$filename || $filename === '.csv') {
+            $filename = "sales-import-{$importId}.csv";
+        }
+
+        return response()->streamDownload(function () use ($importId): void {
+            $output = fopen('php://output', 'wb');
+            if ($output === false) {
+                throw new \RuntimeException('Unable to open the CSV download stream.');
+            }
+
+            fwrite($output, "\xEF\xBB\xBF");
+            fputcsv($output, ['sale_date', 'product_name', 'size', 'units_sold', 'revenue']);
+
+            DB::table('analytics_sales_history')
+                ->where('import_id', $importId)
+                ->orderBy('id')
+                ->chunk(1000, static function ($rows) use ($output): void {
+                    foreach ($rows as $row) {
+                        fputcsv($output, [
+                            $row->sale_date,
+                            self::spreadsheetSafeCsvText((string) $row->product_name),
+                            self::spreadsheetSafeCsvText((string) ($row->size ?? '')),
+                            $row->units_sold,
+                            $row->revenue,
+                        ]);
+                    }
+                });
+
+            fclose($output);
+        }, $filename, [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+            'Cache-Control' => 'no-store',
+        ]);
+    }
+
+    private static function spreadsheetSafeCsvText(string $value): string
+    {
+        return preg_match('/^[\t\r\n ]*[=+\-@]/', $value) === 1 ? "'" . $value : $value;
+    }
+
     private function persistRows(
         array $rows,
         string $fileName,

@@ -1,4 +1,4 @@
-import { buildBusinessAnalyticsCsv, fetchAllReportHistory, filterImportedTransactions, filterSalesTransactions, formatOrderItemSizes, getAnalyticsDateRange, getReportPeriodLabel, getReportSellerRows, getSalesTransactionPage, groupRevenueByInterval, normalizeReportProducts, peso, selectReportIngredients } from "./Reports";
+import { buildBusinessAnalyticsCsv, buildImportedSalesCsv, fetchAllReportHistory, filterImportedTransactions, filterSalesTransactions, formatOrderItemSizes, getAnalyticsDateRange, getReportPeriodLabel, getReportSellerRows, getSalesTransactionPage, groupRevenueByInterval, normalizeReportProducts, peso, selectReportIngredients } from "./Reports";
 
 describe("peso", () => {
   test("formats Philippine pesos with two decimal places", () => {
@@ -115,6 +115,19 @@ describe("getAnalyticsDateRange", () => {
 });
 
 describe("all-time report exports", () => {
+  test("exports normalized rows for one imported sales file as CSV", () => {
+    const csv = buildImportedSalesCsv([{
+      sale_date: "2026-10-01",
+      cake_name: '=SUM("not a formula")',
+      size: "8 inch",
+      units_sold: 2,
+      price: 700,
+    }]);
+
+    expect(csv).toContain('"sale_date","product_name","size","units_sold","revenue"');
+    expect(csv).toContain(`"2026-10-01","'=SUM(""not a formula"")","8 inch","2","700"`);
+  });
+
   test("includes the complete summary, seller, and sales transaction sections in CSV", () => {
     const csv = buildBusinessAnalyticsCsv({
       period: "All time",
