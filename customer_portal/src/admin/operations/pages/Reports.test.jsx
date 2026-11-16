@@ -98,19 +98,26 @@ describe("getAnalyticsDateRange", () => {
     });
   });
 
-  test("preserves a custom date range and gives All an end date", () => {
+  test("preserves a custom date range even when All is selected", () => {
     expect(getAnalyticsDateRange("month", "2026-09-02", "2026-09-18", now)).toEqual({
       start_date: "2026-09-02",
       end_date: "2026-09-18",
+    });
+    expect(getAnalyticsDateRange("all", "2026-10-01", "2026-10-10", now)).toEqual({
+      start_date: "2026-10-01",
+      end_date: "2026-10-10",
     });
     expect(getAnalyticsDateRange("all", "", "", now)).toEqual({
       all: true,
       end_date: "2026-10-12",
     });
-    expect(getAnalyticsDateRange("all", "2026-10-01", "2026-10-10", now)).toEqual({
-      all: true,
-      end_date: "2026-10-12",
-    });
+  });
+});
+
+describe("getReportPeriodLabel", () => {
+  test("labels custom dates instead of All time when both are selected", () => {
+    expect(getReportPeriodLabel("all", "2026-10-01", "2026-10-10")).toBe("2026-10-01 to 2026-10-10");
+    expect(getReportPeriodLabel("all")).toBe("All time");
   });
 });
 
@@ -225,8 +232,8 @@ describe("all-time report exports", () => {
 });
 
 describe("getReportPeriodLabel", () => {
-  test("shows All time even when stale custom dates are present", () => {
-    expect(getReportPeriodLabel("all", "2026-10-01", "2026-10-16")).toBe("All time");
+  test("labels custom dates selected while All is active", () => {
+    expect(getReportPeriodLabel("all", "2026-10-01", "2026-10-16")).toBe("2026-10-01 to 2026-10-16");
   });
 
   test("uses a selected custom date range", () => {

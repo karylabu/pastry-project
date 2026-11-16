@@ -137,11 +137,11 @@ export function getAnalyticsDateRange(range, startDate = '', endDate = '', now =
     String(date.getDate()).padStart(2, '0'),
   ].join('-');
 
-  if (range === 'all') {
-    return { all: true, end_date: formatDate(now) };
-  }
   if (startDate && endDate) {
     return { start_date: startDate, end_date: endDate };
+  }
+  if (range === 'all') {
+    return { all: true, end_date: formatDate(now) };
   }
 
   const end = new Date(now);
@@ -238,8 +238,8 @@ export function formatOrderItemSizes(items) {
 }
 
 export function getReportPeriodLabel(range, startDate = '', endDate = '') {
-  if (range === 'all') return 'All time';
   if (startDate && endDate) return `${startDate} to ${endDate}`;
+  if (range === 'all') return 'All time';
   if (range === 'today') return 'Today';
   if (range === 'week') return 'This week';
   if (range === 'month') return 'This month';
@@ -632,6 +632,8 @@ export default function Reports() {
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState('');
   const [adminDialog, setAdminDialog] = useState(null);
+  const hasCustomDateRange = Boolean(dateFilterStart && dateFilterEnd);
+  const isAllTime = range === 'all' && !hasCustomDateRange;
 
   const refreshAnalyticsAfterImport = () => {
     setSalesPage(1);
@@ -754,10 +756,10 @@ export default function Reports() {
   useEffect(() => {
     let isCurrentRequest = true;
     const params = new URLSearchParams();
-    if (range !== 'all' && dateFilterStart && dateFilterEnd) {
+    if (hasCustomDateRange) {
       params.set('start_date', dateFilterStart);
       params.set('end_date', dateFilterEnd);
-    } else if (range !== 'all') {
+    } else if (!isAllTime) {
       const end = new Date();
       const start = new Date(end);
       if (range === 'today') {
@@ -805,7 +807,7 @@ export default function Reports() {
       });
 
     return () => { isCurrentRequest = false; };
-  }, [range, dateFilterStart, dateFilterEnd, analyticsCategory, orderRefreshKey]);
+  }, [range, dateFilterStart, dateFilterEnd, hasCustomDateRange, isAllTime, analyticsCategory, orderRefreshKey]);
 
   useEffect(() => {
     const importId = new URLSearchParams(location.search).get('import_id');
@@ -989,7 +991,7 @@ export default function Reports() {
   }, [range, dateFilterStart, dateFilterEnd, analyticsProductId, analyticsCategory, analyticsIngredientId, analyticsMovementType, analyticsRefreshKey]);
 
   const normalizeStatus = status => String(status || '').trim().toLowerCase();
-  const ingredientUsagePeriodLabel = range === 'all'
+  const ingredientUsagePeriodLabel = isAllTime
     ? 'All-time'
     : dateFilterStart && dateFilterEnd
       ? 'Selected-period'
@@ -998,7 +1000,6 @@ export default function Reports() {
   const combinedOrders = orders;
 
   const visibleOrders = useMemo(() => {
-    if (range === 'all') return combinedOrders;
     if (dateFilterStart && dateFilterEnd) {
       const start = new Date(dateFilterStart);
       start.setHours(0, 0, 0, 0);
@@ -1006,7 +1007,7 @@ export default function Reports() {
       end.setHours(23, 59, 59, 999);
       return combinedOrders.filter(o => o.created_at && new Date(o.created_at) >= start && new Date(o.created_at) <= end);
     }
-    if (range === 'all') return combinedOrders;
+    if (isAllTime) return combinedOrders;
     const cutoff = new Date();
     if (range === 'today') cutoff.setHours(0, 0, 0, 0);
     else if (range === 'week') cutoff.setDate(cutoff.getDate() - ((cutoff.getDay() + 6) % 7));
@@ -1016,7 +1017,7 @@ export default function Reports() {
     const rangeEnd = new Date();
     rangeEnd.setHours(23, 59, 59, 999);
     return combinedOrders.filter(o => o.created_at && new Date(o.created_at) >= cutoff && new Date(o.created_at) <= rangeEnd);
-  }, [combinedOrders, range, dateFilterStart, dateFilterEnd]);
+  }, [combinedOrders, range, dateFilterStart, dateFilterEnd, isAllTime]);
 
   const completedOrds = useMemo(
     () => visibleOrders.filter((order) => normalizeStatus(order.status) === 'completed'),
@@ -1042,7 +1043,7 @@ export default function Reports() {
   const orderFulfillmentText = `${totalOrdersProcessed} completed · ${cancelledOrds.length} cancelled`;
 
   const prevPeriod = useMemo(() => {
-    if (range === 'all') return null;
+    if (isAllTime) return null;
     const days = Number(range);
     const start = new Date(); start.setDate(start.getDate() - days * 2);
     const end   = new Date(); end.setDate(end.getDate() - days);
@@ -1051,7 +1052,7 @@ export default function Reports() {
       const d = new Date(o.created_at);
       return d >= start && d < end;
     });
-  }, [orders, range]);
+  }, [orders, range, isAllTime]);
   const prevRevenue = useMemo(() => (prevPeriod || []).reduce((s, o) => s + Number(o.total || 0), 0), [prevPeriod]);
   const revenueTrend = prevRevenue > 0 ? Math.round(((totalRevenue - prevRevenue) / prevRevenue) * 100) : 0;
 
@@ -1228,7 +1229,7 @@ export default function Reports() {
     (visibleRevenueDayPage - 1) * REVENUE_DAYS_PER_PAGE,
     visibleRevenueDayPage * REVENUE_DAYS_PER_PAGE
   );
-  const revenuePeriodLabel = range === 'all'
+  const revenuePeriodLabel = isAllTime
     ? 'All time'
     : dateFilterStart && dateFilterEnd
       ? `${dateFilterStart} to ${dateFilterEnd}`
@@ -1242,13 +1243,13 @@ export default function Reports() {
       if (ordersLoadError || analyticsError) {
         throw new Error('The report cannot be exported because some report data failed to load.');
       }
-      if (range === 'all' && !Array.isArray(analytics.sales?.all_selling_products)) {
+      if (isAllTime && !Array.isArray(analytics.sales?.all_selling_products)) {
         throw new Error('Complete all-time seller data is unavailable. Please refresh the report and try again.');
       }
 
       const params = new URLSearchParams({ per_page: '100' });
       if (analyticsCategory) params.set('category', analyticsCategory);
-      if (range !== 'all') {
+      if (!isAllTime) {
         const dateRange = getAnalyticsDateRange(range, dateFilterStart, dateFilterEnd);
         if (dateRange.start_date) params.set('start_date', dateRange.start_date);
         if (dateRange.end_date) params.set('end_date', dateRange.end_date);
@@ -1274,7 +1275,7 @@ export default function Reports() {
         totalOrdersProcessed,
         averageOrderValue: avgOrderValue,
         orderFulfillmentText,
-        sellerRows: getReportSellerRows(analytics, leaderTab, range === 'all'),
+        sellerRows: getReportSellerRows(analytics, leaderTab, isAllTime),
         salesTransactionOrders,
         historicalSales,
       });
@@ -1325,9 +1326,9 @@ export default function Reports() {
     renderExportStatus('Preparing your Business Analytics Report…');
 
     const prepareReport = async () => {
-      const exportSellerRows = getReportSellerRows(analytics, leaderTab, range === 'all');
+      const exportSellerRows = getReportSellerRows(analytics, leaderTab, isAllTime);
       let exportHistoricalSales = historicalVisibleSales;
-      if (range === 'all') {
+      if (isAllTime) {
         if (loading || analyticsLoading || !analytics) {
           throw new Error('Wait for the all-time analytics and order data to finish loading before exporting.');
         }
@@ -2043,7 +2044,7 @@ export default function Reports() {
                   <div>
                     <h3 className="text-base font-bold" style={{ color: C.ink }}>Ingredient Consumption &amp; Procurement Matrix</h3>
                     <p className="mt-0.5 text-xs text-black/50">
-                      {`Consumption and raw-material waste for ${range === 'all' ? 'all recorded years' : dateFilterStart && dateFilterEnd ? 'the selected dates' : ({ today: 'today', week: 'this week', month: 'this month' }[range] || 'the selected period')}.`}
+                      {`Consumption and raw-material waste for ${isAllTime ? 'all recorded years' : dateFilterStart && dateFilterEnd ? 'the selected dates' : ({ today: 'today', week: 'this week', month: 'this month' }[range] || 'the selected period')}.`}
                     </p>
                   </div>
                 </div>
