@@ -1270,6 +1270,7 @@ export default function Reports() {
       }
 
       const params = new URLSearchParams({ per_page: '100' });
+      params.set('all', '1');
       if (analyticsCategory) params.set('category', analyticsCategory);
       if (!isAllTime) {
         const dateRange = getAnalyticsDateRange(range, dateFilterStart, dateFilterEnd);
@@ -1363,6 +1364,7 @@ export default function Reports() {
           throw new Error('Complete all-time seller data is unavailable. Please refresh the report and try again.');
         }
         const params = new URLSearchParams({ per_page: '100' });
+        params.set('all', '1');
         if (analyticsCategory) params.set('category', analyticsCategory);
         exportHistoricalSales = await fetchAllReportHistory(async (page) => {
           params.set('page', String(page));

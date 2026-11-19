@@ -724,8 +724,10 @@ class SalesImportController extends Controller
             'category' => ['nullable', 'in:Customized Cakes,Finished Products,Imported Sales'],
             'page' => ['nullable', 'integer', 'min:1'],
             'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
+            'all' => ['nullable', 'boolean'],
         ]);
         $pageSize = (int) ($validated['per_page'] ?? self::HISTORY_PAGE_SIZE);
+        $returnAllRows = filter_var($validated['all'] ?? false, FILTER_VALIDATE_BOOLEAN);
 
         $importedRows = DB::table('analytics_sales_history as history')
             ->join('analytics_imports as imports', 'imports.id', '=', 'history.import_id')
@@ -773,10 +775,27 @@ class SalesImportController extends Controller
         $summary = (clone $filteredRows)
             ->selectRaw('COUNT(*) AS records, COALESCE(SUM(price), 0) AS total_sales, COALESCE(SUM(down_payment), 0) AS total_down_payments, COALESCE(SUM(remaining_balance), 0) AS total_remaining_balance')
             ->first();
-        $history = (clone $filteredRows)
+        $orderedRows = (clone $filteredRows)
             ->orderByDesc('sale_date')
-            ->orderByDesc('id')
-            ->paginate($pageSize);
+            ->orderByDesc('id');
+        if ($returnAllRows) {
+            $historyRows = $orderedRows->get()->all();
+            $pagination = [
+                'current_page' => 1,
+                'per_page' => $pageSize,
+                'total' => (int) $summary->records,
+                'last_page' => 1,
+            ];
+        } else {
+            $history = $orderedRows->paginate($pageSize);
+            $historyRows = $history->items();
+            $pagination = [
+                'current_page' => $history->currentPage(),
+                'per_page' => $history->perPage(),
+                'total' => $history->total(),
+                'last_page' => $history->lastPage(),
+            ];
+        }
         $sales = array_map(static function ($row) {
             $size = $row->size;
             if (
@@ -803,7 +822,7 @@ class SalesImportController extends Controller
                 'sales_type' => $row->sales_type,
                 'import_id' => $row->import_id === null ? null : (int) $row->import_id,
             ];
-        }, $history->items());
+        }, $historyRows);
         $imports = DB::table('analytics_imports')
             ->where('source_name', 'POS CSV')
             ->whereRaw('LOWER(file_name) LIKE ?', ['%.csv'])
@@ -840,12 +859,7 @@ class SalesImportController extends Controller
             'success' => true,
             'sales' => $sales,
             'imports' => $imports,
-            'pagination' => [
-                'current_page' => $history->currentPage(),
-                'per_page' => $history->perPage(),
-                'total' => $history->total(),
-                'last_page' => $history->lastPage(),
-            ],
+            'pagination' => $pagination,
             'summary' => [
                 'records' => (int) $summary->records,
                 'total_sales' => (float) $summary->total_sales,

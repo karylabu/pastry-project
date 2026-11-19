@@ -1235,6 +1235,30 @@ class SalesImportControllerTest extends TestCase
         $this->assertSame($firstImportId, $payload['sales'][0]['import_id']);
     }
 
+    public function test_history_all_flag_returns_every_matching_row_in_one_page(): void
+    {
+        $admin = User::factory()->createOne(['role' => 'admin']);
+        $importId = DB::table('analytics_imports')->insertGetId([
+            'file_name' => 'all-history.csv',
+            'source_name' => 'POS CSV',
+            'uploaded_at' => now(),
+            'status' => 'completed',
+        ]);
+        DB::table('analytics_sales_history')->insert([
+            ['import_id' => $importId, 'product_name' => 'Cake A', 'sale_date' => '2026-10-01', 'units_sold' => 1, 'revenue' => 100],
+            ['import_id' => $importId, 'product_name' => 'Cake B', 'sale_date' => '2026-10-02', 'units_sold' => 2, 'revenue' => 200],
+            ['import_id' => $importId, 'product_name' => 'Cake C', 'sale_date' => '2026-10-03', 'units_sold' => 3, 'revenue' => 300],
+        ]);
+
+        $this->actingAs($admin)
+            ->getJson("/api/sales/import/history?source=imported&import_id={$importId}&all=1&per_page=1")
+            ->assertOk()
+            ->assertJsonCount(3, 'sales')
+            ->assertJsonPath('pagination.total', 3)
+            ->assertJsonPath('pagination.last_page', 1)
+            ->assertJsonPath('sales.0.cake_name', 'Cake C');
+    }
+
     public function test_processing_csv_import_is_immediately_moved_to_recycle_bin_without_touching_other_sales(): void
     {
         Storage::fake('local');

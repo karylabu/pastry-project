@@ -22,3 +22,14 @@ test("retries a temporary history-page failure without changing row order", asyn
   ]);
   expect(fetchPage).toHaveBeenCalledTimes(4);
 });
+
+test("accepts a complete history response in a single page", async () => {
+  const sales = [{ id: 1 }, { id: 2 }, { id: 3 }];
+  const fetchPage = jest.fn().mockResolvedValue({
+    sales,
+    pagination: { last_page: 1 },
+  });
+
+  await expect(fetchAllReportHistory(fetchPage)).resolves.toEqual(sales);
+  expect(fetchPage).toHaveBeenCalledTimes(1);
+});
