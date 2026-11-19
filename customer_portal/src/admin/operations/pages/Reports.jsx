@@ -288,12 +288,19 @@ export async function fetchAllReportHistory(fetchPage) {
   }
 
   const sales = [...firstPage.sales];
-  for (let page = 2; page <= lastPage; page += 1) {
-    const payload = await fetchPage(page);
-    if (!Array.isArray(payload?.sales)) {
-      throw new Error(`Sales import history returned an invalid sales list for page ${page}.`);
-    }
-    sales.push(...payload.sales);
+  const pageBatchSize = 5;
+  for (let firstPageInBatch = 2; firstPageInBatch <= lastPage; firstPageInBatch += pageBatchSize) {
+    const pageNumbers = Array.from(
+      { length: Math.min(pageBatchSize, lastPage - firstPageInBatch + 1) },
+      (_, index) => firstPageInBatch + index
+    );
+    const pages = await Promise.all(pageNumbers.map((page) => fetchPage(page)));
+    pages.forEach((payload, index) => {
+      if (!Array.isArray(payload?.sales)) {
+        throw new Error(`Sales import history returned an invalid sales list for page ${pageNumbers[index]}.`);
+      }
+      sales.push(...payload.sales);
+    });
   }
   return sales;
 }
