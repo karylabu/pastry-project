@@ -288,13 +288,28 @@ export async function fetchAllReportHistory(fetchPage) {
   }
 
   const sales = [...firstPage.sales];
-  const pageBatchSize = 5;
+  const pageBatchSize = 2;
+  const fetchPageWithRetry = async (page) => {
+    let attempt = 0;
+    while (true) {
+      try {
+        return await fetchPage(page);
+      } catch (error) {
+        const status = Number(error?.status || 0);
+        const retryable = status === 0 || status === 408 || status === 429 || status >= 500;
+        if (!retryable || attempt >= 2) throw error;
+        const retryDelay = 500 * (2 ** attempt);
+        await new Promise((resolve) => setTimeout(resolve, retryDelay));
+        attempt += 1;
+      }
+    }
+  };
   for (let firstPageInBatch = 2; firstPageInBatch <= lastPage; firstPageInBatch += pageBatchSize) {
     const pageNumbers = Array.from(
       { length: Math.min(pageBatchSize, lastPage - firstPageInBatch + 1) },
       (_, index) => firstPageInBatch + index
     );
-    const pages = await Promise.all(pageNumbers.map((page) => fetchPage(page)));
+    const pages = await Promise.all(pageNumbers.map((page) => fetchPageWithRetry(page)));
     pages.forEach((payload, index) => {
       if (!Array.isArray(payload?.sales)) {
         throw new Error(`Sales import history returned an invalid sales list for page ${pageNumbers[index]}.`);
@@ -1267,7 +1282,9 @@ export default function Reports() {
           const response = await laravelStaffFetch(`${LARAVEL_BASE}/api/sales/import/history?${params.toString()}`);
           const payload = await response.json().catch(() => ({}));
           if (!response.ok || !payload.success) {
-            throw new Error(payload.message || `Unable to load imported sales history page ${page}.`);
+            const error = new Error(payload.message || `Unable to load imported sales history page ${page} (HTTP ${response.status}).`);
+            error.status = response.status;
+            throw error;
           }
           return payload;
         }),
@@ -1352,7 +1369,9 @@ export default function Reports() {
           const response = await laravelStaffFetch(`${LARAVEL_BASE}/api/sales/import/history?${params.toString()}`);
           const payload = await response.json().catch(() => ({}));
           if (!response.ok || !payload.success) {
-            throw new Error(payload.message || `Unable to load imported sales history page ${page}.`);
+            const error = new Error(payload.message || `Unable to load imported sales history page ${page} (HTTP ${response.status}).`);
+            error.status = response.status;
+            throw error;
           }
           return payload;
         });
